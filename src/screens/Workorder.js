@@ -23,10 +23,11 @@ export function WorkorderScreen() {
   });
 
   function setCustomerObj(customerObj) {
-    log("setting customer object", customerObj);
+    log("setting customer object to this", customerObj);
   }
   function setWorkorderObj(workorderObj) {
-    log("setting workorder object", workorderObj);
+    // log("setting workorder object to this", workorderObj);
+    setstateWorkorderObj(workorderObj);
   }
   //   console.log("initial", notesTabIndex);
   return (
@@ -63,8 +64,8 @@ export function WorkorderScreen() {
             }}
           >
             <ItemsTab
-              workorderObj={sWorkorderObj}
-              setWorkorderItem={(obj) => setWorkorderObj(obj)}
+              workorderObj={{ ...sWorkorderObj }}
+              setWorkorderObj={(obj) => setWorkorderObj(obj)}
             />
           </View>
         </View>

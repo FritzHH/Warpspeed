@@ -20,6 +20,10 @@ export function fetchIt(url) {
   });
 }
 
+export function trimToTwoDecimals(num) {
+  return Math.floor(num * 100) / 100;
+}
+
 export const dim = {
   windowWidth: window.innerWidth,
   windowHeight: window.innerHeight,

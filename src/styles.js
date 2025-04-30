@@ -12,6 +12,10 @@ export const Colors = {
   tabMenuButtonText: "white",
   buttonDarkBackground: "rgb(40, 38, 38)",
   buttonDarkFont: "rgb(237,238,196)",
+  darkText: "rgb(20, 20, 20)",
+  lightText: "rgb(60, 60, 60)",
+  lightTextOnMainBackground: "rgb(170, 210, 200)",
+  darkTextOnMainBackground: "rgb(40, 40, 40)",
 };
 
 export const ViewStyles = {

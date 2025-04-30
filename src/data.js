@@ -47,11 +47,32 @@ export const Workorder = {
   items: [
     {
       name: "Change tube",
-      qty: 1,
-      price: 4.99,
+      qty: 123,
+      price: 44556.99,
       intakeNotes: "Front",
       serviceNotes: "this is a piece of shit lugnut missing",
-      id: 123,
+      id: "123",
+    },
+    {
+      name: "Change tube",
+      qty: 1,
+      price: 4.99,
+      intakeNotes: "Rear",
+      id: "1233",
+    },
+    {
+      name: "Change tube",
+      qty: 1,
+      price: 33.99,
+      intakeNotes: "top",
+      id: "1233345",
+    },
+    {
+      name: "Change tube",
+      qty: 3,
+      price: 8.99,
+      intakeNotes: "middle",
+      id: "1233655",
     },
   ],
   notes: {

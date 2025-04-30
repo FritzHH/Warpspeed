@@ -1,11 +1,11 @@
 import Stripe from "stripe";
-
-const stripe = new Stripe(
-  "sk_test_51RIH80Ri7F2zMZJPOt5QqWfKdVKIvpbP7yFrEUHEVDgrOV4WnFioBsE8OJL8tNQ9yvTlqsmb8lT7g0fc5089Z8d100ZNNhspEb",
-  {
-    // apiVersion: "2025-03-31.basil",
-  }
-);
+let stripe = "";
+//  stripe = new Stripe(
+//   "sk_test_51RIH80Ri7F2zMZJPOt5QqWfKdVKIvpbP7yFrEUHEVDgrOV4WnFioBsE8OJL8tNQ9yvTlqsmb8lT7g0fc5089Z8d100ZNNhspEb",
+//   {
+//     // apiVersion: "2025-03-31.basil",
+//   }
+// );
 
 import { onRequest } from "firebase-functions/https";
 import * as functions from "firebase-functions";

@@ -1,8 +1,44 @@
+import { Home } from "./screens/Home";
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+import { BrowserRouter, Route, Routes, Link } from "react-router-dom";
+
+import { WorkorderScreen, HomeScreen, NewCustomerScreen } from "./screens";
 import { View } from "react-native-web";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCFqFF3wG-8yNT8Z2O_j8ksL1SWxj9U0gg",
+  authDomain: "warpspeed-original.firebaseapp.com",
+  projectId: "warpspeed-original",
+  storageBucket: "warpspeed-original.firebasestorage.app",
+  messagingSenderId: "499618567073",
+  appId: "1:499618567073:web:4e2ca2cf293cb6d96831e0",
+  measurementId: "G-7SSYMNGKQS",
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+export const ROUTES = {
+  init: "/",
+  homeScreen: "/",
+  workorderScreen: "/workorder",
+  newCustomerScreen: "/newcustomer",
+};
 
 function App() {
   return (
-    <View style={{ width: "100%", height: 50, backgroundColor: "blue" }}></View>
+    <BrowserRouter>
+      <Routes>
+        <Route path={ROUTES.init} element={<WorkorderScreen />} />
+        <Route
+          path={ROUTES.newCustomerScreen}
+          element={<NewCustomerScreen />}
+        />
+        <Route path={ROUTES.homeScreen} element={<HomeScreen />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

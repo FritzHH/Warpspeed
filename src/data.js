@@ -42,13 +42,13 @@ export const Workorder = {
   customerID: "12232",
   brand: "Trek",
   description: "Hybrid",
-  color: "Tan",
+  color: "Yellow",
   changes: {
     startedBy: "Fritz",
     changeLog: [],
   },
   partOrdered: "Derailler",
-  partSource: "Amaon",
+  partSource: "Amazon",
   items: [
     {
       name: "Ebike",
@@ -87,13 +87,13 @@ export const Workorder = {
 };
 
 export const Brands = {
-  brands1: [],
+  brands1: ["Trek", "Specialized", "Sun", "Marin"],
   brands1Title: "Pedal Bikes",
-  brands2: [],
-  brands2Title: "Ebikes",
+  brands2: ["Euphree", "Lectric", "Hiboy"],
+  brands2Title: "E-Bikes",
 };
 
-export const Colors = [
+export const BikeColors = [
   "White",
   "Blue",
   "Green",
@@ -101,6 +101,9 @@ export const Colors = [
   "Yellow",
   "Brown",
   "Silver",
+  "Tan",
 ];
+
+export const Descriptions = ["Hybrid", "E-Bike", "Cruiser", "Road Bike"];
 
 export const PartSources = ["JBI", "QBP", "Amazon", "Ebay"];

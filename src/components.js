@@ -73,6 +73,7 @@ export const ModalDropdown = ({
   closeButtonText,
   removeButtonText,
   itemListStyle = {},
+  buttonStyle = {},
   containerStyle = {},
   modalStyle = {},
 }) => {
@@ -107,7 +108,14 @@ export const ModalDropdown = ({
         }}
         onPress={toggleModal}
       >
-        <Text style={{ color: "white", textAlign: "center", fontSize: 15 }}>
+        <Text
+          style={{
+            color: "white",
+            textAlign: "center",
+            fontSize: 15,
+            ...buttonStyle,
+          }}
+        >
           {buttonLabel}
         </Text>
       </TouchableOpacity>
@@ -129,12 +137,18 @@ export const ModalDropdown = ({
                 keyExtractor={(item, index) => index.toString()}
                 renderItem={({ item }) => {
                   let backgroundColor = null;
+                  // log("current", currentSelectionName);
+                  // log("new", item);
                   if (currentSelectionName == item) {
                     backgroundColor = "lightgray";
                   }
                   return (
                     <TouchableOpacity
-                      style={{ ...styles.option, backgroundColor }}
+                      style={{
+                        ...styles.option,
+                        backgroundColor,
+                        ...itemListStyle,
+                      }}
                       onPress={() => handleSelect(item)}
                     >
                       <Text style={styles.optionText}>{item}</Text>
@@ -205,16 +219,18 @@ const styles = {
     fontSize: 16,
   },
   closeButton: {
-    width: 100,
+    // width: 100,
     marginTop: 10,
     padding: 10,
+    paddingHorizontal: 20,
     backgroundColor: "#e74c3c",
     borderRadius: 5,
   },
   removeButton: {
-    width: 200,
+    // width: 200,
     marginTop: 10,
     padding: 10,
+    paddingHorizontal: 20,
     backgroundColor: "#e74c3c",
     borderRadius: 5,
   },

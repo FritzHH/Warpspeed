@@ -16,7 +16,16 @@ import {
   TextInputLabelOnMainBackground,
 } from "../../components";
 import { Colors } from "../../styles";
-import { Customer, Discounts, Workorder, WorkorderItem } from "../../data";
+import {
+  BikeColors,
+  Brands,
+  Customer,
+  Descriptions,
+  Discounts,
+  PartSources,
+  Workorder,
+  WorkorderItem,
+} from "../../data";
 
 export const WorkorderItemComponent = ({
   workorderItem = WorkorderItem,
@@ -364,7 +373,7 @@ export const InfoComponent = ({
         ) : null}
         {customerObj.phone.cell ? (
           <Text style={{ color: Colors.lightTextOnMainBackground }}>
-            {"Landline:  " + customerObj.phone.landline}
+            {"Land:  " + customerObj.phone.landline}
           </Text>
         ) : null}
         {customerObj.phone.callOnlyOption ? (
@@ -387,7 +396,7 @@ export const InfoComponent = ({
         }}
       >
         <TextInputOnMainBackground
-          styleProps={{ marginRight: 20 }}
+          styleProps={{ marginRight: 5 }}
           value={workorderObj.brand}
           onTextChange={(val) => {
             log(val);
@@ -403,10 +412,21 @@ export const InfoComponent = ({
             width: "30%",
           }}
           closeButtonText={"Close"}
-          removeButtonText={"Remove Color"}
-          buttonLabel={"Brands"}
+          removeButtonText={"Remove"}
+          buttonLabel={Brands.brands1Title}
+          buttonStyle={{ width: 90 }}
+          data={Brands.brands1}
+          currentSelectionName={workorderObj.brand}
+          onSelect={(val) => {
+            workorderObj.brand = val;
+            setWorkorderObj(workorderObj);
+          }}
+          onRemoveSelection={() => {
+            workorderObj.brand = "";
+            setWorkorderObj(workorderObj);
+          }}
         />
-        <View style={{ width: 10 }} />
+        <View style={{ width: 3 }} />
         <ModalDropdown
           itemListStyle={{ width: 100 }}
           modalStyle={{
@@ -414,9 +434,20 @@ export const InfoComponent = ({
             marginVertical: "2%",
             width: "30%",
           }}
-          buttonLabel={"More Brands"}
+          data={Brands.brands2}
+          buttonLabel={Brands.brands2Title}
           closeButtonText={"Close"}
-          removeButtonText={"Remove Color"}
+          removeButtonText={"Remove"}
+          buttonStyle={{ width: 70 }}
+          currentSelectionName={workorderObj.brand}
+          onSelect={(val) => {
+            workorderObj.brand = val;
+            setWorkorderObj(workorderObj);
+          }}
+          onRemoveSelection={() => {
+            workorderObj.brand = "";
+            setWorkorderObj(workorderObj);
+          }}
         />
       </View>
       <TextInputLabelOnMainBackground
@@ -432,7 +463,7 @@ export const InfoComponent = ({
         }}
       >
         <TextInputOnMainBackground
-          styleProps={{ marginRight: 20 }}
+          styleProps={{ marginRight: 2 }}
           value={workorderObj.description}
           onTextChange={(val) => {
             workorderObj.description = val;
@@ -446,9 +477,20 @@ export const InfoComponent = ({
             marginVertical: "2%",
             width: "30%",
           }}
+          data={Descriptions}
           buttonLabel={"Descriptions"}
           closeButtonText={"Close"}
-          removeButtonText={"Remove Description"}
+          buttonStyle={{ width: 90 }}
+          removeButtonText={"Remove"}
+          currentSelectionName={workorderObj.description}
+          onSelect={(val) => {
+            workorderObj.description = val;
+            setWorkorderObj(workorderObj);
+          }}
+          onRemoveSelection={() => {
+            workorderObj.description = "";
+            setWorkorderObj(workorderObj);
+          }}
         />
       </View>
       <TextInputLabelOnMainBackground
@@ -468,7 +510,7 @@ export const InfoComponent = ({
         <TextInputOnMainBackground
           value={workorderObj.color}
           styleProps={{
-            marginRight: 20,
+            marginRight: 2,
             color:
               workorderObj.color == "White" || workorderObj.color == "Tan"
                 ? "dimgray"
@@ -481,15 +523,28 @@ export const InfoComponent = ({
           }}
         />
         <ModalDropdown
-          itemListStyle={{ width: 80 }}
+          itemListStyle={{
+            width: 120,
+          }}
           modalStyle={{
             alignSelf: "flex-start",
             marginVertical: "2%",
             width: "30%",
           }}
+          data={BikeColors}
           closeButtonText={"Close"}
-          removeButtonText={"Remove Color"}
+          buttonStyle={{ width: 90 }}
+          removeButtonText={"Remove"}
           buttonLabel={"Colors"}
+          currentSelectionName={workorderObj.color}
+          onSelect={(val) => {
+            workorderObj.color = val;
+            setWorkorderObj(workorderObj);
+          }}
+          onRemoveSelection={() => {
+            workorderObj.color = "";
+            setWorkorderObj(workorderObj);
+          }}
         />
       </View>
       <TextInputLabelOnMainBackground
@@ -500,14 +555,14 @@ export const InfoComponent = ({
         style={{
           flexDirection: "row",
           justifyContent: "flex-start",
+          alignItems: "center",
           width: "100%",
         }}
       >
         <TextInputOnMainBackground
-          styleProps={{ marginRight: 20 }}
+          styleProps={{ marginRight: 2 }}
           value={workorderObj.partOrdered}
           onTextChange={(val) => {
-            log(val);
             workorderObj.partOrdered = val;
             setWorkorderObj(workorderObj);
           }}
@@ -522,12 +577,13 @@ export const InfoComponent = ({
           // marginTop: 8,
           flexDirection: "row",
           justifyContent: "flex-start",
+          alignItems: "center",
           width: "100%",
         }}
       >
         <TextInputOnMainBackground
           value={workorderObj.partSource}
-          styleProps={{ marginRight: 20 }}
+          styleProps={{ marginRight: 2 }}
           onTextChange={(val) => {
             log(val);
             workorderObj.partSource = val;
@@ -535,15 +591,26 @@ export const InfoComponent = ({
           }}
         />
         <ModalDropdown
-          itemListStyle={{ width: 80 }}
+          itemListStyle={{ width: 90 }}
           modalStyle={{
             alignSelf: "flex-start",
             marginVertical: "2%",
             width: "30%",
           }}
+          data={PartSources}
           closeButtonText={"Close"}
-          removeButtonText={"Remove Source"}
+          removeButtonText={"Remove"}
+          buttonStyle={{ width: 90 }}
           buttonLabel={"Sources"}
+          currentSelectionName={workorderObj.partSource}
+          onSelect={(val) => {
+            workorderObj.partSource = val;
+            setWorkorderObj(workorderObj);
+          }}
+          onRemoveSelection={() => {
+            workorderObj.partSource = "";
+            setWorkorderObj(workorderObj);
+          }}
         />
       </View>
     </View>

@@ -26,7 +26,7 @@ export function WorkorderScreen() {
     log("setting customer object to this", customerObj);
   }
   function setWorkorderObj(workorderObj) {
-    // log("setting workorder object to this", workorderObj);
+    log("setting workorder object to this", workorderObj);
     setstateWorkorderObj(workorderObj);
   }
   //   console.log("initial", notesTabIndex);
@@ -53,8 +53,10 @@ export function WorkorderScreen() {
             }}
           >
             <InfoComponent
-              customerObj={sCustomerObj}
+              customerObj={{ ...sCustomerObj }}
+              workorderObj={{ ...sWorkorderObj }}
               setCustomerObj={(obj) => setCustomerObj(obj)}
+              setWorkorderObj={(obj) => setWorkorderObj(obj)}
             />
           </View>
           <View

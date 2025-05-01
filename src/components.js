@@ -1,7 +1,17 @@
 // "use client";
-import { View, Text, Pressable } from "react-native-web";
+import {
+  View,
+  Text,
+  Pressable,
+  Modal,
+  TouchableOpacity,
+  FlatList,
+  TextInput,
+} from "react-native-web";
 import { log } from "./utils";
 import { Colors } from "./styles";
+import { useState } from "react";
+import { Discounts } from "./data";
 
 const centerItem = {
   alignItems: "center",
@@ -15,6 +25,208 @@ export const TabMenuDivider = () => {
   return (
     <View style={{ width: 1, backgroundColor: "gray", height: "100%" }}></View>
   );
+};
+
+export const TextInputLabelOnMainBackground = ({ value, styleProps = {} }) => {
+  const text_style = {
+    color: Colors.darkTextOnMainBackground,
+    fontSize: 12,
+    marginBottom: 1,
+  };
+  return <Text style={{ ...text_style, ...styleProps }}>{value}</Text>;
+};
+
+export const TextInputOnMainBackground = ({
+  value,
+  onTextChange,
+  styleProps = {},
+}) => {
+  const info_styles = {
+    textInput: {
+      borderWidth: 2,
+      borderColor: "gray",
+      color: Colors.lightTextOnMainBackground,
+      paddingVertical: 3,
+      paddingHorizontal: 4,
+      fontSize: 16,
+      outlineWidth: 0,
+    },
+  };
+
+  return (
+    <TextInput
+      value={value}
+      placeholder="Brand"
+      placeholderTextColor={"darkgray"}
+      style={{ ...info_styles.textInput, ...styleProps }}
+      onChangeText={(val) => onTextChange(val)}
+    />
+  );
+};
+
+export const ModalDropdown = ({
+  data,
+  onSelect,
+  buttonLabel,
+  onRemoveSelection,
+  currentSelectionName,
+  closeButtonText,
+  removeButtonText,
+  itemListStyle = {},
+  containerStyle = {},
+  modalStyle = {},
+}) => {
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [selectedValue, setSelectedValue] = useState(null);
+
+  const toggleModal = () => setModalVisible(!isModalVisible);
+
+  const handleSelect = (item) => {
+    setSelectedValue(item);
+    onSelect(item);
+    toggleModal();
+  };
+
+  return (
+    <View style={{ ...styles.container, ...containerStyle }}>
+      <TouchableOpacity
+        style={{
+          backgroundColor: Colors.smallButtonBackground,
+          borderRadius: 2,
+          margin: 2,
+          paddingHorizontal: 6,
+          paddingVertical: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          // opacity: 0.6,
+          shadowColor: "black",
+          shadowOffset: { width: 3, height: 3 },
+          shadowOpacity: 0.3,
+          shadowRadius: 5,
+          // ...itemListStyle,
+        }}
+        onPress={toggleModal}
+      >
+        <Text style={{ color: "white", textAlign: "center", fontSize: 15 }}>
+          {buttonLabel}
+        </Text>
+      </TouchableOpacity>
+
+      <Modal style={{ width: "50%" }} visible={isModalVisible} transparent>
+        <View
+          style={{
+            width: "50%",
+            alignSelf: "center",
+            justifySelf: "center",
+            flex: 1,
+            ...modalStyle,
+          }}
+        >
+          <View style={styles.modalBackground}>
+            <View style={styles.modalContent}>
+              <FlatList
+                data={data}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => {
+                  let backgroundColor = null;
+                  if (currentSelectionName == item) {
+                    backgroundColor = "lightgray";
+                  }
+                  return (
+                    <TouchableOpacity
+                      style={{ ...styles.option, backgroundColor }}
+                      onPress={() => handleSelect(item)}
+                    >
+                      <Text style={styles.optionText}>{item}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+              <View
+                style={{ flexDirection: "row", justifyContent: "space-around" }}
+              >
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={toggleModal}
+                >
+                  <Text style={styles.closeText}>{closeButtonText}</Text>
+                </TouchableOpacity>
+                {currentSelectionName && (
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => {
+                      onRemoveSelection();
+                      toggleModal();
+                    }}
+                  >
+                    <Text style={styles.closeText}>{removeButtonText}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = {
+  container: {
+    // margin: 20,
+  },
+  button: {
+    // padding: 5,
+    backgroundColor: Colors.smallButtonBackground,
+    borderRadius: 1,
+  },
+  buttonText: {
+    color: "white",
+    textAlign: "center",
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "40%",
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 20,
+  },
+  option: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  optionText: {
+    fontSize: 16,
+  },
+  closeButton: {
+    width: 100,
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: "#e74c3c",
+    borderRadius: 5,
+  },
+  removeButton: {
+    width: 200,
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: "#e74c3c",
+    borderRadius: 5,
+  },
+  closeText: {
+    color: "white",
+    textAlign: "center",
+  },
+  removeText: {
+    color: "white",
+    textAlign: "center",
+    width: 200,
+  },
 };
 
 export const Button = ({

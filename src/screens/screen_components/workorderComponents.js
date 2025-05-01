@@ -4,24 +4,78 @@ import {
   Pressable,
   TextInput,
   FlatList,
-  TouchableHighlight,
+  TouchableOpacity,
 } from "react-native-web";
 import { dim, log, trimToTwoDecimals } from "../../utils";
 import {
   HorzSpacer,
   TabMenuButton,
   TabMenuDivider as Divider,
+  ModalDropdown,
+  TextInputOnMainBackground,
+  TextInputLabelOnMainBackground,
 } from "../../components";
 import { Colors } from "../../styles";
-import { Customer, Workorder, WorkorderItem } from "../../data";
+import { Customer, Discounts, Workorder, WorkorderItem } from "../../data";
 
 export const WorkorderItemComponent = ({
   workorderItem = WorkorderItem,
-  setWorkorderItem,
+  setWorkorderItemUp,
   deleteWorkorderItem,
 }) => {
   //   log("rendering workorder item component", workorderItem);
   workorderItem = { ...workorderItem };
+
+  function splitItems() {
+    let itemList = [];
+
+    for (let i = 0; i <= workorderItem.qty - 1; i++) {
+      let item = { ...workorderItem };
+      item.qty = 1;
+      item.id = item.id + i.toString();
+      delete item.discountObj;
+      setWorkorderItemUp(item);
+    }
+    deleteWorkorderItem(workorderItem);
+  }
+
+  function applyDiscount(discountName) {
+    let discountObj = Discounts.filter((obj) => obj.name == discountName)[0];
+
+    let newPrice;
+    let savings;
+
+    if (discountObj.value.includes("%")) {
+      let multiplier = discountObj.value.slice(0, discountObj.value.length - 1);
+      multiplier = "." + multiplier;
+      multiplier = Number(multiplier);
+      multiplier = 1 - multiplier;
+      newPrice = workorderItem.price * workorderItem.qty * multiplier;
+      savings = workorderItem.price * workorderItem.qty - newPrice;
+    } else {
+      newPrice =
+        workorderItem.price * workorderItem.qty -
+        workorderItem.qty * discountObj.value;
+      savings = workorderItem.price * workorderItem.qty - newPrice;
+    }
+
+    if (newPrice > 0) {
+      discountObj.discountedPrice = newPrice;
+      discountObj.savings = savings;
+      workorderItem.discountObj = discountObj;
+      //   log("discount obj", discountObj);
+      setWorkorderItemUp(workorderItem);
+    }
+  }
+
+  function setWorkorderItem(item, discount = false) {
+    if (Object.hasOwn(workorderItem, "discountObj")) {
+      applyDiscount(workorderItem.discountObj.name);
+      return;
+    }
+    setWorkorderItemUp(item);
+  }
+
   return (
     <View
       style={{
@@ -35,19 +89,26 @@ export const WorkorderItemComponent = ({
       }}
     >
       <View style={{ width: "60%", justifyContent: "center" }}>
+        {Object.hasOwn(workorderItem, "discount") && (
+          <Text style={{ color: "magenta" }}>
+            {workorderItem.discount.name}
+          </Text>
+        )}
         <Text
           style={{ fontSize: 15, color: Colors.darkText, fontWeight: "500" }}
         >
           {workorderItem.name}
         </Text>
-        <TextInput
-          style={{ outlineWidth: 0, color: Colors.lightText }}
-          onChangeText={(val) => {
-            workorderItem.intakeNotes = val;
-            setWorkorderItem(workorderItem);
-          }}
-          value={workorderItem.intakeNotes}
-        />
+        <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+          <TextInput
+            style={{ outlineWidth: 0, color: Colors.lightText }}
+            onChangeText={(val) => {
+              workorderItem.intakeNotes = val;
+              setWorkorderItem(workorderItem);
+            }}
+            value={workorderItem.intakeNotes}
+          />
+        </View>
         {Object.hasOwn(workorderItem, "serviceNotes") && (
           <TextInput
             onChangeText={(val) => {
@@ -67,7 +128,7 @@ export const WorkorderItemComponent = ({
         style={{
           width: "40%",
           flexDirection: "row",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
           alignItems: "center",
           height: "100%",
         }}
@@ -77,10 +138,11 @@ export const WorkorderItemComponent = ({
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
+            // marginRight: 5,
           }}
         >
           {!Object.hasOwn(workorderItem, "serviceNotes") && (
-            <TouchableHighlight
+            <TouchableOpacity
               onPress={() => {
                 if (!workorderItem.serviceNotes) {
                   workorderItem.serviceNotes = "";
@@ -101,10 +163,10 @@ export const WorkorderItemComponent = ({
               >
                 +
               </Text>
-            </TouchableHighlight>
+            </TouchableOpacity>
           )}
           {Object.hasOwn(workorderItem, "serviceNotes") && (
-            <TouchableHighlight
+            <TouchableOpacity
               onPress={() => {
                 delete workorderItem.serviceNotes;
                 setWorkorderItem(workorderItem);
@@ -123,9 +185,9 @@ export const WorkorderItemComponent = ({
               >
                 -
               </Text>
-            </TouchableHighlight>
+            </TouchableOpacity>
           )}
-          <TouchableHighlight
+          <TouchableOpacity
             style={{
               paddingHorizontal: 5,
               borderRadius: 4,
@@ -138,7 +200,7 @@ export const WorkorderItemComponent = ({
             }}
           >
             <Text style={{ color: "gray", fontSize: 35 }}>{"\u2191"}</Text>
-          </TouchableHighlight>
+          </TouchableOpacity>
           <TextInput
             style={{
               marginHorizontal: 10,
@@ -157,7 +219,7 @@ export const WorkorderItemComponent = ({
               }
             }}
           ></TextInput>
-          <TouchableHighlight
+          <TouchableOpacity
             style={{ paddingHorizontal: 5 }}
             onPress={
               workorderItem.qty > 1
@@ -169,12 +231,13 @@ export const WorkorderItemComponent = ({
             }
           >
             <Text style={{ color: "gray", fontSize: 35 }}>{"\u2193"}</Text>
-          </TouchableHighlight>
+          </TouchableOpacity>
         </View>
         <View
           style={{
-            alignItems: "flex-start",
+            alignItems: "flex-end",
             minWidth: 100,
+            marginRight: 6,
           }}
         >
           <Text
@@ -183,9 +246,21 @@ export const WorkorderItemComponent = ({
               minWidth: 30,
             }}
           >
-            {"$" + trimToTwoDecimals(workorderItem.price)}
+            {"$ " + trimToTwoDecimals(workorderItem.price)}
           </Text>
-          {workorderItem.qty > 1 ? (
+          {Object.hasOwn(workorderItem, "discountObj") && (
+            <Text
+              style={{
+                paddingHorizontal: 5,
+                minWidth: 30,
+                color: "magenta",
+              }}
+            >
+              {"$ -" + trimToTwoDecimals(workorderItem.discountObj.savings)}
+            </Text>
+          )}
+          {workorderItem.qty > 1 ||
+          Object.hasOwn(workorderItem, "discountObj") ? (
             <Text
               style={{
                 fontWeight: "bold",
@@ -195,35 +270,87 @@ export const WorkorderItemComponent = ({
                 color: Colors.darkText,
               }}
             >
-              {"$" + trimToTwoDecimals(workorderItem.price * workorderItem.qty)}
+              {"$ " +
+                trimToTwoDecimals(
+                  workorderItem.discountObj
+                    ? workorderItem.discountObj.discountedPrice
+                    : workorderItem.price * workorderItem.qty
+                )}
             </Text>
           ) : null}
         </View>
-        <TouchableHighlight
-          onPress={() => deleteWorkorderItem()}
+        <View
           style={{
-            backgroundColor: Colors.opacityBackgoundDark,
-            borderRadius: 2,
-            marginRight: 15,
-            paddingHorizontal: 6,
-            paddingVertical: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: 0.6,
-            shadowColor: "black",
-            shadowOffset: { width: 3, height: 3 },
-            shadowOpacity: 0.3,
-            shadowRadius: 5,
+            flexDirection: "row",
+            justifyContent: "flex-end",
           }}
         >
-          <Text style={{ color: "red", fontSize: 20 }}>X</Text>
-        </TouchableHighlight>
+          <TouchableOpacity
+            onPress={() => (workorderItem.qty > 1 ? splitItems() : null)}
+            style={{
+              backgroundColor: Colors.smallButtonBackground,
+              borderRadius: 2,
+              margin: 2,
+              paddingHorizontal: 6,
+              paddingVertical: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              shadowColor: "black",
+              shadowOffset: { width: 2, height: 2 },
+              shadowOpacity: 0.4,
+              shadowRadius: 5,
+              opacity: workorderItem.qty > 1 ? null : 0,
+            }}
+          >
+            <Text style={{ color: Colors.tabMenuButton, fontSize: 15 }}>S</Text>
+          </TouchableOpacity>
+          <ModalDropdown
+            buttonLabel={"D"}
+            data={Discounts.map((item) => item.name)}
+            closeButtonText={"Close"}
+            removeButtonText={"Remove Discount"}
+            onSelect={(itemName) => {
+              applyDiscount(itemName, workorderItem);
+            }}
+            onRemoveSelection={() => {
+              delete workorderItem.discountObj;
+              setWorkorderItem(workorderItem);
+            }}
+            currentSelectionName={
+              workorderItem.discountObj ? workorderItem.discountObj.name : null
+            }
+          />
+          <TouchableOpacity
+            onPress={() => deleteWorkorderItem()}
+            style={{
+              backgroundColor: Colors.smallButtonBackground,
+              borderRadius: 2,
+              margin: 2,
+              marginRight: 10,
+              paddingHorizontal: 6,
+              paddingVertical: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              shadowColor: "black",
+              shadowOffset: { width: 3, height: 3 },
+              shadowOpacity: 0.3,
+              shadowRadius: 5,
+            }}
+          >
+            <Text style={{ color: "red", fontSize: 15 }}>X</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 };
 
-export const InfoComponent = ({ customerObj = Customer, setCustomerObj }) => {
+export const InfoComponent = ({
+  customerObj = Customer,
+  setCustomerObj,
+  setWorkorderObj,
+  workorderObj = Workorder,
+}) => {
   return (
     <View style={{ height: "100%", width: "100%", paddingRight: 7 }}>
       <Text style={{ color: Colors.darkTextOnMainBackground, fontSize: 30 }}>
@@ -247,6 +374,178 @@ export const InfoComponent = ({ customerObj = Customer, setCustomerObj }) => {
           <Text style={{ color: "pink" }}>EMAIL ONLY</Text>
         ) : null}
       </View>
+      <TextInputLabelOnMainBackground
+        value={"BRAND"}
+        styleProps={{ marginTop: 10 }}
+      />
+      <View
+        style={{
+          // marginTop: 10,
+          flexDirection: "row",
+          justifyContent: "flex-start",
+          width: "100%",
+        }}
+      >
+        <TextInputOnMainBackground
+          styleProps={{ marginRight: 20 }}
+          value={workorderObj.brand}
+          onTextChange={(val) => {
+            log(val);
+            workorderObj.brand = val;
+            setWorkorderObj(workorderObj);
+          }}
+        />
+        <ModalDropdown
+          itemListStyle={{ width: 80 }}
+          modalStyle={{
+            alignSelf: "flex-start",
+            marginVertical: "2%",
+            width: "30%",
+          }}
+          closeButtonText={"Close"}
+          removeButtonText={"Remove Color"}
+          buttonLabel={"Brands"}
+        />
+        <View style={{ width: 10 }} />
+        <ModalDropdown
+          itemListStyle={{ width: 100 }}
+          modalStyle={{
+            alignSelf: "flex-start",
+            marginVertical: "2%",
+            width: "30%",
+          }}
+          buttonLabel={"More Brands"}
+          closeButtonText={"Close"}
+          removeButtonText={"Remove Color"}
+        />
+      </View>
+      <TextInputLabelOnMainBackground
+        value={"MODEL/DESCRIPTION"}
+        styleProps={{ marginTop: 10, marginBottom: 2 }}
+      />
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "flex-start",
+          width: "100%",
+          alignItems: "center",
+        }}
+      >
+        <TextInputOnMainBackground
+          styleProps={{ marginRight: 20 }}
+          value={workorderObj.description}
+          onTextChange={(val) => {
+            workorderObj.description = val;
+            setWorkorderObj(workorderObj);
+          }}
+        />
+        <ModalDropdown
+          itemListStyle={{ width: 100 }}
+          modalStyle={{
+            alignSelf: "flex-start",
+            marginVertical: "2%",
+            width: "30%",
+          }}
+          buttonLabel={"Descriptions"}
+          closeButtonText={"Close"}
+          removeButtonText={"Remove Description"}
+        />
+      </View>
+      <TextInputLabelOnMainBackground
+        value={"COLOR"}
+        styleProps={{
+          marginTop: 10,
+          marginBottom: 2,
+        }}
+      />
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "flex-start",
+          width: "100%",
+        }}
+      >
+        <TextInputOnMainBackground
+          value={workorderObj.color}
+          styleProps={{
+            marginRight: 20,
+            color:
+              workorderObj.color == "White" || workorderObj.color == "Tan"
+                ? "dimgray"
+                : Colors.lightTextOnMainBackground,
+            backgroundColor: workorderObj.color.toLowerCase(),
+          }}
+          onTextChange={(val) => {
+            workorderObj.color = val;
+            setWorkorderObj(workorderObj);
+          }}
+        />
+        <ModalDropdown
+          itemListStyle={{ width: 80 }}
+          modalStyle={{
+            alignSelf: "flex-start",
+            marginVertical: "2%",
+            width: "30%",
+          }}
+          closeButtonText={"Close"}
+          removeButtonText={"Remove Color"}
+          buttonLabel={"Colors"}
+        />
+      </View>
+      <TextInputLabelOnMainBackground
+        value={"PART ORDERED"}
+        styleProps={{ marginTop: 10, marginBottom: 2 }}
+      />
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "flex-start",
+          width: "100%",
+        }}
+      >
+        <TextInputOnMainBackground
+          styleProps={{ marginRight: 20 }}
+          value={workorderObj.partOrdered}
+          onTextChange={(val) => {
+            log(val);
+            workorderObj.partOrdered = val;
+            setWorkorderObj(workorderObj);
+          }}
+        />
+      </View>
+      <TextInputLabelOnMainBackground
+        value={"PART SOURCE"}
+        styleProps={{ marginTop: 10, marginBottom: 2 }}
+      />
+      <View
+        style={{
+          // marginTop: 8,
+          flexDirection: "row",
+          justifyContent: "flex-start",
+          width: "100%",
+        }}
+      >
+        <TextInputOnMainBackground
+          value={workorderObj.partSource}
+          styleProps={{ marginRight: 20 }}
+          onTextChange={(val) => {
+            log(val);
+            workorderObj.partSource = val;
+            setWorkorderObj(workorderObj);
+          }}
+        />
+        <ModalDropdown
+          itemListStyle={{ width: 80 }}
+          modalStyle={{
+            alignSelf: "flex-start",
+            marginVertical: "2%",
+            width: "30%",
+          }}
+          closeButtonText={"Close"}
+          removeButtonText={"Remove Source"}
+          buttonLabel={"Sources"}
+        />
+      </View>
     </View>
   );
 };
@@ -267,13 +566,17 @@ export const ItemsTab = ({
 
   function changeWorkorderItem(newItem) {
     log("setting new workorder item", newItem);
+    let found = false;
     let newItemList = workorderObj.items.map((oldItem) => {
       if (oldItem.id == newItem.id) {
+        found = true;
+        log("found it");
         return newItem;
       } else {
         return oldItem;
       }
     });
+    if (!found) newItemList.push(newItem);
     workorderObj.items = newItemList;
     setWorkorderObj(workorderObj);
   }
@@ -331,7 +634,7 @@ export const ItemsTab = ({
           return (
             <WorkorderItemComponent
               workorderItem={item.item}
-              setWorkorderItem={(item) => changeWorkorderItem(item)}
+              setWorkorderItemUp={(item) => changeWorkorderItem(item)}
               deleteWorkorderItem={() => deleteWorkorderItem(item.item)}
               keyExtractor={(item) => item.item.id}
             />

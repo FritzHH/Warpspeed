@@ -23,6 +23,11 @@ export const Customer = {
   payments: "",
 };
 
+export const Discounts = [
+  { name: "50% Off Item", value: "10%" },
+  { name: "2-bike purchase, $100 Off Each Bike", value: "100" },
+];
+
 export const WorkorderItem = {
   name: "Change tube",
   qty: 1,
@@ -37,17 +42,17 @@ export const Workorder = {
   customerID: "12232",
   brand: "Trek",
   description: "Hybrid",
-  color: "Green",
+  color: "Tan",
   changes: {
     startedBy: "Fritz",
     changeLog: [],
   },
-  partOrdered: "",
-  partSource: "",
+  partOrdered: "Derailler",
+  partSource: "Amaon",
   items: [
     {
-      name: "Change tube",
-      qty: 123,
+      name: "Ebike",
+      qty: 3,
       price: 44556.99,
       intakeNotes: "Front",
       serviceNotes: "this is a piece of shit lugnut missing",

@@ -50,7 +50,9 @@ export const WorkorderItemComponent = ({
   }
 
   function applyDiscount(discountName) {
-    let discountObj = Discounts.filter((obj) => obj.name == discountName)[0];
+    let discountObj = {
+      ...Discounts.filter((obj) => obj.name == discountName)[0],
+    };
 
     let newPrice;
     let savings;
@@ -99,9 +101,9 @@ export const WorkorderItemComponent = ({
       }}
     >
       <View style={{ width: "60%", justifyContent: "center" }}>
-        {Object.hasOwn(workorderItem, "discount") && (
+        {Object.hasOwn(workorderItem, "discountObj") && (
           <Text style={{ color: "magenta" }}>
-            {workorderItem.discount.name}
+            {workorderItem.discountObj.name}
           </Text>
         )}
         <Text

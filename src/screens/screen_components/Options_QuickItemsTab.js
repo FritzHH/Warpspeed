@@ -172,8 +172,8 @@ export function QuickItemsTab({
                   </Text>
                   <Text
                     style={{
-                      color: Colors.lightTextOnMainBackground,
-                      fontSize: 16,
+                      color: "rgb(40,40,40)",
+                      fontSize: 17,
                     }}
                   >
                     {"$ " + item.item.price}
@@ -221,14 +221,14 @@ const QuickItemButton = ({ title, onPress, color }) => {
       }}
     >
       <Text
+        numberOfLines={2}
         style={{
           textAlign: "center",
           color: "white",
           width: "100%",
           paddingVertical: 11,
-          //   borderRadius: 1,
-          //   borderWidth: 2,
-          //   borderColor: "lightgray",
+          paddingHorizontal: 2,
+          fontSize: 15,
         }}
       >
         {title}

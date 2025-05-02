@@ -1,3 +1,5 @@
+import { log } from "./utils";
+
 export const Customer = {
   first: "Test",
   last: "Customer",
@@ -107,3 +109,106 @@ export const BikeColors = [
 export const Descriptions = ["Hybrid", "E-Bike", "Cruiser", "Road Bike"];
 
 export const PartSources = ["JBI", "QBP", "Amazon", "Ebay"];
+
+export const inventory_cats = {
+  main: {
+    parts: "Parts & Accessories",
+    labor: "Labor",
+    bikes: "Bikes",
+  },
+  descrip: {
+    brakes: "Brakes",
+    cable_housing: "Cables/Housing",
+    drivetrain: "Drivetrain",
+    shifting: "Shifting",
+    tubes: "Tubes",
+    tires: "Tires",
+    accessories: "Accessories",
+    bikeElectric: "Electric Bikes",
+    bikePedal: "Pedal Bikes",
+    miscLabor: "Misc. Labor",
+    miscParts: "Misc. Parts",
+  },
+  location: {
+    service: "Service",
+    retail: "Retail",
+  },
+};
+
+export const inventory_item = {
+  name: "brake handle",
+  price: 20,
+  catMain: inventory_cats.main.parts,
+  catDescrip: inventory_cats.descrip.brakes,
+  catLocation: inventory_cats.location.service,
+  id: "122",
+};
+
+export const inventory = {
+  parts: [],
+  labor: [],
+  accessories: [],
+  bikes: {},
+};
+
+export const quick_button_names = [
+  {
+    name: "Tune-Up",
+    id: "1234",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  { name: "Tube & Tire", id: "58349" },
+  { name: "Brakes", id: "5834fg9" },
+  { name: "Shifting", id: "583r49" },
+  { name: "Drivetrain", id: "58trt349" },
+  { name: "Cable", id: "583sfg49" },
+  { name: "Spoke", id: "58349" },
+  { name: "Cleaning", id: "583fgs49" },
+  { name: "Scooter", id: "5834nh9" },
+  { name: "Pickup", id: "5855r349" },
+  { name: "Diagnostics", id: "58fgs349" },
+  { name: "Labor", id: "58sgf349" },
+  { name: "Brakes", id: "5854t349" },
+  { name: "Part", id: "583t54t49" },
+];
+
+export let brakeHandle = {
+  ...inventory_item,
+  name: "brake handle",
+  price: 20,
+  catMain: inventory_cats.main.parts,
+  catDescrip: inventory_cats.descrip.brakes,
+  catLocation: inventory_cats.location.service,
+  id: "122",
+};
+export let shiftCable = {
+  ...inventory_item,
+  name: "shift cable",
+  price: 5,
+  catMain: inventory_cats.main.parts,
+  catDescrip: inventory_cats.descrip.shifting,
+  catLocation: inventory_cats.location.service,
+  id: "3894",
+};
+export let helmet = {
+  ...inventory_item,
+  name: "helmet",
+  price: 35,
+  catMain: inventory_cats.main.parts,
+  catDescrip: inventory_cats.descrip.accessories,
+  catLocation: inventory_cats.location.retail,
+  id: "9439",
+};
+export let mirror = {
+  ...inventory_item,
+  name: "mirror",
+  price: 30,
+  catMain: inventory_cats.main.parts,
+  catDescrip: inventory_cats.descrip.accessories,
+  catLocation: inventory_cats.location.retail,
+  id: "93483",
+};
+export const test_inventory = [brakeHandle, shiftCable, helmet, mirror];

@@ -1,5 +1,10 @@
 import React from "react";
-import { View, Text, FlatList } from "react-native-web";
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableWithoutFeedback,
+} from "react-native-web";
 import { Customer, Workorder, WorkorderItem } from "../data";
 import { Button } from "react-native-web";
 import { Colors, ViewStyles } from "../styles";
@@ -30,7 +35,9 @@ export function WorkorderScreen() {
     setstateWorkorderObj(workorderObj);
   }
   //   console.log("initial", notesTabIndex);
+  function outsideModalClicked() {}
   return (
+    // <TouchableWithoutFeedback onPress={() => log("pressed")}>
     <View
       style={{
         ...ViewStyles.fullScreen,
@@ -87,8 +94,14 @@ export function WorkorderScreen() {
           backgroundColor: Colors.opacityBackgroundLight,
         }}
       >
-        <OptionsTab />
+        <OptionsTab
+          workorderObj={sWorkorderObj}
+          customerObj={sCustomerObj}
+          setCustomerObj={setstateCustomerObj}
+          setWorkorderObj={setstateWorkorderObj}
+        />
       </View>
     </View>
+    // </TouchableWithoutFeedback>
   );
 }

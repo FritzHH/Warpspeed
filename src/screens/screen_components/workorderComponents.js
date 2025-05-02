@@ -26,6 +26,7 @@ import {
   Workorder,
   WorkorderItem,
 } from "../../data";
+import { QuickItemsTab } from "./Options_QuickItemsTab";
 
 export const WorkorderItemComponent = ({
   workorderItem = WorkorderItem,
@@ -297,7 +298,7 @@ export const WorkorderItemComponent = ({
           <TouchableOpacity
             onPress={() => (workorderItem.qty > 1 ? splitItems() : null)}
             style={{
-              backgroundColor: Colors.smallButtonBackground,
+              backgroundColor: Colors.blueButtonBackground,
               borderRadius: 2,
               margin: 2,
               paddingHorizontal: 6,
@@ -332,7 +333,7 @@ export const WorkorderItemComponent = ({
           <TouchableOpacity
             onPress={() => deleteWorkorderItem()}
             style={{
-              backgroundColor: Colors.smallButtonBackground,
+              backgroundColor: Colors.blueButtonBackground,
               borderRadius: 2,
               margin: 2,
               marginRight: 10,
@@ -712,7 +713,14 @@ export const ItemsTab = ({
   );
 };
 
-export const OptionsTab = ({ onPress, index = 0, workorderObj }) => {
+export const OptionsTab = ({
+  onPress,
+  index = 0,
+  workorderObj,
+  customerObj,
+  setWorkorderObj,
+  setCustomerObj,
+}) => {
   let Component = () => (
     <View
       style={{
@@ -762,7 +770,7 @@ export const OptionsTab = ({ onPress, index = 0, workorderObj }) => {
           isSelected={index == 2 ? true : false}
         />
       </View>
-      <Component />
+      <QuickItemsTab workorderOb={workorderObj} customerObj={customerObj} />
     </View>
   );
 };

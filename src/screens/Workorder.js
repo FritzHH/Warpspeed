@@ -15,6 +15,7 @@ import {
   OptionsTab,
 } from "./screen_components/workorderComponents";
 import { dim, log } from "../utils";
+import { shadow_radius } from "../components";
 // import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
 // import { TabView, SceneMap } from "react-native-tab-view";
 
@@ -70,6 +71,7 @@ export function WorkorderScreen() {
             style={{
               width: "68%",
               backgroundColor: Colors.opacityBackgroundLight,
+              ...shadow_radius,
             }}
           >
             <ItemsTab

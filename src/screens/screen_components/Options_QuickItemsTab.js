@@ -16,6 +16,8 @@ import {
   TextInputOnMainBackground,
   TextInputLabelOnMainBackground,
   shadow_radius,
+  InventoryItemInModal,
+  PartialScreenModal,
 } from "../../components";
 import { Colors } from "../../styles";
 import {
@@ -41,20 +43,25 @@ export function QuickItemsTab({
   customerObj = Customer,
 }) {
   const intervalRef = React.useRef(null);
-  const [sSearchTerm, setstateSearchTerm] = React.useState("");
-  const [sSearchResults, setstateSearchResults] = React.useState([]);
-  const [sInventory, setstateInventory] = React.useState(test_inventory);
-  const [sInitDone, setstateInitDone] = React.useState(false);
+  const [sSearchTerm, _setSearchTerm] = React.useState("");
+  const [sSearchResults, _setSearchResults] = React.useState([]);
+  const [sInventory, _setInventory] = React.useState(test_inventory);
+  const [sInitDone, _setInitDone] = React.useState(false);
+  const [sQuickItemsButtonArr, _setQuickItemsButtonArr] =
+    React.useState(quick_button_names);
+  const [sQuickButtonContentsArr, setstateQuickButtonContentsArr] =
+    React.useState([]);
 
   const quickButtonNames = quick_button_names;
   let lastSearchMillis = new Date().getTime();
+  let quickItemButtonHit = true;
+
   function setSearchTimer() {
     setInterval(() => {
       let curTime = new Date().getTime();
       let diff = curTime - lastSearchMillis;
       if (diff > SEARCH_STRING_TIMER) {
-        setstateSearchResults([]);
-        setstateSearchTerm("");
+        clearSearch();
         lastSearchMillis = curTime;
       }
     }, SEARCH_STRING_TIMER);
@@ -62,29 +69,39 @@ export function QuickItemsTab({
 
   function init() {
     if (!sInitDone) {
-      setstateInitDone(true);
-      setSearchTimer();
+      search("br");
+      //   log("arr", sQuickItemsButtonArr);
+      _setInitDone(true);
+      //   setSearchTimer();
     }
   }
   init();
 
   function search(searchTerm) {
     lastSearchMillis = new Date().getTime();
-    log("search term", searchTerm);
-    setstateSearchTerm(searchTerm);
-    if (searchTerm && searchTerm.length < 2) return;
+    _setSearchTerm(searchTerm);
+    quickItemButtonHit = false;
+    if (searchTerm.length == 0) {
+      _setSearchResults([]);
+      return;
+    }
+    if (searchTerm.length < 2) return;
     let res = {};
     let keys = Object.keys(inventory_item);
     sInventory.forEach((invItem) => {
       keys.forEach((key) => {
-        // if (key == invItem.)
-        if (invItem[key].toString().includes(searchTerm))
+        if (
+          invItem[key]
+            .toString()
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+        )
           res[invItem.id] = invItem;
       });
     });
     res = Object.values(res);
-    // log(res);
-    setstateSearchResults(res);
+    // log("search arr res", res);
+    _setSearchResults(res);
   }
 
   function searchItemSelected(item) {
@@ -92,8 +109,8 @@ export function QuickItemsTab({
   }
 
   function clearSearch() {
-    setstateSearchResults([]);
-    setstateSearchTerm("");
+    _setSearchResults([]);
+    _setSearchTerm("");
   }
 
   return (
@@ -114,6 +131,7 @@ export function QuickItemsTab({
             borderColor: Colors.lightTextOnMainBackground,
             paddingHorizontal: 10,
             marginRight: 25,
+            marginLeft: 5,
             justifyContent: "center",
             ...shadow_radius,
           }}
@@ -121,8 +139,8 @@ export function QuickItemsTab({
           <Text
             style={{
               color: "white",
-              paddingHorizontal: 20,
-              paddingVertical: 7,
+              paddingHorizontal: 15,
+              paddingVertical: 4,
               fontSize: 18,
             }}
           >
@@ -145,9 +163,48 @@ export function QuickItemsTab({
           onChangeText={(val) => search(val)}
         />
       </View>
-      <View style={{ width: "100%" }}>
+      <View
+        style={{
+          width: "100%",
+          flexDirection: "row",
+          paddingTop: 15,
+          justifyContent: "flex-start",
+        }}
+      >
         <FlatList
-          style={{ marginTop: 10, marginLeft: 5, marginRight: 25 }}
+          style={{
+            marginLeft: 5,
+          }}
+          data={sQuickItemsButtonArr}
+          keyExtractor={(item, index) => item.id || index.toString()}
+          renderItem={(item) => {
+            return (
+              <QuickItemButton
+                onPress={() => {
+                  _setSearchTerm("");
+                  quickItemButtonHit = true;
+                  // log("button obj", item);
+                  let arr = [];
+                  item.item.items.forEach((btnItem) => {
+                    sInventory.forEach((invItem) => {
+                      if (invItem.id == btnItem.id) arr.push(invItem);
+                    });
+                  });
+                  //   log("arr", arr);
+                  _setSearchResults(arr);
+                }}
+                title={item.item.name}
+              />
+            );
+          }}
+        />
+
+        <FlatList
+          style={{
+            marginRight: 25,
+            width: "70%",
+            // backgroundColor: "green",
+          }}
           data={sSearchResults}
           renderItem={(item) => {
             // log(item.item);
@@ -158,47 +215,50 @@ export function QuickItemsTab({
                     flexDirection: "row",
                     justifyContent: "space-between",
                     borderBottomWidth: 1,
-                    borderColor: Colors.mainBackground,
+                    borderColor: Colors.opacityBackgoundDark,
                   }}
                 >
                   <Text
                     style={{
-                      color: "blue",
-                      fontSize: 16,
+                      color: "whitesmoke",
+                      fontSize: 15,
                       paddingVertical: 4,
                     }}
+                    numberOfLines={2}
                   >
                     {item.item.name}
                   </Text>
-                  <Text
+                  <View
                     style={{
-                      color: "rgb(40,40,40)",
-                      fontSize: 17,
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      width: "15%",
                     }}
                   >
-                    {"$ " + item.item.price}
-                  </Text>
+                    <PartialScreenModal
+                      buttonLabel={"i"}
+                      modalStyle={{ width: "40%", alignSelf: "flex-end" }}
+                      Component={() => (
+                        <InventoryItemInModal item={item.item} />
+                      )}
+                      buttonStyle={{}}
+                      textStyle={{ fontSize: 14 }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 13,
+                      }}
+                    >
+                      {"$ "}
+                      <Text style={{ fontSize: 16 }}>{item.item.price}</Text>
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             );
           }}
         />
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          marginTop: 5,
-          width: "100%",
-          // backgroundColor: "green",
-        }}
-      >
-        {sSearchResults.length == 0 && (
-          <View style={{}}>
-            {quickButtonNames.map((item) => {
-              return <QuickItemButton title={item.name} />;
-            })}
-          </View>
-        )}
       </View>
     </View>
   );
@@ -219,12 +279,13 @@ const QuickItemButton = ({ title, onPress, color }) => {
         // borderColor: Colors.mainBackground,
         ...shadow_radius,
       }}
+      onPress={onPress}
     >
       <Text
         numberOfLines={2}
         style={{
           textAlign: "center",
-          color: "white",
+          color: "whitesmoke",
           width: "100%",
           paddingVertical: 11,
           paddingHorizontal: 2,

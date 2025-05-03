@@ -130,7 +130,7 @@ export const inventory_cats = {
     miscParts: "Misc. Parts",
   },
   location: {
-    service: "Service",
+    service: "Service Bay",
     retail: "Retail",
   },
 };
@@ -160,55 +160,149 @@ export const quick_button_names = [
       "Tune-Up - Pedal Bike - Single Speed",
     ],
   },
-  { name: "Tube & Tire", id: "58349" },
-  { name: "Brakes", id: "5834fg9" },
-  { name: "Shifting", id: "583r49" },
-  { name: "Drivetrain", id: "58trt349" },
-  { name: "Cable", id: "583sfg49" },
-  { name: "Spoke", id: "58349" },
-  { name: "Cleaning", id: "583fgs49" },
-  { name: "Scooter", id: "5834nh9" },
-  { name: "Pickup", id: "5855r349" },
-  { name: "Diagnostics", id: "58fgs349" },
-  { name: "Labor", id: "58sgf349" },
-  { name: "Brakes", id: "5854t349" },
-  { name: "Part", id: "583t54t49" },
+  {
+    name: "Tube & Tire",
+    id: "58349",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Brakes",
+    id: "5834fg9",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Shifting",
+    id: "583r49",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Drivetrain",
+    id: "58trt349",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Cable",
+    id: "583sfg49",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Spoke",
+    id: "58349",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Cleaning",
+    id: "583fgs49",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Scooter",
+    id: "5834nh9",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Pickup",
+    id: "5855r349",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Diagnostics",
+    id: "58fgs349",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Labor",
+    id: "58sgf349",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Brakes",
+    id: "5854t349",
+    items: [
+      "Tune-Up - Pedal Bike - Standard",
+      "Tune-Up - Pedal Bike - Single Speed",
+    ],
+  },
+  {
+    name: "Part",
+    id: "583t54t49",
+    items: [
+      { name: "Tune-Up - Pedal Bike - Standard", id: "583t54t49" },
+      {
+        name: "Tune-Up - Pedal Bike - Single Speedvdfgagfasgafgfas",
+        id: "5854t349",
+      },
+    ],
+  },
 ];
 
 export let brakeHandle = {
   ...inventory_item,
-  name: "brake handle",
+  name: "Tune-Up - Pedal Bike - Standard",
   price: 20,
   catMain: inventory_cats.main.parts,
   catDescrip: inventory_cats.descrip.brakes,
   catLocation: inventory_cats.location.service,
-  id: "122",
+  id: "583t54t49",
 };
 export let shiftCable = {
   ...inventory_item,
-  name: "shift cable",
+  name: "Tune-Up - Pedal Bike - Single Speedvdfgagfasgafgfas",
   price: 5,
   catMain: inventory_cats.main.parts,
   catDescrip: inventory_cats.descrip.shifting,
   catLocation: inventory_cats.location.service,
-  id: "3894",
+  id: "5854t349",
 };
-export let helmet = {
-  ...inventory_item,
-  name: "helmet",
-  price: 35,
-  catMain: inventory_cats.main.parts,
-  catDescrip: inventory_cats.descrip.accessories,
-  catLocation: inventory_cats.location.retail,
-  id: "9439",
-};
-export let mirror = {
-  ...inventory_item,
-  name: "mirror",
-  price: 30,
-  catMain: inventory_cats.main.parts,
-  catDescrip: inventory_cats.descrip.accessories,
-  catLocation: inventory_cats.location.retail,
-  id: "93483",
-};
-export const test_inventory = [brakeHandle, shiftCable, helmet, mirror];
+// export let helmet = {
+//   ...inventory_item,
+//   name: "helmet",
+//   price: 35,
+//   catMain: inventory_cats.main.parts,
+//   catDescrip: inventory_cats.descrip.accessories,
+//   catLocation: inventory_cats.location.retail,
+//   id: "9439",
+// };
+// export let mirror = {
+//   ...inventory_item,
+//   name: "mirror",
+//   price: 30,
+//   catMain: inventory_cats.main.parts,
+//   catDescrip: inventory_cats.descrip.accessories,
+//   catLocation: inventory_cats.location.retail,
+//   id: "93483",
+// };
+export const test_inventory = [brakeHandle, shiftCable];

@@ -12,7 +12,7 @@ import {
 import { log } from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
-import { Discounts } from "./data";
+import { Discounts, inventory_item } from "./data";
 
 const centerItem = {
   alignItems: "center",
@@ -62,6 +62,71 @@ export const TextInputOnMainBackground = ({
       style={{ ...info_styles.textInput, ...styleProps }}
       onChangeText={(val) => onTextChange(val)}
     />
+  );
+};
+
+export const PartialScreenModal = ({
+  buttonLabel,
+  buttonStyle = {},
+  containerStyle = {},
+  textStyle = {},
+  modalStyle = {},
+  Component,
+}) => {
+  const [sIsModalVisible, _modalVisible] = useState(false);
+
+  const toggleModal = () => _modalVisible(!sIsModalVisible);
+
+  // toggleModal();
+
+  return (
+    <TouchableWithoutFeedback onPress={() => toggleModal()}>
+      <View style={{ ...styles.container, ...containerStyle }}>
+        <TouchableOpacity
+          style={{
+            backgroundColor: Colors.blueButtonBackground,
+            borderRadius: 2,
+            margin: 2,
+            paddingHorizontal: 6,
+            paddingVertical: 0,
+            alignItems: "center",
+            justifyContent: "center",
+            shadowColor: "black",
+            shadowOffset: { width: 2, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 5,
+          }}
+          onPress={toggleModal}
+        >
+          <Text
+            style={{
+              color: "white",
+              textAlign: "center",
+              fontSize: 15,
+              ...textStyle,
+            }}
+          >
+            {buttonLabel}
+          </Text>
+        </TouchableOpacity>
+
+        <Modal style={{ width: "50%" }} visible={sIsModalVisible} transparent>
+          <View
+            style={{
+              width: "50%",
+              alignSelf: "center",
+              justifySelf: "center",
+              flex: 1,
+              ...modalStyle,
+            }}
+          >
+            <View style={styles.modalBackground}>
+              <Component />
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 
@@ -190,6 +255,83 @@ export const ModalDropdown = ({
         </Modal>
       </View>
     </TouchableWithoutFeedback>
+  );
+};
+
+export const InventoryItemInModal = ({ item = inventory_item }) => {
+  return (
+    <View
+      style={{
+        width: "80%",
+        height: "40%",
+        backgroundColor: Colors.opacityBackgroundLight,
+        ...shadow_radius,
+        shadowOffset: { width: 10, height: 10 },
+        padding: 15,
+        // alignItems: "center",
+      }}
+    >
+      <View
+        style={{
+          width: "100%",
+          flexDirection: "row",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text
+          numberOfLines={3}
+          style={{
+            //   marginTop: 10,
+            fontSize: 16,
+            color: "whitesmoke",
+          }}
+        >
+          {item.name}
+        </Text>
+        <Text style={{ color: "red", fontSize: 13 }}>
+          {"$ "}
+          <Text style={{ fontSize: 16 }}>{item.price}</Text>
+        </Text>
+      </View>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginTop: 20 }}
+      >
+        <Text
+          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
+        >
+          Category:
+        </Text>
+        <Text style={{ fontSize: 16, color: "lightgray", marginVertical: 0 }}>
+          {item.catMain}
+        </Text>
+      </View>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
+      >
+        <Text
+          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
+        >
+          Description:
+        </Text>
+
+        <Text style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}>
+          {item.catDescrip}
+        </Text>
+      </View>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
+      >
+        <Text
+          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
+        >
+          Location:
+        </Text>
+
+        <Text style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}>
+          {item.catLocation}
+        </Text>
+      </View>
+    </View>
   );
 };
 
@@ -322,6 +464,8 @@ export const TabMenuButton = ({
         opacity: isSelected ? 1 : 0.65,
         paddingHorizontal: 20,
         paddingVertical: 5,
+        ...shadow_radius,
+        shadowOffset: { width: 0, height: 2 },
       }}
       onPress={onPress}
       text={text}

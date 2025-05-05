@@ -28,3 +28,5 @@ export const dim = {
   windowWidth: window.innerWidth,
   windowHeight: window.innerHeight,
 };
+
+export const deepCopyObject = (obj) => {};

@@ -1,15 +1,20 @@
 import { log } from "./utils";
 
-export const Customer = {
-  first: "Test",
-  last: "Customer",
-  phone: {
-    cell: "123-456-7899",
-    landline: "123-456-2345",
-    // callOnlyOption: true,
-    emailOnlyOption: true,
-  },
+export const DB_DIRECTORY = {
+  customers: "CUSTOMERS",
+  workorders: "WORKORDERS",
+};
 
+export const CUSTOMER = {
+  first: "",
+  last: "",
+  phone: {
+    cell: "",
+    landline: "",
+    emailOnlyOption: false,
+    callOnlyOption: false,
+  },
+  email: "",
   address: {
     streetAddress: "",
     unit: "",
@@ -18,33 +23,131 @@ export const Customer = {
     zip: "",
     notes: "",
   },
-  id: "334739",
-  comments: "",
+  id: "",
   interactionRating: "",
-  workorders: "",
-  payments: "",
+  workorders: [],
+  payments: [],
+  dateCreated: "",
 };
 
-export const Discounts = [
+export const DISCOUNTS = [
   { name: "50% Off Item", value: "10%" },
   { name: "2-bike purchase, $100 Off Each Bike", value: "100" },
 ];
 
-export const WorkorderItem = {
-  name: "Change tube",
+export const WORKORDER_ITEM = {
+  name: "",
   qty: 1,
-  price: 4.99,
-  intakeNotes: "Front",
-  serviceNotes: "this is a piece of shit lugnut missing",
+  price: 0,
+  intakeNotes: "",
+  serviceNotes: "",
   id: 123,
 };
 
-export const Workorder = {
+export const TAB_NAMES = {
+  itemsTab: {
+    workorderItems: "Workorder Items",
+    changeLog: "Change Log",
+    dashboard: "Dashboard",
+    creatingNewWorkorder: "Create New Workorder",
+  },
+  optionsTab: {
+    quickItems: "Quick Items",
+    workorders: "Workorders",
+  },
+};
+
+export const INFO_COMPONENT_NAMES = {
+  workorder: "workorder",
+  phoneNumberEntry: "phoneEntry",
+  nameAddressEntry: "nameAddressEntry",
+};
+
+export const BIKE_COLORS_ARR = [
+  {
+    textColor: "black",
+    backgroundColor: "whitesmoke",
+    label: "White",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "blue",
+    label: "Blue",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "lightblue",
+    label: "Light-blue",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "red",
+    label: "Red",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "green",
+    label: "Green",
+  },
+
+  {
+    textColor: "whitesmoke",
+    backgroundColor: "black",
+    label: "Black",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "yellow",
+    label: "Yellow",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "maroon",
+    label: "Maroon",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "rgb(139,69,19)",
+    label: "Brown",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "rgb(192,192,192)",
+    label: "Silver",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "tan",
+    label: "Tan",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "beige",
+    label: "Beige",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "darkgray",
+    label: "Gray",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "lightgray",
+    label: "Light-gray",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "pink",
+    label: "Pink",
+  },
+];
+
+export const WORKORDER = {
   id: "399439",
   customerID: "12232",
   brand: "Trek",
   description: "Hybrid",
-  color: "Yellow",
+  color: BIKE_COLORS_ARR[0],
   changes: {
     startedBy: "Fritz",
     changeLog: [],
@@ -86,16 +189,36 @@ export const Workorder = {
     internalNotes: "",
     customerNotes: "",
   },
+  dueBy: "Monday",
 };
 
-export const Brands = {
+export const BLANK_WORKORDER = {
+  id: "",
+  customerID: "",
+  brand: "",
+  description: "",
+  color: "",
+  changes: {
+    startedBy: "",
+    changeLog: [],
+  },
+  partOrdered: "",
+  partSource: "",
+  notes: {
+    internalNotes: "",
+    customerNotes: "",
+  },
+  dueBy: "",
+};
+
+export const BRANDS = {
   brands1: ["Trek", "Specialized", "Sun", "Marin"],
   brands1Title: "Pedal Bikes",
   brands2: ["Euphree", "Lectric", "Hiboy"],
   brands2Title: "E-Bikes",
 };
 
-export const BikeColors = [
+export const BIKE_COLORS = [
   "White",
   "Blue",
   "Green",
@@ -106,11 +229,11 @@ export const BikeColors = [
   "Tan",
 ];
 
-export const Descriptions = ["Hybrid", "E-Bike", "Cruiser", "Road Bike"];
+export const BIKE_DESCRIPTIONS = ["Hybrid", "E-Bike", "Cruiser", "Road Bike"];
 
-export const PartSources = ["JBI", "QBP", "Amazon", "Ebay"];
+export const PART_SOURCES = ["JBI", "QBP", "Amazon", "Ebay"];
 
-export const inventory_cats = {
+export const INVENTORY_CATEGORIES = {
   main: {
     parts: "Parts & Accessories",
     labor: "Labor",
@@ -135,23 +258,23 @@ export const inventory_cats = {
   },
 };
 
-export const inventory_item = {
+export const INVENTORY_ITEM = {
   name: "brake handle",
   price: 20,
-  catMain: inventory_cats.main.parts,
-  catDescrip: inventory_cats.descrip.brakes,
-  catLocation: inventory_cats.location.service,
+  catMain: INVENTORY_CATEGORIES.main.parts,
+  catDescrip: INVENTORY_CATEGORIES.descrip.brakes,
+  catLocation: INVENTORY_CATEGORIES.location.service,
   id: "122",
 };
 
-export const inventory = {
+export const INVENTORY_STRUCTURE = {
   parts: [],
   labor: [],
   accessories: [],
   bikes: {},
 };
 
-export const quick_button_names = [
+export const QUICK_BUTTON_NAMES = [
   {
     name: "Tune-Up",
     id: "1234",
@@ -270,21 +393,21 @@ export const quick_button_names = [
 ];
 
 export let brakeHandle = {
-  ...inventory_item,
+  ...INVENTORY_ITEM,
   name: "Tune-Up - Pedal Bike - Standard",
   price: 20,
-  catMain: inventory_cats.main.parts,
-  catDescrip: inventory_cats.descrip.brakes,
-  catLocation: inventory_cats.location.service,
+  catMain: INVENTORY_CATEGORIES.main.parts,
+  catDescrip: INVENTORY_CATEGORIES.descrip.brakes,
+  catLocation: INVENTORY_CATEGORIES.location.service,
   id: "583t54t49",
 };
 export let shiftCable = {
-  ...inventory_item,
+  ...INVENTORY_ITEM,
   name: "Tune-Up - Pedal Bike - Single Speedvdfgagfasgafgfas",
   price: 5,
-  catMain: inventory_cats.main.parts,
-  catDescrip: inventory_cats.descrip.shifting,
-  catLocation: inventory_cats.location.service,
+  catMain: INVENTORY_CATEGORIES.main.parts,
+  catDescrip: INVENTORY_CATEGORIES.descrip.shifting,
+  catLocation: INVENTORY_CATEGORIES.location.service,
   id: "5854t349",
 };
 // export let helmet = {

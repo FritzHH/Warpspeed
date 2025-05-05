@@ -9,10 +9,18 @@ import {
   TextInput,
   TouchableWithoutFeedback,
 } from "react-native-web";
+import React from "react";
 import { log } from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
-import { Discounts, inventory_item } from "./data";
+import {
+  BIKE_COLORS,
+  BIKE_COLORS_ARR,
+  DISCOUNTS,
+  INVENTORY_ITEM,
+} from "./data";
+import { cloneDeep } from "lodash";
+import { CUSTOMER } from "./data";
 
 const centerItem = {
   alignItems: "center",
@@ -41,37 +49,39 @@ export const TextInputOnMainBackground = ({
   value,
   onTextChange,
   styleProps = {},
+  placeholderText,
 }) => {
-  const info_styles = {
-    textInput: {
-      borderWidth: 2,
-      borderColor: "gray",
-      color: Colors.lightTextOnMainBackground,
-      paddingVertical: 3,
-      paddingHorizontal: 4,
-      fontSize: 16,
-      outlineWidth: 0,
-    },
-  };
-
   return (
     <TextInput
       value={value}
-      placeholder="Brand"
+      placeholder={placeholderText}
       placeholderTextColor={"darkgray"}
-      style={{ ...info_styles.textInput, ...styleProps }}
+      style={{
+        borderWidth: 2,
+        borderColor: "gray",
+        color: Colors.lightTextOnMainBackground,
+        paddingVertical: 3,
+        paddingHorizontal: 4,
+        fontSize: 16,
+        outlineWidth: 0,
+        ...styleProps,
+      }}
       onChangeText={(val) => onTextChange(val)}
     />
   );
 };
 
-export const PartialScreenModal = ({
+export const ScreenModal = ({
   buttonLabel,
-  buttonStyle = {},
+  buttonStyle = {
+    backgroundColor: "green",
+  },
+  handleButtonPress,
   containerStyle = {},
   textStyle = {},
-  modalStyle = {},
   Component,
+  shadowProps,
+  modalProps,
 }) => {
   const [sIsModalVisible, _modalVisible] = useState(false);
 
@@ -84,7 +94,7 @@ export const PartialScreenModal = ({
       <View style={{ ...styles.container, ...containerStyle }}>
         <TouchableOpacity
           style={{
-            backgroundColor: Colors.blueButtonBackground,
+            // backgroundColor: Colors.blueButtonBackground,
             borderRadius: 2,
             margin: 2,
             paddingHorizontal: 6,
@@ -95,8 +105,12 @@ export const PartialScreenModal = ({
             shadowOffset: { width: 2, height: 2 },
             shadowOpacity: 0.3,
             shadowRadius: 5,
+            ...buttonStyle,
           }}
-          onPress={toggleModal}
+          onPress={() => {
+            toggleModal();
+            handleButtonPress();
+          }}
         >
           <Text
             style={{
@@ -110,17 +124,27 @@ export const PartialScreenModal = ({
           </Text>
         </TouchableOpacity>
 
-        <Modal style={{ width: "50%" }} visible={sIsModalVisible} transparent>
+        <Modal visible={sIsModalVisible} transparent>
           <View
             style={{
-              width: "50%",
-              alignSelf: "center",
               justifySelf: "center",
+              alignSelf: "center",
               flex: 1,
-              ...modalStyle,
+              width: "50%",
+              height: "100%",
+              ...modalProps,
+
+              // ...modalStyle,
             }}
           >
-            <View style={styles.modalBackground}>
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
               <Component />
             </View>
           </View>
@@ -134,8 +158,9 @@ export const ModalDropdown = ({
   data,
   onSelect,
   buttonLabel,
+  buttonBackgroundColor,
   onRemoveSelection,
-  currentSelectionName,
+  currentSelection,
   closeButtonText,
   removeButtonText,
   itemListStyle = {},
@@ -153,6 +178,7 @@ export const ModalDropdown = ({
     onSelect(item);
     toggleModal();
   };
+  // log(data);
 
   return (
     <TouchableWithoutFeedback onPress={() => toggleModal()}>
@@ -177,7 +203,7 @@ export const ModalDropdown = ({
         >
           <Text
             style={{
-              color: "white",
+              color: buttonBackgroundColor || "white",
               textAlign: "center",
               fontSize: 15,
               ...buttonStyle,
@@ -204,22 +230,46 @@ export const ModalDropdown = ({
                     data={data}
                     keyExtractor={(item, index) => index.toString()}
                     renderItem={({ item }) => {
+                      let label = "";
                       let backgroundColor = null;
-                      // log("current", currentSelectionName);
-                      // log("new", item);
-                      if (currentSelectionName == item) {
-                        backgroundColor = "lightgray";
+                      let textColor = null;
+                      let fontSize = null;
+                      let itemStyleProps = {};
+                      if (typeof item === "object") {
+                        // bike colors modal
+                        if (Object.hasOwn(item, "backgroundColor")) {
+                          label = item.label;
+                          itemStyleProps.backgroundColor = item.backgroundColor;
+                          textColor = item.textColor;
+                          itemStyleProps.paddingVertical = 15;
+                          fontSize = 15;
+                          if (label === currentSelection.label) {
+                            itemStyleProps.borderWidth = 10;
+                            itemStyleProps.borderColor = Colors.mainBackground;
+                          }
+                        }
+                      } else {
+                        fontSize = 15;
+                        label = item;
+                        itemStyleProps.backgroundColor =
+                          Colors.opacityBackgroundLight;
+                        itemStyleProps.marginVertical = 2;
+                        textColor = "white";
                       }
                       return (
                         <TouchableOpacity
                           style={{
                             ...styles.option,
                             backgroundColor,
-                            ...itemListStyle,
+                            // ...borderProps,
+                            borderColor: "dimgray",
+                            ...itemStyleProps,
                           }}
                           onPress={() => handleSelect(item)}
                         >
-                          <Text style={styles.optionText}>{item}</Text>
+                          <Text style={{ fontSize, color: textColor }}>
+                            {label}
+                          </Text>
                         </TouchableOpacity>
                       );
                     }}
@@ -230,13 +280,7 @@ export const ModalDropdown = ({
                       justifyContent: "space-around",
                     }}
                   >
-                    <TouchableOpacity
-                      style={styles.closeButton}
-                      onPress={toggleModal}
-                    >
-                      <Text style={styles.closeText}>{closeButtonText}</Text>
-                    </TouchableOpacity>
-                    {currentSelectionName && (
+                    {currentSelection && (
                       <TouchableOpacity
                         style={styles.removeButton}
                         onPress={() => {
@@ -258,7 +302,7 @@ export const ModalDropdown = ({
   );
 };
 
-export const InventoryItemInModal = ({ item = inventory_item }) => {
+export const InventoryItemInModal = ({ item = INVENTORY_ITEM }) => {
   return (
     <View
       style={{
@@ -331,9 +375,227 @@ export const InventoryItemInModal = ({ item = inventory_item }) => {
           {item.catLocation}
         </Text>
       </View>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
+      >
+        <Text
+          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
+        >
+          Barcode:
+        </Text>
+
+        <Text style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}>
+          {item.upc}
+        </Text>
+      </View>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
+      >
+        <Text
+          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
+        >
+          Vendor ID:
+        </Text>
+
+        <Text style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}>
+          {item.vendorID}
+        </Text>
+      </View>
     </View>
   );
 };
+
+export const CustomerInfoComponent = ({
+  __setInfoComponentName,
+  ssInfoComponentName,
+  __setCustomerObj,
+  ssCustomerObj,
+  // sCustomerInfo,
+  // _setCustomerInfo,
+}) => {
+  const [sBox1Val, _setBox1Val] = React.useState("");
+  const [sBox2Val, _setBox2Val] = React.useState("");
+  const [sShowCustomerModal, _setShowCustomerModal] = React.useState(false);
+  const [sSearchingByName, _setSearchingByName] = React.useState(false);
+  const [sFoundExistingCustomer, _setFoundExistingCustomer] =
+    React.useState(false);
+  const [sCustomerInfo, _setCustomerInfo] = React.useState(cloneDeep(CUSTOMER));
+
+  const TEXT_INPUT_STYLE = {
+    width: 200,
+    height: 40,
+    borderColor: "gray",
+    borderWidth: 1,
+    marginLeft: 20,
+    marginTop: 10,
+    paddingHorizontal: 3,
+  };
+
+  return (
+    <TouchableWithoutFeedback>
+      <View
+        style={{
+          width: "60%",
+          backgroundColor: "whitesmoke",
+          height: "70%",
+          flexDirection: "row",
+          shadowProps: {
+            shadowColor: "black",
+            shadowOffset: { width: 2, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 5,
+          },
+        }}
+      >
+        <View>
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.phone.cell = val;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="Cell phone"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.phone.cell}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.phone.landline = val;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="Landline"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.phone.landline}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.first = val;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="First name"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.first}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.last(val);
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="Last name"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.last}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.email(val);
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="Email address"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.email}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.address.streetAddress = val;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="Street address"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.address.streetAddress}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.address.unit = val;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="Unit"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.address.unit}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.address.city = val;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="City"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.address.city}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.address.state = val;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="State"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.address.state}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.address.zip = val;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="Zip code"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.address.zip}
+            autoComplete="none"
+          />
+          <TextInput
+            onChangeText={(val) => {
+              sCustomerInfo.address.notes(val);
+              _setCustomerInfo(sCustomerInfo);
+            }}
+            placeholderTextColor="darkgray"
+            placeholder="Address notes"
+            style={{ ...TEXT_INPUT_STYLE }}
+            value={sCustomerInfo.address.notes}
+            autoComplete="none"
+          />
+          <Button
+            onPress={() => {
+              log("pressed");
+            }}
+            viewStyle={{
+              marginTop: 30,
+              marginLeft: 20,
+              backgroundColor: "lightgray",
+              height: 40,
+              width: 200,
+            }}
+            textStyle={{ color: "dimgray" }}
+            text={"Create New Customer"}
+          />
+        </View>
+        <View>
+          <View style={{ borderWidth: 1, width: 300, height: 300 }} />
+          <Text>Workorder list</Text>
+          <View style={{ borderWidth: 1, width: 300, height: 300 }} />
+          <Text>Payments</Text>
+        </View>
+      </View>
+    </TouchableWithoutFeedback>
+  );
+};
+
+// export const
 
 export const shadow_radius = {
   shadowColor: "black",
@@ -368,9 +630,7 @@ const styles = {
     padding: 20,
   },
   option: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
+    padding: 18,
   },
   optionText: {
     fontSize: 16,
@@ -404,6 +664,7 @@ const styles = {
 
 export const Button = ({
   onPress,
+  onLongPress,
   height,
   width,
   backgroundColor,
@@ -417,11 +678,12 @@ export const Button = ({
 }) => {
   if (caps) text = text.toUpperCase();
   return (
-    <Pressable
+    <TouchableOpacity
+      onLongPress={onLongPress}
       onPress={
         onPress ||
         (() => {
-          log("button pressed");
+          log("button pressed no function handed to Button in components file");
         })
       }
     >
@@ -444,7 +706,7 @@ export const Button = ({
           {text || "Button"}
         </Text>
       </View>
-    </Pressable>
+    </TouchableOpacity>
   );
 };
 
@@ -455,13 +717,15 @@ export const TabMenuButton = ({
   viewStyle,
   textStyle,
   isSelected,
+  onLongPress,
 }) => {
   return (
     <Button
+      onLongPress={onLongPress}
       textStyle={{ textColor: Colors.tabMenuButtonText }}
       viewStyle={{
         viewStyle,
-        opacity: isSelected ? 1 : 0.65,
+        opacity: isSelected ? 1 : 0.45,
         paddingHorizontal: 20,
         paddingVertical: 5,
         ...shadow_radius,

@@ -17,30 +17,30 @@ import {
   TextInputLabelOnMainBackground,
   shadow_radius,
   InventoryItemInModal,
-  PartialScreenModal,
+  ScreenModal,
 } from "../../components";
 import { Colors } from "../../styles";
 import {
-  BikeColors,
-  Brands,
-  Customer,
-  Descriptions,
-  Discounts,
-  inventory_item,
-  PartSources,
-  quick_button_names,
+  BIKE_COLORS,
+  BRANDS,
+  CUSTOMER,
+  BIKE_DESCRIPTIONS,
+  DISCOUNTS,
+  INVENTORY_ITEM,
+  PART_SOURCES,
+  QUICK_BUTTON_NAMES,
   test_inventory,
-  Workorder,
-  WorkorderItem,
+  WORKORDER,
+  WORKORDER_ITEM,
 } from "../../data";
 import { useActionData } from "react-router-dom";
 
 let firstPass = false;
-const SEARCH_STRING_TIMER = 30 * 1000;
+const SEARCH_STRING_TIMER = 45 * 1000;
 
 export function QuickItemsTab({
-  workorderOb = Workorder,
-  customerObj = Customer,
+  ssWorkorderObj = WORKORDER,
+  __setWorkorderObj,
 }) {
   const intervalRef = React.useRef(null);
   const [sSearchTerm, _setSearchTerm] = React.useState("");
@@ -48,11 +48,10 @@ export function QuickItemsTab({
   const [sInventory, _setInventory] = React.useState(test_inventory);
   const [sInitDone, _setInitDone] = React.useState(false);
   const [sQuickItemsButtonArr, _setQuickItemsButtonArr] =
-    React.useState(quick_button_names);
+    React.useState(QUICK_BUTTON_NAMES);
   const [sQuickButtonContentsArr, setstateQuickButtonContentsArr] =
     React.useState([]);
 
-  const quickButtonNames = quick_button_names;
   let lastSearchMillis = new Date().getTime();
   let quickItemButtonHit = true;
 
@@ -70,9 +69,8 @@ export function QuickItemsTab({
   function init() {
     if (!sInitDone) {
       search("br");
-      //   log("arr", sQuickItemsButtonArr);
       _setInitDone(true);
-      //   setSearchTimer();
+      // setSearchTimer();
     }
   }
   init();
@@ -87,7 +85,7 @@ export function QuickItemsTab({
     }
     if (searchTerm.length < 2) return;
     let res = {};
-    let keys = Object.keys(inventory_item);
+    let keys = Object.keys(INVENTORY_ITEM);
     sInventory.forEach((invItem) => {
       keys.forEach((key) => {
         if (
@@ -104,8 +102,19 @@ export function QuickItemsTab({
     _setSearchResults(res);
   }
 
-  function searchItemSelected(item) {
-    log("selected item", item);
+  function quickItemSelected(item) {
+    // log(workorderOb);
+    let newItem = { ...WORKORDER_ITEM };
+    log("original", WORKORDER_ITEM);
+    log("first workorder", ssWorkorderObj.items);
+    Object.keys(WORKORDER_ITEM).forEach((itemKey) => {
+      if (Object.hasOwn(item, itemKey)) newItem[itemKey] = item[itemKey];
+    });
+    log("new item", newItem);
+    let work = JSON.parse(JSON.stringify(ssWorkorderObj));
+    work.items.push(newItem);
+    log("second workorder", work.items);
+    __setWorkorderObj(work);
   }
 
   function clearSearch() {
@@ -126,13 +135,15 @@ export function QuickItemsTab({
         <TouchableOpacity
           onPress={() => clearSearch()}
           style={{
-            backgroundColor: "darkgray",
-            borderWidth: 1,
-            borderColor: Colors.lightTextOnMainBackground,
-            paddingHorizontal: 10,
-            marginRight: 25,
-            marginLeft: 5,
+            // minWidth: 50,
+            // maxWidth: 150,
+            width: 120,
+            marginVertical: 4,
             justifyContent: "center",
+            borderWidth: 0,
+            alignItems: "center",
+            marginLeft: 7,
+            backgroundColor: "darkgray",
             ...shadow_radius,
           }}
         >
@@ -155,6 +166,7 @@ export function QuickItemsTab({
             color: Colors.darkTextOnMainBackground,
             outlineWidth: 0,
             width: "100%",
+            marginLeft: 20,
             marginRight: 30,
           }}
           placeholder="Search..."
@@ -176,7 +188,7 @@ export function QuickItemsTab({
             marginLeft: 5,
           }}
           data={sQuickItemsButtonArr}
-          keyExtractor={(item, index) => item.id || index.toString()}
+          keyExtractor={(item, index) => index.toString()}
           renderItem={(item) => {
             return (
               <QuickItemButton
@@ -209,7 +221,7 @@ export function QuickItemsTab({
           renderItem={(item) => {
             // log(item.item);
             return (
-              <TouchableOpacity onPress={() => searchItemSelected(item.item)}>
+              <TouchableOpacity onPress={() => quickItemSelected(item.item)}>
                 <View
                   style={{
                     flexDirection: "row",
@@ -236,7 +248,7 @@ export function QuickItemsTab({
                       width: "15%",
                     }}
                   >
-                    <PartialScreenModal
+                    <ScreenModal
                       buttonLabel={"i"}
                       modalStyle={{ width: "40%", alignSelf: "flex-end" }}
                       Component={() => (

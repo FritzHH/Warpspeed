@@ -16,6 +16,7 @@
     "fast-uri": "^3.0.6",
     "firebase": "^11.6.1",
     "fs": "^0.0.1-security",
+    "lodash": "^4.17.21",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-native-pager-view": "^6.7.1",

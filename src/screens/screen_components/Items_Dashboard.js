@@ -33,7 +33,7 @@ export function Items_Dashboard({ fun_create_new_workorder }) {
   return (
     <View style={{ width: "100%", height: "100%" }}>
       <TouchableOpacity
-        onPress={fun_create_new_workorder}
+        // onPress={fun_create_new_workorder}
         style={{
           flexDirection: "row",
           justifyContent: "center",
@@ -42,7 +42,7 @@ export function Items_Dashboard({ fun_create_new_workorder }) {
           height: 150,
         }}
       >
-        <Text style={{ color: "red", fontSize: 30 }}>New Workorder</Text>
+        <Text style={{ color: "red", fontSize: 30 }}>Button Here</Text>
       </TouchableOpacity>
     </View>
   );

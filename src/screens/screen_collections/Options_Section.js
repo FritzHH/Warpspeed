@@ -46,6 +46,7 @@ export function Options_Section({
         ssOptionsTabName={ssOptionsTabName}
         _setWorkorderBtnLongPressed={_setWorkorderBtnLongPressed}
         workorderBtnClicked={workorderBtnClicked}
+        ssWorkorderObj={ssWorkorderObj}
       />
       <Modal visible={sWorkorderBtnLongPressed} transparent>
         <TouchableWithoutFeedback
@@ -91,6 +92,7 @@ const TabBar = ({
   ssOptionsTabName,
   _setWorkorderBtnLongPressed,
   workorderBtnClicked,
+  ssWorkorderObj,
 }) => (
   <View
     style={{
@@ -104,13 +106,15 @@ const TabBar = ({
         flexDirection: "row",
       }}
     >
-      <TabMenuButton
-        onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
-        text={TAB_NAMES.optionsTab.quickItems}
-        isSelected={
-          ssOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
-        }
-      />
+      {ssWorkorderObj && (
+        <TabMenuButton
+          onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
+          text={TAB_NAMES.optionsTab.quickItems}
+          isSelected={
+            ssOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
+          }
+        />
+      )}
       <Divider />
       <TabMenuButton
         onPress={workorderBtnClicked}

@@ -69,13 +69,14 @@ export function Items_Section({
       <TabBar
         __setItemsTabName={__setItemsTabName}
         ssItemsTabName={ssItemsTabName}
+        ssWorkorderObj={ssWorkorderObj}
       />
       {selectComponent()}
     </View>
   );
 }
 
-const TabBar = ({ __setItemsTabName, ssItemsTabName }) => (
+const TabBar = ({ __setItemsTabName, ssItemsTabName, ssWorkorderObj }) => (
   <View
     style={{
       flexDirection: "row",
@@ -88,21 +89,25 @@ const TabBar = ({ __setItemsTabName, ssItemsTabName }) => (
         flexDirection: "row",
       }}
     >
-      <TabMenuButton
-        onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
-        text={TAB_NAMES.itemsTab.workorderItems}
-        isSelected={
-          ssItemsTabName === TAB_NAMES.itemsTab.workorderItems ? true : false
-        }
-      />
+      {ssWorkorderObj && (
+        <TabMenuButton
+          onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
+          text={TAB_NAMES.itemsTab.workorderItems}
+          isSelected={
+            ssItemsTabName === TAB_NAMES.itemsTab.workorderItems ? true : false
+          }
+        />
+      )}
       <Divider />
-      <TabMenuButton
-        onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
-        text={TAB_NAMES.itemsTab.changeLog}
-        isSelected={
-          ssItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
-        }
-      />
+      {ssWorkorderObj && (
+        <TabMenuButton
+          onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
+          text={TAB_NAMES.itemsTab.changeLog}
+          isSelected={
+            ssItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
+          }
+        />
+      )}
     </View>
     <View
       style={{

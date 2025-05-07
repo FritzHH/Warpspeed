@@ -35,7 +35,8 @@ export const Items_WorkorderItemsTab = ({
   __setWorkorderObj,
 }) => {
   //   log("workorder items arr", workorderObj.items);
-  ssWorkorderObj = { ...ssWorkorderObj };
+  // [const ]
+
   function deleteWorkorderItem(item) {
     let newItemList = ssWorkorderObj.items.filter((old) => old.id != item.id);
     ssWorkorderObj.items = newItemList;
@@ -43,7 +44,6 @@ export const Items_WorkorderItemsTab = ({
   }
 
   function changeWorkorderItem(newItem) {
-    log("setting new workorder item", newItem);
     let found = false;
     let newItemList = ssWorkorderObj.items.map((oldItem) => {
       if (oldItem.id == newItem.id) {
@@ -56,6 +56,54 @@ export const Items_WorkorderItemsTab = ({
     if (!found) newItemList.push(newItem);
     ssWorkorderObj.items = newItemList;
     __setWorkorderObj(ssWorkorderObj);
+  }
+
+  if (!ssWorkorderObj) {
+    return (
+      <View
+        style={{
+          width: "100%",
+          height: "100%",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            textAlign: "center",
+            opacity: 0.05,
+            color: "black",
+            fontSize: 120,
+          }}
+        >
+          Ready for Action
+        </Text>
+      </View>
+    );
+  }
+
+  if (ssWorkorderObj.items.length == 0) {
+    return (
+      <View
+        style={{
+          width: "100%",
+          height: "100%",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            textAlign: "center",
+            opacity: 0.05,
+            color: "black",
+            fontSize: 120,
+          }}
+        >
+          Empty Workorder
+        </Text>
+      </View>
+    );
   }
 
   return (

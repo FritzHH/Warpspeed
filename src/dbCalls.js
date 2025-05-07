@@ -29,7 +29,10 @@ export function getNewCollectionRef(collectionName) {
 }
 
 export function setCollectionItem(collectionName, item) {
-  return setDoc(doc(DB, collectionName, item.id), item);
+  let docRef = doc(DB, collectionName, item.id);
+  return setDoc(docRef, item)
+    .then(() => {})
+    .catch((err) => log("err", err));
 }
 
 // async call

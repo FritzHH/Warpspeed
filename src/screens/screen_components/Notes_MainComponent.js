@@ -19,82 +19,83 @@ import { Colors } from "../../styles";
 
 /// Notes Tab Component
 export const Notes_MainComponent = ({ ssWorkorderObj, __setWorkorderObj }) => {
-  if (!ssWorkorderObj) {
-    //dev
-    ssWorkorderObj = {};
-    ssWorkorderObj.notes = {};
-    ssWorkorderObj.notes.customerNotes = "";
-    ssWorkorderObj.notes.internalNotes = "";
-  }
-
   return (
     <View style={{ width: "100%", height: "100%", paddingTop: 20 }}>
-      <View
+      {/* <View
         style={{
-          flexDirection: "row",
           width: "100%",
           height: "100%",
         }}
-      >
+      > */}
+      {ssWorkorderObj && (
         <View
           style={{
-            width: "50%",
+            flexDirection: "row",
+            width: "100%",
             height: "100%",
-            backgroundColor: null,
-            flexDirection: "column",
-            paddingRight: 10,
           }}
         >
-          <View>
-            <Text style={{ color: "lightgray" }}>Customer Notes</Text>
-          </View>
-          <TextInput
-            multiline={true}
-            placeholderTextColor={"darkgray"}
-            placeholder="Write as many notes as you can..."
+          <View
             style={{
-              marginTop: 5,
-              width: "100%",
+              width: "50%",
               height: "100%",
-              outlineWidth: 0,
+              backgroundColor: null,
+              flexDirection: "column",
+              paddingRight: 10,
             }}
-            value={ssWorkorderObj.notes.customerNotes}
-          />
-        </View>
-        <View
-          style={{
-            width: "50%",
-            height: "100%",
-            backgroundColor: null,
-            flexDirection: "column",
-            borderLeftWidth: 1,
-            borderColor: "lightgray",
-            paddingLeft: 10,
-          }}
-        >
-          <View>
-            <Text
+          >
+            <View>
+              <Text style={{ color: "lightgray" }}>Customer Notes</Text>
+            </View>
+            <TextInput
+              multiline={true}
+              placeholderTextColor={"darkgray"}
+              placeholder="Write as many notes as you can..."
               style={{
-                color: "lightgray",
+                marginTop: 5,
+                width: "100%",
+                height: "100%",
+                outlineWidth: 0,
               }}
-            >
-              Internal Notes
-            </Text>
+              value={ssWorkorderObj.notes.customerNotes}
+            />
           </View>
-          <TextInput
-            multiline={true}
-            placeholder="Please be detailed..."
-            placeholderTextColor={"darkgray"}
+          <View
             style={{
-              marginTop: 5,
-              width: "100%",
+              width: "50%",
               height: "100%",
-              outlineWidth: 0,
+              backgroundColor: null,
+              flexDirection: "column",
+              borderLeftWidth: 1,
+              borderColor: "lightgray",
+              paddingLeft: 10,
             }}
-            // value={workorderObj.notes.internalNotes}
-          />
+          >
+            <View>
+              <Text
+                style={{
+                  color: "lightgray",
+                }}
+              >
+                Internal Notes
+              </Text>
+            </View>
+            <TextInput
+              multiline={true}
+              placeholder="Please be detailed..."
+              placeholderTextColor={"darkgray"}
+              style={{
+                marginTop: 5,
+                width: "100%",
+                height: "100%",
+                outlineWidth: 0,
+              }}
+              // value={workorderObj.notes.internalNotes}
+            />
+          </View>
+          {/* </View> */}
         </View>
-      </View>
+      )}
     </View>
   );
 };

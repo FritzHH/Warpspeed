@@ -6,6 +6,8 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import {
+  BIKE_COLORS_ARR,
+  COLLECTION_NAMES,
   CUSTOMER,
   INFO_COMPONENT_NAMES,
   TAB_NAMES,
@@ -16,7 +18,7 @@ import { Button } from "react-native-web";
 import { Colors, ViewStyles } from "../styles";
 
 import { dim, log } from "../utils";
-import { shadow_radius } from "../components";
+import { AlertBox, shadow_radius } from "../components";
 import { cloneDeep } from "lodash";
 import { Items_WorkorderItemsTab } from "./screen_components/Items_WorkorderItems";
 import { Notes_MainComponent } from "./screen_components/Notes_MainComponent";
@@ -24,64 +26,66 @@ import { Info_Section } from "./screen_collections/Info_Section";
 import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
+import { getNewCollectionRef, setCollectionItem } from "../dbCalls";
 // import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
 // import { TabView, SceneMap } from "react-native-tab-view";
 
 let height = dim.windowHeight * 1;
 
-const test_workorder_arr = () => {
-  for (let i = 0; i == 2; i++) {}
-};
+let testWorkorder = cloneDeep(WORKORDER);
+testWorkorder.color = BIKE_COLORS_ARR[4];
+testWorkorder.brand = "brand goes here";
 
-let testWorkorder = { ...WORKORDER };
-testWorkorder.color = {
-  label: "buddy",
-  backgroundColor: "",
-  textColor: "",
-};
-log(testWorkorder);
+let test_cust = cloneDeep(CUSTOMER);
+test_cust.first = "big fat";
+test_cust.last = "jones";
+test_cust.phone.cell = "123-434-5456";
 
 export function WorkorderScreen() {
-  const [sCustomerObj, _setCustomerObj] = React.useState({ ...CUSTOMER });
+  const [sCustomerObj, _setCustomerObj] = React.useState(test_cust);
   const [sWorkorderObj, _setWorkorderObj] = React.useState(testWorkorder);
   const [sWorkordersArr, _setWorkordersArr] = React.useState([]);
-  const [ssItemsTabName, __setItemsTabName] = React.useState(
-    TAB_NAMES.itemsTab.creatingNewWorkorder
+  const [sItemsTabName, _setItemsTabName] = React.useState(
+    TAB_NAMES.itemsTab.workorderItems
   );
-  const [ssOptionsTabName, __setOptionsTabName] = React.useState(
+  const [sOptionsTabName, _setOptionsTabName] = React.useState(
     TAB_NAMES.optionsTab.workorders
   );
-  const [ssInfoComponentName, __setInfoComponentName] = React.useState(
-    INFO_COMPONENT_NAMES.phoneNumberEntry
-  );
+  const [sCurrentUser, _setCurrentUser] = React.useState(null);
+  const [sShowAlertBox, _setShowAlertBox] = React.useState(false);
 
-  // state setting functions
   function setCustomerObj(customerObj) {
-    log("setting customer object to this", customerObj);
+    log("Workorder: setting customer object to this", customerObj);
+    _setCustomerObj(customerObj);
   }
   function setWorkorderObj(workorderObj) {
-    log("setting workorder object to this", workorderObj);
+    log("Workorder: setting workorder object to this", workorderObj);
+
+    // this is a new workorder obj
+    if (!workorderObj.id) {
+      let ref = getNewCollectionRef(COLLECTION_NAMES.workorders);
+      workorderObj.id = ref.id;
+      _setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    }
     _setWorkorderObj(workorderObj);
+    // setCollectionItem(COLLECTION_NAMES.workorders, workorderObj);
   }
 
   function setWorkorderArr(workorderArr) {
-    log("setting workorder arr to this ", workorderArr);
+    log("Workorder: setting workorder arr to this ", workorderArr);
     _setWorkordersArr(workorderArr);
   }
 
-  function setInfoComponentName(name) {
-    log("setting info component name to ", name);
-    __setInfoComponentName(name);
-  }
-
-  // internal functions
-  function createNewWorkorder() {
-    log("creating new workorder screen");
-    __setItemsTabName(TAB_NAMES.itemsTab.creatingNewWorkorder);
+  function createNewCustomer(customerObj) {
+    log("Workorder: CREATING NEW customer object to this", customerObj);
+    let ref = getNewCollectionRef(COLLECTION_NAMES.customers);
+    customerObj.id = ref.id;
+    _setCustomerObj(customerObj);
+    // setCollectionItem(COLLECTION_NAMES.customers, customerObj);
+    _setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 
   return (
-    // <TouchableWithoutFeedback onPress={() => log("pressed")}>
     <View
       style={{
         ...ViewStyles.fullScreen,
@@ -105,11 +109,15 @@ export function WorkorderScreen() {
           >
             <Info_Section
               ssCustomerObj={cloneDeep(sCustomerObj)}
-              ssWorkorderJob={cloneDeep(sWorkorderObj)}
-              ssInfoComponentName={ssInfoComponentName}
-              __setCustomerObj={(obj) => setCustomerObj(cloneDeep(obj))}
-              __setWorkorderObj={(obj) => setWorkorderObj(cloneDeep(obj))}
-              __setInfoComponentName={(name) => setInfoComponentName(name)}
+              ssWorkorderObj={cloneDeep(sWorkorderObj)}
+              __createNewCustomer={createNewCustomer}
+              __setCustomerObj={setCustomerObj}
+              __setWorkorderObj={setWorkorderObj}
+              __setShowAlertBox={_setShowAlertBox}
+              __setOptionsTabName={() =>
+                _setOptionsTabName(TAB_NAMES.optionsTab.quickItems)
+              }
+              ssShowAlertBox={sShowAlertBox}
             />
           </View>
           <View
@@ -121,11 +129,10 @@ export function WorkorderScreen() {
             }}
           >
             <Items_Section
-              ssItemsTabName={ssItemsTabName}
-              __setItemsTabName={__setItemsTabName}
+              ssItemsTabName={sItemsTabName}
+              __setItemsTabName={_setItemsTabName}
               ssWorkorderObj={cloneDeep(sWorkorderObj)}
               __setWorkorderObj={_setWorkorderObj}
-              fun_create_new_workorder={createNewWorkorder}
             />
           </View>
         </View>
@@ -150,9 +157,9 @@ export function WorkorderScreen() {
       >
         <Options_Section
           ssWorderObj={sWorkorderObj}
-          ssOptionsTabName={ssOptionsTabName}
+          ssOptionsTabName={sOptionsTabName}
           __setWorkorderObj={_setWorkorderObj}
-          __setOptionsTabName={__setOptionsTabName}
+          __setOptionsTabName={_setOptionsTabName}
         />
       </View>
     </View>

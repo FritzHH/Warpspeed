@@ -9,7 +9,7 @@ import {
   TextInput,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import React from "react";
+import React, { Component } from "react";
 import { log } from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
@@ -17,6 +17,7 @@ import {
   BIKE_COLORS,
   BIKE_COLORS_ARR,
   DISCOUNTS,
+  FOCUS_NAMES,
   INVENTORY_ITEM,
 } from "./data";
 import { cloneDeep } from "lodash";
@@ -71,44 +72,149 @@ export const TextInputOnMainBackground = ({
   );
 };
 
-export const ScreenModal = ({
-  buttonLabel,
-  buttonStyle = {
-    backgroundColor: "green",
-  },
-  handleButtonPress,
-  containerStyle = {},
-  textStyle = {},
-  Component,
-  shadowProps,
-  modalProps,
+export const AlertBox = ({
+  message,
+  btnText1,
+  btnText2,
+  btnText3,
+  handleBtn1Press,
+  handleBtn2Press,
+  handleBtn3Press,
+  showBox = false,
+  onModalDismiss,
+  canExitOnOuterClick = true,
+  modalStyle = { width: "100%", height: "100%" },
+  alertBoxStyle = { width: 700, height: 200, backgroundColor: "lightgray" },
 }) => {
-  const [sIsModalVisible, _modalVisible] = useState(false);
+  const btnStyle = {
+    width: 150,
+    height: 40,
+    backgroundColor: "dimgray",
+    padding: 10,
+    borderRadius: 4,
+    ...shadow_radius,
+  };
 
-  const toggleModal = () => _modalVisible(!sIsModalVisible);
+  const txtStyle = {
+    color: "whitesmoke",
+    fontSize: 17,
+  };
 
-  // toggleModal();
+  let hasButtons = false;
+  if (btnText1 || btnText2 || btnText3) hasButtons = true;
+
+  if (!hasButtons) alertBoxStyle.justifyContent = "center";
 
   return (
-    <TouchableWithoutFeedback onPress={() => toggleModal()}>
+    <TouchableWithoutFeedback
+      // onPress={() => log("here")}
+      onPress={() => onModalDismiss()}
+    >
+      <Modal
+        onDismiss={() => {
+          onModalDismiss();
+        }}
+        visible={showBox}
+        transparent
+      >
+        <View
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            justifyContent: "center",
+            alignItems: "center",
+            alignSelf: "center",
+            justifySelf: "center",
+            // marginTop: 100,
+            // width: 1000,
+            // height: 800,
+            ...modalStyle,
+          }}
+        >
+          <View
+            style={{
+              shadowColor: "black",
+              shadowOffset: { width: 5, height: 5 },
+              shadowOpacity: 0.7,
+              shadowRadius: 5,
+              padding: 10,
+              // justifyContent: "center",
+              alignItems: "center",
+              ...alertBoxStyle,
+            }}
+          >
+            <Text
+              numberOfLines={3}
+              style={{ color: Colors.darkText, fontSize: 22, color: "red" }}
+            >
+              ALERT!
+            </Text>
+
+            <Text
+              style={{ marginTop: 10, color: Colors.darkText, fontSize: 18 }}
+            >
+              {message}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-around",
+                width: "100%",
+                marginTop: 50,
+              }}
+            >
+              {btnText1 && (
+                <Button
+                  textStyle={{ ...txtStyle }}
+                  viewStyle={{ ...btnStyle }}
+                  text={btnText1}
+                  onPress={handleBtn1Press}
+                />
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </TouchableWithoutFeedback>
+  );
+};
+
+export const ScreenModal = ({
+  canExitOnOuterClick = true,
+  buttonLabel,
+  buttonStyle = {},
+  handleButtonPress = () => {},
+  containerStyle = {},
+  buttonTextStyle = {},
+  Component,
+  shadowProps = {
+    shadowColor: "black",
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  modalStyle,
+  showModal = false,
+  overrideShow = false,
+  onModalDismiss = () => {},
+}) => {
+  const [sIsModalVisible, _modalVisible] = useState(overrideShow);
+
+  return (
+    <TouchableWithoutFeedback
+      onPress={
+        canExitOnOuterClick ? () => _modalVisible(!sIsModalVisible) : null
+      }
+    >
       <View style={{ ...styles.container, ...containerStyle }}>
         <TouchableOpacity
           style={{
-            // backgroundColor: Colors.blueButtonBackground,
-            borderRadius: 2,
-            margin: 2,
-            paddingHorizontal: 6,
-            paddingVertical: 0,
             alignItems: "center",
             justifyContent: "center",
-            shadowColor: "black",
-            shadowOffset: { width: 2, height: 2 },
-            shadowOpacity: 0.3,
-            shadowRadius: 5,
+            ...shadowProps,
             ...buttonStyle,
           }}
           onPress={() => {
-            toggleModal();
+            _modalVisible(!sIsModalVisible);
             handleButtonPress();
           }}
         >
@@ -117,36 +223,33 @@ export const ScreenModal = ({
               color: "white",
               textAlign: "center",
               fontSize: 15,
-              ...textStyle,
+              ...buttonTextStyle,
             }}
           >
             {buttonLabel}
           </Text>
         </TouchableOpacity>
 
-        <Modal visible={sIsModalVisible} transparent>
+        <Modal
+          onDismiss={() => {
+            _modalVisible(false);
+            onModalDismiss();
+          }}
+          visible={sIsModalVisible && showModal}
+          transparent
+        >
           <View
             style={{
-              justifySelf: "center",
-              alignSelf: "center",
               flex: 1,
-              width: "50%",
-              height: "100%",
-              ...modalProps,
-
-              // ...modalStyle,
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              justifyContent: "center",
+              alignItems: "center",
+              alignSelf: "center",
+              justifySelf: "center",
+              ...modalStyle,
             }}
           >
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: "rgba(0, 0, 0, 0.5)",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Component />
-            </View>
+            <Component />
           </View>
         </Modal>
       </View>
@@ -405,22 +508,17 @@ export const InventoryItemInModal = ({ item = INVENTORY_ITEM }) => {
   );
 };
 
+global.test = 1;
 export const CustomerInfoComponent = ({
-  __setInfoComponentName,
-  ssInfoComponentName,
-  __setCustomerObj,
-  ssCustomerObj,
-  // sCustomerInfo,
-  // _setCustomerInfo,
+  sCustomerInfo = CUSTOMER,
+  _setCustomerInfo,
+  handleExitScreenPress,
+  exitScreenButtonText,
+  ssInfoTextFocus,
+  __setInfoTextFocus,
+  __closeButtonText,
+  __handleCloseButtonPress,
 }) => {
-  const [sBox1Val, _setBox1Val] = React.useState("");
-  const [sBox2Val, _setBox2Val] = React.useState("");
-  const [sShowCustomerModal, _setShowCustomerModal] = React.useState(false);
-  const [sSearchingByName, _setSearchingByName] = React.useState(false);
-  const [sFoundExistingCustomer, _setFoundExistingCustomer] =
-    React.useState(false);
-  const [sCustomerInfo, _setCustomerInfo] = React.useState(cloneDeep(CUSTOMER));
-
   const TEXT_INPUT_STYLE = {
     width: 200,
     height: 40,
@@ -458,6 +556,8 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.phone.cell}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.cell}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.cell)}
           />
           <TextInput
             onChangeText={(val) => {
@@ -469,6 +569,8 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.phone.landline}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.land}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.land)}
           />
           <TextInput
             onChangeText={(val) => {
@@ -480,10 +582,12 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.first}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.first}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.first)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.last(val);
+              sCustomerInfo.last = val;
               _setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
@@ -491,10 +595,12 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.last}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.last}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.last)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.email(val);
+              sCustomerInfo.email = val;
               _setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
@@ -502,6 +608,8 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.email}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.email}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.email)}
           />
           <TextInput
             onChangeText={(val) => {
@@ -513,6 +621,8 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.address.streetAddress}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.street}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.street)}
           />
           <TextInput
             onChangeText={(val) => {
@@ -524,6 +634,8 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.address.unit}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.unit}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.unit)}
           />
           <TextInput
             onChangeText={(val) => {
@@ -535,6 +647,8 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.address.city}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.city}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.city)}
           />
           <TextInput
             onChangeText={(val) => {
@@ -546,6 +660,8 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.address.state}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.state}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.state)}
           />
           <TextInput
             onChangeText={(val) => {
@@ -557,10 +673,12 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.address.zip}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.zip}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.zip)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.address.notes(val);
+              sCustomerInfo.address.notes = val;
               _setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
@@ -568,22 +686,71 @@ export const CustomerInfoComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.address.notes}
             autoComplete="none"
+            autoFocus={ssInfoTextFocus === FOCUS_NAMES.notes}
+            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
           />
-          <Button
-            onPress={() => {
-              log("pressed");
+          <CheckBox
+            label={"Call Only"}
+            isChecked={sCustomerInfo.phone.callOnlyOption}
+            onCheck={() => {
+              __setInfoTextFocus(null);
+              sCustomerInfo.phone.callOnlyOption =
+                !sCustomerInfo.phone.callOnlyOption;
+              if (
+                sCustomerInfo.phone.emailOnlyOption &&
+                sCustomerInfo.phone.callOnlyOption
+              )
+                sCustomerInfo.phone.emailOnlyOption = false;
+              _setCustomerInfo(sCustomerInfo);
             }}
-            viewStyle={{
-              marginTop: 30,
-              marginLeft: 20,
-              backgroundColor: "lightgray",
-              height: 40,
-              width: 200,
-            }}
-            textStyle={{ color: "dimgray" }}
-            text={"Create New Customer"}
           />
+          <CheckBox
+            label={"Email Only"}
+            isChecked={sCustomerInfo.phone.emailOnlyOption}
+            onCheck={() => {
+              __setInfoTextFocus(null);
+              sCustomerInfo.phone.emailOnlyOption =
+                !sCustomerInfo.phone.emailOnlyOption;
+              if (
+                sCustomerInfo.phone.callOnlyOption &&
+                sCustomerInfo.phone.emailOnlyOption
+              )
+                sCustomerInfo.phone.callOnlyOption = false;
+              _setCustomerInfo(sCustomerInfo);
+            }}
+          />
+          <View
+            style={{ flexDirection: "row", justifyContent: "space-between" }}
+          >
+            <Button
+              onPress={handleExitScreenPress}
+              viewStyle={{
+                marginTop: 30,
+                marginLeft: 20,
+                backgroundColor: "lightgray",
+                height: 40,
+                width: 200,
+              }}
+              textStyle={{ color: "dimgray" }}
+              text={exitScreenButtonText}
+            />
+            {
+              <Button
+                onPress={__handleCloseButtonPress}
+                viewStyle={{
+                  marginTop: 30,
+                  marginLeft: 20,
+                  backgroundColor: "lightgray",
+                  height: 40,
+                  width: 200,
+                }}
+                textStyle={{ color: "dimgray" }}
+                text={__closeButtonText}
+              />
+            }
+          </View>
         </View>
+
         <View>
           <View style={{ borderWidth: 1, width: 300, height: 300 }} />
           <Text>Workorder list</Text>
@@ -738,3 +905,33 @@ export const TabMenuButton = ({
     />
   );
 };
+
+export const CheckBox = ({
+  label,
+  onCheck,
+  buttonStyle = {},
+  labelStyle = {},
+  viewStyle = {},
+  isChecked = false,
+}) => (
+  <View
+    style={{
+      flexDirection: "row",
+      justifyContent: "flex-start",
+      width: 150,
+      height: 30,
+      borderWidth: 1,
+      ...viewStyle,
+    }}
+  >
+    <TouchableOpacity
+      onPress={onCheck}
+      style={{
+        width: "20%",
+        backgroundColor: isChecked ? "red" : "lightgray",
+        ...buttonStyle,
+      }}
+    />
+    <Text>{label}</Text>
+  </View>
+);

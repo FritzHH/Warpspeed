@@ -1,8 +1,11 @@
 import { log } from "./utils";
 
-export const DB_DIRECTORY = {
+export const COLLECTION_NAMES = {
   customers: "CUSTOMERS",
   workorders: "WORKORDERS",
+  preferences: "PREFERENCES",
+  sales: "SALES",
+  inventory: "INVENTORY",
 };
 
 export const CUSTOMER = {
@@ -61,6 +64,19 @@ export const INFO_COMPONENT_NAMES = {
   workorder: "workorder",
   phoneNumberEntry: "phoneEntry",
   nameAddressEntry: "nameAddressEntry",
+};
+
+export const ALERT_BOX_PROTOTYPE = {
+  message: "",
+  btnText1: "",
+  btnText2: "",
+  btnText3: "",
+  handleBtn1Press: () => {},
+  handleBtn2Press: () => {},
+  handleBtn3Press: () => {},
+  showBox: false,
+  onModalDismiss: () => {},
+  canExitOnOuterClick: true,
 };
 
 export const BIKE_COLORS_ARR = [
@@ -143,67 +159,18 @@ export const BIKE_COLORS_ARR = [
 ];
 
 export const WORKORDER = {
-  id: "399439",
-  customerID: "12232",
-  brand: "Trek",
-  description: "Hybrid",
-  color: BIKE_COLORS_ARR[0],
-  changes: {
-    startedBy: "Fritz",
-    changeLog: [],
-  },
-  partOrdered: "Derailler",
-  partSource: "Amazon",
-  items: [
-    {
-      name: "Ebike",
-      qty: 3,
-      price: 44556.99,
-      intakeNotes: "Front",
-      serviceNotes: "this is a piece of shit lugnut missing",
-      id: "123",
-    },
-    {
-      name: "Change tube",
-      qty: 1,
-      price: 4.99,
-      intakeNotes: "Rear",
-      id: "1233",
-    },
-    {
-      name: "Change tube",
-      qty: 1,
-      price: 33.99,
-      intakeNotes: "top",
-      id: "1233345",
-    },
-    {
-      name: "Change tube",
-      qty: 3,
-      price: 8.99,
-      intakeNotes: "middle",
-      id: "1233655",
-    },
-  ],
-  notes: {
-    internalNotes: "",
-    customerNotes: "",
-  },
-  dueBy: "Monday",
-};
-
-export const BLANK_WORKORDER = {
   id: "",
   customerID: "",
   brand: "",
   description: "",
-  color: "",
+  color: BIKE_COLORS_ARR[0],
   changes: {
     startedBy: "",
     changeLog: [],
   },
   partOrdered: "",
   partSource: "",
+  items: [],
   notes: {
     internalNotes: "",
     customerNotes: "",
@@ -429,3 +396,17 @@ export let shiftCable = {
 //   id: "93483",
 // };
 export const test_inventory = [brakeHandle, shiftCable];
+
+export const FOCUS_NAMES = {
+  cell: "cell",
+  land: "land",
+  first: "first",
+  last: "last",
+  email: "email",
+  street: "street",
+  unit: "unit",
+  city: "city",
+  state: "state",
+  zip: "zip",
+  notes: "notes",
+};

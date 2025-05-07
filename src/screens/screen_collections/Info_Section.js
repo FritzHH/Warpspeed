@@ -24,10 +24,11 @@ import {
   PART_SOURCES,
   WORKORDER,
   WORKORDER_ITEM,
-  DB_DIRECTORY,
+  COLLECTION_NAMES,
   INFO_COMPONENT_NAMES,
+  TAB_NAMES,
 } from "../../data";
-import { Info_MainComponent } from "../screen_components/Info_MainComponent";
+import { Info_WorkorderComponent } from "../screen_components/Info_WorkorderComponent";
 import {
   getFirestore,
   collection,
@@ -42,7 +43,7 @@ import {
   setCollectionItem,
 } from "../../dbCalls";
 
-import { NewCustomerComponent as IncomingCustomerComponent } from "../screen_components/Info_CreateNewWorkorderComponent";
+import { NewCustomerComponent } from "../screen_components/Info_CreateNewCustomerComponent";
 import React from "react";
 import { cloneDeep } from "lodash";
 
@@ -62,34 +63,52 @@ const app = initializeApp(firebaseConfig);
 export const Info_Section = ({
   ssCustomerObj,
   ssWorkorderObj,
-  ssInfoComponentName,
-  __setInfoComponentName,
   __setCustomerObj,
   __setWorkorderObj,
+  __createNewCustomer,
+  __setOptionsTabName,
 }) => {
+  const [sInfoComponentName, _setInfoComponentName] = React.useState(
+    INFO_COMPONENT_NAMES.phoneNumberEntry
+  );
+  const [sNewCustomerObj, _setNewCustomerObj] = React.useState(CUSTOMER);
+  // const[sCreateNewWorkorderPressed, _setCreateNewWorkorderPressed] = React.useState(false)
   let Component = null;
 
-  let Workorder_Component = () => (
-    <Info_MainComponent
-      ssCustomerObj={ssCustomerObj}
-      ssWorkorderObj={ssWorkorderObj}
-      __setCustomerObj={__setCustomerObj}
-      __setWorkorderObj={__setWorkorderObj}
-    />
-  );
+  function createNewCustomer(newCustomerObj) {
+    // log("creating", newCustomerObj);
+    __createNewCustomer(newCustomerObj);
+    _setInfoComponentName(INFO_COMPONENT_NAMES.workorder);
+  }
 
-  let Incoming_Cust_Component = () => (
-    <IncomingCustomerComponent
-      __setInfoComponentName={__setInfoComponentName}
-      ssInfoComponentName={ssInfoComponentName}
-    />
-  );
+  function createNewWorkorderBtnPressed() {
+    // _setInfoComponentName(INFO_COMPONENT_NAMES.phoneNumberEntry);
+    __setWorkorderObj(cloneDeep(WORKORDER));
+    __setCustomerObj(cloneDeep(CUSTOMER));
+    _setInfoComponentName(INFO_COMPONENT_NAMES.phoneNumberEntry);
+    __setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+  }
 
-  if (ssInfoComponentName === INFO_COMPONENT_NAMES.workorder)
-    Component = Workorder_Component;
+  if (sInfoComponentName === INFO_COMPONENT_NAMES.workorder)
+    return (
+      <Info_WorkorderComponent
+        ssCustomerObj={ssCustomerObj}
+        __setCustomerObj={__setCustomerObj}
+        __setWorkorderObj={__setWorkorderObj}
+        ssWorkorderObj={ssWorkorderObj}
+        __handleCreateNewWorkorderPressed={createNewWorkorderBtnPressed}
 
-  if (ssInfoComponentName === INFO_COMPONENT_NAMES.phoneNumberEntry)
-    Component = Incoming_Cust_Component;
+        // __handleExitScreenPressed={() => _setInfoComponentName(INFO_COMPONENT_NAMES.workorder)}
+      />
+    );
+
+  if (sInfoComponentName === INFO_COMPONENT_NAMES.phoneNumberEntry)
+    return (
+      <NewCustomerComponent
+        __createNewCustomer={(obj) => createNewCustomer(obj)}
+        _setInfoComponentName={(name) => log("name", name)}
+      />
+    );
 
   return <Component />;
 };

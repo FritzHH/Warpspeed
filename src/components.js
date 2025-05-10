@@ -19,6 +19,7 @@ import {
   discounts_db,
   FOCUS_NAMES,
   INVENTORY_ITEM_PROTO,
+  INVENTORY_CATEGORIES,
 } from "./data";
 import { cloneDeep, round } from "lodash";
 import { CUSTOMER_PROTO } from "./data";
@@ -211,9 +212,9 @@ export const ScreenModal = ({
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sMouseOver, _setMouseOver] = React.useState(false);
 
+  /////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////
   if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
-  // if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
   useEffect(() => {
     const el = ref ? ref.current : null;
     if (el) {
@@ -222,7 +223,9 @@ export const ScreenModal = ({
       // log("outer", rect);
     }
   }, []);
+
   // log("ref", ref);
+  ////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////
   if (!buttonVisible) {
     buttonStyle = { width: 0, height: 0 };
@@ -235,18 +238,13 @@ export const ScreenModal = ({
   let labelIconFontSize = buttonTextStyle.fontSize + 2 || 20;
   if (!showOuterModal)
     outerModalStyle = { ...outerModalStyle, width: null, height: null };
-  if (sMouseOver) shadowStyle = { ...SHADOW_RADIUS_PROTO };
+  // if (sMouseOver) shadowStyle = { ...SHADOW_RADIUS_PROTO };
   /////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
   if (mouseOverOptions.highlightColor) mouseOverOptions.enable = true;
 
   return (
-    <TouchableWithoutFeedback
-      onPress={() => setModalVisibility(false)}
-      // onPress={
-      //   canExitOnOuterClick ? () => _modalVisible(!sIsModalVisible) : null
-      // }
-    >
+    <TouchableWithoutFeedback onPress={() => setModalVisibility(false)}>
       <View style={{}}>
         <TouchableOpacity
           ref={ref}
@@ -264,19 +262,19 @@ export const ScreenModal = ({
             alignItems: "center",
             justifyContent: "center",
             paddingHorizontal: 10,
-            width: !buttonVisible ? 0 : 150,
-            height: !buttonVisible ? 0 : 40,
+            width: !buttonVisible ? 0 : null,
+            height: !buttonVisible ? 0 : null,
             ...shadowStyle,
             ...buttonStyle,
             backgroundColor: sMouseOver
               ? mouseOverOptions.highlightColor
-              : "transparent",
+              : buttonStyle.backgroundColor || "transparent",
             opacity: sMouseOver ? mouseOverOptions.opacity : null,
           }}
         >
           <Text
             style={{
-              color: "white",
+              color: Colors.darkTextOnMainBackground,
               textAlign: "center",
               fontSize: 15,
               textAlignVertical: "center",
@@ -286,7 +284,13 @@ export const ScreenModal = ({
           >
             {buttonVisible && buttonLabel}
             {showButtonIcon && (
-              <Text style={{ ...buttonTextStyle, fontSize: labelIconFontSize }}>
+              <Text
+                style={{
+                  ...buttonTextStyle,
+                  fontSize: labelIconFontSize,
+                  paddingLeft: 20,
+                }}
+              >
                 {buttonIcon}
               </Text>
             )}
@@ -465,17 +469,23 @@ export const ModalDropdown = ({
   );
 };
 
-export const InventoryItemInModal = ({ item = INVENTORY_ITEM_PROTO }) => {
+export const InventoryItemInModal = ({
+  item = INVENTORY_ITEM_PROTO,
+  __setItem = () => {},
+}) => {
+  const [sCatModalVisible, _setCatModalVisible] = useState(false);
+  const catRef = useRef(null);
+  log("item", item);
   return (
     <View
       style={{
-        width: "80%",
-        height: "40%",
+        width: "40%",
+        height: "60%",
         backgroundColor: Colors.opacityBackgroundLight,
         ...SHADOW_RADIUS_PROTO,
-        shadowOffset: { width: 10, height: 10 },
+        shadowOffset: { width: 3, height: 3 },
         padding: 15,
-        // alignItems: "center",
+        backgroundColor: "whitesmoke",
       }}
     >
       <View
@@ -485,59 +495,68 @@ export const InventoryItemInModal = ({ item = INVENTORY_ITEM_PROTO }) => {
           justifyContent: "space-between",
         }}
       >
-        <Text
+        <Text>name</Text>
+        <TextInput
           numberOfLines={3}
           style={{
-            //   marginTop: 10,
+            marginTop: 10,
             fontSize: 16,
-            color: "whitesmoke",
+            color: "black",
+            borderWidth: 1,
           }}
-        >
-          {item.name}
-        </Text>
-        <Text style={{ color: "red", fontSize: 13 }}>
-          {"$ "}
-          <Text style={{ fontSize: 16 }}>{item.price}</Text>
-        </Text>
+          autoFocus={true}
+          onChangeText={(val) => {
+            // log("val", val);
+            item.name = val;
+            __setItem(item);
+          }}
+          value={item.name}
+        />
+        <View>
+          <Text style={{ color: "red", fontSize: 13 }}>
+            {"Regular $ "}
+            <TextInput val={item.price} style={{ fontSize: 16 }} />
+          </Text>
+          <Text style={{ alignSelf: "flex-end", color: "red", fontSize: 13 }}>
+            {"Sale $ "}
+            <TextInput val={item.salePrice} style={{ fontSize: 16 }} />
+          </Text>
+        </View>
       </View>
       <View
         style={{ flexDirection: "row", alignItems: "center", marginTop: 20 }}
       >
-        <Text
-          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
-        >
-          Category:
-        </Text>
-        <Text style={{ fontSize: 16, color: "lightgray", marginVertical: 0 }}>
-          {item.catMain}
-        </Text>
+        <ScreenModal
+          ref={catRef}
+          setModalVisibility={() => _setCatModalVisible(!sCatModalVisible)}
+          modalVisible={sCatModalVisible}
+          buttonLabel="Category"
+          outerModalStyle={{ width: null, height: null }}
+          modalCoordinateVars={{ x: 0, y: 0 }}
+          buttonStyle={{ backgroundColor: "lightgray" }}
+          Component={() => (
+            <View style={{}}>
+              {Object.values(INVENTORY_CATEGORIES.main).map((i, idx) => (
+                <Button
+                  text={i}
+                  onPress={() => {
+                    item.catMain = i;
+                    __setItem(item);
+                    _setCatModalVisible(false);
+                  }}
+                  buttonStyle={{
+                    backgroundColor: Colors.opacityBackgroundLight,
+                    borderTopWidth: idx != 0 ? 2 : 0,
+                    borderTopColor: "lightgray",
+                  }}
+                />
+              ))}
+            </View>
+          )}
+        />
+        <Text style={{ marginLeft: 10 }}>{item.catMain}</Text>
       </View>
-      <View
-        style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
-      >
-        <Text
-          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
-        >
-          Description:
-        </Text>
 
-        <Text style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}>
-          {item.catDescrip}
-        </Text>
-      </View>
-      <View
-        style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
-      >
-        <Text
-          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
-        >
-          Location:
-        </Text>
-
-        <Text style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}>
-          {item.catLocation}
-        </Text>
-      </View>
       <View
         style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
       >
@@ -547,22 +566,10 @@ export const InventoryItemInModal = ({ item = INVENTORY_ITEM_PROTO }) => {
           Barcode:
         </Text>
 
-        <Text style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}>
-          {item.upc}
-        </Text>
-      </View>
-      <View
-        style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
-      >
-        <Text
-          style={{ width: 70, marginTop: 0, fontSize: 12, marginRight: 10 }}
-        >
-          Vendor ID:
-        </Text>
-
-        <Text style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}>
-          {item.vendorID}
-        </Text>
+        <TextInput
+          style={{ fontSize: 16, color: "lightgray", marginTop: 0 }}
+          val={item.upc}
+        />
       </View>
     </View>
   );
@@ -939,7 +946,7 @@ export const Button = ({
             textAlign: "center",
             textAlignVertical: "center",
             fontSize: 17,
-            color: "whitesmoke",
+            color: Colors.darkTextOnMainBackground,
             ...textStyle,
             color: sMouseOver ? "white" : textStyle.color,
           }}
@@ -990,6 +997,7 @@ export const CheckBox = ({
   text,
   onCheck,
   item,
+  makeEntireViewCheckable = true,
   roundButton = false,
   handleCheckInternal = false,
   isChecked = false,
@@ -1000,7 +1008,7 @@ export const CheckBox = ({
   mouseOverOptions = {
     enable: true,
     opacity: 0.7,
-    highlightColor: Colors.tabMenuButton,
+    highlightColor: "dimgrey",
   },
 }) => {
   const [sMouseOver, _setMouseOver] = React.useState(false);
@@ -1015,7 +1023,7 @@ export const CheckBox = ({
         if (mouseOverOptions.highlightColor) {
           backgroundColor = mouseOverOptions.highlightColor;
         } else {
-          backgroundColor = Colors.tabMenuButton;
+          backgroundColor = "lightgray";
         }
       }
     }
@@ -1026,51 +1034,68 @@ export const CheckBox = ({
 
   let dim = 25;
   return (
-    <View
-      onMouseOver={() => (mouseOverOptions.enable ? _setMouseOver(true) : null)}
-      onMouseLeave={() => {
-        _setMouseOver(false);
-      }}
-      style={{
-        flexDirection: "row",
-        justifyContent: "flex-start",
-        alignItems: "center",
-        ...viewStyle,
-      }}
-    >
-      <TouchableOpacity
-        onPress={() => {
+    <TouchableOpacity
+      onPress={() => {
+        if (makeEntireViewCheckable) {
           if (handleCheckInternal) {
             _setIsChecked(!sIsChecked);
             onCheck(item, !sIsChecked);
           } else {
             onCheck(item);
           }
+        }
+      }}
+    >
+      <View
+        onMouseOver={() =>
+          mouseOverOptions.enable ? _setMouseOver(true) : null
+        }
+        onMouseLeave={() => {
+          _setMouseOver(false);
         }}
         style={{
-          width: buttonStyle.width || dim,
-          height: buttonStyle.height || dim,
-          borderRadius: 100,
           flexDirection: "row",
-          justifyContent: "center",
-          justifyItems: "center",
+          justifyContent: "flex-start",
           alignItems: "center",
-          paddingLeft: 7,
-          ...outerButtonStyle,
+          ...viewStyle,
         }}
       >
-        <View
-          style={{
-            width: dim - 10,
-            height: dim - 10,
-            opacity: isChecked ? 1 : 0.4,
-            backgroundColor,
-            marginRight: 7,
-            ...buttonStyle,
+        <TouchableOpacity
+          onPress={() => {
+            if (handleCheckInternal) {
+              _setIsChecked(!sIsChecked);
+              onCheck(item, !sIsChecked);
+            } else {
+              onCheck(item);
+            }
           }}
-        />
-      </TouchableOpacity>
-      <Text style={{ fontSize: 14, color: rgbText, ...textStyle }}>{text}</Text>
-    </View>
+          style={{
+            width: buttonStyle.width || dim,
+            height: buttonStyle.height || dim,
+            borderRadius: 100,
+            flexDirection: "row",
+            justifyContent: "center",
+            justifyItems: "center",
+            alignItems: "center",
+            paddingLeft: 7,
+            ...outerButtonStyle,
+          }}
+        >
+          <View
+            style={{
+              width: dim - 10,
+              height: dim - 10,
+              opacity: isChecked ? 1 : 0.4,
+              backgroundColor,
+              marginRight: 7,
+              ...buttonStyle,
+            }}
+          />
+        </TouchableOpacity>
+        <Text style={{ fontSize: 14, color: rgbText, ...textStyle }}>
+          {text}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 };

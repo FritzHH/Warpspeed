@@ -20,14 +20,16 @@ import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 
-export function InventoryComponent({ ssInventoryArr }) {
+export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
   /////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState(null);
   const [sCheckboxValue, _setCheckboxValue] = React.useState(null);
   const [sShowDropdownModal, _setShowDropdownModal] = React.useState(false);
-  const [sShowInventoryItemModal, _setShowInventoryItemModal] =
-    React.useState(false);
+  // const [sShowInventoryItemModal, _setShowInventoryItemModal] =
+  // React.useState(false);
+  const [sInventoryItemInModal, _setInventoryItemInModal] =
+    useState(INVENTORY_ITEM_PROTO);
   const [sCategoriesDropdownSelected, _setCategoriesDropdownSelected] =
     useState(null);
   const [sCheckboxSelectedArr, _setCheckboxSelectedArr] = useState([]);
@@ -45,6 +47,7 @@ export function InventoryComponent({ ssInventoryArr }) {
     _setCheckboxValue(null);
     _setCategoriesDropdownSelected(null);
   }
+
   function search(searchTerm) {
     _setSearchTerm(searchTerm);
     if (searchTerm.length == 0) {
@@ -97,6 +100,10 @@ export function InventoryComponent({ ssInventoryArr }) {
     });
     _setSearchResults(res);
     // log(res);
+  }
+
+  function handleAddInventoryPress() {
+    _setInventoryItemInModal(INVENTORY_ITEM_PROTO);
   }
 
   ///////////////////////////////////////////////////////////////
@@ -241,12 +248,37 @@ export function InventoryComponent({ ssInventoryArr }) {
             </View>
           )}
         />
+        <ScreenModal
+          mouseOverOptions={{ enable: false }}
+          showShadow={false}
+          buttonStyle={{
+            color: "red",
+            width: null,
+            height: null,
+            marginLeft: 40,
+            backgroundColor: "green",
+            paddingBottom: 10,
+          }}
+          buttonTextStyle={{ fontSize: 50, color: "red", padding: 0 }}
+          showButtonIcon={false}
+          buttonLabel="+"
+          showOuterModal={true}
+          modalVisible={true}
+          Component={() => {
+            return (
+              <InventoryItemInModal
+                __setItem={__setInventoryItem}
+                item={sInventoryItemInModal}
+              />
+            );
+          }}
+        />
       </View>
       {/* inventory results flatLIST */}
       <FlatList
         style={{
-          marginRight: 25,
-          marginTop: 30,
+          marginRight: 20,
+          marginTop: 10,
           marginLeft: 10,
           // backgroundColor: "green",
         }}
@@ -278,6 +310,7 @@ export function InventoryComponent({ ssInventoryArr }) {
                     showButtonIcon={false}
                     outerModalStyle={{ width: "40%", alignSelf: "flex-end" }}
                     Component={() => <InventoryItemInModal item={item} />}
+                    buttonTextStyle={{ color: "dimgray", fontSize: 17 }}
                     buttonStyle={{
                       paddingTop: 4,
                       paddingLeft: 13,
@@ -288,7 +321,6 @@ export function InventoryComponent({ ssInventoryArr }) {
                     mouseOverOptions={{
                       enable: true,
                       highlightColor: Colors.tabMenuButton,
-                      opacity: 0.3,
                     }}
                     showShadow={false}
                     textStyle={{ fontSize: 14 }}

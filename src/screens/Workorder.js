@@ -74,7 +74,7 @@ export function WorkorderScreen() {
     TAB_NAMES.itemsTab.dashboard
   );
   const [sOptionsTabName, _setOptionsTabName] = React.useState(
-    TAB_NAMES.optionsTab.workorders
+    TAB_NAMES.optionsTab.inventory
   );
   const [sInfoComponentName, _setInfoComponentName] = React.useState(
     INFO_COMPONENT_NAMES.phoneNumberEntry
@@ -89,6 +89,14 @@ export function WorkorderScreen() {
     // log("obj", customerObj);
     if (setToDB && customerObj.id)
       setCollectionItem(COLLECTION_NAMES.customers, customerObj);
+  }
+
+  function setInventoryItem(item) {
+    log("WORKORDER: setting inventory item", item);
+    let arr = sInventoryArr.map((invItem) =>
+      invItem.id === item.id ? item : invItem
+    );
+    _setInventoryArr(arr);
   }
 
   function setWorkorderObj(workorderObj) {
@@ -275,6 +283,7 @@ export function WorkorderScreen() {
           __setWorkorderObj={(obj) => setWorkorderObj(cloneDeep(obj))}
           __setOptionsTabName={(data) => _setOptionsTabName(cloneDeep(data))}
           __setInventoryArr={(data) => _setInventoryArr(cloneDeep(data))}
+          __setInventoryItem={setInventoryItem}
           __setWorkorderPreviewObj={(obj) => {
             _setWorkorderPreviewObj(obj);
             if (obj) {

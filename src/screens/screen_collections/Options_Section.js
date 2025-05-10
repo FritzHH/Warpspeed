@@ -50,6 +50,7 @@ export function Options_Section({
   __setOptionsTabName,
   __setWorkorderObj,
   __setInventoryArr,
+  __setInventoryItem,
   __setWorkorderPreviewObj,
 }) {
   const [sShowWorkorderModal, _setShowWorkorderModal] = React.useState(false);
@@ -118,7 +119,10 @@ export function Options_Section({
         />
       )}
       {ssOptionsTabName === TAB_NAMES.optionsTab.inventory && (
-        <InventoryComponent ssInventoryArr={ssInventoryArr} />
+        <InventoryComponent
+          __setInventoryItem={__setInventoryItem}
+          ssInventoryArr={ssInventoryArr}
+        />
       )}
       {ssOptionsTabName === TAB_NAMES.optionsTab.workorders && (
         <WorkordersComponent

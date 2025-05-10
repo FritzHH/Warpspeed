@@ -158,58 +158,125 @@ export const Notes_MainComponent = ({
     __setWorkorderObj(ssWorkorderObj);
   }
 
+  if (!ssWorkorderObj.id) return null;
   return (
     <View style={{ width: "100%", height: "100%", paddingTop: 20 }}>
-      {ssWorkorderObj.id && (
+      {/* {ssWorkorderObj.id && ( */}
+      <View
+        style={{
+          flexDirection: "row",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <TouchableWithoutFeedback onPress={() => customerOutsideClicked()}>
+          <View
+            style={{
+              width: "50%",
+              height: "100%",
+              backgroundColor: null,
+              flexDirection: "column",
+              paddingRight: 10,
+            }}
+          >
+            <View>
+              <Text style={{ color: "lightgray" }}>{"Customer Notes"}</Text>
+            </View>
+
+            <FlatList
+              keyExtractor={(i, idx) => idx}
+              data={ssWorkorderObj.notes.customerNotes}
+              renderItem={(item) => {
+                let index = item.index;
+                item = item.item;
+                return (
+                  <TouchableWithoutFeedback
+                    onLongPress={() => deleteCustomerItem(item, index)}
+                  >
+                    <View style={{ width: "100%", paddingVertical: 3 }}>
+                      <TextInput
+                        onContentSizeChange={(ev) =>
+                          handleCustomerContentSizeChange(ev, index)
+                        }
+                        multiline={true}
+                        onChangeText={(val) => customerTextChanged(val, index)}
+                        style={{
+                          padding: 2,
+                          height: customerNotesHeight[index] || 20,
+                          backgroundColor: "rgba(0, 0, 0, 0.05)",
+                          outlineWidth: 0,
+                        }}
+                        autoFocus={
+                          index ===
+                          ssWorkorderObj.notes.customerNotes.length - 1
+                        }
+                        value={item.val}
+                      />
+                    </View>
+                  </TouchableWithoutFeedback>
+                );
+              }}
+            />
+          </View>
+        </TouchableWithoutFeedback>
         <View
           style={{
-            flexDirection: "row",
-            width: "100%",
+            width: "50%",
             height: "100%",
+            backgroundColor: null,
+            flexDirection: "column",
+            borderLeftWidth: 1,
+            borderColor: "lightgray",
+            paddingLeft: 10,
           }}
         >
-          <TouchableWithoutFeedback onPress={() => customerOutsideClicked()}>
+          <View>
+            <Text
+              style={{
+                color: "lightgray",
+              }}
+            >
+              {"Internal Notes"}
+            </Text>
+          </View>
+          <TouchableWithoutFeedback onPress={() => internalOutsideClicked()}>
             <View
               style={{
-                width: "50%",
+                width: "100%",
                 height: "100%",
                 backgroundColor: null,
                 flexDirection: "column",
                 paddingRight: 10,
               }}
             >
-              <View>
-                <Text style={{ color: "lightgray" }}>Customer Notes</Text>
-              </View>
-
               <FlatList
                 keyExtractor={(i, idx) => idx}
-                data={ssWorkorderObj.notes.customerNotes}
+                data={ssWorkorderObj.notes.internalNotes}
                 renderItem={(item) => {
                   let index = item.index;
                   item = item.item;
                   return (
                     <TouchableWithoutFeedback
-                      onLongPress={() => deleteCustomerItem(item, index)}
+                      onLongPress={() => deleteInternalItem(item, index)}
                     >
                       <View style={{ width: "100%", paddingVertical: 3 }}>
                         <TextInput
                           onContentSizeChange={(ev) =>
-                            handleCustomerContentSizeChange(ev, index)
+                            handleInternalContentSizeChange(ev, index)
                           }
                           multiline={true}
                           onChangeText={(val) =>
-                            customerTextChanged(val, index)
+                            internalTextChanged(val, index)
                           }
                           style={{
                             padding: 2,
-                            height: customerNotesHeight[index] || 20,
+                            height: internalNotesHeight[index] || 20,
                             backgroundColor: "rgba(0, 0, 0, 0.05)",
                             outlineWidth: 0,
                           }}
                           autoFocus={
                             index ===
-                            ssWorkorderObj.notes.customerNotes.length - 1
+                            ssWorkorderObj.notes.internalNotes.length - 1
                           }
                           value={item.val}
                         />
@@ -220,78 +287,9 @@ export const Notes_MainComponent = ({
               />
             </View>
           </TouchableWithoutFeedback>
-          <View
-            style={{
-              width: "50%",
-              height: "100%",
-              backgroundColor: null,
-              flexDirection: "column",
-              borderLeftWidth: 1,
-              borderColor: "lightgray",
-              paddingLeft: 10,
-            }}
-          >
-            <View>
-              <Text
-                style={{
-                  color: "lightgray",
-                }}
-              >
-                Internal Notes
-              </Text>
-            </View>
-            <TouchableWithoutFeedback onPress={() => internalOutsideClicked()}>
-              <View
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  backgroundColor: null,
-                  flexDirection: "column",
-                  paddingRight: 10,
-                }}
-              >
-                <FlatList
-                  keyExtractor={(i, idx) => idx}
-                  data={ssWorkorderObj.notes.internalNotes}
-                  renderItem={(item) => {
-                    let index = item.index;
-                    item = item.item;
-                    return (
-                      <TouchableWithoutFeedback
-                        onLongPress={() => deleteInternalItem(item, index)}
-                      >
-                        <View style={{ width: "100%", paddingVertical: 3 }}>
-                          <TextInput
-                            onContentSizeChange={(ev) =>
-                              handleInternalContentSizeChange(ev, index)
-                            }
-                            multiline={true}
-                            onChangeText={(val) =>
-                              internalTextChanged(val, index)
-                            }
-                            style={{
-                              padding: 2,
-                              height: internalNotesHeight[index] || 20,
-                              backgroundColor: "rgba(0, 0, 0, 0.05)",
-                              outlineWidth: 0,
-                            }}
-                            autoFocus={
-                              index ===
-                              ssWorkorderObj.notes.internalNotes.length - 1
-                            }
-                            value={item.val}
-                          />
-                        </View>
-                      </TouchableWithoutFeedback>
-                    );
-                  }}
-                />
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-          {/* </View> */}
         </View>
-      )}
+      </View>
+      // )}
     </View>
   );
 };

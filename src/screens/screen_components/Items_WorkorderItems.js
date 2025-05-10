@@ -17,21 +17,20 @@ import {
 } from "../../components";
 import { Colors } from "../../styles";
 import {
-  BIKE_COLORS,
-  BRANDS,
-  CUSTOMER,
-  BIKE_DESCRIPTIONS,
-  DISCOUNTS,
-  PART_SOURCES,
-  WORKORDER,
-  WORKORDER_ITEM,
+  bike_colors_db,
+  bike_brands_db,
+  CUSTOMER_PROTO,
+  bike_descriptions_db,
+  discounts_db,
+  part_sources_db,
+  WORKORDER_PROTO,
+  WORKORDER_ITEM_PROTO,
 } from "../../data";
-import { QuickItemsTab } from "./Options_QuickItemsTab";
 
 export const Items_WorkorderItemsTab = ({
   onPress,
   index = 0,
-  ssWorkorderObj = WORKORDER,
+  ssWorkorderObj = WORKORDER_PROTO,
   __setWorkorderObj,
 }) => {
   //   log("workorder items arr", workorderObj.items);
@@ -134,7 +133,7 @@ export const Items_WorkorderItemsTab = ({
 };
 
 export const WorkorderItemComponent = ({
-  workorderItem = WORKORDER_ITEM,
+  workorderItem = WORKORDER_ITEM_PROTO,
   setWorkorderItemUp,
   deleteWorkorderItem,
 }) => {
@@ -156,7 +155,7 @@ export const WorkorderItemComponent = ({
 
   function applyDiscount(discountName) {
     let discountObj = {
-      ...DISCOUNTS.filter((obj) => obj.name == discountName)[0],
+      ...discounts_db.filter((obj) => obj.name == discountName)[0],
     };
 
     let newPrice;
@@ -425,7 +424,7 @@ export const WorkorderItemComponent = ({
           </TouchableOpacity>
           <ModalDropdown
             buttonLabel={"D"}
-            data={DISCOUNTS.map((item) => item.name)}
+            data={discounts_db.map((item) => item.name)}
             closeButtonText={"Close"}
             removeButtonText={"Remove Discount"}
             onSelect={(itemName) => {

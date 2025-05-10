@@ -10,13 +10,22 @@ import { TabMenuDivider as Divider } from "../../components";
 import { log } from "../../utils";
 import { Colors } from "../../styles";
 import { Items_Dashboard } from "../screen_components/Items_Dashboard";
+import { CustomerSearchListComponent } from "../screen_components/Items_CustomerSearchList";
+import { WorkorderGlimpse } from "../screen_components/Items_WorkorderGlimpse";
 
 export function Items_Section({
   ssWorkorderObj,
-  __setWorkorderObj,
+  ssCustomerObj,
   ssItemsTabName,
+  ssCustomerSearchArr,
+  ssWorkorderPreviewObj,
+  __setWorkorderObj,
   __setItemsTabName,
-  fun_create_new_workorder,
+  __setCustomerObj,
+  __setOptionsTabName,
+  __setInfoComponentName,
+  __setCustomerSearchArr,
+  __setWorkorderPreviewObj,
 }) {
   const Tab_WorkorderItems = (
     <Items_WorkorderItemsTab
@@ -25,14 +34,17 @@ export function Items_Section({
     />
   );
 
+  // log("preview", ssWorkorderPreviewObj);
+  const Tab_Preview = ssWorkorderPreviewObj ? (
+    <WorkorderGlimpse ssWorkorderPreviewObj={ssWorkorderPreviewObj} />
+  ) : null;
+
   const Tab_ChangeLog = (
     <View>
       <Text>Change Log Tab</Text>
     </View>
   );
-  const Tab_Dashboard = (
-    <Items_Dashboard fun_create_new_workorder={fun_create_new_workorder} />
-  );
+  const Tab_Dashboard = null;
   const New_Workorder = (
     <View
       style={{
@@ -55,73 +67,105 @@ export function Items_Section({
     </View>
   );
 
+  const Customer_List = (
+    <CustomerSearchListComponent
+      __setCustomerObj={__setCustomerObj}
+      __setWorkorderObj={__setWorkorderObj}
+      __setOptionsTabName={__setOptionsTabName}
+      __setInfoComponentName={__setInfoComponentName}
+      __setItemsTabName={__setItemsTabName}
+      __setCustomerSearchArr={__setCustomerSearchArr}
+      ssCustomerSearchArr={ssCustomerSearchArr}
+      ssCustomerObj={ssCustomerObj}
+    />
+  );
+
   function selectComponent() {
     if (ssItemsTabName == TAB_NAMES.itemsTab.workorderItems)
       return Tab_WorkorderItems;
     if (ssItemsTabName == TAB_NAMES.itemsTab.changeLog) return Tab_ChangeLog;
     if (ssItemsTabName == TAB_NAMES.itemsTab.dashboard) return Tab_Dashboard;
-    if (ssItemsTabName == TAB_NAMES.itemsTab.creatingNewWorkorder)
-      return New_Workorder;
+    if (ssItemsTabName === TAB_NAMES.itemsTab.customerList)
+      return Customer_List;
+    if (ssItemsTabName === TAB_NAMES.itemsTab.preview) return Tab_Preview;
   }
 
+  let excludeTabNames = [];
+  if (ssItemsTabName === TAB_NAMES.itemsTab.customerList)
+    excludeTabNames.push(TAB_NAMES.itemsTab.customerList);
   return (
     <View style={{ width: "100%", height: "100%" }}>
       <TabBar
         __setItemsTabName={__setItemsTabName}
         ssItemsTabName={ssItemsTabName}
         ssWorkorderObj={ssWorkorderObj}
+        excludeTabNames={excludeTabNames}
       />
       {selectComponent()}
     </View>
   );
 }
 
-const TabBar = ({ __setItemsTabName, ssItemsTabName, ssWorkorderObj }) => (
-  <View
-    style={{
-      flexDirection: "row",
-      width: "100%",
-      justifyContent: "space-between",
-    }}
-  >
+const TabBar = ({
+  __setItemsTabName,
+  ssItemsTabName,
+  ssWorkorderObj,
+  excludeTabNames = [],
+}) => {
+  let excludeWorkorder, excludeChangelog, excludeDashboard;
+  if (ssItemsTabName === TAB_NAMES.itemsTab.customerList) {
+    excludeWorkorder = true;
+    excludeChangelog = true;
+  }
+  return (
     <View
       style={{
         flexDirection: "row",
+        width: "100%",
+        justifyContent: "space-between",
       }}
     >
-      {ssWorkorderObj && (
+      <View
+        style={{
+          flexDirection: "row",
+        }}
+      >
+        {ssWorkorderObj && !excludeWorkorder && (
+          <TabMenuButton
+            onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
+            text={TAB_NAMES.itemsTab.workorderItems}
+            isSelected={
+              ssItemsTabName === TAB_NAMES.itemsTab.workorderItems
+                ? true
+                : false
+            }
+          />
+        )}
+        <Divider />
+        {ssWorkorderObj && !excludeChangelog && (
+          <TabMenuButton
+            onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
+            text={TAB_NAMES.itemsTab.changeLog}
+            isSelected={
+              ssItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
+            }
+          />
+        )}
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          // paddingRight: 10,
+        }}
+      >
         <TabMenuButton
-          onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
-          text={TAB_NAMES.itemsTab.workorderItems}
+          onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.dashboard)}
+          text={TAB_NAMES.itemsTab.dashboard}
           isSelected={
-            ssItemsTabName === TAB_NAMES.itemsTab.workorderItems ? true : false
+            ssItemsTabName === TAB_NAMES.itemsTab.dashboard ? true : false
           }
         />
-      )}
-      <Divider />
-      {ssWorkorderObj && (
-        <TabMenuButton
-          onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
-          text={TAB_NAMES.itemsTab.changeLog}
-          isSelected={
-            ssItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
-          }
-        />
-      )}
+      </View>
     </View>
-    <View
-      style={{
-        flexDirection: "row",
-        // paddingRight: 10,
-      }}
-    >
-      <TabMenuButton
-        onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.dashboard)}
-        text={TAB_NAMES.itemsTab.dashboard}
-        isSelected={
-          ssItemsTabName === TAB_NAMES.itemsTab.dashboard ? true : false
-        }
-      />
-    </View>
-  </View>
-);
+  );
+};

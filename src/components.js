@@ -9,19 +9,19 @@ import {
   TextInput,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import React, { Component } from "react";
+import React, { Component, useEffect, useRef } from "react";
 import { log } from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
 import {
-  BIKE_COLORS,
-  BIKE_COLORS_ARR,
-  DISCOUNTS,
+  bike_colors_db,
+  bike_colors_arr_db,
+  discounts_db,
   FOCUS_NAMES,
-  INVENTORY_ITEM,
+  INVENTORY_ITEM_PROTO,
 } from "./data";
-import { cloneDeep } from "lodash";
-import { CUSTOMER } from "./data";
+import { cloneDeep, round } from "lodash";
+import { CUSTOMER_PROTO } from "./data";
 
 const centerItem = {
   alignItems: "center",
@@ -92,7 +92,7 @@ export const AlertBox = ({
     backgroundColor: "dimgray",
     padding: 10,
     borderRadius: 4,
-    ...shadow_radius,
+    ...SHADOW_RADIUS_PROTO,
   };
 
   const txtStyle = {
@@ -179,43 +179,99 @@ export const AlertBox = ({
 };
 
 export const ScreenModal = ({
-  canExitOnOuterClick = true,
-  buttonLabel,
-  buttonStyle = {},
+  ref,
+  modalCoordinateVars = {
+    x: -30,
+    y: 40,
+  },
+  mouseOverOptions = {
+    enable: true,
+    opacity: 1,
+    highlightColor: Colors.tabMenuButton,
+  },
   handleButtonPress = () => {},
-  containerStyle = {},
+  buttonLabel = "Modal Button",
+  buttonVisible = true,
+  showButtonIcon = true,
+  showOuterModal = false,
+  showShadow = true,
+  allCaps = false,
+  buttonStyle = {},
+  // handleButtonPress = () => {},
   buttonTextStyle = {},
   Component,
-  shadowProps = {
-    shadowColor: "black",
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
-  modalStyle,
-  showModal = false,
-  overrideShow = false,
-  onModalDismiss = () => {},
+  outerModalStyle = {},
+  modalVisible = false,
+  // onModalDismiss = () => {},
+  setModalVisibility = () => {},
+  shadowStyle = { ...SHADOW_RADIUS_PROTO },
+  buttonIcon,
 }) => {
-  const [sIsModalVisible, _modalVisible] = useState(overrideShow);
+  // const [sIsModalVisible, _modalVisible] = useState(showModal);
+  const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
+  const [sMouseOver, _setMouseOver] = React.useState(false);
+
+  //////////////////////////////////////////////////////////////
+  if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
+  // if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
+  useEffect(() => {
+    const el = ref ? ref.current : null;
+    if (el) {
+      let rect = el.getBoundingClientRect();
+      _setModalCoordinates({ x: rect.x, y: rect.y });
+      // log("outer", rect);
+    }
+  }, []);
+  // log("ref", ref);
+  /////////////////////////////////////////////////////////////
+  if (!buttonVisible) {
+    buttonStyle = { width: 0, height: 0 };
+    showButtonIcon = false;
+    showShadow = false;
+  }
+  if (showButtonIcon && !buttonIcon) buttonIcon = "\u21b4";
+  if (allCaps) buttonLabel = buttonLabel.toUpperCase();
+  if (!showShadow) shadowStyle = {};
+  let labelIconFontSize = buttonTextStyle.fontSize + 2 || 20;
+  if (!showOuterModal)
+    outerModalStyle = { ...outerModalStyle, width: null, height: null };
+  if (sMouseOver) shadowStyle = { ...SHADOW_RADIUS_PROTO };
+  /////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////
+  if (mouseOverOptions.highlightColor) mouseOverOptions.enable = true;
 
   return (
     <TouchableWithoutFeedback
-      onPress={
-        canExitOnOuterClick ? () => _modalVisible(!sIsModalVisible) : null
-      }
+      onPress={() => setModalVisibility(false)}
+      // onPress={
+      //   canExitOnOuterClick ? () => _modalVisible(!sIsModalVisible) : null
+      // }
     >
-      <View style={{ ...styles.container, ...containerStyle }}>
+      <View style={{}}>
         <TouchableOpacity
+          ref={ref}
+          onPress={() => {
+            handleButtonPress();
+            setModalVisibility(!modalVisible);
+          }}
+          onMouseOver={() =>
+            mouseOverOptions.enable ? _setMouseOver(true) : null
+          }
+          onMouseLeave={() => {
+            _setMouseOver(false);
+          }}
           style={{
             alignItems: "center",
             justifyContent: "center",
-            ...shadowProps,
+            paddingHorizontal: 10,
+            width: !buttonVisible ? 0 : 150,
+            height: !buttonVisible ? 0 : 40,
+            ...shadowStyle,
             ...buttonStyle,
-          }}
-          onPress={() => {
-            _modalVisible(!sIsModalVisible);
-            handleButtonPress();
+            backgroundColor: sMouseOver
+              ? mouseOverOptions.highlightColor
+              : "transparent",
+            opacity: sMouseOver ? mouseOverOptions.opacity : null,
           }}
         >
           <Text
@@ -223,30 +279,34 @@ export const ScreenModal = ({
               color: "white",
               textAlign: "center",
               fontSize: 15,
+              textAlignVertical: "center",
+              paddingBottom: 3,
               ...buttonTextStyle,
             }}
           >
-            {buttonLabel}
+            {buttonVisible && buttonLabel}
+            {showButtonIcon && (
+              <Text style={{ ...buttonTextStyle, fontSize: labelIconFontSize }}>
+                {buttonIcon}
+              </Text>
+            )}
           </Text>
         </TouchableOpacity>
 
-        <Modal
-          onDismiss={() => {
-            _modalVisible(false);
-            onModalDismiss();
-          }}
-          visible={sIsModalVisible && showModal}
-          transparent
-        >
+        <Modal visible={modalVisible} transparent>
           <View
             style={{
-              flex: 1,
+              width: "100%",
+              height: "100%",
               backgroundColor: "rgba(0, 0, 0, 0.5)",
               justifyContent: "center",
               alignItems: "center",
               alignSelf: "center",
               justifySelf: "center",
-              ...modalStyle,
+              ...outerModalStyle,
+              position: ref ? "absolute" : null,
+              top: ref ? sModalCoordinates.y + modalCoordinateVars.y : null,
+              left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
             }}
           >
             <Component />
@@ -264,12 +324,11 @@ export const ModalDropdown = ({
   buttonBackgroundColor,
   onRemoveSelection,
   currentSelection,
-  closeButtonText,
   removeButtonText,
-  itemListStyle = {},
   buttonStyle = {},
-  containerStyle = {},
-  modalStyle = {},
+  outerModalStyle = {},
+  innerModalStyle = {},
+  // modalStyle = {},
 }) => {
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedValue, setSelectedValue] = useState(null);
@@ -284,23 +343,23 @@ export const ModalDropdown = ({
   // log(data);
 
   return (
-    <TouchableWithoutFeedback onPress={() => toggleModal()}>
-      <View style={{ ...styles.container, ...containerStyle }}>
+    <TouchableWithoutFeedback
+      // style={{ width: 500, height: 100 }}
+      onPress={() => toggleModal()}
+    >
+      <View style={{ flex: 1 }}>
         <TouchableOpacity
           style={{
             backgroundColor: Colors.blueButtonBackground,
             borderRadius: 2,
-            margin: 2,
-            paddingHorizontal: 6,
+            paddingHorizontal: 10,
+            // width: 390,
+            height: 25,
             paddingVertical: 1,
             alignItems: "center",
             justifyContent: "center",
-            // opacity: 0.6,
-            shadowColor: "black",
-            shadowOffset: { width: 3, height: 3 },
-            shadowOpacity: 0.3,
-            shadowRadius: 5,
-            // ...itemListStyle,
+            ...SHADOW_RADIUS_PROTO,
+            ...buttonStyle,
           }}
           onPress={toggleModal}
         >
@@ -316,103 +375,104 @@ export const ModalDropdown = ({
           </Text>
         </TouchableOpacity>
 
-        <Modal style={{ width: "50%" }} visible={isModalVisible} transparent>
+        <Modal visible={isModalVisible} transparent={true}>
           <View
             style={{
-              width: "50%",
-              alignSelf: "center",
-              justifySelf: "center",
-              flex: 1,
-              ...modalStyle,
+              // backgroundColor: "green",
+              // backgroundColor: "black",
+              // opacity: 0.2,
+              width: "100%",
+              height: "100%",
+              ...outerModalStyle,
             }}
           >
-            <View style={styles.modalBackground}>
-              <TouchableWithoutFeedback>
-                <View style={styles.modalContent}>
-                  <FlatList
-                    data={data}
-                    keyExtractor={(item, index) => index.toString()}
-                    renderItem={({ item }) => {
-                      let label = "";
-                      let backgroundColor = null;
-                      let textColor = null;
-                      let fontSize = null;
-                      let itemStyleProps = {};
-                      if (typeof item === "object") {
-                        // bike colors modal
-                        if (Object.hasOwn(item, "backgroundColor")) {
-                          label = item.label;
-                          itemStyleProps.backgroundColor = item.backgroundColor;
-                          textColor = item.textColor;
-                          itemStyleProps.paddingVertical = 15;
-                          fontSize = 15;
-                          if (label === currentSelection.label) {
-                            itemStyleProps.borderWidth = 10;
-                            itemStyleProps.borderColor = Colors.mainBackground;
-                          }
-                        }
-                      } else {
+            {/* <View style={{}}> */}
+            <TouchableWithoutFeedback>
+              <View style={{ width: "20%", ...innerModalStyle }}>
+                <FlatList
+                  data={data}
+                  keyExtractor={(item, index) => index.toString()}
+                  renderItem={({ item }) => {
+                    let label = "";
+                    let backgroundColor = null;
+                    let textColor = null;
+                    let fontSize = null;
+                    let itemStyleProps = {};
+                    if (typeof item === "object") {
+                      // bike colors modal
+                      if (Object.hasOwn(item, "backgroundColor")) {
+                        label = item.label;
+                        itemStyleProps.backgroundColor = item.backgroundColor;
+                        textColor = item.textColor;
+                        itemStyleProps.paddingVertical = 15;
                         fontSize = 15;
-                        label = item;
-                        itemStyleProps.backgroundColor =
-                          Colors.opacityBackgroundLight;
-                        itemStyleProps.marginVertical = 2;
-                        textColor = "white";
+                        if (label === currentSelection.label) {
+                          itemStyleProps.borderWidth = 10;
+                          itemStyleProps.borderColor = Colors.mainBackground;
+                        }
                       }
-                      return (
-                        <TouchableOpacity
-                          style={{
-                            ...styles.option,
-                            backgroundColor,
-                            // ...borderProps,
-                            borderColor: "dimgray",
-                            ...itemStyleProps,
-                          }}
-                          onPress={() => handleSelect(item)}
-                        >
-                          <Text style={{ fontSize, color: textColor }}>
-                            {label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    }}
-                  />
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-around",
-                    }}
-                  >
-                    {currentSelection && (
+                    } else {
+                      fontSize = 15;
+                      label = item;
+                      itemStyleProps.backgroundColor =
+                        Colors.opacityBackgroundLight;
+                      itemStyleProps.marginVertical = 2;
+                      textColor = "white";
+                    }
+                    return (
                       <TouchableOpacity
-                        style={styles.removeButton}
-                        onPress={() => {
-                          onRemoveSelection();
-                          toggleModal();
+                        style={{
+                          ...styles.option,
+                          backgroundColor,
+                          // ...borderProps,
+                          borderColor: "dimgray",
+                          ...itemStyleProps,
                         }}
+                        onPress={() => handleSelect(item)}
                       >
-                        <Text style={styles.closeText}>{removeButtonText}</Text>
+                        <Text style={{ fontSize, color: textColor }}>
+                          {label}
+                        </Text>
                       </TouchableOpacity>
-                    )}
-                  </View>
+                    );
+                  }}
+                />
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-around",
+                  }}
+                >
+                  {currentSelection && (
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => {
+                        onRemoveSelection();
+                        toggleModal();
+                      }}
+                    >
+                      <Text style={styles.closeText}>{removeButtonText}</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              </TouchableWithoutFeedback>
-            </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
+          {/* </View> */}
         </Modal>
       </View>
     </TouchableWithoutFeedback>
   );
 };
 
-export const InventoryItemInModal = ({ item = INVENTORY_ITEM }) => {
+export const InventoryItemInModal = ({ item = INVENTORY_ITEM_PROTO }) => {
   return (
     <View
       style={{
         width: "80%",
         height: "40%",
         backgroundColor: Colors.opacityBackgroundLight,
-        ...shadow_radius,
+        ...SHADOW_RADIUS_PROTO,
         shadowOffset: { width: 10, height: 10 },
         padding: 15,
         // alignItems: "center",
@@ -510,14 +570,14 @@ export const InventoryItemInModal = ({ item = INVENTORY_ITEM }) => {
 
 global.test = 1;
 export const CustomerInfoComponent = ({
-  sCustomerInfo = CUSTOMER,
-  _setCustomerInfo,
-  handleExitScreenPress,
-  exitScreenButtonText,
+  sCustomerInfo = CUSTOMER_PROTO,
+  ssCreateCustomerBtnText,
+  ssCancelButtonText,
   ssInfoTextFocus,
   __setInfoTextFocus,
-  __closeButtonText,
-  __handleCloseButtonPress,
+  __handleCreateCustomerPress,
+  __handleCancelButtonPress,
+  __setCustomerInfo,
 }) => {
   const TEXT_INPUT_STYLE = {
     width: 200,
@@ -549,7 +609,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.phone.cell = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Cell phone"
@@ -562,7 +622,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.phone.landline = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Landline"
@@ -575,7 +635,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.first = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="First name"
@@ -588,7 +648,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.last = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Last name"
@@ -601,7 +661,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.email = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Email address"
@@ -614,7 +674,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.address.streetAddress = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Street address"
@@ -627,7 +687,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.address.unit = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Unit"
@@ -640,7 +700,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.address.city = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="City"
@@ -653,7 +713,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.address.state = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="State"
@@ -666,7 +726,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.address.zip = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Zip code"
@@ -679,7 +739,7 @@ export const CustomerInfoComponent = ({
           <TextInput
             onChangeText={(val) => {
               sCustomerInfo.address.notes = val;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Address notes"
@@ -701,7 +761,7 @@ export const CustomerInfoComponent = ({
                 sCustomerInfo.phone.callOnlyOption
               )
                 sCustomerInfo.phone.emailOnlyOption = false;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
           />
           <CheckBox
@@ -716,14 +776,14 @@ export const CustomerInfoComponent = ({
                 sCustomerInfo.phone.emailOnlyOption
               )
                 sCustomerInfo.phone.callOnlyOption = false;
-              _setCustomerInfo(sCustomerInfo);
+              __setCustomerInfo(sCustomerInfo);
             }}
           />
           <View
             style={{ flexDirection: "row", justifyContent: "space-between" }}
           >
             <Button
-              onPress={handleExitScreenPress}
+              onPress={__handleCreateCustomerPress}
               viewStyle={{
                 marginTop: 30,
                 marginLeft: 20,
@@ -732,11 +792,11 @@ export const CustomerInfoComponent = ({
                 width: 200,
               }}
               textStyle={{ color: "dimgray" }}
-              text={exitScreenButtonText}
+              text={ssCreateCustomerBtnText}
             />
             {
               <Button
-                onPress={__handleCloseButtonPress}
+                onPress={__handleCancelButtonPress}
                 viewStyle={{
                   marginTop: 30,
                   marginLeft: 20,
@@ -745,7 +805,7 @@ export const CustomerInfoComponent = ({
                   width: 200,
                 }}
                 textStyle={{ color: "dimgray" }}
-                text={__closeButtonText}
+                text={ssCancelButtonText}
               />
             }
           </View>
@@ -764,7 +824,7 @@ export const CustomerInfoComponent = ({
 
 // export const
 
-export const shadow_radius = {
+export const SHADOW_RADIUS_PROTO = {
   shadowColor: "black",
   shadowOffset: { width: 3, height: 3 },
   shadowOpacity: 0.25,
@@ -832,42 +892,56 @@ const styles = {
 export const Button = ({
   onPress,
   onLongPress,
-  height,
-  width,
-  backgroundColor,
-  textColor,
   text,
-  fontSize,
-  font,
-  caps = false,
-  viewStyle = {},
+  mouseOverOptions = {
+    enable: true,
+    opacity: 0.7,
+    highlightColor: Colors.tabMenuButton,
+  },
+  shadow = true,
+  allCaps = false,
+  buttonStyle = {},
   textStyle = {},
 }) => {
-  if (caps) text = text.toUpperCase();
+  const [sMouseOver, _setMouseOver] = React.useState(false);
+  if (allCaps) text = text.toUpperCase();
+  let shadowStyle = { ...SHADOW_RADIUS_PROTO };
+  if (!shadow) shadowStyle = {};
+  /////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////
   return (
     <TouchableOpacity
-      onLongPress={onLongPress}
-      onPress={
-        onPress ||
-        (() => {
-          log("button pressed no function handed to Button in components file");
-        })
-      }
+      onMouseOver={() => (mouseOverOptions.enable ? _setMouseOver(true) : null)}
+      onMouseLeave={() => {
+        _setMouseOver(false);
+      }}
+      onPress={onPress}
     >
       <View
         style={{
-          ...centerItem,
-          width: width || null,
-          height: height || null,
-          backgroundColor: backgroundColor || "blue",
-          ...viewStyle,
+          alignItems: "center",
+          justifyContent: "center",
+          width: 130,
+          height: 50,
+          // opacity: 1,
+          ...shadowStyle,
+          ...buttonStyle,
+          backgroundColor: sMouseOver
+            ? mouseOverOptions.highlightColor
+            : buttonStyle.backgroundColor,
+          opacity: sMouseOver ? mouseOverOptions.opacity : buttonStyle.opacity,
         }}
       >
         <Text
           style={{
-            fontSize: fontSize || null,
-            color: textColor || "gray",
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            textAlign: "center",
+            textAlignVertical: "center",
+            fontSize: 17,
+            color: "whitesmoke",
             ...textStyle,
+            color: sMouseOver ? "white" : textStyle.color,
           }}
         >
           {text || "Button"}
@@ -881,7 +955,7 @@ export const TabMenuButton = ({
   onPress,
   text,
   textColor,
-  viewStyle,
+  buttonStyle,
   textStyle,
   isSelected,
   onLongPress,
@@ -889,49 +963,114 @@ export const TabMenuButton = ({
   return (
     <Button
       onLongPress={onLongPress}
-      textStyle={{ textColor: Colors.tabMenuButtonText }}
-      viewStyle={{
-        viewStyle,
-        opacity: isSelected ? 1 : 0.45,
-        paddingHorizontal: 20,
-        paddingVertical: 5,
-        ...shadow_radius,
-        shadowOffset: { width: 0, height: 2 },
-      }}
       onPress={onPress}
       text={text}
-      backgroundColor={Colors.tabMenuButton}
-      textColor={Colors.tabMenuButtonText}
+      textStyle={{
+        textColor: Colors.tabMenuButtonText,
+        fontSize: 15,
+        ...textStyle,
+      }}
+      buttonStyle={{
+        height: 30,
+        // width: 130,
+        backgroundColor: Colors.tabMenuButton,
+        opacity: isSelected ? 1 : 0.45,
+        paddingHorizontal: 15,
+        width: null,
+        paddingVertical: 5,
+        ...SHADOW_RADIUS_PROTO,
+        shadowOffset: { width: 0, height: 2 },
+        ...buttonStyle,
+      }}
     />
   );
 };
 
 export const CheckBox = ({
-  label,
+  text,
   onCheck,
-  buttonStyle = {},
-  labelStyle = {},
-  viewStyle = {},
+  item,
+  roundButton = false,
+  handleCheckInternal = false,
   isChecked = false,
-}) => (
-  <View
-    style={{
-      flexDirection: "row",
-      justifyContent: "flex-start",
-      width: 150,
-      height: 30,
-      borderWidth: 1,
-      ...viewStyle,
-    }}
-  >
-    <TouchableOpacity
-      onPress={onCheck}
-      style={{
-        width: "20%",
-        backgroundColor: isChecked ? "red" : "lightgray",
-        ...buttonStyle,
+  buttonStyle = {},
+  outerButtonStyle = {},
+  textStyle = {},
+  viewStyle = {},
+  mouseOverOptions = {
+    enable: true,
+    opacity: 0.7,
+    highlightColor: Colors.tabMenuButton,
+  },
+}) => {
+  const [sMouseOver, _setMouseOver] = React.useState(false);
+  const [sIsChecked, _setIsChecked] = useState(false);
+  const rgbText = "rgba(50,50,50,1)";
+  if (roundButton) buttonStyle = { ...buttonStyle, borderRadius: 100 };
+
+  let backgroundColor;
+  if (sMouseOver) {
+    if (!isChecked && !sIsChecked) {
+      if (mouseOverOptions.enable) {
+        if (mouseOverOptions.highlightColor) {
+          backgroundColor = mouseOverOptions.highlightColor;
+        } else {
+          backgroundColor = Colors.tabMenuButton;
+        }
+      }
+    }
+  } else {
+    backgroundColor =
+      isChecked || sIsChecked ? Colors.tabMenuButton : "lightgray";
+  }
+
+  let dim = 25;
+  return (
+    <View
+      onMouseOver={() => (mouseOverOptions.enable ? _setMouseOver(true) : null)}
+      onMouseLeave={() => {
+        _setMouseOver(false);
       }}
-    />
-    <Text>{label}</Text>
-  </View>
-);
+      style={{
+        flexDirection: "row",
+        justifyContent: "flex-start",
+        alignItems: "center",
+        ...viewStyle,
+      }}
+    >
+      <TouchableOpacity
+        onPress={() => {
+          if (handleCheckInternal) {
+            _setIsChecked(!sIsChecked);
+            onCheck(item, !sIsChecked);
+          } else {
+            onCheck(item);
+          }
+        }}
+        style={{
+          width: buttonStyle.width || dim,
+          height: buttonStyle.height || dim,
+          borderRadius: 100,
+          flexDirection: "row",
+          justifyContent: "center",
+          justifyItems: "center",
+          alignItems: "center",
+          paddingLeft: 7,
+          ...outerButtonStyle,
+        }}
+      >
+        <View
+          style={{
+            width: dim - 10,
+            height: dim - 10,
+            opacity: isChecked ? 1 : 0.4,
+            backgroundColor,
+            marginRight: 7,
+            ...buttonStyle,
+          }}
+        />
+      </TouchableOpacity>
+      <Text style={{ fontSize: 14, color: rgbText, ...textStyle }}>{text}</Text>
+    </View>
+  );
+};

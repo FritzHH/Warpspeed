@@ -20,39 +20,36 @@ import {
 } from "../../components";
 import { Colors } from "../../styles";
 import {
-  BIKE_COLORS,
-  BRANDS,
-  CUSTOMER,
-  BIKE_DESCRIPTIONS,
-  DISCOUNTS,
-  PART_SOURCES,
-  WORKORDER,
-  WORKORDER_ITEM,
-  BIKE_COLORS_ARR,
+  bike_colors_db,
+  bike_brands_db,
+  CUSTOMER_PROTO,
+  bike_descriptions_db,
+  discounts_db,
+  part_sources_db,
+  WORKORDER_PROTO,
+  WORKORDER_ITEM_PROTO,
+  bike_colors_arr_db,
   FOCUS_NAMES,
 } from "../../data";
-import { QuickItemsTab } from "./Options_QuickItemsTab";
-import { IncomingCustomerComponent } from "./Info_CreateNewCustomerComponent";
+import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useRef } from "react";
 import { cloneDeep } from "lodash";
 
 export const Info_WorkorderComponent = ({
-  ssCustomerObj = CUSTOMER,
-  ssWorkorderObj = WORKORDER,
+  ssCustomerObj = CUSTOMER_PROTO,
+  ssWorkorderObj = WORKORDER_PROTO,
   __setCustomerObj,
   __setWorkorderObj,
   __handleCreateNewWorkorderPressed,
-  // __handleExitScreenPressed,
 }) => {
   const [sShowCustomerInfoModal, _setShowCustomerInfoModal] =
-    React.useState(true);
+    React.useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = React.useState(null);
 
   function setBikeColor(incomingColorVal) {
-    log("incoming", incomingColorVal);
     let foundColor = false;
     let newColorObj = {};
-    BIKE_COLORS_ARR.forEach((bikeColorObj) => {
+    bike_colors_arr_db.forEach((bikeColorObj) => {
       if (bikeColorObj.label.toLowerCase() === incomingColorVal.toLowerCase()) {
         foundColor = true;
         newColorObj = { ...bikeColorObj };
@@ -90,18 +87,26 @@ export const Info_WorkorderComponent = ({
         }}
       >
         <ScreenModal
+          showShadow={false}
+          showButtonIcon={false}
           showModal={sShowCustomerInfoModal}
-          modalStyle={{ height: "90%", width: "90%" }}
+          outerModalStyle={{ height: "90%", width: "90%" }}
           buttonLabel={ssCustomerObj.first + " " + ssCustomerObj.last}
           buttonStyle={{
             alignItems: "flex-start",
             justifyContent: "center",
+            paddingLeft: 0,
           }}
-          buttonTextStyle={{ fontSize: 25, color: Colors.darkText }}
+          mouseOverOptions={{ highlightColor: "transparent" }}
+          handleButtonPress={() => _setShowCustomerInfoModal(true)}
+          buttonTextStyle={{
+            fontSize: 25,
+            color: Colors.darkText,
+          }}
           shadowProps={{ shadowColor: "transparent" }}
           Component={() => (
             <CustomerInfoComponent
-              sCustomerInfo={cloneDeep(ssCustomerObj)}
+              sCustomerInfo={ssCustomerObj}
               _setCustomerInfo={__setCustomerObj}
               handleExitScreenPress={closeModal}
               exitScreenButtonText={"Close"}
@@ -114,8 +119,13 @@ export const Info_WorkorderComponent = ({
         <Button
           onPress={__handleCreateNewWorkorderPressed}
           text={"+"}
-          viewStyle={{ backgroundColor: null }}
-          textStyle={{ padding: 5, fontSize: 60, color: "red" }}
+          shadow={false}
+          buttonStyle={{ width: null }}
+          textStyle={{
+            padding: 5,
+            fontSize: 50,
+            color: "red",
+          }}
         />
       </View>
       {ssWorkorderObj && (
@@ -174,11 +184,10 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              closeButtonText={"Close"}
-              removeButtonText={"Remove"}
-              buttonLabel={BRANDS.brands1Title}
+              removeButtonText={"Remove Color"}
+              buttonLabel={bike_brands_db.brands1Title}
               buttonStyle={{ width: 90 }}
-              data={BRANDS.brands1}
+              data={bike_brands_db.brands1}
               currentSelectionName={ssWorkorderObj.brand}
               onSelect={(val) => {
                 ssWorkorderObj.brand = val;
@@ -197,8 +206,8 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              data={BRANDS.brands2}
-              buttonLabel={BRANDS.brands2Title}
+              data={bike_brands_db.brands2}
+              buttonLabel={bike_brands_db.brands2Title}
               closeButtonText={"Close"}
               removeButtonText={"Remove"}
               buttonStyle={{ width: 70 }}
@@ -241,7 +250,7 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              data={BIKE_DESCRIPTIONS}
+              data={bike_descriptions_db}
               buttonLabel={"Descriptions"}
               closeButtonText={"Close"}
               buttonStyle={{ width: 90 }}
@@ -292,7 +301,7 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              data={BIKE_COLORS_ARR}
+              data={bike_colors_arr_db}
               closeButtonText={"Close"}
               buttonStyle={{ width: 90 }}
               removeButtonText={"Remove Color"}
@@ -364,7 +373,7 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              data={PART_SOURCES}
+              data={part_sources_db}
               closeButtonText={"Close"}
               removeButtonText={"Remove"}
               buttonStyle={{ width: 90 }}

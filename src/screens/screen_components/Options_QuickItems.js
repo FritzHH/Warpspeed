@@ -1,60 +1,77 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
-  Pressable,
-  TextInput,
   FlatList,
+  TouchableWithoutFeedback,
   TouchableOpacity,
+  TextInput,
 } from "react-native-web";
-import { dim, log, trimToTwoDecimals } from "../../utils";
 import {
-  HorzSpacer,
-  TabMenuButton,
-  TabMenuDivider as Divider,
-  ModalDropdown,
-  TextInputOnMainBackground,
-  TextInputLabelOnMainBackground,
-  shadow_radius,
+  bike_colors_arr_db,
+  COLLECTION_NAMES,
+  system_users_db,
+  CUSTOMER_PROTO,
+  INFO_COMPONENT_NAMES,
+  TAB_NAMES,
+  WORKORDER_PROTO,
+  WORKORDER_ITEM_PROTO,
+  QUICK_BUTTON_NAMES,
+  INVENTORY_ITEM_PROTO,
+  ADJUSTABLE_BUTTON_SIZE_OPTIONS_ARR,
+  DEFAULT_USER_PREFERENCES,
+} from "../../data";
+import { Colors, ViewStyles } from "../../styles";
+
+import { dim, log } from "../../utils";
+import {
+  AlertBox,
+  Button,
   InventoryItemInModal,
   ScreenModal,
+  SHADOW_RADIUS_PROTO,
 } from "../../components";
-import { Colors } from "../../styles";
-import {
-  BIKE_COLORS,
-  BRANDS,
-  CUSTOMER,
-  BIKE_DESCRIPTIONS,
-  DISCOUNTS,
-  INVENTORY_ITEM,
-  PART_SOURCES,
-  QUICK_BUTTON_NAMES,
-  test_inventory,
-  WORKORDER,
-  WORKORDER_ITEM,
-} from "../../data";
-import { useActionData } from "react-router-dom";
+import { cloneDeep } from "lodash";
+import { Items_WorkorderItemsTab } from "./Items_WorkorderItems";
 
 let firstPass = false;
 const SEARCH_STRING_TIMER = 45 * 1000;
 
-export function QuickItemsTab({
-  ssWorkorderObj = WORKORDER,
+export function QuickItemComponent({
+  ssWorkorderObj = WORKORDER_PROTO,
+  ssAdjustableUserPreferences = DEFAULT_USER_PREFERENCES,
+  ssInventoryArr,
   __setWorkorderObj,
 }) {
-  const intervalRef = React.useRef(null);
+  ///////////////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
-  const [sInventory, _setInventory] = React.useState(test_inventory);
+  const [sButtonSearchResults, _setButtonSearchResults] = React.useState({
+    name: null,
+    arr: [],
+  });
   const [sInitDone, _setInitDone] = React.useState(false);
   const [sQuickItemsButtonArr, _setQuickItemsButtonArr] =
     React.useState(QUICK_BUTTON_NAMES);
   const [sQuickButtonContentsArr, setstateQuickButtonContentsArr] =
     React.useState([]);
 
+  const [sRefs, _setRefs] = useState([]);
+  // internal vars
   let lastSearchMillis = new Date().getTime();
-  let quickItemButtonHit = true;
+  // const refs = useRef([]);
 
+  useEffect(() => {
+    _setRefs((sRefs) =>
+      Array(sQuickItemsButtonArr.length)
+        .fill()
+        .map((_, i) => sRefs[i] || React.createRef())
+    );
+  }, [sQuickItemsButtonArr.length]);
+
+  ///////////////////////////
+  // functions
+  //////////////////////////
   function setSearchTimer() {
     setInterval(() => {
       let curTime = new Date().getTime();
@@ -73,20 +90,19 @@ export function QuickItemsTab({
       // setSearchTimer();
     }
   }
-  init();
+  // init();
 
   function search(searchTerm) {
     lastSearchMillis = new Date().getTime();
     _setSearchTerm(searchTerm);
-    quickItemButtonHit = false;
     if (searchTerm.length == 0) {
       _setSearchResults([]);
       return;
     }
     if (searchTerm.length < 2) return;
     let res = {};
-    let keys = Object.keys(INVENTORY_ITEM);
-    sInventory.forEach((invItem) => {
+    let keys = Object.keys(INVENTORY_ITEM_PROTO);
+    ssInventoryArr.forEach((invItem) => {
       keys.forEach((key) => {
         if (
           invItem[key]
@@ -104,16 +120,16 @@ export function QuickItemsTab({
 
   function quickItemSelected(item) {
     // log(workorderOb);
-    let newItem = { ...WORKORDER_ITEM };
-    log("original", WORKORDER_ITEM);
-    log("first workorder", ssWorkorderObj.items);
-    Object.keys(WORKORDER_ITEM).forEach((itemKey) => {
+    let newItem = { ...WORKORDER_ITEM_PROTO };
+    // log("original", WORKORDER_ITEM_PROTO);
+    // log("first workorder", ssWorkorderObj.items);
+    Object.keys(WORKORDER_ITEM_PROTO).forEach((itemKey) => {
       if (Object.hasOwn(item, itemKey)) newItem[itemKey] = item[itemKey];
     });
-    log("new item", newItem);
+    // log("new item", newItem);
     let work = JSON.parse(JSON.stringify(ssWorkorderObj));
     work.items.push(newItem);
-    log("second workorder", work.items);
+    // log("second workorder", work.items);
     __setWorkorderObj(work);
   }
 
@@ -121,9 +137,12 @@ export function QuickItemsTab({
     _setSearchResults([]);
     _setSearchTerm("");
   }
-
+  // log("here", ssInventoryArr);
+  //////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////
+  // log("refs", refs);
   return (
-    <View style={{}}>
+    <View style={{ width: "100%", height: "100%" }}>
       <View
         style={{
           width: "100%",
@@ -132,32 +151,12 @@ export function QuickItemsTab({
           marginHorizontal: 4,
         }}
       >
-        <TouchableOpacity
+        <Button
           onPress={() => clearSearch()}
-          style={{
-            // minWidth: 50,
-            // maxWidth: 150,
-            width: 120,
-            marginVertical: 4,
-            justifyContent: "center",
-            borderWidth: 0,
-            alignItems: "center",
-            marginLeft: 7,
-            backgroundColor: "darkgray",
-            ...shadow_radius,
-          }}
-        >
-          <Text
-            style={{
-              color: "white",
-              paddingHorizontal: 15,
-              paddingVertical: 4,
-              fontSize: 18,
-            }}
-          >
-            reset
-          </Text>
-        </TouchableOpacity>
+          text={"reset"}
+          textStyle={{ color: "lightgray" }}
+          buttonStyle={{ height: 35 }}
+        />
         <TextInput
           style={{
             borderBottomWidth: 1,
@@ -169,7 +168,7 @@ export function QuickItemsTab({
             marginLeft: 20,
             marginRight: 30,
           }}
-          placeholder="Search..."
+          placeholder="Search inventory..."
           placeholderTextColor={"darkgray"}
           value={sSearchTerm}
           onChangeText={(val) => search(val)}
@@ -190,27 +189,75 @@ export function QuickItemsTab({
           data={sQuickItemsButtonArr}
           keyExtractor={(item, index) => index.toString()}
           renderItem={(item) => {
+            let index = item.index;
+            item = item.item;
             return (
-              <QuickItemButton
-                onPress={() => {
-                  _setSearchTerm("");
-                  quickItemButtonHit = true;
-                  // log("button obj", item);
-                  let arr = [];
-                  item.item.items.forEach((btnItem) => {
-                    sInventory.forEach((invItem) => {
-                      if (invItem.id == btnItem.id) arr.push(invItem);
+              <ScreenModal
+                ref={sRefs[index]}
+                modalVisible={
+                  item.name === sButtonSearchResults.name &&
+                  sButtonSearchResults.arr.length > 0
+                }
+                setModalVisibility={(val) => {
+                  if (
+                    item.name === sButtonSearchResults.name &&
+                    sButtonSearchResults.arr.length > 0
+                  ) {
+                    _setButtonSearchResults({
+                      name: null,
+                      arr: [],
                     });
-                  });
-                  //   log("arr", arr);
-                  _setSearchResults(arr);
+                  }
                 }}
-                title={item.item.name}
+                modalCoordinateVars={{ x: 160, y: 0 }}
+                showOuterModal={false}
+                buttonStyle={{ paddingVertical: 5, marginVertical: 5 }}
+                outerModalStyle={{}}
+                buttonLabel={item.name}
+                showButtonIcon={false}
+                handleButtonPress={() => {
+                  let arr = [];
+                  ssInventoryArr.forEach((invItem) => {
+                    if (invItem.id == item.id) arr.push(invItem);
+                  });
+                  // log("arr", arr);
+                  _setButtonSearchResults({ name: item.name, arr });
+                }}
+                Component={() => {
+                  return (
+                    <View>
+                      <FlatList
+                        data={sButtonSearchResults.arr}
+                        keyExtractor={(k, i) => i}
+                        renderItem={(item) => {
+                          let index = item.index;
+                          item = item.item;
+                          // log("item", item);
+                          return (
+                            // <View>{"TEZXT"}</View>
+                            <Button
+                              text={item.name}
+                              textStyle={{
+                                ...ssAdjustableUserPreferences
+                                  .optionsTabButtonSizes.text,
+                              }}
+                              buttonStyle={{
+                                marginVertical: 4,
+                                ...ssAdjustableUserPreferences
+                                  .optionsTabButtonSizes.view,
+                              }}
+                            />
+                          );
+                        }}
+                      />
+                    </View>
+                  );
+                }}
               />
             );
           }}
         />
-
+        {/* search results list */}
         <FlatList
           style={{
             marginRight: 25,
@@ -218,10 +265,12 @@ export function QuickItemsTab({
             // backgroundColor: "green",
           }}
           data={sSearchResults}
+          keyExtractor={(item) => item.id}
           renderItem={(item) => {
+            item = item.item;
             // log(item.item);
             return (
-              <TouchableOpacity onPress={() => quickItemSelected(item.item)}>
+              <TouchableOpacity onPress={() => quickItemSelected(item)}>
                 <View
                   style={{
                     flexDirection: "row",
@@ -238,7 +287,7 @@ export function QuickItemsTab({
                     }}
                     numberOfLines={2}
                   >
-                    {item.item.name}
+                    {item.name}
                   </Text>
                   <View
                     style={{
@@ -251,9 +300,7 @@ export function QuickItemsTab({
                     <ScreenModal
                       buttonLabel={"i"}
                       modalStyle={{ width: "40%", alignSelf: "flex-end" }}
-                      Component={() => (
-                        <InventoryItemInModal item={item.item} />
-                      )}
+                      Component={() => <InventoryItemInModal item={item} />}
                       buttonStyle={{}}
                       textStyle={{ fontSize: 14 }}
                     />
@@ -263,7 +310,7 @@ export function QuickItemsTab({
                       }}
                     >
                       {"$ "}
-                      <Text style={{ fontSize: 16 }}>{item.item.price}</Text>
+                      <Text style={{ fontSize: 16 }}>{item.price}</Text>
                     </Text>
                   </View>
                 </View>
@@ -289,7 +336,7 @@ const QuickItemButton = ({ title, onPress, color }) => {
         alignItems: "center",
         marginLeft: 7,
         // borderColor: Colors.mainBackground,
-        ...shadow_radius,
+        ...SHADOW_RADIUS_PROTO,
       }}
       onPress={onPress}
     >

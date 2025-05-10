@@ -5,9 +5,13 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
+  onSnapshot,
+  query,
 } from "firebase/firestore";
 import { initializeApp } from "firebase/app";
 import { log } from "./utils";
+import { COLLECTION_NAMES } from "./data";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCFqFF3wG-8yNT8Z2O_j8ksL1SWxj9U0gg",
@@ -28,6 +32,16 @@ export function getNewCollectionRef(collectionName) {
   return ref;
 }
 
+export function getCollection(collectionName) {
+  let arr = [];
+  return getDocs(collection(DB, collectionName)).then((res) => {
+    res.forEach((doc) => {
+      arr.push(doc.data());
+    });
+    return arr;
+  });
+}
+
 export function setCollectionItem(collectionName, item) {
   let docRef = doc(DB, collectionName, item.id);
   return setDoc(docRef, item)
@@ -44,5 +58,21 @@ export function getCollectionItem(collectionName, itemID) {
     } else {
       return null;
     }
+  });
+}
+
+export function subscribeToCollectionNode(collectionName, callback) {
+  let q = query(collection(DB, collectionName));
+  return onSnapshot(q, (querySnapshot) => {
+    let arr = [];
+    querySnapshot.forEach((query) => {
+      // log(count, query.data());
+      try {
+        arr.push(query.data());
+      } catch (e) {
+        callback(arr);
+      }
+    });
+    callback(arr);
   });
 }

@@ -16,14 +16,14 @@ import {
 } from "../../components";
 import { Colors } from "../../styles";
 import {
-  BIKE_COLORS,
-  BRANDS,
-  CUSTOMER,
-  BIKE_DESCRIPTIONS,
-  DISCOUNTS,
-  PART_SOURCES,
-  WORKORDER,
-  WORKORDER_ITEM,
+  bike_colors_db,
+  bike_brands_db,
+  CUSTOMER_PROTO,
+  bike_descriptions_db,
+  discounts_db,
+  part_sources_db,
+  WORKORDER_PROTO,
+  WORKORDER_ITEM_PROTO,
   COLLECTION_NAMES,
   INFO_COMPONENT_NAMES,
   TAB_NAMES,
@@ -43,53 +43,37 @@ import {
   setCollectionItem,
 } from "../../dbCalls";
 
-import { NewCustomerComponent } from "../screen_components/Info_CreateNewCustomerComponent";
+import { CustomerInfoScreenComponent } from "../screen_components/Info_CustomerInfoComponent";
 import React from "react";
 import { cloneDeep } from "lodash";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCFqFF3wG-8yNT8Z2O_j8ksL1SWxj9U0gg",
-  authDomain: "warpspeed-original.firebaseapp.com",
-  projectId: "warpspeed-original",
-  storageBucket: "warpspeed-original.firebasestorage.app",
-  messagingSenderId: "499618567073",
-  appId: "1:499618567073:web:4e2ca2cf293cb6d96831e0",
-  measurementId: "G-7SSYMNGKQS",
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 
 export const Info_Section = ({
   ssCustomerObj,
   ssWorkorderObj,
+  ssCustomersArr,
+  ssSelectedCustomerSearchItem,
+  ssInfoComponentName,
+  __setInfoComponentName,
   __setCustomerObj,
   __setWorkorderObj,
   __createNewCustomer,
   __setOptionsTabName,
+  __setCustomerSearchArr,
+  __setItemsTabName,
 }) => {
-  const [sInfoComponentName, _setInfoComponentName] = React.useState(
-    INFO_COMPONENT_NAMES.phoneNumberEntry
-  );
-  const [sNewCustomerObj, _setNewCustomerObj] = React.useState(CUSTOMER);
-  // const[sCreateNewWorkorderPressed, _setCreateNewWorkorderPressed] = React.useState(false)
-  let Component = null;
-
   function createNewCustomer(newCustomerObj) {
-    // log("creating", newCustomerObj);
     __createNewCustomer(newCustomerObj);
-    _setInfoComponentName(INFO_COMPONENT_NAMES.workorder);
+    __setInfoComponentName(INFO_COMPONENT_NAMES.workorder);
   }
 
-  function createNewWorkorderBtnPressed() {
-    // _setInfoComponentName(INFO_COMPONENT_NAMES.phoneNumberEntry);
-    __setWorkorderObj(cloneDeep(WORKORDER));
-    __setCustomerObj(cloneDeep(CUSTOMER));
-    _setInfoComponentName(INFO_COMPONENT_NAMES.phoneNumberEntry);
+  function createNewWorkorderBtnPressed(customerObj) {
+    __setWorkorderObj(WORKORDER_PROTO);
+    __setCustomerObj(customerObj);
+    __setInfoComponentName(INFO_COMPONENT_NAMES.phoneNumberEntry);
     __setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 
-  if (sInfoComponentName === INFO_COMPONENT_NAMES.workorder)
+  if (ssInfoComponentName === INFO_COMPONENT_NAMES.workorder)
     return (
       <Info_WorkorderComponent
         ssCustomerObj={ssCustomerObj}
@@ -97,18 +81,18 @@ export const Info_Section = ({
         __setWorkorderObj={__setWorkorderObj}
         ssWorkorderObj={ssWorkorderObj}
         __handleCreateNewWorkorderPressed={createNewWorkorderBtnPressed}
-
-        // __handleExitScreenPressed={() => _setInfoComponentName(INFO_COMPONENT_NAMES.workorder)}
       />
     );
 
-  if (sInfoComponentName === INFO_COMPONENT_NAMES.phoneNumberEntry)
+  if (ssInfoComponentName === INFO_COMPONENT_NAMES.phoneNumberEntry) {
+    // __setItemsTabName(TAB_NAMES.itemsTab.customerList);
     return (
-      <NewCustomerComponent
+      <CustomerInfoScreenComponent
         __createNewCustomer={(obj) => createNewCustomer(obj)}
-        _setInfoComponentName={(name) => log("name", name)}
+        __setCustomerSearchArr={__setCustomerSearchArr}
+        ssCustomersArr={ssCustomersArr}
+        ssSelectedCustomerSearchItem={ssSelectedCustomerSearchItem}
       />
     );
-
-  return <Component />;
+  }
 };

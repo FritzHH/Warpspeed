@@ -17,16 +17,15 @@ import {
 } from "../../components";
 import { Colors } from "../../styles";
 import {
-  BIKE_COLORS,
-  BRANDS,
-  CUSTOMER,
-  BIKE_DESCRIPTIONS,
-  DISCOUNTS,
-  PART_SOURCES,
-  WORKORDER,
-  WORKORDER_ITEM,
+  bike_colors_db,
+  bike_brands_db,
+  CUSTOMER_PROTO,
+  bike_descriptions_db,
+  discounts_db,
+  part_sources_db,
+  WORKORDER_PROTO,
+  WORKORDER_ITEM_PROTO,
 } from "../../data";
-import { QuickItemsTab } from "./Options_QuickItemsTab";
 import { create } from "lodash";
 
 export function Items_Dashboard({ fun_create_new_workorder }) {

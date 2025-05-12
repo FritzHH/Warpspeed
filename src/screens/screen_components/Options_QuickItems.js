@@ -23,7 +23,7 @@ import {
 } from "../../data";
 import { Colors, ViewStyles } from "../../styles";
 
-import { dim, log } from "../../utils";
+import { jclone, dim, log } from "../../utils";
 import {
   AlertBox,
   Button,
@@ -149,18 +149,19 @@ export function QuickItemComponent({
           marginTop: 10,
           flexDirection: "row",
           marginHorizontal: 4,
+          // marginTop: 10,
         }}
       >
         <Button
           onPress={() => clearSearch()}
           text={"reset"}
-          textStyle={{ color: "lightgray" }}
+          textStyle={{ color: "darkgray" }}
           buttonStyle={{ height: 35 }}
         />
         <TextInput
           style={{
             borderBottomWidth: 1,
-            borderBottomColor: "darkgray",
+            borderBottomColor: sSearchTerm.length > 0 ? "dimgray" : "darkgray",
             fontSize: 20,
             color: Colors.darkTextOnMainBackground,
             outlineWidth: 0,
@@ -182,6 +183,7 @@ export function QuickItemComponent({
           justifyContent: "flex-start",
         }}
       >
+        {/**Quick items buttons vertical list */}
         <FlatList
           style={{
             marginLeft: 5,
@@ -211,7 +213,12 @@ export function QuickItemComponent({
                 }}
                 modalCoordinateVars={{ x: 160, y: 0 }}
                 showOuterModal={false}
-                buttonStyle={{ paddingVertical: 5, marginVertical: 5 }}
+                buttonStyle={{
+                  paddingVertical: 5,
+                  marginVertical: 5,
+                  borderWidth: 0,
+                }}
+                buttonTextStyle={{ paddingVertical: 5 }}
                 outerModalStyle={{}}
                 buttonLabel={item.name}
                 showButtonIcon={false}
@@ -236,15 +243,16 @@ export function QuickItemComponent({
                           return (
                             // <View>{"TEZXT"}</View>
                             <Button
-                              text={item.name}
-                              textStyle={{
-                                ...ssAdjustableUserPreferences
-                                  .optionsTabButtonSizes.text,
+                              onPress={() => {
+                                if (!ssWorkorderObj.id) return;
+                                let item = cloneDeep(ssWorkorderObj);
+                                item.itemIdArr.push(item);
+                                __setWorkorderObj(item);
                               }}
+                              text={item.name}
+                              textStyle={{}}
                               buttonStyle={{
                                 marginVertical: 4,
-                                ...ssAdjustableUserPreferences
-                                  .optionsTabButtonSizes.view,
                               }}
                             />
                           );
@@ -261,6 +269,7 @@ export function QuickItemComponent({
         <FlatList
           style={{
             marginRight: 25,
+            marginLeft: 5,
             width: "70%",
             // backgroundColor: "green",
           }}
@@ -268,53 +277,67 @@ export function QuickItemComponent({
           keyExtractor={(item) => item.id}
           renderItem={(item) => {
             item = item.item;
-            // log(item.item);
             return (
-              <TouchableOpacity onPress={() => quickItemSelected(item)}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    borderBottomWidth: 1,
-                    borderColor: Colors.opacityBackgoundDark,
-                  }}
-                >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  borderBottomWidth: 1,
+                  borderColor: Colors.opacityBackgoundDark,
+                }}
+              >
+                {/* <TouchableOpacity style={{ width: "75%" }} onPress={() => {}}>
                   <Text
                     style={{
                       color: "whitesmoke",
                       fontSize: 15,
                       paddingVertical: 4,
+                      width: "100%",
                     }}
                     numberOfLines={2}
                   >
                     {item.name}
                   </Text>
-                  <View
+                </TouchableOpacity> */}
+                <View style={{ width: "75%" }}>
+                  <Button
+                    numLines={2}
+                    text={item.name}
+                    shadow={false}
+                    textStyle={{
+                      width: "100%",
+                      fontSize: 15,
+                    }}
+                    buttonStyle={{ width: "100%" }}
+                  />
+                </View>
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "15%",
+                  }}
+                >
+                  {/**Information full screen inventory modal */}
+                  <ScreenModal
+                    buttonLabel={"i"}
+                    modalStyle={{ width: "40%", alignSelf: "flex-end" }}
+                    Component={() => <InventoryItemInModal item={item} />}
+                    buttonStyle={{}}
+                    textStyle={{ fontSize: 14 }}
+                  />
+                  <Text
                     style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      width: "15%",
+                      fontSize: 13,
                     }}
                   >
-                    <ScreenModal
-                      buttonLabel={"i"}
-                      modalStyle={{ width: "40%", alignSelf: "flex-end" }}
-                      Component={() => <InventoryItemInModal item={item} />}
-                      buttonStyle={{}}
-                      textStyle={{ fontSize: 14 }}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 13,
-                      }}
-                    >
-                      {"$ "}
-                      <Text style={{ fontSize: 16 }}>{item.price}</Text>
-                    </Text>
-                  </View>
+                    {"$ "}
+                    <Text style={{ fontSize: 16 }}>{item.price}</Text>
+                  </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           }}
         />
@@ -327,15 +350,13 @@ const QuickItemButton = ({ title, onPress, color }) => {
   return (
     <TouchableOpacity
       style={{
-        // minWidth: 50,
-        // maxWidth: 150,
         width: 120,
         marginVertical: 4,
         justifyContent: "center",
         borderWidth: 0,
         alignItems: "center",
         marginLeft: 7,
-        // borderColor: Colors.mainBackground,
+        borderColor: Colors.mainBackground,
         ...SHADOW_RADIUS_PROTO,
       }}
       onPress={onPress}

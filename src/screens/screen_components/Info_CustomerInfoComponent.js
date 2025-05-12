@@ -11,6 +11,8 @@ import {
   dim,
   log,
   removeDashesFromPhone,
+  searchArray,
+  searchCustomerNames,
   searchPhoneNum,
   trimToTwoDecimals,
 } from "../../utils";
@@ -28,14 +30,20 @@ import {
   SHADOW_RADIUS_PROTO,
 } from "../../components";
 import { ButtonStyles, Colors } from "../../styles";
-import { CUSTOMER_PROTO, FOCUS_NAMES, ALERT_BOX_PROTO } from "../../data";
-import React, { useState } from "react";
+import {
+  CUSTOMER_PROTO,
+  FOCUS_NAMES,
+  ALERT_BOX_PROTO,
+  TAB_NAMES,
+} from "../../data";
+import React, { useEffect, useState } from "react";
 import { cloneDeep } from "lodash";
 
 export function CustomerInfoScreenComponent({
   ssCustomersArr,
   __createNewCustomer,
   __setCustomerSearchArr,
+  __setItemsTabName,
 }) {
   const [sBox1Val, _setBox1Val] = React.useState("");
   const [sBox2Val, _setBox2Val] = React.useState("");
@@ -45,74 +53,82 @@ export function CustomerInfoScreenComponent({
     ...ALERT_BOX_PROTO,
   });
   const [sShowCustomerModal, _setShowCustomerModal] = React.useState(false);
-  const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] = useState(true);
+  const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] =
+    useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
 
+  useEffect(() => {
+    __setItemsTabName(TAB_NAMES.itemsTab.customerList);
+  }, []);
+
+  /////////////////
+  const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
+  const NUMS = "1234567890-";
   ///////////////////////
   // button press handlers
   ///////////////////////
   function handleBox1TextChange(incomingText = "") {
     // log("incoming box 1", incomingText);
-    let test = true;
-    if (!sSearchingByName) {
-      if ("1234567890".includes(incomingText[incomingText.length - 1])) {
-        if (incomingText.length <= 12) {
-          let phoneNumNoDashes = removeDashesFromPhone(incomingText);
-          let searchArr = searchPhoneNum(phoneNumNoDashes, ssCustomersArr);
-          __setCustomerSearchArr(searchArr);
-
-          if (searchArr.length == 0 && incomingText.length == 12) {
-            _setShowCreateCustomerBtn(true);
-          } else {
-            _setShowCreateCustomerBtn(false);
-          }
-          // log("search arr", searchArr);
-        } else {
-          test = false;
-        }
-      }
-    } else {
-      if (incomingText.length > 0) {
-        _setShowCreateCustomerBtn(true);
-      } else {
-        _setShowCreateCustomerBtn(false);
-      }
-      test = "qwertyuioplkjhgfdsazxcvbnm-".includes(
-        incomingText[incomingText.length - 1]
-      );
+    // if all input erased
+    if (incomingText === "") {
+      _setBox1Val("");
+      __setCustomerSearchArr([]);
+      return;
     }
 
-    if (!test) {
-      // log("failed test in box 1 challenge: ", incomingText);
-      _setBox1Val(incomingText.slice(0, incomingText.length - 1));
-    } else {
-      _setBox1Val(incomingText);
-    }
+    let formattedText = incomingText;
+    if (!sSearchingByName) formattedText = removeDashesFromPhone(incomingText);
+
+    // check for valid inputs for each box
     if (sSearchingByName) {
-      if (incomingText.length >= 2) {
-        _setShowCreateCustomerBtn(true);
+      if (LETTERS.includes(formattedText[formattedText.length - 1])) {
+        _setBox1Val(formattedText);
       } else {
-        _setShowCreateCustomerBtn(false);
+        return;
       }
     } else {
-      if (incomingText.length >= 12) {
-        _setShowCreateCustomerBtn(true);
+      if (
+        NUMS.includes(formattedText[formattedText.length - 1]) &&
+        formattedText.length <= 10
+      ) {
+        _setBox1Val(formattedText);
       } else {
-        _setShowCreateCustomerBtn(false);
+        return;
       }
     }
+
+    // run searches
+    let searchResults = [];
+    if (sSearchingByName) {
+      searchResults = searchCustomerNames(
+        formattedText,
+        sBox2Val,
+        ssCustomersArr
+      );
+    } else {
+      searchResults = searchPhoneNum(formattedText, ssCustomersArr);
+      // log(searchResults);
+    }
+    // log("search results", searchResults);
+    __setCustomerSearchArr(searchResults);
+
+    // show the create customer button if input conditions are met
+    if (sSearchingByName) _setShowCreateCustomerBtn(formattedText.length >= 2);
+    if (!sSearchingByName)
+      _setShowCreateCustomerBtn(
+        formattedText.length === 10 && searchResults.length === 0
+      );
   }
 
-  function handleBox2TextChange(incomingText = "") {
-    // log("incoming box 2", incomingText);
-    let test = "qwertyuioplkjhgfdsazxcvbnm-".includes(
-      incomingText[incomingText.length - 1]
-    );
-    if (!test) {
-      // log("removing characters in box2");
-      _setBox2Val(incomingText.slice(0, incomingText.length - 1));
+  function handleBox2TextChange(formattedText = "") {
+    if (formattedText.length === 0) {
+      _setBox2Val("");
+      return;
+    }
+    if (!LETTERS.includes(formattedText[formattedText.length - 1])) {
+      return;
     } else {
-      _setBox2Val(incomingText);
+      _setBox2Val(formattedText);
     }
   }
 
@@ -168,17 +184,17 @@ export function CustomerInfoScreenComponent({
             style={{
               borderBottomWidth: 1,
               width: sSearchingByName ? 200 : null,
-              borderColor: Colors.darkText,
               width: 160,
               height: 40,
               paddingHorizontal: 3,
               outlineStyle: "none",
-              borderColor: "gray",
+              borderColor: sBox1Val.length < 0 ? "gray" : "dimgray",
               fontSize: 16,
+              color: sBox1Val.length < 0 ? "gray" : "dimgray",
             }}
             autoFocus={true}
             placeholder={sSearchingByName ? "First Name..." : "Phone number..."}
-            placeholderTextColor={"darkgray"}
+            placeholderTextColor={"gray"}
             value={sBox1Val}
             onChangeText={(val) => handleBox1TextChange(val)}
           />
@@ -219,6 +235,8 @@ export function CustomerInfoScreenComponent({
           _setBox1Val("");
           _setBox2Val("");
           _setSearchingByName(!sSearchingByName);
+          __setCustomerSearchArr([]);
+          _setShowCreateCustomerBtn(false);
         }}
         text={sSearchingByName ? "Use Phone #" : "Use Name"}
       />

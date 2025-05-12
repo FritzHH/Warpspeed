@@ -22,7 +22,7 @@ import {
 import { Button } from "react-native-web";
 import { Colors, ViewStyles } from "../styles";
 
-import { dim, generateRandomID, log } from "../utils";
+import { dim, generateBarcode, generateRandomID, log } from "../utils";
 import { AlertBox, SHADOW_RADIUS_PROTO } from "../components";
 import { cloneDeep } from "lodash";
 import { Items_WorkorderItemsTab } from "./screen_components/Items_WorkorderItems";
@@ -84,7 +84,7 @@ export function WorkorderScreen() {
   //setter functions for db and state
   /////////
   function setCustomerObj(customerObj, setToDB = true) {
-    log("WORKORDER: setting customer object to this", customerObj);
+    // log("WORKORDER: setting customer object to this", customerObj);
     _setCustomerObj(customerObj);
     // log("obj", customerObj);
     if (setToDB && customerObj.id)
@@ -92,41 +92,69 @@ export function WorkorderScreen() {
   }
 
   function setInventoryItem(item) {
-    log("WORKORDER: setting inventory item", item);
-    let arr = sInventoryArr.map((invItem) =>
-      invItem.id === item.id ? item : invItem
-    );
-    _setInventoryArr(arr);
+    // log("WORKORDER: setting inventory item", item);
+    let newInvArr;
+    if (!item.id) {
+      item.id = generateRandomID(COLLECTION_NAMES.inventory);
+      item.upc = generateBarcode();
+      newInvArr = cloneDeep(sInventoryArr);
+      newInvArr.push(item);
+    } else {
+      newInvArr = sInventoryArr.map((invItem) =>
+        invItem.id === item.id ? item : invItem
+      );
+    }
+    setCollectionItem(COLLECTION_NAMES.inventory, item);
+    _setInventoryArr(newInvArr);
   }
 
-  function setWorkorderObj(workorderObj) {
+  function setWorkorderObj(workorderObj = WORKORDER_PROTO) {
+    if (!workorderObj) {
+      // log("WORKORDER: no incoming workorder");
+      return;
+    }
     log("WORKORDER: setting workorder object to this", workorderObj);
 
-    // new workorder obj
-    if (!workorderObj.id) {
-      log("WORKORDER:new workorder object");
-      let ref = getNewCollectionRef(COLLECTION_NAMES.openWorkorders);
-      workorderObj.id = ref.id;
-      workorderObj.customerID = sCustomerObj.id;
-      workorderObj.changes.startedBy = sCurrentUser.first;
-      workorderObj.status = WORKORDER_STATUS_NAMES.open;
-    }
-    getCollectionItem(COLLECTION_NAMES.customers, workorderObj.customerID).then(
-      (res) => {
-        // log("res", res);
-        if (res) {
-          log("WORKORDER: setting customer obj", res);
-          setCustomerObj(res, false);
-        }
-      }
-    );
+    // check for new additions to workorder lines, we set an id in the "items"
+    // array. need to go grab a fresh copy of the item from the inventory
+
+    let idListLength = workorderObj.itemIdArr.length;
+    let workorderLinesLength = workorderObj.workorderLines.length;
+    // log("orig", sWorkorderObj);
+    // log("new", workorderObj);
+
+    // if (idListLength != workorderLinesLength) {
+    //   if (idListLength > workorderLinesLength) {
+    //     let lastIdAdded =
+    //       workorderObj.itemIdArr[workorderObj.itemIdArr.length - 1];
+    //     let workorderLine = { ...WORKORDER_ITEM_PROTO };
+    //     workorderLine.itemID = lastIdAdded;
+
+    //     workorderLine.id = generateRandomID();
+    //     workorderObj.workorderLines.push(workorderLine);
+    //   } else {
+    //     let newArr = [];
+    //     workorderObj.itemIdArr.forEach((itemId) => {
+    //       // log("id", itemId);
+    //       let workorderLine = workorderObj.workorderLines.find(
+    //         (obj) => obj.itemID === itemId
+    //       );
+    //       // log("line", workorderLine);
+    //       if (workorderLine) newArr.push(workorderLine);
+    //     });
+    //     workorderObj.workorderLines = newArr;
+    //   }
+    // }
+    // log("obj", workorderObj);
     _setWorkorderObj(workorderObj);
-    _setInfoComponentName(INFO_COMPONENT_NAMES.workorder);
+    _setCustomerObj(
+      sCustomersArr.find((obj) => obj.id === workorderObj.customerID)
+    );
     setCollectionItem(COLLECTION_NAMES.openWorkorders, workorderObj);
   }
 
   function createNewCustomer(customerObj) {
-    log("WORKORDER: CREATING NEW customer object to this", customerObj);
+    // log("WORKORDER: CREATING NEW customer object to this", customerObj);
     let ref = getNewCollectionRef(COLLECTION_NAMES.customers);
     customerObj.id = ref.id;
     _setCustomerObj(customerObj);
@@ -135,12 +163,24 @@ export function WorkorderScreen() {
     _setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
 
+  function createNewWorkorder(customerObj) {
+    // log("WORKORDER: setting customer for new workorder", customerObj);
+    let newWorkorder = structuredClone(WORKORDER_PROTO);
+    newWorkorder.customerID = customerObj.id;
+    let ref = getNewCollectionRef(COLLECTION_NAMES.openWorkorders);
+    newWorkorder.id = ref.id;
+    newWorkorder.changes.startedBy =
+      sCurrentUser.first + " " + sCurrentUser.last;
+    newWorkorder.status = WORKORDER_STATUS_NAMES.open;
+    _setWorkorderObj(newWorkorder);
+  }
+
   /////////////////
   // side effects (db calls)
   /////////////////
   async function getAllCustomersArrFromDB() {
     let customersArr = await getCollection(COLLECTION_NAMES.customers);
-    log("customers from db", customersArr);
+    // log("WORKORDER: customers from db", customersArr);
     _setCustomersArr(customersArr);
   }
 
@@ -159,7 +199,7 @@ export function WorkorderScreen() {
   async function setDBListeners() {
     let workordersCallback = (workordersArr) => {
       _setWorkordersArr(workordersArr);
-      log("WORKORDER: incoming snapshot db workorders arr", workordersArr);
+      // log("WORKORDER: incoming snapshot db workorders arr", workordersArr);
     };
     // let customersCallback = () => getAllCustomersArrFromDB();
     subscribeToCollectionNode(
@@ -171,6 +211,7 @@ export function WorkorderScreen() {
 
   /////////////////
   // init function runs once until refresh
+  // need to change to useEffect
   ////////////////
   function initialize() {
     if (!sInitFlag) {
@@ -239,8 +280,9 @@ export function WorkorderScreen() {
               ssWorkorderObj={sWorkorderObj}
               ssCustomerSearchArr={sCustomerSearchArr}
               ssWorkorderPreviewObj={sWorkorderPreviewObj}
+              ssInventoryArr={sInventoryArr}
               __setItemsTabName={(data) => _setItemsTabName(cloneDeep(data))}
-              __setWorkorderObj={(data) => _setWorkorderObj(cloneDeep(data))}
+              __setWorkorderObj={setWorkorderObj}
               __setCustomerObj={(data) => _setCustomerObj(cloneDeep(data))}
               __setOptionsTabName={(data) =>
                 _setOptionsTabName(cloneDeep(data))
@@ -251,6 +293,7 @@ export function WorkorderScreen() {
               __setCustomerSearchArr={(data) =>
                 _setCustomerSearchArr(cloneDeep(data))
               }
+              __createNewWorkorder={createNewWorkorder}
             />
           </View>
         </View>
@@ -275,15 +318,16 @@ export function WorkorderScreen() {
         }}
       >
         <Options_Section
-          ssWorderObj={sWorkorderObj}
+          ssWorkorderObj={sWorkorderObj}
           ssOptionsTabName={sOptionsTabName}
           ssWorkordersArr={sWorkordersArr}
           ssInventoryArr={sInventoryArr}
           ssAdjustableUserPreferences={sAdjustableUserPreferences}
-          __setWorkorderObj={(obj) => setWorkorderObj(cloneDeep(obj))}
-          __setOptionsTabName={(data) => _setOptionsTabName(cloneDeep(data))}
-          __setInventoryArr={(data) => _setInventoryArr(cloneDeep(data))}
+          __setWorkorderObj={_setWorkorderObj}
+          __setOptionsTabName={_setOptionsTabName}
+          __setInventoryArr={_setInventoryArr}
           __setInventoryItem={setInventoryItem}
+          __setInfoComponentName={_setInfoComponentName}
           __setWorkorderPreviewObj={(obj) => {
             _setWorkorderPreviewObj(obj);
             if (obj) {

@@ -26,7 +26,8 @@ export const WORKORDER_PROTO = {
   },
   partOrdered: "",
   partSource: "",
-  items: [],
+  itemIdArr: [],
+  workorderLines: [],
   notes: {
     internalNotes: [],
     customerNotes: [],
@@ -34,13 +35,17 @@ export const WORKORDER_PROTO = {
   dueBy: "",
   status: "",
 };
-export const WORKORDER_ITEM_PROTO = {
+export const DISCOUNT_OBJ_PROTO = {
   name: "",
-  qty: 1,
-  price: 0,
+  value: "",
+  type: "",
+};
+export const WORKORDER_ITEM_PROTO = {
+  qty: 0,
   intakeNotes: "",
   serviceNotes: "",
-  id: "",
+  itemID: "",
+  discountObj: { ...DISCOUNT_OBJ_PROTO },
 };
 export const CUSTOMER_PROTO = {
   first: "",
@@ -66,8 +71,9 @@ export const CUSTOMER_PROTO = {
   payments: [],
   dateCreated: "",
 };
+
 export const INVENTORY_ITEM_PROTO = {
-  name: "sup bro",
+  name: "",
   price: 0,
   salePrice: 0,
   catMain: "",
@@ -331,8 +337,14 @@ export const bike_brands_db = {
   brands2Title: "E-Bikes",
 };
 export const discounts_db = [
-  { name: "50% Off Item", value: "10%" },
-  { name: "2-bike purchase, $100 Off Each Bike", value: "100" },
+  { name: "50% Off Item", value: "50", type: "percent" },
+  { name: "10% Off Item", value: "10", type: "percent" },
+  { name: "20% Off Item", value: "20", type: "percent" },
+  { name: "30% Off Item", value: "30", type: "percent" },
+  { name: "40% Off Item", value: "40", type: "percent" },
+  { name: "50% Off Item", value: "50", type: "percent" },
+  { name: "2-bike purchase, $100 Off Each Bike", value: "100", type: "dollar" },
+  { name: "$10 Off", value: "10", type: "dollar" },
 ];
 export const bike_colors_db = [
   "White",

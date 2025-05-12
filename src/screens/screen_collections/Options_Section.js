@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import { dim, log, trimToTwoDecimals } from "../../utils";
+import { dim, generateRandomID, log, trimToTwoDecimals } from "../../utils";
 import {
   HorzSpacer,
   TabMenuButton,
@@ -43,7 +43,7 @@ import { WorkorderGlimpse } from "../screen_components/Items_WorkorderGlimpse";
 
 export function Options_Section({
   ssOptionsTabName,
-  ssWorkorderObj,
+  ssWorkorderObj = WORKORDER_PROTO,
   ssWorkordersArr,
   ssInventoryArr,
   ssAdjustableUserPreferences,
@@ -52,44 +52,39 @@ export function Options_Section({
   __setInventoryArr,
   __setInventoryItem,
   __setWorkorderPreviewObj,
+  __setInfoComponentName,
+  __createNewWorkorder,
 }) {
   const [sShowWorkorderModal, _setShowWorkorderModal] = React.useState(false);
   const [sShowInventoryModal, _setShowInventoryModal] = React.useState(false);
   /////////////////////////////////
   // functions
   ////////////////////////////////
-  function selectComponent() {
-    if (ssOptionsTabName == TAB_NAMES.optionsTab.quickItems)
-      return <QuickItemsTab />;
-    if (ssOptionsTabName == TAB_NAMES.optionsTab.workorders)
-      return <WorkordersComponent />;
+  function addItemToWorkorder(inventoryItem) {
+    // log("incoming item", inventoryItem);
+    let cWorkorderObj = structuredClone(ssWorkorderObj);
+    let newLine = { ...WORKORDER_ITEM_PROTO };
+    let curLines = cWorkorderObj.workorderLines;
+    let foundObj = curLines.find((line) => inventoryItem.id === line.itemID); // if (found)
+    if (foundObj) {
+      newLine = { ...foundObj };
+      newLine.qty = foundObj.qty + 1;
+      curLines = curLines.map((oldLine) => {
+        if (oldLine.itemID === inventoryItem.id) return newLine;
+        return oldLine;
+      });
+    } else {
+      newLine.qty = 1;
+      newLine.id = generateRandomID();
+      newLine.itemID = inventoryItem.id;
+      curLines.push(newLine);
+      // cWorkorderObj.itemIdArr.push(inventoryItem.id);
+    }
+    cWorkorderObj.workorderLines = curLines;
+    // log("finished", curLines);
+    // log("here", cWorkorderObj);
+    __setWorkorderObj(cWorkorderObj);
   }
-
-  function QuickItemsTab() {}
-
-  const WorkordersTab = (
-    <View style={{ flex: 1 }}>
-      <FlatList
-        data={ssWorkordersArr}
-        renderItem={(item) => {
-          item = item.item;
-          return (
-            <View style={{ flexDirection: "row", width: "100%", height: 30 }}>
-              <TouchableOpacity>
-                <View style={{ height: "100%", width: "100%" }}>
-                  <Text>{item.name}</Text>
-                </View>
-                <View style={{ height: "100%", width: "80%" }}>
-                  <Text>{item.name}</Text>
-                </View>
-                <View style={{ width: "20%", height: "100%" }}></View>
-              </TouchableOpacity>
-            </View>
-          );
-        }}
-      />
-    </View>
-  );
 
   // log("modal", sShowWorkorderModal);
   return (
@@ -120,15 +115,21 @@ export function Options_Section({
       )}
       {ssOptionsTabName === TAB_NAMES.optionsTab.inventory && (
         <InventoryComponent
-          __setInventoryItem={__setInventoryItem}
           ssInventoryArr={ssInventoryArr}
+          ssWorkorderObj={ssWorkorderObj}
+          __setInventoryItem={__setInventoryItem}
+          __setOptionsTabName={__setOptionsTabName}
+          __setWorkorderObj={__setWorkorderObj}
+          __addItemToWorkorder={addItemToWorkorder}
         />
       )}
       {ssOptionsTabName === TAB_NAMES.optionsTab.workorders && (
         <WorkordersComponent
+          ssWorkordersArr={ssWorkordersArr}
           __setWorkorderObj={__setWorkorderObj}
           __setWorkorderPreviewObject={__setWorkorderPreviewObj}
-          ssWorkordersArr={ssWorkordersArr}
+          __setOptionsTabName={__setOptionsTabName}
+          __setInfoComponentName={__setInfoComponentName}
         />
       )}
     </View>

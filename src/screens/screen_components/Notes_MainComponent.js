@@ -161,7 +161,6 @@ export const Notes_MainComponent = ({
   if (!ssWorkorderObj.id) return null;
   return (
     <View style={{ width: "100%", height: "100%", paddingTop: 20 }}>
-      {/* {ssWorkorderObj.id && ( */}
       <View
         style={{
           flexDirection: "row",
@@ -289,7 +288,6 @@ export const Notes_MainComponent = ({
           </TouchableWithoutFeedback>
         </View>
       </View>
-      // )}
     </View>
   );
 };

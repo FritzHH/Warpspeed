@@ -32,6 +32,8 @@ import {
   WORKORDER_ITEM_PROTO,
   bike_colors_arr_db,
   FOCUS_NAMES,
+  TAB_NAMES,
+  INFO_COMPONENT_NAMES,
 } from "../../data";
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useEffect, useRef, useState } from "react";
@@ -41,6 +43,8 @@ export function WorkordersComponent({
   ssWorkordersArr,
   __setWorkorderPreviewObject,
   __setWorkorderObj,
+  __setOptionsTabName,
+  __setInfoComponentName,
 }) {
   const [sAllowPreview, _setAllowPreview] = useState(true);
 
@@ -80,9 +84,11 @@ export function WorkordersComponent({
           return (
             <RowItemComponent
               ssAllowPreview={sAllowPreview}
+              item={item}
               __setWorkorderObj={__setWorkorderObj}
               __setWorkorderPreviewObject={__setWorkorderPreviewObject}
-              item={item}
+              __setOptionsTabName={__setOptionsTabName}
+              __setInfoComponentName={__setInfoComponentName}
             />
           );
         }}
@@ -96,12 +102,13 @@ function RowItemComponent({
   ssAllowPreview,
   __setWorkorderPreviewObject,
   __setWorkorderObj,
+  __setOptionsTabName,
+  __setInfoComponentName,
 }) {
   const [sLastHoverInsideMillis, _setLastHoverInsideMilles] = useState(
     new Date().getTime() * 2
   );
 
-  useInterval(() => {}, 1000);
   /////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////
   return (
@@ -118,6 +125,8 @@ function RowItemComponent({
         onPress={() => {
           __setWorkorderPreviewObject(null);
           __setWorkorderObj(item);
+          __setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+          __setInfoComponentName(INFO_COMPONENT_NAMES.workorder);
         }}
       >
         <View

@@ -15,12 +15,23 @@ import {
   CheckBox,
 } from "../../components";
 import { Colors } from "../../styles";
-import { INVENTORY_ITEM_PROTO, INVENTORY_CATEGORIES } from "../../data";
+import {
+  INVENTORY_ITEM_PROTO,
+  INVENTORY_CATEGORIES,
+  TAB_NAMES,
+} from "../../data";
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 
-export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
+export function InventoryComponent({
+  ssInventoryArr,
+  ssWorkorderObj,
+  __setInventoryItem,
+  __setWorkorderObj,
+  __setOptionsTabName,
+  __addItemToWorkorder,
+}) {
   /////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState(null);
@@ -28,8 +39,8 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
   const [sShowDropdownModal, _setShowDropdownModal] = React.useState(false);
   // const [sShowInventoryItemModal, _setShowInventoryItemModal] =
   // React.useState(false);
-  const [sInventoryItemInModal, _setInventoryItemInModal] =
-    useState(INVENTORY_ITEM_PROTO);
+  const [sInventoryItemInModal, _setInventoryItemInModal] = useState(null);
+  const [sInventoryModalVisible, _setInventoryModalVisible] = useState(false);
   const [sCategoriesDropdownSelected, _setCategoriesDropdownSelected] =
     useState(null);
   const [sCheckboxSelectedArr, _setCheckboxSelectedArr] = useState([]);
@@ -42,10 +53,10 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
   ///////////////////////////
 
   function clearSearch() {
-    _setSearchResults([]);
+    _setSearchResults(ssInventoryArr);
     _setSearchTerm("");
     _setCheckboxValue(null);
-    _setCategoriesDropdownSelected(null);
+    // _setCategoriesDropdownSelected(null);
   }
 
   function search(searchTerm) {
@@ -106,6 +117,7 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
     _setInventoryItemInModal(INVENTORY_ITEM_PROTO);
   }
 
+  // log("ssw", ssWorkorderObj);
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
   const tabMargin = 20;
@@ -122,13 +134,13 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
         <Button
           onPress={() => clearSearch()}
           text={"reset"}
-          textStyle={{ color: "lightgray" }}
-          buttonStyle={{ height: 35 }}
+          textStyle={{ color: "gray" }}
+          buttonStyle={{ height: 30, width: 70 }}
         />
         <TextInput
           style={{
             borderBottomWidth: 1,
-            borderBottomColor: "darkgray",
+            borderBottomColor: sSearchTerm.length > 0 ? "dimgray" : "darkgray",
             fontSize: 20,
             color: Colors.darkTextOnMainBackground,
             outlineWidth: 0,
@@ -142,50 +154,55 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
           onChangeText={(val) => search(val)}
         />
       </View>
-      {/** checkbox and dropdown */}
+      {/** checkboxes and categories dropdown row */}
       <View
         style={{
           marginTop: 10,
+          paddingRight: 50,
           flexDirection: "row",
           width: "100%",
-          justifyContent: "flex-start",
+          justifyContent: "space-between",
           alignItems: "center",
         }}
       >
-        <CheckBox
-          viewStyle={{ marginRight: tabMargin, marginLeft: 10 }}
-          buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
-          roundButton={true}
-          text={INVENTORY_CATEGORIES.main.parts}
-          onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.main.parts)}
-          isChecked={INVENTORY_CATEGORIES.main.parts === sCheckboxValue}
-        />
-        <CheckBox
-          viewStyle={{ marginRight: tabMargin }}
-          buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
-          roundButton={true}
-          text={INVENTORY_CATEGORIES.main.accessories}
-          onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.main.accessories)}
-          isChecked={INVENTORY_CATEGORIES.main.accessories === sCheckboxValue}
-        />
-        <CheckBox
-          viewStyle={{ marginRight: tabMargin }}
-          buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
-          roundButton={true}
-          text={INVENTORY_CATEGORIES.main.labor}
-          onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.main.labor)}
-          isChecked={INVENTORY_CATEGORIES.main.labor === sCheckboxValue}
-        />
-        <CheckBox
-          viewStyle={{ marginRight: tabMargin }}
-          buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
-          roundButton={true}
-          text={INVENTORY_CATEGORIES.main.bikes}
-          onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.main.bikes)}
-          isChecked={INVENTORY_CATEGORIES.main.bikes === sCheckboxValue}
-        />
-        {/* <View ref={dropdownRef}></View> */}
-        <ScreenModal
+        <View style={{ flexDirection: "row" }}>
+          <CheckBox
+            viewStyle={{ marginRight: tabMargin, marginLeft: 10 }}
+            buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
+            roundButton={true}
+            text={INVENTORY_CATEGORIES.main.parts}
+            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.main.parts)}
+            isChecked={INVENTORY_CATEGORIES.main.parts === sCheckboxValue}
+          />
+          <CheckBox
+            viewStyle={{ marginRight: tabMargin }}
+            buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
+            roundButton={true}
+            text={INVENTORY_CATEGORIES.main.accessories}
+            onCheck={() =>
+              checkboxPressed(INVENTORY_CATEGORIES.main.accessories)
+            }
+            isChecked={INVENTORY_CATEGORIES.main.accessories === sCheckboxValue}
+          />
+          <CheckBox
+            viewStyle={{ marginRight: tabMargin }}
+            buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
+            roundButton={true}
+            text={INVENTORY_CATEGORIES.main.labor}
+            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.main.labor)}
+            isChecked={INVENTORY_CATEGORIES.main.labor === sCheckboxValue}
+          />
+          <CheckBox
+            viewStyle={{ marginRight: tabMargin }}
+            buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
+            roundButton={true}
+            text={INVENTORY_CATEGORIES.main.bikes}
+            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.main.bikes)}
+            isChecked={INVENTORY_CATEGORIES.main.bikes === sCheckboxValue}
+          />
+        </View>
+        {/* Categories dropdown modal*/}
+        {/* <ScreenModal
           ref={categoriesModalBtnRef}
           buttonLabel={
             sCategoriesDropdownSelected
@@ -247,28 +264,38 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
               />
             </View>
           )}
-        />
+        /> */}
+        {/** MODAL Plus button full screen inventory modal */}
         <ScreenModal
           mouseOverOptions={{ enable: false }}
           showShadow={false}
           buttonStyle={{
             color: "red",
-            width: null,
-            height: null,
+            width: 40,
+            height: 40,
             marginLeft: 40,
-            backgroundColor: "green",
-            paddingBottom: 10,
+            marginBottom: 10,
           }}
-          buttonTextStyle={{ fontSize: 50, color: "red", padding: 0 }}
+          setModalVisibility={(val) => _setInventoryModalVisible(val)}
+          handleButtonPress={() => {
+            _setInventoryItemInModal(INVENTORY_ITEM_PROTO);
+            _setInventoryModalVisible(true);
+          }}
+          buttonTextStyle={{
+            fontSize: 50,
+            color: "red",
+            padding: 0,
+          }}
           showButtonIcon={false}
           buttonLabel="+"
           showOuterModal={true}
-          modalVisible={true}
+          modalVisible={sInventoryModalVisible}
           Component={() => {
             return (
               <InventoryItemInModal
                 __setItem={__setInventoryItem}
                 item={sInventoryItemInModal}
+                handleClosePress={() => _setInventoryModalVisible(false)}
               />
             );
           }}
@@ -292,7 +319,7 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
                   flexDirection: "row",
                   justifyContent: "flex-start",
                   borderBottomWidth: 1,
-                  borderColor: Colors.opacityBackgoundDark,
+                  borderColor: "darkgray",
                   paddingVertical: 5,
                   width: "100%",
                 }}
@@ -305,11 +332,10 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
                     // background: "red",
                   }}
                 >
+                  {/**MODAL search result list item full screen modal */}
                   <ScreenModal
                     buttonLabel={"i"}
                     showButtonIcon={false}
-                    outerModalStyle={{ width: "40%", alignSelf: "flex-end" }}
-                    Component={() => <InventoryItemInModal item={item} />}
                     buttonTextStyle={{ color: "dimgray", fontSize: 17 }}
                     buttonStyle={{
                       paddingTop: 4,
@@ -322,8 +348,24 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
                       enable: true,
                       highlightColor: Colors.tabMenuButton,
                     }}
+                    handleButtonPress={() => {
+                      _setInventoryModalVisible(true);
+                      _setInventoryItemInModal(item);
+                    }}
                     showShadow={false}
                     textStyle={{ fontSize: 14 }}
+                    Component={() => {
+                      return (
+                        <InventoryItemInModal
+                          __setItem={__setInventoryItem}
+                          item={item}
+                          handleClosePress={() => {
+                            _setInventoryItemInModal(INVENTORY_ITEM_PROTO);
+                            _setInventoryModalVisible(false);
+                          }}
+                        />
+                      );
+                    }}
                   />
                   <CheckBox
                     item={item}
@@ -345,13 +387,23 @@ export function InventoryComponent({ ssInventoryArr, __setInventoryItem }) {
                       }
                       _setCheckboxSelectedArr(arr);
                     }}
-                    buttonStyle={{ borderColor: 1, marginRight: 15 }}
+                    buttonStyle={{
+                      borderColor: "gray",
+                      borderWidth: 1,
+                      marginRight: 15,
+                    }}
                   />
 
+                  {/** this is where we grab an inventory item and toss it up to the
+                   * workorder
+                   */}
                   <Button
                     textStyle={{ width: "100%", fontSize: 14 }}
                     text={item.name}
                     shadow={false}
+                    onPress={() => {
+                      __addItemToWorkorder(item);
+                    }}
                     buttonStyle={{
                       width: "100%",
                       height: 23,

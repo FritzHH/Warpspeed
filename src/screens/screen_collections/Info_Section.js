@@ -70,7 +70,8 @@ export const Info_Section = ({
     __setWorkorderObj(WORKORDER_PROTO);
     __setCustomerObj(customerObj);
     __setInfoComponentName(INFO_COMPONENT_NAMES.phoneNumberEntry);
-    __setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    __setOptionsTabName(null);
+    __setItemsTabName(null);
   }
 
   if (ssInfoComponentName === INFO_COMPONENT_NAMES.workorder)
@@ -85,11 +86,11 @@ export const Info_Section = ({
     );
 
   if (ssInfoComponentName === INFO_COMPONENT_NAMES.phoneNumberEntry) {
-    // __setItemsTabName(TAB_NAMES.itemsTab.customerList);
     return (
       <CustomerInfoScreenComponent
         __createNewCustomer={(obj) => createNewCustomer(obj)}
         __setCustomerSearchArr={__setCustomerSearchArr}
+        __setItemsTabName={__setItemsTabName}
         ssCustomersArr={ssCustomersArr}
         ssSelectedCustomerSearchItem={ssSelectedCustomerSearchItem}
       />

@@ -29,7 +29,8 @@
     "stripe": "^18.0.0",
     "util": "^0.12.5",
     "web-vitals": "^2.1.4",
-    "zlib": "^1.0.5"
+    "zlib": "^1.0.5",
+    "zustand": "^5.0.4"
   },
   "scripts": {
     "start": "react-scripts start",

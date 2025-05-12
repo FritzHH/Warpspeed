@@ -19,6 +19,7 @@ export function Items_Section({
   ssItemsTabName,
   ssCustomerSearchArr,
   ssWorkorderPreviewObj,
+  ssInventoryArr,
   __setWorkorderObj,
   __setItemsTabName,
   __setCustomerObj,
@@ -26,10 +27,12 @@ export function Items_Section({
   __setInfoComponentName,
   __setCustomerSearchArr,
   __setWorkorderPreviewObj,
+  __createNewWorkorder,
 }) {
   const Tab_WorkorderItems = (
     <Items_WorkorderItemsTab
       ssWorkorderObj={ssWorkorderObj}
+      ssInventoryArr={ssInventoryArr}
       __setWorkorderObj={__setWorkorderObj}
     />
   );
@@ -45,38 +48,18 @@ export function Items_Section({
     </View>
   );
   const Tab_Dashboard = null;
-  const New_Workorder = (
-    <View
-      style={{
-        width: "100%",
-        height: "90%",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text
-        style={{
-          opacity: 0.17,
-          fontSize: 100,
-          width: "80%",
-          textAlign: "center",
-        }}
-      >
-        Empty Workorder
-      </Text>
-    </View>
-  );
 
   const Customer_List = (
     <CustomerSearchListComponent
+      ssCustomerSearchArr={ssCustomerSearchArr}
+      ssCustomerObj={ssCustomerObj}
       __setCustomerObj={__setCustomerObj}
       __setWorkorderObj={__setWorkorderObj}
       __setOptionsTabName={__setOptionsTabName}
       __setInfoComponentName={__setInfoComponentName}
       __setItemsTabName={__setItemsTabName}
       __setCustomerSearchArr={__setCustomerSearchArr}
-      ssCustomerSearchArr={ssCustomerSearchArr}
-      ssCustomerObj={ssCustomerObj}
+      __createNewWorkorder={__createNewWorkorder}
     />
   );
 
@@ -99,24 +82,18 @@ export function Items_Section({
         __setItemsTabName={__setItemsTabName}
         ssItemsTabName={ssItemsTabName}
         ssWorkorderObj={ssWorkorderObj}
-        excludeTabNames={excludeTabNames}
       />
       {selectComponent()}
     </View>
   );
 }
 
-const TabBar = ({
-  __setItemsTabName,
-  ssItemsTabName,
-  ssWorkorderObj,
-  excludeTabNames = [],
-}) => {
-  let excludeWorkorder, excludeChangelog, excludeDashboard;
-  if (ssItemsTabName === TAB_NAMES.itemsTab.customerList) {
-    excludeWorkorder = true;
-    excludeChangelog = true;
-  }
+const TabBar = ({ __setItemsTabName, ssItemsTabName, ssWorkorderObj }) => {
+  // let excludeWorkorder, excludeChangelog, excludeDashboard;
+  // if (ssItemsTabName === TAB_NAMES.itemsTab.customerList) {
+  //   excludeWorkorder = true;
+  //   excludeChangelog = true;
+  // }
   return (
     <View
       style={{
@@ -130,7 +107,7 @@ const TabBar = ({
           flexDirection: "row",
         }}
       >
-        {ssWorkorderObj && !excludeWorkorder && (
+        {ssWorkorderObj.id ? (
           <TabMenuButton
             onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
             text={TAB_NAMES.itemsTab.workorderItems}
@@ -140,9 +117,9 @@ const TabBar = ({
                 : false
             }
           />
-        )}
+        ) : null}
         <Divider />
-        {ssWorkorderObj && !excludeChangelog && (
+        {ssWorkorderObj.id ? (
           <TabMenuButton
             onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}
@@ -150,7 +127,7 @@ const TabBar = ({
               ssItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
             }
           />
-        )}
+        ) : null}
       </View>
       <View
         style={{

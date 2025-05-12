@@ -23,13 +23,13 @@ export function CustomerSearchListComponent({
   __setOptionsTabName,
   __setInfoComponentName,
   __setItemsTabName,
+  __createNewWorkorder,
 }) {
   const [sShowModal, _setShowModal] = React.useState(false);
 
   function handleNewWorkorderBtnPress(customerObj) {
-    // log("customer", customerObj);
     __setCustomerObj(customerObj);
-    __setWorkorderObj(cloneDeep(WORKORDER_PROTO));
+    __createNewWorkorder(customerObj);
     __setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
     __setInfoComponentName(INFO_COMPONENT_NAMES.workorder);
     __setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
@@ -68,7 +68,7 @@ export function CustomerSearchListComponent({
                 canExitOnOuterClick={false}
                 Component={() => (
                   <CustomerInfoComponent
-                    sCustomerInfo={cloneDeep(item)}
+                    sCustomerInfo={item}
                     _setCustomerInfo={__setCustomerObj}
                     handleExitScreenPress={() => {
                       _setShowModal(false);

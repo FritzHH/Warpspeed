@@ -1,5 +1,7 @@
+/* eslint-disable */
+
 import { getNewCollectionRef } from "./dbCalls";
-import { generateRandomID, log } from "./utils";
+import { formatDateTime, generateRandomID, log } from "./utils";
 
 /////////// object prototypes
 export const ALERT_BOX_PROTO = {
@@ -70,6 +72,62 @@ export const CUSTOMER_PROTO = {
   workorders: [],
   payments: [],
   dateCreated: "",
+};
+
+export const RECEIPT_NAMES = {
+  left: "Left-Desk",
+  right: "Right-Desk",
+};
+
+export const RECEIPT_WORKORDER_PROTO = {
+  heading: "Work Order",
+  dateTime: "",
+  workorderNumber: "",
+  customerContactBlurb: "",
+  workorderItem: "",
+  startedOnStr: "",
+  itemArr: [{ item: "", qty: "", price: "", discount: "" }],
+  laborCharges: "",
+  partsCharges: "",
+  taxCharges: "",
+  discountTotal: "",
+  total: "",
+  customerNotes: "",
+  internalNotes: "",
+  barcode: "",
+  id: "",
+};
+
+const receiptHeading = () => {
+  let str = "";
+  str += "9102 Bonita Beach Rd SE\n";
+  str += "Bonita Springs, FL 34135\n";
+  str += "(239) 281 9396\n";
+  str += "support@bonitabikes.com\n";
+  str += "www.bonitabikes.com";
+};
+
+export const RECEIPT_PROTO = {
+  heading: {
+    title: "Bonita Bikes LLC",
+    subHeading: receiptHeading,
+  },
+  dateTime: "",
+  workorderNumber: "",
+  customerName: "",
+  customerContactBlurb: "",
+  workorderItem: "",
+  startedOnStr: "",
+  itemArr: [{ item: "", qty: "", price: "", discount: "" }],
+  laborCharges: "",
+  partsCharges: "",
+  taxCharges: "",
+  discountTotal: "",
+  total: "",
+  customerNotes: "",
+  paymentDetails: "",
+  footer: "",
+  barcode: "",
 };
 
 export const INVENTORY_ITEM_PROTO = {
@@ -168,6 +226,11 @@ export const COLLECTION_NAMES = {
   preferences: "PREFERENCES",
   sales: "SALES",
   inventory: "INVENTORY",
+  printers: {
+    collectionName: "PRINTERS",
+    left: "Left-Desk-Printer",
+    right: "Right-Desk-Printer",
+  },
 };
 export const WORKORDER_STATUS_NAMES = Object.freeze({
   open: "open",

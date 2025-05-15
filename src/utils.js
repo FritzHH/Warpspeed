@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef } from "./dbCalls";
 import { COLLECTION_NAMES, CUSTOMER_PROTO } from "./data";
@@ -22,6 +23,45 @@ export function fetchIt(url) {
     // log("fetch url result", res);
     return res.json().then((json) => json);
   });
+}
+
+export function formatDateTime(dateObj, millis) {
+  let now = dateObj;
+  if (millis) {
+    now = new Date();
+    now.setTime(millis);
+  }
+
+  // log("now", now);
+  const dateOptions = { year: "numeric", month: "long", day: "numeric" };
+  const timeOptions = { hour: "2-digit", minute: "2-digit" };
+
+  let formattedDate = now.toLocaleDateString("en-US", dateOptions);
+  let formattedTime = now.toLocaleTimeString("en-US", timeOptions);
+
+  if (formattedTime.startsWith("0")) {
+    formattedTime = formattedTime.slice(1, formattedTime.length - 1);
+  }
+
+  let endSliced = formattedTime.slice(0, formattedTime.length - 2);
+  if (formattedTime.endsWith("P")) {
+    endSliced += " pm";
+    formattedTime = endSliced;
+  } else if (formattedTime.endsWith("A")) {
+    endSliced += " am";
+    formattedTime = endSliced;
+  }
+
+  let topTicketDateTimeString = "";
+  topTicketDateTimeString += formattedDate;
+  topTicketDateTimeString += " --> ";
+  topTicketDateTimeString += formattedTime;
+
+  return {
+    date: formattedDate,
+    time: formattedTime,
+    topTicketDateTimeString,
+  };
 }
 
 export function trimToTwoDecimals(num) {

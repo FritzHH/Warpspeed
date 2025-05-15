@@ -49,6 +49,39 @@ export function setCollectionItem(collectionName, item) {
     .catch((err) => log("err", err));
 }
 
+export async function setSubCollectionItem(
+  collectionName,
+  documentId,
+  subCollectionName,
+  subDocumentId,
+  data
+) {
+  log(collectionName, documentId);
+  try {
+    const subCollectionRef = collection(
+      DB,
+      collectionName,
+      documentId,
+      subCollectionName
+    );
+    await setDoc(doc(subCollectionRef, subDocumentId), data);
+    console.log("Document successfully written!");
+  } catch (e) {
+    console.error("Error adding document: ", e);
+  }
+}
+
+// Example Usage
+const collectionName = "users";
+const documentId = "user123";
+const subCollectionName = "orders";
+const subDocumentId = "order456";
+const data = {
+  product: "Laptop",
+  quantity: 1,
+  price: 1200,
+};
+
 // async call
 export function getCollectionItem(collectionName, itemID) {
   let ref = doc(DB, collectionName, itemID);
@@ -76,3 +109,5 @@ export function subscribeToCollectionNode(collectionName, callback) {
     callback(arr);
   });
 }
+
+export function setPrinterItem() {}

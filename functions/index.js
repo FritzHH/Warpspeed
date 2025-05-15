@@ -7,9 +7,9 @@ stripe = new Stripe(
   }
 );
 
-import { onRequest } from "firebase-functions/https";
-import * as functions from "firebase-functions";
-import { log } from "firebase-functions/logger";
+// import { onRequest } from "firebase-functions/https";
+// import * as functions from "firebase-functions";
+// import { log } from "firebase-functions/logger";
 
 function logg(one, two) {
   let str = "[MY LOG] ";
@@ -22,36 +22,36 @@ function logg(one, two) {
   } else {
     // str = "log: " + str;
   }
-  log.info(str);
+  // log.info(str);
 }
 
-export const t1 = functions.https.onRequest(
-  { cors: true },
-  async (req, res) => {
-    log("creating request");
-    const session = await stripe.checkout.sessions.create({
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "test product name",
-            },
-            unit_amount: 2000,
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      ui_mode: "embedded",
-      // The URL of your payment completion page
-      return_url: "https://example.com/return?session_id={CHECKOUT_SESSION_ID}",
-    });
-    log("session", session);
-    res.json(session);
-    //   res.send(JSON.stringify("Hello from Firebase broooooo!"));
-  }
-);
+// export const t1 = functions.https.onRequest(
+//   { cors: true },
+//   async (req, res) => {
+//     log("creating request");
+//     const session = await stripe.checkout.sessions.create({
+//       line_items: [
+//         {
+//           price_data: {
+//             currency: "usd",
+//             product_data: {
+//               name: "test product name",
+//             },
+//             unit_amount: 2000,
+//           },
+//           quantity: 1,
+//         },
+//       ],
+//       mode: "payment",
+//       ui_mode: "embedded",
+//       // The URL of your payment completion page
+//       return_url: "https://example.com/return?session_id={CHECKOUT_SESSION_ID}",
+//     });
+//     log("session", session);
+//     res.json(session);
+//     //   res.send(JSON.stringify("Hello from Firebase broooooo!"));
+//   }
+// );
 
 // export const createSession = onRequest(async (req, res) => {
 //   log("creating request");

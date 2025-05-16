@@ -9,6 +9,8 @@ import {
   onSnapshot,
   query,
 } from "firebase/firestore";
+
+import { getDatabase, ref, set } from "firebase/database";
 import { initializeApp } from "firebase/app";
 import { log } from "./utils";
 import { COLLECTION_NAMES } from "./data";
@@ -26,6 +28,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const DB = getFirestore(app);
+const FB = getDatabase();
 
 export function getNewCollectionRef(collectionName) {
   let ref = doc(collection(DB, collectionName));
@@ -42,8 +45,11 @@ export function getCollection(collectionName) {
   });
 }
 
-export function setCollectionItem(collectionName, item) {
-  let docRef = doc(DB, collectionName, item.id);
+export function setCollectionItem(collectionName, item, stringify) {
+  let id = item.id;
+  if (stringify) item = { item: JSON.stringify(item) };
+
+  let docRef = doc(DB, collectionName, id);
   return setDoc(docRef, item)
     .then(() => {})
     .catch((err) => log("err", err));
@@ -56,7 +62,7 @@ export async function setSubCollectionItem(
   subDocumentId,
   data
 ) {
-  log(collectionName, documentId);
+  // log(collectionName, documentId);
   try {
     const subCollectionRef = collection(
       DB,
@@ -110,4 +116,10 @@ export function subscribeToCollectionNode(collectionName, callback) {
   });
 }
 
-export function setPrinterItem() {}
+// export function setReceiptItem(item) {
+//   set(ref(FB, "PRINTERS/" + item.id), item)
+//     .then(() => {
+//       log("success writing to firebase database!");
+//     })
+//     .catch((err) => log("error: ", err));
+// }

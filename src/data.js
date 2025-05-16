@@ -74,17 +74,19 @@ export const CUSTOMER_PROTO = {
   dateCreated: "",
 };
 
-export const RECEIPT_NAMES = {
-  left: "Left-Desk",
-  right: "Right-Desk",
+export const RECEIPT_TYPES = {
+  workorder: "Workorder",
+  sales: "Sales",
 };
 
 export const RECEIPT_WORKORDER_PROTO = {
-  heading: "Work Order",
+  heading: "",
   dateTime: "",
   workorderNumber: "",
   customerContactBlurb: "",
   workorderItem: "",
+  workorderNumber: "",
+  customerContactBlurb: "",
   startedOnStr: "",
   itemArr: [{ item: "", qty: "", price: "", discount: "" }],
   laborCharges: "",
@@ -96,6 +98,8 @@ export const RECEIPT_WORKORDER_PROTO = {
   internalNotes: "",
   barcode: "",
   id: "",
+  receiptType: "",
+  location: "",
 };
 
 const receiptHeading = () => {
@@ -226,11 +230,7 @@ export const COLLECTION_NAMES = {
   preferences: "PREFERENCES",
   sales: "SALES",
   inventory: "INVENTORY",
-  printers: {
-    collectionName: "PRINTERS",
-    left: "Left-Desk-Printer",
-    right: "Right-Desk-Printer",
-  },
+  printers: "PRINTERS",
 };
 export const WORKORDER_STATUS_NAMES = Object.freeze({
   open: "open",
@@ -392,6 +392,11 @@ export const workorder_status = [
   { name: "Service", id: generateRandomID() },
   { name: "Finished", id: generateRandomID() },
 ];
+
+export const printer_names = {
+  left: "Left Desk Printer",
+  right: "Right Desk Printer",
+};
 
 export const bike_brands_db = {
   brands1: ["Trek", "Specialized", "Sun", "Marin"],

@@ -18,11 +18,20 @@ import {
   ADJUSTABLE_BUTTON_SIZE_OPTIONS_ARR,
   DEFAULT_USER_PREFERENCES,
   WORKORDER_STATUS_NAMES,
+  RECEIPT_WORKORDER_PROTO,
+  printer_names,
+  RECEIPT_TYPES,
 } from "../data";
 import { Button } from "react-native-web";
 import { Colors, ViewStyles } from "../styles";
 
-import { dim, generateBarcode, generateRandomID, log } from "../utils";
+import {
+  dim,
+  formatDateTime,
+  generateBarcode,
+  generateRandomID,
+  log,
+} from "../utils";
 import { AlertBox, SHADOW_RADIUS_PROTO } from "../components";
 import { cloneDeep } from "lodash";
 import { Items_WorkorderItemsTab } from "./screen_components/Items_WorkorderItems";
@@ -51,6 +60,29 @@ let test_cust = cloneDeep(CUSTOMER_PROTO);
 test_cust.first = "big fat";
 test_cust.last = "jones";
 test_cust.phone.cell = "123-434-5456";
+
+let proto = cloneDeep(RECEIPT_WORKORDER_PROTO);
+proto.dateTime = formatDateTime(new Date()).topTicketDateTimeString;
+proto.workorderNumber = "1234";
+proto.customerContactBlurb =
+  "Customer Name \n(239) 336 9177 \n123 Bonita Beach Rd \nNaples, FL";
+proto.workorderItem = "Trek Hybrid";
+proto.startedOnStr = formatDateTime(new Date()).topTicketDateTimeString;
+proto.itemArr = [{ item: "Brake cable", price: "2.00", qty: 2, discount: "" }];
+proto.laborCharges = "22.90";
+proto.partsCharges = "43.44";
+proto.taxCharges = "4.34";
+proto.total = "76.56";
+proto.customerNotes =
+  "please was the damn bike and shit also \nclean the chain";
+proto.internalNotes =
+  "The chain is falling off and so on and so forth so keep an eye on that or else bad shit will happen";
+proto.barcode = "123432756456";
+proto.id = generateRandomID();
+proto.receiptType = RECEIPT_TYPES.workorder;
+proto.location = printer_names.left;
+// log("proto", proto);
+setCollectionItem(COLLECTION_NAMES.printers, proto, true);
 
 export function WorkorderScreen() {
   const [sInitFlag, _setInitFlag] = React.useState(false);

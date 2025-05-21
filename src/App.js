@@ -19,24 +19,11 @@ import { View } from "react-native-web";
 // // Initialize Firebase
 // const app = initializeApp(firebaseConfig);
 // const analytics = getAnalytics(app);
+/* eslint-disable */
 
 export const ROUTES = {
   init: "/",
 };
-
-import { formatDateTime, generateRandomID, log } from "./utils";
-import { cloneDeep } from "lodash";
-import {
-  COLLECTION_NAMES,
-  printer_names,
-  RECEIPT_WORKORDER_PROTO,
-} from "./data";
-import {
-  getNewCollectionRef,
-  setCollectionItem,
-  setReceiptItem,
-  setSubCollectionItem,
-} from "./dbCalls";
 
 function App() {
   return (

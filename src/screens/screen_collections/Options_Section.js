@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import {
   View,
   Text,
@@ -40,6 +42,7 @@ import { WorkordersComponent } from "../screen_components/Options_Workorders";
 import { QuickItemComponent } from "../screen_components/Options_QuickItems";
 import { InventoryComponent } from "../screen_components/Options_Inventory";
 import { WorkorderGlimpse } from "../screen_components/Items_WorkorderGlimpse";
+import { MessagesComponent } from "../screen_components/Options_Messages";
 
 export function Options_Section({
   ssOptionsTabName,
@@ -47,6 +50,8 @@ export function Options_Section({
   ssWorkordersArr,
   ssInventoryArr,
   ssAdjustableUserPreferences,
+  ssMessagesArr,
+  __setMessagesArr,
   __setOptionsTabName,
   __setWorkorderObj,
   __setInventoryArr,
@@ -132,6 +137,12 @@ export function Options_Section({
           __setInfoComponentName={__setInfoComponentName}
         />
       )}
+      {ssOptionsTabName === TAB_NAMES.optionsTab.messages && (
+        <MessagesComponent
+          ssMessagesArr={ssMessagesArr}
+          __setMessagesArr={__setMessagesArr}
+        />
+      )}
     </View>
   );
 }
@@ -195,6 +206,14 @@ const TabBar = ({
         text={`\u2610`}
         isSelected={
           ssOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
+        }
+      />
+      <Divider />
+      <TabMenuButton
+        onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.messages)}
+        text={TAB_NAMES.optionsTab.messages}
+        isSelected={
+          ssOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
         }
       />
     </View>

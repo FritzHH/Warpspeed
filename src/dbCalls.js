@@ -1,3 +1,8 @@
+/* eslint-disable */
+
+const endpoint =
+  "https://us-central1-warpspeed-original.cloudfunctions.net/sendSMS";
+
 import {
   getFirestore,
   collection,
@@ -28,7 +33,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const DB = getFirestore(app);
-const FB = getDatabase();
+const RDB = getDatabase();
 
 export function getNewCollectionRef(collectionName) {
   let ref = doc(collection(DB, collectionName));
@@ -116,10 +121,30 @@ export function subscribeToCollectionNode(collectionName, callback) {
   });
 }
 
-// export function setReceiptItem(item) {
-//   set(ref(FB, "PRINTERS/" + item.id), item)
-//     .then(() => {
-//       log("success writing to firebase database!");
-//     })
-//     .catch((err) => log("error: ", err));
-// }
+export function sendSMS(messageBody) {
+  fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // "Access-Control-Allow-Origin": "*",
+    },
+    body: JSON.stringify(messageBody),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        log("FETCH FAILURE HERE IS THE REASON ==> ", res.status);
+        return null;
+      }
+      return res;
+    })
+    .then((res) => {
+      if (res) {
+        res.json().then((res) => {
+          log("COMPLETE!", res);
+          return res;
+        });
+      }
+      log("no res to exist for .json operation");
+      return null;
+    });
+}

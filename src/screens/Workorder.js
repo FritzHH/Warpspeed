@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import React, { useState } from "react";
 import {
   View,
@@ -21,6 +23,7 @@ import {
   RECEIPT_WORKORDER_PROTO,
   printer_names,
   RECEIPT_TYPES,
+  SMS_PROTO,
 } from "../data";
 import { Button } from "react-native-web";
 import { Colors, ViewStyles } from "../styles";
@@ -44,9 +47,12 @@ import {
   getCollection,
   getCollectionItem,
   getNewCollectionRef,
+  sendSMS,
   setCollectionItem,
   subscribeToCollectionNode,
 } from "../dbCalls";
+import { sendTestMessage, testPayment } from "../testing";
+import { PaymentElement } from "../PaymentElement";
 // import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
 // import { TabView, SceneMap } from "react-native-tab-view";
 
@@ -61,28 +67,8 @@ test_cust.first = "big fat";
 test_cust.last = "jones";
 test_cust.phone.cell = "123-434-5456";
 
-let proto = cloneDeep(RECEIPT_WORKORDER_PROTO);
-proto.dateTime = formatDateTime(new Date()).topTicketDateTimeString;
-proto.workorderNumber = "1234";
-proto.customerContactBlurb =
-  "Customer Name \n(239) 336 9177 \n123 Bonita Beach Rd \nNaples, FL";
-proto.workorderItem = "Trek Hybrid";
-proto.startedOnStr = formatDateTime(new Date()).topTicketDateTimeString;
-proto.itemArr = [{ item: "Brake cable", price: "2.00", qty: 2, discount: "" }];
-proto.laborCharges = "22.90";
-proto.partsCharges = "43.44";
-proto.taxCharges = "4.34";
-proto.total = "76.56";
-proto.customerNotes =
-  "please was the damn bike and shit also \nclean the chain";
-proto.internalNotes =
-  "The chain is falling off and so on and so forth so keep an eye on that or else bad shit will happen";
-proto.barcode = "123432756456";
-proto.id = generateRandomID();
-proto.receiptType = RECEIPT_TYPES.workorder;
-proto.location = printer_names.left;
-// log("proto", proto);
-setCollectionItem(COLLECTION_NAMES.printers, proto, true);
+// sendTestMessage();
+testPayment();
 
 export function WorkorderScreen() {
   const [sInitFlag, _setInitFlag] = React.useState(false);
@@ -101,20 +87,20 @@ export function WorkorderScreen() {
     React.useState(DEFAULT_USER_PREFERENCES);
   const [sInventoryArr, _setInventoryArr] = React.useState(test_inventory);
   const [sWorkorderPreviewObj, _setWorkorderPreviewObj] = useState(null);
+  const [sMessagesArr, _setMessagesArr] = useState([]);
   ////////////////// tab selections ///////////////////////////
   const [sItemsTabName, _setItemsTabName] = React.useState(
     TAB_NAMES.itemsTab.dashboard
   );
   const [sOptionsTabName, _setOptionsTabName] = React.useState(
-    TAB_NAMES.optionsTab.inventory
+    TAB_NAMES.optionsTab.messages
   );
   const [sInfoComponentName, _setInfoComponentName] = React.useState(
     INFO_COMPONENT_NAMES.phoneNumberEntry
   );
 
-  /////////
-  //setter functions for db and state
-  /////////
+  //setter functions for db and state  ///////////////////////
+
   function setCustomerObj(customerObj, setToDB = true) {
     // log("WORKORDER: setting customer object to this", customerObj);
     _setCustomerObj(customerObj);
@@ -139,6 +125,8 @@ export function WorkorderScreen() {
     setCollectionItem(COLLECTION_NAMES.inventory, item);
     _setInventoryArr(newInvArr);
   }
+
+  function setMessagesArr(newArr) {}
 
   function setWorkorderObj(workorderObj = WORKORDER_PROTO) {
     if (!workorderObj) {
@@ -207,9 +195,7 @@ export function WorkorderScreen() {
     _setWorkorderObj(newWorkorder);
   }
 
-  /////////////////
-  // side effects (db calls)
-  /////////////////
+  // side effects (db calls) ///////////////////////////////////
   async function getAllCustomersArrFromDB() {
     let customersArr = await getCollection(COLLECTION_NAMES.customers);
     // log("WORKORDER: customers from db", customersArr);
@@ -241,10 +227,9 @@ export function WorkorderScreen() {
     // subscribeToCollectionNode(COLLECTION_NAMES.customers, customersCallback);
   }
 
-  /////////////////
-  // init function runs once until refresh
-  // need to change to useEffect
-  ////////////////
+  // init function runs once until refresh //////////////////////
+  // need to change to useEffect ///////////////////////////////
+
   function initialize() {
     if (!sInitFlag) {
       _setInitFlag(true);
@@ -263,6 +248,7 @@ export function WorkorderScreen() {
         justifyContent: "space-around",
       }}
     >
+      <PaymentElement amount={200} />
       <View style={{ height: height, width: "64%" }}>
         <View
           style={{
@@ -354,7 +340,9 @@ export function WorkorderScreen() {
           ssOptionsTabName={sOptionsTabName}
           ssWorkordersArr={sWorkordersArr}
           ssInventoryArr={sInventoryArr}
+          ssMessagesArr={sMessagesArr}
           ssAdjustableUserPreferences={sAdjustableUserPreferences}
+          __setMessagesArr={setMessagesArr}
           __setWorkorderObj={_setWorkorderObj}
           __setOptionsTabName={_setOptionsTabName}
           __setInventoryArr={_setInventoryArr}

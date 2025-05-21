@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { getNewCollectionRef } from "./dbCalls";
+// import { getNewCollectionRef } from "./dbCalls";
 import { formatDateTime, generateRandomID, log } from "./utils";
 
 /////////// object prototypes
@@ -37,6 +37,19 @@ export const WORKORDER_PROTO = {
   dueBy: "",
   status: "",
 };
+
+export const SMS_PROTO = {
+  firstName: "",
+  lastName: "",
+  phoneNumber: "",
+  canRespond: false,
+  millis: "",
+  message: "",
+  customerID: "",
+  read: false,
+  id: "",
+};
+
 export const DISCOUNT_OBJ_PROTO = {
   name: "",
   value: "",
@@ -248,6 +261,7 @@ export const TAB_NAMES = {
     quickItems: "Quick Items",
     workorders: "Workorders",
     inventory: "Inventory",
+    messages: "Messages",
   },
 };
 

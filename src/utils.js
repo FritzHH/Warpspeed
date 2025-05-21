@@ -5,6 +5,17 @@ import { COLLECTION_NAMES, CUSTOMER_PROTO } from "./data";
 
 export function log(one, two) {
   let str = "";
+
+  if (typeof one === "object") {
+    console.log(str + JSON.stringify(one) + two);
+    return;
+  }
+
+  if (typeof two === "object") {
+    console.log(str + one + " : " + JSON.stringify(two));
+    return;
+  }
+
   if (one) {
     str += one;
   }
@@ -14,7 +25,7 @@ export function log(one, two) {
   } else {
     // str = "log: " + str;
   }
-  console.log(one, two);
+  console.log(str);
 }
 
 export function fetchIt(url) {

@@ -18,8 +18,6 @@ const DB = getFirestore();
 
 // twilio
 const twilioPhoneNumber = "+12393171234";
-// const twilioaccountSid = "dfd";
-// const twilioauthToken = "dfda";
 const twilioClient = require("twilio")(twilioaccountSid, twilioauthToken);
 
 const SMS_PROTO = {

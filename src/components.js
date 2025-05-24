@@ -695,26 +695,26 @@ export const CustomerInfoComponent = ({
         <View>
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.phone.cell = val;
+              sCustomerInfo.cell = val;
               __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Cell phone"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.phone.cell}
+            value={sCustomerInfo.cell}
             autoComplete="none"
             autoFocus={ssInfoTextFocus === FOCUS_NAMES.cell}
             onFocus={() => __setInfoTextFocus(FOCUS_NAMES.cell)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.phone.landline = val;
+              sCustomerInfo.landline = val;
               __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Landline"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.phone.landline}
+            value={sCustomerInfo.landline}
             autoComplete="none"
             autoFocus={ssInfoTextFocus === FOCUS_NAMES.land}
             onFocus={() => __setInfoTextFocus(FOCUS_NAMES.land)}
@@ -760,109 +760,108 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.address.streetAddress = val;
+              sCustomerInfo.streetAddress = val;
               __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Street address"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.address.streetAddress}
+            value={sCustomerInfo.streetAddress}
             autoComplete="none"
             autoFocus={ssInfoTextFocus === FOCUS_NAMES.street}
             onFocus={() => __setInfoTextFocus(FOCUS_NAMES.street)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.address.unit = val;
+              sCustomerInfo.unit = val;
               __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Unit"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.address.unit}
+            value={sCustomerInfo.unit}
             autoComplete="none"
             autoFocus={ssInfoTextFocus === FOCUS_NAMES.unit}
             onFocus={() => __setInfoTextFocus(FOCUS_NAMES.unit)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.address.city = val;
+              sCustomerInfo.city = val;
               __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="City"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.address.city}
+            value={sCustomerInfo.city}
             autoComplete="none"
             autoFocus={ssInfoTextFocus === FOCUS_NAMES.city}
             onFocus={() => __setInfoTextFocus(FOCUS_NAMES.city)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.address.state = val;
+              sCustomerInfo.state = val;
               __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="State"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.address.state}
+            value={sCustomerInfo.state}
             autoComplete="none"
             autoFocus={ssInfoTextFocus === FOCUS_NAMES.state}
             onFocus={() => __setInfoTextFocus(FOCUS_NAMES.state)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.address.zip = val;
+              sCustomerInfo.zip = val;
               __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Zip code"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.address.zip}
+            value={sCustomerInfo.zip}
             autoComplete="none"
             autoFocus={ssInfoTextFocus === FOCUS_NAMES.zip}
             onFocus={() => __setInfoTextFocus(FOCUS_NAMES.zip)}
           />
           <TextInput
             onChangeText={(val) => {
-              sCustomerInfo.address.notes = val;
+              sCustomerInfo.notes = val;
               __setCustomerInfo(sCustomerInfo);
             }}
             placeholderTextColor="darkgray"
             placeholder="Address notes"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.address.notes}
+            value={sCustomerInfo.notes}
             autoComplete="none"
             autoFocus={ssInfoTextFocus === FOCUS_NAMES.notes}
             onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
           />
           <CheckBox
             label={"Call Only"}
-            isChecked={sCustomerInfo.phone.callOnlyOption}
+            isChecked={sCustomerInfo.contactRestriction === "CALL"}
             onCheck={() => {
               __setInfoTextFocus(null);
-              sCustomerInfo.phone.callOnlyOption =
-                !sCustomerInfo.phone.callOnlyOption;
-              if (
-                sCustomerInfo.phone.emailOnlyOption &&
-                sCustomerInfo.phone.callOnlyOption
-              )
-                sCustomerInfo.phone.emailOnlyOption = false;
+              if (sCustomerInfo.contactRestriction === "CALL") {
+                sCustomerInfo.contactRestriction = "";
+              } else {
+                sCustomerInfo.contactRestriction = "CALL";
+              }
               __setCustomerInfo(sCustomerInfo);
             }}
           />
           <CheckBox
             label={"Email Only"}
-            isChecked={sCustomerInfo.phone.emailOnlyOption}
+            isChecked={sCustomerInfo.contactRestriction === "EMAIL"}
             onCheck={() => {
               __setInfoTextFocus(null);
-              sCustomerInfo.phone.emailOnlyOption =
-                !sCustomerInfo.phone.emailOnlyOption;
-              if (
-                sCustomerInfo.phone.callOnlyOption &&
-                sCustomerInfo.phone.emailOnlyOption
-              )
-                sCustomerInfo.phone.callOnlyOption = false;
+              // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
+              // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
+              //   sCustomerInfo.callOnlyOption = false;
+              if (sCustomerInfo.contactRestriction === "EMAIL") {
+                sCustomerInfo.contactRestriction = "";
+              } else {
+                sCustomerInfo.contactRestriction = "EMAIL";
+              }
               __setCustomerInfo(sCustomerInfo);
             }}
           />

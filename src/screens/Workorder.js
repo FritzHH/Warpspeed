@@ -52,7 +52,7 @@ import {
   subscribeToCollectionNode,
 } from "../dbCalls";
 import { sendTestMessage, testPayment } from "../testing";
-import { PaymentElement } from "../PaymentElement";
+import { PaymentElement, PaymentElementComponent } from "../PaymentElement";
 // import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
 // import { TabView, SceneMap } from "react-native-tab-view";
 
@@ -62,13 +62,8 @@ let testWorkorder = cloneDeep(WORKORDER_PROTO);
 testWorkorder.color = bike_colors_arr_db[4];
 testWorkorder.brand = "brand goes here";
 
-let test_cust = cloneDeep(CUSTOMER_PROTO);
-test_cust.first = "big fat";
-test_cust.last = "jones";
-test_cust.phone.cell = "123-434-5456";
-
 // sendTestMessage();
-testPayment();
+// testPayment();
 
 export function WorkorderScreen() {
   const [sInitFlag, _setInitFlag] = React.useState(false);
@@ -248,7 +243,7 @@ export function WorkorderScreen() {
         justifyContent: "space-around",
       }}
     >
-      <PaymentElement amount={200} />
+      {/* <PaymentElementComponent amount={200} />F */}
       <View style={{ height: height, width: "64%" }}>
         <View
           style={{

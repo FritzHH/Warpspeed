@@ -1,6 +1,7 @@
 import { cloneDeep } from "lodash";
 import {
   COLLECTION_NAMES,
+  CUSTOMER_PROTO,
   printer_names,
   RECEIPT_TYPES,
   RECEIPT_WORKORDER_PROTO,
@@ -8,6 +9,11 @@ import {
 } from "./data";
 import { sendSMS, setCollectionItem } from "./dbCalls";
 import { formatDateTime, generateRandomID, log } from "./utils";
+
+export let TEST_CUSTOMER = cloneDeep(CUSTOMER_PROTO);
+TEST_CUSTOMER.first = "Jim";
+TEST_CUSTOMER.last = "Jones";
+TEST_CUSTOMER.cell = "123-434-5456";
 
 export function testPayment() {}
 

@@ -99,15 +99,15 @@ export function searchPhoneNum(searchTerm, customerArrToSearch) {
   let resObj = {};
   for (let i = 0; i <= customerArrToSearch.length - 1; i++) {
     let customerObj = customerArrToSearch[i];
-    if (customerObj.phone.cell.startsWith(searchTerm))
+    if (customerObj.cell.startsWith(searchTerm))
       resObj[customerObj.id] = customerObj;
-    if (customerObj.phone.landline.startsWith(searchTerm))
+    if (customerObj.landline.startsWith(searchTerm))
       resObj[customerObj.id] = customerObj;
 
     if (searchTerm.length === 4) {
-      if (customerObj.phone.cell.endsWith(searchTerm))
+      if (customerObj.cell.endsWith(searchTerm))
         resObj[customerObj.id] = customerObj;
-      if (customerObj.phone.landline.endsWith(searchTerm))
+      if (customerObj.landline.endsWith(searchTerm))
         resObj[customerObj.id] = customerObj;
     }
   }
@@ -227,5 +227,13 @@ export function searchArray(
         }
       });
     });
+  });
+}
+
+export function combine2ArraysOrderByMillis(arr1, arr2) {
+  let newArr = [...arr1, ...arr2];
+  newArr.sort((a, b) => {
+    if (a.millis > b.millis) return 1;
+    if (a.millis <= b.millis) return -1;
   });
 }

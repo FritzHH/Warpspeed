@@ -151,7 +151,7 @@ export function CustomerInfoScreenComponent({
       _setInfoTextFocus(FOCUS_NAMES.cell);
     } else {
       _setInfoTextFocus(FOCUS_NAMES.first);
-      custInfo.phone.cell = sBox1Val;
+      custInfo.cell = sBox1Val;
     }
     _setCustomerInfo(custInfo);
     _setShowCustomerModal(true);
@@ -248,7 +248,8 @@ export function CustomerInfoScreenComponent({
           height: 50,
           marginVertical: 10,
           marginTop: 50,
-          width: "90%",
+          width: null,
+          // width: "90%",
         }}
         buttonVisible={sShowCreateCustomerButton}
         buttonTextStyle={{ color: "whitesmoke" }}

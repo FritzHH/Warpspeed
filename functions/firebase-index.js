@@ -6,7 +6,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 var serviceAccount = require("./creds.json");
 const cors = require("cors")({ origin: true });
-const StripeStuff = require("./payments");
+// const handlePayment = require("./payments.js");
 
 // firebase
 admin.initializeApp({
@@ -18,6 +18,10 @@ const DB = getFirestore();
 
 // twilio
 const twilioPhoneNumber = "+12393171234";
+const twilioaccountSid = "AC8a368bba2aac361fb084b3e117069d62";
+const twilioauthToken = "46b9e7d07dbebfc382eeeda6fd6abf94";
+
+const twilioClient = require("twilio")(twilioaccountSid, twilioauthToken);
 
 const SMS_PROTO = {
   firstName: "",
@@ -76,6 +80,9 @@ const sendTwilioMessage = (messageObj) => {
     });
 };
 
+exports.sendSMS = onRequest(async (request, response) => {
+  cors(request, response, async () => {});
+});
 exports.sendSMS = onRequest(async (request, response) => {
   cors(request, response, async () => {
     let body = request.body;

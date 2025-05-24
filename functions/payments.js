@@ -28,16 +28,22 @@ async function createPaymentIntent(amount, currency) {
 }
 
 async function handlePayment() {
-  const paymentIntent = await createPaymentIntent(1000, "usd"); // Example: $10.00
-  if (paymentIntent) {
-    // Send the client secret to the client
-    return {
-      clientSecret: paymentIntent.client_secret,
-    };
-  } else {
-    // Handle error
-    return { error: "Failed to create PaymentIntent" };
-  }
+  const reader = await stripe.terminal.readers.create({
+    location: "acct_1RRLAyG8PZMnVdxF",
+    registration_code: "simulated-wpe",
+  });
+
+  return;
+  //   const paymentIntent = await createPaymentIntent(1000, "usd"); // Example: $10.00
+  //   if (paymentIntent) {
+  //     // Send the client secret to the client
+  //     return {
+  //       clientSecret: paymentIntent.client_secret,
+  //     };
+  //   } else {
+  //     // Handle error
+  //     return { error: "Failed to create PaymentIntent" };
+  //   }
 }
 
 async function stripePayment(firstName, lastName) {}

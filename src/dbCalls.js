@@ -15,19 +15,22 @@ import {
   query,
 } from "firebase/firestore";
 
-import { getDatabase, ref, set } from "firebase/database";
+import { getDatabase, onValue, ref, set } from "firebase/database";
 import { initializeApp } from "firebase/app";
 import { log } from "./utils";
 import { COLLECTION_NAMES } from "./data";
+import { isArray } from "lodash";
+// import { isArray } from "lodash";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCFqFF3wG-8yNT8Z2O_j8ksL1SWxj9U0gg",
-  authDomain: "warpspeed-original.firebaseapp.com",
-  projectId: "warpspeed-original",
-  storageBucket: "warpspeed-original.firebasestorage.app",
-  messagingSenderId: "499618567073",
-  appId: "1:499618567073:web:4e2ca2cf293cb6d96831e0",
-  measurementId: "G-7SSYMNGKQS",
+  apiKey: "AIzaSyBcDa03BacWhVaUaNokgqHCJLkUqkv2gM8",
+  authDomain: "ftl-bonitabikes.firebaseapp.com",
+  databaseURL: "https://ftl-bonitabikes-default-rtdb.firebaseio.com",
+  projectId: "ftl-bonitabikes",
+  storageBucket: "ftl-bonitabikes.firebasestorage.app",
+  messagingSenderId: "229464948114",
+  appId: "1:229464948114:web:e76caf7d57cfa1840b154b",
+  measurementId: "G-8W4VJBGDY1",
 };
 
 // Initialize Firebase
@@ -121,6 +124,77 @@ export function subscribeToCollectionNode(collectionName, callback) {
   });
 }
 
+////// Realtime Database calls ////////////////////////////////////////
+
+export function getCustomerMessages(customerPhone) {
+  let returnObj = {
+    incomingMessages: null,
+    outgoingMessages: null,
+  };
+  let incomingRef = ref(RDB, "MESSAGES/INCOMING/" + customerPhone);
+  let outgoingRef = ref(RDB, "MESSAGES/OUTGOING/" + customerPhone);
+
+  return new Promise((resolve, reject) => {
+    get(incomingRef)
+      .then((snap) => {
+        if (snap.exists) {
+          returnObj.incomingMessages = snap.val();
+        } else {
+          returnObj.incomingMessages = [];
+        }
+        if (isArray(returnObj.outgoingMessages)) {
+          resolve(returnObj);
+        }
+      })
+      .catch((e) => {
+        log(
+          "ERROR RETRIEVING INCOMING CUSTOMER MESSAGES IN getCustomerMessages()",
+          e
+        );
+        reject(
+          "ERROR RETRIEVING INCOMING CUSTOMER MESSAGES IN getCustomerMessages() :: " +
+            e
+        );
+      });
+
+    get(outgoingRef)
+      .then((snap) => {
+        if (snap.exists) {
+          returnObj.outgoingMessages = snap.val();
+        } else {
+          returnObj.outgoingMessages = [];
+        }
+        if (isArray(returnObj.incomingMessages)) {
+          resolve(returnObj);
+        }
+      })
+      .catch((e) => {
+        log(
+          "ERROR RETRIEVING OUTGOING CUSTOMER MESSAGES IN getCustomerMessages()",
+          e
+        );
+        reject(
+          "ERROR RETRIEVING OUTGOING CUSTOMER MESSAGES IN getCustomerMessages() :: " +
+            e
+        );
+      });
+  });
+}
+
+export function subscribeToCustomerMessageNode(customerPhone, callback) {
+  let dbRef = ref(RDB, "MESSAGES/" + customerPhone);
+  onValue(
+    dbRef,
+    (snap) => {
+      callback(snap.val());
+    },
+    (e) => {
+      log("ERROR WATCHING REALTIME NODE subscribeToCustomerMessageNode()", e);
+    }
+  );
+}
+
+////// Firebase Function calls ///////////////////////////////////////
 export function sendSMS(messageBody) {
   fetch(endpoint, {
     method: "POST",

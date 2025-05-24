@@ -57,7 +57,7 @@ export const Info_WorkorderComponent = ({
     });
     if (!foundColor) {
       // log("not found", incomingColorVal);
-      newColorObj.label = newColorObj.label;
+      // newColorObj.label = newColorObj.label;
       newColorObj.backgroundColor = null;
       newColorObj.textColor = null;
     }
@@ -138,20 +138,20 @@ export const Info_WorkorderComponent = ({
               // backgroundColor: "red",
             }}
           >
-            {ssCustomerObj.phone.cell.length > 0 ? (
+            {ssCustomerObj.cell.length > 0 ? (
               <Text style={{ color: Colors.lightTextOnMainBackground }}>
-                {"Cell:  " + ssCustomerObj.phone.cell}
+                {"Cell:  " + ssCustomerObj.cell}
               </Text>
             ) : null}
-            {ssCustomerObj.phone.landline.length > 0 ? (
+            {ssCustomerObj.landline.length > 0 ? (
               <Text style={{ color: Colors.lightTextOnMainBackground }}>
-                {"Land:  " + ssCustomerObj.phone.landline}
+                {"Land:  " + ssCustomerObj.landline}
               </Text>
             ) : null}
-            {ssCustomerObj.phone.callOnlyOption ? (
+            {ssCustomerObj.contactRestriction === "CALL" ? (
               <Text style={{ color: "pink" }}>CALL ONLY</Text>
             ) : null}
-            {ssCustomerObj.phone.emailOnlyOption ? (
+            {ssCustomerObj.contactRestriction === "EMAIL" ? (
               <Text style={{ color: "pink" }}>EMAIL ONLY</Text>
             ) : null}
           </View>

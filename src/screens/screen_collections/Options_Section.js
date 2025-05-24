@@ -94,12 +94,6 @@ export function Options_Section({
   // log("modal", sShowWorkorderModal);
   return (
     <View style={{ flex: 1 }}>
-      <WorkordersFullscreenModal
-        __setModalVisibility={(val) => _setShowWorkorderModal(val)}
-        // __setShowWorkorderModal={_setShowWorkorderModal}
-        ssShowWorkorderModal={sShowWorkorderModal}
-        ssModalVisible={sShowWorkorderModal}
-      />
       <TabBar
         ssOptionsTabName={ssOptionsTabName}
         workorderBtnClicked={(workorderObj) => log("clicked", workorderObj)}
@@ -219,32 +213,3 @@ const TabBar = ({
     </View>
   </View>
 );
-
-function WorkordersFullscreenModal({
-  ssWorkordersArr,
-  onSelectWorkorder,
-  ssModalVisible,
-  ssShowWorkorderModal,
-  __setShowWorkorderModal,
-  __setModalVisibility,
-}) {
-  return (
-    <ScreenModal
-      modalVisible={ssModalVisible}
-      setModalVisibility={__setModalVisibility}
-      buttonVisible={false}
-      showButtonIcon={false}
-      Component={() => (
-        <TouchableWithoutFeedback>
-          <View
-            style={{
-              backgroundColor: "lightgray",
-              width: "60%",
-              height: "90%",
-            }}
-          ></View>
-        </TouchableWithoutFeedback>
-      )}
-    />
-  );
-}

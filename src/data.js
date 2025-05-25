@@ -22,18 +22,14 @@ export const WORKORDER_PROTO = {
   brand: "",
   description: "",
   color: "",
-  changes: {
-    startedBy: "",
-    changeLog: [],
-  },
+  changeLog: [null],
+  startedBy: "",
   partOrdered: "",
   partSource: "",
   itemIdArr: [],
   workorderLines: [],
-  notes: {
-    internalNotes: [],
-    customerNotes: [],
-  },
+  internalNotes: [],
+  customerNotes: [],
   dueBy: "",
   status: "",
 };
@@ -65,29 +61,29 @@ export const WORKORDER_ITEM_PROTO = {
 export const CUSTOMER_PROTO = {
   first: "",
   last: "",
-  phone: {
-    cell: "",
-    landline: "",
-    emailOnlyOption: false,
-    callOnlyOption: false,
-  },
   cell: "",
   landline: "",
   contactRestriction: "",
   email: "",
-  // address: {
   streetAddress: "",
   unit: "",
   city: "",
   state: "",
   zip: "",
   notes: "",
-  // },
   id: "",
   interactionRating: "",
   workorders: [],
   payments: [],
   dateCreated: "",
+};
+
+export const CUSTOMER_PREVIEW_PROTO = {
+  cell: "",
+  landline: "",
+  first: "",
+  last: "",
+  id: "",
 };
 
 export const RECEIPT_TYPES = {
@@ -152,12 +148,30 @@ export const RECEIPT_PROTO = {
 
 export const INVENTORY_ITEM_PROTO = {
   name: "",
+  quickItemName: "",
   price: 0,
   salePrice: 0,
   catMain: "",
   catDescrip: "",
   catLocation: "",
   id: "",
+};
+
+export const APP_PREFERENCES_PROTO = {
+  statuses: [
+    { name: "Service", id: "343343314" },
+    { name: "Finished", id: "343343312" },
+  ],
+  quickItemButtonNames: [],
+  bikeColors: [],
+  bikeBrands: [],
+  bikeOptionalBrands: [],
+  discounts: [],
+  users: [],
+  bikeDescriptions: [],
+  partSources: [],
+  printerNames: [],
+  loginTimeout: 15,
 };
 
 ////////// hardcoded settings and options ///////
@@ -239,6 +253,9 @@ export const INVENTORY_CATEGORIES = {
     retail: "Retail",
   },
 };
+
+// export const S
+
 export const COLLECTION_NAMES = {
   customers: "CUSTOMERS",
   openWorkorders: "OPEN-WORKORDERS",
@@ -404,17 +421,15 @@ export const FOCUS_NAMES = {
   notes: "notes",
 };
 
-///////// variables to import from DB ////////
+///////// variables to import from DB ///////////////////////////////
 export const workorder_status = [
-  { name: "Service", id: generateRandomID() },
-  { name: "Finished", id: generateRandomID() },
+  { name: "Service", id: "343343" },
+  { name: "Finished", id: "343343312" },
 ];
-
 export const printer_names = {
   left: "Left Desk Printer",
   right: "Right Desk Printer",
 };
-
 export const bike_brands_db = {
   brands1: ["Trek", "Specialized", "Sun", "Marin"],
   brands1Title: "Pedal Bikes",

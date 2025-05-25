@@ -172,10 +172,11 @@ export function CustomerInfoScreenComponent({
       /> */}
       <View
         style={{
-          flexDirection: "row",
+          // flexDirection: "row",
           marginTop: "50%",
           width: "90%",
           justifyContent: "space-between",
+          alignItems: "center",
           // backgroundColor: "green",
         }}
       >
@@ -183,8 +184,8 @@ export function CustomerInfoScreenComponent({
           <TextInput
             style={{
               borderBottomWidth: 1,
-              width: sSearchingByName ? 200 : null,
-              width: 160,
+              // width: sSearchingByName ? 200 : null,
+              width: 200,
               height: 40,
               paddingHorizontal: 3,
               outlineStyle: "none",
@@ -209,7 +210,7 @@ export function CustomerInfoScreenComponent({
                 padding: 3,
                 borderBottomWidth: 1,
                 fontSize: 16,
-                width: 160,
+                width: 200,
                 height: 40,
                 outlineStyle: "none",
                 borderColor: "gray",
@@ -219,27 +220,28 @@ export function CustomerInfoScreenComponent({
             />
           </View>
         )}
+        <Button
+          buttonStyle={{
+            width: 160,
+            height: 30,
+            padding: 7,
+            ...SHADOW_RADIUS_PROTO,
+            // backgroundColor: "",
+            marginVertical: 10,
+            marginTop: 20,
+          }}
+          textStyle={{ color: "lightgray" }}
+          onPress={() => {
+            _setBox1Val("");
+            _setBox2Val("");
+            _setSearchingByName(!sSearchingByName);
+            __setCustomerSearchArr([]);
+            _setShowCreateCustomerBtn(false);
+          }}
+          text={sSearchingByName ? "Use Phone #" : "Use Name"}
+        />
       </View>
-      <Button
-        buttonStyle={{
-          width: 160,
-          height: 30,
-          padding: 7,
-          ...SHADOW_RADIUS_PROTO,
-          // backgroundColor: "",
-          marginVertical: 10,
-          marginTop: 20,
-        }}
-        textStyle={{ color: "lightgray" }}
-        onPress={() => {
-          _setBox1Val("");
-          _setBox2Val("");
-          _setSearchingByName(!sSearchingByName);
-          __setCustomerSearchArr([]);
-          _setShowCreateCustomerBtn(false);
-        }}
-        text={sSearchingByName ? "Use Phone #" : "Use Name"}
-      />
+
       {/** customer info modal */}
       <ScreenModal
         showOuterModal={true}

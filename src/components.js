@@ -235,11 +235,12 @@ export const ScreenModal = ({
   // log("ref", ref);
   ////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////
-  if (!buttonVisible) {
-    buttonStyle = { width: 0, height: 0 };
-    showButtonIcon = false;
-    showShadow = false;
-  }
+  // if (!buttonVisible) {
+  //   buttonStyle = { width: 0, height: 0 };
+  //   showButtonIcon = false;
+  //   showShadow = false;
+  //   buttonLabel = "";
+  // }
   if (showButtonIcon && !buttonIcon) buttonIcon = "\u21b4";
   if (allCaps) buttonLabel = buttonLabel.toUpperCase();
   if (!showShadow) shadowStyle = {};
@@ -262,33 +263,35 @@ export const ScreenModal = ({
       }}
     >
       <View style={{}}>
-        <Button
-          text={buttonLabel}
-          onPress={() => {
-            handleButtonPress();
-            setModalVisibility(!modalVisible);
-            _setInternalModalShow(!sInternalModalShow);
-          }}
-          onMouseOver={() =>
-            mouseOverOptions.enable ? _setMouseOver(true) : null
-          }
-          onMouseLeave={() => {
-            _setMouseOver(false);
-          }}
-          textStyle={{ ...buttonTextStyle }}
-          buttonStyle={{
-            alignItems: "center",
-            justifyContent: "center",
-            width: !buttonVisible ? 0 : null,
-            height: !buttonVisible ? 0 : null,
-            ...shadowStyle,
-            ...buttonStyle,
-            backgroundColor: sMouseOver
-              ? mouseOverOptions.highlightColor
-              : buttonStyle.backgroundColor || "transparent",
-            opacity: sMouseOver ? mouseOverOptions.opacity : null,
-          }}
-        />
+        {buttonVisible ? (
+          <Button
+            text={buttonLabel}
+            onPress={() => {
+              handleButtonPress();
+              setModalVisibility(!modalVisible);
+              _setInternalModalShow(!sInternalModalShow);
+            }}
+            onMouseOver={() =>
+              mouseOverOptions.enable ? _setMouseOver(true) : null
+            }
+            onMouseLeave={() => {
+              _setMouseOver(false);
+            }}
+            textStyle={{ ...buttonTextStyle }}
+            buttonStyle={{
+              alignItems: "center",
+              justifyContent: "center",
+              width: !buttonVisible ? 0 : null,
+              height: !buttonVisible ? 0 : null,
+              ...shadowStyle,
+              ...buttonStyle,
+              backgroundColor: sMouseOver
+                ? mouseOverOptions.highlightColor
+                : buttonStyle.backgroundColor || "transparent",
+              opacity: sMouseOver ? mouseOverOptions.opacity : null,
+            }}
+          />
+        ) : null}
 
         <Modal
           visible={

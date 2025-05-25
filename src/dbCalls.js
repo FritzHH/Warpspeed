@@ -15,10 +15,25 @@ import {
   query,
 } from "firebase/firestore";
 
-import { getDatabase, onValue, ref, set } from "firebase/database";
+import {
+  getDatabase,
+  onChildAdded,
+  onChildChanged,
+  onChildRemoved,
+  onValue,
+  ref,
+  set,
+} from "firebase/database";
 import { initializeApp } from "firebase/app";
 import { log } from "./utils";
-import { COLLECTION_NAMES } from "./data";
+import {
+  COLLECTION_NAMES,
+  CUSTOMER_PREVIEW_PROTO,
+  CUSTOMER_PROTO,
+  INVENTORY_ITEM_PROTO,
+  WORKORDER_ITEM_PROTO,
+  WORKORDER_PROTO,
+} from "./data";
 import { isArray } from "lodash";
 // import { isArray } from "lodash";
 
@@ -126,6 +141,7 @@ export function subscribeToCollectionNode(collectionName, callback) {
 
 ////// Realtime Database calls ////////////////////////////////////////
 
+// getters
 export function getCustomerMessages(customerPhone) {
   let returnObj = {
     incomingMessages: null,
@@ -181,20 +197,139 @@ export function getCustomerMessages(customerPhone) {
   });
 }
 
+// setters
+export function setPreferences(key, prefObj) {
+  let dbRef = ref(RDB, "PREFERENCES/" + key);
+  return set(dbRef, prefObj);
+}
+
+export function setOpenWorkorder(workorderObj = WORKORDER_PROTO) {
+  let dbRef = ref(RDB, "OPEN-WORKORDERS/" + workorderObj.id);
+  return set(dbRef, workorderObj);
+}
+
+export function setClosedWorkorder(workorder = WORKORDER_PROTO) {
+  let dbRef = ref(RDB, "CLOSED-WORKORDERS/" + workorder.id);
+  return set(dbRef, workorder);
+}
+
+export function setCustomer(customerObj = CUSTOMER_PROTO) {
+  let custPreview = { ...CUSTOMER_PREVIEW_PROTO };
+  custPreview.cell = customerObj.cell;
+  custPreview.landline = customerObj.landline;
+  custPreview.first = customerObj.first;
+  custPreview.last = customerObj.last;
+  custPreview.id = customerObj.id;
+
+  let id = customerObj.id;
+  let previewRef = ref(RDB, "CUSTOMER-PREVIEWS/" + id);
+  let dbRef = ref(RDB, "CUSTOMERS/" + id);
+  return concurrentDBSet(previewRef, custPreview, dbRef, customerObj);
+}
+
+export function setInventoryItem(inventoryObj = INVENTORY_ITEM_PROTO) {
+  let dbRef = ref(RDB, "INVENTORY/" + inventoryObj.id);
+  return set(dbRef, inventoryObj);
+}
+
+function concurrentDBSet(dbref1, obj1, dbref2, obj2) {
+  let ref1Complete = false;
+  let ref2Complete = false;
+  return new Promise((resolve, reject) => {
+    set(dbref1, obj1)
+      .then((res) => {
+        ref1Complete = true;
+        if (ref2Complete) resolve("first");
+      })
+      .catch((e) => {
+        log("ERROR IN CONCURRENT DBSET", e);
+        resolve(null);
+      });
+    set(dbref2, obj2)
+      .then((res) => {
+        ref2Complete = true;
+        if (ref1Complete) resolve("second");
+      })
+      .catch((e) => {
+        log("ERROR IN CONCURRENT DBSET", e);
+        resolve(null);
+      });
+  });
+}
+
+// subscriptions
 export function subscribeToCustomerMessageNode(customerPhone, callback) {
   let dbRef = ref(RDB, "MESSAGES/" + customerPhone);
-  onValue(
-    dbRef,
-    (snap) => {
-      callback(snap.val());
-    },
-    (e) => {
-      log("ERROR WATCHING REALTIME NODE subscribeToCustomerMessageNode()", e);
+  subscribeToNodeAddition(dbRef, callback);
+}
+
+export function subscribeToWorkorderNode(workorderID, callback) {
+  let dbRef = ref(RDB, "OPEN-WORKORDERS/" + workorderID);
+  return subscribeToNodeAddition(dbRef, callback);
+}
+
+export function subscribeToWorkorders(callback) {
+  let dbRef = ref(RDB, "OPEN-WORKORDERS");
+  subscribeToNodeAddition(dbRef, callback);
+  subscribeToNodeRemoval(dbRef, callback);
+  subscribeToNodeChange(dbRef, callback);
+}
+
+export function subscribeToCustomer(customerID, callback) {
+  let dbRef = ref(RDB, "CUSTOMERS/" + customerID);
+  subscribeToNodeChange(dbRef, callback);
+  subscribeToNodeRemoval(dbRef, callback);
+  subscribeToNodeAddition(dbRef, callback);
+}
+
+export function subscribeToInventory(callback) {
+  let dbRef = ref(RDB, "INVENTORY");
+  subscribeToNodeChange(dbRef, callback);
+  subscribeToNodeRemoval(dbRef, callback);
+  subscribeToNodeAddition(dbRef, callback);
+}
+
+function subscribeToNodeChange(dbRef, callback) {
+  onChildChanged(dbRef, (snap) => {
+    log("incoming child changed event", snap.val());
+    if (snap.val()) {
+      callback("changed", snap.val());
+    } else {
+      log("incoming child changed event nothing in it", snap);
     }
-  );
+  });
+}
+
+function subscribeToNodeRemoval(dbRef, callback) {
+  onChildRemoved(dbRef, (snap) => {
+    log("incoming child REMOVED event", snap.val());
+    if (snap.val()) {
+      callback("removed", snap.val());
+    }
+  });
+}
+
+function subscribeToNodeAddition(dbRef, callback) {
+  onChildAdded(dbRef, (snap) => {
+    log("incoming child ADDED event", snap.val());
+    if (snap.val()) {
+      callback("added", snap.val());
+    }
+  });
+
+  // onValue(
+  //   dbRef,
+  //   (snap) => {
+  //     callback(snap.val());
+  //   },
+  //   (e) => {
+  //     log("ERROR WATCHING REALTIME NODE : " + dbRef + " : ", e);
+  //   }
+  // );
 }
 
 ////// Firebase Function calls ///////////////////////////////////////
+
 export function sendSMS(messageBody) {
   fetch(endpoint, {
     method: "POST",

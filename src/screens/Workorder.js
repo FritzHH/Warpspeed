@@ -49,9 +49,10 @@ import {
   getNewCollectionRef,
   sendSMS,
   setCollectionItem,
+  setCustomer,
   subscribeToCollectionNode,
 } from "../dbCalls";
-import { sendTestMessage, testPayment } from "../testing";
+import { sendTestMessage, testNode, testPayment } from "../testing";
 import { PaymentElement, PaymentElementComponent } from "../PaymentElement";
 // import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
 // import { TabView, SceneMap } from "react-native-tab-view";
@@ -64,6 +65,7 @@ testWorkorder.brand = "brand goes here";
 
 // sendTestMessage();
 // testPayment();
+testNode();
 
 export function WorkorderScreen() {
   const [sInitFlag, _setInitFlag] = React.useState(false);
@@ -99,9 +101,7 @@ export function WorkorderScreen() {
   function setCustomerObj(customerObj, setToDB = true) {
     // log("WORKORDER: setting customer object to this", customerObj);
     _setCustomerObj(customerObj);
-    // log("obj", customerObj);
-    if (setToDB && customerObj.id)
-      setCollectionItem(COLLECTION_NAMES.customers, customerObj);
+    if (setToDB && customerObj.id) setCustomer(customerObj);
   }
 
   function setInventoryItem(item) {

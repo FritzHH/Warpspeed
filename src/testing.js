@@ -2,12 +2,22 @@ import { cloneDeep } from "lodash";
 import {
   COLLECTION_NAMES,
   CUSTOMER_PROTO,
+  INVENTORY_ITEM_PROTO,
   printer_names,
   RECEIPT_TYPES,
   RECEIPT_WORKORDER_PROTO,
   SMS_PROTO,
+  WORKORDER_PROTO,
 } from "./data";
-import { sendSMS, setCollectionItem } from "./dbCalls";
+import {
+  sendSMS,
+  setCollectionItem,
+  setCustomer,
+  setInventoryItem,
+  setOpenWorkorder,
+  setPreferences,
+  subscribeToInventory,
+} from "./dbCalls";
 import { formatDateTime, generateRandomID, log } from "./utils";
 
 export let TEST_CUSTOMER = cloneDeep(CUSTOMER_PROTO);
@@ -56,4 +66,24 @@ export function sendTestMessage() {
   message.canRespond = false;
 
   // sendSMS(message);
+}
+
+export function testNode() {
+  // subscribeToInventory((changeType, val) => {
+  //   log("here is the changed val", val);
+  // });
+  // let wo = { ...WORKORDER_PROTO };
+  // wo.brand = "trek nvvvy";
+  // wo.id = "3434";
+  // setOpenWorkorder(wo);
+  // let invObj = { ...INVENTORY_ITEM_PROTO };
+  // invObj.id = "1334e3";
+  // invObj.name = "cablsfe";
+  // setInventoryItem(invObj);
+  // let cust1 = { ...CUSTOMER_PROTO };
+  // cust1.first = "fritz";
+  // cust1.last = "hieb";
+  // cust1.cell = "12349";
+  // cust1.id = "13343";
+  // setCustomer(cust1).then((res) => log("result", res));
 }

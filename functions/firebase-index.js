@@ -81,9 +81,6 @@ const sendTwilioMessage = (messageObj) => {
 };
 
 exports.sendSMS = onRequest(async (request, response) => {
-  cors(request, response, async () => {});
-});
-exports.sendSMS = onRequest(async (request, response) => {
   cors(request, response, async () => {
     let body = request.body;
     log("Incoming SMS body from APP", body);

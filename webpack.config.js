@@ -38,7 +38,8 @@ const appDirectory = path.resolve(__dirname, "../");
 const babelLoaderConfiguration = {
   test: /\.js$/,
   include: [
-    path.resolve(appDirectory, "index.web.js"),
+    // path.resolve(appDirectory, "index.web.js"),
+    path.resolve(appDirectory, "w-good/src/index.js"),
     path.resolve(appDirectory, "src"),
     path.resolve(appDirectory, "node_modules/react-native-uncompiled"),
   ],
@@ -64,7 +65,8 @@ const imageLoaderConfiguration = {
 };
 
 module.exports = {
-  entry: path.join(appDirectory, "index.web.js"),
+  // entry: path.join(appDirectory, "index.web.js"),
+  entry: path.join(appDirectory, "w-good/src/index.js"),
   output: {
     path: path.resolve(appDirectory, "dist"),
     filename: "bundle.js",

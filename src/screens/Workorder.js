@@ -64,10 +64,6 @@ import {
 
 let height = dim.windowHeight * 1;
 
-let testWorkorder = cloneDeep(WORKORDER_PROTO);
-testWorkorder.color = bike_colors_arr_db[4];
-testWorkorder.brand = "brand goes here";
-
 // sendTestMessage();
 // testPayment();
 // testNode();

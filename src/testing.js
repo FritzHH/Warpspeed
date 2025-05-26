@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import { cloneDeep } from "lodash";
 import {
   COLLECTION_NAMES,

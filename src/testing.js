@@ -76,10 +76,10 @@ export function testNode() {
   // wo.brand = "trek nvvvy";
   // wo.id = "3434";
   // setOpenWorkorder(wo);
-  // let invObj = { ...INVENTORY_ITEM_PROTO };
-  // invObj.id = "1334e3";
-  // invObj.name = "cablsfe";
-  // setInventoryItem(invObj);
+  let invObj = { ...INVENTORY_ITEM_PROTO };
+  invObj.id = "13dddfddsaddddddfdddf3d4adfsdfadfae3";
+  invObj.name = "cablsfe";
+  setInventoryItem(invObj);
   // let cust1 = { ...CUSTOMER_PROTO };
   // cust1.first = "fritz";
   // cust1.last = "hieb";

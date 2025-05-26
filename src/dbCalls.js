@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 
 import {
+  get,
   getDatabase,
   onChildAdded,
   onChildChanged,
@@ -139,9 +140,18 @@ export function subscribeToCollectionNode(collectionName, callback) {
   });
 }
 
+///////////////////////////////////////////////////////////////////////
 ////// Realtime Database calls ////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
 
 // getters
+export function getNodeObject(dbRef) {
+  get(dbRef).then((snap) => {
+    if (snap.exists) return snap.val();
+    return null;
+  });
+}
+
 export function getCustomerMessages(customerPhone) {
   let returnObj = {
     incomingMessages: null,
@@ -195,6 +205,11 @@ export function getCustomerMessages(customerPhone) {
         );
       });
   });
+}
+
+export async function getInventory() {
+  let dbRef = ref(RDB, "INVENTORY");
+  return getNodeObject(dbRef);
 }
 
 // setters
@@ -257,43 +272,27 @@ function concurrentDBSet(dbref1, obj1, dbref2, obj2) {
   });
 }
 
-// subscriptions
-export function subscribeToCustomerMessageNode(customerPhone, callback) {
-  let dbRef = ref(RDB, "MESSAGES/" + customerPhone);
-  subscribeToNodeAddition(dbRef, callback);
-}
-
-export function subscribeToWorkorderNode(workorderID, callback) {
-  let dbRef = ref(RDB, "OPEN-WORKORDERS/" + workorderID);
-  return subscribeToNodeAddition(dbRef, callback);
-}
-
-export function subscribeToWorkorders(callback) {
-  let dbRef = ref(RDB, "OPEN-WORKORDERS");
-  subscribeToNodeAddition(dbRef, callback);
-  subscribeToNodeRemoval(dbRef, callback);
-  subscribeToNodeChange(dbRef, callback);
-}
-
-export function subscribeToCustomer(customerID, callback) {
-  let dbRef = ref(RDB, "CUSTOMERS/" + customerID);
-  subscribeToNodeChange(dbRef, callback);
-  subscribeToNodeRemoval(dbRef, callback);
-  subscribeToNodeAddition(dbRef, callback);
-}
-
-export function subscribeToInventory(callback) {
-  let dbRef = ref(RDB, "INVENTORY");
-  subscribeToNodeChange(dbRef, callback);
-  subscribeToNodeRemoval(dbRef, callback);
-  subscribeToNodeAddition(dbRef, callback);
+// subscriptions /////////////////////////////////////////////////////
+export function subscribeToNode(nodePath, callback) {
+  let dbRef = ref(RDB, nodePath);
+  let childChanged, childAdded, childRemoved;
+  return new Promise(async (resolve, reject) => {
+    childChanged = await subscribeToNodeChange(dbRef, callback);
+    childAdded = await subscribeToNodeAddition(dbRef, callback);
+    childRemoved = await subscribeToNodeRemoval(dbRef, callback);
+    resolve({
+      childChanged,
+      childAdded,
+      childRemoved,
+    });
+  });
 }
 
 function subscribeToNodeChange(dbRef, callback) {
   onChildChanged(dbRef, (snap) => {
-    log("incoming child changed event", snap.val());
+    // log("incoming child CHANGED event", snap.val());
     if (snap.val()) {
-      callback("changed", snap.val());
+      callback("changed", snap.key, snap.val());
     } else {
       log("incoming child changed event nothing in it", snap);
     }
@@ -302,30 +301,20 @@ function subscribeToNodeChange(dbRef, callback) {
 
 function subscribeToNodeRemoval(dbRef, callback) {
   onChildRemoved(dbRef, (snap) => {
-    log("incoming child REMOVED event", snap.val());
+    // log("incoming child REMOVED event", snap.val());
     if (snap.val()) {
-      callback("removed", snap.val());
+      callback("removed", snap.key, snap.val());
     }
   });
 }
 
 function subscribeToNodeAddition(dbRef, callback) {
   onChildAdded(dbRef, (snap) => {
-    log("incoming child ADDED event", snap.val());
+    // log("incoming child ADDED event", snap.val());
     if (snap.val()) {
-      callback("added", snap.val());
+      callback("added", snap.key, snap.val());
     }
   });
-
-  // onValue(
-  //   dbRef,
-  //   (snap) => {
-  //     callback(snap.val());
-  //   },
-  //   (e) => {
-  //     log("ERROR WATCHING REALTIME NODE : " + dbRef + " : ", e);
-  //   }
-  // );
 }
 
 ////// Firebase Function calls ///////////////////////////////////////

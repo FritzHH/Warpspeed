@@ -471,7 +471,7 @@ export const bike_descriptions_db = [
   "Cruiser",
   "Road Bike",
 ];
-export const part_sources_db = ["JBI", "QBP", "Amazon", "Ebay"];
+export const part_sources_db = ["JBI", "QBP", "Amazon", "Ebay", "Customer"];
 
 export let bike_colors_arr_db = [
   {

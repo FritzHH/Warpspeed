@@ -54,6 +54,11 @@ import {
 } from "../dbCalls";
 import { sendTestMessage, testNode, testPayment } from "../testing";
 import { PaymentElement, PaymentElementComponent } from "../PaymentElement";
+import {
+  customerSubscribe,
+  inventoryPull,
+  inventorySubscribe,
+} from "../data_transfer";
 // import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
 // import { TabView, SceneMap } from "react-native-tab-view";
 
@@ -65,14 +70,14 @@ testWorkorder.brand = "brand goes here";
 
 // sendTestMessage();
 // testPayment();
-testNode();
+// testNode();
 
 export function WorkorderScreen() {
   const [sInitFlag, _setInitFlag] = React.useState(false);
   const [sCustomerObj, _setCustomerObj] = React.useState(CUSTOMER_PROTO);
   const [sWorkorderObj, _setWorkorderObj] = React.useState(WORKORDER_PROTO);
   const [sWorkordersArr, _setWorkordersArr] = React.useState([]);
-  const [sCustomersArr, _setCustomersArr] = React.useState([]);
+  const [sCustomersPreviewArr, _setCustomersPreviewArr] = React.useState([]);
   const [sShowUserPinInputBox, _setShowUserPinInputBox] = React.useState(false);
   const [sCustomerSearchArr, _setCustomerSearchArr] = React.useState([]);
   const [sSelectedCustomerSearchItem, _setSelectedCustomerSearchItem] =
@@ -163,7 +168,7 @@ export function WorkorderScreen() {
     // log("obj", workorderObj);
     _setWorkorderObj(workorderObj);
     _setCustomerObj(
-      sCustomersArr.find((obj) => obj.id === workorderObj.customerID)
+      sCustomersPreviewArr.find((obj) => obj.id === workorderObj.customerID)
     );
     setCollectionItem(COLLECTION_NAMES.openWorkorders, workorderObj);
   }
@@ -191,11 +196,7 @@ export function WorkorderScreen() {
   }
 
   // side effects (db calls) ///////////////////////////////////
-  async function getAllCustomersArrFromDB() {
-    let customersArr = await getCollection(COLLECTION_NAMES.customers);
-    // log("WORKORDER: customers from db", customersArr);
-    _setCustomersArr(customersArr);
-  }
+  async function getAllCustomersArrFromDB() {}
 
   async function getWorkordersFromDB(type = "open") {
     let collectionName;
@@ -209,28 +210,21 @@ export function WorkorderScreen() {
     _setWorkordersArr(workordersArr);
   }
 
-  async function setDBListeners() {
-    let workordersCallback = (workordersArr) => {
-      _setWorkordersArr(workordersArr);
-      // log("WORKORDER: incoming snapshot db workorders arr", workordersArr);
-    };
-    // let customersCallback = () => getAllCustomersArrFromDB();
-    subscribeToCollectionNode(
-      COLLECTION_NAMES.openWorkorders,
-      workordersCallback
-    );
-    // subscribeToCollectionNode(COLLECTION_NAMES.customers, customersCallback);
-  }
+  async function setDBListeners() {}
 
   // init function runs once until refresh //////////////////////
   // need to change to useEffect ///////////////////////////////
 
   function initialize() {
     if (!sInitFlag) {
+      // inventorySubscribe(sInventoryArr, _setInventoryArr);
+      customerSubscribe(
+        { ...CUSTOMER_PROTO, id: "13343" },
+        sCustomersPreviewArr,
+        setCustomerObj,
+        _setCustomersPreviewArr
+      );
       _setInitFlag(true);
-      getAllCustomersArrFromDB();
-      // getWorkordersFromDB();
-      setDBListeners();
     }
   }
   initialize();
@@ -262,7 +256,7 @@ export function WorkorderScreen() {
               ssCustomerObj={sCustomerObj}
               ssWorkorderObj={sWorkorderObj}
               ssSelectedCustomerSearchItem={sSelectedCustomerSearchItem}
-              ssCustomersArr={sCustomersArr}
+              ssCustomersArr={sCustomersPreviewArr}
               ssInfoComponentName={sInfoComponentName}
               __setInfoComponentName={(data) =>
                 _setInfoComponentName(cloneDeep(data))

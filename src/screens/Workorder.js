@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -48,17 +48,44 @@ import {
   getCollectionItem,
   getNewCollectionRef,
   sendSMS,
-  setCollectionItem,
+  setFirestoreCollectionItem,
   setCustomer,
   subscribeToCollectionNode,
-} from "../dbCalls";
-import { sendTestMessage, testNode, testPayment } from "../testing";
+  subscribeToNodeAddition,
+  subscribeToNodeChange,
+  subscribeToNodeRemoval,
+} from "../db";
+import {
+  fillCustomers,
+  fillInventory,
+  fillOpenWorkorders,
+  sendTestMessage,
+  testNode,
+  testPayment,
+} from "../testing";
 import { PaymentElement, PaymentElementComponent } from "../PaymentElement";
 import {
+  customerPreviewListSubscribe,
   customerSubscribe,
   inventoryPull,
   inventorySubscribe,
-} from "../data_transfer";
+  openWorkordersSubscribe,
+  removeCustomerSub,
+  removeInventorySub,
+} from "../db_subscriptions";
+import {
+  useCustomerPreviewStore,
+  useCustomerStore,
+  useInventoryStore,
+  useOpenWorkorderStore,
+} from "../stores";
+import {
+  get,
+  getDatabase,
+  onChildAdded,
+  onChildChanged,
+  ref,
+} from "firebase/database";
 // import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
 // import { TabView, SceneMap } from "react-native-tab-view";
 
@@ -68,7 +95,37 @@ let height = dim.windowHeight * 1;
 // testPayment();
 // testNode();
 
+let customerSub;
+
 export function WorkorderScreen() {
+  const _zAddWorkorder = useOpenWorkorderStore((state) => state.addItem);
+  const _zChangeWorkorder = useOpenWorkorderStore((state) => state.changeItem);
+  const _zRemoveWorkorder = useOpenWorkorderStore((state) => state.removeItem);
+  const _zAddInventoryItem = useInventoryStore((state) => state.addItem);
+  const _zChangeInventoryItem = useInventoryStore((state) => state.changeItem);
+  const _zRemoveInventoryItem = useInventoryStore((state) => state.removeItem);
+  // const _zAddCustPreview = useCustomerPreviewStore((state) => state.addItem);
+  // const _zChangeCustPreview = useCustomerPreviewStore(
+  //   (state) => state.changeItem
+  // );
+  // const _zRemoveCustPreview = useCustomerPreviewStore(
+  //   (state) => state.removeItem
+  // );
+  const _zModCustPreviewItem = useCustomerPreviewStore(
+    (state) => state.modItem
+  );
+  const _zSetCustomerObj = useCustomerStore((state) => state.setCustomerObj);
+  const zWorkorderArr = useOpenWorkorderStore((state) =>
+    state.getWorkorderArr()
+  );
+  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  // const zCustPreviewArr = useCustomerPreviewStore((state) =>
+  //   state.getPreviewArr()
+  // );
+  const zCustomerObj = useCustomerStore((state) => state.getCustomerObj());
+  //////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////
+
   const [sInitFlag, _setInitFlag] = React.useState(false);
   const [sCustomerObj, _setCustomerObj] = React.useState(CUSTOMER_PROTO);
   const [sWorkorderObj, _setWorkorderObj] = React.useState(WORKORDER_PROTO);
@@ -83,7 +140,7 @@ export function WorkorderScreen() {
   );
   const [sAdjustableUserPreferences, _setAdjustableUserPreferences] =
     React.useState(DEFAULT_USER_PREFERENCES);
-  const [sInventoryArr, _setInventoryArr] = React.useState(test_inventory);
+  const [sInventoryArr, _setInventoryArr] = React.useState([]);
   const [sWorkorderPreviewObj, _setWorkorderPreviewObj] = useState(null);
   const [sMessagesArr, _setMessagesArr] = useState([]);
   ////////////////// tab selections ///////////////////////////
@@ -91,7 +148,7 @@ export function WorkorderScreen() {
     TAB_NAMES.itemsTab.dashboard
   );
   const [sOptionsTabName, _setOptionsTabName] = React.useState(
-    TAB_NAMES.optionsTab.messages
+    TAB_NAMES.optionsTab.workorders
   );
   const [sInfoComponentName, _setInfoComponentName] = React.useState(
     INFO_COMPONENT_NAMES.phoneNumberEntry
@@ -99,11 +156,7 @@ export function WorkorderScreen() {
 
   //setter functions for db and state  ///////////////////////
 
-  function setCustomerObj(customerObj, setToDB = true) {
-    // log("WORKORDER: setting customer object to this", customerObj);
-    _setCustomerObj(customerObj);
-    if (setToDB && customerObj.id) setCustomer(customerObj);
-  }
+  function setCustomerObj(customerObj, setToDB = true) {}
 
   function setInventoryItem(item) {
     // log("WORKORDER: setting inventory item", item);
@@ -118,7 +171,7 @@ export function WorkorderScreen() {
         invItem.id === item.id ? item : invItem
       );
     }
-    setCollectionItem(COLLECTION_NAMES.inventory, item);
+    setFirestoreCollectionItem(COLLECTION_NAMES.inventory, item);
     _setInventoryArr(newInvArr);
   }
 
@@ -166,7 +219,7 @@ export function WorkorderScreen() {
     _setCustomerObj(
       sCustomersPreviewArr.find((obj) => obj.id === workorderObj.customerID)
     );
-    setCollectionItem(COLLECTION_NAMES.openWorkorders, workorderObj);
+    setFirestoreCollectionItem(COLLECTION_NAMES.openWorkorders, workorderObj);
   }
 
   function createNewCustomer(customerObj) {
@@ -174,7 +227,7 @@ export function WorkorderScreen() {
     let ref = getNewCollectionRef(COLLECTION_NAMES.customers);
     customerObj.id = ref.id;
     _setCustomerObj(customerObj);
-    setCollectionItem(COLLECTION_NAMES.customers, customerObj);
+    setFirestoreCollectionItem(COLLECTION_NAMES.customers, customerObj);
     _setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
     _setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
@@ -191,35 +244,19 @@ export function WorkorderScreen() {
     _setWorkorderObj(newWorkorder);
   }
 
-  // side effects (db calls) ///////////////////////////////////
-  async function getAllCustomersArrFromDB() {}
+  useEffect(() => {
+    openWorkordersSubscribe(_zModCustPreviewItem);
+    inventorySubscribe(_zModCustPreviewItem);
+    customerPreviewListSubscribe(_zModCustPreviewItem);
+  }, []);
 
-  async function getWorkordersFromDB(type = "open") {
-    let collectionName;
-    if (type == "open") {
-      collectionName = COLLECTION_NAMES.openWorkorders;
-    } else {
-      collectionName = COLLECTION_NAMES.closedWorkorders;
-    }
-    let workordersArr = await getCollection(collectionName);
-    // log("workorders from db", workordersArr);
-    _setWorkordersArr(workordersArr);
-  }
-
-  async function setDBListeners() {}
-
-  // init function runs once until refresh //////////////////////
-  // need to change to useEffect ///////////////////////////////
-
-  function initialize() {
+  async function initialize() {
     if (!sInitFlag) {
-      // inventorySubscribe(sInventoryArr, _setInventoryArr);
-      customerSubscribe(
-        { ...CUSTOMER_PROTO, id: "13343" },
-        sCustomersPreviewArr,
-        setCustomerObj,
-        _setCustomersPreviewArr
-      );
+      // customerSubscribe("BZb60oVQWhZ7g3cufwp4", _zCustomerObj);
+      // fillCustomers();
+      // global.sub = customerSub;
+      // fillInventory();
+      // fillOpenWorkorders();
       _setInitFlag(true);
     }
   }
@@ -235,6 +272,16 @@ export function WorkorderScreen() {
     >
       {/* <PaymentElementComponent amount={200} />F */}
       <View style={{ height: height, width: "64%" }}>
+        <Button
+          title="test"
+          onPress={() => {
+            removeCustomerSub();
+            // customerSub();
+            // fillOpenWorkorders();
+            // removeCustomerSub();
+            // removeInventorySub();
+          }}
+        />
         <View
           style={{
             width: "100%",
@@ -253,6 +300,7 @@ export function WorkorderScreen() {
               ssWorkorderObj={sWorkorderObj}
               ssSelectedCustomerSearchItem={sSelectedCustomerSearchItem}
               ssCustomersArr={sCustomersPreviewArr}
+              // zCustPreviewArr={zCustPreviewArr}
               ssInfoComponentName={sInfoComponentName}
               __setInfoComponentName={(data) =>
                 _setInfoComponentName(cloneDeep(data))
@@ -282,6 +330,7 @@ export function WorkorderScreen() {
               ssCustomerObj={sCustomerObj}
               ssWorkorderObj={sWorkorderObj}
               ssCustomerSearchArr={sCustomerSearchArr}
+              // zCustPreviewArr={zCustPreviewArr}
               ssWorkorderPreviewObj={sWorkorderPreviewObj}
               ssInventoryArr={sInventoryArr}
               __setItemsTabName={(data) => _setItemsTabName(cloneDeep(data))}
@@ -323,8 +372,10 @@ export function WorkorderScreen() {
         <Options_Section
           ssWorkorderObj={sWorkorderObj}
           ssOptionsTabName={sOptionsTabName}
-          ssWorkordersArr={sWorkordersArr}
-          ssInventoryArr={sInventoryArr}
+          // ssWorkordersArr={sWorkordersArr}
+          ssWorkordersArr={zWorkorderArr}
+          // ssInventoryArr={sInventoryArr}
+          ssInventoryArr={zInventoryArr}
           ssMessagesArr={sMessagesArr}
           ssAdjustableUserPreferences={sAdjustableUserPreferences}
           __setMessagesArr={setMessagesArr}

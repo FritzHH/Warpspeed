@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
-import { getNewCollectionRef } from "./dbCalls";
+import { getNewCollectionRef } from "./db";
 import { COLLECTION_NAMES, CUSTOMER_PROTO } from "./data";
 
 export function log(one, two) {
@@ -228,6 +228,18 @@ export function searchArray(
       });
     });
   });
+}
+
+export function arrayAddObjCheckForDupes(arr, arrKey, obj, objKey) {
+  let found = arr.find((o) => o[arrKey] === obj[objKey]);
+  if (!found) {
+    arr.push(obj);
+  }
+  return arr;
+}
+
+export function checkArr(arr, obj) {
+  return arr.find((o) => o.id === obj.id);
 }
 
 export function combine2ArraysOrderByMillis(arr1, arr2) {

@@ -2,6 +2,9 @@
 
 import { cloneDeep } from "lodash";
 import {
+  bike_brands_db,
+  bike_colors_db,
+  bike_descriptions_db,
   COLLECTION_NAMES,
   CUSTOMER_PROTO,
   INVENTORY_ITEM_PROTO,
@@ -13,14 +16,16 @@ import {
 } from "./data";
 import {
   sendSMS,
-  setCollectionItem,
+  setFirestoreCollectionItem,
   setCustomer,
   setInventoryItem,
   setOpenWorkorder,
   setPreferences,
   subscribeToInventory,
-} from "./dbCalls";
+} from "./db";
 import { formatDateTime, generateRandomID, log } from "./utils";
+import { customerSubscribe } from "./db_subscriptions";
+import { dbSetCustomerObj } from "./db_calls";
 
 export let TEST_CUSTOMER = cloneDeep(CUSTOMER_PROTO);
 TEST_CUSTOMER.first = "Jim";
@@ -53,7 +58,7 @@ export function sendTestCollectionItem() {
   proto.receiptType = RECEIPT_TYPES.workorder;
   proto.location = printer_names.left;
   // log("proto", proto);
-  setCollectionItem(COLLECTION_NAMES.printers, proto, true);
+  setFirestoreCollectionItem(COLLECTION_NAMES.printers, proto, true);
 }
 
 export function sendTestMessage() {
@@ -70,6 +75,40 @@ export function sendTestMessage() {
   // sendSMS(message);
 }
 
+export function fillInventory() {
+  for (let i = 0; i <= 5; i++) {
+    let inv = { ...INVENTORY_ITEM_PROTO, id: generateRandomID() };
+    inv.name = "Test Item Name";
+    (inv.price = 2.49), (inv.catLocation = "Sales Floor");
+    setInventoryItem(inv);
+  }
+}
+
+export function fillOpenWorkorders() {
+  for (let i = 0; i <= 3; i++) {
+    let wo = { ...WORKORDER_PROTO, id: generateRandomID() };
+    wo.brand = bike_brands_db.brands1[i];
+    wo.color = bike_colors_db[i];
+    wo.customerID = i.toString();
+    wo.description = bike_descriptions_db[i];
+    wo.startedBy = "Test User";
+    wo.status = { name: "Service", id: "343343", position: 0 };
+    setOpenWorkorder(wo);
+  }
+}
+
+export function fillCustomers() {
+  for (let i = 5; i <= 8; i++) {
+    let cust = { ...CUSTOMER_PROTO };
+    cust.id = generateRandomID();
+    cust.first = "test first" + i;
+    cust.last = "test last " + i;
+    cust.cell = "111111111" + i;
+    cust.city = "test city " + i;
+    dbSetCustomerObj(cust);
+  }
+}
+
 export function testNode() {
   // subscribeToInventory((changeType, val) => {
   //   log("here is the changed val", val);
@@ -78,14 +117,17 @@ export function testNode() {
   // wo.brand = "trek nvvvy";
   // wo.id = "3434";
   // setOpenWorkorder(wo);
-  let invObj = { ...INVENTORY_ITEM_PROTO };
-  invObj.id = "13dddfddsaddddddfdddf3d4adfsdfadfae3";
-  invObj.name = "cablsfe";
-  setInventoryItem(invObj);
-  // let cust1 = { ...CUSTOMER_PROTO };
-  // cust1.first = "fritz";
-  // cust1.last = "hieb";
-  // cust1.cell = "12349";
-  // cust1.id = "13343";
+
+  // let invObj = { ...INVENTORY_ITEM_PROTO };
+  // invObj.id = "13dddfddsaddddddfdddf3d4adfsdfadfae3";
+  // invObj.name = "cablsfe";
+  // setInventoryItem(invObj);
+
+  let cust1 = { ...CUSTOMER_PROTO };
+  cust1.first = "fritz";
+  cust1.last = "hieb";
+  cust1.cell = "1111111114";
+  cust1.id = "vpgJGrwyer1lJYmwUDPM";
   // setCustomer(cust1).then((res) => log("result", res));
+  // customerSubscribe(cust1, (obj) => log("obj", obj));
 }

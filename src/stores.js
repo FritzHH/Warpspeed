@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { INVENTORY_ITEM_PROTO } from "./data";
-import { log } from "./utils";
+import { checkArr, log, searchPhoneNum } from "./utils";
 
+// components /////////////////////////////////////////////////////
 export const useInvModalStore = create((set, get) => ({
   currentFocusName: null,
   item: { ...INVENTORY_ITEM_PROTO },
@@ -12,7 +13,7 @@ export const useInvModalStore = create((set, get) => ({
     }));
   },
   setItem: (item) => {
-    log("setting item in zStore", item);
+    // log("setting item in zStore", item);
     set((state) => ({ item: { ...item } }));
   },
   getItem: () => {
@@ -32,3 +33,156 @@ export const useInvModalStore = create((set, get) => ({
     }));
   },
 }));
+
+export const useTabNamesStore = create((set, get) => ({
+  itemsTabName: "",
+  optionsTabName: "",
+  infoTabName: "",
+  getItemsTabName: () => get().itemsTabName,
+  getOptionsTabName: () => get().optionsTabName,
+  getInfoTabName: () => get().infoTabName,
+  setTabName: (name, option) => {
+    if (option === "items") return set((state) => ({ itemsTabName: name }));
+  },
+}));
+
+export const useCustomerSearchStore = create((set, get) => ({
+  searchTerm: "",
+  selectedItem: null,
+  searchResultsArr: [],
+  getSearchTerm: () => get().searchTerm,
+  getSearchResultsArr: () => get().searchResultsArr,
+  getSelectedItem: () => get().selectedItem,
+  setSelectedItem: (item) => {
+    set((state) => ({
+      selectedItem: item,
+    }));
+  },
+  setSearchTerm: (term) => {
+    set((state) => ({ searchTerm: term }));
+  },
+  setSearchResultsArr: (arr) => {
+    set((state) => ({ searchResultsArr: arr }));
+  },
+  reset: () => {
+    set((state) => ({ searchTerm: "" }));
+    set((state) => ({ searchResultsArr: [] }));
+    set((state) => ({ selectedItem: null }));
+  },
+}));
+
+// from database //////////////////////////////////////////////////
+export const useCustomerPreviewStore = create((set, get) => ({
+  previewArr: [],
+  getCustPreviewArr: () => get().previewArr,
+  modItem: (item, option) => {
+    if (option === "change")
+      return set((state) => ({
+        previewArr: changeItem(get().previewArr, item),
+      }));
+    if (option === "add")
+      return set((state) => ({
+        previewArr: addItem(get().previewArr, item),
+      }));
+    if (option === "remove")
+      return set((state) => ({
+        previewArr: removeItem(get().previewArr, item),
+      }));
+  },
+}));
+
+export const useCustomerStore = create((set, get) => ({
+  customerObj: {},
+  getCustomerObj: () => get().customerObj,
+  setCustomerObj: (obj) => {
+    set((state) => ({ customerObj: obj }));
+  },
+}));
+
+export const useInventoryStore = create((set, get) => ({
+  inventoryArr: [],
+  getInventoryArr: () => get().inventoryArr,
+  modItem: (item, option) => {
+    if (option === "change")
+      return set((state) => ({
+        inventoryArr: changeItem(get().inventoryArr, item),
+      }));
+    if (option === "add")
+      return set((state) => ({
+        inventoryArr: addItem(get().inventoryArr, item),
+      }));
+    if (option === "remove")
+      return set((state) => ({
+        inventoryArr: removeItem(get().inventoryArr, item),
+      }));
+  },
+  changeItem: (newItem) => {
+    set((state) => ({
+      inventoryArr: changeItem(get().inventoryArr, newItem),
+    }));
+  },
+  addItem: (newItem) => {
+    set((state) => ({
+      inventoryArr: addItem(get().inventoryArr, newItem),
+    }));
+  },
+  removeItem: (oldItem) => {
+    set((state) => ({
+      inventoryArr: removeItem(get().inventoryArr, oldItem),
+    }));
+  },
+}));
+
+export const useOpenWorkorderStore = create((set, get) => ({
+  workorderArr: [],
+  getWorkorderArr: () => get().workorderArr,
+  setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
+  modItem: (item, option) => {
+    if (option === "change")
+      return set((state) => ({
+        workorderArr: changeItem(get().workorderArr, item),
+      }));
+    if (option === "add")
+      return set((state) => ({
+        workorderArr: addItem(get().workorderArr, item),
+      }));
+    if (option === "remove")
+      return set((state) => ({
+        workorderArr: removeItem(get().workorderArr, item),
+      }));
+  },
+}));
+
+export const useCustMessagesStore = create((set, get) => ({
+  incomingMessagesArr: [],
+  outgoingMessagesArr: [],
+  getIncomingMessagesArr: () => get().incomingMessagesArr,
+  getOutgoingMessagesArr: () => get().outgoingMessagesArr,
+  setIncomingMessage: (obj) => {
+    let messages = get().incomingMessagesArr;
+    if (checkArr(messages, obj)) return;
+    set((state) => ({ incomingMessagesArr: [...messages, obj] }));
+  },
+  setOutgoingMessage: (obj) => {
+    let messages = get().outgoingMessagesArr;
+    if (checkArr(messages, obj)) return;
+    set((state) => ({ outgoingMessagesArr: [...messages, obj] }));
+  },
+}));
+
+/// internal functions ///////////////////////////////////////////
+function changeItem(arr, item) {
+  return arr.map((o) => (o.id === item.id ? item : o));
+}
+
+function addItem(arr, item) {
+  let foundItem = arr.find((o) => o.id === item.id);
+  if (foundItem) return arr;
+  return [...arr, item];
+
+  // return arr.find((o) => o.id === item.id);
+}
+
+function removeItem(arr, item) {
+  return arr.filter((o) => o.id !== item.id);
+}

@@ -38,6 +38,7 @@ import {
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
+import { useOpenWorkorderStore } from "../../stores";
 
 export function WorkordersComponent({
   ssWorkordersArr,
@@ -47,14 +48,24 @@ export function WorkordersComponent({
   __setInfoComponentName,
 }) {
   const [sAllowPreview, _setAllowPreview] = useState(true);
-
+  // const [zWorkorderArr] = useOpenWorkorderStore((state) => state.get());
   //////////////////////////////////
   //// functions
   /////////////////////////////////
 
   //////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////
+  // log("store", zWorkorderArr);
   // log("arr", ssWorkordersArr);
+
+  useEffect(() => {
+    // log("use effect workorders component");
+
+    return () => {
+      // log("closing it");
+    };
+  }, []);
+
   return (
     <View
       style={{

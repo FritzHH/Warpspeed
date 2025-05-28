@@ -38,13 +38,19 @@ import {
 } from "../../data";
 import React, { useEffect, useState } from "react";
 import { cloneDeep } from "lodash";
-
+import { useCustomerPreviewStore, useCustomerSearchStore } from "../../stores";
+const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
+const NUMS = "1234567890-";
 export function CustomerInfoScreenComponent({
   ssCustomersArr,
   __createNewCustomer,
   __setCustomerSearchArr,
   __setItemsTabName,
 }) {
+  const zCustomerSearchTerm = useCustomerSearchStore((state) =>
+    state.getSearchTerm()
+  );
+  //////////////////////////////////////////////////////////////////////
   const [sBox1Val, _setBox1Val] = React.useState("");
   const [sBox2Val, _setBox2Val] = React.useState("");
   const [sSearchingByName, _setSearchingByName] = React.useState(false);
@@ -62,8 +68,7 @@ export function CustomerInfoScreenComponent({
   }, []);
 
   /////////////////
-  const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
-  const NUMS = "1234567890-";
+
   ///////////////////////
   // button press handlers
   ///////////////////////

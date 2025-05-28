@@ -3,6 +3,24 @@
 // import { getNewCollectionRef } from "./dbCalls";
 import { formatDateTime, generateRandomID, log } from "./utils";
 
+////////// bootstrap prototypes
+export const USER = {
+  id: "",
+  preferences: [],
+  quickButtons: [],
+};
+
+export const SETTINGS = {
+  quickButtons: [],
+  // brands: { ...bike_brands_db },
+  // optionalBrands: [...],
+  // orderingSources: [...part_sources_db],
+  // colors: { ...bike_colors_arr_db },
+  // descriptions: [...bike_descriptions_db],
+  // printerNames: [...printer_names],
+  // discounts: [...discounts_db],
+};
+
 /////////// object prototypes
 export const ALERT_BOX_PROTO = {
   message: "",
@@ -148,7 +166,6 @@ export const RECEIPT_PROTO = {
 
 export const INVENTORY_ITEM_PROTO = {
   name: "",
-  quickItemName: "",
   price: 0,
   salePrice: 0,
   catMain: "",
@@ -423,8 +440,8 @@ export const FOCUS_NAMES = {
 
 ///////// variables to import from DB ///////////////////////////////
 export const workorder_status = [
-  { name: "Service", id: "343343" },
-  { name: "Finished", id: "343343312" },
+  { name: "Service", id: "343343", position: 0 },
+  { name: "Finished", id: "343343312", position: 1 },
 ];
 export const printer_names = {
   left: "Left Desk Printer",

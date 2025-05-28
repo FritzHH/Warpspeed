@@ -42,8 +42,8 @@ import { initializeApp } from "firebase/app";
 import {
   getCollectionItem,
   getNewCollectionRef,
-  setCollectionItem,
-} from "../../dbCalls";
+  setFirestoreCollectionItem,
+} from "../../db";
 
 import { CustomerInfoScreenComponent } from "../screen_components/Info_CustomerInfoComponent";
 import React from "react";

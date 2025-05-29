@@ -1,6 +1,8 @@
 import { CUSTOMER_PREVIEW_PROTO } from "./data";
 import {
   getCollectionItem,
+  getNodeObject,
+  getRealtimeNodeItem,
   setFirestoreCollectionItem,
   setRealtimeNodeItem,
 } from "./db";
@@ -38,6 +40,10 @@ export function dbSetSaleItem(item) {
 // getters ///////////////////////////////////////////////////////////
 export function dbGetClosedWorkorderItem(id) {
   return getCollectionItem("CLOSED-WORKORDERS", id);
+}
+
+export function dbGetOpenWorkorderItem(id) {
+  return getRealtimeNodeItem("OPEN-WORKORDERS/" + id);
 }
 
 export function dbGetSaleItem(id) {

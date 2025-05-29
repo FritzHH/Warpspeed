@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import {
   View,
   Text,
@@ -19,71 +21,64 @@ import {
 import { Colors } from "../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
+import { useCurrentUserStore, useCurrentWorkorderStore } from "../../stores";
+import { WORKORDER_PROTO } from "../../data";
+import { dbSetOpenWorkorderItem } from "../../db_calls";
 
 /// Notes Tab Component
+export function Notes_MainComponent() {
+  const zCurrentUser = useCurrentUserStore((state) => state.getCurrentUser());
+  const zWorkorderObj = useCurrentWorkorderStore((state) =>
+    state.getWorkorderObj()
+  );
+  ///
+  const _zSetWorkorderObj = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
 
-let name = "(Fritz) ";
-let notesArr = [];
-let notesObj = { name: "", val: "", time: "" };
-notesArr[0] = {
-  ...notesObj,
-  name: "Fritz",
-  val: name + "hello sir",
-  time: new Date().getTime(),
-};
-notesArr[1] = {
-  ...notesObj,
-  name: "Fritz",
-  val: name + "gday sir",
-  time: new Date().getTime(),
-};
-export const Notes_MainComponent = ({
-  ssCurrentUser,
-  ssWorkorderObj,
-  __setWorkorderObj,
-}) => {
-  // log("workorder", ssWorkorderObj);
+  if (!zWorkorderObj.customerNotes)
+    _zSetWorkorderObj({ ...zWorkorderObj, customerNotes: [] });
+  if (!zWorkorderObj.internalNotes)
+    _zSetWorkorderObj({ ...zWorkorderObj, internalNotes: [] });
+  /////////////////////////////////////////////////////////////////////////////////
   const [customerNotesHeight, setCustomerNotesHeight] = useState([25]); // Initial height
   const [internalNotesHeight, setInternalNotesHeight] = useState([20]); // Initial height
-  // log("ss", ssWorkorderObj);
+  // log(zWorkorderObj);
   function customerOutsideClicked() {
-    let notesArr = ssWorkorderObj.notes.customerNotes;
-    notesArr.push({ ...notesObj, name: name, val: name });
-    ssWorkorderObj.notes.customerNotes = notesArr;
-    __setWorkorderObj(ssWorkorderObj);
+    let newObj = { ...zWorkorderObj };
+    let notesArr = newObj.customerNotes;
+    notesArr.push("");
+    newObj.customerNotes = notesArr;
+    _zSetWorkorderObj(newObj);
+    dbSetOpenWorkorderItem(newObj);
   }
 
   function deleteCustomerItem(item, index) {
-    // log("deleting", index);
-    let arr = ssWorkorderObj.notes.customerNotes.filter(
+    let newObj = { ...zWorkorderObj };
+    let arr = zWorkorderObj.customerNotes.filter(
       (item, index1) => index != index1
     );
-    ssWorkorderObj.notes.customerNotes = arr;
-    __setWorkorderObj(ssWorkorderObj);
-    // let arr = ssWorkorderObj
+    newObj.customerNotes = arr;
+    _zSetWorkorderObj(newObj);
+    dbSetOpenWorkorderItem(newObj);
   }
 
   function customerTextChanged(newVal, index) {
-    // log("incoming", newVal);
-    let prevItem = ssWorkorderObj.notes.customerNotes[index];
-    if (
-      newVal.length > prevItem.val.length &&
-      newVal.startsWith(prevItem.val)
-    ) {
+    let newObj = { ...zWorkorderObj };
+    let prevItem = newObj.customerNotes[index];
+    if (newVal.length > prevItem.length && newVal.startsWith(prevItem)) {
       // log("added");
-      prevItem.val = newVal;
-    } else if (
-      newVal.length < prevItem.val.length &&
-      prevItem.val.startsWith(newVal)
-    ) {
-      if (!newVal.startsWith("(" + ssCurrentUser.first + ") ")) {
-        prevItem.val = "(" + ssCurrentUser.first + ") ";
+      prevItem = newVal;
+    } else if (newVal.length < prevItem.length && prevItem.startsWith(newVal)) {
+      if (!newVal.startsWith("(" + zCurrentUser.first + ") ")) {
+        prevItem = "(" + zCurrentUser.first + ") ";
       } else {
-        prevItem.val = newVal;
+        prevItem = newVal;
       }
     }
-
-    __setWorkorderObj(ssWorkorderObj);
+    newObj.customerNotes[index] = prevItem;
+    _zSetWorkorderObj(newObj);
+    dbSetOpenWorkorderItem(newObj);
   }
 
   const handleCustomerContentSizeChange = (event, index) => {
@@ -119,46 +114,46 @@ export const Notes_MainComponent = ({
   };
 
   function internalOutsideClicked() {
-    let notesArr = ssWorkorderObj.notes.internalNotes;
-    notesArr.push({ ...notesObj, name: name, val: name });
-    ssWorkorderObj.notes.internalNotes = notesArr;
-    __setWorkorderObj(ssWorkorderObj);
+    let newObj = { ...zWorkorderObj };
+    let notesArr = newObj.internalNotes;
+    notesArr.push("");
+    newObj.internalNotes = notesArr;
+    _zSetWorkorderObj(newObj);
+    dbSetOpenWorkorderItem(newObj);
   }
 
   function deleteInternalItem(item, index) {
     // log("deleting", index);
-    let arr = ssWorkorderObj.notes.internalNotes.filter(
-      (item, index1) => index != index1
-    );
-    ssWorkorderObj.notes.internalNotes = arr;
-    __setWorkorderObj(ssWorkorderObj);
-    // let arr = ssWorkorderObj
+    let newObj = { ...zWorkorderObj };
+    let arr = newObj.internalNotes.filter((item, index1) => index != index1);
+    newObj.internalNotes = arr;
+    _zSetWorkorderObj(newObj);
+    dbSetOpenWorkorderItem(newObj);
+
+    // let arr = zWorkorderObj
   }
 
   function internalTextChanged(newVal, index) {
     // log("incoming", newVal);
-    let prevItem = ssWorkorderObj.notes.internalNotes[index];
-    if (
-      newVal.length > prevItem.val.length &&
-      newVal.startsWith(prevItem.val)
-    ) {
+    let newObj = { ...zWorkorderObj };
+    let prevItem = newObj.internalNotes[index];
+    if (newVal.length > prevItem.length && newVal.startsWith(prevItem)) {
       // log("added");
-      prevItem.val = newVal;
-    } else if (
-      newVal.length < prevItem.val.length &&
-      prevItem.val.startsWith(newVal)
-    ) {
-      if (!newVal.startsWith("(" + ssCurrentUser.first + ") ")) {
-        prevItem.val = "(" + ssCurrentUser.first + ") ";
+      prevItem = newVal;
+    } else if (newVal.length < prevItem.length && prevItem.startsWith(newVal)) {
+      if (!newVal.startsWith("(" + zCurrentUser.first + ") ")) {
+        prevItem.val = "(" + zCurrentUser.first + ") ";
       } else {
-        prevItem.val = newVal;
+        prevItem = newVal;
       }
     }
+    newObj.internalNotes[index] = prevItem;
 
-    __setWorkorderObj(ssWorkorderObj);
+    _zSetWorkorderObj(newObj);
+    dbSetOpenWorkorderItem(newObj);
   }
 
-  if (!ssWorkorderObj.id) return null;
+  if (!zWorkorderObj.id) return null;
   return (
     <View style={{ width: "100%", height: "100%", paddingTop: 20 }}>
       <View
@@ -184,7 +179,7 @@ export const Notes_MainComponent = ({
 
             <FlatList
               keyExtractor={(i, idx) => idx}
-              data={ssWorkorderObj.notes.customerNotes}
+              data={zWorkorderObj.customerNotes}
               renderItem={(item) => {
                 let index = item.index;
                 item = item.item;
@@ -206,10 +201,9 @@ export const Notes_MainComponent = ({
                           outlineWidth: 0,
                         }}
                         autoFocus={
-                          index ===
-                          ssWorkorderObj.notes.customerNotes.length - 1
+                          index === zWorkorderObj.customerNotes.length - 1
                         }
-                        value={item.val}
+                        value={item}
                       />
                     </View>
                   </TouchableWithoutFeedback>
@@ -250,7 +244,7 @@ export const Notes_MainComponent = ({
             >
               <FlatList
                 keyExtractor={(i, idx) => idx}
-                data={ssWorkorderObj.notes.internalNotes}
+                data={zWorkorderObj.internalNotes}
                 renderItem={(item) => {
                   let index = item.index;
                   item = item.item;
@@ -274,8 +268,7 @@ export const Notes_MainComponent = ({
                             outlineWidth: 0,
                           }}
                           autoFocus={
-                            index ===
-                            ssWorkorderObj.notes.internalNotes.length - 1
+                            index === zWorkorderObj.internalNotes.length - 1
                           }
                           value={item.val}
                         />
@@ -290,4 +283,4 @@ export const Notes_MainComponent = ({
       </View>
     </View>
   );
-};
+}

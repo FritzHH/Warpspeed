@@ -3,6 +3,7 @@
 import { cloneDeep } from "lodash";
 import {
   bike_brands_db,
+  bike_colors_arr_db,
   bike_colors_db,
   bike_descriptions_db,
   COLLECTION_NAMES,
@@ -85,14 +86,19 @@ export function fillInventory() {
 }
 
 export function fillOpenWorkorders() {
-  for (let i = 0; i <= 3; i++) {
+  for (let i = 0; i <= 0; i++) {
     let wo = { ...WORKORDER_PROTO, id: generateRandomID() };
     wo.brand = bike_brands_db.brands1[i];
-    wo.color = bike_colors_db[i];
-    wo.customerID = i.toString();
+    wo.color = bike_colors_arr_db[i];
     wo.description = bike_descriptions_db[i];
     wo.startedBy = "Test User";
-    wo.status = { name: "Service", id: "343343", position: 0 };
+    wo.status = { name: "Newly Created", color: "red", position: 0 };
+    wo.customerFirst = "Test";
+    wo.customerLast = "Customer";
+    wo.customerPhone = "1111111111";
+    wo.customerID = "BZb60oVQWhZ7g3cufwp4";
+    wo.startedBy = "Test User";
+    wo.changeLog.push("Started by: " + "Test" + " " + "User");
     setOpenWorkorder(wo);
   }
 }

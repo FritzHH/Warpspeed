@@ -28,13 +28,13 @@ export function log(one, two) {
   console.log(str);
 }
 
-export function fetchIt(url) {
-  // log("fetching this url", url);
-  return fetch(url).then((res) => {
-    // log("fetch url result", res);
-    return res.json().then((json) => json);
-  });
-}
+// export function fetchIt(url) {
+//   // log("fetching this url", url);
+//   return fetch(url).then((res) => {
+//     // log("fetch url result", res);
+//     return res.json().then((json) => json);
+//   });
+// }
 
 export function formatDateTime(dateObj, millis) {
   let now = dateObj;

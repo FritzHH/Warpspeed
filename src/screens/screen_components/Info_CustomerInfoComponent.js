@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import {
   View,
   Text,
@@ -9,6 +11,7 @@ import {
 } from "react-native-web";
 import {
   dim,
+  generateRandomID,
   log,
   removeDashesFromPhone,
   searchArray,
@@ -35,10 +38,21 @@ import {
   FOCUS_NAMES,
   ALERT_BOX_PROTO,
   TAB_NAMES,
+  WORKORDER_PROTO,
+  INFO_COMPONENT_NAMES,
 } from "../../data";
 import React, { useEffect, useState } from "react";
 import { cloneDeep } from "lodash";
-import { useCustomerPreviewStore, useCustomerSearchStore } from "../../stores";
+import {
+  useCurrentCustomerStore,
+  useCurrentUserStore,
+  useCustomerPreviewStore,
+  useCustomerSearchStore,
+  useOpenWorkordersStore,
+  useTabNamesStore,
+  useCurrentWorkorderStore,
+} from "../../stores";
+import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
 const NUMS = "1234567890-";
 export function CustomerInfoScreenComponent({
@@ -47,31 +61,58 @@ export function CustomerInfoScreenComponent({
   __setCustomerSearchArr,
   __setItemsTabName,
 }) {
-  const zCustomerSearchTerm = useCustomerSearchStore((state) =>
-    state.getSearchTerm()
+  const zCustPreviewArr = useCustomerPreviewStore((state) =>
+    state.getCustPreviewArr()
+  );
+  const zSelectedSearchItem = useCustomerSearchStore((state) =>
+    state.getSelectedItem()
+  );
+  const zCurrentUser = useCurrentUserStore((state) => state.getCurrentUser());
+  const zCurrentCustomer = useCurrentCustomerStore((state) =>
+    state.getCustomerObj()
+  );
+  ///////////
+  const _zSetOptionsTabName = useTabNamesStore(
+    (state) => state.setOptionsTabName
+  );
+  const _zSetItemsTabName = useTabNamesStore(
+    (state) => state.setOptionsTabName
+  );
+  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
+  const _zSetSearchResults = useCustomerSearchStore(
+    (state) => state.setSearchResultsArr
+  );
+  // const _zSetSelectedItem = useCustomerSearchStore(
+  //   (state) => state.setSelectedItem
+  // );
+  const _zResetSearch = useCustomerSearchStore((state) => state.reset);
+  const _zSetNewWorkorderInArr = useOpenWorkordersStore(
+    (state) => state.modItem
+  );
+  const _zSetOpenWorkorder = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  const _zSetCurrentCustomer = useCurrentCustomerStore(
+    (state) => state.setCustomerObj
   );
   //////////////////////////////////////////////////////////////////////
-  const [sBox1Val, _setBox1Val] = React.useState("");
+  const [sBox1Val, _setBox1Val] = React.useState("2222222222");
   const [sBox2Val, _setBox2Val] = React.useState("");
   const [sSearchingByName, _setSearchingByName] = React.useState(false);
-  const [sCustomerInfo, _setCustomerInfo] = React.useState(CUSTOMER_PROTO);
-  const [sImproperDataAlertBox, _setImproperDataAlertBox] = React.useState({
-    ...ALERT_BOX_PROTO,
-  });
-  const [sShowCustomerModal, _setShowCustomerModal] = React.useState(false);
-  const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] =
-    useState(false);
+  const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
+  const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] = useState(true);
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
 
   useEffect(() => {
-    __setItemsTabName(TAB_NAMES.itemsTab.customerList);
+    // __setItemsTabName(TAB_NAMES.itemsTab.customerList);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders);
+
+    return () => {
+      _setCustomerInfo(null);
+    };
   }, []);
 
-  /////////////////
-
-  ///////////////////////
-  // button press handlers
-  ///////////////////////
   function handleBox1TextChange(incomingText = "") {
     // log("incoming box 1", incomingText);
     // if all input erased
@@ -103,19 +144,19 @@ export function CustomerInfoScreenComponent({
     }
 
     // run searches
+    ///////////////////////
     let searchResults = [];
     if (sSearchingByName) {
       searchResults = searchCustomerNames(
         formattedText,
         sBox2Val,
-        ssCustomersArr
+        zCustPreviewArr
       );
     } else {
-      searchResults = searchPhoneNum(formattedText, ssCustomersArr);
+      searchResults = searchPhoneNum(formattedText, zCustPreviewArr);
       // log(searchResults);
     }
-    // log("search results", searchResults);
-    __setCustomerSearchArr(searchResults);
+    _zSetSearchResults(searchResults);
 
     // show the create customer button if input conditions are met
     if (sSearchingByName) _setShowCreateCustomerBtn(formattedText.length >= 2);
@@ -138,18 +179,33 @@ export function CustomerInfoScreenComponent({
   }
 
   function handleCreateNewCustomerPressed() {
-    //to do bump new customer up to workorder
-    // log("creating new customer in modal");
-    __createNewCustomer(sCustomerInfo);
-    _setShowCustomerModal(false);
+    let newWorkorder = { ...WORKORDER_PROTO };
+    newWorkorder.id = generateRandomID();
+    newWorkorder.customerFirst = sCustomerInfo.first;
+    newWorkorder.customerLast = sCustomerInfo.last;
+    newWorkorder.customerPhone = sCustomerInfo.cell || sCustomerInfo.landline;
+    newWorkorder.customerID = sCustomerInfo.id;
+    newWorkorder.startedBy = zCurrentUser.first;
+    newWorkorder.status = "Newly Created";
+    newWorkorder.changeLog.push(
+      "Started by: " + zCurrentUser.first + " " + zCurrentUser.last
+    );
+    let newCustomerObj = { ...sCustomerInfo };
+    newCustomerObj.dateCreated = new Date().getTime();
+    newCustomerObj.workorders.push(newWorkorder.id);
+    _zSetCurrentCustomer(newCustomerObj);
+    dbSetCustomerObj(newCustomerObj);
+    dbSetOpenWorkorderItem(newWorkorder);
+    _zSetNewWorkorderInArr(newWorkorder, "add");
+    _zSetOpenWorkorder(newWorkorder);
+    _zResetSearch();
+    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 
   function handleModalCreateCustomerBtnPressed() {
-    // log("pressed");
-    let testForImproperDataEntry = true;
-    let message = "";
-
-    let custInfo = cloneDeep(sCustomerInfo);
+    let custInfo = { ...CUSTOMER_PROTO };
     if (sSearchingByName) {
       custInfo.first = sBox1Val;
       custInfo.last = sBox2Val;
@@ -158,8 +214,8 @@ export function CustomerInfoScreenComponent({
       _setInfoTextFocus(FOCUS_NAMES.first);
       custInfo.cell = sBox1Val;
     }
+    custInfo.id = generateRandomID();
     _setCustomerInfo(custInfo);
-    _setShowCustomerModal(true);
   }
 
   //////////////////////////////////////////////////////////////////////
@@ -235,7 +291,7 @@ export function CustomerInfoScreenComponent({
             marginVertical: 10,
             marginTop: 20,
           }}
-          textStyle={{ color: "lightgray" }}
+          textStyle={{ color: "dimgray" }}
           onPress={() => {
             _setBox1Val("");
             _setBox2Val("");
@@ -259,27 +315,28 @@ export function CustomerInfoScreenComponent({
           // width: "90%",
         }}
         buttonVisible={sShowCreateCustomerButton}
-        buttonTextStyle={{ color: "whitesmoke" }}
+        buttonTextStyle={{ color: "dimgray" }}
         handleButtonPress={handleModalCreateCustomerBtnPressed}
         buttonLabel={"Create New Customer"}
-        modalVisible={sShowCustomerModal}
+        modalVisible={sCustomerInfo}
         canExitOnOuterClick={false}
         Component={() => (
           <CustomerInfoComponent
-            sCustomerInfo={cloneDeep(sCustomerInfo)}
-            exitScreenButtonText={"Create Customer"}
-            closeButtonText={"Cancel"}
+            sCustomerInfo={sCustomerInfo || {}}
+            button1Text={"Create Customer"}
+            button2Text={"Cancel"}
             ssInfoTextFocus={sInfoTextFocus}
-            ssCancelButtonText={"Cancel"}
-            ssCreateCustomerBtnText={"Create Customer"}
             __setInfoTextFocus={_setInfoTextFocus}
-            __handleCreateCustomerPress={handleCreateNewCustomerPressed}
+            handleButton1Press={handleCreateNewCustomerPressed}
             __setCustomerInfo={_setCustomerInfo}
-            __handleCancelButtonPress={() => {
+            handleButton2Press={() => {
+              // cancel button
               _setBox1Val("");
               _setBox2Val("");
               _setSearchingByName(false);
-              _setShowCustomerModal(false);
+              _zResetSearch();
+              _setShowCreateCustomerBtn(false);
+              _setCustomerInfo(null);
             }}
           />
         )}
@@ -287,34 +344,3 @@ export function CustomerInfoScreenComponent({
     </View>
   );
 }
-
-// if (!sSearchingByName) {
-//   // change this to < 12 production
-//   if (sBox1Val.length < 12) {
-//     testForImproperDataEntry = false;
-//     message = "The phone number is too short or improperly formatted";
-//   }
-// } else {
-//   if (sBox1Val.length < 1) {
-//     testForImproperDataEntry = false;
-//     message = "You need to have at least an initial in the First Name box";
-//   }
-// }
-
-///////////////////////
-// functions
-///////////////////////
-// if (!testForImproperDataEntry) {
-//   _setShowCustomerModal(false);
-//   _setImproperDataAlertBox({
-//     ...sImproperDataAlertBox,
-//     message,
-//     showBox: true,
-//     handleBtn1Press: () =>
-//       _setImproperDataAlertBox({
-//         ...sImproperDataAlertBox,
-//         showBox: false,
-//       }),
-//   });
-//   return;
-// }

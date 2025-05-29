@@ -1,5 +1,7 @@
+/* eslint-disable */
+
 import { create } from "zustand";
-import { INVENTORY_ITEM_PROTO } from "./data";
+import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO, TAB_NAMES } from "./data";
 import { checkArr, log, searchPhoneNum } from "./utils";
 
 // components /////////////////////////////////////////////////////
@@ -37,20 +39,26 @@ export const useInvModalStore = create((set, get) => ({
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: "",
   optionsTabName: "",
-  infoTabName: "",
+  infoTabName: TAB_NAMES.infoTab.customer,
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
   getInfoTabName: () => get().infoTabName,
-  setTabName: (name, option) => {
-    if (option === "items") return set((state) => ({ itemsTabName: name }));
+  setInfoTabName: (name) => {
+    set((state) => ({ infoTabName: name }));
+  },
+  setItemsTabName: (name) => {
+    set((state) => ({ itemsTabName: name }));
+  },
+  setOptionsTabName: (name) => {
+    set((state) => ({ optionsTabName: name }));
   },
 }));
 
 export const useCustomerSearchStore = create((set, get) => ({
-  searchTerm: "",
+  // searchTerm: "",
   selectedItem: null,
   searchResultsArr: [],
-  getSearchTerm: () => get().searchTerm,
+  // getSearchTerm: () => get().searchTerm,
   getSearchResultsArr: () => get().searchResultsArr,
   getSelectedItem: () => get().selectedItem,
   setSelectedItem: (item) => {
@@ -58,16 +66,29 @@ export const useCustomerSearchStore = create((set, get) => ({
       selectedItem: item,
     }));
   },
-  setSearchTerm: (term) => {
-    set((state) => ({ searchTerm: term }));
-  },
+  // setSearchTerm: (term) => {
+  //   set((state) => ({ searchTerm: term }));
+  // },
   setSearchResultsArr: (arr) => {
     set((state) => ({ searchResultsArr: arr }));
   },
   reset: () => {
-    set((state) => ({ searchTerm: "" }));
+    // set((state) => ({ searchTerm: "" }));
     set((state) => ({ searchResultsArr: [] }));
     set((state) => ({ selectedItem: null }));
+  },
+}));
+
+export const useCurrentUserStore = create((set, get) => ({
+  currentUser: {
+    first: "Test User",
+    last: "Last Name Here",
+    pin: "1",
+    id: "dkfjdkfk",
+  },
+  getCurrentUser: () => get().currentUser,
+  setCurrentUser: (user) => {
+    set((state) => ({ currentUser: user }));
   },
 }));
 
@@ -91,8 +112,8 @@ export const useCustomerPreviewStore = create((set, get) => ({
   },
 }));
 
-export const useCustomerStore = create((set, get) => ({
-  customerObj: {},
+export const useCurrentCustomerStore = create((set, get) => ({
+  customerObj: { ...CUSTOMER_PROTO },
   getCustomerObj: () => get().customerObj,
   setCustomerObj: (obj) => {
     set((state) => ({ customerObj: obj }));
@@ -133,7 +154,7 @@ export const useInventoryStore = create((set, get) => ({
   },
 }));
 
-export const useOpenWorkorderStore = create((set, get) => ({
+export const useOpenWorkordersStore = create((set, get) => ({
   workorderArr: [],
   getWorkorderArr: () => get().workorderArr,
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
@@ -153,6 +174,14 @@ export const useOpenWorkorderStore = create((set, get) => ({
   },
 }));
 
+export const useCurrentWorkorderStore = create((set, get) => ({
+  workorderObj: {},
+  getWorkorderObj: () => get().workorderObj,
+  setWorkorderObj: (obj) => {
+    set((state) => ({ workorderObj: obj }));
+  },
+}));
+
 export const useCustMessagesStore = create((set, get) => ({
   incomingMessagesArr: [],
   outgoingMessagesArr: [],
@@ -168,6 +197,13 @@ export const useCustMessagesStore = create((set, get) => ({
     if (checkArr(messages, obj)) return;
     set((state) => ({ outgoingMessagesArr: [...messages, obj] }));
   },
+}));
+
+export const useWorkorderPreviewStore = create((set, get) => ({
+  previewObj: null,
+  getPreviewObj: () => get().previewObj,
+  // setPreviewObj: (obj) => log("setting", obj),
+  setPreviewObj: (obj) => set((state) => ({ previewObj: obj })),
 }));
 
 /// internal functions ///////////////////////////////////////////

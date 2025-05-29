@@ -75,9 +75,10 @@ import {
 } from "../db_subscriptions";
 import {
   useCustomerPreviewStore,
-  useCustomerStore,
+  useCurrentCustomerStore,
   useInventoryStore,
-  useOpenWorkorderStore,
+  useOpenWorkordersStore,
+  useCurrentWorkorderStore,
 } from "../stores";
 import {
   get,
@@ -86,6 +87,7 @@ import {
   onChildChanged,
   ref,
 } from "firebase/database";
+import { dbGetCustomerObj, dbGetOpenWorkorderItem } from "../db_calls";
 // import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
 // import { TabView, SceneMap } from "react-native-tab-view";
 
@@ -98,31 +100,27 @@ let height = dim.windowHeight * 1;
 let customerSub;
 
 export function WorkorderScreen() {
-  const _zAddWorkorder = useOpenWorkorderStore((state) => state.addItem);
-  const _zChangeWorkorder = useOpenWorkorderStore((state) => state.changeItem);
-  const _zRemoveWorkorder = useOpenWorkorderStore((state) => state.removeItem);
-  const _zAddInventoryItem = useInventoryStore((state) => state.addItem);
-  const _zChangeInventoryItem = useInventoryStore((state) => state.changeItem);
-  const _zRemoveInventoryItem = useInventoryStore((state) => state.removeItem);
-  // const _zAddCustPreview = useCustomerPreviewStore((state) => state.addItem);
-  // const _zChangeCustPreview = useCustomerPreviewStore(
-  //   (state) => state.changeItem
-  // );
-  // const _zRemoveCustPreview = useCustomerPreviewStore(
-  //   (state) => state.removeItem
-  // );
   const _zModCustPreviewItem = useCustomerPreviewStore(
     (state) => state.modItem
   );
-  const _zSetCustomerObj = useCustomerStore((state) => state.setCustomerObj);
-  const zWorkorderArr = useOpenWorkorderStore((state) =>
+  const _zModWorkorderItem = useOpenWorkordersStore((state) => state.modItem);
+  const _zSetCustomerObj = useCurrentCustomerStore(
+    (state) => state.setCustomerObj
+  );
+  const _zSetCurrentWorkorderObj = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  /////
+  const zWorkorderArr = useOpenWorkordersStore((state) =>
     state.getWorkorderArr()
   );
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   // const zCustPreviewArr = useCustomerPreviewStore((state) =>
   //   state.getPreviewArr()
   // );
-  const zCustomerObj = useCustomerStore((state) => state.getCustomerObj());
+  const zCustomerObj = useCurrentCustomerStore((state) =>
+    state.getCustomerObj()
+  );
   //////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////
 
@@ -245,18 +243,19 @@ export function WorkorderScreen() {
   }
 
   useEffect(() => {
-    openWorkordersSubscribe(_zModCustPreviewItem);
+    openWorkordersSubscribe(_zModWorkorderItem);
     inventorySubscribe(_zModCustPreviewItem);
     customerPreviewListSubscribe(_zModCustPreviewItem);
   }, []);
 
   async function initialize() {
     if (!sInitFlag) {
-      // customerSubscribe("BZb60oVQWhZ7g3cufwp4", _zCustomerObj);
-      // fillCustomers();
-      // global.sub = customerSub;
-      // fillInventory();
       // fillOpenWorkorders();
+      setTimeout(async () => {
+        // let wo = await dbGetOpenWorkorderItem("3zPg0cOKDV3eVlLtD4zB");
+        // let cust = await dbGetCustomerObj('3zPg0cOKDV3eVlLtD4zB')
+        // _zSetCurrentWorkorderObj(wo);
+      }, 1000);
       _setInitFlag(true);
     }
   }

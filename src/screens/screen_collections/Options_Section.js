@@ -41,8 +41,9 @@ import { cloneDeep } from "lodash";
 import { WorkordersComponent } from "../screen_components/Options_Workorders";
 import { QuickItemComponent } from "../screen_components/Options_QuickItems";
 import { InventoryComponent } from "../screen_components/Options_Inventory";
-import { WorkorderGlimpse } from "../screen_components/Items_WorkorderGlimpse";
+import { WorkorderPreview } from "../screen_components/Items_WorkorderPreview";
 import { MessagesComponent } from "../screen_components/Options_Messages";
+import { useTabNamesStore } from "../../stores";
 
 export function Options_Section({
   ssOptionsTabName,
@@ -60,6 +61,10 @@ export function Options_Section({
   __setInfoComponentName,
   __createNewWorkorder,
 }) {
+  const zOptionsTabName = useTabNamesStore((state) =>
+    state.getOptionsTabName()
+  );
+  /////////////////////
   const [sShowWorkorderModal, _setShowWorkorderModal] = React.useState(false);
   const [sShowInventoryModal, _setShowInventoryModal] = React.useState(false);
   /////////////////////////////////
@@ -95,7 +100,7 @@ export function Options_Section({
   return (
     <View style={{ flex: 1 }}>
       <TabBar
-        ssOptionsTabName={ssOptionsTabName}
+        zOptionsTabName={zOptionsTabName}
         workorderBtnClicked={(workorderObj) => log("clicked", workorderObj)}
         ssWorkorderObj={ssWorkorderObj}
         ssShowWorkorderModal={sShowWorkorderModal}
@@ -104,15 +109,15 @@ export function Options_Section({
         __setShowWorkorderModal={_setShowWorkorderModal}
         __setOptionsTabName={__setOptionsTabName}
       />
-      {ssOptionsTabName === TAB_NAMES.optionsTab.quickItems && (
+      {zOptionsTabName === TAB_NAMES.optionsTab.quickItems && (
         <QuickItemComponent
-          ssWorkorderObj={ssOptionsTabName}
+          ssWorkorderObj={{}}
           __setWorkorderObj={__setWorkorderObj}
           ssAdjustableUserPreferences={ssAdjustableUserPreferences}
           ssInventoryArr={ssInventoryArr}
         />
       )}
-      {ssOptionsTabName === TAB_NAMES.optionsTab.inventory && (
+      {zOptionsTabName === TAB_NAMES.optionsTab.inventory && (
         <InventoryComponent
           ssInventoryArr={ssInventoryArr}
           ssWorkorderObj={ssWorkorderObj}
@@ -122,7 +127,7 @@ export function Options_Section({
           __addItemToWorkorder={addItemToWorkorder}
         />
       )}
-      {ssOptionsTabName === TAB_NAMES.optionsTab.workorders && (
+      {zOptionsTabName === TAB_NAMES.optionsTab.workorders && (
         <WorkordersComponent
           ssWorkordersArr={ssWorkordersArr}
           __setWorkorderObj={__setWorkorderObj}
@@ -131,7 +136,7 @@ export function Options_Section({
           __setInfoComponentName={__setInfoComponentName}
         />
       )}
-      {ssOptionsTabName === TAB_NAMES.optionsTab.messages && (
+      {zOptionsTabName === TAB_NAMES.optionsTab.messages && (
         <MessagesComponent
           ssMessagesArr={ssMessagesArr}
           __setMessagesArr={__setMessagesArr}
@@ -142,7 +147,7 @@ export function Options_Section({
 }
 
 const TabBar = ({
-  ssOptionsTabName,
+  zOptionsTabName,
   workorderBtnClicked,
   ssWorkorderObj,
   ssShowWorkorderModal,
@@ -167,7 +172,7 @@ const TabBar = ({
         onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
         text={TAB_NAMES.optionsTab.quickItems}
         isSelected={
-          ssOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
+          zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
         }
       />
       <Divider />
@@ -175,7 +180,7 @@ const TabBar = ({
         onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.workorders)}
         text={TAB_NAMES.optionsTab.workorders}
         isSelected={
-          ssOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
+          zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
         }
       />
       <TabMenuButton
@@ -183,7 +188,7 @@ const TabBar = ({
         buttonStyle={{ width: 50 }}
         text={`\u2610`}
         isSelected={
-          ssOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
+          zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
         }
       />
       <Divider />
@@ -191,7 +196,7 @@ const TabBar = ({
         onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.inventory)}
         text={TAB_NAMES.optionsTab.inventory}
         isSelected={
-          ssOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
+          zOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
         }
       />
       <TabMenuButton
@@ -199,7 +204,7 @@ const TabBar = ({
         buttonStyle={{ width: 50 }}
         text={`\u2610`}
         isSelected={
-          ssOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
+          zOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
         }
       />
       <Divider />
@@ -207,7 +212,7 @@ const TabBar = ({
         onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.messages)}
         text={TAB_NAMES.optionsTab.messages}
         isSelected={
-          ssOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
+          zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
         }
       />
     </View>

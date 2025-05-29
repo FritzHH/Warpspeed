@@ -1,15 +1,8 @@
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-} from "react-native-web";
+/* eslint-disable */
+
+import { View, Text } from "react-native-web";
 import { dim, log, trimToTwoDecimals } from "../../utils";
 import {
-  HorzSpacer,
-  TabMenuButton,
   TabMenuDivider as Divider,
   ModalDropdown,
   TextInputOnMainBackground,
@@ -20,31 +13,50 @@ import {
 } from "../../components";
 import { Colors } from "../../styles";
 import {
-  bike_colors_db,
   bike_brands_db,
-  CUSTOMER_PROTO,
   bike_descriptions_db,
-  discounts_db,
   part_sources_db,
-  WORKORDER_PROTO,
-  WORKORDER_ITEM_PROTO,
   bike_colors_arr_db,
-  FOCUS_NAMES,
 } from "../../data";
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useRef } from "react";
 import { cloneDeep } from "lodash";
+import {
+  useCurrentCustomerStore,
+  useCurrentWorkorderStore,
+} from "../../stores";
+import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 
 export const Info_WorkorderComponent = ({
-  ssCustomerObj = CUSTOMER_PROTO,
-  ssWorkorderObj = WORKORDER_PROTO,
-  __setCustomerObj,
-  __setWorkorderObj,
   __handleCreateNewWorkorderPressed,
 }) => {
+  const zWorkorderObj = {
+    ...useCurrentWorkorderStore((state) => state.getWorkorderObj()),
+  };
+  const zCustomerObj = {
+    ...useCurrentCustomerStore((state) => state.getCustomerObj()),
+  };
+  ////
+  const _zSetWorkorderObj = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  const _zSetCustomerObj = useCurrentWorkorderStore(
+    (state) => state.customerObj
+  );
+  ////////////////////////////////////////////////////////////////////
   const [sShowCustomerInfoModal, _setShowCustomerInfoModal] =
     React.useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = React.useState(null);
+
+  function setWorkorderObj(obj) {
+    _zSetWorkorderObj(obj);
+    dbSetOpenWorkorderItem(obj);
+  }
+
+  function setCustomerObj(obj) {
+    _zSetCustomerObj(obj);
+    dbSetCustomerObj(obj);
+  }
 
   function setBikeColor(incomingColorVal) {
     let foundColor = false;
@@ -63,8 +75,9 @@ export const Info_WorkorderComponent = ({
     }
 
     // log("setting", newColorObj);
-    ssWorkorderObj.color = newColorObj;
-    __setWorkorderObj(ssWorkorderObj);
+    let wo = { ...zWorkorderObj };
+    wo.color = newColorObj;
+    setWorkorderObj(wo);
   }
 
   function closeModal() {
@@ -75,7 +88,6 @@ export const Info_WorkorderComponent = ({
     // _setS;
   }
 
-  // const exitButtonRef = useRef(null)
   return (
     <View style={{ height: "100%", width: "100%", paddingRight: 7 }}>
       <View
@@ -91,7 +103,9 @@ export const Info_WorkorderComponent = ({
           showButtonIcon={false}
           showModal={sShowCustomerInfoModal}
           outerModalStyle={{ height: "90%", width: "90%" }}
-          buttonLabel={ssCustomerObj.first + " " + ssCustomerObj.last}
+          buttonLabel={
+            zWorkorderObj.customerFirst + " " + zWorkorderObj.customerLast
+          }
           buttonStyle={{
             alignItems: "flex-start",
             justifyContent: "center",
@@ -106,10 +120,10 @@ export const Info_WorkorderComponent = ({
           shadowProps={{ shadowColor: "transparent" }}
           Component={() => (
             <CustomerInfoComponent
-              sCustomerInfo={ssCustomerObj}
-              _setCustomerInfo={__setCustomerObj}
-              handleExitScreenPress={closeModal}
-              exitScreenButtonText={"Close"}
+              sCustomerInfo={zCustomerObj}
+              _setCustomerInfo={setCustomerObj}
+              handleButton1Press={closeModal}
+              button1Text={"Close"}
               ssInfoTextFocus={sInfoTextFocus}
               __setInfoTextFocus={_setInfoTextFocus}
             />
@@ -128,7 +142,7 @@ export const Info_WorkorderComponent = ({
           }}
         />
       </View>
-      {ssWorkorderObj && (
+      {zWorkorderObj && (
         <View>
           <View
             style={{
@@ -138,20 +152,20 @@ export const Info_WorkorderComponent = ({
               // backgroundColor: "red",
             }}
           >
-            {ssCustomerObj.cell.length > 0 ? (
+            {zCustomerObj.cell.length > 0 ? (
               <Text style={{ color: Colors.lightTextOnMainBackground }}>
-                {"Cell:  " + ssCustomerObj.cell}
+                {"Cell:  " + zCustomerObj.cell}
               </Text>
             ) : null}
-            {ssCustomerObj.landline.length > 0 ? (
+            {zCustomerObj.landline.length > 0 ? (
               <Text style={{ color: Colors.lightTextOnMainBackground }}>
-                {"Land:  " + ssCustomerObj.landline}
+                {"Land:  " + zCustomerObj.landline}
               </Text>
             ) : null}
-            {ssCustomerObj.contactRestriction === "CALL" ? (
+            {zCustomerObj.contactRestriction === "CALL" ? (
               <Text style={{ color: "pink" }}>CALL ONLY</Text>
             ) : null}
-            {ssCustomerObj.contactRestriction === "EMAIL" ? (
+            {zCustomerObj.contactRestriction === "EMAIL" ? (
               <Text style={{ color: "pink" }}>EMAIL ONLY</Text>
             ) : null}
           </View>
@@ -170,11 +184,11 @@ export const Info_WorkorderComponent = ({
             <TextInputOnMainBackground
               placeholderText={"Brand"}
               styleProps={{ marginRight: 5 }}
-              value={ssWorkorderObj.brand}
+              value={zWorkorderObj.brand}
               onTextChange={(val) => {
                 // log(val);
-                ssWorkorderObj.brand = val;
-                __setWorkorderObj(ssWorkorderObj);
+                zWorkorderObj.brand = val;
+                setWorkorderObj(zWorkorderObj);
               }}
             />
             <ModalDropdown
@@ -188,14 +202,14 @@ export const Info_WorkorderComponent = ({
               buttonLabel={bike_brands_db.brands1Title}
               buttonStyle={{ width: 90 }}
               data={bike_brands_db.brands1}
-              currentSelectionName={ssWorkorderObj.brand}
+              currentSelectionName={zWorkorderObj.brand}
               onSelect={(val) => {
-                ssWorkorderObj.brand = val;
-                __setWorkorderObj(ssWorkorderObj);
+                zWorkorderObj.brand = val;
+                setWorkorderObj(zWorkorderObj);
               }}
               onRemoveSelection={() => {
-                ssWorkorderObj.brand = "";
-                __setWorkorderObj(ssWorkorderObj);
+                zWorkorderObj.brand = "";
+                setWorkorderObj(zWorkorderObj);
               }}
             />
             <View style={{ width: 3 }} />
@@ -211,14 +225,16 @@ export const Info_WorkorderComponent = ({
               closeButtonText={"Close"}
               removeButtonText={"Remove"}
               buttonStyle={{ width: 70 }}
-              currentSelectionName={ssWorkorderObj.brand}
+              currentSelectionName={zWorkorderObj.brand}
               onSelect={(val) => {
-                ssWorkorderObj.brand = val;
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.brand = val;
+                setWorkorderObj(newObj);
               }}
               onRemoveSelection={() => {
-                ssWorkorderObj.brand = "";
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.brand = "";
+                setWorkorderObj(newObj);
               }}
             />
           </View>
@@ -237,10 +253,11 @@ export const Info_WorkorderComponent = ({
             <TextInputOnMainBackground
               placeholderText={"Model/Description"}
               styleProps={{ marginRight: 2 }}
-              value={ssWorkorderObj.description}
+              value={zWorkorderObj.description}
               onTextChange={(val) => {
-                ssWorkorderObj.description = val;
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.description = val;
+                setWorkorderObj(newObj);
               }}
             />
             <ModalDropdown
@@ -255,14 +272,16 @@ export const Info_WorkorderComponent = ({
               closeButtonText={"Close"}
               buttonStyle={{ width: 90 }}
               removeButtonText={"Remove"}
-              currentSelectionName={ssWorkorderObj.description}
+              currentSelectionName={zWorkorderObj.description}
               onSelect={(val) => {
-                ssWorkorderObj.description = val;
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.description = val;
+                setWorkorderObj(newObj);
               }}
               onRemoveSelection={() => {
-                ssWorkorderObj.description = "";
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.description = "";
+                setWorkorderObj(newObj);
               }}
             />
           </View>
@@ -282,11 +301,11 @@ export const Info_WorkorderComponent = ({
           >
             <TextInputOnMainBackground
               placeholderText={"Color"}
-              value={ssWorkorderObj.color.label}
+              value={zWorkorderObj.color.label}
               styleProps={{
                 marginRight: 2,
-                backgroundColor: ssWorkorderObj.color.backgroundColor,
-                color: ssWorkorderObj.color.textColor,
+                backgroundColor: zWorkorderObj.color.backgroundColor,
+                color: zWorkorderObj.color.textColor,
               }}
               onTextChange={(val) => {
                 setBikeColor(val);
@@ -306,18 +325,20 @@ export const Info_WorkorderComponent = ({
               buttonStyle={{ width: 90 }}
               removeButtonText={"Remove Color"}
               buttonLabel={"Colors"}
-              currentSelection={ssWorkorderObj.color}
+              currentSelection={zWorkorderObj.color}
               onSelect={(val) => {
-                ssWorkorderObj.color = val;
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.color = val;
+                setWorkorderObj(newObj);
               }}
               onRemoveSelection={() => {
-                ssWorkorderObj.color = {
+                let newObj = { ...zWorkorderObj };
+                newObj.color = {
                   label: "",
                   backgroundColor: "",
                   textColor: "",
                 };
-                __setWorkorderObj(ssWorkorderObj);
+                setWorkorderObj(newObj);
               }}
             />
           </View>
@@ -337,10 +358,11 @@ export const Info_WorkorderComponent = ({
             <TextInputOnMainBackground
               placeholderText={"Part Ordered"}
               styleProps={{ marginRight: 2 }}
-              value={ssWorkorderObj.partOrdered}
+              value={zWorkorderObj.partOrdered}
               onTextChange={(val) => {
-                ssWorkorderObj.partOrdered = val;
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.partOrdered = val;
+                setWorkorderObj(newObj);
               }}
             />
           </View>
@@ -358,12 +380,13 @@ export const Info_WorkorderComponent = ({
             }}
           >
             <TextInputOnMainBackground
-              value={ssWorkorderObj.partSource}
+              value={zWorkorderObj.partSource}
               placeholderText={"Part Source"}
               styleProps={{ marginRight: 2 }}
               onTextChange={(val) => {
-                ssWorkorderObj.partSource = val;
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.partSource = val;
+                setWorkorderObj(newObj);
               }}
             />
             <ModalDropdown
@@ -378,14 +401,16 @@ export const Info_WorkorderComponent = ({
               removeButtonText={"Remove"}
               buttonStyle={{ width: 90 }}
               buttonLabel={"Sources"}
-              currentSelectionName={ssWorkorderObj.partSource}
+              currentSelectionName={zWorkorderObj.partSource}
               onSelect={(val) => {
-                ssWorkorderObj.partSource = val;
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.partSource = val;
+                setWorkorderObj(newObj);
               }}
               onRemoveSelection={() => {
-                ssWorkorderObj.partSource = "";
-                __setWorkorderObj(ssWorkorderObj);
+                let newObj = { ...zWorkorderObj };
+                newObj.partSource = "";
+                setWorkorderObj(newObj);
               }}
             />
           </View>

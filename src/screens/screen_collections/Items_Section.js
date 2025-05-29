@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import { on } from "events";
 import { Items_WorkorderItemsTab } from "../screen_components/Items_WorkorderItems";
 import { Tab } from "react-tabs";
@@ -11,89 +13,59 @@ import { log } from "../../utils";
 import { Colors } from "../../styles";
 import { Items_Dashboard } from "../screen_components/Items_Dashboard";
 import { CustomerSearchListComponent } from "../screen_components/Items_CustomerSearchList";
-import { WorkorderGlimpse } from "../screen_components/Items_WorkorderGlimpse";
+import { WorkorderPreview } from "../screen_components/Items_WorkorderPreview";
+import {
+  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
+  useTabNamesStore,
+  useWorkorderPreviewStore,
+} from "../../stores";
 
-export function Items_Section({
-  ssWorkorderObj,
-  ssCustomerObj,
-  ssItemsTabName,
-  ssCustomerSearchArr,
-  ssWorkorderPreviewObj,
-  ssInventoryArr,
-  __setWorkorderObj,
-  __setItemsTabName,
-  __setCustomerObj,
-  __setOptionsTabName,
-  __setInfoComponentName,
-  __setCustomerSearchArr,
-  __setWorkorderPreviewObj,
-  __createNewWorkorder,
-}) {
-  const Tab_WorkorderItems = (
-    <Items_WorkorderItemsTab
-      ssWorkorderObj={ssWorkorderObj}
-      ssInventoryArr={ssInventoryArr}
-      __setWorkorderObj={__setWorkorderObj}
-    />
+export function Items_Section({ ssWorkorderObj, __setItemsTabName }) {
+  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
+  ///
+  const zWorkorderPreview = useWorkorderPreviewStore((state) =>
+    state.getPreviewObj()
   );
-
-  // log("preview", ssWorkorderPreviewObj);
-  const Tab_Preview = ssWorkorderPreviewObj ? (
-    <WorkorderGlimpse ssWorkorderPreviewObj={ssWorkorderPreviewObj} />
-  ) : null;
-
-  const Tab_ChangeLog = (
-    <View>
-      <Text>Change Log Tab</Text>
-    </View>
+  const zWorkorderObj = useCurrentWorkorderStore((state) =>
+    state.getWorkorderObj()
   );
-  const Tab_Dashboard = null;
+  const zItemsTabName = useTabNamesStore((state) => state.getItemsTabName());
 
-  const Customer_List = (
-    <CustomerSearchListComponent
-      ssCustomerSearchArr={ssCustomerSearchArr}
-      ssCustomerObj={ssCustomerObj}
-      __setCustomerObj={__setCustomerObj}
-      __setWorkorderObj={__setWorkorderObj}
-      __setOptionsTabName={__setOptionsTabName}
-      __setInfoComponentName={__setInfoComponentName}
-      __setItemsTabName={__setItemsTabName}
-      __setCustomerSearchArr={__setCustomerSearchArr}
-      __createNewWorkorder={__createNewWorkorder}
-    />
-  );
-
+  /////////////////////////////////////////////////////////////////////////////
   function selectComponent() {
-    if (ssItemsTabName == TAB_NAMES.itemsTab.workorderItems)
-      return Tab_WorkorderItems;
-    if (ssItemsTabName == TAB_NAMES.itemsTab.changeLog) return Tab_ChangeLog;
-    if (ssItemsTabName == TAB_NAMES.itemsTab.dashboard) return Tab_Dashboard;
-    if (ssItemsTabName === TAB_NAMES.itemsTab.customerList)
-      return Customer_List;
-    if (ssItemsTabName === TAB_NAMES.itemsTab.preview) return Tab_Preview;
+    if (zWorkorderPreview) return <WorkorderPreview />;
+    if (zItemsTabName == TAB_NAMES.itemsTab.workorderItems)
+      return <Items_WorkorderItemsTab />;
+    if (zItemsTabName == TAB_NAMES.itemsTab.changeLog)
+      return (
+        <View>
+          <Text>Change Log Tab</Text>
+        </View>
+      );
+    if (zItemsTabName == TAB_NAMES.itemsTab.dashboard)
+      return (
+        <View>
+          <Text>Dashboard babes</Text>
+        </View>
+      );
+    if (zItemsTabName === TAB_NAMES.itemsTab.customerList)
+      return <CustomerSearchListComponent />;
   }
 
-  let excludeTabNames = [];
-  if (ssItemsTabName === TAB_NAMES.itemsTab.customerList)
-    excludeTabNames.push(TAB_NAMES.itemsTab.customerList);
   return (
     <View style={{ width: "100%", height: "100%" }}>
       <TabBar
-        __setItemsTabName={__setItemsTabName}
-        ssItemsTabName={ssItemsTabName}
-        ssWorkorderObj={ssWorkorderObj}
+        _zSetItemsTabName={_zSetItemsTabName}
+        zItemsTabName={zItemsTabName}
+        zWorkorderObj={zWorkorderObj}
       />
       {selectComponent()}
     </View>
   );
 }
 
-const TabBar = ({ __setItemsTabName, ssItemsTabName, ssWorkorderObj }) => {
-  // let excludeWorkorder, excludeChangelog, excludeDashboard;
-  // if (ssItemsTabName === TAB_NAMES.itemsTab.customerList) {
-  //   excludeWorkorder = true;
-  //   excludeChangelog = true;
-  // }
+const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
   return (
     <View
       style={{
@@ -107,24 +79,22 @@ const TabBar = ({ __setItemsTabName, ssItemsTabName, ssWorkorderObj }) => {
           flexDirection: "row",
         }}
       >
-        {ssWorkorderObj.id ? (
+        {zWorkorderObj.id ? (
           <TabMenuButton
-            onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
+            onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
             text={TAB_NAMES.itemsTab.workorderItems}
             isSelected={
-              ssItemsTabName === TAB_NAMES.itemsTab.workorderItems
-                ? true
-                : false
+              zItemsTabName === TAB_NAMES.itemsTab.workorderItems ? true : false
             }
           />
         ) : null}
         <Divider />
-        {ssWorkorderObj.id ? (
+        {zWorkorderObj.id ? (
           <TabMenuButton
-            onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
+            onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}
             isSelected={
-              ssItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
+              zItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
             }
           />
         ) : null}
@@ -136,10 +106,10 @@ const TabBar = ({ __setItemsTabName, ssItemsTabName, ssWorkorderObj }) => {
         }}
       >
         <TabMenuButton
-          onPress={() => __setItemsTabName(TAB_NAMES.itemsTab.dashboard)}
+          onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.dashboard)}
           text={TAB_NAMES.itemsTab.dashboard}
           isSelected={
-            ssItemsTabName === TAB_NAMES.itemsTab.dashboard ? true : false
+            zItemsTabName === TAB_NAMES.itemsTab.dashboard ? true : false
           }
         />
       </View>

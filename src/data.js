@@ -37,9 +37,16 @@ export const ALERT_BOX_PROTO = {
 export const WORKORDER_PROTO = {
   id: "",
   customerID: "",
+  customerFirst: "",
+  customerLast: "",
+  customerPhone: "",
   brand: "",
   description: "",
-  color: "",
+  color: {
+    textColor: "",
+    backgroundColor: "",
+    label: "",
+  },
   changeLog: [null],
   startedBy: "",
   partOrdered: "",
@@ -287,6 +294,10 @@ export const WORKORDER_STATUS_NAMES = Object.freeze({
   finished: "finished",
 });
 export const TAB_NAMES = {
+  infoTab: {
+    customer: "Customer Entry",
+    workorder: "Workorder View",
+  },
   itemsTab: {
     workorderItems: "Workorder Items",
     changeLog: "Change Log",
@@ -463,16 +474,7 @@ export const discounts_db = [
   { name: "2-bike purchase, $100 Off Each Bike", value: "100", type: "dollar" },
   { name: "$10 Off", value: "10", type: "dollar" },
 ];
-export const bike_colors_db = [
-  "White",
-  "Blue",
-  "Green",
-  "Black",
-  "Yellow",
-  "Brown",
-  "Silver",
-  "Tan",
-];
+
 export const system_users_db = {
   1389343: {
     first: "Fritz",

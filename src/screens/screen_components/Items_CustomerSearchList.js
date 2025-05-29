@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import React from "react";
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import { log } from "../../utils";
@@ -14,32 +16,27 @@ import {
   WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "../../data";
+import { useCustomerSearchStore } from "../../stores";
 
-export function CustomerSearchListComponent({
-  ssCustomerSearchArr = [],
-  __setCustomerSearchArr,
-  __setWorkorderObj,
-  __setCustomerObj,
-  __setOptionsTabName,
-  __setInfoComponentName,
-  __setItemsTabName,
-  __createNewWorkorder,
-}) {
+export function CustomerSearchListComponent({}) {
+  const zSearchResultsArr = useCustomerSearchStore((state) =>
+    state.getSearchResultsArr()
+  );
+  const _zSetSearchSelectedItem = useCustomerSearchStore(
+    (state) => state.setSelectedItem
+  );
+
   const [sShowModal, _setShowModal] = React.useState(false);
 
   function handleNewWorkorderBtnPress(customerObj) {
-    __setCustomerObj(customerObj);
-    __createNewWorkorder(customerObj);
-    __setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    __setInfoComponentName(INFO_COMPONENT_NAMES.workorder);
-    __setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    __setCustomerSearchArr([]);
+    _zSetSearchSelectedItem(customerObj);
   }
 
+  // log("search res", zSearchResultsArr);
   return (
     <View style={{ flex: 1 }}>
       <FlatList
-        data={ssCustomerSearchArr}
+        data={zSearchResultsArr}
         key={(item) => item.id}
         renderItem={(item) => {
           item = item.item;
@@ -52,7 +49,7 @@ export function CustomerSearchListComponent({
                 marginTop: 30,
               }}
             >
-              <ScreenModal
+              {/* <ScreenModal
                 modalStyle={{ height: "100%", width: "100%" }}
                 modalProps={{ height: "90%", width: "90%" }}
                 buttonStyle={{
@@ -69,7 +66,7 @@ export function CustomerSearchListComponent({
                 Component={() => (
                   <CustomerInfoComponent
                     sCustomerInfo={item}
-                    _setCustomerInfo={__setCustomerObj}
+                    _setCustomerInfo={_zSetSearchSelectedItem}
                     handleExitScreenPress={() => {
                       _setShowModal(false);
                     }}
@@ -85,7 +82,7 @@ export function CustomerSearchListComponent({
                     // }}
                   />
                 )}
-              />
+              /> */}
               <TouchableOpacity
                 style={{ minWidth: 250, paddingVertical: 10 }}
                 onPress={() => handleNewWorkorderBtnPress(item)}

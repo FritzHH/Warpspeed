@@ -658,15 +658,14 @@ export const InventoryItemInModal = ({
   );
 };
 
-global.test = 1;
 export const CustomerInfoComponent = ({
   sCustomerInfo = CUSTOMER_PROTO,
-  ssCreateCustomerBtnText,
-  ssCancelButtonText,
+  button1Text,
+  button2Text,
   ssInfoTextFocus,
   __setInfoTextFocus,
-  __handleCreateCustomerPress,
-  __handleCancelButtonPress,
+  handleButton1Press,
+  handleButton2Press,
   __setCustomerInfo,
 }) => {
   const TEXT_INPUT_STYLE = {
@@ -679,6 +678,7 @@ export const CustomerInfoComponent = ({
     paddingHorizontal: 3,
   };
 
+  sCustomerInfo = { ...sCustomerInfo };
   return (
     <TouchableWithoutFeedback>
       <View
@@ -871,21 +871,9 @@ export const CustomerInfoComponent = ({
           <View
             style={{ flexDirection: "row", justifyContent: "space-between" }}
           >
-            <Button
-              onPress={__handleCreateCustomerPress}
-              viewStyle={{
-                marginTop: 30,
-                marginLeft: 20,
-                backgroundColor: "lightgray",
-                height: 40,
-                width: 200,
-              }}
-              textStyle={{ color: "dimgray" }}
-              text={ssCreateCustomerBtnText}
-            />
-            {
+            {button1Text ? (
               <Button
-                onPress={__handleCancelButtonPress}
+                onPress={handleButton1Press}
                 viewStyle={{
                   marginTop: 30,
                   marginLeft: 20,
@@ -894,7 +882,21 @@ export const CustomerInfoComponent = ({
                   width: 200,
                 }}
                 textStyle={{ color: "dimgray" }}
-                text={ssCancelButtonText}
+                text={button1Text}
+              />
+            ) : null}
+            {
+              <Button
+                onPress={handleButton2Press}
+                viewStyle={{
+                  marginTop: 30,
+                  marginLeft: 20,
+                  backgroundColor: "lightgray",
+                  height: 40,
+                  width: 200,
+                }}
+                textStyle={{ color: "dimgray" }}
+                text={button2Text}
               />
             }
           </View>

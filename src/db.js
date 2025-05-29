@@ -154,8 +154,9 @@ function createRealtimeRef(path) {
 }
 
 // getters
-export function getNodeObject(dbRef) {
-  get(dbRef).then((snap) => {
+function getNodeObject(dbRef) {
+  return get(dbRef).then((snap) => {
+    // log("snap", snap.val());
     if (snap.exists) return snap.val();
     return null;
   });
@@ -239,6 +240,11 @@ export function setClosedWorkorder(workorder = WORKORDER_PROTO) {
 
 export function setRealtimeNodeItem(path, item) {
   return set(createRealtimeRef(path), item);
+}
+
+export function getRealtimeNodeItem(path) {
+  let dbRef = ref(RDB, path);
+  return getNodeObject(dbRef);
 }
 
 export function setInventoryItem(inventoryObj = INVENTORY_ITEM_PROTO) {

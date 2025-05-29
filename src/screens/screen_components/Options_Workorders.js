@@ -1,62 +1,54 @@
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-} from "react-native-web";
+/* eslint-disable */
+import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import { dim, log, trimToTwoDecimals, useInterval } from "../../utils";
-import {
-  HorzSpacer,
-  TabMenuButton,
-  TabMenuDivider as Divider,
-  ModalDropdown,
-  TextInputOnMainBackground,
-  TextInputLabelOnMainBackground,
-  ScreenModal,
-  CustomerInfoComponent,
-  Button,
-  CheckBox,
-} from "../../components";
+import { TabMenuDivider as Divider, CheckBox } from "../../components";
 import { Colors } from "../../styles";
-import {
-  bike_colors_db,
-  bike_brands_db,
-  CUSTOMER_PROTO,
-  bike_descriptions_db,
-  discounts_db,
-  part_sources_db,
-  WORKORDER_PROTO,
-  WORKORDER_ITEM_PROTO,
-  bike_colors_arr_db,
-  FOCUS_NAMES,
-  TAB_NAMES,
-  INFO_COMPONENT_NAMES,
-} from "../../data";
+import { INFO_COMPONENT_NAMES, TAB_NAMES } from "../../data";
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
-import { useOpenWorkorderStore } from "../../stores";
+import {
+  useCurrentCustomerStore,
+  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
+  useTabNamesStore,
+  useWorkorderPreviewStore,
+} from "../../stores";
+import { dbGetCustomerObj } from "../../db_calls";
 
-export function WorkordersComponent({
-  ssWorkordersArr,
-  __setWorkorderPreviewObject,
-  __setWorkorderObj,
-  __setOptionsTabName,
-  __setInfoComponentName,
-}) {
+export function WorkordersComponent({}) {
+  const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
+    state.getWorkorderArr()
+  );
+  ///
+  const _zSetOpenWorkorder = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  const _zSetPreviewObj = useWorkorderPreviewStore(
+    (state) => state.setPreviewObj
+  );
+  const _zSetCurrentCustomer = useCurrentCustomerStore(
+    (state) => state.setCustomerObj
+  );
+  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
+  const _zSetOptionsTabName = useTabNamesStore(
+    (state) => state.setOptionsTabName
+  );
+  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
+  ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
-  // const [zWorkorderArr] = useOpenWorkorderStore((state) => state.get());
-  //////////////////////////////////
-  //// functions
-  /////////////////////////////////
 
-  //////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  // log("store", zWorkorderArr);
-  // log("arr", ssWorkordersArr);
+  function workorderSelected(obj) {
+    obj = { ...obj };
+    dbGetCustomerObj(obj.customerID).then((custObj) => {
+      _zSetCurrentCustomer(custObj);
+      // log("cust obj", custObj);
+    });
+    _zSetOpenWorkorder(obj);
+    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+  }
 
   useEffect(() => {
     // log("use effect workorders component");
@@ -88,18 +80,16 @@ export function WorkordersComponent({
         textStyle={{ color: "lightgray", marginRight: 10 }}
       />
       <FlatList
-        data={ssWorkordersArr}
+        data={zOpenWorkordersArr}
         keyExtractor={(item, index) => index}
         renderItem={(item) => {
           item = item.item;
           return (
             <RowItemComponent
               ssAllowPreview={sAllowPreview}
-              item={item}
-              __setWorkorderObj={__setWorkorderObj}
-              __setWorkorderPreviewObject={__setWorkorderPreviewObject}
-              __setOptionsTabName={__setOptionsTabName}
-              __setInfoComponentName={__setInfoComponentName}
+              _zSetPreviewObj={_zSetPreviewObj}
+              onWorkorderSelected={workorderSelected}
+              itemObj={item}
             />
           );
         }}
@@ -109,12 +99,10 @@ export function WorkordersComponent({
 }
 
 function RowItemComponent({
-  item,
+  itemObj,
   ssAllowPreview,
-  __setWorkorderPreviewObject,
-  __setWorkorderObj,
-  __setOptionsTabName,
-  __setInfoComponentName,
+  onWorkorderSelected,
+  _zSetPreviewObj,
 }) {
   const [sLastHoverInsideMillis, _setLastHoverInsideMilles] = useState(
     new Date().getTime() * 2
@@ -127,17 +115,15 @@ function RowItemComponent({
       <TouchableOpacity
         onMouseOver={() => {
           if (!ssAllowPreview) return;
-          __setWorkorderPreviewObject(item);
+          _zSetPreviewObj(itemObj);
         }}
         onMouseLeave={() => {
-          __setWorkorderPreviewObject(null);
           if (!ssAllowPreview) return;
+          _zSetPreviewObj(null);
         }}
         onPress={() => {
-          __setWorkorderPreviewObject(null);
-          __setWorkorderObj(item);
-          __setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-          __setInfoComponentName(INFO_COMPONENT_NAMES.workorder);
+          _zSetPreviewObj(null);
+          onWorkorderSelected(itemObj);
         }}
       >
         <View
@@ -148,8 +134,8 @@ function RowItemComponent({
           }}
         >
           <View style={{ marginVertical: 5 }}>
-            <Text>{item.brand || "Brand goes here"}</Text>
-            <Text>{item.description || "Descripion goes here"}</Text>
+            <Text>{itemObj.brand || "Brand goes here"}</Text>
+            <Text>{itemObj.description || "Descripion goes here"}</Text>
           </View>
         </View>
       </TouchableOpacity>

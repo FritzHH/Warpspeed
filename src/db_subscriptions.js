@@ -58,62 +58,50 @@ function documentChangeCallback(dataObj, dataTargetSetterFun) {
 //////////////////////////////////////////////////////////////////////
 
 // realtime database
-export async function openWorkordersSubscribe(
-  _zAddWorkorder,
-  _zChangeWorkorder,
-  _zRemoveWorkorder
-) {
+export async function openWorkordersSubscribe(_zModWorkorderItem) {
   workorderAddSub = await subscribeToNodeAddition(
     "OPEN-WORKORDERS",
-    (type, key, val) => _zAddWorkorder(val)
+    (type, key, val) => _zModWorkorderItem(val, "add")
   );
   workorderRemoveSub = await subscribeToNodeRemoval(
     "OPEN-WORKORDERS",
-    (type, key, val) => _zRemoveWorkorder(val)
+    (type, key, val) => _zModWorkorderItem(val, "change")
   );
   workorderChangeSub = await subscribeToNodeChange(
     "OPEN-WORKORDERS",
-    (type, key, val) => _zChangeWorkorder(val)
+    (type, key, val) => _zModWorkorderItem(val, "remove")
   );
 }
 
 // realtime database
-export async function inventorySubscribe(
-  zAddInventoryItem,
-  zChangeInventoryItem,
-  zRemoveInventoryItem
-) {
+export async function inventorySubscribe(zModInventoryItem) {
   inventoryChangeSub = await subscribeToNodeChange(
     "INVENTORY",
-    (type, key, val) => zChangeInventoryItem(val, "change")
+    (type, key, val) => zModInventoryItem(val, "change")
   );
   inventoryAddSub = await subscribeToNodeAddition(
     "INVENTORY",
-    (type, key, val) => zAddInventoryItem(val, "add")
+    (type, key, val) => zModInventoryItem(val, "add")
   );
   inventoryRemoveSub = await subscribeToNodeRemoval(
     "INVENTORY",
-    (type, key, val) => zRemoveInventoryItem(val, "remove")
+    (type, key, val) => zModInventoryItem(val, "remove")
   );
 }
 
 // realtime database
-export async function customerPreviewListSubscribe(
-  _zAddCustPreview,
-  _zChangeCustPreview,
-  _zRemoveCustPreview
-) {
+export async function customerPreviewListSubscribe(_zModItemCustPreviewItem) {
   custPreviewChangeSub = await subscribeToNodeChange(
     "CUSTOMER-PREVIEWS",
-    (type, key, val) => _zChangeCustPreview(val, "change")
+    (type, key, val) => _zModItemCustPreviewItem(val, "change")
   );
   custPreviewAddSub = await subscribeToNodeAddition(
     "CUSTOMER-PREVIEWS",
-    (type, key, val) => _zAddCustPreview(val, "add")
+    (type, key, val) => _zModItemCustPreviewItem(val, "add")
   );
   custPreviewRemoveSub = await subscribeToNodeRemoval(
     "CUSTOMER-PREVIEWS",
-    (type, key, val) => _zRemoveCustPreview(val, "remove")
+    (type, key, val) => _zModItemCustPreviewItem(val, "remove")
   );
 }
 

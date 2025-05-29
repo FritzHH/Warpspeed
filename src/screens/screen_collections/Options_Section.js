@@ -46,30 +46,23 @@ import { MessagesComponent } from "../screen_components/Options_Messages";
 import { useTabNamesStore } from "../../stores";
 
 export function Options_Section({
-  ssOptionsTabName,
   ssWorkorderObj = WORKORDER_PROTO,
-  ssWorkordersArr,
   ssInventoryArr,
   ssAdjustableUserPreferences,
-  ssMessagesArr,
-  __setMessagesArr,
-  __setOptionsTabName,
   __setWorkorderObj,
-  __setInventoryArr,
-  __setInventoryItem,
-  __setWorkorderPreviewObj,
-  __setInfoComponentName,
-  __createNewWorkorder,
 }) {
+  const _zSetOptionsTabName = useTabNamesStore(
+    (state) => state.setOptionsTabName
+  );
+  ///
   const zOptionsTabName = useTabNamesStore((state) =>
     state.getOptionsTabName()
   );
-  /////////////////////
+
+  /////////////////////////////////////////////////////////////////////////////
   const [sShowWorkorderModal, _setShowWorkorderModal] = React.useState(false);
   const [sShowInventoryModal, _setShowInventoryModal] = React.useState(false);
-  /////////////////////////////////
-  // functions
-  ////////////////////////////////
+
   function addItemToWorkorder(inventoryItem) {
     // log("incoming item", inventoryItem);
     let cWorkorderObj = structuredClone(ssWorkorderObj);
@@ -96,18 +89,16 @@ export function Options_Section({
     __setWorkorderObj(cWorkorderObj);
   }
 
-  // log("modal", sShowWorkorderModal);
+  log("modal", zOptionsTabName);
+  /////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////
   return (
     <View style={{ flex: 1 }}>
       <TabBar
         zOptionsTabName={zOptionsTabName}
-        workorderBtnClicked={(workorderObj) => log("clicked", workorderObj)}
-        ssWorkorderObj={ssWorkorderObj}
-        ssShowWorkorderModal={sShowWorkorderModal}
-        ssShowInventoryModal={sShowInventoryModal}
+        _zSetOptionsTabName={_zSetOptionsTabName}
         __setShowInventoryModal={_setShowInventoryModal}
         __setShowWorkorderModal={_setShowWorkorderModal}
-        __setOptionsTabName={__setOptionsTabName}
       />
       {zOptionsTabName === TAB_NAMES.optionsTab.quickItems && (
         <QuickItemComponent
@@ -118,29 +109,13 @@ export function Options_Section({
         />
       )}
       {zOptionsTabName === TAB_NAMES.optionsTab.inventory && (
-        <InventoryComponent
-          ssInventoryArr={ssInventoryArr}
-          ssWorkorderObj={ssWorkorderObj}
-          __setInventoryItem={__setInventoryItem}
-          __setOptionsTabName={__setOptionsTabName}
-          __setWorkorderObj={__setWorkorderObj}
-          __addItemToWorkorder={addItemToWorkorder}
-        />
+        <InventoryComponent />
       )}
       {zOptionsTabName === TAB_NAMES.optionsTab.workorders && (
-        <WorkordersComponent
-          ssWorkordersArr={ssWorkordersArr}
-          __setWorkorderObj={__setWorkorderObj}
-          __setWorkorderPreviewObject={__setWorkorderPreviewObj}
-          __setOptionsTabName={__setOptionsTabName}
-          __setInfoComponentName={__setInfoComponentName}
-        />
+        <WorkordersComponent />
       )}
       {zOptionsTabName === TAB_NAMES.optionsTab.messages && (
-        <MessagesComponent
-          ssMessagesArr={ssMessagesArr}
-          __setMessagesArr={__setMessagesArr}
-        />
+        <MessagesComponent />
       )}
     </View>
   );
@@ -148,11 +123,7 @@ export function Options_Section({
 
 const TabBar = ({
   zOptionsTabName,
-  workorderBtnClicked,
-  ssWorkorderObj,
-  ssShowWorkorderModal,
-  ssShowInventoryModal,
-  __setOptionsTabName,
+  _zSetOptionsTabName,
   __setShowWorkorderModal,
   __setShowInventoryModal,
 }) => (
@@ -169,7 +140,7 @@ const TabBar = ({
       }}
     >
       <TabMenuButton
-        onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
+        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
         text={TAB_NAMES.optionsTab.quickItems}
         isSelected={
           zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
@@ -177,7 +148,7 @@ const TabBar = ({
       />
       <Divider />
       <TabMenuButton
-        onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.workorders)}
+        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
         text={TAB_NAMES.optionsTab.workorders}
         isSelected={
           zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
@@ -193,7 +164,7 @@ const TabBar = ({
       />
       <Divider />
       <TabMenuButton
-        onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.inventory)}
+        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory)}
         text={TAB_NAMES.optionsTab.inventory}
         isSelected={
           zOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
@@ -209,7 +180,7 @@ const TabBar = ({
       />
       <Divider />
       <TabMenuButton
-        onPress={() => __setOptionsTabName(TAB_NAMES.optionsTab.messages)}
+        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}
         text={TAB_NAMES.optionsTab.messages}
         isSelected={
           zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false

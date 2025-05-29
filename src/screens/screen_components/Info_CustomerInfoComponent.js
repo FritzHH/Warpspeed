@@ -104,13 +104,7 @@ export function CustomerInfoScreenComponent({
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
 
   useEffect(() => {
-    // __setItemsTabName(TAB_NAMES.itemsTab.customerList);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders);
-
-    return () => {
-      _setCustomerInfo(null);
-    };
+    return () => {};
   }, []);
 
   function handleBox1TextChange(incomingText = "") {

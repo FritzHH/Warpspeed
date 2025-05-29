@@ -8,6 +8,7 @@ import {
   bike_descriptions_db,
   COLLECTION_NAMES,
   CUSTOMER_PROTO,
+  INVENTORY_CATEGORIES,
   INVENTORY_ITEM_PROTO,
   printer_names,
   RECEIPT_TYPES,
@@ -24,7 +25,12 @@ import {
   setPreferences,
   subscribeToInventory,
 } from "./db";
-import { formatDateTime, generateRandomID, log } from "./utils";
+import {
+  formatDateTime,
+  generateBarcode,
+  generateRandomID,
+  log,
+} from "./utils";
 import { customerSubscribe } from "./db_subscriptions";
 import { dbSetCustomerObj } from "./db_calls";
 
@@ -77,10 +83,14 @@ export function sendTestMessage() {
 }
 
 export function fillInventory() {
-  for (let i = 0; i <= 5; i++) {
+  let keys = Object.keys(INVENTORY_CATEGORIES);
+  for (let i = 1; i <= 5; i++) {
     let inv = { ...INVENTORY_ITEM_PROTO, id: generateRandomID() };
-    inv.name = "Test Item Name";
-    (inv.price = 2.49), (inv.catLocation = "Sales Floor");
+    inv.formalName = " Test Item Name: " + i;
+    inv.informalName = i < 3 ? i + " Informal name here" : "";
+    inv.price = i * 4 + "." + i + i * 2;
+    inv.category = INVENTORY_CATEGORIES[keys[i - 1]];
+    inv.upc = generateBarcode();
     setInventoryItem(inv);
   }
 }

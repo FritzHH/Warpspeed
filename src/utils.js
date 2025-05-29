@@ -196,9 +196,10 @@ export function generateRandomID(collectionPath) {
 }
 
 export function generateBarcode() {
-  let millis = new Date().getTime().toString();
-  let last8 = millis.slice(millis.length - 9, millis.length - 1);
-  let barcode = "0000" + last8;
+  let num = Math.random().toString();
+  num = num.split(".")[1];
+  num = num.slice(0, 8);
+  let barcode = "0000" + num;
   return barcode;
   // log(barcode.length, barcode);
 }

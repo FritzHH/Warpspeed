@@ -47,7 +47,7 @@ export const WORKORDER_PROTO = {
     backgroundColor: "",
     label: "",
   },
-  changeLog: [null],
+  changeLog: [],
   startedBy: "",
   partOrdered: "",
   partSource: "",
@@ -172,13 +172,13 @@ export const RECEIPT_PROTO = {
 };
 
 export const INVENTORY_ITEM_PROTO = {
-  name: "",
+  formalName: "",
+  informalName: "",
   price: 0,
-  salePrice: 0,
-  catMain: "",
-  catDescrip: "",
-  catLocation: "",
+  salePrice: "",
+  category: "",
   id: "",
+  upc: "",
 };
 
 export const APP_PREFERENCES_PROTO = {
@@ -216,69 +216,12 @@ export const DEFAULT_USER_PREFERENCES = {
 
 ////////// names ////////////////////////////
 export const INVENTORY_CATEGORIES = {
-  main: {
-    parts: "Parts",
-    labor: "Labor",
-    bikes: "Bikes",
-    accessories: "Accessories",
-    other: "Other",
-  },
-  // partsDescriptions: {
-  //   accessories: "Accessories",
-  //   brakes: "Brakes",
-  //   cable_housing: "Cables/Housing",
-  //   drivetrain: "Drivetrain",
-  //   shifting: "Shifting",
-  //   tubes: "Tubes",
-  //   tires: "Tires",
-  //   suspension: "Suspension",
-  //   frame: "Frame",
-  //   miscParts: "Misc. Parts",
-  // },
-  // laborDescriptions: {
-  //   brakes: "Brakes",
-  //   cable_housing: "Cables/Housing",
-  //   drivetrain: "Drivetrain",
-  //   shifting: "Shifting",
-  //   tubes: "Tubes",
-  //   tires: "Tires",
-  //   frame: "Frame",
-  //   assembly: "Assembly",
-  //   miscLabor: "Misc. Labor",
-  // },
-  // machineDescriptions: {
-  //   pedal: "Pedal",
-  //   electric: "Electric",
-  //   trike: "Trike",
-  //   scooter: "Scooter",
-  //   other: "Other",
-  // },
-  // accessoryDescriptions: {
-  //   parts: 'parts',
-  //   luggage: 'bags',
-
-  // },
-  // descriptions: {
-  //   accessories: "Accessories",
-  //   brakes: "Brakes",
-  //   cable_housing: "Cables/Housing",
-  //   drivetrain: "Drivetrain",
-  //   shifting: "Shifting",
-  //   tubes: "Tubes",
-  //   tires: "Tires",
-  //   bikeElectric: "Electric Bikes",
-  //   bikePedal: "Pedal Bikes",
-  //   otherMachines: "Other Machines",
-  //   miscLabor: "Misc. Labor",
-  //   miscParts: "Misc. Parts",
-  // },
-  location: {
-    service: "Service Bay",
-    retail: "Retail",
-  },
+  parts: "Parts",
+  labor: "Labor",
+  bikes: "Bikes",
+  accessories: "Accessories",
+  other: "Other",
 };
-
-// export const S
 
 export const COLLECTION_NAMES = {
   customers: "CUSTOMERS",

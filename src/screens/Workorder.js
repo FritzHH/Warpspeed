@@ -54,11 +54,13 @@ import {
   subscribeToNodeAddition,
   subscribeToNodeChange,
   subscribeToNodeRemoval,
+  getRealtimeNodeItem,
 } from "../db";
 import {
   fillCustomers,
   fillInventory,
   fillOpenWorkorders,
+  fillPreferences,
   sendTestMessage,
   testNode,
   testPayment,
@@ -72,6 +74,7 @@ import {
   openWorkordersSubscribe,
   removeCustomerSub,
   removeInventorySub,
+  settingsSubscribe,
 } from "../db_subscriptions";
 import {
   useCustomerPreviewStore,
@@ -79,6 +82,7 @@ import {
   useInventoryStore,
   useOpenWorkordersStore,
   useCurrentWorkorderStore,
+  useSettingsStore,
 } from "../stores";
 import {
   get,
@@ -105,7 +109,8 @@ export function WorkorderScreen() {
   );
   const _zModWorkorderItem = useOpenWorkordersStore((state) => state.modItem);
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
-  /////
+  const _zSetSettingsItem = useSettingsStore((state) => state.setSettingsItem);
+  const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
 
   //////////////////////////////////////////////////////////////////////////////
   const [sInitFlag, _setInitFlag] = React.useState(false);
@@ -115,10 +120,13 @@ export function WorkorderScreen() {
     openWorkordersSubscribe(_zModWorkorderItem);
     inventorySubscribe(_zModInventoryItem);
     customerPreviewListSubscribe(_zModCustPreviewItem);
+    settingsSubscribe(_zSetSettingsItem);
+    getRealtimeNodeItem("SETTINGS").then((res) => _zSetSettingsObj(res));
   }, []);
 
   async function initialize() {
     if (!sInitFlag) {
+      // fillPreferences();
       // fillInventory();
       // fillOpenWorkorders();
       setTimeout(async () => {}, 1000);

@@ -6,6 +6,7 @@ import {
   setFirestoreCollectionItem,
   setRealtimeNodeItem,
 } from "./db";
+import { log } from "./utils";
 
 // setters ///////////////////////////////////////////////////////
 export function dbSetCustomerObj(customerObj) {
@@ -19,6 +20,10 @@ export function dbSetCustomerObj(customerObj) {
   return setFirestoreCollectionItem("CUSTOMERS", customerObj.id, customerObj);
 }
 
+export function dbSetSettings(settingsObj) {
+  return setRealtimeNodeItem("SETTINGS", settingsObj);
+}
+
 export function dbSetOpenWorkorderItem(item) {
   let path = "OPEN-WORKORDERS/" + item.id;
   return setRealtimeNodeItem(path, item);
@@ -28,8 +33,9 @@ export function dbSetClosedWorkorderItem(item) {
   return setFirestoreCollectionItem("CLOSED-WORKORDERS", item.id, item);
 }
 
-export function dbSetInventoryItem(item) {
+export function dbSetInventoryItem(item, remove = false) {
   let path = "INVENTORY/" + item.id;
+  if (remove) item = null;
   return setRealtimeNodeItem(path, item);
 }
 

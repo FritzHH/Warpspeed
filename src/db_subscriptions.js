@@ -15,12 +15,13 @@ import {
   subscribeToNodeRemoval,
 } from "./db";
 import { arrayAddObjCheckForDupes, log } from "./utils";
+import { LocalPage } from "twilio/lib/rest/api/v2010/account/availablePhoneNumberCountry/local";
 
 let inventoryChangeSub, inventoryAddSub, inventoryRemoveSub;
 let workorderChangeSub, workorderAddSub, workorderRemoveSub;
 let custPreviewChangeSub, custPreviewAddSub, custPreviewRemoveSub;
 let customerObjSub;
-let appPreferencesObjSub;
+let settingsSub;
 
 // realtime database
 function arrayChangeCallback(type, key, obj, targetArr, dataTargetSetterFun) {
@@ -105,8 +106,11 @@ export async function customerPreviewListSubscribe(_zModItemCustPreviewItem) {
   );
 }
 
-export async function userSubscribe(ssUserObj, __setUserObj) {
-  appPreferencesObjSub = await subscribeToNodeChange("USERS");
+export async function settingsSubscribe(_zSetSettingsItem) {
+  settingsSub = await subscribeToNodeChange("SETTINGS", (type, key, val) => {
+    // log("incoming", key);
+    _zSetSettingsItem(key, val);
+  });
 }
 
 // firestore

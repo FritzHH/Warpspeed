@@ -3,22 +3,10 @@
 // import { getNewCollectionRef } from "./dbCalls";
 import { formatDateTime, generateRandomID, log } from "./utils";
 
-////////// bootstrap prototypes
-export const USER = {
-  id: "",
-  preferences: [],
-  quickButtons: [],
-};
-
-export const SETTINGS = {
-  quickButtons: [],
-  // brands: { ...bike_brands_db },
-  // optionalBrands: [...],
-  // orderingSources: [...part_sources_db],
-  // colors: { ...bike_colors_arr_db },
-  // descriptions: [...bike_descriptions_db],
-  // printerNames: [...printer_names],
-  // discounts: [...discounts_db],
+////////// data types
+export const DISCOUNT_TYPES = {
+  percent: "Percent",
+  dollar: "Dollar Amount",
 };
 
 /////////// object prototypes
@@ -181,19 +169,181 @@ export const INVENTORY_ITEM_PROTO = {
   upc: "",
 };
 
-export const APP_PREFERENCES_PROTO = {
+export const SETTINGS_PROTO = {
   statuses: [
-    { name: "Service", id: "343343314" },
-    { name: "Finished", id: "343343312" },
+    { name: "Service", position: 0 },
+    { name: "Finished", position: 1 },
   ],
-  quickItemButtonNames: [],
-  bikeColors: [],
-  bikeBrands: [],
-  bikeOptionalBrands: [],
-  discounts: [],
-  users: [],
-  bikeDescriptions: [],
-  partSources: [],
+  quickItemButtonNames: [
+    {
+      name: "Tune-Up",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Tube & Tire",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Brakes",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Shifting",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Drivetrain",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Cable",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Spoke",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Cleaning",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Scooter",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Pickup",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "Diagnostics",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "$Labor",
+      position: "999",
+      items: [],
+    },
+    {
+      name: "Brakes",
+      position: "1",
+      items: [],
+    },
+    {
+      name: "$Part",
+      position: "1000",
+      items: [],
+    },
+  ],
+  bikeColors: [
+    {
+      textColor: "black",
+      backgroundColor: "whitesmoke",
+      label: "White",
+    },
+    {
+      textColor: "white",
+      backgroundColor: "blue",
+      label: "Blue",
+    },
+    {
+      textColor: "black",
+      backgroundColor: "lightblue",
+      label: "Light-blue",
+    },
+    {
+      textColor: "white",
+      backgroundColor: "red",
+      label: "Red",
+    },
+    {
+      textColor: "white",
+      backgroundColor: "green",
+      label: "Green",
+    },
+
+    {
+      textColor: "whitesmoke",
+      backgroundColor: "black",
+      label: "Black",
+    },
+    {
+      textColor: "black",
+      backgroundColor: "yellow",
+      label: "Yellow",
+    },
+    {
+      textColor: "white",
+      backgroundColor: "maroon",
+      label: "Maroon",
+    },
+    {
+      textColor: "white",
+      backgroundColor: "rgb(139,69,19)",
+      label: "Brown",
+    },
+    {
+      textColor: "black",
+      backgroundColor: "rgb(192,192,192)",
+      label: "Silver",
+    },
+    {
+      textColor: "black",
+      backgroundColor: "tan",
+      label: "Tan",
+    },
+    {
+      textColor: "black",
+      backgroundColor: "beige",
+      label: "Beige",
+    },
+    {
+      textColor: "white",
+      backgroundColor: "darkgray",
+      label: "Gray",
+    },
+    {
+      textColor: "black",
+      backgroundColor: "lightgray",
+      label: "Light-gray",
+    },
+    {
+      textColor: "black",
+      backgroundColor: "pink",
+      label: "Pink",
+    },
+  ],
+  bikeBrands: ["Trek", "Specialized", "Sun", "Marin"],
+  bikeBrandsName: "Bikes",
+  bikeOptionalBrands: ["Euphree", "Lectric", "Hiboy"],
+  bikeOptionalBrandsName: "E-bikes",
+  discounts: [
+    { name: "50% Off Item", value: "50", type: DISCOUNT_TYPES.percent },
+    { name: "10% Off Item", value: "10", type: DISCOUNT_TYPES.percent },
+    { name: "20% Off Item", value: "20", type: DISCOUNT_TYPES.percent },
+    { name: "30% Off Item", value: "30", type: DISCOUNT_TYPES.percent },
+    { name: "40% Off Item", value: "40", type: DISCOUNT_TYPES.percent },
+    { name: "50% Off Item", value: "50", type: DISCOUNT_TYPES.percent },
+    {
+      name: "2-bike purchase, $100 Off Each Bike",
+      value: "100",
+      type: DISCOUNT_TYPES.dollar,
+    },
+    { name: "$10 Off", value: "10", type: DISCOUNT_TYPES.dollar },
+  ],
+  bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
+  partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   printerNames: [],
   loginTimeout: 15,
 };
@@ -265,117 +415,86 @@ export const QUICK_BUTTON_NAMES = [
   {
     name: "Tune-Up",
     id: "1234",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Tube & Tire",
     id: "58349",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Brakes",
     id: "5834fg9",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Shifting",
     id: "583r49",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Drivetrain",
     id: "58trt349",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Cable",
     id: "583sfg49",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Spoke",
     id: "58349",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Cleaning",
     id: "583fgs49",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Scooter",
     id: "5834nh9",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Pickup",
     id: "5855r349",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
     name: "Diagnostics",
     id: "58fgs349",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
-    name: "Labor",
+    name: "$Labor",
     id: "58sgf349",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "999",
+    items: [],
   },
   {
     name: "Brakes",
     id: "5854t349",
-    items: [
-      "Tune-Up - Pedal Bike - Standard",
-      "Tune-Up - Pedal Bike - Single Speed",
-    ],
+    position: "1",
+    items: [],
   },
   {
-    name: "Part",
+    name: "$Part",
     id: "583t54t49",
-    items: [
-      { name: "Tune-Up - Pedal Bike - Standard", id: "583t54t49" },
-      {
-        name: "Tune-Up - Pedal Bike - Single Speedvdfgagfasgafgfas",
-        id: "5854t349",
-      },
-    ],
+    position: "1000",
+    items: [],
   },
 ];
 export const FOCUS_NAMES = {
@@ -394,8 +513,8 @@ export const FOCUS_NAMES = {
 
 ///////// variables to import from DB ///////////////////////////////
 export const workorder_status = [
-  { name: "Service", id: "343343", position: 0 },
-  { name: "Finished", id: "343343312", position: 1 },
+  { name: "Service", position: 0 },
+  { name: "Finished", position: 1 },
 ];
 export const printer_names = {
   left: "Left Desk Printer",

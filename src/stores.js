@@ -137,21 +137,6 @@ export const useInventoryStore = create((set, get) => ({
         inventoryArr: removeItem(get().inventoryArr, item),
       }));
   },
-  changeItem: (newItem) => {
-    set((state) => ({
-      inventoryArr: changeItem(get().inventoryArr, newItem),
-    }));
-  },
-  addItem: (newItem) => {
-    set((state) => ({
-      inventoryArr: addItem(get().inventoryArr, newItem),
-    }));
-  },
-  removeItem: (oldItem) => {
-    set((state) => ({
-      inventoryArr: removeItem(get().inventoryArr, oldItem),
-    }));
-  },
 }));
 
 export const useOpenWorkordersStore = create((set, get) => ({
@@ -204,6 +189,14 @@ export const useWorkorderPreviewStore = create((set, get) => ({
   getPreviewObj: () => get().previewObj,
   // setPreviewObj: (obj) => log("setting", obj),
   setPreviewObj: (obj) => set((state) => ({ previewObj: obj })),
+}));
+
+export const useSettingsStore = create((set, get) => ({
+  settings: {},
+  getSettingsObj: () => get().settings,
+  setSettingsObj: (obj) => set((state) => ({ settings: obj })),
+  setSettingsItem: (key, val) =>
+    set((state) => ({ ...get().setttings, [key]: val })),
 }));
 
 /// internal functions ///////////////////////////////////////////

@@ -30,23 +30,24 @@ import {
   useCurrentWorkorderStore,
   useInventoryStore,
   useOpenWorkordersStore,
+  useSettingsStore,
 } from "../../stores";
+import {
+  dbSetInventoryItem,
+  dbSetOpenWorkorderItem,
+  dbSetSettings,
+} from "../../db_calls";
 
 const tabMargin = 20;
-export function InventoryComponent({
-  ssInventoryArr,
-  ssWorkorderObj,
-  __setInventoryItem,
-  __setWorkorderObj,
-  __setOptionsTabName,
-  __addItemToWorkorder,
-}) {
+export function InventoryComponent({}) {
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
+  const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
   ///
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   const zCurrentWorkorderObj = useCurrentWorkorderStore((state) =>
     state.getWorkorderObj()
   );
+  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
 
   /////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
@@ -63,9 +64,6 @@ export function InventoryComponent({
   }
 
   function search(searchTerm) {
-    // log("search", searchTerm);
-    // return;
-
     _setSearchTerm(searchTerm);
     if (searchTerm.length == 0) {
       _setSearchResults([]);
@@ -116,14 +114,41 @@ export function InventoryComponent({
     // log(res);
   }
 
+  function handleQuickButtonAdd(itemName, invItem) {
+    let settingsObj = { ...zSettingsObj };
+    let idx = zSettingsObj.quickItemButtonNames.findIndex(
+      (o) => o.name === itemName
+    );
+    let obj = settingsObj.quickItemButtonNames[idx];
+    // log("obj", obj);
+    // return;
+    if (!obj.assignments) {
+      obj.assignments = [];
+      obj.assignments.push(invItem.id);
+    } else if (obj.assignments.find((o) => o === invItem.id)) {
+      return;
+    } else {
+      obj.assignments.push(invItem.id);
+    }
+    // log(obj.assignments);
+    settingsObj.quickItemButtonNames[idx] = obj;
+    _zSetSettings(settingsObj);
+    dbSetSettings(settingsObj);
+  }
+
   function handleCreateItemPressed(item) {
     _zModInventoryItem(item, "add");
+    dbSetInventoryItem(item);
   }
+
   function handleChangeItem(item) {
     _zModInventoryItem(item, "change");
+    _setInventoryItemInModal(item);
+    dbSetInventoryItem(item);
   }
   function handleDeleteItemPressed(item) {
     _zModInventoryItem(item, "remove");
+    dbSetInventoryItem(item, true);
   }
   function handleClosePress() {
     _setInventoryItemInModal(null);
@@ -131,8 +156,6 @@ export function InventoryComponent({
 
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
-  let listData = zInventoryArr;
-  if (sSearchResults.length > 0) listData = sSearchResults;
   return (
     <View style={{ width: "100%", height: "100%" }}>
       <View
@@ -229,7 +252,7 @@ export function InventoryComponent({
           marginLeft: 10,
           // backgroundColor: "green",
         }}
-        data={listData}
+        data={sSearchResults.length > 0 ? sSearchResults : zInventoryArr}
         renderItem={(item) => {
           if (!item) return null;
           item = item.item;
@@ -279,12 +302,13 @@ export function InventoryComponent({
                     Component={() => {
                       return (
                         <InventoryItemInModal
-                          __setItem={_zModInventoryItem}
                           item={sInventoryItemInModal}
                           handleCreateItemPressed={handleCreateItemPressed}
                           handleChangeItem={handleChangeItem}
                           handleDeleteItemPressed={handleDeleteItemPressed}
                           handleClosePress={handleClosePress}
+                          handleQuickButtonAdd={handleQuickButtonAdd}
+                          zSettingsObj={zSettingsObj}
                         />
                       );
                     }}
@@ -361,6 +385,8 @@ export function InventoryComponent({
               handleChangeItem={handleChangeItem}
               handleDeleteItemPressed={handleDeleteItemPressed}
               handleClosePress={handleClosePress}
+              zSettingsObj={zSettingsObj}
+              _zSetSettingsObj={_zSetSettings}
             />
           );
         }}

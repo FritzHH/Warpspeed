@@ -13,6 +13,7 @@ import {
   printer_names,
   RECEIPT_TYPES,
   RECEIPT_WORKORDER_PROTO,
+  SETTINGS_PROTO,
   SMS_PROTO,
   WORKORDER_PROTO,
 } from "./data";
@@ -24,6 +25,7 @@ import {
   setOpenWorkorder,
   setPreferences,
   subscribeToInventory,
+  getRealtimeNodeItem,
 } from "./db";
 import {
   formatDateTime,
@@ -32,41 +34,9 @@ import {
   log,
 } from "./utils";
 import { customerSubscribe } from "./db_subscriptions";
-import { dbSetCustomerObj } from "./db_calls";
-
-export let TEST_CUSTOMER = cloneDeep(CUSTOMER_PROTO);
-TEST_CUSTOMER.first = "Jim";
-TEST_CUSTOMER.last = "Jones";
-TEST_CUSTOMER.cell = "123-434-5456";
+import { dbSetCustomerObj, dbSetSettings } from "./db_calls";
 
 export function testPayment() {}
-
-export function sendTestCollectionItem() {
-  let proto = cloneDeep(RECEIPT_WORKORDER_PROTO);
-  proto.dateTime = formatDateTime(new Date()).topTicketDateTimeString;
-  proto.workorderNumber = "1234";
-  proto.customerContactBlurb =
-    "Customer Name \n(239) 336 9177 \n123 Bonita Beach Rd \nNaples, FL";
-  proto.workorderItem = "Trek Hybrid";
-  proto.startedOnStr = formatDateTime(new Date()).topTicketDateTimeString;
-  proto.itemArr = [
-    { item: "Brake cable", price: "2.00", qty: 2, discount: "" },
-  ];
-  proto.laborCharges = "22.90";
-  proto.partsCharges = "43.45";
-  proto.taxCharges = "4.34";
-  proto.total = "76.56";
-  proto.customerNotes =
-    "please was the damn bike and shit also \nclean the chain";
-  proto.internalNotes =
-    "The chain is falling off and so on and so forth so keep an eye on that or else bad shit will happen";
-  proto.barcode = "123432756456";
-  proto.id = generateRandomID();
-  proto.receiptType = RECEIPT_TYPES.workorder;
-  proto.location = printer_names.left;
-  // log("proto", proto);
-  setFirestoreCollectionItem(COLLECTION_NAMES.printers, proto, true);
-}
 
 export function sendTestMessage() {
   let message = { ...SMS_PROTO };
@@ -125,25 +95,8 @@ export function fillCustomers() {
   }
 }
 
-export function testNode() {
-  // subscribeToInventory((changeType, val) => {
-  //   log("here is the changed val", val);
-  // });
-  // let wo = { ...WORKORDER_PROTO };
-  // wo.brand = "trek nvvvy";
-  // wo.id = "3434";
-  // setOpenWorkorder(wo);
-
-  // let invObj = { ...INVENTORY_ITEM_PROTO };
-  // invObj.id = "13dddfddsaddddddfdddf3d4adfsdfadfae3";
-  // invObj.name = "cablsfe";
-  // setInventoryItem(invObj);
-
-  let cust1 = { ...CUSTOMER_PROTO };
-  cust1.first = "fritz";
-  cust1.last = "hieb";
-  cust1.cell = "1111111114";
-  cust1.id = "vpgJGrwyer1lJYmwUDPM";
-  // setCustomer(cust1).then((res) => log("result", res));
-  // customerSubscribe(cust1, (obj) => log("obj", obj));
+export function fillPreferences() {
+  // log(SETTINGS_PROTO);
+  dbSetSettings(SETTINGS_PROTO);
+  // getRealtimeNodeItem("SETTINGS").then((res) => log("res", res));
 }

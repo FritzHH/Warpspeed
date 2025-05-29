@@ -455,12 +455,13 @@ export const ModalDropdown = ({
 
 export const InventoryItemInModal = ({
   item = INVENTORY_ITEM_PROTO,
-  newItemUPC,
-  _zModItem,
+  zSettingsObj,
+  _zSetSettingsObj,
   handleClosePress,
   handleCreateItemPressed,
   handleDeleteItemPressed,
   handleChangeItem,
+  handleQuickButtonAdd,
 }) => {
   const _zSetFocus = useInvModalStore((state) => state.setFocus);
   ///
@@ -471,6 +472,7 @@ export const InventoryItemInModal = ({
   const isMounted = useRef(false);
   if (!item) return null;
 
+  const isNewItem = item.upc && !item.id;
   useEffect(() => {
     if (!item) return;
     if (!isMounted.current) {
@@ -493,7 +495,8 @@ export const InventoryItemInModal = ({
   };
 
   function changeItem(item, focusName) {
-    log("item", item);
+    // _zSetFocus(focusName);
+    // log("item", item);
     handleChangeItem(item);
   }
 
@@ -503,11 +506,16 @@ export const InventoryItemInModal = ({
     handleClosePress();
   }
 
-  function handleCancelPress() {
+  function handleRemoveItem() {
+    handleDeleteItemPressed(item);
     handleClosePress();
   }
 
-  // log("zFocus", item);
+  function handleCancelPress() {
+    handleClosePress();
+  }
+  // log("obj", zSettingsObj);
+  // log(zSettingsObj.quickItemButtonNames);
   return (
     <TouchableWithoutFeedback>
       <View
@@ -538,14 +546,17 @@ export const InventoryItemInModal = ({
                 color: "black",
                 borderWidth: 1,
               }}
+              // selection={{ start: 2, end:  }}
               autoFocus={zFocus === FOCUS_NAMES.formalName}
               onClick={() => _zSetFocus(FOCUS_NAMES.formalName)}
               onChangeText={(val) => {
                 let newItem = { ...item };
                 newItem.formalName = val;
-                newItemUPC ? _setNewItem(newItem) : changeItem(item);
+                isNewItem
+                  ? _setNewItem(newItem)
+                  : changeItem(newItem, FOCUS_NAMES.formalName);
               }}
-              value={newItemUPC ? sNewItem.formalName : item.formalName}
+              value={isNewItem ? sNewItem.formalName : item.formalName}
             />
             <Text>Keyword Name</Text>
             <TextInput
@@ -561,9 +572,11 @@ export const InventoryItemInModal = ({
               onChangeText={(val) => {
                 let newItem = { ...item };
                 newItem.informalName = val;
-                newItemUPC ? _setNewItem(newItem) : changeItem(item);
+                isNewItem
+                  ? _setNewItem(newItem)
+                  : changeItem(newItem, FOCUS_NAMES.informalName);
               }}
-              value={newItemUPC ? sNewItem.informalName : item.informalName}
+              value={isNewItem ? sNewItem.informalName : item.informalName}
             />
           </View>
           <View>
@@ -575,9 +588,11 @@ export const InventoryItemInModal = ({
                 onChangeText={(val) => {
                   let newItem = { ...item };
                   newItem.price = val;
-                  newItemUPC ? _setNewItem(newItem) : changeItem(item);
+                  isNewItem
+                    ? _setNewItem(newItem)
+                    : changeItem(newItem, FOCUS_NAMES.price);
                 }}
-                value={newItemUPC ? sNewItem.price : item.price}
+                value={isNewItem ? sNewItem.price : item.price}
                 style={{ fontSize: 16 }}
               />
             </Text>
@@ -589,9 +604,11 @@ export const InventoryItemInModal = ({
                 onChangeText={(val) => {
                   let newItem = { ...item };
                   newItem.salePrice = val;
-                  newItemUPC ? _setNewItem(newItem) : changeItem(item);
+                  isNewItem
+                    ? _setNewItem(newItem)
+                    : changeItem(newItem, FOCUS_NAMES.sale);
                 }}
-                value={newItemUPC ? sNewItem.salePrice : item.salePrice}
+                value={isNewItem ? sNewItem.salePrice : item.salePrice}
                 style={{ fontSize: 16 }}
               />
             </Text>
@@ -620,11 +637,13 @@ export const InventoryItemInModal = ({
               autoFocus={zFocus === FOCUS_NAMES.upc}
               onClick={() => _zSetFocus(FOCUS_NAMES.upc)}
               style={{ fontSize: 16, color: "black", marginTop: 0 }}
-              value={newItemUPC ? newItemUPC : item.upc}
+              value={item.upc}
               onChangeText={(val) => {
                 let newItem = { ...item };
                 item.upc = val;
-                newItemUPC ? _setNewItem(newItem) : changeItem(item);
+                isNewItem
+                  ? _setNewItem(newItem)
+                  : changeItem(newItem, FOCUS_NAMES.upc);
               }}
             />
           </View>
@@ -632,14 +651,24 @@ export const InventoryItemInModal = ({
         <View
           style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
         >
-          {newItemUPC && (
-            <Button text={"Create Item"} onPress={handleNewItemPress} />
-          )}
           <Button
-            text={newItemUPC ? "Cancel" : "Close"}
-            onPress={handleCancelPress}
+            text={isNewItem ? "Create Item" : "Close"}
+            onPress={isNewItem ? handleNewItemPress : handleCancelPress}
+          />
+          <Button
+            text={isNewItem ? "Cancel" : "Delete Item"}
+            onPress={isNewItem ? handleCancelPress : handleRemoveItem}
           />
         </View>
+        <ModalDropdown
+          buttonLabel={"Quick Items"}
+          data={
+            zSettingsObj.quickItemButtonNames
+              ? zSettingsObj.quickItemButtonNames.map((o) => o.name)
+              : []
+          }
+          onSelect={(itemName) => handleQuickButtonAdd(itemName, item)}
+        />
       </View>
     </TouchableWithoutFeedback>
   );

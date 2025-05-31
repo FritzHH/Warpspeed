@@ -207,7 +207,8 @@ export const ScreenModal = ({
   shadowStyle = { ...SHADOW_RADIUS_PROTO },
   buttonIcon,
   handleModalActionInternally = false,
-  canExitOnOuterModalClick = true,
+  // canExitOnOuterModalClick = true,
+  handleOuterClick,
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sMouseOver, _setMouseOver] = React.useState(false);
@@ -239,9 +240,10 @@ export const ScreenModal = ({
     <TouchableWithoutFeedback
       ref={ref}
       onPress={() => {
-        if (canExitOnOuterModalClick) {
+        if (handleOuterClick) {
           _setInternalModalShow(false);
-          setModalVisibility(false);
+          // setModalVisibility(false);
+          handleOuterClick();
         }
       }}
     >
@@ -331,17 +333,13 @@ export const ModalDropdown = ({
   // log(data);
 
   return (
-    <TouchableWithoutFeedback
-      // style={{ width: 500, height: 100 }}
-      onPress={() => toggleModal()}
-    >
-      <View style={{ flex: 1 }}>
+    <TouchableWithoutFeedback onPress={() => toggleModal()}>
+      <View>
         <TouchableOpacity
           style={{
             backgroundColor: Colors.blueButtonBackground,
             borderRadius: 2,
             paddingHorizontal: 10,
-            // width: 390,
             height: 25,
             paddingVertical: 1,
             alignItems: "center",
@@ -454,14 +452,15 @@ export const ModalDropdown = ({
 };
 
 export const InventoryItemInModal = ({
-  item = INVENTORY_ITEM_PROTO,
-  zSettingsObj,
-  _zSetSettingsObj,
+  item,
+  quickItemButtonNames,
+  quickItemButtonAssignments,
   handleClosePress,
   handleCreateItemPressed,
   handleDeleteItemPressed,
   handleChangeItem,
   handleQuickButtonAdd,
+  handleQuickButtonRemove,
 }) => {
   const _zSetFocus = useInvModalStore((state) => state.setFocus);
   ///
@@ -471,7 +470,7 @@ export const InventoryItemInModal = ({
   const [sNewItem, _setNewItem] = useState(INVENTORY_ITEM_PROTO);
   const isMounted = useRef(false);
   if (!item) return null;
-
+  // log("names", quickItemButtonNames);
   const isNewItem = item.upc && !item.id;
   useEffect(() => {
     if (!item) return;
@@ -514,19 +513,21 @@ export const InventoryItemInModal = ({
   function handleCancelPress() {
     handleClosePress();
   }
-  // log("obj", zSettingsObj);
-  // log(zSettingsObj.quickItemButtonNames);
   return (
-    <TouchableWithoutFeedback>
+    <TouchableWithoutFeedback
+      onLongPress={() => {
+        () => handleRemoveItem();
+      }}
+    >
       <View
         style={{
           width: "40%",
           height: "60%",
-          backgroundColor: Colors.opacityBackgroundLight,
+          // backgroundColor: Colors.opacityBackgroundLight,
           ...SHADOW_RADIUS_PROTO,
           shadowOffset: { width: 3, height: 3 },
           padding: 15,
-          backgroundColor: "whitesmoke",
+          backgroundColor: "white",
         }}
       >
         <View
@@ -648,26 +649,30 @@ export const InventoryItemInModal = ({
             />
           </View>
         ) : null}
-        <View
-          style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}
-        >
-          <Button
-            text={isNewItem ? "Create Item" : "Close"}
-            onPress={isNewItem ? handleNewItemPress : handleCancelPress}
-          />
-          <Button
-            text={isNewItem ? "Cancel" : "Delete Item"}
-            onPress={isNewItem ? handleCancelPress : handleRemoveItem}
-          />
-        </View>
+
+        {isNewItem ? (
+          <Button text={"Create Item"} onPress={handleNewItemPress} />
+        ) : null}
         <ModalDropdown
           buttonLabel={"Quick Items"}
+          buttonStyle={{ width: 200 }}
           data={
-            zSettingsObj.quickItemButtonNames
-              ? zSettingsObj.quickItemButtonNames.map((o) => o.name)
-              : []
+            quickItemButtonNames ? quickItemButtonNames.map((o) => o.name) : []
           }
           onSelect={(itemName) => handleQuickButtonAdd(itemName, item)}
+        />
+        <FlatList
+          data={quickItemButtonAssignments}
+          renderItem={(item) => {
+            item = item.item;
+            return (
+              <TouchableWithoutFeedback
+                onLongPress={() => handleQuickButtonRemove(item)}
+              >
+                <Text>{item.name}</Text>
+              </TouchableWithoutFeedback>
+            );
+          }}
         />
       </View>
     </TouchableWithoutFeedback>

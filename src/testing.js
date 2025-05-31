@@ -4,36 +4,22 @@ import { cloneDeep } from "lodash";
 import {
   bike_brands_db,
   bike_colors_arr_db,
-  bike_colors_db,
   bike_descriptions_db,
-  COLLECTION_NAMES,
   CUSTOMER_PROTO,
   INVENTORY_CATEGORIES,
   INVENTORY_ITEM_PROTO,
-  printer_names,
-  RECEIPT_TYPES,
-  RECEIPT_WORKORDER_PROTO,
   SETTINGS_PROTO,
   SMS_PROTO,
   WORKORDER_PROTO,
 } from "./data";
-import {
-  sendSMS,
-  setFirestoreCollectionItem,
-  setCustomer,
-  setInventoryItem,
-  setOpenWorkorder,
-  setPreferences,
-  subscribeToInventory,
-  getRealtimeNodeItem,
-} from "./db";
+import { setInventoryItem, setOpenWorkorder } from "./db";
 import {
   formatDateTime,
   generateBarcode,
   generateRandomID,
   log,
+  randomWordGenerator,
 } from "./utils";
-import { customerSubscribe } from "./db_subscriptions";
 import { dbSetCustomerObj, dbSetSettings } from "./db_calls";
 
 export function testPayment() {}
@@ -52,13 +38,23 @@ export function sendTestMessage() {
   // sendSMS(message);
 }
 
-export function fillInventory() {
+export async function fillInventory() {
   let keys = Object.keys(INVENTORY_CATEGORIES);
   for (let i = 1; i <= 5; i++) {
     let inv = { ...INVENTORY_ITEM_PROTO, id: generateRandomID() };
-    inv.formalName = " Test Item Name: " + i;
-    inv.informalName = i < 3 ? i + " Informal name here" : "";
+    inv.formalName =
+      (await randomWordGenerator()) +
+      " " +
+      (await randomWordGenerator()) +
+      " " +
+      (await randomWordGenerator());
+    inv.informalName =
+      "Informal " +
+      (await randomWordGenerator()) +
+      " " +
+      (await randomWordGenerator());
     inv.price = i * 4 + "." + i + i * 2;
+    if (i === 1 || i === 3) inv.salePrice = i * 2 + "." + i + i * 2;
     inv.category = INVENTORY_CATEGORIES[keys[i - 1]];
     inv.upc = generateBarcode();
     setInventoryItem(inv);
@@ -100,3 +96,5 @@ export function fillPreferences() {
   dbSetSettings(SETTINGS_PROTO);
   // getRealtimeNodeItem("SETTINGS").then((res) => log("res", res));
 }
+
+export function initWorkorder() {}

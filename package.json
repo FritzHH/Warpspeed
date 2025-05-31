@@ -22,6 +22,7 @@
     "firebase": "^11.6.1",
     "fs": "^0.0.1-security",
     "lodash": "^4.17.21",
+    "random-words": "^2.0.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-native-pager-view": "^6.7.1",
@@ -39,7 +40,7 @@
     "zustand": "^5.0.5"
   },
   "scripts": {
-    "emulator":"firebase emulators:start --only functions",
+    "emulator": "firebase emulators:start --only functions",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

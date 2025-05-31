@@ -1,77 +1,65 @@
+/*eslint-disable*/
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   FlatList,
-  TouchableWithoutFeedback,
   TouchableOpacity,
   TextInput,
 } from "react-native-web";
 import {
-  bike_colors_arr_db,
-  COLLECTION_NAMES,
-  system_users_db,
-  CUSTOMER_PROTO,
-  INFO_COMPONENT_NAMES,
-  TAB_NAMES,
-  WORKORDER_PROTO,
   WORKORDER_ITEM_PROTO,
   QUICK_BUTTON_NAMES,
   INVENTORY_ITEM_PROTO,
-  ADJUSTABLE_BUTTON_SIZE_OPTIONS_ARR,
   DEFAULT_USER_PREFERENCES,
+  WORKORDER_PROTO,
+  SETTINGS_PROTO,
 } from "../../data";
-import { Colors, ViewStyles } from "../../styles";
+import { Colors } from "../../styles";
 
-import { jclone, dim, log } from "../../utils";
+import { log, randomWordGenerator } from "../../utils";
 import {
   AlertBox,
   Button,
   InventoryItemInModal,
   ScreenModal,
+  SHADOW_RADIUS_NOTHING,
   SHADOW_RADIUS_PROTO,
 } from "../../components";
 import { cloneDeep } from "lodash";
-import { Items_WorkorderItemsTab } from "./Items_WorkorderItems";
+import {
+  useSettingsStore,
+  useCurrentWorkorderStore,
+  useInventoryStore,
+} from "../../stores";
+import { dbSetInventoryItem, dbSetSettings } from "../../db_calls";
 
-let firstPass = false;
 const SEARCH_STRING_TIMER = 45 * 1000;
 
 export function QuickItemComponent({
   ssWorkorderObj = WORKORDER_PROTO,
-  ssAdjustableUserPreferences = DEFAULT_USER_PREFERENCES,
   ssInventoryArr,
   __setWorkorderObj,
 }) {
+  /// setters
+  const _zSetWorkorderObj = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
+  const _zModInventoryItem = useInventoryStore((state) => state.modItem);
+  /// getters
+  let zWorkorderObj = WORKORDER_PROTO;
+  let zSettingsObj = SETTINGS_PROTO;
+  zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
+  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+
   ///////////////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
-  const [sButtonSearchResults, _setButtonSearchResults] = React.useState({
-    name: null,
-    arr: [],
-  });
-  const [sInitDone, _setInitDone] = React.useState(false);
-  const [sQuickItemsButtonArr, _setQuickItemsButtonArr] =
-    React.useState(QUICK_BUTTON_NAMES);
-  const [sQuickButtonContentsArr, setstateQuickButtonContentsArr] =
-    React.useState([]);
+  const [sModalInventoryObj, _setModalInventoryObj] = React.useState(null);
 
-  const [sRefs, _setRefs] = useState([]);
-  // internal vars
   let lastSearchMillis = new Date().getTime();
-  // const refs = useRef([]);
-
-  useEffect(() => {
-    _setRefs((sRefs) =>
-      Array(sQuickItemsButtonArr.length)
-        .fill()
-        .map((_, i) => sRefs[i] || React.createRef())
-    );
-  }, [sQuickItemsButtonArr.length]);
-
-  ///////////////////////////
-  // functions
-  //////////////////////////
   function setSearchTimer() {
     setInterval(() => {
       let curTime = new Date().getTime();
@@ -83,15 +71,6 @@ export function QuickItemComponent({
     }, SEARCH_STRING_TIMER);
   }
 
-  function init() {
-    if (!sInitDone) {
-      search("br");
-      _setInitDone(true);
-      // setSearchTimer();
-    }
-  }
-  // init();
-
   function search(searchTerm) {
     lastSearchMillis = new Date().getTime();
     _setSearchTerm(searchTerm);
@@ -102,7 +81,7 @@ export function QuickItemComponent({
     if (searchTerm.length < 2) return;
     let res = {};
     let keys = Object.keys(INVENTORY_ITEM_PROTO);
-    ssInventoryArr.forEach((invItem) => {
+    zInventoryArr.forEach((invItem) => {
       keys.forEach((key) => {
         if (
           invItem[key]
@@ -118,29 +97,124 @@ export function QuickItemComponent({
     _setSearchResults(res);
   }
 
-  function quickItemSelected(item) {
-    // log(workorderOb);
-    let newItem = { ...WORKORDER_ITEM_PROTO };
-    // log("original", WORKORDER_ITEM_PROTO);
-    // log("first workorder", ssWorkorderObj.items);
-    Object.keys(WORKORDER_ITEM_PROTO).forEach((itemKey) => {
-      if (Object.hasOwn(item, itemKey)) newItem[itemKey] = item[itemKey];
+  function handleSearchItemSelected(item) {
+    if (!zWorkorderObj.id) {
+      _setModalInventoryObj(item);
+      return;
+    }
+    let wo = { ...zWorkorderObj };
+    wo.workorderLines.push(item);
+    _zSetWorkorderObj(wo);
+  }
+
+  function handleQuickButtonPress(buttonObj) {
+    let assignmentsArr = buttonObj.assignments;
+    if (!assignmentsArr) return;
+    let arr = [];
+    let notFoundArr = [];
+    assignmentsArr.forEach((id) => {
+      let item = zInventoryArr.find((o) => o.id === id);
+      if (item) {
+        arr.push(item);
+      } else {
+        notFoundArr.push(id);
+      }
     });
-    // log("new item", newItem);
-    let work = JSON.parse(JSON.stringify(ssWorkorderObj));
-    work.items.push(newItem);
-    // log("second workorder", work.items);
-    __setWorkorderObj(work);
+
+    // log(notFoundArr);
+    if (notFoundArr.length > 0) {
+      notFoundArr.forEach((id) => {
+        let idx = assignmentsArr.findIndex((o) => o === id);
+        assignmentsArr[idx] = null;
+      });
+      let newAssignmentsArr = assignmentsArr.filter((o) => o !== null);
+      buttonObj.assignments = newAssignmentsArr;
+      let settingsObj = { ...zSettingsObj };
+      let idx = settingsObj.quickItemButtonNames.findIndex(
+        (o) => o.name === buttonObj.name
+      );
+      settingsObj[idx] = buttonObj;
+      _zSetSettings(settingsObj);
+      dbSetSettings(settingsObj);
+      // log("settings", settingsObj);
+      // log("idx", idx.toString());
+    }
+    // settingsObj.quickItemButtonNames
+    _setSearchResults(arr);
+  }
+
+  function handleCreateItemPressed(item) {
+    _zModInventoryItem(item, "add");
+    dbSetInventoryItem(item);
+  }
+
+  function handleChangeItem(item) {
+    _zModInventoryItem(item, "change");
+    _setModalInventoryObj(item);
+    dbSetInventoryItem(item);
+  }
+  function handleDeleteItemPressed(item) {
+    _zModInventoryItem(item, "remove");
+    dbSetInventoryItem(item, true);
+  }
+
+  function handleQuickButtonRemove(qBItemToRemove, obj) {
+    // log("quick button to remove \n\n", qBItemToRemove);
+    // log("inventory obj to remove the button from \n\n", obj);
+    let idx = zSettingsObj.quickItemButtonNames.findIndex(
+      (o) => o.name === qBItemToRemove.name
+    );
+    let assignments = { ...zSettingsObj.quickItemButtonNames[idx] }.assignments;
+    let newAssignmentsArr = assignments.filter((id) => id != obj.id);
+    let newSettingsObj = { ...zSettingsObj };
+    newSettingsObj.quickItemButtonNames[idx] = newAssignmentsArr;
+    _zSetSettings(newSettingsObj);
+    dbSetSettings(newSettingsObj);
+    // log(newAssignmentsArr);
+  }
+
+  function handleQuickButtonAdd(itemName, invItem) {
+    let settingsObj = { ...zSettingsObj };
+    let idx = zSettingsObj.quickItemButtonNames.findIndex(
+      (o) => o.name === itemName
+    );
+    let obj = settingsObj.quickItemButtonNames[idx];
+    // log("obj", obj);
+    // return;
+    if (!obj.assignments) {
+      obj.assignments = [];
+      obj.assignments.push(invItem.id);
+    } else if (obj.assignments.find((o) => o === invItem.id)) {
+      return;
+    } else {
+      obj.assignments.push(invItem.id);
+    }
+    // log(obj.assignments);
+    settingsObj.quickItemButtonNames[idx] = obj;
+    _zSetSettings(settingsObj);
+    dbSetSettings(settingsObj);
   }
 
   function clearSearch() {
     _setSearchResults([]);
     _setSearchTerm("");
   }
-  // log("here", ssInventoryArr);
+
+  function getQuickButtonAssignmentsForInvItem(invItem) {
+    if (!invItem) return;
+    let arr = [];
+    zSettingsObj.quickItemButtonNames.forEach((quickItemButtonNameObj) => {
+      let assignmentsArr = quickItemButtonNameObj.assignments;
+      if (!assignmentsArr) return;
+      assignmentsArr.forEach((assignmentID) => {
+        if (assignmentID === invItem.id) arr.push(quickItemButtonNameObj);
+      });
+    });
+    return arr;
+  }
   //////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////
-  // log("refs", refs);
+  // log("refs", randomWordGenerator());
   return (
     <View style={{ width: "100%", height: "100%" }}>
       <View
@@ -188,84 +262,24 @@ export function QuickItemComponent({
           style={{
             marginLeft: 5,
           }}
-          data={sQuickItemsButtonArr}
+          data={zSettingsObj.quickItemButtonNames}
           keyExtractor={(item, index) => index.toString()}
           renderItem={(item) => {
             let index = item.index;
             item = item.item;
             return (
-              <ScreenModal
-                ref={sRefs[index]}
-                modalVisible={
-                  item.name === sButtonSearchResults.name &&
-                  sButtonSearchResults.arr.length > 0
-                }
-                setModalVisibility={(val) => {
-                  if (
-                    item.name === sButtonSearchResults.name &&
-                    sButtonSearchResults.arr.length > 0
-                  ) {
-                    _setButtonSearchResults({
-                      name: null,
-                      arr: [],
-                    });
-                  }
-                }}
-                modalCoordinateVars={{ x: 160, y: 0 }}
-                showOuterModal={false}
+              <Button
+                onPress={() => handleQuickButtonPress(item)}
                 buttonStyle={{
-                  paddingVertical: 5,
-                  marginVertical: 5,
-                  borderWidth: 0,
+                  ...SHADOW_RADIUS_NOTHING,
+                  borderBottomWidth: 1,
+                  borderColor: "darkgray",
                 }}
-                buttonTextStyle={{ paddingVertical: 5 }}
-                outerModalStyle={{}}
-                buttonLabel={item.name}
-                showButtonIcon={false}
-                handleButtonPress={() => {
-                  let arr = [];
-                  ssInventoryArr.forEach((invItem) => {
-                    if (invItem.id == item.id) arr.push(invItem);
-                  });
-                  // log("arr", arr);
-                  _setButtonSearchResults({ name: item.name, arr });
-                }}
-                Component={() => {
-                  return (
-                    <View>
-                      <FlatList
-                        data={sButtonSearchResults.arr}
-                        keyExtractor={(k, i) => i}
-                        renderItem={(item) => {
-                          let index = item.index;
-                          item = item.item;
-                          // log("item", item);
-                          return (
-                            // <View>{"TEZXT"}</View>
-                            <Button
-                              onPress={() => {
-                                if (!ssWorkorderObj.id) return;
-                                let item = cloneDeep(ssWorkorderObj);
-                                item.itemIdArr.push(item);
-                                __setWorkorderObj(item);
-                              }}
-                              text={item.name}
-                              textStyle={{}}
-                              buttonStyle={{
-                                marginVertical: 4,
-                              }}
-                            />
-                          );
-                        }}
-                      />
-                    </View>
-                  );
-                }}
+                text={item.name}
               />
             );
           }}
         />
-        {/* search results list */}
         <FlatList
           style={{
             marginRight: 25,
@@ -274,8 +288,9 @@ export function QuickItemComponent({
             // backgroundColor: "green",
           }}
           data={sSearchResults}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, idx) => idx}
           renderItem={(item) => {
+            // log("item", item.item);
             item = item.item;
             return (
               <View
@@ -286,23 +301,11 @@ export function QuickItemComponent({
                   borderColor: Colors.opacityBackgoundDark,
                 }}
               >
-                {/* <TouchableOpacity style={{ width: "75%" }} onPress={() => {}}>
-                  <Text
-                    style={{
-                      color: "whitesmoke",
-                      fontSize: 15,
-                      paddingVertical: 4,
-                      width: "100%",
-                    }}
-                    numberOfLines={2}
-                  >
-                    {item.name}
-                  </Text>
-                </TouchableOpacity> */}
                 <View style={{ width: "75%" }}>
                   <Button
+                    onPress={() => handleSearchItemSelected(item)}
                     numLines={2}
-                    text={item.name}
+                    text={item.informalName || item.formalName}
                     shadow={false}
                     textStyle={{
                       width: "100%",
@@ -323,19 +326,34 @@ export function QuickItemComponent({
                   {/**Information full screen inventory modal */}
                   <ScreenModal
                     buttonLabel={"i"}
+                    handleButtonPress={() => _setModalInventoryObj(item)}
                     modalStyle={{ width: "40%", alignSelf: "flex-end" }}
-                    Component={() => <InventoryItemInModal item={item} />}
                     buttonStyle={{}}
+                    showShadow={false}
                     textStyle={{ fontSize: 14 }}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 13,
+                    showOuterModal={true}
+                    modalVisible={sModalInventoryObj == item}
+                    outerModalStyle={{
+                      backgroundColor: "rgba(50,50,50,.5)",
                     }}
-                  >
-                    {"$ "}
-                    <Text style={{ fontSize: 16 }}>{item.price}</Text>
-                  </Text>
+                    handleOuterClick={() => _setModalInventoryObj(null)}
+                    Component={() => (
+                      <InventoryItemInModal
+                        quickItemButtonNames={zSettingsObj.quickItemButtonNames}
+                        handleQuickButtonAdd={handleQuickButtonAdd}
+                        handleClosePress={() => _setModalInventoryObj(null)}
+                        item={sModalInventoryObj}
+                        handleDeleteItemPressed={handleDeleteItemPressed}
+                        handleChangeItem={handleChangeItem}
+                        handleQuickButtonRemove={(qBItem) =>
+                          handleQuickButtonRemove(qBItem, sModalInventoryObj)
+                        }
+                        quickItemButtonAssignments={getQuickButtonAssignmentsForInvItem(
+                          sModalInventoryObj
+                        )}
+                      />
+                    )}
+                  />
                 </View>
               </View>
             );
@@ -346,34 +364,74 @@ export function QuickItemComponent({
   );
 }
 
-const QuickItemButton = ({ title, onPress, color }) => {
-  return (
-    <TouchableOpacity
-      style={{
-        width: 120,
-        marginVertical: 4,
-        justifyContent: "center",
-        borderWidth: 0,
-        alignItems: "center",
-        marginLeft: 7,
-        borderColor: Colors.mainBackground,
-        ...SHADOW_RADIUS_PROTO,
-      }}
-      onPress={onPress}
-    >
-      <Text
-        numberOfLines={2}
-        style={{
-          textAlign: "center",
-          color: "whitesmoke",
-          width: "100%",
-          paddingVertical: 11,
-          paddingHorizontal: 2,
-          fontSize: 15,
-        }}
-      >
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
-};
+//       <ScreenModal
+//         ref={sRefs[index]}
+//         modalVisible={
+//           item.name === sButtonSearchResults.name &&
+//           sButtonSearchResults.arr.length > 0
+//         }
+//         setModalVisibility={(val) => {
+//           if (
+//             item.name === sButtonSearchResults.name &&
+//             sButtonSearchResults.arr.length > 0
+//           ) {
+//             _setButtonSearchResults({
+//               name: null,
+//               arr: [],
+//             });
+//           }
+//         }}
+//         modalCoordinateVars={{ x: 160, y: 0 }}
+//         showOuterModal={false}
+//         buttonStyle={{
+//           paddingVertical: 5,
+//           marginVertical: 5,
+//           borderWidth: 0,
+//         }}
+//         buttonTextStyle={{ paddingVertical: 5 }}
+//         outerModalStyle={{}}
+//         buttonLabel={item.name}
+//         showButtonIcon={false}
+//         handleButtonPress={() => {
+//           let arr = [];
+//           ssInventoryArr.forEach((invItem) => {
+//             if (invItem.id == item.id) arr.push(invItem);
+//           });
+//           // log("arr", arr);
+//           _setButtonSearchResults({ name: item.name, arr });
+//         }}
+//         Component={() => {
+//           return (
+//             <View>
+//               <FlatList
+//                 data={sButtonSearchResults.arr}
+//                 keyExtractor={(k, i) => i}
+//                 renderItem={(item) => {
+//                   let index = item.index;
+//                   item = item.item;
+//                   // log("item", item);
+//                   return (
+//                     // <View>{"TEZXT"}</View>
+//                     <Button
+//                       onPress={() => {
+//                         if (!zWorkorderObj.id) return;
+//                         // let item = {...zWorkorderObj}
+//                         // item.itemIdArr.push(item);
+//                         // _zSetWorkorderObj(item);
+//                       }}
+//                       text={item.name}
+//                       textStyle={{}}
+//                       buttonStyle={{
+//                         marginVertical: 4,
+//                       }}
+//                     />
+//                   );
+//                 }}
+//               />
+//             </View>
+//           );
+//         }}
+//       />
+//     );
+//   }}
+// />

@@ -40,9 +40,10 @@ import {
 
 const tabMargin = 20;
 export function InventoryComponent({}) {
+  /// setters
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
   const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
-  ///
+  /// getters
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   const zCurrentWorkorderObj = useCurrentWorkorderStore((state) =>
     state.getWorkorderObj()
@@ -102,7 +103,6 @@ export function InventoryComponent({}) {
   }
 
   function checkboxPressed(checkboxName) {
-    _setCategoriesDropdownSelected(null);
     if (checkboxName === sCheckboxValue) checkboxName = null;
     _setCheckboxValue(checkboxName);
     // log(checkboxName);
@@ -136,6 +136,22 @@ export function InventoryComponent({}) {
     dbSetSettings(settingsObj);
   }
 
+  function handleQuickButtonRemove(qBItemToRemove, invItem) {
+    let idx = zSettingsObj.quickItemButtonNames.findIndex(
+      (o) => o.name === qBItemToRemove.name
+    );
+    // log(idx);
+    let assignments = { ...zSettingsObj.quickItemButtonNames[idx] }.assignments;
+    let newAssignmentsArr = assignments.filter((id) => id != invItem.id);
+    let newQButton = { ...qBItemToRemove };
+    qBItemToRemove.assignments = newAssignmentsArr;
+    let newSettingsObj = { ...zSettingsObj };
+    newSettingsObj.quickItemButtonNames[idx] = qBItemToRemove;
+
+    _zSetSettings(newSettingsObj);
+    dbSetSettings(newSettingsObj);
+  }
+
   function handleCreateItemPressed(item) {
     _zModInventoryItem(item, "add");
     dbSetInventoryItem(item);
@@ -150,8 +166,18 @@ export function InventoryComponent({}) {
     _zModInventoryItem(item, "remove");
     dbSetInventoryItem(item, true);
   }
-  function handleClosePress() {
-    _setInventoryItemInModal(null);
+
+  function getQuickButtonAssignmentsForInvItem(invItem) {
+    if (!invItem) return;
+    let arr = [];
+    zSettingsObj.quickItemButtonNames.forEach((quickItemButtonNameObj) => {
+      let assignmentsArr = quickItemButtonNameObj.assignments;
+      if (!assignmentsArr) return;
+      assignmentsArr.forEach((assignmentID) => {
+        if (assignmentID === invItem.id) arr.push(quickItemButtonNameObj);
+      });
+    });
+    return arr;
   }
 
   ///////////////////////////////////////////////////////////////
@@ -202,7 +228,7 @@ export function InventoryComponent({}) {
         <View style={{ flexDirection: "row" }}>
           <CheckBox
             viewStyle={{ marginRight: tabMargin, marginLeft: 10 }}
-            buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
+            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
             roundButton={true}
             text={INVENTORY_CATEGORIES.parts}
             onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.parts)}
@@ -210,7 +236,7 @@ export function InventoryComponent({}) {
           />
           <CheckBox
             viewStyle={{ marginRight: tabMargin }}
-            buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
+            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
             roundButton={true}
             text={INVENTORY_CATEGORIES.accessories}
             onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.accessories)}
@@ -218,7 +244,7 @@ export function InventoryComponent({}) {
           />
           <CheckBox
             viewStyle={{ marginRight: tabMargin }}
-            buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
+            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
             roundButton={true}
             text={INVENTORY_CATEGORIES.labor}
             onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.labor)}
@@ -226,11 +252,19 @@ export function InventoryComponent({}) {
           />
           <CheckBox
             viewStyle={{ marginRight: tabMargin }}
-            buttonStyle={{ borderWidth: 1, borderColor: "brown" }}
+            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
             roundButton={true}
             text={INVENTORY_CATEGORIES.bikes}
             onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.bikes)}
             isChecked={INVENTORY_CATEGORIES.bikes === sCheckboxValue}
+          />
+          <CheckBox
+            viewStyle={{ marginRight: 0 }}
+            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
+            roundButton={true}
+            text={INVENTORY_CATEGORIES.other}
+            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.other)}
+            isChecked={INVENTORY_CATEGORIES.other === sCheckboxValue}
           />
         </View>
         {/** MODAL Plus button full screen inventory modal */}
@@ -252,7 +286,7 @@ export function InventoryComponent({}) {
           marginLeft: 10,
           // backgroundColor: "green",
         }}
-        data={sSearchResults.length > 0 ? sSearchResults : zInventoryArr}
+        data={sSearchResults}
         renderItem={(item) => {
           if (!item) return null;
           item = item.item;
@@ -278,9 +312,9 @@ export function InventoryComponent({}) {
                 >
                   {/**MODAL search result list item full screen modal */}
                   <ScreenModal
+                    // canExitOnOuterModalClick={true}
                     buttonVisible={zCurrentWorkorderObj.id ? true : false}
                     buttonLabel={"i"}
-                    showButtonIcon={false}
                     buttonTextStyle={{ color: "dimgray", fontSize: 17 }}
                     showShadow={false}
                     buttonStyle={{
@@ -293,11 +327,12 @@ export function InventoryComponent({}) {
                     handleButtonPress={() => {
                       _setInventoryItemInModal(item);
                     }}
-                    modalVisible={sInventoryItemInModal}
+                    handleOuterClick={() => _setInventoryItemInModal(null)}
+                    modalVisible={sInventoryItemInModal === item}
                     textStyle={{ fontSize: 14 }}
                     showOuterModal={true}
                     outerModalStyle={{
-                      backgroundColor: "rgba(100,100,100,.06)",
+                      backgroundColor: "rgba(50,50,50,.5)",
                     }}
                     Component={() => {
                       return (
@@ -306,9 +341,22 @@ export function InventoryComponent({}) {
                           handleCreateItemPressed={handleCreateItemPressed}
                           handleChangeItem={handleChangeItem}
                           handleDeleteItemPressed={handleDeleteItemPressed}
-                          handleClosePress={handleClosePress}
+                          handleClosePress={() =>
+                            _setInventoryItemInModal(null)
+                          }
+                          quickItemButtonNames={
+                            zSettingsObj.quickItemButtonNames
+                          }
                           handleQuickButtonAdd={handleQuickButtonAdd}
-                          zSettingsObj={zSettingsObj}
+                          handleQuickButtonRemove={(qBItem) =>
+                            handleQuickButtonRemove(
+                              qBItem,
+                              sInventoryItemInModal
+                            )
+                          }
+                          quickItemButtonAssignments={getQuickButtonAssignmentsForInvItem(
+                            sInventoryItemInModal
+                          )}
                         />
                       );
                     }}

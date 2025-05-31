@@ -2,6 +2,7 @@
 import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef } from "./db";
 import { COLLECTION_NAMES, CUSTOMER_PROTO } from "./data";
+import { generate } from "random-words";
 
 export function log(one, two) {
   let str = "";
@@ -202,6 +203,10 @@ export function generateBarcode() {
   let barcode = "0000" + num;
   return barcode;
   // log(barcode.length, barcode);
+}
+
+export async function randomWordGenerator() {
+  return generate({ minLength: 4, maxLength: 8 });
 }
 
 export function jclone(item = {}) {

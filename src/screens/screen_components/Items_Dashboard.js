@@ -1,32 +1,11 @@
 import {
   View,
   Text,
-  Pressable,
   TextInput,
   FlatList,
   TouchableOpacity,
 } from "react-native-web";
-import { dim, log, trimToTwoDecimals } from "../../utils";
-import {
-  HorzSpacer,
-  TabMenuButton,
-  TabMenuDivider as Divider,
-  ModalDropdown,
-  TextInputOnMainBackground,
-  TextInputLabelOnMainBackground,
-} from "../../components";
-import { Colors } from "../../styles";
-import {
-  bike_colors_db,
-  bike_brands_db,
-  CUSTOMER_PROTO,
-  bike_descriptions_db,
-  discounts_db,
-  part_sources_db,
-  WORKORDER_PROTO,
-  WORKORDER_ITEM_PROTO,
-} from "../../data";
-import { create } from "lodash";
+import { log } from "../../utils";
 
 export function Items_Dashboard({ fun_create_new_workorder }) {
   return (

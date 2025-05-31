@@ -62,19 +62,31 @@ export async function fillInventory() {
 }
 
 export function fillOpenWorkorders() {
-  for (let i = 0; i <= 0; i++) {
+  let statusCount = 0;
+  for (let i = 0; i <= 14; i++) {
+    let j = i;
     let wo = { ...WORKORDER_PROTO, id: generateRandomID() };
-    wo.brand = bike_brands_db.brands1[i];
-    wo.color = bike_colors_arr_db[i];
-    wo.description = bike_descriptions_db[i];
+    j = i;
+    if (j > 3) j = 2;
+    wo.brand = SETTINGS_PROTO.bikeBrands[j];
+    j = i;
+    if (j > 13) j = 4;
+    wo.color = SETTINGS_PROTO.bikeColors[j];
+    j = i;
+    if (j > 3) j = 2;
+    wo.description = SETTINGS_PROTO.bikeDescriptions[j];
     wo.startedBy = "Test User";
-    wo.status = { name: "Newly Created", color: "red", position: 0 };
+    j = i;
+    if (statusCount == 14) statusCount = 0;
+    wo.status = SETTINGS_PROTO.statuses[statusCount];
+    statusCount++;
     wo.customerFirst = "Test";
     wo.customerLast = "Customer";
     wo.customerPhone = "1111111111";
-    wo.customerID = "BZb60oVQWhZ7g3cufwp4";
+    wo.customerID = "HtFHEOIqZzDR3BF7ZH8k";
     wo.startedBy = "Test User";
     wo.changeLog.push("Started by: " + "Test" + " " + "User");
+    // log("status", wo.status);
     setOpenWorkorder(wo);
   }
 }

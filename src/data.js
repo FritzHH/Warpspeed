@@ -171,9 +171,72 @@ export const INVENTORY_ITEM_PROTO = {
 
 export const SETTINGS_PROTO = {
   statuses: [
-    { name: "Service", position: 0 },
-    { name: "Finished", position: 1 },
+    "Work in Progress",
+    "Work in Progress - Waiting",
+    "Newly Created",
+    "Service",
+    "Finished",
+    "Finished, Waiting to Contact",
+    "Finished, Customer Away",
+    "Part Ordered",
+    "Bicycle Ordered",
+    "Customer Bringing Part",
+    "Order for Customer",
+    "Messaging With Customer",
+    "Emailing With Company",
+    "Customer Not Responding",
   ],
+  statusGroups: [
+    {
+      color: "gray",
+      textColor: "black",
+      name: "Work in Progress",
+      members: ["Work in Progress", "Work in Progress - Waiting"],
+    },
+    {
+      color: "whitesmoke",
+      textColor: "dimgray",
+      name: "Open Service",
+      members: ["Newly Created", "Service"],
+    },
+    {
+      color: "green",
+      textColor: "white",
+      name: "Finished",
+      members: [
+        "Finished",
+        "Finished, Waiting to Contact",
+        "Finished, Customer Away",
+      ],
+    },
+    {
+      color: "orange",
+      textColor: "white",
+      name: "Communication",
+      members: ["Messaging With Customer", "Emailing With Company"],
+    },
+    {
+      color: "lightblue",
+      textColor: "dimgray",
+      name: "Ordering",
+      members: [
+        "Part Ordered",
+        "Bicycle Ordered",
+        "Customer Bringing Part",
+        "Order for Customer",
+      ],
+    },
+    {
+      color: "lightgray",
+      textColor: "black",
+      name: "Waiting",
+      members: ["Customer Not Responding"],
+    },
+    // { color: "orange", name: "Ordering" },
+    // { color: "whitesmoke", name: "Communication" },
+    // { color: "lightblue", name: "Waiting" },
+  ],
+
   quickItemButtonNames: [
     {
       name: "Tune-Up",
@@ -605,6 +668,11 @@ export let bike_colors_arr_db = [
     textColor: "black",
     backgroundColor: "rgb(192,192,192)",
     label: "Silver",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "rgb(255,165,0)",
+    label: "Orange",
   },
   {
     textColor: "black",

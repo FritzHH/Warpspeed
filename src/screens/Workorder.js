@@ -126,10 +126,9 @@ export function WorkorderScreen() {
 
   async function initialize() {
     if (!sInitFlag) {
-      // fillPreferences();
+      fillPreferences();
       // fillInventory();
       // fillOpenWorkorders();
-      setTimeout(async () => {}, 1000);
       _setInitFlag(true);
     }
   }

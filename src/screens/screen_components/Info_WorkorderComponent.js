@@ -1,15 +1,17 @@
 /* eslint-disable */
 
-import { View, Text } from "react-native-web";
+import { View, Text, TextInput } from "react-native-web";
 import { dim, log, trimToTwoDecimals } from "../../utils";
 import {
   TabMenuDivider as Divider,
   ModalDropdown,
-  TextInputOnMainBackground,
+  // TextInputOnMainBackground,
   TextInputLabelOnMainBackground,
   ScreenModal,
   CustomerInfoComponent,
   Button,
+  SHADOW_RADIUS_NOTHING,
+  SHADOW_RADIUS_PROTO,
 } from "../../components";
 import { Colors } from "../../styles";
 import {
@@ -17,6 +19,9 @@ import {
   bike_descriptions_db,
   part_sources_db,
   bike_colors_arr_db,
+  SETTINGS_PROTO,
+  WORKORDER_PROTO,
+  CUSTOMER_PROTO,
 } from "../../data";
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useRef } from "react";
@@ -24,19 +29,21 @@ import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
   useCurrentWorkorderStore,
+  useSettingsStore,
 } from "../../stores";
 import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 
 export const Info_WorkorderComponent = ({
   __handleCreateNewWorkorderPressed,
 }) => {
-  const zWorkorderObj = {
-    ...useCurrentWorkorderStore((state) => state.getWorkorderObj()),
-  };
-  const zCustomerObj = {
-    ...useCurrentCustomerStore((state) => state.getCustomerObj()),
-  };
-  ////
+  // getters
+  let zWorkorderObj = WORKORDER_PROTO;
+  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
+  let zCustomerObj = CUSTOMER_PROTO;
+  zCustomerObj = useCurrentCustomerStore((state) => state.getCustomerObj());
+  var zSettingsObj = SETTINGS_PROTO;
+  zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  // setters
   const _zSetWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
@@ -57,7 +64,6 @@ export const Info_WorkorderComponent = ({
     _zSetCustomerObj(obj);
     dbSetCustomerObj(obj);
   }
-
   function setBikeColor(incomingColorVal) {
     let foundColor = false;
     let newColorObj = {};
@@ -86,6 +92,24 @@ export const Info_WorkorderComponent = ({
       _setShowCustomerInfoModal(true);
     }, 300);
     // _setS;
+  }
+
+  function getBackgroundColor(workorderObj) {
+    let backgroundColor;
+    let textColor;
+    let color = zSettingsObj.statusGroups.find((o) => {
+      let members = o.members;
+
+      members.forEach((member) => {
+        if (member === zWorkorderObj.status) {
+          textColor = o.textColor;
+          backgroundColor = o.color;
+        }
+      });
+      return backgroundColor;
+    });
+    // log(backgroundColor, textColor);
+    return { backgroundColor, textColor };
   }
 
   return (
@@ -199,9 +223,9 @@ export const Info_WorkorderComponent = ({
                 width: "30%",
               }}
               removeButtonText={"Remove Color"}
-              buttonLabel={bike_brands_db.brands1Title}
-              buttonStyle={{ width: 90 }}
-              data={bike_brands_db.brands1}
+              buttonLabel={zSettingsObj.bikeBrandsName}
+              // buttonStyle={{ width: 90 }}
+              data={zSettingsObj.bikeBrands}
               currentSelectionName={zWorkorderObj.brand}
               onSelect={(val) => {
                 zWorkorderObj.brand = val;
@@ -220,8 +244,8 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              data={bike_brands_db.brands2}
-              buttonLabel={bike_brands_db.brands2Title}
+              data={zSettingsObj.bikeOptionalBrands}
+              buttonLabel={zSettingsObj.bikeOptionalBrandsName}
               closeButtonText={"Close"}
               removeButtonText={"Remove"}
               buttonStyle={{ width: 70 }}
@@ -267,7 +291,7 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              data={bike_descriptions_db}
+              data={zSettingsObj.bikeDescriptions}
               buttonLabel={"Descriptions"}
               closeButtonText={"Close"}
               buttonStyle={{ width: 90 }}
@@ -320,7 +344,7 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              data={bike_colors_arr_db}
+              data={zSettingsObj.bikeColors}
               closeButtonText={"Close"}
               buttonStyle={{ width: 90 }}
               removeButtonText={"Remove Color"}
@@ -396,7 +420,7 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              data={part_sources_db}
+              data={zSettingsObj.partSources}
               closeButtonText={"Close"}
               removeButtonText={"Remove"}
               buttonStyle={{ width: 90 }}
@@ -414,8 +438,72 @@ export const Info_WorkorderComponent = ({
               }}
             />
           </View>
+          <View
+            style={{
+              // marginTop: 8,
+              flexDirection: "row",
+              justifyContent: "center",
+              marginTop: 8,
+              alignItems: "center",
+              width: "90%",
+              padding: 5,
+              backgroundColor: getBackgroundColor().backgroundColor,
+              ...SHADOW_RADIUS_PROTO,
+            }}
+          >
+            <ModalDropdown
+              // itemListStyle={{ width: 90 }}
+              modalStyle={{
+                alignSelf: "flex-start",
+                marginVertical: "2%",
+                width: "30%",
+              }}
+              data={zSettingsObj.statuses}
+              closeButtonText={"Close"}
+              // removeButtonText={"Remove"}
+              // buttonStyle={{ width: 90 }}
+              buttonStyle={{
+                width: "100%",
+                backgroundColor: "transparent",
+                ...SHADOW_RADIUS_NOTHING,
+              }}
+              textStyle={{ color: getBackgroundColor().textColor }}
+              buttonLabel={zWorkorderObj.status}
+              onSelect={(val) => {
+                let newObj = cloneDeep(zWorkorderObj);
+                newObj.status = val;
+                setWorkorderObj(newObj);
+              }}
+            />
+          </View>
         </View>
       )}
     </View>
+  );
+};
+
+const TextInputOnMainBackground = ({
+  value,
+  onTextChange,
+  styleProps = {},
+  placeholderText,
+}) => {
+  return (
+    <TextInput
+      value={value}
+      placeholder={placeholderText}
+      placeholderTextColor={"darkgray"}
+      style={{
+        borderWidth: 2,
+        borderColor: "gray",
+        color: Colors.lightTextOnMainBackground,
+        paddingVertical: 3,
+        paddingHorizontal: 4,
+        fontSize: 16,
+        outlineWidth: 0,
+        ...styleProps,
+      }}
+      onChangeText={(val) => onTextChange(val)}
+    />
   );
 };

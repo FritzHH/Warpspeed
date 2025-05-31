@@ -44,11 +44,7 @@ export function Items_Section({ ssWorkorderObj, __setItemsTabName }) {
         </View>
       );
     if (zItemsTabName == TAB_NAMES.itemsTab.dashboard)
-      return (
-        <View>
-          <Text>Dashboard babes</Text>
-        </View>
-      );
+      return <Items_Dashboard />;
     if (zItemsTabName === TAB_NAMES.itemsTab.customerList)
       return <CustomerSearchListComponent />;
   }

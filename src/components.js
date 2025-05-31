@@ -316,6 +316,7 @@ export const ModalDropdown = ({
   currentSelection,
   removeButtonText,
   buttonStyle = {},
+  textStyle = {},
   outerModalStyle = {},
   innerModalStyle = {},
   // modalStyle = {},
@@ -351,10 +352,10 @@ export const ModalDropdown = ({
         >
           <Text
             style={{
-              color: buttonBackgroundColor || "white",
+              color: "white",
               textAlign: "center",
               fontSize: 15,
-              ...buttonStyle,
+              ...textStyle,
             }}
           >
             {buttonLabel}
@@ -932,6 +933,10 @@ export const CustomerInfoComponent = ({
       </View>
     </TouchableWithoutFeedback>
   );
+};
+
+export const ColorGridPickerComponent = ({ onColorSelect }) => {
+  let colorArr = [];
 };
 
 // export const

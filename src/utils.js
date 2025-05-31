@@ -29,6 +29,11 @@ export function log(one, two) {
   console.log(str);
 }
 
+export function clog(one, two) {
+  console.log(one);
+  if (two) console.log(two);
+}
+
 // export function fetchIt(url) {
 //   // log("fetching this url", url);
 //   return fetch(url).then((res) => {
@@ -247,6 +252,8 @@ export function arrayAddObjCheckForDupes(arr, arrKey, obj, objKey) {
 export function checkArr(arr, obj) {
   return arr.find((o) => o.id === obj.id);
 }
+
+export function orderNumericArrByKey(arr, key) {}
 
 export function combine2ArraysOrderByMillis(arr1, arr2) {
   let newArr = [...arr1, ...arr2];

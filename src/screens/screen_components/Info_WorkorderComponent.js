@@ -139,7 +139,7 @@ export const Info_WorkorderComponent = ({
           handleButtonPress={() => _setShowCustomerInfoModal(true)}
           buttonTextStyle={{
             fontSize: 25,
-            color: Colors.darkText,
+            color: Colors.lightText,
           }}
           shadowProps={{ shadowColor: "transparent" }}
           Component={() => (
@@ -177,20 +177,20 @@ export const Info_WorkorderComponent = ({
             }}
           >
             {zCustomerObj.cell.length > 0 ? (
-              <Text style={{ color: Colors.lightTextOnMainBackground }}>
+              <Text style={{ color: Colors.darkText }}>
                 {"Cell:  " + zCustomerObj.cell}
               </Text>
             ) : null}
             {zCustomerObj.landline.length > 0 ? (
-              <Text style={{ color: Colors.lightTextOnMainBackground }}>
+              <Text style={{ color: Colors.darkText }}>
                 {"Land:  " + zCustomerObj.landline}
               </Text>
             ) : null}
             {zCustomerObj.contactRestriction === "CALL" ? (
-              <Text style={{ color: "pink" }}>CALL ONLY</Text>
+              <Text style={{ color: Colors.darkText }}>CALL ONLY</Text>
             ) : null}
             {zCustomerObj.contactRestriction === "EMAIL" ? (
-              <Text style={{ color: "pink" }}>EMAIL ONLY</Text>
+              <Text style={{ color: Colors.darkText }}>EMAIL ONLY</Text>
             ) : null}
           </View>
           <TextInputLabelOnMainBackground
@@ -492,11 +492,11 @@ const TextInputOnMainBackground = ({
     <TextInput
       value={value}
       placeholder={placeholderText}
-      placeholderTextColor={"darkgray"}
+      placeholderTextColor={"lightgray"}
       style={{
         borderWidth: 2,
-        borderColor: "gray",
-        color: Colors.lightTextOnMainBackground,
+        borderColor: "dimgray",
+        color: "dimgray",
         paddingVertical: 3,
         paddingHorizontal: 4,
         fontSize: 16,

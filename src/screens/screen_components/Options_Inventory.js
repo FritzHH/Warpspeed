@@ -21,6 +21,7 @@ import {
   INVENTORY_ITEM_PROTO,
   INVENTORY_CATEGORIES,
   TAB_NAMES,
+  WORKORDER_ITEM_PROTO,
 } from "../../data";
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useEffect, useRef, useState } from "react";
@@ -43,13 +44,18 @@ export function InventoryComponent({}) {
   /// setters
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
   const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
+  const _zSetWorkorderObj = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
   /// getters
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   const zCurrentWorkorderObj = useCurrentWorkorderStore((state) =>
     state.getWorkorderObj()
   );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-
+  const zWorkorderObj = useCurrentWorkorderStore((state) =>
+    state.getWorkorderObj()
+  );
   /////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
@@ -95,11 +101,18 @@ export function InventoryComponent({}) {
   }
 
   function inventoryItemSelected(item) {
-    if (zCurrentWorkorderObj.id) {
-      // todo add to workorder
-      return;
+    if (!zWorkorderObj.id) {
+      _setModalInventoryObj(item);
+      // return;
     }
-    _setInventoryItemInModal(item);
+    let wo = cloneDeep(zWorkorderObj);
+    if (!wo.workorderLines) wo.workorderLines = [];
+    // log("item", item);
+    let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
+    lineItem.invItemID = item.id;
+    wo.workorderLines.push(lineItem);
+    _zSetWorkorderObj(wo);
+    dbSetOpenWorkorderItem(wo);
   }
 
   function checkboxPressed(checkboxName) {

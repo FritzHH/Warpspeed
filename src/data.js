@@ -44,7 +44,7 @@ export const WORKORDER_PROTO = {
   internalNotes: [],
   customerNotes: [],
   dueBy: "",
-  status: "",
+  status: "Newly Created",
 };
 
 export const SMS_PROTO = {
@@ -65,10 +65,10 @@ export const DISCOUNT_OBJ_PROTO = {
   type: "",
 };
 export const WORKORDER_ITEM_PROTO = {
-  qty: 0,
+  qty: 1,
   intakeNotes: "",
   serviceNotes: "",
-  itemID: "",
+  invItemID: "",
   discountObj: { ...DISCOUNT_OBJ_PROTO },
 };
 export const CUSTOMER_PROTO = {

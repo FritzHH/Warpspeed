@@ -2,6 +2,7 @@
 import { View, Text, TextInput, FlatList } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
+  clog,
   generateRandomID,
   log,
   trimToTwoDecimals,
@@ -20,25 +21,81 @@ import {
 } from "../../data";
 import { useRef, useState } from "react";
 import { clone, cloneDeep } from "lodash";
+import { useCurrentWorkorderStore, useInventoryStore } from "../../stores";
+import {
+  dbSetClosedWorkorderItem,
+  dbSetOpenWorkorderItem,
+} from "../../db_calls";
+import { WorkerPage } from "twilio/lib/rest/taskrouter/v1/workspace/worker";
 
-export const Items_WorkorderItemsTab = ({
-  ssWorkorderObj = WORKORDER_PROTO,
-  ssInventoryArr = [],
-  __setWorkorderObj,
-}) => {
-  function deleteWorkorderItem(workorderItem) {
-    // log("incoming", ssWorkorderObj);
-    let newLinesArr = ssWorkorderObj.workorderLines.filter(
-      (line) => line.id != workorderItem.id
-    );
-    let WO = cloneDeep(ssWorkorderObj);
-    WO.workorderLines = newLinesArr;
-    // WO.itemIdArr = newIDArr;
+export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
+  // getters
+  let zWorkorderObj;
+  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
+  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  // setters
+  const _zSetWorkorderObj = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  ///////////////////////////////////////////////////////////////////////////
+
+  function deleteWorkorderItem(workorderItem, index) {
+    let woCopy = cloneDeep(zWorkorderObj);
+    woCopy.workorderLines.splice(index, 1);
     // log("res", WO);
-    __setWorkorderObj(WO);
+    _zSetWorkorderObj(woCopy);
+    dbSetOpenWorkorderItem(woCopy);
+  }
+
+  function modQtyPressed(workorderLine, option, idx) {
+    let newWOLine = cloneDeep(workorderLine);
+    if (option === "up") {
+      newWOLine.qty = newWOLine.qty + 1;
+    } else {
+      let qty = newWOLine.qty - 1;
+      if (qty <= 0) return;
+      newWOLine.qty = qty;
+    }
+    let wo = cloneDeep(zWorkorderObj);
+    wo.workorderLines[idx] = newWOLine;
+    _zSetWorkorderObj(wo);
+    dbSetOpenWorkorderItem(wo);
+  }
+
+  function applyDiscount(inventoryItem, workorderLine, discountObj, index) {
+    let newDiscountObj = applyDiscountToWorkorderItem(
+      discountObj,
+      workorderLine,
+      inventoryItem
+    );
+
+    let woCopy = cloneDeep(zWorkorderObj);
+    woCopy.workorderLines[index].discountObj = newDiscountObj;
+    _zSetWorkorderObj(woCopy);
+    dbSetOpenWorkorderItem(woCopy);
+  }
+
+  function splitItems(workorderLine, index) {
+    let wo = cloneDeep(zWorkorderObj);
+    let num = workorderLine.qty;
+    for (let i = 0; i <= num - 1; i++) {
+      let newLine = cloneDeep(workorderLine);
+      newLine.qty = 1;
+      if (i === 0) {
+        wo.workorderLines[index] = newLine;
+        continue;
+      }
+      wo.workorderLines.splice(index + 1, 0, newLine);
+      // wo.workorderLines.push(newLine);
+    }
+    _zSetWorkorderObj(wo);
+    dbSetOpenWorkorderItem(wo);
   }
   //
-  if (ssWorkorderObj.workorderLines.length == 0) {
+  if (
+    !zWorkorderObj.workorderLines ||
+    zWorkorderObj.workorderLines.length == 0
+  ) {
     return (
       <View
         style={{
@@ -72,20 +129,24 @@ export const Items_WorkorderItemsTab = ({
     >
       <FlatList
         style={{ marginVertical: 3, marginRight: 5 }}
-        data={ssWorkorderObj.workorderLines}
+        data={zWorkorderObj.workorderLines}
         keyExtractor={(item, idx) => idx}
         renderItem={(item) => {
+          // log("index", idx.);
+          let idx = item.index;
           item = item.item;
-          // log("item", item);
-          let invItem = ssInventoryArr.find((obj) => obj.id === item.itemID);
-          // log("inv item", invItem);
+          let invItem = zInventoryArr.find((obj) => obj.id === item.invItemID);
           return (
             <WorkorderItemComponent
               __deleteWorkorderLine={deleteWorkorderItem}
-              __setWorkorderObj={__setWorkorderObj}
+              __setWorkorderObj={_zSetWorkorderObj}
               inventoryItem={invItem}
               workorderLine={item}
-              ssWorkorderObj={ssWorkorderObj}
+              zWorkorderObj={zWorkorderObj}
+              __splitItems={splitItems}
+              __modQtyPressed={modQtyPressed}
+              index={idx}
+              applyDiscount={applyDiscount}
             />
           );
         }}
@@ -97,13 +158,12 @@ export const Items_WorkorderItemsTab = ({
 export const WorkorderItemComponent = ({
   inventoryItem = INVENTORY_ITEM_PROTO,
   workorderLine = WORKORDER_ITEM_PROTO,
-  ssWorkorderObj = WORKORDER_PROTO,
-  __setWorkorderObj,
   __deleteWorkorderLine,
+  __splitItems,
+  __modQtyPressed,
+  index,
+  applyDiscount,
 }) => {
-  const [sShowServiceNotes, _setShowServiceNotes] = useState(
-    workorderLine.serviceNotes.length > 0
-  );
   const [sTempQtyVal, _setTempQtyVal] = useState(null);
   const [sDiscountedPrice, _setDiscountedPrice] = useState(null);
   const [sDiscountSavings, _setDiscountSavings] = useState(null);
@@ -111,43 +171,8 @@ export const WorkorderItemComponent = ({
 
   const ref = useRef();
 
-  function setWorkorderLine(newWorkorderLine) {
-    let newArr = ssWorkorderObj.workorderLines.map((oldLine) => {
-      if (oldLine.id === newWorkorderLine.id) return newWorkorderLine;
-      return oldLine;
-    });
-    // log("new arr", newArr);
-
-    let newObj = structuredClone(ssWorkorderObj);
-    newObj.workorderLines = newArr;
-    __setWorkorderObj(newObj);
-  }
-
-  function splitItems() {
-    let WO = cloneDeep(ssWorkorderObj);
-    let numItems = workorderLine.qty;
-    let arr = WO.workorderLines.filter(
-      (item) => item.itemID != workorderLine.itemID
-    );
-    for (let i = 0; i <= numItems - 1; i++) {
-      if (i > 0) WO.itemIdArr.push(workorderLine.itemID);
-      arr.push({ ...workorderLine, qty: 1, id: generateRandomID() });
-    }
-    // log("arr", arr);
-    WO.workorderLines = arr;
-    let newWO = cloneDeep(WO);
-    __setWorkorderObj(newWO);
-  }
-
-  function applyDiscount(discountObj) {
-    let resObj = applyDiscountToWorkorderItem(
-      discountObj,
-      workorderLine,
-      inventoryItem
-    );
-    _setDiscountSavings(resObj.savings);
-    _setDiscountedPrice(resObj.newPrice);
-  }
+  // log("item", inventoryItem);
+  // return null;
   return (
     <View
       style={{
@@ -177,7 +202,7 @@ export const WorkorderItemComponent = ({
           }}
         >
           <Button
-            onPress={() => __deleteWorkorderLine(workorderLine)}
+            onPress={() => __deleteWorkorderLine(workorderLine, index)}
             text={"X"}
             buttonStyle={{
               width: null,
@@ -193,9 +218,9 @@ export const WorkorderItemComponent = ({
             textStyle={{ color: "red", fontSize: 17, fontWeight: 600 }}
           />
           <View>
-            {workorderLine.discountObj.name ? (
+            {workorderLine.discountObj && workorderLine.discountObj.name ? (
               <Text style={{ color: "magenta" }}>
-                {workorderLine.discountObj.name || "discount goes here"}
+                {workorderLine.discountObj.formalName || "discount goes here"}
               </Text>
             ) : null}
             <Text
@@ -205,7 +230,7 @@ export const WorkorderItemComponent = ({
                 fontWeight: "500",
               }}
             >
-              {inventoryItem.name}
+              {inventoryItem.formalName}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
               <TextInput
@@ -242,23 +267,14 @@ export const WorkorderItemComponent = ({
             }}
           >
             <Button
-              onPress={() => {
-                let line = structuredClone(workorderLine);
-                line.qty = line.qty + 1;
-                setWorkorderLine(line);
-              }}
+              onPress={() => __modQtyPressed(workorderLine, "up", index)}
               buttonStyle={{ borderRadius: 3, width: null, height: null }}
               textStyle={{ color: Colors.tabMenuButton, fontSize: 20 }}
               text={"\u2B06"}
               shadow={false}
             />
             <Button
-              onPress={() => {
-                let line = structuredClone(workorderLine);
-                line.qty = line.qty - 1;
-                if (Number(line.qty) < 1) return;
-                setWorkorderLine(line);
-              }}
+              onPress={() => __modQtyPressed(workorderLine, "down", index)}
               buttonStyle={{ borderRadius: 3, width: null, height: null }}
               textStyle={{ color: Colors.tabMenuButton, fontSize: 20 }}
               text={"\u2B07"}
@@ -318,7 +334,7 @@ export const WorkorderItemComponent = ({
                 {"$ -" + sDiscountSavings}
               </Text>
             ) : null}
-            {sDiscountedPrice ? (
+            {workorderLine.discountObj.newPrice ? (
               <Text
                 style={{
                   fontWeight: "bold",
@@ -328,7 +344,7 @@ export const WorkorderItemComponent = ({
                   color: Colors.darkText,
                 }}
               >
-                {"$ " + sDiscountedPrice}
+                {"$ " + workorderLine.discountObj.newPrice}
               </Text>
             ) : null}
           </View>
@@ -375,7 +391,7 @@ export const WorkorderItemComponent = ({
           {workorderLine.qty > 1 ? (
             <Button
               textStyle={{ fontSize: 13 }}
-              onPress={() => splitItems()}
+              onPress={() => __splitItems(workorderLine, index)}
               text={"Split Items"}
               buttonStyle={{
                 backgroundColor: Colors.mainBackground,
@@ -388,25 +404,15 @@ export const WorkorderItemComponent = ({
           ) : null}
           <ScreenModal
             buttonStyle={{
-              // width: null,
-              // height: null,
               backgroundColor: Colors.mainBackground,
               shadowOffset: { width: 1, height: 1 },
               marginHorizontal: 2,
-              // borderRadius: 4,
             }}
             buttonTextStyle={{
-              // color: "whitesmoke",
-              // fontWeight: 600,
               fontSize: 13,
-              // textAlignVertical: "center",
-              // height: 27,
-              // width: 27,
             }}
             buttonLabel="Discount"
             showButtonIcon={false}
-            // handleButtonPress={() => {}}
-            // showOuterModal={true}
             handleModalActionInternally={true}
             outerModalStyle={{
               width: null,
@@ -434,9 +440,16 @@ export const WorkorderItemComponent = ({
                             paddingVertical: 10,
                             backgroundColor: "lightgray",
                           }}
-                          onPress={() => applyDiscount(item)}
+                          onPress={() =>
+                            applyDiscount(
+                              inventoryItem,
+                              workorderLine,
+                              item,
+                              index
+                            )
+                          }
                           shadow={false}
-                          text={item.name}
+                          text={item.formalName}
                         />
                       );
                     }}

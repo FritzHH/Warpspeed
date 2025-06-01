@@ -32,7 +32,11 @@ import {
   useCurrentWorkorderStore,
   useInventoryStore,
 } from "../../stores";
-import { dbSetInventoryItem, dbSetSettings } from "../../db_calls";
+import {
+  dbSetInventoryItem,
+  dbSetOpenWorkorderItem,
+  dbSetSettings,
+} from "../../db_calls";
 
 const SEARCH_STRING_TIMER = 45 * 1000;
 
@@ -100,14 +104,20 @@ export function QuickItemComponent({
   function handleSearchItemSelected(item) {
     if (!zWorkorderObj.id) {
       _setModalInventoryObj(item);
-      return;
+      // return;
     }
-    let wo = { ...zWorkorderObj };
-    wo.workorderLines.push(item);
+    let wo = cloneDeep(zWorkorderObj);
+    if (!wo.workorderLines) wo.workorderLines = [];
+    // log("item", item);
+    let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
+    lineItem.invItemID = item.id;
+    wo.workorderLines.push(lineItem);
     _zSetWorkorderObj(wo);
+    dbSetOpenWorkorderItem(wo);
   }
 
   function handleQuickButtonPress(buttonObj) {
+    // log("here");
     let assignmentsArr = buttonObj.assignments;
     if (!assignmentsArr) return;
     let arr = [];
@@ -120,7 +130,7 @@ export function QuickItemComponent({
         notFoundArr.push(id);
       }
     });
-
+    // return;
     // log(notFoundArr);
     if (notFoundArr.length > 0) {
       notFoundArr.forEach((id) => {

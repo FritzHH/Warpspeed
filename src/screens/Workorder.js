@@ -126,7 +126,7 @@ export function WorkorderScreen() {
 
   async function initialize() {
     if (!sInitFlag) {
-      fillPreferences();
+      // fillPreferences();
       // fillInventory();
       // fillOpenWorkorders();
       _setInitFlag(true);

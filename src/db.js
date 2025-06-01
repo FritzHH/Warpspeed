@@ -39,6 +39,8 @@ import {
 import { isArray } from "lodash";
 import { useRef } from "react";
 // import { isArray } from "lodash";
+const SMS_URL =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/sendSMS";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM",
@@ -325,7 +327,7 @@ export function subscribeToNodeAddition(
 ////// Firebase Function calls ///////////////////////////////////////
 
 export function sendSMS(messageBody) {
-  fetch(endpoint, {
+  fetch(SMS_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -335,7 +337,7 @@ export function sendSMS(messageBody) {
   })
     .then((res) => {
       if (!res.ok) {
-        log("FETCH FAILURE HERE IS THE REASON ==> ", res.status);
+        log("FETCH FAILURE IN SENDSMS HERE IS THE REASON ==> ", res.status);
         return null;
       }
       return res;
@@ -347,7 +349,7 @@ export function sendSMS(messageBody) {
           return res;
         });
       }
-      log("no res to exist for .json operation");
+      log("no res to exist for .json operation IN SENDSMS");
       return null;
     });
 }

@@ -38,7 +38,7 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: TAB_NAMES.itemsTab.dashboard,
-  optionsTabName: TAB_NAMES.optionsTab.workorders,
+  optionsTabName: TAB_NAMES.optionsTab.messages,
   infoTabName: TAB_NAMES.infoTab.customer,
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
@@ -175,12 +175,17 @@ export const useCustMessagesStore = create((set, get) => ({
   setIncomingMessage: (obj) => {
     let messages = get().incomingMessagesArr;
     if (checkArr(messages, obj)) return;
-    set((state) => ({ incomingMessagesArr: [...messages, obj] }));
+    set((state) => ({
+      incomingMessagesArr: [...state.incomingMessagesArr, obj],
+    }));
   },
   setOutgoingMessage: (obj) => {
     let messages = get().outgoingMessagesArr;
     if (checkArr(messages, obj)) return;
-    set((state) => ({ outgoingMessagesArr: [...messages, obj] }));
+    // log("out", obj);
+    set((state) => ({
+      outgoingMessagesArr: [...state.outgoingMessagesArr, obj],
+    }));
   },
 }));
 

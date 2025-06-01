@@ -11,11 +11,15 @@ import {
 import { useWorkorderPreviewStore } from "../../stores";
 
 export function WorkorderPreview() {
-  const zWorkorderPreview = useWorkorderPreviewStore((state) =>
+  let zWorkorderPreview = WORKORDER_PROTO;
+  zWorkorderPreview = useWorkorderPreviewStore((state) =>
     state.getPreviewObj()
   );
   return (
-    <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,.6)" }}>
+    <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,.2)" }}>
+      <Text>
+        {zWorkorderPreview.customerFirst + " " + zWorkorderPreview.customerLast}
+      </Text>
       <Text>{zWorkorderPreview.brand}</Text>
     </View>
   );

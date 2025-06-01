@@ -33,9 +33,7 @@ import {
 } from "../../stores";
 import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 
-export const Info_WorkorderComponent = ({
-  __handleCreateNewWorkorderPressed,
-}) => {
+export const Info_WorkorderComponent = ({}) => {
   // getters
   let zWorkorderObj = WORKORDER_PROTO;
   zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
@@ -155,7 +153,7 @@ export const Info_WorkorderComponent = ({
         />
 
         <Button
-          onPress={__handleCreateNewWorkorderPressed}
+          onPress={() => {}}
           text={"+"}
           shadow={false}
           buttonStyle={{ width: null }}
@@ -211,8 +209,9 @@ export const Info_WorkorderComponent = ({
               value={zWorkorderObj.brand}
               onTextChange={(val) => {
                 // log(val);
-                zWorkorderObj.brand = val;
-                setWorkorderObj(zWorkorderObj);
+                let wo = cloneDeep(zWorkorderObj);
+                wo.brand = val;
+                setWorkorderObj(wo);
               }}
             />
             <ModalDropdown
@@ -222,18 +221,18 @@ export const Info_WorkorderComponent = ({
                 marginVertical: "2%",
                 width: "30%",
               }}
-              removeButtonText={"Remove Color"}
               buttonLabel={zSettingsObj.bikeBrandsName}
-              // buttonStyle={{ width: 90 }}
               data={zSettingsObj.bikeBrands}
               currentSelectionName={zWorkorderObj.brand}
               onSelect={(val) => {
-                zWorkorderObj.brand = val;
-                setWorkorderObj(zWorkorderObj);
+                let wo = cloneDeep(zWorkorderObj);
+                wo.brand = val;
+                setWorkorderObj(wo);
               }}
               onRemoveSelection={() => {
-                zWorkorderObj.brand = "";
-                setWorkorderObj(zWorkorderObj);
+                let wo = cloneDeep(zWorkorderObj);
+                wo.brand = "";
+                setWorkorderObj(wo);
               }}
             />
             <View style={{ width: 3 }} />
@@ -247,18 +246,18 @@ export const Info_WorkorderComponent = ({
               data={zSettingsObj.bikeOptionalBrands}
               buttonLabel={zSettingsObj.bikeOptionalBrandsName}
               closeButtonText={"Close"}
-              removeButtonText={"Remove"}
               buttonStyle={{ width: 70 }}
               currentSelectionName={zWorkorderObj.brand}
               onSelect={(val) => {
-                let newObj = { ...zWorkorderObj };
-                newObj.brand = val;
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+                wo.brand = val;
+                setWorkorderObj(wo);
               }}
               onRemoveSelection={() => {
-                let newObj = { ...zWorkorderObj };
-                newObj.brand = "";
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+
+                wo.brand = "";
+                setWorkorderObj(wo);
               }}
             />
           </View>
@@ -279,9 +278,10 @@ export const Info_WorkorderComponent = ({
               styleProps={{ marginRight: 2 }}
               value={zWorkorderObj.description}
               onTextChange={(val) => {
-                let newObj = { ...zWorkorderObj };
-                newObj.description = val;
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+
+                wo.description = val;
+                setWorkorderObj(wo);
               }}
             />
             <ModalDropdown
@@ -298,14 +298,16 @@ export const Info_WorkorderComponent = ({
               removeButtonText={"Remove"}
               currentSelectionName={zWorkorderObj.description}
               onSelect={(val) => {
-                let newObj = { ...zWorkorderObj };
-                newObj.description = val;
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+
+                wo.description = val;
+                setWorkorderObj(wo);
               }}
               onRemoveSelection={() => {
-                let newObj = { ...zWorkorderObj };
-                newObj.description = "";
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+
+                wo.description = "";
+                setWorkorderObj(wo);
               }}
             />
           </View>
@@ -351,12 +353,13 @@ export const Info_WorkorderComponent = ({
               buttonLabel={"Colors"}
               currentSelection={zWorkorderObj.color}
               onSelect={(val) => {
-                let newObj = { ...zWorkorderObj };
-                newObj.color = val;
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+
+                wo.color = val;
+                setWorkorderObj(wo);
               }}
               onRemoveSelection={() => {
-                let newObj = { ...zWorkorderObj };
+                let newObj = cloneDeep(zWorkorderObj);
                 newObj.color = {
                   label: "",
                   backgroundColor: "",
@@ -384,9 +387,10 @@ export const Info_WorkorderComponent = ({
               styleProps={{ marginRight: 2 }}
               value={zWorkorderObj.partOrdered}
               onTextChange={(val) => {
-                let newObj = { ...zWorkorderObj };
-                newObj.partOrdered = val;
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+
+                wo.partOrdered = val;
+                setWorkorderObj(wo);
               }}
             />
           </View>
@@ -408,9 +412,9 @@ export const Info_WorkorderComponent = ({
               placeholderText={"Part Source"}
               styleProps={{ marginRight: 2 }}
               onTextChange={(val) => {
-                let newObj = { ...zWorkorderObj };
-                newObj.partSource = val;
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+                wo.partSource = val;
+                setWorkorderObj(wo);
               }}
             />
             <ModalDropdown
@@ -427,55 +431,40 @@ export const Info_WorkorderComponent = ({
               buttonLabel={"Sources"}
               currentSelectionName={zWorkorderObj.partSource}
               onSelect={(val) => {
-                let newObj = { ...zWorkorderObj };
-                newObj.partSource = val;
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+                wo.partSource = val;
+                setWorkorderObj(wo);
               }}
               onRemoveSelection={() => {
-                let newObj = { ...zWorkorderObj };
-                newObj.partSource = "";
-                setWorkorderObj(newObj);
+                let wo = cloneDeep(zWorkorderObj);
+                wo.partSource = "";
+                setWorkorderObj(wo);
               }}
             />
           </View>
-          <View
-            style={{
-              // marginTop: 8,
-              flexDirection: "row",
-              justifyContent: "center",
-              marginTop: 8,
-              alignItems: "center",
-              width: "90%",
-              padding: 5,
-              backgroundColor: getBackgroundColor().backgroundColor,
-              ...SHADOW_RADIUS_PROTO,
+
+          <ModalDropdown
+            modalStyle={{
+              alignSelf: "flex-start",
+              marginVertical: "2%",
+              width: "30%",
             }}
-          >
-            <ModalDropdown
-              // itemListStyle={{ width: 90 }}
-              modalStyle={{
-                alignSelf: "flex-start",
-                marginVertical: "2%",
-                width: "30%",
-              }}
-              data={zSettingsObj.statuses}
-              closeButtonText={"Close"}
-              // removeButtonText={"Remove"}
-              // buttonStyle={{ width: 90 }}
-              buttonStyle={{
-                width: "100%",
-                backgroundColor: "transparent",
-                ...SHADOW_RADIUS_NOTHING,
-              }}
-              textStyle={{ color: getBackgroundColor().textColor }}
-              buttonLabel={zWorkorderObj.status}
-              onSelect={(val) => {
-                let newObj = cloneDeep(zWorkorderObj);
-                newObj.status = val;
-                setWorkorderObj(newObj);
-              }}
-            />
-          </View>
+            data={zSettingsObj.statuses}
+            closeButtonText={"Close"}
+            buttonStyle={{
+              width: "100%",
+              backgroundColor: getBackgroundColor().backgroundColor,
+              paddingVertical: 10,
+              marginTop: 10,
+            }}
+            textStyle={{ color: getBackgroundColor().textColor }}
+            buttonLabel={zWorkorderObj.status}
+            onSelect={(val) => {
+              let wo = cloneDeep(zWorkorderObj);
+              wo.status = val;
+              setWorkorderObj(wo);
+            }}
+          />
         </View>
       )}
     </View>

@@ -57,6 +57,7 @@ export const SMS_PROTO = {
   customerID: "",
   read: false,
   id: "",
+  type: "",
 };
 
 export const DISCOUNT_OBJ_PROTO = {
@@ -70,6 +71,7 @@ export const WORKORDER_ITEM_PROTO = {
   serviceNotes: "",
   invItemID: "",
   discountObj: { ...DISCOUNT_OBJ_PROTO },
+  id: "",
 };
 export const CUSTOMER_PROTO = {
   first: "",
@@ -418,6 +420,12 @@ export const ADJUSTABLE_BUTTON_SIZE_OPTIONS_ARR = [
   { text: { fontSize: 15 }, view: { height: 37 } },
   { text: { fontSize: 15 }, view: { height: 33 } },
 ];
+
+export const SHADOW_RADIUS_NOTHING = {
+  shadowOffset: { width: 0, height: 0 },
+  shadowRadius: 0,
+  shadowColor: "transparent",
+};
 
 ////////// default settings ////////////////////
 export const DEFAULT_USER_PREFERENCES = {

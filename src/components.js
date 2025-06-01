@@ -208,7 +208,7 @@ export const ScreenModal = ({
   buttonIcon,
   handleModalActionInternally = false,
   // canExitOnOuterModalClick = true,
-  handleOuterClick,
+  handleOuterClick = () => {},
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sMouseOver, _setMouseOver] = React.useState(false);
@@ -220,10 +220,8 @@ export const ScreenModal = ({
   useEffect(() => {
     const el = ref ? ref.current : null;
     if (el) {
-      // log("el", el);
       let rect = el.getBoundingClientRect();
       _setModalCoordinates({ x: rect.x, y: rect.y });
-      // log("outer", rect);
     }
   }, []);
 
@@ -240,11 +238,8 @@ export const ScreenModal = ({
     <TouchableWithoutFeedback
       ref={ref}
       onPress={() => {
-        if (handleOuterClick) {
-          _setInternalModalShow(false);
-          // setModalVisibility(false);
-          handleOuterClick();
-        }
+        _setInternalModalShow(false);
+        handleOuterClick();
       }}
     >
       <View style={{}}>
@@ -336,44 +331,41 @@ export const ModalDropdown = ({
   return (
     <TouchableWithoutFeedback onPress={() => toggleModal()}>
       <View>
-        <TouchableOpacity
-          style={{
-            backgroundColor: Colors.blueButtonBackground,
-            borderRadius: 2,
-            paddingHorizontal: 10,
-            height: 25,
-            paddingVertical: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            ...SHADOW_RADIUS_PROTO,
-            ...buttonStyle,
-          }}
-          onPress={toggleModal}
-        >
-          <Text
+        <TouchableOpacity onPress={toggleModal}>
+          <View
             style={{
-              color: "white",
-              textAlign: "center",
-              fontSize: 15,
-              ...textStyle,
+              backgroundColor: Colors.blueButtonBackground,
+              borderRadius: 2,
+              paddingHorizontal: 10,
+              height: 25,
+              padding: 3,
+              alignItems: "center",
+              justifyContent: "center",
+              ...SHADOW_RADIUS_PROTO,
+              ...buttonStyle,
             }}
           >
-            {buttonLabel}
-          </Text>
+            <Text
+              style={{
+                color: "white",
+                textAlign: "center",
+                fontSize: 15,
+                ...textStyle,
+              }}
+            >
+              {buttonLabel}
+            </Text>
+          </View>
         </TouchableOpacity>
 
         <Modal visible={isModalVisible} transparent={true}>
           <View
             style={{
-              // backgroundColor: "green",
-              // backgroundColor: "black",
-              // opacity: 0.2,
               width: "100%",
               height: "100%",
               ...outerModalStyle,
             }}
           >
-            {/* <View style={{}}> */}
             <TouchableWithoutFeedback>
               <View style={{ width: "20%", ...innerModalStyle }}>
                 <FlatList
@@ -943,7 +935,7 @@ export const ColorGridPickerComponent = ({ onColorSelect }) => {
 
 export const SHADOW_RADIUS_PROTO = {
   shadowColor: "black",
-  shadowOffset: { width: 3, height: 3 },
+  shadowOffset: { width: 2, height: 2 },
   shadowOpacity: 0.25,
   shadowRadius: 1,
 };

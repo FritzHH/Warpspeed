@@ -1,36 +1,45 @@
-import { CUSTOMER_PREVIEW_PROTO } from "./data";
+import { CUSTOMER_PREVIEW_PROTO, SMS_PROTO } from "./data";
 import {
   getCollectionItem,
   getNodeObject,
   getRealtimeNodeItem,
+  sendSMS,
   setFirestoreCollectionItem,
   setRealtimeNodeItem,
 } from "./db";
 import { log } from "./utils";
 
 // setters ///////////////////////////////////////////////////////
-export function dbSetCustomerObj(customerObj) {
+export function dbSetCustomerObj(customerObj, removeOption = false) {
+  let id = customerObj.id;
   let previewObj = {};
   previewObj.cell = customerObj.cell;
   previewObj.first = customerObj.first;
   previewObj.id = customerObj.id;
   previewObj.landline = customerObj.landline;
   previewObj.last = customerObj.last;
-  setRealtimeNodeItem("CUSTOMER-PREVIEWS/" + customerObj.id, previewObj);
-  return setFirestoreCollectionItem("CUSTOMERS", customerObj.id, customerObj);
+  if (removeOption) {
+    previewObj = null;
+    customerObj = null;
+  }
+  setRealtimeNodeItem("CUSTOMER-PREVIEWS/" + id, previewObj);
+  return setFirestoreCollectionItem("CUSTOMERS", id, customerObj);
 }
 
 export function dbSetSettings(settingsObj) {
   return setRealtimeNodeItem("SETTINGS", settingsObj);
 }
 
-export function dbSetOpenWorkorderItem(item) {
+export function dbSetOpenWorkorderItem(item, removeOption = false) {
   let path = "OPEN-WORKORDERS/" + item.id;
+  if (removeOption) item = null;
   return setRealtimeNodeItem(path, item);
 }
 
-export function dbSetClosedWorkorderItem(item) {
-  return setFirestoreCollectionItem("CLOSED-WORKORDERS", item.id, item);
+export function dbSetClosedWorkorderItem(item, removeOption = false) {
+  let id = item.id;
+  if (removeOption) item = null;
+  return setFirestoreCollectionItem("CLOSED-WORKORDERS", id, item);
 }
 
 export function dbSetInventoryItem(item, remove = false) {
@@ -39,8 +48,10 @@ export function dbSetInventoryItem(item, remove = false) {
   return setRealtimeNodeItem(path, item);
 }
 
-export function dbSetSaleItem(item) {
-  return setFirestoreCollectionItem("SALES", item.id, item);
+export function dbSetSaleItem(item, removeOption = false) {
+  let id = item.id;
+  if (removeOption) item = null;
+  return setFirestoreCollectionItem("SALES", id, item);
 }
 
 // getters ///////////////////////////////////////////////////////////
@@ -58,4 +69,10 @@ export function dbGetSaleItem(id) {
 
 export function dbGetCustomerObj(id) {
   return getCollectionItem("CUSTOMERS", id);
+}
+
+// firebase functions ///////////////////////////////////////////////
+
+export function dbSendMessageToCustomer(messageObj) {
+  return sendSMS(messageObj);
 }

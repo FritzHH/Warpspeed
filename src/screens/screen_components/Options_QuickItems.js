@@ -17,7 +17,7 @@ import {
 } from "../../data";
 import { Colors } from "../../styles";
 
-import { log, randomWordGenerator } from "../../utils";
+import { generateRandomID, log, randomWordGenerator } from "../../utils";
 import {
   AlertBox,
   Button,
@@ -111,6 +111,7 @@ export function QuickItemComponent({
     // log("item", item);
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
     lineItem.invItemID = item.id;
+    lineItem.id = generateRandomID();
     wo.workorderLines.push(lineItem);
     _zSetWorkorderObj(wo);
     dbSetOpenWorkorderItem(wo);

@@ -44,7 +44,7 @@ export function clog(one, two) {
 
 export function formatDateTime(dateObj, millis) {
   let now = dateObj;
-  if (millis) {
+  if (!dateObj) {
     now = new Date();
     now.setTime(millis);
   }
@@ -69,6 +69,29 @@ export function formatDateTime(dateObj, millis) {
     formattedTime = endSliced;
   }
 
+  let dayOfWeek = now.getDay();
+  switch (dayOfWeek) {
+    case 0:
+      dayOfWeek = "Sunday";
+      break;
+    case 1:
+      dayOfWeek = "Monday";
+      break;
+    case 2:
+      dayOfWeek = "Tuesday";
+      break;
+    case 3:
+      dayOfWeek = "Wednesday";
+      break;
+    case 4:
+      dayOfWeek = "Thursday";
+      break;
+    case 5:
+      dayOfWeek = "Friday";
+      break;
+    case 6:
+      dayOfWeek = "Saturday";
+  }
   let topTicketDateTimeString = "";
   topTicketDateTimeString += formattedDate;
   topTicketDateTimeString += " --> ";
@@ -78,6 +101,7 @@ export function formatDateTime(dateObj, millis) {
     date: formattedDate,
     time: formattedTime,
     topTicketDateTimeString,
+    dayOfWeek,
   };
 }
 
@@ -141,6 +165,8 @@ export function removeDashesFromPhone(num = "") {
   return newVal;
 }
 
+export function addDashesToPhone(num = "") {}
+
 export const dim = {
   windowWidth: window.innerWidth,
   windowHeight: window.innerHeight,
@@ -173,7 +199,7 @@ export function applyDiscountToWorkorderItem(
   let newPrice;
   let savings;
 
-  if (discountObj.type === "percent") {
+  if (discountObj.type === "Percent") {
     let multiplier = discountObj.value;
     multiplier = 1 - Number("." + multiplier);
     newPrice = inventoryObj.price * workorderLineObj.qty * multiplier;
@@ -186,9 +212,11 @@ export function applyDiscountToWorkorderItem(
   }
 
   return {
+    type: discountObj.type,
+    value: discountObj.value,
     newPrice: trimToTwoDecimals(newPrice),
     savings: trimToTwoDecimals(savings),
-    discountName: discountObj.name,
+    name: discountObj.name,
   };
 }
 
@@ -214,9 +242,9 @@ export async function randomWordGenerator() {
   return generate({ minLength: 4, maxLength: 8 });
 }
 
-export function jclone(item = {}) {
-  return structuredClone(item);
-}
+// export function jclone(item = {}) {
+//   return structuredClone(item);
+// }
 
 export function searchArray(
   searchTerms = [],
@@ -253,12 +281,11 @@ export function checkArr(arr, obj) {
   return arr.find((o) => o.id === obj.id);
 }
 
-export function orderNumericArrByKey(arr, key) {}
-
 export function combine2ArraysOrderByMillis(arr1, arr2) {
   let newArr = [...arr1, ...arr2];
   newArr.sort((a, b) => {
     if (a.millis > b.millis) return 1;
     if (a.millis <= b.millis) return -1;
   });
+  return newArr;
 }

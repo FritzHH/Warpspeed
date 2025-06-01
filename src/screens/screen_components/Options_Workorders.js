@@ -15,7 +15,7 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../stores";
-import { dbGetCustomerObj } from "../../db_calls";
+import { dbGetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 
 export function WorkordersComponent({}) {
   // getters
@@ -38,15 +38,16 @@ export function WorkordersComponent({}) {
     (state) => state.setOptionsTabName
   );
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
+  const _zModOpenWorkorderArrItem = useOpenWorkordersStore(
+    (state) => state.modItem
+  );
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
-  const [sSortedWorkorders, _setSortedWorkorders] = useState([]);
 
   function workorderSelected(obj) {
     obj = { ...obj };
     dbGetCustomerObj(obj.customerID).then((custObj) => {
       _zSetCurrentCustomer(custObj);
-      // log("cust obj", custObj);
     });
     _zSetOpenWorkorder(obj);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
@@ -54,19 +55,15 @@ export function WorkordersComponent({}) {
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 
-  let init = false;
   function sortWorkorders(openWorkordersArr) {
     if (!openWorkordersArr) return [];
     if (!zSettingsObj.statusGroups) return [];
-    init = true;
     let statusGroups = zSettingsObj.statusGroups;
-    // log(statusGroups);
     let statusGroupsCopy = cloneDeep(statusGroups);
     statusGroupsCopy = statusGroups.map((statusGroup) => ({
       ...statusGroup,
       workorderArr: [],
     }));
-    // clog(statusGroupsCopy);
     statusGroups.forEach((statusGroup, idx) => {
       let members = statusGroup.members;
       let workorderMemberArr = [];
@@ -89,9 +86,10 @@ export function WorkordersComponent({}) {
     return arr;
   }
 
-  useEffect(() => {
-    sortWorkorders();
-  }, [zOpenWorkordersArr, zSettingsObj]);
+  function workorderDeleted(workorderObj) {
+    _zModOpenWorkorderArrItem(workorderObj, "remove");
+    dbSetOpenWorkorderItem(workorderObj, true);
+  }
 
   return (
     <View
@@ -130,6 +128,7 @@ export function WorkordersComponent({}) {
               onWorkorderSelected={workorderSelected}
               workorder={workorder}
               backgroundColor={backgroundColor}
+              deleteWorkorder={workorderDeleted}
             />
           );
         }}
@@ -143,6 +142,7 @@ function RowItemComponent({
   workorder,
   ssAllowPreview,
   onWorkorderSelected,
+  deleteWorkorder,
   _zSetPreviewObj,
 }) {
   const [sLastHoverInsideMillis, _setLastHoverInsideMilles] = useState(
@@ -154,6 +154,7 @@ function RowItemComponent({
   return (
     <View>
       <TouchableOpacity
+        onLongPress={() => deleteWorkorder(workorder)}
         onMouseOver={() => {
           if (!ssAllowPreview) return;
           _zSetPreviewObj(workorder);

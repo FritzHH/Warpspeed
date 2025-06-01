@@ -55,12 +55,7 @@ import {
 import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
 const NUMS = "1234567890-";
-export function CustomerInfoScreenComponent({
-  ssCustomersArr,
-  __createNewCustomer,
-  __setCustomerSearchArr,
-  __setItemsTabName,
-}) {
+export function CustomerInfoScreenComponent({}) {
   const zCustPreviewArr = useCustomerPreviewStore((state) =>
     state.getCustPreviewArr()
   );
@@ -82,9 +77,6 @@ export function CustomerInfoScreenComponent({
   const _zSetSearchResults = useCustomerSearchStore(
     (state) => state.setSearchResultsArr
   );
-  // const _zSetSelectedItem = useCustomerSearchStore(
-  //   (state) => state.setSelectedItem
-  // );
   const _zResetSearch = useCustomerSearchStore((state) => state.reset);
   const _zSetNewWorkorderInArr = useOpenWorkordersStore(
     (state) => state.modItem
@@ -103,16 +95,12 @@ export function CustomerInfoScreenComponent({
   const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] = useState(true);
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
 
-  useEffect(() => {
-    return () => {};
-  }, []);
-
   function handleBox1TextChange(incomingText = "") {
     // log("incoming box 1", incomingText);
     // if all input erased
     if (incomingText === "") {
       _setBox1Val("");
-      __setCustomerSearchArr([]);
+      _zSetSearchResults([]);
       return;
     }
 
@@ -290,7 +278,7 @@ export function CustomerInfoScreenComponent({
             _setBox1Val("");
             _setBox2Val("");
             _setSearchingByName(!sSearchingByName);
-            __setCustomerSearchArr([]);
+            _zSetSearchResults([]);
             _setShowCreateCustomerBtn(false);
           }}
           text={sSearchingByName ? "Use Phone #" : "Use Name"}

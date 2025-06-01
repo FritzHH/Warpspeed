@@ -8,7 +8,13 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import { dim, generateBarcode, log, trimToTwoDecimals } from "../../utils";
+import {
+  dim,
+  generateBarcode,
+  generateRandomID,
+  log,
+  trimToTwoDecimals,
+} from "../../utils";
 import {
   TabMenuDivider as Divider,
   ScreenModal,
@@ -110,6 +116,7 @@ export function InventoryComponent({}) {
     // log("item", item);
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
     lineItem.invItemID = item.id;
+    lineItem.id = generateRandomID();
     wo.workorderLines.push(lineItem);
     _zSetWorkorderObj(wo);
     dbSetOpenWorkorderItem(wo);

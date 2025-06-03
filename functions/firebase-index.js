@@ -7,7 +7,7 @@ const { getFirestore } = require("firebase-admin/firestore");
 var serviceAccount = require("./creds.json");
 const cors = require("cors")({ origin: true });
 // const handlePayment = require("./payments.js");
-const { databaseURL, twilioObj } = require("./creds");
+// const { databaseURL, twilioObj } = require("./creds.js");
 
 // firebase
 admin.initializeApp({

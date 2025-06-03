@@ -5,8 +5,7 @@ const admin = require("firebase-admin");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const cors = require("cors")({ origin: true });
-const { serviceAccount } = require("./creds.js");
-const { databaseURL, twilioObj } = require("./creds.js");
+const { databaseURL, twilioObj, serviceAccount } = require("./creds.js");
 
 // firebase
 admin.initializeApp({

@@ -7,8 +7,8 @@ exports.twilioObj = {
   twilioauthToken: "d0dcce118e65455383f2ae202e7c02e4",
 };
 // exports.serviceAccount = require("./creds.json");
-const { serviceAccount } = require("./creds.json");
-exports.serviceAccount = serviceAccount;
+exports.serviceAccount = require("./creds.json");
+// exports.serviceAccount = serviceAccount;
 
 const twilioPhoneNumber = "+12393171234";
 const twilioaccountSid = "AC8a368bba2aac361fb084b3e117069d62";

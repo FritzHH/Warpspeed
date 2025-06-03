@@ -953,6 +953,7 @@ export const LoginScreenComponent = ({
       USER_ACTION_GLOBAL.setUser(user);
       _setModalVisibility();
       loginCallback();
+      _setInput("");
     }
   }
 
@@ -1139,6 +1140,7 @@ export const TabMenuButton = ({
   textStyle,
   isSelected,
   onLongPress,
+  height,
 }) => {
   return (
     <Button
@@ -1152,7 +1154,7 @@ export const TabMenuButton = ({
         ...textStyle,
       }}
       buttonStyle={{
-        height: 30,
+        height,
         // width: 130,
         backgroundColor: Colors.tabMenuButton,
         opacity: isSelected ? 1 : 0.45,

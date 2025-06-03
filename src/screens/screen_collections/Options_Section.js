@@ -92,7 +92,7 @@ export function Options_Section({
   /////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{}}>
       <TabBar
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}
@@ -131,6 +131,7 @@ const TabBar = ({
       flexDirection: "row",
       width: "100%",
       justifyContent: "space-between",
+      height: "3%",
     }}
   >
     <View
@@ -139,6 +140,7 @@ const TabBar = ({
       }}
     >
       <TabMenuButton
+        height={dim.windowHeight * 0.03}
         onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
         text={TAB_NAMES.optionsTab.quickItems}
         isSelected={
@@ -147,6 +149,7 @@ const TabBar = ({
       />
       <Divider />
       <TabMenuButton
+        height={dim.windowHeight * 0.03}
         onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
         text={TAB_NAMES.optionsTab.workorders}
         isSelected={
@@ -154,6 +157,7 @@ const TabBar = ({
         }
       />
       <TabMenuButton
+        height={dim.windowHeight * 0.03}
         onPress={() => __setShowWorkorderModal(true)}
         buttonStyle={{ width: 50 }}
         text={`\u2610`}
@@ -163,6 +167,7 @@ const TabBar = ({
       />
       <Divider />
       <TabMenuButton
+        height={dim.windowHeight * 0.03}
         onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory)}
         text={TAB_NAMES.optionsTab.inventory}
         isSelected={
@@ -170,6 +175,7 @@ const TabBar = ({
         }
       />
       <TabMenuButton
+        height={dim.windowHeight * 0.03}
         onPress={() => __setShowInventoryModal(true)}
         buttonStyle={{ width: 50 }}
         text={`\u2610`}
@@ -179,6 +185,7 @@ const TabBar = ({
       />
       <Divider />
       <TabMenuButton
+        height={dim.windowHeight * 0.03}
         onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}
         text={TAB_NAMES.optionsTab.messages}
         isSelected={

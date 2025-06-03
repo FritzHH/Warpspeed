@@ -17,7 +17,7 @@ import {
 } from "../../data";
 import { Colors } from "../../styles";
 
-import { generateRandomID, log, randomWordGenerator } from "../../utils";
+import { dim, generateRandomID, log, randomWordGenerator } from "../../utils";
 import {
   AlertBox,
   Button,
@@ -227,7 +227,7 @@ export function QuickItemComponent({
   //////////////////////////////////////////////////////////////////
   // log("refs", randomWordGenerator());
   return (
-    <View style={{ width: "100%", height: "100%" }}>
+    <View style={{ width: "100%", height: dim.windowHeight * 0.96 }}>
       <View
         style={{
           width: "100%",

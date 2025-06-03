@@ -154,7 +154,7 @@ export function WorkorderScreen() {
   // testing
   async function initialize() {
     if (!sInitFlag) {
-      fillPreferences();
+      // fillPreferences();
       _setInitFlag(true);
     }
   }
@@ -165,27 +165,28 @@ export function WorkorderScreen() {
     <div
       onKeyUp={() => USER_ACTION_GLOBAL.set()}
       onMouseMove={() => USER_ACTION_GLOBAL.set()}
-      style={{ width: "100%", height: "100%" }}
+      style={{ width: "100%" }}
     >
       <View
         style={{
-          width: "100%",
-          height: "100%",
+          flex: 1,
+          // width: "100%",
+          // height: "100%",
           flexDirection: "row",
           justifyContent: "space-around",
         }}
       >
         <View
           style={{
-            height: height,
             width: "65%",
             backgroundColor: Colors.mainBackground,
+            paddingLeft: 5,
           }}
         >
           <View
             style={{
               width: "100%",
-              height: height * 0.65,
+              height: dim.windowHeight * 0.65,
               flexDirection: "row",
               justifyContent: "flex-start",
             }}
@@ -211,7 +212,7 @@ export function WorkorderScreen() {
           <View
             style={{
               width: "100%",
-              height: height * 0.35,
+              height: dim.windowHeight * 0.35,
             }}
           >
             <Notes_Section />
@@ -220,7 +221,7 @@ export function WorkorderScreen() {
         <View
           style={{
             width: "35%",
-            height: height,
+            height: dim.windowHeight,
             backgroundColor: Colors.opacityBackgroundLight,
           }}
         >

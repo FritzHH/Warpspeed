@@ -67,7 +67,7 @@ export function MessagesComponent({}) {
   );
 
   /////////////////////////////////////////////////////////////
-  const [sNewMessage, _setNewMessage] = useState("test message buddyyyy");
+  const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(true);
   // const [sLastMessageRendered, _setLastMessageRendered] = useState(null);
   const [sScrollPosition, _setScrollPosition] = useState(null);
@@ -116,46 +116,53 @@ export function MessagesComponent({}) {
   return (
     <View
       style={{
-        width: "100%",
-        height: "80%",
+        flex: 1,
       }}
     >
-      {/* <LoginScreenComponent /> */}
       <LoginScreenComponent
         modalVisible={sShowLoginScreen}
         loginCallback={() => sLoginFunctionCallback()}
         _setModalVisibility={() => _setShowLoginScreen(false)}
       />
-      <FlatList
-        onScrollToIndexFailed={(info) => {
-          const wait = new Promise((resolve) => setTimeout(resolve, 50));
-          wait.then(() => {
-            messageListRef.current?.scrollToIndex({
-              index: info.index,
-              animated: true,
-            });
-          });
-        }}
-        ref={messageListRef}
-        style={{ width: "100%", height: "30%" }}
-        data={combine2ArraysOrderByMillis(
-          zIncomingMessagesArr,
-          zOutgoingMessagesArr
-        )}
-        renderItem={(item) => {
-          let idx = item.index;
-          item = item.item;
-          // log("item", item);
-          if (item.type === "incoming")
-            return <IncomingMessageComponent msgObj={item} />;
-          return <OutgoingMessageComponent msgObj={item} />;
-        }}
-      />
       <View
         style={{
+          width: "100%",
+          height: dim.windowHeight * 0.8,
+          backgroundColor: "transparent",
+        }}
+      >
+        <FlatList
+          onScrollToIndexFailed={(info) => {
+            const wait = new Promise((resolve) => setTimeout(resolve, 50));
+            wait.then(() => {
+              messageListRef.current?.scrollToIndex({
+                index: info.index,
+                animated: true,
+              });
+            });
+          }}
+          ref={messageListRef}
+          data={combine2ArraysOrderByMillis(
+            zIncomingMessagesArr,
+            zOutgoingMessagesArr
+          )}
+          renderItem={(item) => {
+            let idx = item.index;
+            item = item.item;
+            // log("item", item);
+            if (item.type === "incoming")
+              return <IncomingMessageComponent msgObj={item} />;
+            return <OutgoingMessageComponent msgObj={item} />;
+          }}
+        />
+      </View>
+      <View
+        style={{
+          marginTop: 5,
           flexDirection: "row",
           width: "100%",
-          // backgroundColor: "green",
+          // backgroundColor: "blue",
+          height: dim.windowHeight * 0.16,
         }}
       >
         <TextInput
@@ -169,13 +176,18 @@ export function MessagesComponent({}) {
           autoFocus={true}
           numberOfLines={4}
           multiline={true}
+          placeholderTextColor={"gray"}
+          placeholder={
+            "Type message to customer here ... \n\nCheck response box to right if they may respond..."
+          }
           style={{
+            fontSize: 15,
             flexWrap: "wrap",
             textWrap: "pretty",
             // minHeight: 60,
             outlineWidth: 0,
             width: "85%",
-            borderWidth: 1,
+            // borderTopWidth: 1,
           }}
           value={sNewMessage}
         />

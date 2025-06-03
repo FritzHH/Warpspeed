@@ -7,21 +7,22 @@ const { getFirestore } = require("firebase-admin/firestore");
 var serviceAccount = require("./creds.json");
 const cors = require("cors")({ origin: true });
 // const handlePayment = require("./payments.js");
+const { databaseURL, twilioObj } = require("./creds");
 
 // firebase
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com/",
+  databaseURL: databaseURL,
 });
 const RDB = admin.database();
 const DB = getFirestore();
 
 // twilio
-const twilioPhoneNumber = "+12393171234";
-const twilioaccountSid = "AC8a368bba2aac361fb084b3e117069d62";
-const twilioauthToken = "d0dcce118e65455383f2ae202e7c02e4";
 
-const twilioClient = require("twilio")(twilioaccountSid, twilioauthToken);
+const twilioClient = require("twilio")(
+  twilioObj.twilioaccountSid,
+  twilioObj.twilioauthToken
+);
 
 const SMS_PROTO = {
   firstName: "",
@@ -68,7 +69,7 @@ const sendTwilioMessage = (messageObj) => {
     .create({
       body: messageObj.message,
       to: "+1" + messageObj.phoneNumber,
-      from: twilioPhoneNumber,
+      from: twilioObj.twilioPhoneNumber,
     })
     .then((res) => {
       log("It appears that sending SMS is complete", res);

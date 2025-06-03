@@ -11,9 +11,6 @@ export const USER_ACTION_GLOBAL = {
   set: () => (global.lastActionMillis = new Date().getTime()),
   setUser: (userObj) => (global.currentUserObj = userObj),
   getUser: () => {
-    log(global.lastActionMillis);
-    log(new Date().getTime());
-    log("diff", (new Date().getTime() - global.lastActionMillis) / 1000);
     if (
       (new Date().getTime() - global.lastActionMillis) / 1000 >
       global.loginTimeout
@@ -29,7 +26,6 @@ export const USER_ACTION_GLOBAL = {
     setStateFunctionCallback,
     setStateShowLoginScreenCallback
   ) => {
-    log("user", USER_ACTION_GLOBAL.getUser());
     if (!USER_ACTION_GLOBAL.getUser()) {
       // log("no good");
       setStateFunctionCallback(() => callback);

@@ -109,7 +109,8 @@ export function WorkordersComponent({}) {
   return (
     <View
       style={{
-        flex: 1,
+        // flex: 1,
+        height: dim.windowHeight * 0.96,
       }}
     >
       <CheckBox

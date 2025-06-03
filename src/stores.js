@@ -27,8 +27,7 @@ export const USER_ACTION_GLOBAL = {
     setStateShowLoginScreenCallback
   ) => {
     if (!USER_ACTION_GLOBAL.getUser()) {
-      // log("no good");
-      setStateFunctionCallback(() => callback);
+      setStateFunctionCallback(callback);
       setStateShowLoginScreenCallback(true);
     } else {
       callback();
@@ -48,6 +47,19 @@ export const execute = (
     setStateShowLoginScreenCallback
   );
 };
+
+export const useWaitForLoginStore = create((set, get) => ({
+  loginFunctionCallback: () => {},
+  showLoginScreen: false,
+  getLoginFunctionCallback: () => get().loginFunctionCallback,
+  getShowLoginScreen: () => get().showLoginScreen,
+  setLoginFunctionCallback: (callback) => {
+    set((state) => ({ loginFunctionCallback: callback }));
+  },
+  setShowLoginScreen: (val) => {
+    set((state) => ({ showLoginScreen: val }));
+  },
+}));
 
 // components /////////////////////////////////////////////////////
 export const useInvModalStore = create((set, get) => ({
@@ -124,7 +136,6 @@ export const useCustomerSearchStore = create((set, get) => ({
   },
 }));
 
-let timeWindow = 10000;
 export const useCurrentUserStore = create((set, get) => ({
   userObj: null,
   getCurrentUser: () => get().userObj,

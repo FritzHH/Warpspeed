@@ -36,10 +36,11 @@ import {
   log,
   useInterval,
 } from "../utils";
-import { AlertBox, SHADOW_RADIUS_PROTO } from "../components";
-import { cloneDeep } from "lodash";
-import { Items_WorkorderItemsTab } from "./screen_components/Items_WorkorderItems";
-import { Notes_MainComponent } from "./screen_components/Notes_MainComponent";
+import {
+  AlertBox,
+  LoginScreenComponent,
+  SHADOW_RADIUS_PROTO,
+} from "../components";
 import { Info_Section } from "./screen_collections/Info_Section";
 import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
@@ -66,49 +67,25 @@ import {
   testNode,
   testPayment,
 } from "../testing";
-import { PaymentElement, PaymentElementComponent } from "../PaymentElement";
 import {
   customerPreviewListSubscribe,
-  customerSubscribe,
-  inventoryPull,
   inventorySubscribe,
   openWorkordersSubscribe,
-  removeCustomerSub,
-  removeInventorySub,
   settingsSubscribe,
 } from "../db_subscriptions";
 import {
   useCustomerPreviewStore,
-  useCurrentCustomerStore,
   useInventoryStore,
   useOpenWorkordersStore,
-  useCurrentWorkorderStore,
   useSettingsStore,
   useActionStore,
   useCurrentUserStore,
   USER_ACTION_GLOBAL,
+  useWaitForLoginStore,
 } from "../stores";
-import {
-  get,
-  getDatabase,
-  onChildAdded,
-  onChildChanged,
-  ref,
-} from "firebase/database";
-import { dbGetCustomerObj, dbGetOpenWorkorderItem } from "../db_calls";
-// import { Tab, Tabs, TabList, TabPanel } from "react-tabs";
-// import { TabView, SceneMap } from "react-native-tab-view";
-
-let height = dim.windowHeight * 1;
-
-// sendTestMessage();
-// testPayment();
-// testNode();
-
-let customerSub;
 
 export function WorkorderScreen() {
-  // setters
+  // setters ////////////////////////////////////////////////////////////////
   const _zModCustPreviewItem = useCustomerPreviewStore(
     (state) => state.modItem
   );
@@ -120,11 +97,22 @@ export function WorkorderScreen() {
     (state) => state.setLastActionMillis
   );
   const _zSetUserObj = useCurrentUserStore((state) => state.setCurrentUser);
-  // getters
+  const _zSetShowLoginScreen = useWaitForLoginStore(
+    (state) => state.setShowLoginScreen
+  );
+
+  // getters /////////////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zLastActionMillis = useActionStore((state) =>
     state.getLastActionMillis()
   );
+  const zShowLoginScreen = useWaitForLoginStore((state) =>
+    state.getShowLoginScreen()
+  );
+  const zLoginFunctionCallback = useWaitForLoginStore((state) =>
+    state.getLoginFunctionCallback()
+  );
+
   //////////////////////////////////////////////////////////////////////////////
   const [sInitFlag, _setInitFlag] = React.useState(false);
   const [sShowUserPinInputBox, _setShowUserPinInputBox] = React.useState(false);
@@ -134,7 +122,7 @@ export function WorkorderScreen() {
     openWorkordersSubscribe(_zModWorkorderItem);
     inventorySubscribe(_zModInventoryItem);
     customerPreviewListSubscribe(_zModCustPreviewItem);
-    settingsSubscribe(_zSetSettingsItem);
+    settingsSubscribe(_zSetSettingsItem); // subscribe to changes only
     getRealtimeNodeItem("SETTINGS").then((res) => _zSetSettingsObj(res));
   }, []);
 
@@ -142,6 +130,7 @@ export function WorkorderScreen() {
     // set the global login timeout from settings
     if (zSettingsObj.loginTimeout)
       USER_ACTION_GLOBAL.init(zSettingsObj.loginTimeout);
+    if (zSettingsObj.users) USER_ACTION_GLOBAL.setUser(zSettingsObj.users[0]);
   }, [zSettingsObj]);
 
   // timer
@@ -154,7 +143,7 @@ export function WorkorderScreen() {
   // testing
   async function initialize() {
     if (!sInitFlag) {
-      // fillPreferences();
+      fillPreferences();
       _setInitFlag(true);
     }
   }
@@ -176,6 +165,11 @@ export function WorkorderScreen() {
           justifyContent: "space-around",
         }}
       >
+        <LoginScreenComponent
+          modalVisible={zShowLoginScreen}
+          loginCallback={() => zLoginFunctionCallback()}
+          _setModalVisibility={() => _zSetShowLoginScreen(false)}
+        />
         <View
           style={{
             width: "65%",

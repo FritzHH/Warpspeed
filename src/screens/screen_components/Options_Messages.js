@@ -35,7 +35,7 @@ import {
   SETTINGS_PROTO,
 } from "../../data";
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
-import React, { useEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useReducer, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   execute,
@@ -44,12 +44,23 @@ import {
   useCustMessagesStore,
   USER_ACTION_GLOBAL,
   useSettingsStore,
+  useWaitForLoginStore,
 } from "../../stores";
 import { dbSendMessageToCustomer } from "../../db_calls";
 import { getListeners } from "../../db_subscriptions";
 
 export function MessagesComponent({}) {
-  // getters
+  // setters /////////////////////////////////////////////////////////////
+  const _zSetOutgoingMessage = useCustMessagesStore(
+    (state) => state.setOutgoingMessage
+  );
+  const _zSetLoginFunctionCallback = useWaitForLoginStore(
+    (state) => state.setLoginFunctionCallback
+  );
+  const _zSetShowLoginScreen = useWaitForLoginStore(
+    (state) => state.setShowLoginScreen
+  );
+  // getters ///////////////////////////////////////////////////////////////
   let zCustomerObj = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
 
@@ -61,48 +72,43 @@ export function MessagesComponent({}) {
   const zOutgoingMessagesArr = useCustMessagesStore((state) =>
     state.getOutgoingMessagesArr()
   );
-  // setters
-  const zSetOutgoingMessage = useCustMessagesStore(
-    (state) => state.setOutgoingMessage
-  );
-
-  /////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(true);
   // const [sLastMessageRendered, _setLastMessageRendered] = useState(null);
-  const [sScrollPosition, _setScrollPosition] = useState(null);
-  const [sHeldOutgoingMessage, _setHeldOutgoingMessage] = useState(null);
-  const [sLoginFunctionCallback, _setLoginFunctionCallback] = useState(
-    () => () => {}
-  );
-  const [sShowLoginScreen, _setShowLoginScreen] = useState(false);
+  // const [sLoginFunctionCallback, _setLoginFunctionCallback] = useState(
+  //   () => () => {}
+  // );
+  // const [sShowLoginScreen, _setShowLoginScreen] = useState(false);
 
-  let messageListRef = useRef(null);
+  const textInputRef = useRef("");
+  const messageListRef = useRef(null);
 
   function sendMessage(text, canRespond) {
+    // log(textInputRef.current._getText());
+    // return;
     let msg = { ...SMS_PROTO };
     msg.message = text;
-    msg.phoneNumber = zCustomerObj.cell || "2393369177";
-    msg.firstName = zCustomerObj.first || "Fritz";
-    msg.lastName = zCustomerObj.last || "Hieb";
+    msg.phoneNumber = zCustomerObj.cell; // || "2393369177";
+    msg.firstName = zCustomerObj.first; // || "Fritz";
+    msg.lastName = zCustomerObj.last; // || "Hieb";
     msg.canRespond = canRespond || sCanRespond;
     msg.millis = new Date().getTime();
-    msg.customerID = zCustomerObj.id || "3d2E63TXCY2bzmOdeQc8";
+    msg.customerID = zCustomerObj.id; // || "3d2E63TXCY2bzmOdeQc8";
     msg.id = generateRandomID();
     msg.type = "outgoing";
-    if (!USER_ACTION_GLOBAL.getUser()) {
-    }
-    msg.senderUserID;
-    zSetOutgoingMessage(msg);
+    msg.senderUserID = USER_ACTION_GLOBAL.getUser().id;
+    _zSetOutgoingMessage(msg);
     dbSendMessageToCustomer(msg);
   }
 
   useEffect(() => {
+    // log("here");
     let arr = combine2ArraysOrderByMillis(
       zIncomingMessagesArr,
       zOutgoingMessagesArr
     );
-    _setScrollPosition(arr.length - 1);
+    // _setScrollPosition(arr.length - 1);
     if (arr.length - 1 > 0) {
       messageListRef.current?.scrollToIndex({
         index: arr.length - 1,
@@ -119,11 +125,6 @@ export function MessagesComponent({}) {
         flex: 1,
       }}
     >
-      <LoginScreenComponent
-        modalVisible={sShowLoginScreen}
-        loginCallback={() => sLoginFunctionCallback()}
-        _setModalVisibility={() => _setShowLoginScreen(false)}
-      />
       <View
         style={{
           width: "100%",
@@ -161,18 +162,12 @@ export function MessagesComponent({}) {
           marginTop: 5,
           flexDirection: "row",
           width: "100%",
-          // backgroundColor: "blue",
           height: dim.windowHeight * 0.16,
         }}
       >
         <TextInput
-          onChangeText={(val) =>
-            execute(
-              () => _setNewMessage(val),
-              _setLoginFunctionCallback,
-              _setShowLoginScreen
-            )
-          }
+          onChangeText={(val) => _setNewMessage(val)}
+          ref={textInputRef}
           autoFocus={true}
           numberOfLines={4}
           multiline={true}
@@ -184,17 +179,21 @@ export function MessagesComponent({}) {
             fontSize: 15,
             flexWrap: "wrap",
             textWrap: "pretty",
-            // minHeight: 60,
             outlineWidth: 0,
             width: "85%",
-            // borderTopWidth: 1,
           }}
           value={sNewMessage}
         />
         <View style={{ width: "14%" }}>
           {sNewMessage.length > 5 ? (
             <Button
-              onPress={() => sendMessage(sNewMessage)}
+              onPress={() =>
+                execute(
+                  () => sendMessage(sNewMessage),
+                  _zSetLoginFunctionCallback,
+                  _zSetShowLoginScreen
+                )
+              }
               text={"Send"}
               buttonStyle={{ width: "100%" }}
             />
@@ -232,7 +231,7 @@ const INFO_TEXT_STYLE = {
   marginTop: 2,
 };
 
-function IncomingMessageComponent({ msgObj }) {
+const IncomingMessageComponent = memo(({ msgObj }) => {
   let dateObj = formatDateTime(null, msgObj.millis);
   let backgroundColor = "lightgray";
   return (
@@ -254,9 +253,9 @@ function IncomingMessageComponent({ msgObj }) {
       </View>
     </View>
   );
-}
+});
 
-function OutgoingMessageComponent({ msgObj }) {
+const OutgoingMessageComponent = memo(({ msgObj }) => {
   let dateObj = formatDateTime(null, msgObj.millis);
   let backgroundColor = "rgb(0,122,255)";
   return (
@@ -278,4 +277,4 @@ function OutgoingMessageComponent({ msgObj }) {
       </View>
     </View>
   );
-}
+});

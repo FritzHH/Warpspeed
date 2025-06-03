@@ -20,6 +20,7 @@ import {
   ScreenModal,
   CustomerInfoComponent,
   Button,
+  LoginScreenComponent,
 } from "../../components";
 import { Colors } from "../../styles";
 import {
@@ -36,14 +37,14 @@ import {
   TAB_NAMES,
 } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import { WorkordersComponent } from "../screen_components/Options_Workorders";
 import { QuickItemComponent } from "../screen_components/Options_QuickItems";
 import { InventoryComponent } from "../screen_components/Options_Inventory";
 import { WorkorderPreview } from "../screen_components/Items_WorkorderPreview";
 import { MessagesComponent } from "../screen_components/Options_Messages";
-import { useTabNamesStore } from "../../stores";
+import { useTabNamesStore, useWaitForLoginStore } from "../../stores";
 
 export function Options_Section({
   ssWorkorderObj = WORKORDER_PROTO,
@@ -51,43 +52,27 @@ export function Options_Section({
   ssAdjustableUserPreferences,
   __setWorkorderObj,
 }) {
+  // setters
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
-  ///
+  // const _zSetShowLoginScreen = useWaitForLoginStore(
+  //   (state) => state.setShowLoginScreen
+  // );
+  // getters
   const zOptionsTabName = useTabNamesStore((state) =>
     state.getOptionsTabName()
   );
+  // const zShowLoginScreen = useWaitForLoginStore((state) =>
+  //   state.getShowLoginScreen()
+  // );
+  // const zLoginFunctionCallback = useWaitForLoginStore((state) =>
+  //   state.getLoginFunctionCallback()
+  // );
 
   /////////////////////////////////////////////////////////////////////////////
   const [sShowWorkorderModal, _setShowWorkorderModal] = React.useState(false);
   const [sShowInventoryModal, _setShowInventoryModal] = React.useState(false);
-
-  function addItemToWorkorder(inventoryItem) {
-    // log("incoming item", inventoryItem);
-    let cWorkorderObj = structuredClone(ssWorkorderObj);
-    let newLine = { ...WORKORDER_ITEM_PROTO };
-    let curLines = cWorkorderObj.workorderLines;
-    let foundObj = curLines.find((line) => inventoryItem.id === line.itemID); // if (found)
-    if (foundObj) {
-      newLine = { ...foundObj };
-      newLine.qty = foundObj.qty + 1;
-      curLines = curLines.map((oldLine) => {
-        if (oldLine.itemID === inventoryItem.id) return newLine;
-        return oldLine;
-      });
-    } else {
-      newLine.qty = 1;
-      newLine.id = generateRandomID();
-      newLine.itemID = inventoryItem.id;
-      curLines.push(newLine);
-      // cWorkorderObj.itemIdArr.push(inventoryItem.id);
-    }
-    cWorkorderObj.workorderLines = curLines;
-    // log("finished", curLines);
-    // log("here", cWorkorderObj);
-    __setWorkorderObj(cWorkorderObj);
-  }
 
   /////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////
@@ -99,6 +84,11 @@ export function Options_Section({
         __setShowInventoryModal={_setShowInventoryModal}
         __setShowWorkorderModal={_setShowWorkorderModal}
       />
+      {/* <LoginScreenComponent
+        modalVisible={zShowLoginScreen}
+        loginCallback={() => zLoginFunctionCallback()}
+        _setModalVisibility={() => _zSetShowLoginScreen(false)}
+      /> */}
       {zOptionsTabName === TAB_NAMES.optionsTab.quickItems && (
         <QuickItemComponent
           ssWorkorderObj={{}}

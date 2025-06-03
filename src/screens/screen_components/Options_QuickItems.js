@@ -31,6 +31,8 @@ import {
   useSettingsStore,
   useCurrentWorkorderStore,
   useInventoryStore,
+  execute,
+  useWaitForLoginStore,
 } from "../../stores";
 import {
   dbSetInventoryItem,
@@ -40,18 +42,21 @@ import {
 
 const SEARCH_STRING_TIMER = 45 * 1000;
 
-export function QuickItemComponent({
-  ssWorkorderObj = WORKORDER_PROTO,
-  ssInventoryArr,
-  __setWorkorderObj,
-}) {
-  /// setters
+export function QuickItemComponent({}) {
+  // setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
   const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
-  /// getters
+  const _zSetLoginFunctionCallback = useWaitForLoginStore(
+    (state) => state.setLoginFunctionCallback
+  );
+  const _zSetShowLoginScreen = useWaitForLoginStore(
+    (state) => state.setShowLoginScreen
+  );
+
+  // getters //////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
   let zSettingsObj = SETTINGS_PROTO;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
@@ -62,6 +67,7 @@ export function QuickItemComponent({
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sModalInventoryObj, _setModalInventoryObj] = React.useState(null);
+  const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
 
   let lastSearchMillis = new Date().getTime();
   function setSearchTimer() {
@@ -160,9 +166,10 @@ export function QuickItemComponent({
   }
 
   function handleChangeItem(item) {
-    _zModInventoryItem(item, "change");
-    _setModalInventoryObj(item);
-    dbSetInventoryItem(item);
+    // _zModInventoryItem(item, "change");
+    // // log("item", item);
+    // _setModalInventoryObj(item);
+    // dbSetInventoryItem(item);
   }
   function handleDeleteItemPressed(item) {
     _zModInventoryItem(item, "remove");
@@ -278,6 +285,8 @@ export function QuickItemComponent({
           renderItem={(item) => {
             let index = item.index;
             item = item.item;
+            // log(item);
+            if (!item) return null;
             return (
               <Button
                 onPress={() => handleQuickButtonPress(item)}
@@ -314,7 +323,13 @@ export function QuickItemComponent({
               >
                 <View style={{ width: "75%" }}>
                   <Button
-                    onPress={() => handleSearchItemSelected(item)}
+                    onPress={() =>
+                      execute(
+                        () => handleSearchItemSelected(item),
+                        _zSetLoginFunctionCallback,
+                        _zSetShowLoginScreen
+                      )
+                    }
                     numLines={2}
                     text={item.informalName || item.formalName}
                     shadow={false}
@@ -337,31 +352,36 @@ export function QuickItemComponent({
                   {/**Information full screen inventory modal */}
                   <ScreenModal
                     buttonLabel={"i"}
-                    handleButtonPress={() => _setModalInventoryObj(item)}
+                    handleButtonPress={() => {
+                      _setModalInventoryObjIdx(
+                        zInventoryArr.findIndex((o) => o.id == item.id)
+                      );
+                      _setModalInventoryObj(item);
+                    }}
                     modalStyle={{ width: "40%", alignSelf: "flex-end" }}
                     buttonStyle={{}}
                     showShadow={false}
                     textStyle={{ fontSize: 14 }}
                     showOuterModal={true}
-                    modalVisible={sModalInventoryObj == item}
+                    modalVisible={sModalInventoryObj === item}
                     outerModalStyle={{
                       backgroundColor: "rgba(50,50,50,.5)",
                     }}
                     handleOuterClick={() => _setModalInventoryObj(null)}
                     Component={() => (
                       <InventoryItemInModal
-                        quickItemButtonNames={zSettingsObj.quickItemButtonNames}
+                        // quickItemButtonNames={zSettingsObj.quickItemButtonNames}
                         handleQuickButtonAdd={handleQuickButtonAdd}
                         handleClosePress={() => _setModalInventoryObj(null)}
-                        item={sModalInventoryObj}
+                        itemIdx={sModalInventoryObjIdx}
                         handleDeleteItemPressed={handleDeleteItemPressed}
-                        handleChangeItem={handleChangeItem}
-                        handleQuickButtonRemove={(qBItem) =>
-                          handleQuickButtonRemove(qBItem, sModalInventoryObj)
-                        }
-                        quickItemButtonAssignments={getQuickButtonAssignmentsForInvItem(
-                          sModalInventoryObj
-                        )}
+                        // handleChangeItem={handleChangeItem}
+                        // handleQuickButtonRemove={(qBItem) =>
+                        //   handleQuickButtonRemove(qBItem, sModalInventoryObj)
+                        // }
+                        // quickItemButtonAssignments={getQuickButtonAssignmentsForInvItem(
+                        //   sModalInventoryObj
+                        // )}
                       />
                     )}
                   />

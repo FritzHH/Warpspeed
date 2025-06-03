@@ -341,7 +341,7 @@ export function sendSMS(messageBody) {
         return null;
       } else {
         res.json().then((res) => {
-          // log("COMPLETE!", res);
+          log("COMPLETE!", res);
           return res;
         });
       }

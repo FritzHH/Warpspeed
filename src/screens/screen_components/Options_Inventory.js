@@ -47,13 +47,14 @@ import {
 
 const tabMargin = 20;
 export function InventoryComponent({}) {
-  /// setters
+  /// setters ///////////////////////////////////////////////////////////////
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
   const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
   const _zSetWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
-  /// getters
+
+  /// getters /////////////////////////////////////////////////////////////
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   const zCurrentWorkorderObj = useCurrentWorkorderStore((state) =>
     state.getWorkorderObj()
@@ -69,6 +70,8 @@ export function InventoryComponent({}) {
   const [sInventoryItemInModal, _setInventoryItemInModal] = useState(null);
   const [sInventoryModalVisible, _setInventoryModalVisible] = useState(false);
   const [sCheckboxSelectedArr, _setCheckboxSelectedArr] = useState([]);
+  const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
+  const [sModalInventoryObj, _setModalInventoryObj] = useState(null);
 
   function clearSearch() {
     _setSearchResults([]);

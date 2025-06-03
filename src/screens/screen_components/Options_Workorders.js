@@ -20,12 +20,13 @@ import { dbGetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 import { messagesSubscribe } from "../../db_subscriptions";
 
 export function WorkordersComponent({}) {
-  // getters
+  // getters ///////////////////////////////////////////////////////
   const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
     state.getWorkorderArr()
   );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  // setters
+
+  // setters ////////////////////////////////////////////////////////
   const _zSetIncomingMessage = useCustMessagesStore(
     (state) => state.setIncomingMessage
   );
@@ -62,7 +63,6 @@ export function WorkordersComponent({}) {
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    log("INCOMING_MESSAGES/" + obj.customerID);
     messagesSubscribe(
       obj.customerID,
       _zSetIncomingMessage,

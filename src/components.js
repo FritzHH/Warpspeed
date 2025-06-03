@@ -26,10 +26,13 @@ import { cloneDeep, round } from "lodash";
 import { CUSTOMER_PROTO } from "./data";
 import {
   useCurrentUserStore,
+  useInventoryStore,
   useInvModalStore,
   USER_ACTION_GLOBAL,
   useSettingsStore,
 } from "./stores";
+import { dbSetInventoryItem, dbSetSettings } from "./db_calls";
+import { setInventoryItem } from "./db";
 
 const centerItem = {
   alignItems: "center",
@@ -451,28 +454,44 @@ export const ModalDropdown = ({
 };
 
 export const InventoryItemInModal = ({
-  item,
-  quickItemButtonNames,
-  quickItemButtonAssignments,
+  itemIdx,
+  // quickItemButtonNames,
+  // quickItemButtonAssignments,
   handleClosePress,
-  handleCreateItemPressed,
-  handleDeleteItemPressed,
-  handleChangeItem,
-  handleQuickButtonAdd,
-  handleQuickButtonRemove,
+  // handleCreateItemPressed,
+  // handleDeleteItemPressed,
+  // handleChangeItem,
+  // handleQuickButtonAdd,
+  // handleQuickButtonRemove,
 }) => {
+  // setters ////////////////////////////////////////////////////////
   const _zSetFocus = useInvModalStore((state) => state.setFocus);
-  ///
-  const zFocus = useInvModalStore((state) => state.getFocus());
+  const _zModInventoryItem = useInventoryStore((state) => state.modItem);
+  const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
 
+  // getters ///////////////////////////////////////////////////////
+  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zFocus = useInvModalStore((state) => state.getFocus());
+  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   ////////////////////////////////////////////////////////////////////
   const [sNewItem, _setNewItem] = useState(INVENTORY_ITEM_PROTO);
+  const [sModalInventoryObj, _setModalInventoryObj] = React.useState(itemIdx);
+
   const isMounted = useRef(false);
-  if (!item) return null;
+
+  function handleChangeItem(item, focusName) {
+    _zSetFocus(focusName);
+    _zModInventoryItem(item, "change");
+    // log("item", item.formalName);
+    _setModalInventoryObj(item);
+    dbSetInventoryItem(item);
+  }
+
+  if (!itemIdx) return null;
   // log("names", quickItemButtonNames);
-  const isNewItem = item.upc && !item.id;
+  const isNewItem = itemIdx.upc && !itemIdx.id;
   useEffect(() => {
-    if (!item) return;
+    if (!itemIdx) return;
     if (!isMounted.current) {
       isMounted.current = true;
       // _zModItem(item);
@@ -492,26 +511,59 @@ export const InventoryItemInModal = ({
     upc: "upc",
   };
 
-  function changeItem(item, focusName) {
-    // _zSetFocus(focusName);
-    // log("item", item);
-    handleChangeItem(item);
+  function handleQuickButtonRemove(qBItemToRemove, objIdx) {
+    const obj = zInventoryArr[objIdx];
+    let idx = zSettingsObj.quickItemButtonNames.findIndex(
+      (o) => o.name === qBItemToRemove.name
+    );
+    let assignments = { ...zSettingsObj.quickItemButtonNames[idx] }.assignments;
+    let newAssignmentsArr = assignments.filter((id) => id != obj.id);
+    let newSettingsObj = { ...zSettingsObj };
+    newSettingsObj.quickItemButtonNames[idx] = newAssignmentsArr;
+    _zSetSettingsObj(newSettingsObj);
+    dbSetSettings(newSettingsObj);
+  }
+
+  function handleQuickButtonAdd(itemName, invItemIdx) {
+    const invItem = zInventoryArr[invItemIdx];
+    // log("item name", itemName);
+    let settingsObj = { ...zSettingsObj };
+    let idx = zSettingsObj.quickItemButtonNames.findIndex(
+      (o) => o.name === itemName
+    );
+    let obj = settingsObj.quickItemButtonNames[idx];
+    // log("obj", obj);
+    // return;
+    if (!obj.assignments) {
+      obj.assignments = [];
+      obj.assignments.push(invItem.id);
+    } else if (obj.assignments.find((o) => o === invItem.id)) {
+      return;
+    } else {
+      obj.assignments.push(invItem.id);
+    }
+    // log(obj.assignments);
+    settingsObj.quickItemButtonNames[idx] = obj;
+    _zSetSettingsObj(settingsObj);
+    dbSetSettings(settingsObj);
   }
 
   function handleNewItemPress() {
     let item = { ...sNewItem, id: generateRandomID() };
-    handleCreateItemPressed(item);
+    _zModInventoryItem(item, "add");
+    dbSetInventoryItem(item);
     handleClosePress();
   }
 
   function handleRemoveItem() {
-    handleDeleteItemPressed(item);
+    let item = zInventoryArr[itemIdx];
+    _zModInventoryItem(item, "remove");
+    dbSetInventoryItem(item, true);
+
+    // handleDeleteItemPressed(itemIdx);
     handleClosePress();
   }
 
-  function handleCancelPress() {
-    handleClosePress();
-  }
   return (
     <TouchableWithoutFeedback
       onLongPress={() => {
@@ -550,13 +602,17 @@ export const InventoryItemInModal = ({
               autoFocus={zFocus === FOCUS_NAMES.formalName}
               onClick={() => _zSetFocus(FOCUS_NAMES.formalName)}
               onChangeText={(val) => {
-                let newItem = { ...item };
+                let newItem = cloneDeep(zInventoryArr[itemIdx]);
                 newItem.formalName = val;
                 isNewItem
                   ? _setNewItem(newItem)
-                  : changeItem(newItem, FOCUS_NAMES.formalName);
+                  : handleChangeItem(newItem, FOCUS_NAMES.formalName);
               }}
-              value={isNewItem ? sNewItem.formalName : item.formalName}
+              value={
+                isNewItem
+                  ? sNewItem.formalName
+                  : zInventoryArr[itemIdx].formalName
+              }
             />
             <Text>Keyword Name</Text>
             <TextInput
@@ -570,13 +626,17 @@ export const InventoryItemInModal = ({
               autoFocus={zFocus === FOCUS_NAMES.informalName}
               onClick={() => _zSetFocus(FOCUS_NAMES.informalName)}
               onChangeText={(val) => {
-                let newItem = { ...item };
+                let newItem = cloneDeep(zInventoryArr[itemIdx]);
                 newItem.informalName = val;
                 isNewItem
                   ? _setNewItem(newItem)
-                  : changeItem(newItem, FOCUS_NAMES.informalName);
+                  : handleChangeItem(newItem, FOCUS_NAMES.informalName);
               }}
-              value={isNewItem ? sNewItem.informalName : item.informalName}
+              value={
+                isNewItem
+                  ? sNewItem.informalName
+                  : zInventoryArr[itemIdx].informalName
+              }
             />
           </View>
           <View>
@@ -586,13 +646,15 @@ export const InventoryItemInModal = ({
                 autoFocus={zFocus === FOCUS_NAMES.price}
                 onClick={() => _zSetFocus(FOCUS_NAMES.price)}
                 onChangeText={(val) => {
-                  let newItem = { ...item };
+                  let newItem = cloneDeep(zInventoryArr[itemIdx]);
                   newItem.price = val;
                   isNewItem
                     ? _setNewItem(newItem)
-                    : changeItem(newItem, FOCUS_NAMES.price);
+                    : handleChangeItem(newItem, FOCUS_NAMES.price);
                 }}
-                value={isNewItem ? sNewItem.price : item.price}
+                value={
+                  isNewItem ? sNewItem.price : zInventoryArr[itemIdx].price
+                }
                 style={{ fontSize: 16 }}
               />
             </Text>
@@ -602,13 +664,17 @@ export const InventoryItemInModal = ({
                 autoFocus={zFocus === FOCUS_NAMES.sale}
                 onClick={() => _zSetFocus(FOCUS_NAMES.sale)}
                 onChangeText={(val) => {
-                  let newItem = { ...item };
+                  let newItem = cloneDeep(zInventoryArr[itemIdx]);
                   newItem.salePrice = val;
                   isNewItem
                     ? _setNewItem(newItem)
-                    : changeItem(newItem, FOCUS_NAMES.sale);
+                    : handleChangeItem(newItem, FOCUS_NAMES.sale);
                 }}
-                value={isNewItem ? sNewItem.salePrice : item.salePrice}
+                value={
+                  isNewItem
+                    ? sNewItem.salePrice
+                    : zInventoryArr[itemIdx].salePrice
+                }
                 style={{ fontSize: 16 }}
               />
             </Text>
@@ -617,10 +683,12 @@ export const InventoryItemInModal = ({
         <View
           style={{ flexDirection: "row", alignItems: "center", marginTop: 20 }}
         >
-          <Text style={{ marginLeft: 10 }}>{item.catMain}</Text>
+          <Text style={{ marginLeft: 10 }}>
+            {zInventoryArr[itemIdx].catMain}
+          </Text>
         </View>
 
-        {item.category !== INVENTORY_CATEGORIES.labor ? (
+        {sModalInventoryObj.category !== INVENTORY_CATEGORIES.labor ? (
           <View style={{ flexDirection: "row" }}>
             <Text
               style={{
@@ -637,13 +705,13 @@ export const InventoryItemInModal = ({
               autoFocus={zFocus === FOCUS_NAMES.upc}
               onClick={() => _zSetFocus(FOCUS_NAMES.upc)}
               style={{ fontSize: 16, color: "black", marginTop: 0 }}
-              value={item.upc}
+              value={zInventoryArr[itemIdx].upc}
               onChangeText={(val) => {
-                let newItem = { ...item };
-                item.upc = val;
+                let newItem = cloneDeep(zInventoryArr[itemIdx]);
+                newItem.upc = val;
                 isNewItem
                   ? _setNewItem(newItem)
-                  : changeItem(newItem, FOCUS_NAMES.upc);
+                  : handleChangeItem(newItem, FOCUS_NAMES.upc);
               }}
             />
           </View>
@@ -656,17 +724,21 @@ export const InventoryItemInModal = ({
           buttonLabel={"Quick Items"}
           buttonStyle={{ width: 200 }}
           data={
-            quickItemButtonNames ? quickItemButtonNames.map((o) => o.name) : []
+            zSettingsObj.quickItemButtonNames
+              ? zSettingsObj.quickItemButtonNames.map((o) => o.name)
+              : []
           }
-          onSelect={(itemName) => handleQuickButtonAdd(itemName, item)}
+          onSelect={(itemName) =>
+            handleQuickButtonAdd(itemName, sModalInventoryObj)
+          }
         />
         <FlatList
-          data={quickItemButtonAssignments}
+          data={zSettingsObj.quickItemButtonAssignments}
           renderItem={(item) => {
             item = item.item;
             return (
               <TouchableWithoutFeedback
-                onLongPress={() => handleQuickButtonRemove(item)}
+                onLongPress={() => handleQuickButtonRemove(item, itemIdx)}
               >
                 <Text>{item.name}</Text>
               </TouchableWithoutFeedback>

@@ -2,24 +2,21 @@
 const { logger } = require("firebase-functions");
 const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
-const cors = require("cors")({ origin: true });
-const { databaseURL, twilioObj, serviceAccount } = require("./creds.js");
+const serviceAccount = require("./creds.json");
 
 // firebase
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: databaseURL,
+  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com/",
 });
 const RDB = admin.database();
 const DB = getFirestore();
 
 // twilio
-
 const twilioClient = require("twilio")(
-  twilioObj.twilioaccountSid,
-  twilioObj.twilioauthToken
+  "AC8a368bba2aac361fb084b3e117069d62",
+  "1a405e19658914851cb3ac6f96863f9f"
 );
 
 const SMS_PROTO = {
@@ -67,7 +64,7 @@ const sendTwilioMessage = (messageObj) => {
     .create({
       body: messageObj.message,
       to: "+1" + messageObj.phoneNumber,
-      from: twilioObj.twilioPhoneNumber,
+      from: "+12393171234",
     })
     .then((res) => {
       log("It appears that sending SMS is complete", res);
@@ -75,7 +72,7 @@ const sendTwilioMessage = (messageObj) => {
     })
     .catch((e) => {
       log("ERROR SENDING TWILIO SMS", e);
-      return e;
+      return null;
     });
 };
 
@@ -83,10 +80,10 @@ exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
   let body = request.body;
   log("Incoming SMS body from APP", body);
 
-  let dbRef = RDB.ref("OUTGOING_MESSAGES/" + body.customerID);
-  dbRef.update({ [body.id]: { ...body } });
-
   let res = await sendTwilioMessage(body);
+  let dbRef = RDB.ref("OUTGOING_MESSAGES/" + body.customerID);
+  if (res.status != 400) dbRef.update({ [body.id]: { ...body } });
+
   sendResult(response, res);
 });
 

@@ -58,6 +58,8 @@ export const SMS_PROTO = {
   read: false,
   id: "",
   type: "",
+  deliverySuccess: false,
+  senderUserObj: "",
 };
 
 export const DISCOUNT_OBJ_PROTO = {
@@ -411,6 +413,16 @@ export const SETTINGS_PROTO = {
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   printerNames: [],
   loginTimeout: 15,
+  users: [
+    {
+      first: "Fritz",
+      last: "Hieb",
+      id: "1234",
+      permissions: "owner",
+      phone: "2393369177",
+      pin: "33",
+    },
+  ],
 };
 
 ////////// hardcoded settings and options ///////

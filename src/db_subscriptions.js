@@ -19,41 +19,10 @@ import { LocalPage } from "twilio/lib/rest/api/v2010/account/availablePhoneNumbe
 
 let inventoryChangeSub, inventoryAddSub, inventoryRemoveSub;
 let workorderChangeSub, workorderAddSub, workorderRemoveSub;
+let incomingMessagesSub, outgoingMessagesSub;
 let custPreviewChangeSub, custPreviewAddSub, custPreviewRemoveSub;
 let customerObjSub;
 let settingsSub;
-
-// realtime database
-function arrayChangeCallback(type, key, obj, targetArr, dataTargetSetterFun) {
-  let arr = [];
-  //   log(type, obj);
-  switch (type) {
-    case "removed":
-      arr = targetArr.filter((o) => o.id != obj.id);
-      //   log(targetArr);
-      //   log("count", arr.length);
-      break;
-    case "added":
-      arr = arrayAddObjCheckForDupes(targetArr, "id", obj, "id");
-      //   log("count", targetArr.length);
-      break;
-    case "changed":
-      arr = targetArr.map((o) => {
-        if (o.id === obj.id) {
-          return obj;
-        }
-        return o;
-      });
-      break;
-  }
-  dataTargetSetterFun([...arr]);
-}
-
-// firestore
-function documentChangeCallback(dataObj, dataTargetSetterFun) {
-  log("document changed", dataObj);
-  dataTargetSetterFun(dataObj);
-}
 
 // subscriptions /////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -106,11 +75,32 @@ export async function customerPreviewListSubscribe(_zModItemCustPreviewItem) {
   );
 }
 
+// realtime database
 export async function settingsSubscribe(_zSetSettingsItem) {
   settingsSub = await subscribeToNodeChange("SETTINGS", (type, key, val) => {
     // log("incoming", key);
     _zSetSettingsItem(key, val);
   });
+}
+
+// realtime database
+export async function messagesSubscribe(
+  customerID,
+  _zSetIncomingMessages,
+  _zSetOutgoingMessages
+) {
+  incomingMessagesSub = await subscribeToNodeAddition(
+    "INCOMING_MESSAGES/" + customerID,
+    (type, key, val) => {
+      _zSetIncomingMessages(val);
+    }
+  );
+  outgoingMessagesSub = await subscribeToNodeAddition(
+    "OUTGOING_MESSAGES/" + customerID,
+    (type, key, val) => {
+      _zSetOutgoingMessages(val);
+    }
+  );
 }
 
 // firestore
@@ -157,6 +147,13 @@ export function removeAllDatabaseSubs() {
   removeInventorySub();
   removeCustomerPreviewSub();
   removeOpenWorkordersSub();
+}
+
+export function getListeners(type) {
+  log("incoming", incomingMessagesSub);
+  if (type === "messages") {
+    return { incomingMessagesSub: incomingMessagesSub, outgoingMessagesSub };
+  }
 }
 
 // retrievals ///////////////////////////////////////////////////////////

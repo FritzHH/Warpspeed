@@ -20,10 +20,16 @@ import {
   FOCUS_NAMES,
   INVENTORY_ITEM_PROTO,
   INVENTORY_CATEGORIES,
+  SETTINGS_PROTO,
 } from "./data";
 import { cloneDeep, round } from "lodash";
 import { CUSTOMER_PROTO } from "./data";
-import { useInvModalStore } from "./stores";
+import {
+  useCurrentUserStore,
+  useInvModalStore,
+  USER_ACTION_GLOBAL,
+  useSettingsStore,
+} from "./stores";
 
 const centerItem = {
   alignItems: "center",
@@ -929,6 +935,61 @@ export const CustomerInfoComponent = ({
 
 export const ColorGridPickerComponent = ({ onColorSelect }) => {
   let colorArr = [];
+};
+
+export const LoginScreenComponent = ({
+  modalVisible,
+  loginCallback,
+  _setModalVisibility,
+}) => {
+  let zSettingsObj = SETTINGS_PROTO;
+  zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const [sInput, _setInput] = useState("");
+
+  function checkUserInput(input) {
+    _setInput(input);
+    let user = zSettingsObj.users.find((user) => user.pin == input);
+    if (user) {
+      USER_ACTION_GLOBAL.setUser(user);
+      _setModalVisibility();
+      loginCallback();
+    }
+  }
+
+  return (
+    <ScreenModal
+      modalVisible={modalVisible}
+      showOuterModal={true}
+      outerModalStyle={{
+        backgroundColor: "rgba(50,50,50,.5)",
+      }}
+      buttonVisible={false}
+      Component={() => (
+        <View
+          style={{
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "green",
+            width: 500,
+            height: 500,
+          }}
+        >
+          <TextInput
+            autoFocus={true}
+            style={{ outlineWidth: 0, borderWidth: 1, width: 200, height: 40 }}
+            value={sInput}
+            onChangeText={(val) => checkUserInput(val)}
+          />
+          <Button
+            onPress={() => {
+              _setModalVisibility();
+              loginCallback();
+            }}
+          />
+        </View>
+      )}
+    />
+  );
 };
 
 // export const

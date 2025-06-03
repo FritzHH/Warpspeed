@@ -26,6 +26,7 @@ import { clone, cloneDeep } from "lodash";
 import {
   useCurrentWorkorderStore,
   useInventoryStore,
+  USER_ACTION_GLOBAL,
   useSettingsStore,
 } from "../../stores";
 import {
@@ -48,6 +49,7 @@ export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
   );
   ///////////////////////////////////////////////////////////////////////////
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
+  const [sLoginScreenCallback, _setLoginScreenCallback] = useState(() => {});
 
   function deleteWorkorderItem(workorderItem, index) {
     let woCopy = cloneDeep(zWorkorderObj);
@@ -76,8 +78,12 @@ export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
       if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
     }
     wo.workorderLines[idx] = newWOLine;
-    _zSetWorkorderObj(wo);
-    dbSetOpenWorkorderItem(wo);
+    if (!USER_ACTION_GLOBAL.getUser()) {
+      _setLoginScreenCallback(() => {});
+    } else {
+      _zSetWorkorderObj(wo);
+      dbSetOpenWorkorderItem(wo);
+    }
   }
 
   function applyDiscount(inventoryItem, workorderLine, discountObj, index) {

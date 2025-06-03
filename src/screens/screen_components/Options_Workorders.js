@@ -10,12 +10,14 @@ import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
   useCurrentWorkorderStore,
+  useCustMessagesStore,
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../stores";
 import { dbGetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
+import { messagesSubscribe } from "../../db_subscriptions";
 
 export function WorkordersComponent({}) {
   // getters
@@ -24,6 +26,12 @@ export function WorkordersComponent({}) {
   );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   // setters
+  const _zSetIncomingMessage = useCustMessagesStore(
+    (state) => state.setIncomingMessage
+  );
+  const _zSetOutgoingMessage = useCustMessagesStore(
+    (state) => state.setOutgoingMessage
+  );
   const _zSetOpenWorkorder = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
@@ -45,6 +53,7 @@ export function WorkordersComponent({}) {
   const [sAllowPreview, _setAllowPreview] = useState(true);
 
   function workorderSelected(obj) {
+    // log("obj", obj);
     obj = { ...obj };
     dbGetCustomerObj(obj.customerID).then((custObj) => {
       _zSetCurrentCustomer(custObj);
@@ -53,6 +62,12 @@ export function WorkordersComponent({}) {
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    log("INCOMING_MESSAGES/" + obj.customerID);
+    messagesSubscribe(
+      obj.customerID,
+      _zSetIncomingMessage,
+      _zSetOutgoingMessage
+    );
   }
 
   function sortWorkorders(openWorkordersArr) {

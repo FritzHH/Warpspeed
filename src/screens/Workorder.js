@@ -34,6 +34,7 @@ import {
   generateBarcode,
   generateRandomID,
   log,
+  useInterval,
 } from "../utils";
 import { AlertBox, SHADOW_RADIUS_PROTO } from "../components";
 import { cloneDeep } from "lodash";
@@ -83,6 +84,9 @@ import {
   useOpenWorkordersStore,
   useCurrentWorkorderStore,
   useSettingsStore,
+  useActionStore,
+  useCurrentUserStore,
+  USER_ACTION_GLOBAL,
 } from "../stores";
 import {
   get,
@@ -104,6 +108,7 @@ let height = dim.windowHeight * 1;
 let customerSub;
 
 export function WorkorderScreen() {
+  // setters
   const _zModCustPreviewItem = useCustomerPreviewStore(
     (state) => state.modItem
   );
@@ -111,11 +116,20 @@ export function WorkorderScreen() {
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
   const _zSetSettingsItem = useSettingsStore((state) => state.setSettingsItem);
   const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
-
+  const _zSetLastActionMillis = useActionStore(
+    (state) => state.setLastActionMillis
+  );
+  const _zSetUserObj = useCurrentUserStore((state) => state.setCurrentUser);
+  // getters
+  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zLastActionMillis = useActionStore((state) =>
+    state.getLastActionMillis()
+  );
   //////////////////////////////////////////////////////////////////////////////
   const [sInitFlag, _setInitFlag] = React.useState(false);
   const [sShowUserPinInputBox, _setShowUserPinInputBox] = React.useState(false);
 
+  // subscribe to database listeners
   useEffect(() => {
     openWorkordersSubscribe(_zModWorkorderItem);
     inventorySubscribe(_zModInventoryItem);
@@ -124,74 +138,95 @@ export function WorkorderScreen() {
     getRealtimeNodeItem("SETTINGS").then((res) => _zSetSettingsObj(res));
   }, []);
 
+  useEffect(() => {
+    // set the global login timeout from settings
+    if (zSettingsObj.loginTimeout)
+      USER_ACTION_GLOBAL.init(zSettingsObj.loginTimeout);
+  }, [zSettingsObj]);
+
+  // timer
+  useEffect(() => {
+    function tick() {}
+    let id = setInterval(tick, 200);
+    return () => clearInterval(id);
+  }, []);
+
+  // testing
   async function initialize() {
     if (!sInitFlag) {
-      // fillPreferences();
-      // fillInventory();
-      // fillOpenWorkorders();
+      fillPreferences();
       _setInitFlag(true);
     }
   }
   initialize();
 
+  // log("rendering");
   return (
-    <View
-      style={{
-        ...ViewStyles.fullScreen,
-        flexDirection: "row",
-        justifyContent: "space-around",
-      }}
+    <div
+      onKeyUp={() => USER_ACTION_GLOBAL.set()}
+      onMouseMove={() => USER_ACTION_GLOBAL.set()}
+      style={{ width: "100%", height: "100%" }}
     >
-      <View style={{ height: height, width: "64%" }}>
-        {/* <Button
-          title="test"
-          onPress={() => {
-          }}
-        /> */}
-        <View
-          style={{
-            width: "100%",
-            height: height * 0.65,
-            flexDirection: "row",
-            justifyContent: "flex-start",
-          }}
-        >
-          <View
-            style={{
-              width: "33%",
-            }}
-          >
-            <Info_Section />
-          </View>
-          <View
-            style={{
-              width: "68%",
-              height: "100%",
-              backgroundColor: Colors.opacityBackgroundLight,
-              ...SHADOW_RADIUS_PROTO,
-            }}
-          >
-            <Items_Section />
-          </View>
-        </View>
-        <View
-          style={{
-            width: "100%",
-            height: height * 0.35,
-          }}
-        >
-          <Notes_Section />
-        </View>
-      </View>
       <View
         style={{
-          width: "34%",
-          height: height,
-          backgroundColor: Colors.opacityBackgroundLight,
+          width: "100%",
+          height: "100%",
+          flexDirection: "row",
+          justifyContent: "space-around",
         }}
       >
-        <Options_Section />
+        <View
+          style={{
+            height: height,
+            width: "65%",
+            backgroundColor: Colors.mainBackground,
+          }}
+        >
+          <View
+            style={{
+              width: "100%",
+              height: height * 0.65,
+              flexDirection: "row",
+              justifyContent: "flex-start",
+            }}
+          >
+            <View
+              style={{
+                width: "33%",
+              }}
+            >
+              <Info_Section />
+            </View>
+            <View
+              style={{
+                width: "66%",
+                height: "100%",
+                backgroundColor: Colors.opacityBackgroundLight,
+                ...SHADOW_RADIUS_PROTO,
+              }}
+            >
+              <Items_Section />
+            </View>
+          </View>
+          <View
+            style={{
+              width: "100%",
+              height: height * 0.35,
+            }}
+          >
+            <Notes_Section />
+          </View>
+        </View>
+        <View
+          style={{
+            width: "35%",
+            height: height,
+            backgroundColor: Colors.opacityBackgroundLight,
+          }}
+        >
+          <Options_Section />
+        </View>
       </View>
-    </View>
+    </div>
   );
 }

@@ -16,20 +16,34 @@ import {
   WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "../../data";
-import { useCustomerSearchStore } from "../../stores";
+import { useCustMessagesStore, useCustomerSearchStore } from "../../stores";
 
 export function CustomerSearchListComponent({}) {
+  // getters
   const zSearchResultsArr = useCustomerSearchStore((state) =>
     state.getSearchResultsArr()
   );
+
+  // setters
   const _zSetSearchSelectedItem = useCustomerSearchStore(
     (state) => state.setSelectedItem
   );
-
+  const _zSetIncomingMessage = useCustMessagesStore(
+    (state) => state.setIncomingMessage
+  );
+  const _zSetOutgoingMessage = useCustMessagesStore(
+    (state) => state.setOutgoingMessage
+  );
+  ////////////////////////////////////////////////////////////////////////////////////////
   const [sShowModal, _setShowModal] = React.useState(false);
 
-  function handleNewWorkorderBtnPress(customerObj) {
+  function handleCustomerSelected(customerObj) {
     _zSetSearchSelectedItem(customerObj);
+    messagesSubscribe(
+      customerObj.id,
+      _zSetIncomingMessage,
+      _zSetOutgoingMessage
+    );
   }
 
   // log("search res", zSearchResultsArr);
@@ -85,7 +99,7 @@ export function CustomerSearchListComponent({}) {
               /> */}
               <TouchableOpacity
                 style={{ minWidth: 250, paddingVertical: 10 }}
-                onPress={() => handleNewWorkorderBtnPress(item)}
+                onPress={() => handleCustomerSelected(item)}
               >
                 <Text
                   style={{ marginLeft: 10, fontSize: 17, color: "whitesmoke" }}

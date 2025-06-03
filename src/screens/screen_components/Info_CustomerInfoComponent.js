@@ -51,11 +51,16 @@ import {
   useOpenWorkordersStore,
   useTabNamesStore,
   useCurrentWorkorderStore,
+  useCustMessagesStore,
+  USER_ACTION_GLOBAL,
+  execute,
 } from "../../stores";
 import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
+import { messagesSubscribe } from "../../db_subscriptions";
 const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
 const NUMS = "1234567890-";
 export function CustomerInfoScreenComponent({}) {
+  /// getters
   const zCustPreviewArr = useCustomerPreviewStore((state) =>
     state.getCustPreviewArr()
   );
@@ -66,7 +71,13 @@ export function CustomerInfoScreenComponent({}) {
   const zCurrentCustomer = useCurrentCustomerStore((state) =>
     state.getCustomerObj()
   );
-  ///////////
+  /// setters
+  const _zSetIncomingMessage = useCustMessagesStore(
+    (state) => state.setIncomingMessage
+  );
+  const _zSetOutgoingMessage = useCustMessagesStore(
+    (state) => state.setOutgoingMessage
+  );
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
@@ -94,6 +105,21 @@ export function CustomerInfoScreenComponent({}) {
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
   const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] = useState(true);
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
+  const [sLoginScreenCallback, _setLoginScreenCallback] = useState(
+    () => () => {}
+  );
+
+  useEffect(() => {
+    // global.currentUserObj = "hello";
+  }, []);
+
+  // const execute = (callback, stateCallback) => {
+  //   if (!USER_ACTION_GLOBAL.getUser()) {
+  //     stateCallback(() => callback);
+  //   } else {
+  //     callback();
+  //   }
+  // };
 
   function handleBox1TextChange(incomingText = "") {
     // log("incoming box 1", incomingText);
@@ -108,21 +134,20 @@ export function CustomerInfoScreenComponent({}) {
     if (!sSearchingByName) formattedText = removeDashesFromPhone(incomingText);
 
     // check for valid inputs for each box
+
     if (sSearchingByName) {
       if (LETTERS.includes(formattedText[formattedText.length - 1])) {
         _setBox1Val(formattedText);
       } else {
         return;
       }
+    } else if (
+      NUMS.includes(formattedText[formattedText.length - 1]) &&
+      formattedText.length <= 10
+    ) {
+      _setBox1Val(formattedText);
     } else {
-      if (
-        NUMS.includes(formattedText[formattedText.length - 1]) &&
-        formattedText.length <= 10
-      ) {
-        _setBox1Val(formattedText);
-      } else {
-        return;
-      }
+      return;
     }
 
     // run searches
@@ -184,6 +209,11 @@ export function CustomerInfoScreenComponent({}) {
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    messagesSubscribe(
+      newCustomerObj.id,
+      _zSetIncomingMessage,
+      _zSetOutgoingMessage
+    );
   }
 
   function handleModalCreateCustomerBtnPressed() {
@@ -240,7 +270,9 @@ export function CustomerInfoScreenComponent({}) {
             placeholder={sSearchingByName ? "First Name..." : "Phone number..."}
             placeholderTextColor={"gray"}
             value={sBox1Val}
-            onChangeText={(val) => handleBox1TextChange(val)}
+            onChangeText={(val) =>
+              execute(() => handleBox1TextChange(val), _setLoginScreenCallback)
+            }
           />
         </View>
         <View style={{ width: 10 }} />

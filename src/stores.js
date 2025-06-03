@@ -3,6 +3,55 @@
 import { create } from "zustand";
 import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO, TAB_NAMES } from "./data";
 import { checkArr, log, searchPhoneNum } from "./utils";
+import { StaticRouter } from "react-router-dom";
+
+// globals ///////////////////////////////////////////////////////
+export const USER_ACTION_GLOBAL = {
+  init: (loginTimeout) => (global.loginTimeout = loginTimeout),
+  set: () => (global.lastActionMillis = new Date().getTime()),
+  setUser: (userObj) => (global.currentUserObj = userObj),
+  getUser: () => {
+    log(global.lastActionMillis);
+    log(new Date().getTime());
+    log("diff", (new Date().getTime() - global.lastActionMillis) / 1000);
+    if (
+      (new Date().getTime() - global.lastActionMillis) / 1000 >
+      global.loginTimeout
+    ) {
+      global.currentUserObj = null;
+      return null;
+    } else {
+      return global.currentUserObj;
+    }
+  },
+  execute: (
+    callback,
+    setStateFunctionCallback,
+    setStateShowLoginScreenCallback
+  ) => {
+    log("user", USER_ACTION_GLOBAL.getUser());
+    if (!USER_ACTION_GLOBAL.getUser()) {
+      // log("no good");
+      setStateFunctionCallback(() => callback);
+      setStateShowLoginScreenCallback(true);
+    } else {
+      callback();
+    }
+  },
+};
+
+// shortcut for above execute function
+export const execute = (
+  callback,
+  setStateFunctionCallback,
+  setStateShowLoginScreenCallback
+) => {
+  USER_ACTION_GLOBAL.execute(
+    callback,
+    setStateFunctionCallback,
+    setStateShowLoginScreenCallback
+  );
+};
 
 // components /////////////////////////////////////////////////////
 export const useInvModalStore = create((set, get) => ({
@@ -79,16 +128,20 @@ export const useCustomerSearchStore = create((set, get) => ({
   },
 }));
 
+let timeWindow = 10000;
 export const useCurrentUserStore = create((set, get) => ({
-  currentUser: {
-    first: "Test User",
-    last: "Last Name Here",
-    pin: "1",
-    id: "dkfjdkfk",
-  },
-  getCurrentUser: () => get().currentUser,
-  setCurrentUser: (user) => {
-    set((state) => ({ currentUser: user }));
+  userObj: null,
+  getCurrentUser: () => get().userObj,
+  setCurrentUser: (obj) => set((state) => ({ userObj: obj })),
+}));
+
+export const useActionStore = create((set, get) => ({
+  lastActionMillis: 0,
+
+  getLastActionMillis: () => get().lastActionMillis,
+  setLastActionMillis: (lastActionMillis) => {
+    // log(lastActionMillis);
+    set((state) => ({ lastActionMillis }));
   },
 }));
 
@@ -202,6 +255,22 @@ export const useSettingsStore = create((set, get) => ({
   setSettingsObj: (obj) => set((state) => ({ settings: obj })),
   setSettingsItem: (key, val) =>
     set((state) => ({ ...get().setttings, [key]: val })),
+}));
+
+export const useListenersStore = create((set, get) => ({
+  inventoryChangeSub: "",
+  inventoryAddSub: "",
+  inventoryRemoveSub: "",
+  workorderChangeSub: "",
+  workorderAddSub: "",
+  workorderRemoveSub: "",
+  incomingMessagesSub: "",
+  outgoingMessagesSub: "",
+  custPreviewChangeSub: "",
+  custPreviewAddSub: "",
+  custPreviewRemoveSub: "",
+  customerObjSub: "",
+  settingsSub: "",
 }));
 
 /// internal functions ///////////////////////////////////////////

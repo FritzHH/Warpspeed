@@ -331,25 +331,33 @@ export function sendSMS(messageBody) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      // "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": "*",
     },
     body: JSON.stringify(messageBody),
   })
     .then((res) => {
       if (!res.ok) {
-        log("FETCH FAILURE IN SENDSMS HERE IS THE REASON ==> ", res.status);
+        log("FETCH FAILURE IN SENDSMS HERE IS THE REASON ==> ", res);
         return null;
-      }
-      return res;
-    })
-    .then((res) => {
-      if (res) {
+      } else {
         res.json().then((res) => {
-          log("COMPLETE!", res);
+          // log("COMPLETE!", res);
           return res;
         });
       }
-      log("no res to exist for .json operation IN SENDSMS");
-      return null;
+      return res;
+    })
+    // .then((res) => {
+    //   if (res) {
+    //     res.json().then((res) => {
+    //       log("COMPLETE!", res);
+    //       return res;
+    //     });
+    //   }
+    //   log("no res to exist for .json operation IN SENDSMS");
+    //   return null;
+    // })
+    .catch((e) => {
+      log("error in Fetch sendSMS", e);
     });
 }

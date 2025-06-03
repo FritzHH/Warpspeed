@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "warpspeed-bonitabikes",
+  "private_key_id": "ed52c94d70780032c397dfdaa29277a413392fd5",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCuLx4S53qJQNFz\n7A13dUAn8GbFbajjMtL2YI715CJgsReyk1FJXP2R53V94lg/VTHeG0G+z+lwHFj4\nBeWmTT0oOV3JVv5bIwZuBxquyn98T266/1vYXKiOPx+CJNapDyB94DNnFnNs/Cq1\nqxP+FKogx+RR2X5p2uYO3GJE6S1ncDbJottuBwQZqvlGjd+TEorGlaPi490GxeHJ\nJo2Vasi+UcwoZRqRbTRwIdyANUFC/u3rs2eY3uHj7W19aQXMxG+mzN7mQCsNe6rv\nxwFKvKJAmGHWTwhjY1iQ8vM4g23kMvN+c7W0v1/Gt6pV27FNJGdDXFWa7YxiZfbT\nVkM/4oKPAgMBAAECggEADN/WrTcGy5ZK5PKRnD7CWzFdp0IPtZtQFH3Wkz4lfFga\nlExnObDx3RLqkD9mnmfBo9UH6v6bFnpB6TMmYkBbQNncoMEZU8sm8oL76ed1vM5y\nNMgjFb7jhoAL6Cao5x4DHMqxgfEa3vdUgNEATUtht8KOka4ttc1EK90GNmm1vWti\nmwCG70+OINnLYfOIDuYMalXwX9JY6o7DqNtnxO/t/x40WDc2vJz9wlT6KVNpvUuI\nexu4IN9I9/DJ8Rydt9ngk15wwrrXFKYr5dremqjsa66dA4+g3WZB5p+16ODH++Ic\nXFGEtiDTOb1ibAjiM+yV3zYKCHynfVpl3TVCfdWhgQKBgQDgf4ABzJUtvrjAwWaj\neAvtiZ66oDnfiHELA+vnRTITvDHmk4fMXYHJ2OG8MWYR/Q5GwUyzNCb2JU7huIqG\nGQRYbU8ffEgsHf76aD+RePzhgPGN/8TKbNSeDJvkErKMM/h6XTOKHfkHDMXG9VJg\nGX+klXpSCS8Bnl17LX9aUSAmcQKBgQDGoDhPYvOO4dITihKfi2B+WqWXkZUF5scW\nNYeQhYJUPU4Cai+X/S655mET7NmXqkkiRQbFfDbfUC2Pr2IMd4YlUnzlMR/amjp+\nbWGSnmemSs0NpUA7KSCg5Dp+GWmszeyqrfDXrwELAjW80/68IAw/1g1+5Avp/8Ih\nMPvrhGu4/wKBgFXLpEoLu39OAiF4SBd1C2nuTEEadsOcy0bgaslpwmeUZqWuABn0\nKmPPhQV9A3sgcNJNkVhzN+id/XV6J0Z0TRrWO4TW5GYn2IguSwz3Zf1wX+BavQR3\nbxIv02voUWAPhIiPEeFY7xDoqrUMkDy1wfhOP/8WD2bY9PTcQG1tz5GhAoGAJ018\n1viViShWEVe456kEpvv42E0OV+SacGKXOJmyeEjJLuEkGccXf+F+RBsR01j2r7lI\n5br2gKm02kGx/RWJjckMva1CyFbMTEgIjqKZj+YtPQ3977brpeqDSIBu0KrOsddJ\nWORgKHV/fKXWOhN9WQRaF0m4sczR9Q9kSe4iArECgYAbQu5/dqqBSWUVeNcpT/R5\niPu7FvPLiNFUM7jHE53NBfrYHbP8JqiYyop+V6b6EJ98aHVBFAlpXuLzqcAzbYVE\nkoWqHpTrUWwCtye/3yH4dH1pH3mwFpoxS3m2kSIapEeG3OYe0816W4DRJPAC2Tp5\nZLaj9MByOGVuN7DM5xeQXQ==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@warpspeed-bonitabikes.iam.gserviceaccount.com",
+  "client_id": "113140452100683133620",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40warpspeed-bonitabikes.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

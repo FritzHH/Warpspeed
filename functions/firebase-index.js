@@ -11,7 +11,7 @@ const cors = require("cors")({ origin: true });
 // firebase
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://warpspeed-original-default-rtdb.firebaseio.com/",
+  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com/",
 });
 const RDB = admin.database();
 const DB = getFirestore();
@@ -19,7 +19,7 @@ const DB = getFirestore();
 // twilio
 const twilioPhoneNumber = "+12393171234";
 const twilioaccountSid = "AC8a368bba2aac361fb084b3e117069d62";
-const twilioauthToken = "46b9e7d07dbebfc382eeeda6fd6abf94";
+const twilioauthToken = "d0dcce118e65455383f2ae202e7c02e4";
 
 const twilioClient = require("twilio")(twilioaccountSid, twilioauthToken);
 
@@ -36,10 +36,10 @@ const SMS_PROTO = {
 };
 
 const CLOSED_THREAD_RESPONSE =
-  "Thank you for messaging Bonita Bikes. Due to staffing limitations we cannot keep messaging open. If you need to send a picture, please call (239) 291-9396 and we can open the messaging for you, or send an email to support@bonitabikes.com. Thank you and we'll chat soon!";
+  "Thank you for messaging Bonita Bikes. Due to staffing limitations, we cannot keep messaging open for all return responses. If you need to send a picture, for immediate service please call (239) 291-9396 and we can open the messaging service, or include the picture/video in an email to support@bonitabikes.com. Thank you and we'll chat soon!";
 
 function log(one, two) {
-  let str = "[Fritz ========>] ";
+  let str = "[MY LOG ========>] ";
 
   if (typeof one === "object") {
     logger.log(str + JSON.stringify(one) + two || "");
@@ -67,7 +67,7 @@ const sendTwilioMessage = (messageObj) => {
   return twilioClient.messages
     .create({
       body: messageObj.message,
-      to: messageObj.phoneNumber,
+      to: "+1" + messageObj.phoneNumber,
       from: twilioPhoneNumber,
     })
     .then((res) => {
@@ -75,22 +75,20 @@ const sendTwilioMessage = (messageObj) => {
       return res;
     })
     .catch((e) => {
-      log("ERROR SENDING SMS", e);
+      log("ERROR SENDING TWILIO SMS", e);
       return e;
     });
 };
 
-exports.sendSMS = onRequest(async (request, response) => {
-  cors(request, response, async () => {
-    let body = request.body;
-    log("Incoming SMS body from APP", body);
+exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
+  let body = request.body;
+  log("Incoming SMS body from APP", body);
 
-    let dbRef = RDB.ref("OUTGOING_MESSAGES/" + body.phoneNumber);
-    dbRef.update({ [body.id]: { ...body } });
+  let dbRef = RDB.ref("OUTGOING_MESSAGES/" + body.customerID);
+  dbRef.update({ [body.id]: { ...body } });
 
-    let res = await sendTwilioMessage(body);
-    sendResult(response, res);
-  });
+  let res = await sendTwilioMessage(body);
+  sendResult(response, res);
 });
 
 exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
@@ -102,35 +100,9 @@ exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
   log("phone", incomingPhone);
   log("message", incomingMessage);
 
-  let lastOutgoingMessageObj = await RDB.ref(
-    "OUTGOING_MESSAGES/" + incomingPhone
-  )
-    .orderByChild("millis")
-    .limitToLast(1)
-    .once("value")
-    .then((snap) => {
-      return snap.val();
-    });
-
-  let lastOutgoingMessage = lastOutgoingMessageObj
-    ? Object.values(lastOutgoingMessageObj)[0]
-    : null;
-  log("last outgoing message", lastOutgoingMessage);
-
-  let canRespond = lastOutgoingMessage ? lastOutgoingMessage.canRespond : null;
-  if (!canRespond) {
-    let message = { ...lastOutgoingMessage };
-    message.message = CLOSED_THREAD_RESPONSE;
-    message.phoneNumber = incomingPhone;
-    log("outgoing message", message);
-    sendTwilioMessage(message);
-    return;
-  }
-
+  // get the customer from firestore
   let customerRef = DB.collection("CUSTOMERS");
-  let snapshot = await customerRef
-    .where("cellPhoneNumber", "==", incomingPhone)
-    .get();
+  let snapshot = await customerRef.where("cell", "==", incomingPhone).get();
   let customerObj;
   if (!snapshot | snapshot.empty) {
     log("no customer snapshot found", snapshot);
@@ -140,9 +112,45 @@ exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
     log("here is the arrary", arr);
     customerObj = arr[0];
   }
-
   log("here is the customer obj", customerObj);
 
+  let lastOutgoingMessage;
+  if (customerObj) {
+    // get the last message from us to see if they are allowed to respond
+    lastOutgoingMessageObj = await RDB.ref(
+      "OUTGOING_MESSAGES/" + customerObj.id
+    )
+      .orderByChild("millis")
+      .limitToLast(1)
+      .once("value")
+      .then((snap) => {
+        return snap.val();
+      });
+
+    lastOutgoingMessage = lastOutgoingMessageObj
+      ? Object.values(lastOutgoingMessageObj)[0]
+      : null;
+    log("last outgoing message", lastOutgoingMessage);
+  }
+  log("here is this one", lastOutgoingMessage);
+  let canRespond = lastOutgoingMessage ? lastOutgoingMessage.canRespond : null;
+
+  // if not allowed to respond, send a bounceback message
+  if (!canRespond) {
+    log("cannot respond", lastOutgoingMessage.canRespond);
+    let message = { ...SMS_PROTO };
+    if (lastOutgoingMessage) message = { ...lastOutgoingMessage };
+    message.message = CLOSED_THREAD_RESPONSE;
+    message.phoneNumber = incomingPhone;
+    log(
+      "outgoing bounceback not customer not authorized to respond message",
+      message
+    );
+    sendTwilioMessage(message);
+    return;
+  }
+
+  // if allowed to respond, create and store the message in realtime db
   const message = {
     firstName: customerObj.first,
     lastName: customerObj.last,
@@ -151,9 +159,10 @@ exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
     message: incomingMessage,
     customerID: customerObj.id,
     id: body.SmsSid,
+    type: "incoming",
   };
 
-  let dbRef = RDB.ref("INCOMING_MESSAGES/" + incomingPhone);
+  let dbRef = RDB.ref("INCOMING_MESSAGES/" + customerObj.id);
   dbRef.update({ [body.SmsSid]: { ...message } });
 });
 

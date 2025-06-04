@@ -32,7 +32,6 @@ import {
   part_sources_db,
   WORKORDER_PROTO,
   WORKORDER_ITEM_PROTO,
-  bike_colors_arr_db,
   FOCUS_NAMES,
   TAB_NAMES,
 } from "../../data";
@@ -44,7 +43,7 @@ import { QuickItemComponent } from "../screen_components/Options_QuickItems";
 import { InventoryComponent } from "../screen_components/Options_Inventory";
 import { WorkorderPreview } from "../screen_components/Items_WorkorderPreview";
 import { MessagesComponent } from "../screen_components/Options_Messages";
-import { useTabNamesStore, useWaitForLoginStore } from "../../stores";
+import { useTabNamesStore, useLoginStore } from "../../stores";
 
 export function Options_Section({
   ssWorkorderObj = WORKORDER_PROTO,

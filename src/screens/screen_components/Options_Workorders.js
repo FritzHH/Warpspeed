@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import { clog, dim, log, trimToTwoDecimals, useInterval } from "../../utils";
 import { TabMenuDivider as Divider, CheckBox } from "../../components";
 import { Colors } from "../../styles";
-import { INFO_COMPONENT_NAMES, TAB_NAMES } from "../../data";
+import { TAB_NAMES } from "../../data";
 import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";

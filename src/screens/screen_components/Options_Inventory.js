@@ -36,6 +36,7 @@ import {
   useCurrentCustomerStore,
   useCurrentWorkorderStore,
   useInventoryStore,
+  useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
 } from "../../stores";
@@ -53,7 +54,7 @@ export function InventoryComponent({}) {
   const _zSetWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
-
+  const _zExecute = useLoginStore((state) => state.execute);
   /// getters /////////////////////////////////////////////////////////////
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   const zCurrentWorkorderObj = useCurrentWorkorderStore((state) =>
@@ -67,11 +68,21 @@ export function InventoryComponent({}) {
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sCheckboxValue, _setCheckboxValue] = React.useState(null);
-  const [sInventoryItemInModal, _setInventoryItemInModal] = useState(null);
-  const [sInventoryModalVisible, _setInventoryModalVisible] = useState(false);
-  const [sCheckboxSelectedArr, _setCheckboxSelectedArr] = useState([]);
+  const [sNewItemObj, _setNewItemObject] = useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
-  const [sModalInventoryObj, _setModalInventoryObj] = useState(null);
+  const [sLastInputMilles, _setLastInputMillies] = useState(0);
+  const [count, setCount] = useState(0);
+  // testing
+  useEffect(() => {
+    if (zInventoryArr.length > 0 && !sCheckboxValue) {
+      _setCheckboxValue("Parts");
+      let res = [];
+      zInventoryArr.forEach((invItem) => {
+        if (invItem.category === "Parts") res.push(invItem);
+      });
+      _setSearchResults(res);
+    }
+  }, [zInventoryArr]);
 
   function clearSearch() {
     _setSearchResults([]);
@@ -79,30 +90,41 @@ export function InventoryComponent({}) {
     _setCheckboxValue(null);
   }
 
-  function search(searchTerm) {
+  let lastMillis = 0;
+
+  function setBarcode(val) {}
+
+  function search(searchTerm, o) {
+    searchTerm = searchTerm.toString();
     _setSearchTerm(searchTerm);
-    if (searchTerm.length == 0) {
+    if (searchTerm.length == 0 || searchTerm.length < 4) {
       _setSearchResults([]);
       return;
     }
-    if (searchTerm.length < 2) return;
+
     let res = {};
     let keys = Object.keys(INVENTORY_ITEM_PROTO);
     zInventoryArr.forEach((invItem) => {
       keys.forEach((key) => {
-        if (
-          invItem[key]
-            .toString()
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
-        )
-          res[invItem.id] = invItem;
+        try {
+          if (
+            invItem[key]
+              .toString()
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase())
+          )
+            res[invItem.id] = invItem;
+        } catch (e) {}
       });
     });
     res = Object.values(res);
 
     if (res.length === 0 && searchTerm.length === 12) {
-      _setInventoryItemInModal({ ...INVENTORY_ITEM_PROTO, upc: searchTerm });
+      _setNewItemObject({
+        ...cloneDeep(INVENTORY_ITEM_PROTO),
+        upc: searchTerm,
+      });
+      _setModalInventoryObjIdx(-1);
       _setSearchTerm("");
     }
 
@@ -111,8 +133,9 @@ export function InventoryComponent({}) {
 
   function inventoryItemSelected(item) {
     if (!zWorkorderObj.id) {
-      _setModalInventoryObj(item);
-      // return;
+      let idx = zInventoryArr.findIndex((o) => o.id == item.id);
+      _setModalInventoryObjIdx(idx);
+      return;
     }
     let wo = cloneDeep(zWorkorderObj);
     if (!wo.workorderLines) wo.workorderLines = [];
@@ -136,73 +159,6 @@ export function InventoryComponent({}) {
     _setSearchResults(res);
     // log(res);
   }
-
-  function handleQuickButtonAdd(itemName, invItem) {
-    let settingsObj = { ...zSettingsObj };
-    let idx = zSettingsObj.quickItemButtonNames.findIndex(
-      (o) => o.name === itemName
-    );
-    let obj = settingsObj.quickItemButtonNames[idx];
-    // log("obj", obj);
-    // return;
-    if (!obj.assignments) {
-      obj.assignments = [];
-      obj.assignments.push(invItem.id);
-    } else if (obj.assignments.find((o) => o === invItem.id)) {
-      return;
-    } else {
-      obj.assignments.push(invItem.id);
-    }
-    // log(obj.assignments);
-    settingsObj.quickItemButtonNames[idx] = obj;
-    _zSetSettings(settingsObj);
-    dbSetSettings(settingsObj);
-  }
-
-  function handleQuickButtonRemove(qBItemToRemove, invItem) {
-    let idx = zSettingsObj.quickItemButtonNames.findIndex(
-      (o) => o.name === qBItemToRemove.name
-    );
-    // log(idx);
-    let assignments = { ...zSettingsObj.quickItemButtonNames[idx] }.assignments;
-    let newAssignmentsArr = assignments.filter((id) => id != invItem.id);
-    let newQButton = { ...qBItemToRemove };
-    qBItemToRemove.assignments = newAssignmentsArr;
-    let newSettingsObj = { ...zSettingsObj };
-    newSettingsObj.quickItemButtonNames[idx] = qBItemToRemove;
-
-    _zSetSettings(newSettingsObj);
-    dbSetSettings(newSettingsObj);
-  }
-
-  function handleCreateItemPressed(item) {
-    _zModInventoryItem(item, "add");
-    dbSetInventoryItem(item);
-  }
-
-  function handleChangeItem(item) {
-    _zModInventoryItem(item, "change");
-    _setInventoryItemInModal(item);
-    dbSetInventoryItem(item);
-  }
-  function handleDeleteItemPressed(item) {
-    _zModInventoryItem(item, "remove");
-    dbSetInventoryItem(item, true);
-  }
-
-  function getQuickButtonAssignmentsForInvItem(invItem) {
-    if (!invItem) return;
-    let arr = [];
-    zSettingsObj.quickItemButtonNames.forEach((quickItemButtonNameObj) => {
-      let assignmentsArr = quickItemButtonNameObj.assignments;
-      if (!assignmentsArr) return;
-      assignmentsArr.forEach((assignmentID) => {
-        if (assignmentID === invItem.id) arr.push(quickItemButtonNameObj);
-      });
-    });
-    return arr;
-  }
-
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
   return (
@@ -236,6 +192,9 @@ export function InventoryComponent({}) {
           placeholderTextColor={"darkgray"}
           value={sSearchTerm}
           onChangeText={(val) => search(val)}
+          // onChange={(ev) => log(ev)}
+          // onSubmitEditing={(ev) => log(ev)}
+          // onKeyPress={(ev) => log(ev)}
         />
       </View>
       <View
@@ -295,8 +254,8 @@ export function InventoryComponent({}) {
           <Button
             text={"+"}
             onPress={() => {
-              let item = { ...INVENTORY_ITEM_PROTO };
-              _setInventoryItemInModal(item);
+              _setModalInventoryObjIdx(-1);
+              _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
             }}
           />
         }
@@ -312,6 +271,7 @@ export function InventoryComponent({}) {
         data={sSearchResults}
         renderItem={(item) => {
           if (!item) return null;
+          let itemIndex = item.index;
           item = item.item;
           return (
             <TouchableOpacity onPress={() => inventoryItemSelected(item)}>
@@ -333,9 +293,8 @@ export function InventoryComponent({}) {
                     // background: "red",
                   }}
                 >
-                  {/**MODAL search result list item full screen modal */}
-                  <ScreenModal
-                    // canExitOnOuterModalClick={true}
+                  {/* *MODAL search result list item full screen modal */}
+                  {/* <ScreenModal
                     buttonVisible={zCurrentWorkorderObj.id ? true : false}
                     buttonLabel={"i"}
                     buttonTextStyle={{ color: "dimgray", fontSize: 17 }}
@@ -348,10 +307,10 @@ export function InventoryComponent({}) {
                       highlightColor: Colors.tabMenuButton,
                     }}
                     handleButtonPress={() => {
-                      _setInventoryItemInModal(item);
+                      log("button pressed");
                     }}
-                    handleOuterClick={() => _setInventoryItemInModal(null)}
-                    modalVisible={sInventoryItemInModal === item}
+                    handleOuterClick={() => _setModalInventoryObjIdx(null)}
+                    modalVisible={sModalInventoryObjIdx == itemIndex}
                     textStyle={{ fontSize: 14 }}
                     showOuterModal={true}
                     outerModalStyle={{
@@ -360,30 +319,14 @@ export function InventoryComponent({}) {
                     Component={() => {
                       return (
                         <InventoryItemInModal
-                          item={sInventoryItemInModal}
-                          handleCreateItemPressed={handleCreateItemPressed}
-                          handleChangeItem={handleChangeItem}
-                          handleDeleteItemPressed={handleDeleteItemPressed}
+                          itemIdx={sModalInventoryObjIdx}
                           handleClosePress={() =>
-                            _setInventoryItemInModal(null)
+                            _setModalInventoryObjIdx(null)
                           }
-                          quickItemButtonNames={
-                            zSettingsObj.quickItemButtonNames
-                          }
-                          handleQuickButtonAdd={handleQuickButtonAdd}
-                          handleQuickButtonRemove={(qBItem) =>
-                            handleQuickButtonRemove(
-                              qBItem,
-                              sInventoryItemInModal
-                            )
-                          }
-                          quickItemButtonAssignments={getQuickButtonAssignmentsForInvItem(
-                            sInventoryItemInModal
-                          )}
                         />
                       );
                     }}
-                  />
+                  /> */}
                   <Button
                     textStyle={{
                       textAlign: "left",
@@ -441,23 +384,22 @@ export function InventoryComponent({}) {
       />
       <ScreenModal
         buttonVisible={false}
-        modalVisible={!sSearchResults && sInventoryItemInModal}
+        handleOuterClick={() => {
+          _setModalInventoryObjIdx(null);
+          _setNewItemObject(null);
+        }}
+        modalVisible={sModalInventoryObjIdx}
         textStyle={{ fontSize: 14 }}
         showOuterModal={true}
         outerModalStyle={{
-          backgroundColor: "rgba(100,100,100,.06)",
+          backgroundColor: "rgba(50,50,50,.5)",
         }}
         Component={() => {
           return (
             <InventoryItemInModal
-              __setItem={_zModInventoryItem}
-              item={sInventoryItemInModal}
-              handleCreateItemPressed={handleCreateItemPressed}
-              handleChangeItem={handleChangeItem}
-              handleDeleteItemPressed={handleDeleteItemPressed}
-              handleClosePress={handleClosePress}
-              zSettingsObj={zSettingsObj}
-              _zSetSettingsObj={_zSetSettings}
+              itemIdx={sModalInventoryObjIdx}
+              handleClosePress={() => _setModalInventoryObjIdx(null)}
+              newItemObj={sNewItemObj}
             />
           );
         }}

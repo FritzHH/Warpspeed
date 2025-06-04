@@ -3,7 +3,6 @@
 import { cloneDeep } from "lodash";
 import {
   bike_brands_db,
-  bike_colors_arr_db,
   bike_descriptions_db,
   CUSTOMER_PROTO,
   INVENTORY_CATEGORIES,

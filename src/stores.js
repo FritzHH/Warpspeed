@@ -7,7 +7,14 @@ import { StaticRouter } from "react-router-dom";
 
 // globals ///////////////////////////////////////////////////////
 export const USER_ACTION_GLOBAL = {
-  init: (loginTimeout) => (global.loginTimeout = loginTimeout),
+  // loginFunctionCallback: () => {},
+  // showLoginScreenCallback: () => {},
+  // lastActionMillis: 0,
+  init: (loginTimeout, loginFunctionCallback, showLoginScreenCallback) => {
+    global.loginTimeout = loginTimeout;
+    global.loginFunctionCallback = loginFunctionCallback;
+    global.showLoginScreenCallback = showLoginScreenCallback;
+  },
   set: () => (global.lastActionMillis = new Date().getTime()),
   setUser: (userObj) => (global.currentUserObj = userObj),
   getUser: () => {
@@ -27,8 +34,9 @@ export const USER_ACTION_GLOBAL = {
     setStateShowLoginScreenCallback
   ) => {
     if (!USER_ACTION_GLOBAL.getUser()) {
-      setStateFunctionCallback(callback);
+      // setStateFunctionCallback(callback);
       setStateShowLoginScreenCallback(true);
+      // global.
     } else {
       callback();
     }
@@ -42,26 +50,50 @@ export const execute = (
   setStateShowLoginScreenCallback
 ) => {
   USER_ACTION_GLOBAL.execute(
-    callback,
-    setStateFunctionCallback,
-    setStateShowLoginScreenCallback
+    callback
+    // setStateFunctionCallback,
+    // setStateShowLoginScreenCallback
   );
 };
 
-export const useWaitForLoginStore = create((set, get) => ({
-  loginFunctionCallback: () => {},
+export const useLoginStore = create((set, get) => ({
+  loginTimeout: 0,
+  currentUserObj: null,
+  lastActionMillis: 0,
+  postLoginFunctionCallback: () => {},
   showLoginScreen: false,
+
   getLoginFunctionCallback: () => get().loginFunctionCallback,
   getShowLoginScreen: () => get().showLoginScreen,
-  setLoginFunctionCallback: (callback) => {
-    set((state) => ({ loginFunctionCallback: callback }));
+  getLastActionMillis: () => get().lastActionMillis,
+  getCurrentUserObj: () => get().currentUserObj,
+
+  setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
+  setCurrentUserObj: (currentUser) => set((state) => ({ currentUser })),
+  setLastActionMillis: () =>
+    set((state) => ({ lastActionMillis: new Date().getTime() })),
+  // setLoginFunctionCallback: (loginFunctionCallback) => {
+  //   set((state) => ({ loginFunctionCallback }));
+  // },
+  setShowLoginScreen: (showLoginScreen) => {
+    set((state) => ({ showLoginScreen }));
   },
-  setShowLoginScreen: (val) => {
-    set((state) => ({ showLoginScreen: val }));
+  execute: (postLoginFunctionCallback) => {
+    let lastMillis = get().lastActionMillis;
+    let cur = new Date().getTime();
+    let diff = (cur - lastMillis) / 1000;
+    // log("diff", diff);
+    if (diff > get().loginTimeout) {
+      set((state) => ({ postLoginFunctionCallback }));
+      set((state) => ({ showLoginScreen: true }));
+      return;
+    }
+    postLoginFunctionCallback();
   },
+  runPostLoginFunction: () => get().postLoginFunctionCallback(),
 }));
 
-// components /////////////////////////////////////////////////////
+// internal use  /////////////////////////////////////////////////////
 export const useInvModalStore = create((set, get) => ({
   currentFocusName: null,
   item: { ...INVENTORY_ITEM_PROTO },
@@ -95,7 +127,7 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: TAB_NAMES.itemsTab.dashboard,
-  optionsTabName: TAB_NAMES.optionsTab.messages,
+  optionsTabName: TAB_NAMES.optionsTab.inventory,
   infoTabName: TAB_NAMES.infoTab.customer,
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
@@ -152,7 +184,7 @@ export const useActionStore = create((set, get) => ({
   },
 }));
 
-// from database //////////////////////////////////////////////////
+// database  //////////////////////////////////////////////////
 export const useCustomerPreviewStore = create((set, get) => ({
   previewArr: [],
   getCustPreviewArr: () => get().previewArr,

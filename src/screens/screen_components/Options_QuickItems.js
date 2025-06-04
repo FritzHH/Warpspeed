@@ -9,9 +9,7 @@ import {
 } from "react-native-web";
 import {
   WORKORDER_ITEM_PROTO,
-  QUICK_BUTTON_NAMES,
   INVENTORY_ITEM_PROTO,
-  DEFAULT_USER_PREFERENCES,
   WORKORDER_PROTO,
   SETTINGS_PROTO,
 } from "../../data";
@@ -32,7 +30,7 @@ import {
   useCurrentWorkorderStore,
   useInventoryStore,
   execute,
-  useWaitForLoginStore,
+  useLoginStore,
 } from "../../stores";
 import {
   dbSetInventoryItem,
@@ -49,10 +47,10 @@ export function QuickItemComponent({}) {
   );
   const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
-  const _zSetLoginFunctionCallback = useWaitForLoginStore(
+  const _zSetLoginFunctionCallback = useLoginStore(
     (state) => state.setLoginFunctionCallback
   );
-  const _zSetShowLoginScreen = useWaitForLoginStore(
+  const _zSetShowLoginScreen = useLoginStore(
     (state) => state.setShowLoginScreen
   );
 
@@ -370,18 +368,8 @@ export function QuickItemComponent({}) {
                     handleOuterClick={() => _setModalInventoryObj(null)}
                     Component={() => (
                       <InventoryItemInModal
-                        // quickItemButtonNames={zSettingsObj.quickItemButtonNames}
-                        handleQuickButtonAdd={handleQuickButtonAdd}
                         handleClosePress={() => _setModalInventoryObj(null)}
                         itemIdx={sModalInventoryObjIdx}
-                        handleDeleteItemPressed={handleDeleteItemPressed}
-                        // handleChangeItem={handleChangeItem}
-                        // handleQuickButtonRemove={(qBItem) =>
-                        //   handleQuickButtonRemove(qBItem, sModalInventoryObj)
-                        // }
-                        // quickItemButtonAssignments={getQuickButtonAssignmentsForInvItem(
-                        //   sModalInventoryObj
-                        // )}
                       />
                     )}
                   />
@@ -394,75 +382,3 @@ export function QuickItemComponent({}) {
     </View>
   );
 }
-
-//       <ScreenModal
-//         ref={sRefs[index]}
-//         modalVisible={
-//           item.name === sButtonSearchResults.name &&
-//           sButtonSearchResults.arr.length > 0
-//         }
-//         setModalVisibility={(val) => {
-//           if (
-//             item.name === sButtonSearchResults.name &&
-//             sButtonSearchResults.arr.length > 0
-//           ) {
-//             _setButtonSearchResults({
-//               name: null,
-//               arr: [],
-//             });
-//           }
-//         }}
-//         modalCoordinateVars={{ x: 160, y: 0 }}
-//         showOuterModal={false}
-//         buttonStyle={{
-//           paddingVertical: 5,
-//           marginVertical: 5,
-//           borderWidth: 0,
-//         }}
-//         buttonTextStyle={{ paddingVertical: 5 }}
-//         outerModalStyle={{}}
-//         buttonLabel={item.name}
-//         showButtonIcon={false}
-//         handleButtonPress={() => {
-//           let arr = [];
-//           ssInventoryArr.forEach((invItem) => {
-//             if (invItem.id == item.id) arr.push(invItem);
-//           });
-//           // log("arr", arr);
-//           _setButtonSearchResults({ name: item.name, arr });
-//         }}
-//         Component={() => {
-//           return (
-//             <View>
-//               <FlatList
-//                 data={sButtonSearchResults.arr}
-//                 keyExtractor={(k, i) => i}
-//                 renderItem={(item) => {
-//                   let index = item.index;
-//                   item = item.item;
-//                   // log("item", item);
-//                   return (
-//                     // <View>{"TEZXT"}</View>
-//                     <Button
-//                       onPress={() => {
-//                         if (!zWorkorderObj.id) return;
-//                         // let item = {...zWorkorderObj}
-//                         // item.itemIdArr.push(item);
-//                         // _zSetWorkorderObj(item);
-//                       }}
-//                       text={item.name}
-//                       textStyle={{}}
-//                       buttonStyle={{
-//                         marginVertical: 4,
-//                       }}
-//                     />
-//                   );
-//                 }}
-//               />
-//             </View>
-//           );
-//         }}
-//       />
-//     );
-//   }}
-// />

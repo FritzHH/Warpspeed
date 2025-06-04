@@ -13,30 +13,16 @@ import {
   dim,
   formatDateTime,
   generateRandomID,
-  log,
-  trimToTwoDecimals,
 } from "../../utils";
-import {
-  TabMenuDivider as Divider,
-  ScreenModal,
-  Button,
-  InventoryItemInModal,
-  CheckBox,
-  LoginScreenComponent,
-} from "../../components";
+import { TabMenuDivider as Divider, Button, CheckBox } from "../../components";
 import { Colors } from "../../styles";
 import {
-  INVENTORY_ITEM_PROTO,
-  INVENTORY_CATEGORIES,
-  TAB_NAMES,
   SMS_PROTO,
   WORKORDER_PROTO,
   CUSTOMER_PROTO,
   SETTINGS_PROTO,
 } from "../../data";
-import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { memo, useEffect, useReducer, useRef, useState } from "react";
-import { cloneDeep } from "lodash";
 import {
   execute,
   useCurrentCustomerStore,
@@ -44,22 +30,23 @@ import {
   useCustMessagesStore,
   USER_ACTION_GLOBAL,
   useSettingsStore,
-  useWaitForLoginStore,
+  useLoginStore,
 } from "../../stores";
 import { dbSendMessageToCustomer } from "../../db_calls";
-import { getListeners } from "../../db_subscriptions";
 
 export function MessagesComponent({}) {
   // setters /////////////////////////////////////////////////////////////
   const _zSetOutgoingMessage = useCustMessagesStore(
     (state) => state.setOutgoingMessage
   );
-  const _zSetLoginFunctionCallback = useWaitForLoginStore(
+  const _zSetLoginFunctionCallback = useLoginStore(
     (state) => state.setLoginFunctionCallback
   );
-  const _zSetShowLoginScreen = useWaitForLoginStore(
+  const _zSetShowLoginScreen = useLoginStore(
     (state) => state.setShowLoginScreen
   );
+
+  const _zExecute = useLoginStore((state) => state.execute);
   // getters ///////////////////////////////////////////////////////////////
   let zCustomerObj = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
@@ -188,10 +175,10 @@ export function MessagesComponent({}) {
           {sNewMessage.length > 5 ? (
             <Button
               onPress={() =>
-                execute(
-                  () => sendMessage(sNewMessage),
-                  _zSetLoginFunctionCallback,
-                  _zSetShowLoginScreen
+                _zExecute(
+                  () => sendMessage(sNewMessage)
+                  // _zSetLoginFunctionCallback,
+                  // _zSetShowLoginScreen
                 )
               }
               text={"Send"}

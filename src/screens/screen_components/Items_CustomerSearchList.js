@@ -10,12 +10,7 @@ import {
   SHADOW_RADIUS_PROTO,
 } from "../../components";
 import { cloneDeep } from "lodash";
-import {
-  INFO_COMPONENT_NAMES,
-  TAB_NAMES,
-  WORKORDER_ITEM_PROTO,
-  WORKORDER_PROTO,
-} from "../../data";
+import { TAB_NAMES, WORKORDER_ITEM_PROTO, WORKORDER_PROTO } from "../../data";
 import { useCustMessagesStore, useCustomerSearchStore } from "../../stores";
 
 export function CustomerSearchListComponent({}) {

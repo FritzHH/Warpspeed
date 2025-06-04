@@ -9,6 +9,149 @@ export const DISCOUNT_TYPES = {
   dollar: "Dollar Amount",
 };
 
+////////// names ////////////////////////////
+export const INVENTORY_CATEGORIES = {
+  parts: "Parts",
+  labor: "Labor",
+  bikes: "Bikes",
+  accessories: "Accessories",
+  other: "Other",
+};
+
+export const COLLECTION_NAMES = {
+  customers: "CUSTOMERS",
+  openWorkorders: "OPEN-WORKORDERS",
+  closedWorkorders: "CLOSED-WORKORDERS",
+  preferences: "PREFERENCES",
+  sales: "SALES",
+  inventory: "INVENTORY",
+  printers: "PRINTERS",
+};
+export const WORKORDER_STATUS_NAMES = Object.freeze({
+  open: "open",
+  finished: "finished",
+});
+
+export const TAB_NAMES = {
+  infoTab: {
+    customer: "Customer Entry",
+    workorder: "Workorder View",
+  },
+  itemsTab: {
+    workorderItems: "Workorder Items",
+    changeLog: "Change Log",
+    dashboard: "Dashboard",
+    customerList: "",
+    preview: "Preview",
+  },
+  optionsTab: {
+    quickItems: "Quick Items",
+    workorders: "Workorders",
+    inventory: "Inventory",
+    messages: "Messages",
+  },
+};
+
+export const QUICK_BUTTON_NAMES = [
+  {
+    name: "Tune-Up",
+    id: "1234",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Tube & Tire",
+    id: "58349",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Brakes",
+    id: "5834fg9",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Shifting",
+    id: "583r49",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Drivetrain",
+    id: "58trt349",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Cable",
+    id: "583sfg49",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Spoke",
+    id: "58349",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Cleaning",
+    id: "583fgs49",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Scooter",
+    id: "5834nh9",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Pickup",
+    id: "5855r349",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "Diagnostics",
+    id: "58fgs349",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "$Labor",
+    id: "58sgf349",
+    position: "999",
+    items: [],
+  },
+  {
+    name: "Brakes",
+    id: "5854t349",
+    position: "1",
+    items: [],
+  },
+  {
+    name: "$Part",
+    id: "583t54t49",
+    position: "1000",
+    items: [],
+  },
+];
+export const FOCUS_NAMES = {
+  cell: "cell",
+  land: "land",
+  first: "first",
+  last: "last",
+  email: "email",
+  street: "street",
+  unit: "unit",
+  city: "city",
+  state: "state",
+  zip: "zip",
+  notes: "notes",
+};
+
 /////////// object prototypes
 export const ALERT_BOX_PROTO = {
   message: "",
@@ -168,7 +311,7 @@ export const INVENTORY_ITEM_PROTO = {
   informalName: "",
   price: 0,
   salePrice: "",
-  category: "",
+  category: INVENTORY_CATEGORIES.other,
   id: "",
   upc: "",
 };
@@ -391,9 +534,9 @@ export const SETTINGS_PROTO = {
       label: "Pink",
     },
   ],
-  bikeBrands: ["Trek", "Specialized", "Sun", "Marin"],
+  bikeBrands: ["Trek", "Specialized", "Sun", "Marin", "Cannondale", "Jamis"],
   bikeBrandsName: "Bikes",
-  bikeOptionalBrands: ["Euphree", "Lectric", "Hiboy"],
+  bikeOptionalBrands: ["Euphree", "Lectric", "Hiboy", "Ridstar", "Velowave"],
   bikeOptionalBrandsName: "E-bikes",
   discounts: [
     { name: "50% Off Item", value: "50", type: DISCOUNT_TYPES.percent },
@@ -426,172 +569,11 @@ export const SETTINGS_PROTO = {
 };
 
 ////////// hardcoded settings and options ///////
-export const ADJUSTABLE_BUTTON_SIZE_OPTIONS_ARR = [
-  { text: { fontSize: 17 }, view: { height: 45 } },
-  { text: { fontSize: 16 }, view: { height: 42 } },
-  { text: { fontSize: 15 }, view: { height: 37 } },
-  { text: { fontSize: 15 }, view: { height: 33 } },
-];
 
 export const SHADOW_RADIUS_NOTHING = {
   shadowOffset: { width: 0, height: 0 },
   shadowRadius: 0,
   shadowColor: "transparent",
-};
-
-////////// default settings ////////////////////
-export const DEFAULT_USER_PREFERENCES = {
-  optionsTabButtonSizes: {
-    view: { ...ADJUSTABLE_BUTTON_SIZE_OPTIONS_ARR[0].view },
-    text: { ...ADJUSTABLE_BUTTON_SIZE_OPTIONS_ARR[0].text },
-  },
-};
-
-////////// names ////////////////////////////
-export const INVENTORY_CATEGORIES = {
-  parts: "Parts",
-  labor: "Labor",
-  bikes: "Bikes",
-  accessories: "Accessories",
-  other: "Other",
-};
-
-export const COLLECTION_NAMES = {
-  customers: "CUSTOMERS",
-  openWorkorders: "OPEN-WORKORDERS",
-  closedWorkorders: "CLOSED-WORKORDERS",
-  preferences: "PREFERENCES",
-  sales: "SALES",
-  inventory: "INVENTORY",
-  printers: "PRINTERS",
-};
-export const WORKORDER_STATUS_NAMES = Object.freeze({
-  open: "open",
-  finished: "finished",
-});
-export const TAB_NAMES = {
-  infoTab: {
-    customer: "Customer Entry",
-    workorder: "Workorder View",
-  },
-  itemsTab: {
-    workorderItems: "Workorder Items",
-    changeLog: "Change Log",
-    dashboard: "Dashboard",
-    customerList: "",
-    preview: "Preview",
-  },
-  optionsTab: {
-    quickItems: "Quick Items",
-    workorders: "Workorders",
-    inventory: "Inventory",
-    messages: "Messages",
-  },
-};
-
-export const INFO_COMPONENT_NAMES = {
-  workorder: "workorder",
-  phoneNumberEntry: "phoneEntry",
-  nameAddressEntry: "nameAddressEntry",
-};
-export const QUICK_BUTTON_NAMES = [
-  {
-    name: "Tune-Up",
-    id: "1234",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Tube & Tire",
-    id: "58349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Brakes",
-    id: "5834fg9",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Shifting",
-    id: "583r49",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Drivetrain",
-    id: "58trt349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Cable",
-    id: "583sfg49",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Spoke",
-    id: "58349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Cleaning",
-    id: "583fgs49",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Scooter",
-    id: "5834nh9",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Pickup",
-    id: "5855r349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Diagnostics",
-    id: "58fgs349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "$Labor",
-    id: "58sgf349",
-    position: "999",
-    items: [],
-  },
-  {
-    name: "Brakes",
-    id: "5854t349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "$Part",
-    id: "583t54t49",
-    position: "1000",
-    items: [],
-  },
-];
-export const FOCUS_NAMES = {
-  cell: "cell",
-  land: "land",
-  first: "first",
-  last: "last",
-  email: "email",
-  street: "street",
-  unit: "unit",
-  city: "city",
-  state: "state",
-  zip: "zip",
-  notes: "notes",
 };
 
 ///////// variables to import from DB ///////////////////////////////
@@ -719,65 +701,4 @@ export let bike_colors_arr_db = [
     backgroundColor: "pink",
     label: "Pink",
   },
-];
-
-/////////// testing///////////////////////////
-//////////////////////////////////////////////
-//////////////////////////////////////////////
-export let brakeHandle = {
-  ...INVENTORY_ITEM_PROTO,
-  name: "Tune-Up - Pedal Bike - Standard",
-  price: 20,
-  // catMain: INVENTORY_CATEGORIES.main.parts,
-  // catDescrip: INVENTORY_CATEGORIES.partsDescriptions.brakes,
-  // catLocation: INVENTORY_CATEGORIES.location.service,
-  id: "583t54t49",
-};
-
-export let shiftCable = {
-  ...INVENTORY_ITEM_PROTO,
-  name: "Tune-Up - Pedal Bike - Single Speedvdfgagfasgafgfas",
-  price: 5,
-  // catMain: INVENTORY_CATEGORIES.main.parts,
-  // catDescrip: INVENTORY_CATEGORIES.descriptions.shifting,
-  // catLocation: INVENTORY_CATEGORIES.location.service,
-  id: "5854t349",
-};
-
-export let fixSomething = {
-  ...INVENTORY_ITEM_PROTO,
-  name: "fixing some shit",
-  price: 30.43,
-  // catMain: INVENTORY_CATEGORIES.main.labor,
-  // catDescrip: INVENTORY_CATEGORIES.descriptions.drivetrain,
-  // catLocation: INVENTORY_CATEGORIES.location.service,
-  id: "585444t349",
-};
-export let bikeBag = {
-  ...INVENTORY_ITEM_PROTO,
-  name: "West biking bag",
-  price: 34.39,
-  // catMain: INVENTORY_CATEGORIES.main.accessories,
-  // catDescrip: INVENTORY_CATEGORIES..accessories,
-  // catLocation: INVENTORY_CATEGORIES.location.retail,
-  id: "58544dfd4t349",
-};
-export let bike = {
-  ...INVENTORY_ITEM_PROTO,
-  name: "Euphree city robinz",
-  price: 2000,
-  salePrice: "",
-  brand: "",
-  // catMain: INVENTORY_CATEGORIES.main.bikes,
-  // catDescrip: INVENTORY_CATEGORIES.machineDescriptions.electric,
-  // catLocation: INVENTORY_CATEGORIES.location.retail,
-  id: "58544dfddfd4t349",
-};
-
-export const test_inventory = [
-  { ...brakeHandle },
-  { ...shiftCable },
-  { ...fixSomething },
-  { ...bikeBag },
-  { ...bike },
 ];

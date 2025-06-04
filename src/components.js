@@ -14,22 +14,21 @@ import { generateRandomID, log } from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
 import {
-  bike_colors_db,
-  bike_colors_arr_db,
-  discounts_db,
   FOCUS_NAMES,
   INVENTORY_ITEM_PROTO,
   INVENTORY_CATEGORIES,
   SETTINGS_PROTO,
 } from "./data";
-import { cloneDeep, round } from "lodash";
+import { cloneDeep } from "lodash";
 import { CUSTOMER_PROTO } from "./data";
 import {
+  execute,
   useCurrentUserStore,
   useInventoryStore,
   useInvModalStore,
   USER_ACTION_GLOBAL,
   useSettingsStore,
+  useLoginStore,
 } from "./stores";
 import { dbSetInventoryItem, dbSetSettings } from "./db_calls";
 import { setInventoryItem } from "./db";
@@ -455,53 +454,27 @@ export const ModalDropdown = ({
 
 export const InventoryItemInModal = ({
   itemIdx,
-  // quickItemButtonNames,
-  // quickItemButtonAssignments,
   handleClosePress,
-  // handleCreateItemPressed,
-  // handleDeleteItemPressed,
-  // handleChangeItem,
-  // handleQuickButtonAdd,
-  // handleQuickButtonRemove,
+  newItemObj,
 }) => {
   // setters ////////////////////////////////////////////////////////
   const _zSetFocus = useInvModalStore((state) => state.setFocus);
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
   const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
-
+  const _zSetLoginFunctionCallback = useLoginStore(
+    (state) => state.setLoginFunctionCallback
+  );
+  const _zSetShowLoginScreen = useLoginStore(
+    (state) => state.setShowLoginScreen
+  );
   // getters ///////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zFocus = useInvModalStore((state) => state.getFocus());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+
   ////////////////////////////////////////////////////////////////////
-  const [sNewItem, _setNewItem] = useState(INVENTORY_ITEM_PROTO);
-  const [sModalInventoryObj, _setModalInventoryObj] = React.useState(itemIdx);
-
+  const [sItem, _setItem] = React.useState({});
   const isMounted = useRef(false);
-
-  function handleChangeItem(item, focusName) {
-    _zSetFocus(focusName);
-    _zModInventoryItem(item, "change");
-    // log("item", item.formalName);
-    _setModalInventoryObj(item);
-    dbSetInventoryItem(item);
-  }
-
-  if (!itemIdx) return null;
-  // log("names", quickItemButtonNames);
-  const isNewItem = itemIdx.upc && !itemIdx.id;
-  useEffect(() => {
-    if (!itemIdx) return;
-    if (!isMounted.current) {
-      isMounted.current = true;
-      // _zModItem(item);
-    }
-    return () => {
-      isMounted.current = false;
-      // _zModItem(INVENTORY_ITEM_PROTO);
-    };
-  }, []);
-
   const FOCUS_NAMES = {
     formalName: "name",
     informalName: "informalName",
@@ -510,6 +483,29 @@ export const InventoryItemInModal = ({
     sale: "sale",
     upc: "upc",
   };
+
+  useEffect(() => {
+    if (newItemObj) {
+      _setItem(newItemObj);
+    } else {
+      _setItem(cloneDeep(zInventoryArr[itemIdx]));
+    }
+  }, []);
+
+  function handleChangeItem(item1, focusName) {
+    _zSetFocus(focusName);
+    _setItem(item1);
+
+    if (!newItemObj)
+      execute(
+        () => {
+          _zModInventoryItem(item1, "change");
+          dbSetInventoryItem(item1);
+        },
+        _zSetLoginFunctionCallback,
+        _zSetShowLoginScreen
+      );
+  }
 
   function handleQuickButtonRemove(qBItemToRemove, objIdx) {
     const obj = zInventoryArr[objIdx];
@@ -549,21 +545,25 @@ export const InventoryItemInModal = ({
   }
 
   function handleNewItemPress() {
-    let item = { ...sNewItem, id: generateRandomID() };
-    _zModInventoryItem(item, "add");
-    dbSetInventoryItem(item);
+    log("new item", sItem);
+    return;
+    _zModInventoryItem(sItem, "add");
+    dbSetInventoryItem(sItem);
     handleClosePress();
   }
 
   function handleRemoveItem() {
-    let item = zInventoryArr[itemIdx];
-    _zModInventoryItem(item, "remove");
-    dbSetInventoryItem(item, true);
-
-    // handleDeleteItemPressed(itemIdx);
-    handleClosePress();
+    execute(
+      () => {
+        _zModInventoryItem(sItem, "remove");
+        dbSetInventoryItem(sItem, true);
+        handleClosePress();
+      },
+      _zSetLoginFunctionCallback,
+      _zSetShowLoginScreen
+    );
   }
-
+  if (!sItem) return null;
   return (
     <TouchableWithoutFeedback
       onLongPress={() => {
@@ -598,21 +598,14 @@ export const InventoryItemInModal = ({
                 color: "black",
                 borderWidth: 1,
               }}
-              // selection={{ start: 2, end:  }}
               autoFocus={zFocus === FOCUS_NAMES.formalName}
               onClick={() => _zSetFocus(FOCUS_NAMES.formalName)}
               onChangeText={(val) => {
-                let newItem = cloneDeep(zInventoryArr[itemIdx]);
+                let newItem = cloneDeep(sItem);
                 newItem.formalName = val;
-                isNewItem
-                  ? _setNewItem(newItem)
-                  : handleChangeItem(newItem, FOCUS_NAMES.formalName);
+                handleChangeItem(newItem, FOCUS_NAMES.formalName);
               }}
-              value={
-                isNewItem
-                  ? sNewItem.formalName
-                  : zInventoryArr[itemIdx].formalName
-              }
+              value={sItem.formalName}
             />
             <Text>Keyword Name</Text>
             <TextInput
@@ -626,17 +619,11 @@ export const InventoryItemInModal = ({
               autoFocus={zFocus === FOCUS_NAMES.informalName}
               onClick={() => _zSetFocus(FOCUS_NAMES.informalName)}
               onChangeText={(val) => {
-                let newItem = cloneDeep(zInventoryArr[itemIdx]);
+                let newItem = cloneDeep(sItem);
                 newItem.informalName = val;
-                isNewItem
-                  ? _setNewItem(newItem)
-                  : handleChangeItem(newItem, FOCUS_NAMES.informalName);
+                handleChangeItem(newItem, FOCUS_NAMES.informalName);
               }}
-              value={
-                isNewItem
-                  ? sNewItem.informalName
-                  : zInventoryArr[itemIdx].informalName
-              }
+              value={sItem.informalName}
             />
           </View>
           <View>
@@ -646,15 +633,11 @@ export const InventoryItemInModal = ({
                 autoFocus={zFocus === FOCUS_NAMES.price}
                 onClick={() => _zSetFocus(FOCUS_NAMES.price)}
                 onChangeText={(val) => {
-                  let newItem = cloneDeep(zInventoryArr[itemIdx]);
+                  let newItem = cloneDeep(sItem);
                   newItem.price = val;
-                  isNewItem
-                    ? _setNewItem(newItem)
-                    : handleChangeItem(newItem, FOCUS_NAMES.price);
+                  handleChangeItem(newItem, FOCUS_NAMES.price);
                 }}
-                value={
-                  isNewItem ? sNewItem.price : zInventoryArr[itemIdx].price
-                }
+                value={sItem.price}
                 style={{ fontSize: 16 }}
               />
             </Text>
@@ -664,17 +647,11 @@ export const InventoryItemInModal = ({
                 autoFocus={zFocus === FOCUS_NAMES.sale}
                 onClick={() => _zSetFocus(FOCUS_NAMES.sale)}
                 onChangeText={(val) => {
-                  let newItem = cloneDeep(zInventoryArr[itemIdx]);
+                  let newItem = cloneDeep(sItem);
                   newItem.salePrice = val;
-                  isNewItem
-                    ? _setNewItem(newItem)
-                    : handleChangeItem(newItem, FOCUS_NAMES.sale);
+                  handleChangeItem(newItem, FOCUS_NAMES.sale);
                 }}
-                value={
-                  isNewItem
-                    ? sNewItem.salePrice
-                    : zInventoryArr[itemIdx].salePrice
-                }
+                value={sItem.salePrice}
                 style={{ fontSize: 16 }}
               />
             </Text>
@@ -683,43 +660,37 @@ export const InventoryItemInModal = ({
         <View
           style={{ flexDirection: "row", alignItems: "center", marginTop: 20 }}
         >
-          <Text style={{ marginLeft: 10 }}>
-            {zInventoryArr[itemIdx].catMain}
-          </Text>
+          <Text style={{ marginLeft: 10 }}>{sItem.catMain}</Text>
         </View>
 
-        {sModalInventoryObj.category !== INVENTORY_CATEGORIES.labor ? (
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{
-                width: 70,
-                marginTop: 0,
-                fontSize: 12,
-                marginRight: 10,
-              }}
-            >
-              Barcode:
-            </Text>
+        <View style={{ flexDirection: "row" }}>
+          <Text
+            style={{
+              width: 70,
+              marginTop: 0,
+              fontSize: 12,
+              marginRight: 10,
+            }}
+          >
+            Barcode:
+          </Text>
 
-            <TextInput
-              autoFocus={zFocus === FOCUS_NAMES.upc}
-              onClick={() => _zSetFocus(FOCUS_NAMES.upc)}
-              style={{ fontSize: 16, color: "black", marginTop: 0 }}
-              value={zInventoryArr[itemIdx].upc}
-              onChangeText={(val) => {
-                let newItem = cloneDeep(zInventoryArr[itemIdx]);
-                newItem.upc = val;
-                isNewItem
-                  ? _setNewItem(newItem)
-                  : handleChangeItem(newItem, FOCUS_NAMES.upc);
-              }}
-            />
-          </View>
-        ) : null}
+          <TextInput
+            autoFocus={zFocus === FOCUS_NAMES.upc}
+            onClick={() => _zSetFocus(FOCUS_NAMES.upc)}
+            style={{ fontSize: 16, color: "black", marginTop: 0 }}
+            value={sItem.upc}
+            onChangeText={(val) => {
+              let newItem = cloneDeep(sItem);
+              newItem.upc = val;
+              handleChangeItem(newItem, FOCUS_NAMES.upc);
+            }}
+          />
+        </View>
 
-        {isNewItem ? (
-          <Button text={"Create Item"} onPress={handleNewItemPress} />
-        ) : null}
+        {/* {newItemObj ? ( */}
+        <Button text={"Create Item"} onPress={handleNewItemPress} />
+        {/* ) : null} */}
         <ModalDropdown
           buttonLabel={"Quick Items"}
           buttonStyle={{ width: 200 }}
@@ -728,9 +699,7 @@ export const InventoryItemInModal = ({
               ? zSettingsObj.quickItemButtonNames.map((o) => o.name)
               : []
           }
-          onSelect={(itemName) =>
-            handleQuickButtonAdd(itemName, sModalInventoryObj)
-          }
+          onSelect={(itemName) => handleQuickButtonAdd(itemName)}
         />
         <FlatList
           data={zSettingsObj.quickItemButtonAssignments}
@@ -738,7 +707,7 @@ export const InventoryItemInModal = ({
             item = item.item;
             return (
               <TouchableWithoutFeedback
-                onLongPress={() => handleQuickButtonRemove(item, itemIdx)}
+                onLongPress={() => handleQuickButtonRemove(item)}
               >
                 <Text>{item.name}</Text>
               </TouchableWithoutFeedback>
@@ -1009,22 +978,31 @@ export const ColorGridPickerComponent = ({ onColorSelect }) => {
   let colorArr = [];
 };
 
-export const LoginScreenComponent = ({
-  modalVisible,
-  loginCallback,
-  _setModalVisibility,
-}) => {
+export const LoginScreenComponent = ({ modalVisible }) => {
+  // setters /////////////////////////////////////////////////////////////
+  const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
+  const _zSetShowLoginScreen = useLoginStore(
+    (state) => state.setShowLoginScreen
+  );
+  const _zExecutePostLoginFunction = useLoginStore(
+    (state) => state.executePostLoginFunction
+  );
+  // getters ////////////////////////////////////////////////////////////
+  const zRunPostLoginCallback = useLoginStore(
+    (state) => state.runPostLoginFunction
+  );
+
   let zSettingsObj = SETTINGS_PROTO;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const [sInput, _setInput] = useState("");
 
   function checkUserInput(input) {
     _setInput(input);
-    let user = zSettingsObj.users.find((user) => user.pin == input);
-    if (user) {
-      USER_ACTION_GLOBAL.setUser(user);
-      _setModalVisibility();
-      loginCallback();
+    let userObj = zSettingsObj.users.find((user) => user.pin == input);
+    if (userObj) {
+      _zSetCurrentUserObj(userObj);
+      _zSetShowLoginScreen(false);
+      zRunPostLoginCallback();
       _setInput("");
     }
   }

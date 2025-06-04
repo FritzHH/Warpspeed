@@ -3,7 +3,7 @@
 import {} from "react-native-web";
 import {} from "../../components";
 import { Colors } from "../../styles";
-import { WORKORDER_PROTO, INFO_COMPONENT_NAMES, TAB_NAMES } from "../../data";
+import { TAB_NAMES } from "../../data";
 import { Info_WorkorderComponent } from "../screen_components/Info_WorkorderComponent";
 import { CustomerInfoScreenComponent } from "../screen_components/Info_CustomerInfoComponent";
 import React from "react";

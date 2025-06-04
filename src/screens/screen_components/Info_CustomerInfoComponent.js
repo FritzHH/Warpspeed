@@ -39,7 +39,6 @@ import {
   ALERT_BOX_PROTO,
   TAB_NAMES,
   WORKORDER_PROTO,
-  INFO_COMPONENT_NAMES,
 } from "../../data";
 import React, { useEffect, useState } from "react";
 import { cloneDeep } from "lodash";

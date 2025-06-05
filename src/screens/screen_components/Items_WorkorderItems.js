@@ -22,7 +22,7 @@ import {
   DISCOUNT_OBJ_PROTO,
 } from "../../data";
 import { useRef, useState } from "react";
-import { clone, cloneDeep } from "lodash";
+import { cloneDeep } from "lodash";
 import {
   useCurrentWorkorderStore,
   useInventoryStore,
@@ -33,7 +33,6 @@ import {
   dbSetClosedWorkorderItem,
   dbSetOpenWorkorderItem,
 } from "../../db_calls";
-import { WorkerPage } from "twilio/lib/rest/taskrouter/v1/workspace/worker";
 
 export const Items_WorkorderItemsTab = ({}) => {
   // setters ///////////////////////////////////////////////////////////////

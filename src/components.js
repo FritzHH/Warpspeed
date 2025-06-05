@@ -1207,6 +1207,7 @@ export const Button = ({
         _setMouseOver(false);
       }}
       onPress={onPress}
+      onLongPress={onLongPress}
     >
       <View
         style={{

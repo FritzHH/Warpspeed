@@ -275,6 +275,7 @@ export const LineItemComponent = ({
           style={{
             width: "73%",
             justifyContent: "flex-start",
+            alignItems: "center",
             flexDirection: "row",
             // backgroundColor: "green",
           }}
@@ -289,11 +290,17 @@ export const LineItemComponent = ({
               // shadowOffset: { width: 1, height: 1 },
               marginHorizontal: 1,
               marginRight: 10,
-              padding: 0,
-              borderRadius: 5,
+              padding: 5,
+              paddingVertical: 10,
+              borderRadius: 3,
+            }}
+            mouseOverOptions={{
+              enable: true,
+              opacity: 0.7,
+              highlightColor: "red",
             }}
             shadow={false}
-            textStyle={{ color: "red", fontSize: 17, fontWeight: 600 }}
+            textStyle={{ color: "lightgray", fontSize: 17, fontWeight: 600 }}
           />
           <View>
             {workorderLine.discountObj.name ? (

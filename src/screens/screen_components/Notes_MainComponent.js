@@ -46,6 +46,7 @@ export function Notes_MainComponent() {
   /////////////////////////////////////////////////////////////////////////////////
   const [customerNotesHeight, setCustomerNotesHeight] = useState([25]); // Initial height
   const [internalNotesHeight, setInternalNotesHeight] = useState([20]); // Initial height
+  const [sFocusIdx, _setFocusIdx] = useState(null);
 
   if (!zWorkorderObj) return null;
 
@@ -69,7 +70,7 @@ export function Notes_MainComponent() {
       notesArr = wo.internalNotes || [];
     }
 
-    notesArr.push({
+    notesArr.unshift({
       name: formatUserShowName(),
       userID: zCurrentUserObj.id,
       value: "",
@@ -80,6 +81,8 @@ export function Notes_MainComponent() {
     } else {
       wo.internalNotes = notesArr;
     }
+
+    _setFocusIdx(0);
     _zSetWorkorderObj(wo);
     dbSetOpenWorkorderItem(wo);
   }
@@ -98,7 +101,6 @@ export function Notes_MainComponent() {
     } else {
       newObj.internalNotes = arr;
     }
-    log(item);
     _zSetWorkorderObj(newObj);
     dbSetOpenWorkorderItem(newObj);
   }
@@ -216,11 +218,17 @@ export function Notes_MainComponent() {
               paddingRight: 10,
             }}
           >
-            <View>
-              <Text style={{ color: "lightgray", marginBottom: 5 }}>
-                {"Customer Notes"}
-              </Text>
-            </View>
+            <TouchableWithoutFeedback
+              onPress={() => outsideClicked("customer")}
+            >
+              <View
+                style={{ width: "100%", height: 40, justifyContent: "center" }}
+              >
+                <Text style={{ color: "lightgray", marginBottom: 5 }}>
+                  {"Customer Notes"}
+                </Text>
+              </View>
+            </TouchableWithoutFeedback>
 
             <View style={{ height: "100%" }}>
               <FlatList
@@ -231,6 +239,7 @@ export function Notes_MainComponent() {
                   item = item.item;
                   return (
                     <TouchableWithoutFeedback
+                      onPress={() => _setFocusIdx(index)}
                       onLongPress={() => deleteItem(item, index, "customer")}
                     >
                       <View
@@ -268,9 +277,7 @@ export function Notes_MainComponent() {
                             outlineWidth: 0,
                             width: "100%",
                           }}
-                          autoFocus={
-                            index === zWorkorderObj.customerNotes.length - 1
-                          }
+                          autoFocus={index === sFocusIdx}
                           value={item.value}
                         />
                       </View>
@@ -292,16 +299,16 @@ export function Notes_MainComponent() {
             paddingLeft: 10,
           }}
         >
-          <View>
-            <Text
-              style={{
-                color: "lightgray",
-              }}
+          <TouchableWithoutFeedback onPress={() => outsideClicked("internal")}>
+            <View
+              style={{ width: "100%", height: 40, justifyContent: "center" }}
             >
-              {"Internal Notes"}
-            </Text>
-          </View>
-          <TouchableWithoutFeedback onPress={() => internalOutsideClicked()}>
+              <Text style={{ color: "lightgray", marginBottom: 5 }}>
+                {"Internal Notes"}
+              </Text>
+            </View>
+          </TouchableWithoutFeedback>
+          <TouchableWithoutFeedback onPress={() => outsideClicked("internal")}>
             <View
               style={{
                 width: "100%",
@@ -319,27 +326,45 @@ export function Notes_MainComponent() {
                   item = item.item;
                   return (
                     <TouchableWithoutFeedback
-                      onLongPress={() => deleteInternalItem(item, index)}
+                      onPress={() => _setFocusIdx(index)}
+                      onLongPress={() => deleteItem(item, index, "internal")}
                     >
-                      <View style={{ width: "100%", paddingVertical: 3 }}>
+                      <View
+                        style={{
+                          width: "100%",
+                          // paddingVertical: 3,
+                          flexDirection: "row",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            padding: 2,
+                            height: internalNotesHeight[index] || null,
+                            backgroundColor: "rgba(0, 0, 0, 0.03)",
+                            outlineWidth: 0,
+                          }}
+                        >
+                          {item.name}
+                        </Text>
                         <TextInput
                           onContentSizeChange={(ev) =>
                             handleInternalContentSizeChange(ev, index)
                           }
                           multiline={true}
+                          // numberOfLines={5}
                           onChangeText={(val) =>
-                            internalTextChanged(val, index)
+                            textChanged(val, index, "internal")
                           }
                           style={{
                             padding: 2,
-                            height: internalNotesHeight[index] || 20,
-                            backgroundColor: "rgba(0, 0, 0, 0.05)",
+                            height: internalNotesHeight[index] || null,
+                            backgroundColor: "rgba(0, 0, 0, 0.03)",
                             outlineWidth: 0,
+                            width: "100%",
                           }}
-                          autoFocus={
-                            index === zWorkorderObj.internalNotes.length - 1
-                          }
-                          value={item.val}
+                          autoFocus={index === sFocusIdx}
+                          value={item.value}
                         />
                       </View>
                     </TouchableWithoutFeedback>

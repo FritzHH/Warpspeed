@@ -53,62 +53,75 @@ export const Items_WorkorderItemsTab = ({}) => {
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
 
   function deleteWorkorderLineItem(index) {
-    let woCopy = cloneDeep(zWorkorderObj);
-    woCopy.workorderLines.splice(index, 1);
-    // log("res", WO);
-    _zSetWorkorderObj(woCopy);
-    dbSetOpenWorkorderItem(woCopy);
+    let fun = () => {
+      let woCopy = cloneDeep(zWorkorderObj);
+      woCopy.workorderLines.splice(index, 1);
+      // log("res", WO);
+      _zSetWorkorderObj(woCopy);
+      dbSetOpenWorkorderItem(woCopy);
+    };
+    _zExecute(fun);
   }
 
   function modQtyPressed(inventoryItem, workorderLine, option, idx) {
-    let newWOLine = cloneDeep(workorderLine);
-    let wo = cloneDeep(zWorkorderObj);
-    if (option === "up") {
-      newWOLine.qty = newWOLine.qty + 1;
-    } else {
-      let qty = newWOLine.qty - 1;
-      if (qty <= 0) return;
-      newWOLine.qty = qty;
-    }
-    if (newWOLine.discountObj.name) {
-      let discountObj = applyDiscountToWorkorderItem(
-        newWOLine.discountObj,
-        newWOLine,
-        inventoryItem
-      );
-      if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
-    }
-    wo.workorderLines[idx] = newWOLine;
+    let fun = () => {
+      let newWOLine = cloneDeep(workorderLine);
+      let wo = cloneDeep(zWorkorderObj);
+      if (option === "up") {
+        newWOLine.qty = newWOLine.qty + 1;
+      } else {
+        let qty = newWOLine.qty - 1;
+        if (qty <= 0) return;
+        newWOLine.qty = qty;
+      }
+      if (newWOLine.discountObj.name) {
+        let discountObj = applyDiscountToWorkorderItem(
+          newWOLine.discountObj,
+          newWOLine,
+          inventoryItem
+        );
+        if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
+      }
+      wo.workorderLines[idx] = newWOLine;
 
-    _zSetWorkorderObj(wo);
-    dbSetOpenWorkorderItem(wo);
+      _zSetWorkorderObj(wo);
+      dbSetOpenWorkorderItem(wo);
+    };
+    _zExecute(fun);
   }
 
   function setWorkorderLineItem(workorderLine) {
-    let idx = zWorkorderObj.workorderLines.findIndex(
-      (o) => o.id == workorderLine.id
-    );
-    let wo = cloneDeep(zWorkorderObj);
-    wo[idx] = workorderLine;
-    _zSetWorkorderObj(wo);
+    let fun = () => {
+      let idx = zWorkorderObj.workorderLines.findIndex(
+        (o) => o.id == workorderLine.id
+      );
+      let wo = cloneDeep(zWorkorderObj);
+      wo[idx] = workorderLine;
+      _zSetWorkorderObj(wo);
+    };
+
+    _zExecute(fun);
   }
 
   function applyDiscount(inventoryItem, workorderLine, discountObj, index) {
-    let newDiscountObj = DISCOUNT_OBJ_PROTO;
-    if (discountObj.value) {
-      newDiscountObj = applyDiscountToWorkorderItem(
-        discountObj,
-        workorderLine,
-        inventoryItem
-      );
-      if (newDiscountObj.newPrice <= 0) return;
-    }
+    let fun = () => {
+      let newDiscountObj = DISCOUNT_OBJ_PROTO;
+      if (discountObj.value) {
+        newDiscountObj = applyDiscountToWorkorderItem(
+          discountObj,
+          workorderLine,
+          inventoryItem
+        );
+        if (newDiscountObj.newPrice <= 0) return;
+      }
 
-    // log(discountObj);
-    let woCopy = cloneDeep(zWorkorderObj);
-    woCopy.workorderLines[index].discountObj = newDiscountObj;
-    _zSetWorkorderObj(woCopy);
-    dbSetOpenWorkorderItem(woCopy);
+      // log(discountObj);
+      let woCopy = cloneDeep(zWorkorderObj);
+      woCopy.workorderLines[index].discountObj = newDiscountObj;
+      _zSetWorkorderObj(woCopy);
+      dbSetOpenWorkorderItem(woCopy);
+    };
+    _zExecute(fun);
   }
 
   function splitItems(inventoryItem, workorderLine, index) {
@@ -182,20 +195,16 @@ export const Items_WorkorderItemsTab = ({}) => {
           let invItem = zInventoryArr.find((obj) => obj.id === item.invItemID);
           return (
             <LineItemComponent
-              __deleteWorkorderLine={() =>
-                _zExecute(() => deleteWorkorderLineItem())
-              }
+              __deleteWorkorderLine={deleteWorkorderLineItem}
               // __setWorkorderObj={_zSetWorkorderObj}
-              __setWorkorderLineItem={() =>
-                _zExecute(() => setWorkorderLineItem())
-              }
+              __setWorkorderLineItem={setWorkorderLineItem}
               inventoryItem={invItem}
               workorderLine={item}
               zWorkorderObj={zWorkorderObj}
               __splitItems={splitItems}
-              __modQtyPressed={() => _zExecute(() => modQtyPressed())}
+              __modQtyPressed={modQtyPressed}
               index={idx}
-              applyDiscount={() => _zExecute(() => applyDiscount())}
+              applyDiscount={applyDiscount}
               zSettingsObj={zSettingsObj}
               ssButtonsRowID={sButtonsRowID}
               __setButtonsRowID={_setButtonsRowID}
@@ -473,7 +482,7 @@ export const LineItemComponent = ({
               textStyle={{ fontSize: 13 }}
               onPress={() => {
                 __splitItems(inventoryItem, workorderLine, index);
-                _setShowButtonsRow(null);
+                __setButtonsRowID(null);
               }}
               text={"Split Items"}
               buttonStyle={{
@@ -493,6 +502,8 @@ export const LineItemComponent = ({
             }}
             buttonTextStyle={{
               fontSize: 11,
+              paddingHorizontal: 10,
+              paddingVertical: 2,
             }}
             // modalVisible={}
             buttonLabel="Discount"

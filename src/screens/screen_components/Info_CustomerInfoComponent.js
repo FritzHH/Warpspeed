@@ -1,42 +1,25 @@
 /* eslint-disable */
 
-import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-} from "react-native-web";
+import { View, TextInput } from "react-native-web";
 import {
   dim,
   generateRandomID,
   log,
   removeDashesFromPhone,
-  searchArray,
   searchCustomerNames,
   searchPhoneNum,
-  trimToTwoDecimals,
 } from "../../utils";
 import {
-  HorzSpacer,
-  TabMenuButton,
-  TabMenuDivider as Divider,
-  ModalDropdown,
-  TextInputOnMainBackground,
-  TextInputLabelOnMainBackground,
   ScreenModal,
   Button,
-  CustomerInfoComponent,
-  AlertBox,
+  CustomerInfoScreenModalComponent,
   SHADOW_RADIUS_PROTO,
+  LoginScreenModalComponent,
 } from "../../components";
 import { ButtonStyles, Colors } from "../../styles";
 import {
   CUSTOMER_PROTO,
   FOCUS_NAMES,
-  ALERT_BOX_PROTO,
   TAB_NAMES,
   WORKORDER_PROTO,
 } from "../../data";
@@ -44,33 +27,21 @@ import React, { useEffect, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
-  useCurrentUserStore,
+  useAppCurrentUserStore,
   useCustomerPreviewStore,
   useCustomerSearchStore,
   useOpenWorkordersStore,
   useTabNamesStore,
   useCurrentWorkorderStore,
   useCustMessagesStore,
-  USER_ACTION_GLOBAL,
-  execute,
+  useLoginStore,
 } from "../../stores";
 import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 import { messagesSubscribe } from "../../db_subscriptions";
 const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
 const NUMS = "1234567890-";
 export function CustomerInfoScreenComponent({}) {
-  /// getters
-  const zCustPreviewArr = useCustomerPreviewStore((state) =>
-    state.getCustPreviewArr()
-  );
-  const zSelectedSearchItem = useCustomerSearchStore((state) =>
-    state.getSelectedItem()
-  );
-  const zCurrentUser = useCurrentUserStore((state) => state.getCurrentUser());
-  const zCurrentCustomer = useCurrentCustomerStore((state) =>
-    state.getCustomerObj()
-  );
-  /// setters
+  // setters ////////////////////////////////////////////////////////////////
   const _zSetIncomingMessage = useCustMessagesStore(
     (state) => state.setIncomingMessage
   );
@@ -80,14 +51,13 @@ export function CustomerInfoScreenComponent({}) {
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
-  const _zSetItemsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
+  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
   const _zSetSearchResults = useCustomerSearchStore(
     (state) => state.setSearchResultsArr
   );
   const _zResetSearch = useCustomerSearchStore((state) => state.reset);
+
   const _zSetNewWorkorderInArr = useOpenWorkordersStore(
     (state) => state.modItem
   );
@@ -97,28 +67,22 @@ export function CustomerInfoScreenComponent({}) {
   const _zSetCurrentCustomer = useCurrentCustomerStore(
     (state) => state.setCustomerObj
   );
+  const _zExecute = useLoginStore((state) => state.execute);
+
+  // getters ///////////////////////////////////////////////////////////////
+  const zCustPreviewArr = useCustomerPreviewStore((state) =>
+    state.getCustPreviewArr()
+  );
+  const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUserObj());
+
   //////////////////////////////////////////////////////////////////////
-  const [sBox1Val, _setBox1Val] = React.useState("2222222222");
+  const [sBox1Val, _setBox1Val] = React.useState("239336917");
   const [sBox2Val, _setBox2Val] = React.useState("");
   const [sSearchingByName, _setSearchingByName] = React.useState(false);
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
   const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] = useState(true);
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
-  const [sLoginScreenCallback, _setLoginScreenCallback] = useState(
-    () => () => {}
-  );
-
-  useEffect(() => {
-    // global.currentUserObj = "hello";
-  }, []);
-
-  // const execute = (callback, stateCallback) => {
-  //   if (!USER_ACTION_GLOBAL.getUser()) {
-  //     stateCallback(() => callback);
-  //   } else {
-  //     callback();
-  //   }
-  // };
 
   function handleBox1TextChange(incomingText = "") {
     // log("incoming box 1", incomingText);
@@ -163,7 +127,10 @@ export function CustomerInfoScreenComponent({}) {
       // log(searchResults);
     }
     _zSetSearchResults(searchResults);
-
+    if (searchResults.length > 0) {
+      _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
+    }
+    // log("res", searchResults);
     // show the create customer button if input conditions are met
     if (sSearchingByName) _setShowCreateCustomerBtn(formattedText.length >= 2);
     if (!sSearchingByName)
@@ -185,23 +152,30 @@ export function CustomerInfoScreenComponent({}) {
   }
 
   function handleCreateNewCustomerPressed() {
-    let newWorkorder = { ...WORKORDER_PROTO };
+    // log("create new customer pressed", log(zCurrentUser));
+    // setInterval(() => {
+    //   log(zCurrentUser);
+    // }, 500);
+
+    // return;
+    let newWorkorder = cloneDeep(WORKORDER_PROTO);
     newWorkorder.id = generateRandomID();
     newWorkorder.customerFirst = sCustomerInfo.first;
     newWorkorder.customerLast = sCustomerInfo.last;
     newWorkorder.customerPhone = sCustomerInfo.cell || sCustomerInfo.landline;
     newWorkorder.customerID = sCustomerInfo.id;
     newWorkorder.startedBy = zCurrentUser.first;
-    newWorkorder.status = "Newly Created";
+    newWorkorder.status = "Service";
     newWorkorder.changeLog.push(
       "Started by: " + zCurrentUser.first + " " + zCurrentUser.last
     );
-    let newCustomerObj = { ...sCustomerInfo };
+    let newCustomerObj = cloneDeep(sCustomerInfo);
     newCustomerObj.dateCreated = new Date().getTime();
     newCustomerObj.workorders.push(newWorkorder.id);
+
     _zSetCurrentCustomer(newCustomerObj);
-    dbSetCustomerObj(newCustomerObj);
-    dbSetOpenWorkorderItem(newWorkorder);
+    // dbSetCustomerObj(newCustomerObj);
+    // dbSetOpenWorkorderItem(newWorkorder);
     _zSetNewWorkorderInArr(newWorkorder, "add");
     _zSetOpenWorkorder(newWorkorder);
     _zResetSearch();
@@ -233,22 +207,13 @@ export function CustomerInfoScreenComponent({}) {
   //////////////////////////////////////////////////////////////////////
   return (
     <View style={{ width: "100%", height: "100%" }}>
-      {/* <AlertBox
-        {...sImproperDataAlertBox}
-        onModalDismiss={() =>
-          _setImproperDataAlertBox({
-            ...sImproperDataAlertBox,
-            showBox: false,
-          })
-        }
-      /> */}
+      <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+
       <View
         style={{
-          // flexDirection: "row",
           marginTop: "50%",
           width: "90%",
           justifyContent: "space-between",
-          alignItems: "center",
           // backgroundColor: "green",
         }}
       >
@@ -256,7 +221,6 @@ export function CustomerInfoScreenComponent({}) {
           <TextInput
             style={{
               borderBottomWidth: 1,
-              // width: sSearchingByName ? 200 : null,
               width: 200,
               height: 40,
               paddingHorizontal: 3,
@@ -269,9 +233,7 @@ export function CustomerInfoScreenComponent({}) {
             placeholder={sSearchingByName ? "First Name..." : "Phone number..."}
             placeholderTextColor={"gray"}
             value={sBox1Val}
-            onChangeText={(val) =>
-              execute(() => handleBox1TextChange(val), _setLoginScreenCallback)
-            }
+            onChangeText={(val) => handleBox1TextChange(val)}
           />
         </View>
         <View style={{ width: 10 }} />
@@ -325,16 +287,17 @@ export function CustomerInfoScreenComponent({}) {
           marginVertical: 10,
           marginTop: 50,
           width: null,
-          // width: "90%",
         }}
         buttonVisible={sShowCreateCustomerButton}
         buttonTextStyle={{ color: "dimgray" }}
-        handleButtonPress={handleModalCreateCustomerBtnPressed}
+        handleButtonPress={() =>
+          _zExecute(() => handleModalCreateCustomerBtnPressed())
+        }
         buttonLabel={"Create New Customer"}
         modalVisible={sCustomerInfo}
         canExitOnOuterClick={false}
         Component={() => (
-          <CustomerInfoComponent
+          <CustomerInfoScreenModalComponent
             sCustomerInfo={sCustomerInfo || {}}
             button1Text={"Create Customer"}
             button2Text={"Cancel"}

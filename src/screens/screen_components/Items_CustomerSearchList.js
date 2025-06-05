@@ -2,24 +2,36 @@
 
 import React from "react";
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
-import { log } from "../../utils";
+import { generateRandomID, log } from "../../utils";
 import {
   Button,
-  CustomerInfoComponent,
+  CustomerInfoScreenModalComponent,
   ScreenModal,
   SHADOW_RADIUS_PROTO,
 } from "../../components";
 import { cloneDeep } from "lodash";
-import { TAB_NAMES, WORKORDER_ITEM_PROTO, WORKORDER_PROTO } from "../../data";
-import { useCustMessagesStore, useCustomerSearchStore } from "../../stores";
+import {
+  APP_USER,
+  SETTINGS_PROTO,
+  TAB_NAMES,
+  WORKORDER_ITEM_PROTO,
+  WORKORDER_PROTO,
+  WORKORDER_STATUS_NAMES,
+} from "../../data";
+import {
+  useCurrentCustomerStore,
+  useCurrentWorkorderStore,
+  useCustMessagesStore,
+  useCustomerSearchStore,
+  useLoginStore,
+  useOpenWorkordersStore,
+  useTabNamesStore,
+} from "../../stores";
+import { messagesSubscribe } from "../../db_subscriptions";
+import { dbGetCustomerObj } from "../../db_calls";
 
 export function CustomerSearchListComponent({}) {
-  // getters
-  const zSearchResultsArr = useCustomerSearchStore((state) =>
-    state.getSearchResultsArr()
-  );
-
-  // setters
+  // setters //////////////////////////////////////////////////////////////////////
   const _zSetSearchSelectedItem = useCustomerSearchStore(
     (state) => state.setSelectedItem
   );
@@ -29,16 +41,47 @@ export function CustomerSearchListComponent({}) {
   const _zSetOutgoingMessage = useCustMessagesStore(
     (state) => state.setOutgoingMessage
   );
+  const _zSetCurrentCustomer = useCurrentCustomerStore(
+    (state) => state.setCustomerObj
+  );
+  const _zSetOpenWorkorder = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
+  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
+  const _zExecute = useLoginStore((state) => state.execute);
+
+  // getters //////////////////////////////////////////////////////////////////////
+  const zSearchResultsArr = useCustomerSearchStore((state) =>
+    state.getSearchResultsArr()
+  );
+  let zCurrentUserObj = APP_USER;
+  zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
+
   ////////////////////////////////////////////////////////////////////////////////////////
-  const [sShowModal, _setShowModal] = React.useState(false);
 
   function handleCustomerSelected(customerObj) {
-    _zSetSearchSelectedItem(customerObj);
+    dbGetCustomerObj(customerObj.id).then((res) => _zSetCurrentCustomer(res));
+    let wo = cloneDeep(WORKORDER_PROTO);
+    wo.customerID = customerObj.id;
+    wo.changeLog = wo.changeLog.push(
+      "Started by: " + zCurrentUserObj.first + " " + zCurrentUserObj.last[0]
+    );
+    wo.customerFirst = customerObj.first;
+    wo.customerLast = customerObj.last;
+    wo.customerPhone = customerObj.cell || customerObj.landline;
+    wo.id = generateRandomID();
+    wo.status = SETTINGS_PROTO.statuses[0];
+    _zSetOpenWorkorder(wo);
+    _zSetCurrentCustomer(customerObj);
     messagesSubscribe(
       customerObj.id,
       _zSetIncomingMessage,
       _zSetOutgoingMessage
     );
+    _zSetSearchSelectedItem(null);
+    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
 
   // log("search res", zSearchResultsArr);
@@ -58,43 +101,9 @@ export function CustomerSearchListComponent({}) {
                 marginTop: 30,
               }}
             >
-              {/* <ScreenModal
-                modalStyle={{ height: "100%", width: "100%" }}
-                modalProps={{ height: "90%", width: "90%" }}
-                buttonStyle={{
-                  paddingVertical: 5,
-                  paddingHorizontal: 10,
-                  marginRight: 20,
-                  marginLeft: 10,
-                }}
-                buttonTextStyle={{ color: "whitesmoke" }}
-                handleButtonPress={() => _setShowModal(true)}
-                buttonLabel={"View"}
-                showModal={sShowModal}
-                canExitOnOuterClick={false}
-                Component={() => (
-                  <CustomerInfoComponent
-                    sCustomerInfo={item}
-                    _setCustomerInfo={_zSetSearchSelectedItem}
-                    handleExitScreenPress={() => {
-                      _setShowModal(false);
-                    }}
-                    exitScreenButtonText={"Exit screen"}
-                    // ssInfoTextFocus={sInfoTextFocus}
-                    // __setInfoTextFocus={_setInfoTextFocus}
-                    // __closeButtonText={"Cancel"}
-                    // __handleCloseButtonPress={() => {
-                    //   _setBox1Val("");
-                    //   _setBox2Val("");
-                    //   _setSearchingByName(false);
-                    //   _setShowEnterModal(false);
-                    // }}
-                  />
-                )}
-              /> */}
               <TouchableOpacity
                 style={{ minWidth: 250, paddingVertical: 10 }}
-                onPress={() => handleCustomerSelected(item)}
+                onPress={() => _zExecute(() => handleCustomerSelected(item))}
               >
                 <Text
                   style={{ marginLeft: 10, fontSize: 17, color: "whitesmoke" }}

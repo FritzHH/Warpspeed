@@ -18,7 +18,7 @@ import {
   log,
   useInterval,
 } from "../utils";
-import { LoginScreenComponent, SHADOW_RADIUS_PROTO } from "../components";
+import { LoginScreenModalComponent, SHADOW_RADIUS_PROTO } from "../components";
 import { Info_Section } from "./screen_collections/Info_Section";
 import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
@@ -37,8 +37,7 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
   useActionStore,
-  useCurrentUserStore,
-  USER_ACTION_GLOBAL,
+  useAppCurrentUserStore,
   useLoginStore,
 } from "../stores";
 
@@ -62,7 +61,7 @@ export function WorkorderScreen() {
   // getters /////////////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
-
+  const zModalVisible = useLoginStore((state) => state.getModalVisible());
   //////////////////////////////////////////////////////////////////////////////
   const [sInitFlag, _setInitFlag] = React.useState(false);
 
@@ -76,10 +75,7 @@ export function WorkorderScreen() {
   }, []);
 
   useEffect(() => {
-    // set the global login timeout from settings
-    if (zSettingsObj.loginTimeout)
-      // USER_ACTION_GLOBAL.init(zSettingsObj.loginTimeout);
-      _zSetLoginTimeout(zSettingsObj.loginTimeout);
+    if (zSettingsObj.loginTimeout) _zSetLoginTimeout(zSettingsObj.loginTimeout);
 
     // testing take out this is your user obj
     if (zSettingsObj.users) _zSetCurrentUserObj(zSettingsObj.users[0]);
@@ -101,32 +97,25 @@ export function WorkorderScreen() {
   }
   initialize();
 
-  // log("rendering");
   return (
     <div
       onKeyUp={() => {
         _zSetLastActionMillis();
-        // USER_ACTION_GLOBAL.set();
       }}
       onMouseMove={() => {
         _zSetLastActionMillis();
-        // USER_ACTION_GLOBAL.set();
       }}
       style={{ width: "100%" }}
     >
       <View
         style={{
           flex: 1,
-          // width: "100%",
-          // height: "100%",
           flexDirection: "row",
           justifyContent: "space-around",
         }}
       >
-        <LoginScreenComponent
-          modalVisible={zShowLoginScreen}
-          // loginCallback={() => zLoginFunctionCallback()}
-          // _setModalVisibility={() => _zSetShowLoginScreen(false)}
+        <LoginScreenModalComponent
+          modalVisible={zShowLoginScreen && !zModalVisible}
         />
         <View
           style={{

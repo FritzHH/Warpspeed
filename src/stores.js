@@ -1,64 +1,20 @@
 /* eslint-disable */
 
 import { create } from "zustand";
-import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO, TAB_NAMES } from "./data";
-import { checkArr, log, searchPhoneNum } from "./utils";
-import { StaticRouter } from "react-router-dom";
+import {
+  CUSTOMER_PROTO,
+  INVENTORY_ITEM_PROTO,
+  PRIVILEDGE_LEVELS,
+  TAB_NAMES,
+} from "./data";
+import { checkArr, log } from "./utils";
 
-// globals ///////////////////////////////////////////////////////
-export const USER_ACTION_GLOBAL = {
-  // loginFunctionCallback: () => {},
-  // showLoginScreenCallback: () => {},
-  // lastActionMillis: 0,
-  init: (loginTimeout, loginFunctionCallback, showLoginScreenCallback) => {
-    global.loginTimeout = loginTimeout;
-    global.loginFunctionCallback = loginFunctionCallback;
-    global.showLoginScreenCallback = showLoginScreenCallback;
-  },
-  set: () => (global.lastActionMillis = new Date().getTime()),
-  setUser: (userObj) => (global.currentUserObj = userObj),
-  getUser: () => {
-    if (
-      (new Date().getTime() - global.lastActionMillis) / 1000 >
-      global.loginTimeout
-    ) {
-      global.currentUserObj = null;
-      return null;
-    } else {
-      return global.currentUserObj;
-    }
-  },
-  execute: (
-    callback,
-    setStateFunctionCallback,
-    setStateShowLoginScreenCallback
-  ) => {
-    if (!USER_ACTION_GLOBAL.getUser()) {
-      // setStateFunctionCallback(callback);
-      setStateShowLoginScreenCallback(true);
-      // global.
-    } else {
-      callback();
-    }
-  },
-};
-
-// shortcut for above execute function
-export const execute = (
-  callback,
-  setStateFunctionCallback,
-  setStateShowLoginScreenCallback
-) => {
-  USER_ACTION_GLOBAL.execute(
-    callback
-    // setStateFunctionCallback,
-    // setStateShowLoginScreenCallback
-  );
-};
-
+// internal use  /////////////////////////////////////////////////////
 export const useLoginStore = create((set, get) => ({
+  adminPrivilege: "",
   loginTimeout: 0,
   currentUserObj: null,
+  modalVisible: false,
   lastActionMillis: 0,
   postLoginFunctionCallback: () => {},
   showLoginScreen: false,
@@ -67,33 +23,65 @@ export const useLoginStore = create((set, get) => ({
   getShowLoginScreen: () => get().showLoginScreen,
   getLastActionMillis: () => get().lastActionMillis,
   getCurrentUserObj: () => get().currentUserObj,
+  getAdminPrivilege: () => get().adminPrivilege,
+  getModalVisible: () => get().modalVisible,
 
+  setModalVisible: (modalVisible) => set((state) => ({ modalVisible })),
   setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
-  setCurrentUserObj: (currentUser) => set((state) => ({ currentUser })),
+  setCurrentUserObj: (currentUserObj) => {
+    // log("user", currentUserObj);
+    set((state) => ({ currentUserObj: currentUserObj }));
+  },
   setLastActionMillis: () =>
     set((state) => ({ lastActionMillis: new Date().getTime() })),
-  // setLoginFunctionCallback: (loginFunctionCallback) => {
-  //   set((state) => ({ loginFunctionCallback }));
-  // },
   setShowLoginScreen: (showLoginScreen) => {
     set((state) => ({ showLoginScreen }));
   },
-  execute: (postLoginFunctionCallback) => {
+
+  execute: (postLoginFunctionCallback, priviledgeLevel) => {
     let lastMillis = get().lastActionMillis;
     let cur = new Date().getTime();
     let diff = (cur - lastMillis) / 1000;
+    let userObj = get().currentUserObj;
     // log("diff", diff);
-    if (diff > get().loginTimeout) {
+    let hasAccess = true;
+    if (priviledgeLevel && userObj) {
+      hasAccess = false;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.owner &&
+        userObj.permissions == PRIVILEDGE_LEVELS.owner
+      ) {
+      }
+      hasAccess = true;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.admin &&
+        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
+          userObj.permissions == PRIVILEDGE_LEVELS.admin)
+      )
+        hasAccess = true;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.superUser &&
+        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
+          userObj.permissions == PRIVILEDGE_LEVELS.admin ||
+          userObj.permissions == PRIVILEDGE_LEVELS.superUser)
+      )
+        hasAccess = true;
+    }
+    // log("user in login store", userObj);
+    // log("diff", diff);
+    // log(get().loginTimeout);
+    if (diff > get().loginTimeout || !hasAccess || !userObj) {
       set((state) => ({ postLoginFunctionCallback }));
       set((state) => ({ showLoginScreen: true }));
+      set((state) => ({ adminPrivilege: priviledgeLevel }));
       return;
+    } else if (hasAccess) {
+      postLoginFunctionCallback();
     }
-    postLoginFunctionCallback();
   },
   runPostLoginFunction: () => get().postLoginFunctionCallback(),
 }));
 
-// internal use  /////////////////////////////////////////////////////
 export const useInvModalStore = create((set, get) => ({
   currentFocusName: null,
   item: { ...INVENTORY_ITEM_PROTO },
@@ -127,7 +115,7 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: TAB_NAMES.itemsTab.dashboard,
-  optionsTabName: TAB_NAMES.optionsTab.inventory,
+  optionsTabName: TAB_NAMES.optionsTab.workorders,
   infoTabName: TAB_NAMES.infoTab.customer,
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
@@ -168,19 +156,18 @@ export const useCustomerSearchStore = create((set, get) => ({
   },
 }));
 
-export const useCurrentUserStore = create((set, get) => ({
+export const useAppCurrentUserStore = create((set, get) => ({
   userObj: null,
   getCurrentUser: () => get().userObj,
   setCurrentUser: (obj) => set((state) => ({ userObj: obj })),
 }));
 
-export const useActionStore = create((set, get) => ({
-  lastActionMillis: 0,
-
-  getLastActionMillis: () => get().lastActionMillis,
-  setLastActionMillis: (lastActionMillis) => {
-    // log(lastActionMillis);
-    set((state) => ({ lastActionMillis }));
+export const useCurrentWorkorderStore = create((set, get) => ({
+  workorderObj: {},
+  getWorkorderObj: () => get().workorderObj,
+  setWorkorderObj: (workorderObj) => {
+    // log("here");
+    set((state) => ({ workorderObj }));
   },
 }));
 
@@ -248,14 +235,6 @@ export const useOpenWorkordersStore = create((set, get) => ({
       return set((state) => ({
         workorderArr: removeItem(get().workorderArr, item),
       }));
-  },
-}));
-
-export const useCurrentWorkorderStore = create((set, get) => ({
-  workorderObj: {},
-  getWorkorderObj: () => get().workorderObj,
-  setWorkorderObj: (obj) => {
-    set((state) => ({ workorderObj: obj }));
   },
 }));
 

@@ -26,7 +26,7 @@ import { clone, cloneDeep } from "lodash";
 import {
   useCurrentWorkorderStore,
   useInventoryStore,
-  USER_ACTION_GLOBAL,
+  useLoginStore,
   useSettingsStore,
 } from "../../stores";
 import {
@@ -35,23 +35,24 @@ import {
 } from "../../db_calls";
 import { WorkerPage } from "twilio/lib/rest/taskrouter/v1/workspace/worker";
 
-export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
-  // getters
+export const Items_WorkorderItemsTab = ({}) => {
+  // setters ///////////////////////////////////////////////////////////////
+  const _zSetWorkorderObj = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  const _zExecute = useLoginStore((state) => state.execute);
+
+  // getters ///////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
   let zSettingsObj = SETTINGS_PROTO;
   zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
 
-  // setters
-  const _zSetWorkorderObj = useCurrentWorkorderStore(
-    (state) => state.setWorkorderObj
-  );
   ///////////////////////////////////////////////////////////////////////////
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
-  const [sLoginScreenCallback, _setLoginScreenCallback] = useState(() => {});
 
-  function deleteWorkorderItem(workorderItem, index) {
+  function deleteWorkorderLineItem(index) {
     let woCopy = cloneDeep(zWorkorderObj);
     woCopy.workorderLines.splice(index, 1);
     // log("res", WO);
@@ -78,12 +79,18 @@ export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
       if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
     }
     wo.workorderLines[idx] = newWOLine;
-    if (!USER_ACTION_GLOBAL.getUser()) {
-      _setLoginScreenCallback(() => {});
-    } else {
-      _zSetWorkorderObj(wo);
-      dbSetOpenWorkorderItem(wo);
-    }
+
+    _zSetWorkorderObj(wo);
+    dbSetOpenWorkorderItem(wo);
+  }
+
+  function setWorkorderLineItem(workorderLine) {
+    let idx = zWorkorderObj.workorderLines.findIndex(
+      (o) => o.id == workorderLine.id
+    );
+    let wo = cloneDeep(zWorkorderObj);
+    wo[idx] = workorderLine;
+    _zSetWorkorderObj(wo);
   }
 
   function applyDiscount(inventoryItem, workorderLine, discountObj, index) {
@@ -129,10 +136,10 @@ export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
     _zSetWorkorderObj(wo);
     dbSetOpenWorkorderItem(wo);
   }
-  //
+
   if (
-    !zWorkorderObj.workorderLines ||
-    zWorkorderObj.workorderLines.length == 0
+    !zWorkorderObj?.workorderLines ||
+    zWorkorderObj?.workorderLines.length == 0
   ) {
     return (
       <View
@@ -151,12 +158,11 @@ export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
             fontSize: 120,
           }}
         >
-          Empty Workorder
+          {zWorkorderObj ? "Empty Workorder" : "New \nCustomer"}
         </Text>
       </View>
     );
   }
-
   return (
     <View
       style={{
@@ -175,16 +181,21 @@ export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
           item = item.item;
           let invItem = zInventoryArr.find((obj) => obj.id === item.invItemID);
           return (
-            <WorkorderItemComponent
-              __deleteWorkorderLine={deleteWorkorderItem}
-              __setWorkorderObj={_zSetWorkorderObj}
+            <LineItemComponent
+              __deleteWorkorderLine={() =>
+                _zExecute(() => deleteWorkorderLineItem())
+              }
+              // __setWorkorderObj={_zSetWorkorderObj}
+              __setWorkorderLineItem={() =>
+                _zExecute(() => setWorkorderLineItem())
+              }
               inventoryItem={invItem}
               workorderLine={item}
               zWorkorderObj={zWorkorderObj}
               __splitItems={splitItems}
-              __modQtyPressed={modQtyPressed}
+              __modQtyPressed={() => _zExecute(() => modQtyPressed())}
               index={idx}
-              applyDiscount={applyDiscount}
+              applyDiscount={() => _zExecute(() => applyDiscount())}
               zSettingsObj={zSettingsObj}
               ssButtonsRowID={sButtonsRowID}
               __setButtonsRowID={_setButtonsRowID}
@@ -196,24 +207,28 @@ export const Items_WorkorderItemsTab = ({ ssInventoryArr = [] }) => {
   );
 };
 
-export const WorkorderItemComponent = ({
+export const LineItemComponent = ({
   inventoryItem = INVENTORY_ITEM_PROTO,
   workorderLine = WORKORDER_ITEM_PROTO,
   zSettingsObj = SETTINGS_PROTO,
   __deleteWorkorderLine,
-  __splitItems,
   __modQtyPressed,
+  __setWorkorderObj,
+  __setWorkorderLineItem,
+  // __
+  __splitItems,
   index,
   applyDiscount,
   ssButtonsRowID,
   __setButtonsRowID,
 }) => {
-  const [sTempQtyVal, _setTempQtyVal] = useState(null);
-  const [sDiscountedPrice, _setDiscountedPrice] = useState(null);
-  const [sDiscountSavings, _setDiscountSavings] = useState(null);
-  const [sShowButtonsRow, _setShowButtonsRow] = useState(false);
-  const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
+  // setters ///////////////////////////////////////////////////////////
 
+  // getters //////////////////////////////////////////////////////////
+
+  //////////////////////////////////////////////////////////////////////
+  const [sTempQtyVal, _setTempQtyVal] = useState(null);
+  const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
   const ref = useRef();
 
   function formatDiscountsArr(discountArr) {
@@ -224,6 +239,7 @@ export const WorkorderItemComponent = ({
     });
     return discountArr;
   }
+
   // clog("item", workorderLine);
   // return null;
   return (
@@ -255,7 +271,7 @@ export const WorkorderItemComponent = ({
           }}
         >
           <Button
-            onPress={() => __deleteWorkorderLine(workorderLine, index)}
+            onPress={() => __deleteWorkorderLine(index)}
             text={"X"}
             buttonStyle={{
               width: null,
@@ -292,7 +308,7 @@ export const WorkorderItemComponent = ({
                 onChangeText={(val) => {
                   let line = structuredClone(workorderLine);
                   line.intakeNotes = val;
-                  setWorkorderLine(line);
+                  __setWorkorderLineItem(line);
                 }}
                 placeholder="Intake and service notes..."
                 placeholderTextColor={"gray"}
@@ -361,7 +377,7 @@ export const WorkorderItemComponent = ({
                 }
                 let line = structuredClone(workorderLine);
                 line.qty = val;
-                setWorkorderLine(line);
+                __setWorkorderLineItem(line);
               }}
             />
           </View>

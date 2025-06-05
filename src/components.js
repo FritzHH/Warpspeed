@@ -10,7 +10,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import React, { Component, useEffect, useRef } from "react";
-import { generateRandomID, log } from "./utils";
+import { clog, generateRandomID, log } from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
 import {
@@ -18,25 +18,19 @@ import {
   INVENTORY_ITEM_PROTO,
   INVENTORY_CATEGORIES,
   SETTINGS_PROTO,
+  PRIVILEDGE_LEVELS,
 } from "./data";
 import { cloneDeep } from "lodash";
 import { CUSTOMER_PROTO } from "./data";
 import {
-  execute,
-  useCurrentUserStore,
+  useAppCurrentUserStore,
   useInventoryStore,
   useInvModalStore,
-  USER_ACTION_GLOBAL,
   useSettingsStore,
   useLoginStore,
 } from "./stores";
 import { dbSetInventoryItem, dbSetSettings } from "./db_calls";
 import { setInventoryItem } from "./db";
-
-const centerItem = {
-  alignItems: "center",
-  justifyContent: "center",
-};
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -221,8 +215,15 @@ export const ScreenModal = ({
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sMouseOver, _setMouseOver] = React.useState(false);
   const [sInternalModalShow, _setInternalModalShow] = useState(false);
+  const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
 
   //////////////////////////////////////////////////////////////
+  useEffect(() => {
+    _zSetModalVisible(true);
+    return () => {
+      _zSetModalVisible(false);
+    };
+  });
   if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
   // log("ref in ScreenModal", ref);
   useEffect(() => {
@@ -324,6 +325,7 @@ export const ModalDropdown = ({
   innerModalStyle = {},
   // modalStyle = {},
 }) => {
+  const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedValue, setSelectedValue] = useState(null);
 
@@ -335,6 +337,13 @@ export const ModalDropdown = ({
     toggleModal();
   };
   // log(data);
+
+  useEffect(() => {
+    _zSetModalVisible(true);
+    return () => {
+      _zSetModalVisible(false);
+    };
+  });
 
   return (
     <TouchableWithoutFeedback onPress={() => toggleModal()}>
@@ -452,7 +461,7 @@ export const ModalDropdown = ({
   );
 };
 
-export const InventoryItemInModal = ({
+export const InventoryItemScreeenModalComponent = ({
   itemIdx,
   handleClosePress,
   newItemObj,
@@ -467,10 +476,14 @@ export const InventoryItemInModal = ({
   const _zSetShowLoginScreen = useLoginStore(
     (state) => state.setShowLoginScreen
   );
+  const _zExecute = useLoginStore((state) => state.execute);
+  // const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
+
   // getters ///////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zFocus = useInvModalStore((state) => state.getFocus());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
 
   ////////////////////////////////////////////////////////////////////
   const [sItem, _setItem] = React.useState({});
@@ -497,14 +510,10 @@ export const InventoryItemInModal = ({
     _setItem(item1);
 
     if (!newItemObj)
-      execute(
-        () => {
-          _zModInventoryItem(item1, "change");
-          dbSetInventoryItem(item1);
-        },
-        _zSetLoginFunctionCallback,
-        _zSetShowLoginScreen
-      );
+      _zExecute(() => {
+        _zModInventoryItem(item1, "change");
+        dbSetInventoryItem(item1);
+      }, PRIVILEDGE_LEVELS.superUser);
   }
 
   function handleQuickButtonRemove(qBItemToRemove, objIdx) {
@@ -520,10 +529,10 @@ export const InventoryItemInModal = ({
     dbSetSettings(newSettingsObj);
   }
 
-  function handleQuickButtonAdd(itemName, invItemIdx) {
-    const invItem = zInventoryArr[invItemIdx];
-    // log("item name", itemName);
-    let settingsObj = { ...zSettingsObj };
+  // log(zSettingsObj);
+  function handleQuickButtonAdd(itemName) {
+    const invItem = { ...zInventoryArr[itemIdx] };
+    let settingsObj = cloneDeep(zSettingsObj);
     let idx = zSettingsObj.quickItemButtonNames.findIndex(
       (o) => o.name === itemName
     );
@@ -553,15 +562,11 @@ export const InventoryItemInModal = ({
   }
 
   function handleRemoveItem() {
-    execute(
-      () => {
-        _zModInventoryItem(sItem, "remove");
-        dbSetInventoryItem(sItem, true);
-        handleClosePress();
-      },
-      _zSetLoginFunctionCallback,
-      _zSetShowLoginScreen
-    );
+    _zExecute(() => {
+      _zModInventoryItem(sItem, "remove");
+      dbSetInventoryItem(sItem, true);
+      handleClosePress();
+    }, "Admin");
   }
   if (!sItem) return null;
   return (
@@ -581,6 +586,7 @@ export const InventoryItemInModal = ({
           backgroundColor: "white",
         }}
       >
+        <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
         <View
           style={{
             width: "100%",
@@ -589,7 +595,7 @@ export const InventoryItemInModal = ({
           }}
         >
           <View>
-            <Text>Catalog Name</Text>
+            <Text>{"Catalog Name"}</Text>
             <TextInput
               numberOfLines={3}
               style={{
@@ -690,6 +696,8 @@ export const InventoryItemInModal = ({
 
         {/* {newItemObj ? ( */}
         <Button text={"Create Item"} onPress={handleNewItemPress} />
+        <Button text={"Delete Item"} onPress={handleRemoveItem} />
+
         {/* ) : null} */}
         <ModalDropdown
           buttonLabel={"Quick Items"}
@@ -702,8 +710,16 @@ export const InventoryItemInModal = ({
           onSelect={(itemName) => handleQuickButtonAdd(itemName)}
         />
         <FlatList
-          data={zSettingsObj.quickItemButtonAssignments}
+          data={zSettingsObj.quickItemButtonNames.map((nameObj) => {
+            let found;
+            nameObj.assignments?.forEach((id) => {
+              if (id == sItem.id) found = nameObj;
+            });
+            return found;
+          })}
           renderItem={(item) => {
+            // log("i", item);
+            if (!item.item) return null;
             item = item.item;
             return (
               <TouchableWithoutFeedback
@@ -719,7 +735,7 @@ export const InventoryItemInModal = ({
   );
 };
 
-export const CustomerInfoComponent = ({
+export const CustomerInfoScreenModalComponent = ({
   sCustomerInfo = CUSTOMER_PROTO,
   button1Text,
   button2Text,
@@ -738,8 +754,7 @@ export const CustomerInfoComponent = ({
     marginTop: 10,
     paddingHorizontal: 3,
   };
-
-  sCustomerInfo = { ...sCustomerInfo };
+  // log("here");
   return (
     <TouchableWithoutFeedback>
       <View
@@ -759,6 +774,7 @@ export const CustomerInfoComponent = ({
         <View>
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.cell = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -772,6 +788,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.landline = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -785,6 +802,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.first = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -798,6 +816,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.last = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -811,6 +830,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.email = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -824,6 +844,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.streetAddress = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -837,6 +858,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.unit = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -850,6 +872,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.city = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -863,6 +886,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.state = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -876,6 +900,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.zip = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -889,6 +914,7 @@ export const CustomerInfoComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               sCustomerInfo.notes = val;
               __setCustomerInfo(sCustomerInfo);
             }}
@@ -904,6 +930,7 @@ export const CustomerInfoComponent = ({
             label={"Call Only"}
             isChecked={sCustomerInfo.contactRestriction === "CALL"}
             onCheck={() => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               __setInfoTextFocus(null);
               if (sCustomerInfo.contactRestriction === "CALL") {
                 sCustomerInfo.contactRestriction = "";
@@ -917,6 +944,7 @@ export const CustomerInfoComponent = ({
             label={"Email Only"}
             isChecked={sCustomerInfo.contactRestriction === "EMAIL"}
             onCheck={() => {
+              sCustomerInfo = cloneDeep(sCustomerInfo);
               __setInfoTextFocus(null);
               // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
               // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
@@ -946,7 +974,7 @@ export const CustomerInfoComponent = ({
                 text={button1Text}
               />
             ) : null}
-            {
+            {button2Text ? (
               <Button
                 onPress={handleButton2Press}
                 viewStyle={{
@@ -959,7 +987,7 @@ export const CustomerInfoComponent = ({
                 textStyle={{ color: "dimgray" }}
                 text={button2Text}
               />
-            }
+            ) : null}
           </View>
         </View>
 
@@ -974,36 +1002,75 @@ export const CustomerInfoComponent = ({
   );
 };
 
-export const ColorGridPickerComponent = ({ onColorSelect }) => {
-  let colorArr = [];
-};
-
-export const LoginScreenComponent = ({ modalVisible }) => {
+export const LoginScreenModalComponent = ({ modalVisible }) => {
   // setters /////////////////////////////////////////////////////////////
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
   const _zSetShowLoginScreen = useLoginStore(
     (state) => state.setShowLoginScreen
   );
-  const _zExecutePostLoginFunction = useLoginStore(
-    (state) => state.executePostLoginFunction
-  );
+
   // getters ////////////////////////////////////////////////////////////
   const zRunPostLoginCallback = useLoginStore(
     (state) => state.runPostLoginFunction
   );
-
+  const zAdminPrivilege = useLoginStore((state) => state.getAdminPrivilege());
   let zSettingsObj = SETTINGS_PROTO;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  /////////////////////////////////////////////////////////////////////
+  const [sBackgroundColor, _setBackgroundColor] = useState("green");
   const [sInput, _setInput] = useState("");
 
   function checkUserInput(input) {
     _setInput(input);
-    let userObj = zSettingsObj.users.find((user) => user.pin == input);
-    if (userObj) {
+    let userObj;
+    userObj = zSettingsObj.users.find((user) => user.pin == input);
+    if (!userObj)
+      userObj = zSettingsObj.users.find((user) => user.alternatePin == input);
+
+    let failedAccessCheck = true;
+    if (zAdminPrivilege && userObj) {
+      hasAccess = false;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.owner &&
+        userObj.permissions == PRIVILEDGE_LEVELS.owner
+      ) {
+      }
+      failedAccessCheck = false;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.admin &&
+        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
+          userObj.permissions == PRIVILEDGE_LEVELS.admin)
+      )
+        failedAccessCheck = false;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.superUser &&
+        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
+          userObj.permissions == PRIVILEDGE_LEVELS.admin ||
+          userObj.permissions == PRIVILEDGE_LEVELS.superUser)
+      )
+        failedAccessCheck = false;
+    }
+
+    if (!zAdminPrivilege) failedAccessCheck = false;
+
+    // log("user", userObj);
+    // log("check", failedAccessCheck.toString());
+    if (userObj && zAdminPrivilege && failedAccessCheck) {
+      _zSetCurrentUserObj(userObj);
+      _setInput("");
+      _setBackgroundColor("red");
+      setTimeout(() => {
+        _setInput("");
+        _zSetShowLoginScreen(false);
+      }, 500);
+      userObj = null;
+    }
+
+    if (userObj && !failedAccessCheck) {
       _zSetCurrentUserObj(userObj);
       _zSetShowLoginScreen(false);
-      zRunPostLoginCallback();
       _setInput("");
+      zRunPostLoginCallback();
     }
   }
 
@@ -1020,7 +1087,7 @@ export const LoginScreenComponent = ({ modalVisible }) => {
           style={{
             justifyContent: "center",
             alignItems: "center",
-            backgroundColor: "green",
+            backgroundColor: sBackgroundColor,
             width: 500,
             height: 500,
           }}
@@ -1030,12 +1097,6 @@ export const LoginScreenComponent = ({ modalVisible }) => {
             style={{ outlineWidth: 0, borderWidth: 1, width: 200, height: 40 }}
             value={sInput}
             onChangeText={(val) => checkUserInput(val)}
-          />
-          <Button
-            onPress={() => {
-              _setModalVisibility();
-              loginCallback();
-            }}
           />
         </View>
       )}
@@ -1159,14 +1220,13 @@ export const Button = ({
             ? mouseOverOptions.highlightColor
             : buttonStyle.backgroundColor,
           opacity: sMouseOver ? mouseOverOptions.opacity : buttonStyle.opacity,
-          // backgroundColor: "blue",
         }}
       >
         <Text
           numberOfLines={numLines}
           style={{
-            paddingHorizontal: 10,
-            paddingVertical: 5,
+            // paddingHorizontal: 10,
+            // paddingVertical: 5,
             textAlign: "center",
             textAlignVertical: "center",
             fontSize: 17,
@@ -1205,14 +1265,13 @@ export const TabMenuButton = ({
       }}
       buttonStyle={{
         height,
-        // width: 130,
         backgroundColor: Colors.tabMenuButton,
         opacity: isSelected ? 1 : 0.45,
         paddingHorizontal: 15,
         width: null,
         paddingVertical: 5,
-        ...SHADOW_RADIUS_PROTO,
-        shadowOffset: { width: 0, height: 2 },
+        ...SHADOW_RADIUS_NOTHING,
+        borderRadius: 0,
         ...buttonStyle,
       }}
     />

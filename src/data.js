@@ -27,6 +27,7 @@ export const COLLECTION_NAMES = {
   inventory: "INVENTORY",
   printers: "PRINTERS",
 };
+
 export const WORKORDER_STATUS_NAMES = Object.freeze({
   open: "open",
   finished: "finished",
@@ -138,6 +139,7 @@ export const QUICK_BUTTON_NAMES = [
     items: [],
   },
 ];
+
 export const FOCUS_NAMES = {
   cell: "cell",
   land: "land",
@@ -153,6 +155,16 @@ export const FOCUS_NAMES = {
 };
 
 /////////// object prototypes
+export const APP_USER = {
+  first: "",
+  last: "",
+  id: "",
+  permissions: "",
+  phone: "",
+  pin: "",
+  alternatePin: "",
+};
+
 export const ALERT_BOX_PROTO = {
   message: "",
   btnText1: "",
@@ -165,6 +177,7 @@ export const ALERT_BOX_PROTO = {
   onModalDismiss: () => {},
   canExitOnOuterClick: true,
 };
+
 export const WORKORDER_PROTO = {
   id: "",
   customerID: "",
@@ -210,14 +223,15 @@ export const DISCOUNT_OBJ_PROTO = {
   value: "",
   type: "",
 };
+
 export const WORKORDER_ITEM_PROTO = {
   qty: 1,
-  intakeNotes: "",
-  serviceNotes: "",
+  notes: "",
   invItemID: "",
   discountObj: { ...DISCOUNT_OBJ_PROTO },
   id: "",
 };
+
 export const CUSTOMER_PROTO = {
   first: "",
   last: "",
@@ -318,13 +332,16 @@ export const INVENTORY_ITEM_PROTO = {
 
 export const SETTINGS_PROTO = {
   statuses: [
-    "Work in Progress",
-    "Work in Progress - Waiting",
     "Newly Created",
+    "Work in Progress",
+    "Work in Progress - On Hold",
+    "Service - Commuter",
     "Service",
+    "Service - Priority",
     "Finished",
-    "Finished, Waiting to Contact",
-    "Finished, Customer Away",
+    "Finished - Waiting to Contact",
+    "Finished - Customer Away",
+    "Finished - Customer Not Responding",
     "Part Ordered",
     "Bicycle Ordered",
     "Customer Bringing Part",
@@ -564,8 +581,16 @@ export const SETTINGS_PROTO = {
       permissions: "owner",
       phone: "2393369177",
       pin: "33",
+      alternatePin: "jj",
     },
   ],
+};
+
+export const PRIVILEDGE_LEVELS = {
+  admin: "Admin",
+  superUser: "Editor",
+  owner: "Owner",
+  user: "User",
 };
 
 ////////// hardcoded settings and options ///////

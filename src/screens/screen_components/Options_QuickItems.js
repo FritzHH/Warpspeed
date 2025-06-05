@@ -1,12 +1,6 @@
 /*eslint-disable*/
 import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-} from "react-native-web";
+import { View, FlatList, TextInput } from "react-native-web";
 import {
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
@@ -19,17 +13,15 @@ import { dim, generateRandomID, log, randomWordGenerator } from "../../utils";
 import {
   AlertBox,
   Button,
-  InventoryItemInModal,
+  InventoryItemScreeenModalComponent,
   ScreenModal,
   SHADOW_RADIUS_NOTHING,
-  SHADOW_RADIUS_PROTO,
 } from "../../components";
 import { cloneDeep } from "lodash";
 import {
   useSettingsStore,
   useCurrentWorkorderStore,
   useInventoryStore,
-  execute,
   useLoginStore,
 } from "../../stores";
 import {
@@ -53,6 +45,8 @@ export function QuickItemComponent({}) {
   const _zSetShowLoginScreen = useLoginStore(
     (state) => state.setShowLoginScreen
   );
+  const _zExecute = useLoginStore((state) => state.execute);
+  const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
 
   // getters //////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
@@ -322,7 +316,7 @@ export function QuickItemComponent({}) {
                 <View style={{ width: "75%" }}>
                   <Button
                     onPress={() =>
-                      execute(
+                      _zExecute(
                         () => handleSearchItemSelected(item),
                         _zSetLoginFunctionCallback,
                         _zSetShowLoginScreen
@@ -367,7 +361,7 @@ export function QuickItemComponent({}) {
                     }}
                     handleOuterClick={() => _setModalInventoryObj(null)}
                     Component={() => (
-                      <InventoryItemInModal
+                      <InventoryItemScreeenModalComponent
                         handleClosePress={() => _setModalInventoryObj(null)}
                         itemIdx={sModalInventoryObjIdx}
                       />

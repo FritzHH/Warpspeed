@@ -18,9 +18,9 @@ import {
   TextInputOnMainBackground,
   TextInputLabelOnMainBackground,
   ScreenModal,
-  CustomerInfoComponent,
+  CustomerInfoScreenModalComponent,
   Button,
-  LoginScreenComponent,
+  LoginScreenModalComponent,
 } from "../../components";
 import { Colors } from "../../styles";
 import {

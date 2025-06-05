@@ -16,25 +16,38 @@ import { CustomerSearchListComponent } from "../screen_components/Items_Customer
 import { WorkorderPreview } from "../screen_components/Items_WorkorderPreview";
 import {
   useCurrentWorkorderStore,
+  useCustomerPreviewStore,
+  useCustomerSearchStore,
   useOpenWorkordersStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../stores";
 
-export function Items_Section({ ssWorkorderObj, __setItemsTabName }) {
+export function Items_Section({}) {
+  // setters ///////////////////////////////////////////////////////////////////
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  ///
+
+  // getters ///////////////////////////////////////////////////////////////////
   const zWorkorderPreview = useWorkorderPreviewStore((state) =>
     state.getPreviewObj()
   );
   const zWorkorderObj = useCurrentWorkorderStore((state) =>
     state.getWorkorderObj()
   );
+  const zCustomerSearchArr = useCustomerSearchStore((state) =>
+    state.getSearchResultsArr()
+  );
   const zItemsTabName = useTabNamesStore((state) => state.getItemsTabName());
 
   /////////////////////////////////////////////////////////////////////////////
+
   function selectComponent() {
     if (zWorkorderPreview) return <WorkorderPreview />;
+    if (
+      zCustomerSearchArr.length > 1 &&
+      zItemsTabName === TAB_NAMES.itemsTab.customerList
+    )
+      return <CustomerSearchListComponent />;
     if (zItemsTabName == TAB_NAMES.itemsTab.workorderItems)
       return <Items_WorkorderItemsTab />;
     if (zItemsTabName == TAB_NAMES.itemsTab.changeLog)
@@ -43,10 +56,7 @@ export function Items_Section({ ssWorkorderObj, __setItemsTabName }) {
           <Text>Change Log Tab</Text>
         </View>
       );
-    if (zItemsTabName == TAB_NAMES.itemsTab.dashboard)
-      return <Items_Dashboard />;
-    if (zItemsTabName === TAB_NAMES.itemsTab.customerList)
-      return <CustomerSearchListComponent />;
+    return <Items_Dashboard />;
   }
 
   return (
@@ -75,7 +85,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
           flexDirection: "row",
         }}
       >
-        {zWorkorderObj.id ? (
+        {zWorkorderObj?.id ? (
           <TabMenuButton
             onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
             text={TAB_NAMES.itemsTab.workorderItems}
@@ -85,7 +95,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
           />
         ) : null}
         <Divider />
-        {zWorkorderObj.id ? (
+        {zWorkorderObj?.id ? (
           <TabMenuButton
             onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}

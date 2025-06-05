@@ -7,27 +7,18 @@ import { TAB_NAMES } from "../../data";
 import { Info_WorkorderComponent } from "../screen_components/Info_WorkorderComponent";
 import { CustomerInfoScreenComponent } from "../screen_components/Info_CustomerInfoComponent";
 import React from "react";
-import { useTabNamesStore } from "../../stores";
+import { useCurrentWorkorderStore, useTabNamesStore } from "../../stores";
 
-export const Info_Section = ({
-  ssCustomerObj,
-  ssWorkorderObj,
-  __setCustomerObj,
-  __setWorkorderObj,
-}) => {
+export const Info_Section = ({}) => {
   const zInfoTabName = useTabNamesStore((state) => state.getInfoTabName());
+  const zOpenWorkorder = useCurrentWorkorderStore((state) =>
+    state.getWorkorderObj()
+  );
 
-  if (zInfoTabName === TAB_NAMES.infoTab.workorder)
-    return (
-      <Info_WorkorderComponent
-        ssCustomerObj={ssCustomerObj}
-        __setCustomerObj={__setCustomerObj}
-        __setWorkorderObj={__setWorkorderObj}
-        ssWorkorderObj={ssWorkorderObj}
-      />
-    );
+  if (zInfoTabName === TAB_NAMES.infoTab.workorder || zOpenWorkorder?.id)
+    return <Info_WorkorderComponent />;
 
-  if (zInfoTabName === TAB_NAMES.infoTab.customer) {
-    return <CustomerInfoScreenComponent />;
-  }
+  // if (zInfoTabName === TAB_NAMES.infoTab.customer) {
+  return <CustomerInfoScreenComponent />;
+  // }
 };

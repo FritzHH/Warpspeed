@@ -33,7 +33,7 @@ export function WorkordersComponent({}) {
   const _zSetOutgoingMessage = useCustMessagesStore(
     (state) => state.setOutgoingMessage
   );
-  const _zSetOpenWorkorder = useCurrentWorkorderStore(
+  const _zSetCurrentWorkorder = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
   const _zSetPreviewObj = useWorkorderPreviewStore(
@@ -59,7 +59,7 @@ export function WorkordersComponent({}) {
     dbGetCustomerObj(obj.customerID).then((custObj) => {
       _zSetCurrentCustomer(custObj);
     });
-    _zSetOpenWorkorder(obj);
+    _zSetCurrentWorkorder(obj);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);

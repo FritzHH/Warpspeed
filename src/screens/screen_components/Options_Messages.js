@@ -24,12 +24,9 @@ import {
 } from "../../data";
 import React, { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
-  execute,
   useCurrentCustomerStore,
   useCurrentWorkorderStore,
   useCustMessagesStore,
-  USER_ACTION_GLOBAL,
-  useSettingsStore,
   useLoginStore,
 } from "../../stores";
 import { dbSendMessageToCustomer } from "../../db_calls";
@@ -39,18 +36,11 @@ export function MessagesComponent({}) {
   const _zSetOutgoingMessage = useCustMessagesStore(
     (state) => state.setOutgoingMessage
   );
-  const _zSetLoginFunctionCallback = useLoginStore(
-    (state) => state.setLoginFunctionCallback
-  );
-  const _zSetShowLoginScreen = useLoginStore(
-    (state) => state.setShowLoginScreen
-  );
 
   const _zExecute = useLoginStore((state) => state.execute);
   // getters ///////////////////////////////////////////////////////////////
   let zCustomerObj = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
-
   zCustomerObj = useCurrentCustomerStore((state) => state.getCustomerObj());
   zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
   const zIncomingMessagesArr = useCustMessagesStore((state) =>
@@ -59,21 +49,14 @@ export function MessagesComponent({}) {
   const zOutgoingMessagesArr = useCustMessagesStore((state) =>
     state.getOutgoingMessagesArr()
   );
+  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
   //////////////////////////////////////////////////////////////////////////
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(true);
-  // const [sLastMessageRendered, _setLastMessageRendered] = useState(null);
-  // const [sLoginFunctionCallback, _setLoginFunctionCallback] = useState(
-  //   () => () => {}
-  // );
-  // const [sShowLoginScreen, _setShowLoginScreen] = useState(false);
-
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
 
   function sendMessage(text, canRespond) {
-    // log(textInputRef.current._getText());
-    // return;
     let msg = { ...SMS_PROTO };
     msg.message = text;
     msg.phoneNumber = zCustomerObj.cell; // || "2393369177";
@@ -84,7 +67,7 @@ export function MessagesComponent({}) {
     msg.customerID = zCustomerObj.id; // || "3d2E63TXCY2bzmOdeQc8";
     msg.id = generateRandomID();
     msg.type = "outgoing";
-    msg.senderUserID = USER_ACTION_GLOBAL.getUser().id;
+    msg.senderUserObj = zCurrentUserObj;
     _zSetOutgoingMessage(msg);
     dbSendMessageToCustomer(msg);
   }
@@ -174,13 +157,7 @@ export function MessagesComponent({}) {
         <View style={{ width: "14%" }}>
           {sNewMessage.length > 5 ? (
             <Button
-              onPress={() =>
-                _zExecute(
-                  () => sendMessage(sNewMessage)
-                  // _zSetLoginFunctionCallback,
-                  // _zSetShowLoginScreen
-                )
-              }
+              onPress={() => _zExecute(() => sendMessage(sNewMessage))}
               text={"Send"}
               buttonStyle={{ width: "100%" }}
             />

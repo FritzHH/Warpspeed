@@ -19,7 +19,7 @@ import {
   TabMenuDivider as Divider,
   ScreenModal,
   Button,
-  InventoryItemInModal,
+  InventoryItemScreeenModalComponent,
   CheckBox,
 } from "../../components";
 import { Colors } from "../../styles";
@@ -39,6 +39,7 @@ import {
   useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
+  useTabNamesStore,
 } from "../../stores";
 import {
   dbSetInventoryItem,
@@ -49,18 +50,13 @@ import {
 const tabMargin = 20;
 export function InventoryComponent({}) {
   /// setters ///////////////////////////////////////////////////////////////
-  const _zModInventoryItem = useInventoryStore((state) => state.modItem);
-  const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
   const _zSetWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
+  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
   const _zExecute = useLoginStore((state) => state.execute);
   /// getters /////////////////////////////////////////////////////////////
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
-  const zCurrentWorkorderObj = useCurrentWorkorderStore((state) =>
-    state.getWorkorderObj()
-  );
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zWorkorderObj = useCurrentWorkorderStore((state) =>
     state.getWorkorderObj()
   );
@@ -70,8 +66,6 @@ export function InventoryComponent({}) {
   const [sCheckboxValue, _setCheckboxValue] = React.useState(null);
   const [sNewItemObj, _setNewItemObject] = useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
-  const [sLastInputMilles, _setLastInputMillies] = useState(0);
-  const [count, setCount] = useState(0);
   // testing
   useEffect(() => {
     if (zInventoryArr.length > 0 && !sCheckboxValue) {
@@ -89,10 +83,6 @@ export function InventoryComponent({}) {
     _setSearchTerm("");
     _setCheckboxValue(null);
   }
-
-  let lastMillis = 0;
-
-  function setBarcode(val) {}
 
   function search(searchTerm, o) {
     searchTerm = searchTerm.toString();
@@ -132,11 +122,12 @@ export function InventoryComponent({}) {
   }
 
   function inventoryItemSelected(item) {
-    if (!zWorkorderObj.id) {
+    if (!zWorkorderObj?.id) {
       let idx = zInventoryArr.findIndex((o) => o.id == item.id);
       _setModalInventoryObjIdx(idx);
       return;
     }
+
     let wo = cloneDeep(zWorkorderObj);
     if (!wo.workorderLines) wo.workorderLines = [];
     // log("item", item);
@@ -144,8 +135,11 @@ export function InventoryComponent({}) {
     lineItem.invItemID = item.id;
     lineItem.id = generateRandomID();
     wo.workorderLines.push(lineItem);
-    _zSetWorkorderObj(wo);
-    dbSetOpenWorkorderItem(wo);
+    _zExecute(() => {
+      _zSetWorkorderObj(wo);
+      dbSetOpenWorkorderItem(wo);
+      _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    });
   }
 
   function checkboxPressed(checkboxName) {
@@ -396,7 +390,7 @@ export function InventoryComponent({}) {
         }}
         Component={() => {
           return (
-            <InventoryItemInModal
+            <InventoryItemScreeenModalComponent
               itemIdx={sModalInventoryObjIdx}
               handleClosePress={() => _setModalInventoryObjIdx(null)}
               newItemObj={sNewItemObj}

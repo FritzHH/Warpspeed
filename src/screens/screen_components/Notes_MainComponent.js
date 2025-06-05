@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import { dim, log, trimToTwoDecimals } from "../../utils";
+import { dim, generateRandomID, log, trimToTwoDecimals } from "../../utils";
 import {
   HorzSpacer,
   TabMenuButton,
@@ -21,64 +21,107 @@ import {
 import { Colors } from "../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
-import { useCurrentUserStore, useCurrentWorkorderStore } from "../../stores";
+import {
+  useAppCurrentUserStore,
+  useCurrentWorkorderStore,
+  useLoginStore,
+} from "../../stores";
 import { WORKORDER_PROTO } from "../../data";
 import { dbSetOpenWorkorderItem } from "../../db_calls";
 
 /// Notes Tab Component
 export function Notes_MainComponent() {
-  const zCurrentUser = useCurrentUserStore((state) => state.getCurrentUser());
-  const zWorkorderObj = useCurrentWorkorderStore((state) =>
-    state.getWorkorderObj()
-  );
-  ///
+  // setters /////////////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
+  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
+  const _zExecute = useLoginStore((state) => state.execute);
 
-  if (!zWorkorderObj.customerNotes)
-    _zSetWorkorderObj({ ...zWorkorderObj, customerNotes: [] });
-  if (!zWorkorderObj.internalNotes)
-    _zSetWorkorderObj({ ...zWorkorderObj, internalNotes: [] });
+  // getters /////////////////////////////////////////////////////////////////////
+  const zWorkorderObj = useCurrentWorkorderStore((state) =>
+    state.getWorkorderObj()
+  );
+
   /////////////////////////////////////////////////////////////////////////////////
   const [customerNotesHeight, setCustomerNotesHeight] = useState([25]); // Initial height
   const [internalNotesHeight, setInternalNotesHeight] = useState([20]); // Initial height
-  // log(zWorkorderObj);
-  function customerOutsideClicked() {
-    let newObj = { ...zWorkorderObj };
-    let notesArr = newObj.customerNotes;
-    notesArr.push("");
-    newObj.customerNotes = notesArr;
-    _zSetWorkorderObj(newObj);
-    dbSetOpenWorkorderItem(newObj);
-  }
 
-  function deleteCustomerItem(item, index) {
-    let newObj = { ...zWorkorderObj };
-    let arr = zWorkorderObj.customerNotes.filter(
-      (item, index1) => index != index1
+  if (!zWorkorderObj) return null;
+
+  function formatUserShowName() {
+    return (
+      "(" +
+      zCurrentUserObj.first.toString() +
+      " " +
+      zCurrentUserObj.last[0] +
+      ")  "
     );
-    newObj.customerNotes = arr;
+  }
+
+  // log(zWorkorderObj);
+  function outsideClicked(option) {
+    let wo = cloneDeep(zWorkorderObj);
+    let notesArr;
+    if (option == "customer") {
+      notesArr = wo.customerNotes || [];
+    } else {
+      notesArr = wo.internalNotes || [];
+    }
+
+    notesArr.push({
+      name: formatUserShowName(),
+      userID: zCurrentUserObj.id,
+      value: "",
+      id: generateRandomID(),
+    });
+    if (option === "customer") {
+      wo.customerNotes = notesArr;
+    } else {
+      wo.internalNotes = notesArr;
+    }
+    _zSetWorkorderObj(wo);
+    dbSetOpenWorkorderItem(wo);
+  }
+
+  function deleteItem(item, index, option) {
+    let newObj = cloneDeep(zWorkorderObj);
+    let arr;
+    if (option == "customer") {
+      arr = zWorkorderObj.customerNotes;
+    } else {
+      arr = zWorkorderObj.internalNotes;
+    }
+    arr = arr.filter((o) => o.id != item.id);
+    if (option == "customer") {
+      newObj.customerNotes = arr;
+    } else {
+      newObj.internalNotes = arr;
+    }
+    log(item);
     _zSetWorkorderObj(newObj);
     dbSetOpenWorkorderItem(newObj);
   }
 
-  function customerTextChanged(newVal, index) {
-    let newObj = { ...zWorkorderObj };
-    let prevItem = newObj.customerNotes[index];
-    if (newVal.length > prevItem.length && newVal.startsWith(prevItem)) {
-      // log("added");
-      prevItem = newVal;
-    } else if (newVal.length < prevItem.length && prevItem.startsWith(newVal)) {
-      if (!newVal.startsWith("(" + zCurrentUser.first + ") ")) {
-        prevItem = "(" + zCurrentUser.first + ") ";
-      } else {
-        prevItem = newVal;
-      }
+  function textChanged(value, index, option) {
+    let wo = cloneDeep(zWorkorderObj);
+    let item;
+    if (option === "customer") {
+      item = wo.customerNotes;
+    } else {
+      item = wo.internalNotes;
     }
-    newObj.customerNotes[index] = prevItem;
-    _zSetWorkorderObj(newObj);
-    dbSetOpenWorkorderItem(newObj);
+    let line = item[index];
+    line.value = value;
+    item[index] = line;
+
+    if (option === "customer") {
+      wo.customerNotes = item;
+    } else {
+      wo.internalNotes = item;
+    }
+    _zSetWorkorderObj(wo);
+    dbSetOpenWorkorderItem(wo);
   }
 
   const handleCustomerContentSizeChange = (event, index) => {
@@ -141,8 +184,8 @@ export function Notes_MainComponent() {
       // log("added");
       prevItem = newVal;
     } else if (newVal.length < prevItem.length && prevItem.startsWith(newVal)) {
-      if (!newVal.startsWith("(" + zCurrentUser.first + ") ")) {
-        prevItem.val = "(" + zCurrentUser.first + ") ";
+      if (!newVal.startsWith("(" + zCurrentUserObj.first + ") ")) {
+        prevItem.val = "(" + zCurrentUserObj.first + ") ";
       } else {
         prevItem = newVal;
       }
@@ -163,7 +206,7 @@ export function Notes_MainComponent() {
           height: "100%",
         }}
       >
-        <TouchableWithoutFeedback onPress={() => customerOutsideClicked()}>
+        <TouchableWithoutFeedback onPress={() => outsideClicked("customer")}>
           <View
             style={{
               width: "50%",
@@ -174,42 +217,68 @@ export function Notes_MainComponent() {
             }}
           >
             <View>
-              <Text style={{ color: "lightgray" }}>{"Customer Notes"}</Text>
+              <Text style={{ color: "lightgray", marginBottom: 5 }}>
+                {"Customer Notes"}
+              </Text>
             </View>
 
-            <FlatList
-              keyExtractor={(i, idx) => idx}
-              data={zWorkorderObj.customerNotes}
-              renderItem={(item) => {
-                let index = item.index;
-                item = item.item;
-                return (
-                  <TouchableWithoutFeedback
-                    onLongPress={() => deleteCustomerItem(item, index)}
-                  >
-                    <View style={{ width: "100%", paddingVertical: 3 }}>
-                      <TextInput
-                        onContentSizeChange={(ev) =>
-                          handleCustomerContentSizeChange(ev, index)
-                        }
-                        multiline={true}
-                        onChangeText={(val) => customerTextChanged(val, index)}
+            <View style={{ height: "100%" }}>
+              <FlatList
+                keyExtractor={(i, idx) => idx}
+                data={zWorkorderObj.customerNotes}
+                renderItem={(item) => {
+                  let index = item.index;
+                  item = item.item;
+                  return (
+                    <TouchableWithoutFeedback
+                      onLongPress={() => deleteItem(item, index, "customer")}
+                    >
+                      <View
                         style={{
-                          padding: 2,
-                          height: customerNotesHeight[index] || 20,
-                          backgroundColor: "rgba(0, 0, 0, 0.05)",
-                          outlineWidth: 0,
+                          width: "100%",
+                          // paddingVertical: 3,
+                          flexDirection: "row",
+                          alignItems: "center",
                         }}
-                        autoFocus={
-                          index === zWorkorderObj.customerNotes.length - 1
-                        }
-                        value={item}
-                      />
-                    </View>
-                  </TouchableWithoutFeedback>
-                );
-              }}
-            />
+                      >
+                        <Text
+                          style={{
+                            padding: 2,
+                            height: customerNotesHeight[index] || null,
+                            backgroundColor: "rgba(0, 0, 0, 0.03)",
+                            outlineWidth: 0,
+                            // width: "100%",
+                          }}
+                        >
+                          {item.name}
+                        </Text>
+                        <TextInput
+                          onContentSizeChange={(ev) =>
+                            handleCustomerContentSizeChange(ev, index)
+                          }
+                          multiline={true}
+                          // numberOfLines={5}
+                          onChangeText={(val) =>
+                            textChanged(val, index, "customer")
+                          }
+                          style={{
+                            padding: 2,
+                            height: customerNotesHeight[index] || null,
+                            backgroundColor: "rgba(0, 0, 0, 0.03)",
+                            outlineWidth: 0,
+                            width: "100%",
+                          }}
+                          autoFocus={
+                            index === zWorkorderObj.customerNotes.length - 1
+                          }
+                          value={item.value}
+                        />
+                      </View>
+                    </TouchableWithoutFeedback>
+                  );
+                }}
+              />
+            </View>
           </View>
         </TouchableWithoutFeedback>
         <View

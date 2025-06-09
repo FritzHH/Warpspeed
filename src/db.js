@@ -29,11 +29,9 @@ import {
 import { initializeApp } from "firebase/app";
 import { log } from "./utils";
 import {
-  COLLECTION_NAMES,
   CUSTOMER_PREVIEW_PROTO,
   CUSTOMER_PROTO,
   INVENTORY_ITEM_PROTO,
-  WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "./data";
 import { isArray } from "lodash";

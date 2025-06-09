@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef } from "./db";
-import { COLLECTION_NAMES, CUSTOMER_PROTO } from "./data";
+import { CUSTOMER_PROTO } from "./data";
 import { generate } from "random-words";
 
 export function log(one, two) {
@@ -225,7 +225,7 @@ export function getItemFromArr(value, arrKey, arr) {
 }
 
 export function generateRandomID(collectionPath) {
-  let ref = getNewCollectionRef(collectionPath || COLLECTION_NAMES.customers);
+  let ref = getNewCollectionRef(collectionPath || "CUSTOMERS");
   return ref.id;
 }
 

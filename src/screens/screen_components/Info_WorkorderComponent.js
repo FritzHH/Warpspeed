@@ -16,10 +16,6 @@ import {
 } from "../../components";
 import { Colors } from "../../styles";
 import {
-  bike_brands_db,
-  bike_descriptions_db,
-  part_sources_db,
-  bike_colors_arr_db,
   SETTINGS_PROTO,
   WORKORDER_PROTO,
   CUSTOMER_PROTO,
@@ -79,7 +75,7 @@ export const Info_WorkorderComponent = ({}) => {
   function setBikeColor(incomingColorVal) {
     let foundColor = false;
     let newColorObj = {};
-    bike_colors_arr_db.forEach((bikeColorObj) => {
+    zSettingsObj.bikeColors.forEach((bikeColorObj) => {
       if (bikeColorObj.label.toLowerCase() === incomingColorVal.toLowerCase()) {
         foundColor = true;
         newColorObj = { ...bikeColorObj };
@@ -214,19 +210,36 @@ export const Info_WorkorderComponent = ({}) => {
             <Text style={{ color: Colors.darkText }}>EMAIL ONLY</Text>
           ) : null}
         </View>
-        <TextInputLabelOnMainBackground styleProps={{ marginTop: 10 }} />
-        <View
+
+        {/* <View
           style={{
             marginTop: 15,
+            width: "100%",
+            // backgroundColor: "blue",
+            flexDirection: "row",
+            justifyItems: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Text>Number of items: </Text>
+          <TextInputOnMainBackground
+            value={zWorkorderObj.numItems || 1}
+            style={{ width: 25, margin: 0 }}
+          />
+        </View> */}
+        <View
+          style={{
+            marginTop: 20,
             flexDirection: "row",
             justifyContent: "flex-start",
+            alignItems: "center",
             width: "100%",
           }}
         >
-          <View style={{ width: "50" }}>
+          <View style={{}}>
             <TextInputOnMainBackground
               placeholderText={"Brand"}
-              styleProps={{ marginRight: 5 }}
+              style={{ marginRight: 5 }}
               value={zWorkorderObj.brand}
               onTextChange={(val) => {
                 // log(val);
@@ -238,6 +251,7 @@ export const Info_WorkorderComponent = ({}) => {
           </View>
           <View
             style={{
+              // marginTop: 10,
               width: "50%",
               flexDirection: "row",
               paddingLeft: 5,
@@ -246,7 +260,12 @@ export const Info_WorkorderComponent = ({}) => {
             }}
           >
             <View
-              style={{ width: "48%", height: "100%", justifyContent: "center" }}
+              style={{
+                width: "48%",
+                height: "100%",
+                justifyContent: "center",
+                // marginTop: 10,
+              }}
             >
               <ModalDropdown
                 itemListStyle={{ width: 80 }}
@@ -306,21 +325,18 @@ export const Info_WorkorderComponent = ({}) => {
             </View>
           </View>
         </View>
-        <TextInputLabelOnMainBackground
-          // value={"MODEL/DESCRIPTION"}
-          styleProps={{ marginTop: 10, marginBottom: 2 }}
-        />
         <View
           style={{
             flexDirection: "row",
             justifyContent: "flex-start",
             width: "100%",
             alignItems: "center",
+            marginTop: 5,
           }}
         >
           <TextInputOnMainBackground
             placeholderText={"Model/Description"}
-            styleProps={{ marginRight: 2 }}
+            style={{ marginRight: 2 }}
             value={zWorkorderObj.description}
             onTextChange={(val) => {
               let wo = cloneDeep(zWorkorderObj);
@@ -354,24 +370,20 @@ export const Info_WorkorderComponent = ({}) => {
             }}
           />
         </View>
-        <TextInputLabelOnMainBackground
-          // value={"COLOR"}
-          styleProps={{
-            marginTop: 10,
-            marginBottom: 2,
-          }}
-        />
+
         <View
           style={{
             flexDirection: "row",
             justifyContent: "flex-start",
+            alignItems: "center",
             width: "100%",
+            marginTop: 5,
           }}
         >
           <TextInputOnMainBackground
             placeholderText={"Color"}
             value={zWorkorderObj.color.label}
-            styleProps={{
+            style={{
               marginRight: 2,
               backgroundColor: zWorkorderObj.color.backgroundColor,
               color: zWorkorderObj.color.textColor,
@@ -412,22 +424,18 @@ export const Info_WorkorderComponent = ({}) => {
             }}
           />
         </View>
-        <TextInputLabelOnMainBackground
-          placeholderText={"Part Ordered"}
-          // value={"PART ORDERED"}
-          styleProps={{ marginTop: 10, marginBottom: 2 }}
-        />
         <View
           style={{
             flexDirection: "row",
             justifyContent: "flex-start",
             alignItems: "center",
             width: "100%",
+            marginTop: 5,
           }}
         >
           <TextInputOnMainBackground
             placeholderText={"Part Ordered"}
-            styleProps={{ marginRight: 2 }}
+            style={{ marginRight: 2 }}
             value={zWorkorderObj.partOrdered}
             onTextChange={(val) => {
               let wo = cloneDeep(zWorkorderObj);
@@ -437,10 +445,7 @@ export const Info_WorkorderComponent = ({}) => {
             }}
           />
         </View>
-        <TextInputLabelOnMainBackground
-          // value={"PART SOURCE"}
-          styleProps={{ marginTop: 10, marginBottom: 2 }}
-        />
+
         <View
           style={{
             // marginTop: 8,
@@ -448,12 +453,13 @@ export const Info_WorkorderComponent = ({}) => {
             justifyContent: "flex-start",
             alignItems: "center",
             width: "100%",
+            marginTop: 5,
           }}
         >
           <TextInputOnMainBackground
             value={zWorkorderObj.partSource}
             placeholderText={"Part Source"}
-            styleProps={{ marginRight: 2 }}
+            style={{ marginRight: 2 }}
             onTextChange={(val) => {
               let wo = cloneDeep(zWorkorderObj);
               wo.partSource = val;
@@ -516,7 +522,7 @@ export const Info_WorkorderComponent = ({}) => {
 const TextInputOnMainBackground = ({
   value,
   onTextChange,
-  styleProps = {},
+  style = {},
   placeholderText,
 }) => {
   return (
@@ -526,14 +532,13 @@ const TextInputOnMainBackground = ({
       placeholderTextColor={"lightgray"}
       style={{
         borderWidth: 2,
-        borderColor: "dimgray",
-        color: "dimgray",
+        borderColor: "gray",
+        color: Colors.darkText,
         paddingVertical: 3,
         paddingHorizontal: 4,
         fontSize: 16,
         outlineWidth: 0,
-        width: "100%",
-        ...styleProps,
+        ...style,
       }}
       onChangeText={(val) => onTextChange(val)}
     />

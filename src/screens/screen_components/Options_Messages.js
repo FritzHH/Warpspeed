@@ -13,6 +13,7 @@ import {
   dim,
   formatDateTime,
   generateRandomID,
+  log,
 } from "../../utils";
 import { TabMenuDivider as Divider, Button, CheckBox } from "../../components";
 import { Colors } from "../../styles";
@@ -52,7 +53,7 @@ export function MessagesComponent({}) {
   const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
   //////////////////////////////////////////////////////////////////////////
   const [sNewMessage, _setNewMessage] = useState("");
-  const [sCanRespond, _setCanRespond] = useState(true);
+  const [sCanRespond, _setCanRespond] = useState(false);
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
 
@@ -68,17 +69,23 @@ export function MessagesComponent({}) {
     msg.id = generateRandomID();
     msg.type = "outgoing";
     msg.senderUserObj = zCurrentUserObj;
+    _setNewMessage("");
     _zSetOutgoingMessage(msg);
     dbSendMessageToCustomer(msg);
   }
 
+  log("res", sCanRespond);
   useEffect(() => {
-    // log("here");
     let arr = combine2ArraysOrderByMillis(
       zIncomingMessagesArr,
       zOutgoingMessagesArr
     );
-    // _setScrollPosition(arr.length - 1);
+
+    let lastMessage = arr[arr.length - 1];
+    console.log(lastMessage);
+    if (!lastMessage.senderUserObj || lastMessage.canRespond) {
+      _setCanRespond(true);
+    }
     if (arr.length - 1 > 0) {
       messageListRef.current?.scrollToIndex({
         index: arr.length - 1,
@@ -163,6 +170,8 @@ export function MessagesComponent({}) {
             />
           ) : null}
           <CheckBox
+            checkedColor={"red"}
+            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
             text={"Respond"}
             isChecked={sCanRespond}
             onCheck={() => _setCanRespond(!sCanRespond)}
@@ -210,10 +219,10 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
           justifyContent: "space-between",
         }}
       >
+        <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>
         <Text style={{ ...INFO_TEXT_STYLE }}>
           {dateObj.dayOfWeek + ", " + dateObj.time}
         </Text>
-        <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>
       </View>
     </View>
   );

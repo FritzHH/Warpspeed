@@ -3,12 +3,6 @@
 // import { getNewCollectionRef } from "./dbCalls";
 import { formatDateTime, generateRandomID, log } from "./utils";
 
-////////// data types
-export const DISCOUNT_TYPES = {
-  percent: "Percent",
-  dollar: "Dollar Amount",
-};
-
 ////////// names ////////////////////////////
 export const INVENTORY_CATEGORIES = {
   parts: "Parts",
@@ -18,20 +12,10 @@ export const INVENTORY_CATEGORIES = {
   other: "Other",
 };
 
-export const COLLECTION_NAMES = {
-  customers: "CUSTOMERS",
-  openWorkorders: "OPEN-WORKORDERS",
-  closedWorkorders: "CLOSED-WORKORDERS",
-  preferences: "PREFERENCES",
-  sales: "SALES",
-  inventory: "INVENTORY",
-  printers: "PRINTERS",
+export const DISCOUNT_TYPES = {
+  percent: "Percent",
+  dollar: "Dollar Amount",
 };
-
-export const WORKORDER_STATUS_NAMES = Object.freeze({
-  open: "open",
-  finished: "finished",
-});
 
 export const TAB_NAMES = {
   infoTab: {
@@ -53,92 +37,92 @@ export const TAB_NAMES = {
   },
 };
 
-export const QUICK_BUTTON_NAMES = [
-  {
-    name: "Tune-Up",
-    id: "1234",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Tube & Tire",
-    id: "58349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Brakes",
-    id: "5834fg9",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Shifting",
-    id: "583r49",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Drivetrain",
-    id: "58trt349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Cable",
-    id: "583sfg49",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Spoke",
-    id: "58349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Cleaning",
-    id: "583fgs49",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Scooter",
-    id: "5834nh9",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Pickup",
-    id: "5855r349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "Diagnostics",
-    id: "58fgs349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "$Labor",
-    id: "58sgf349",
-    position: "999",
-    items: [],
-  },
-  {
-    name: "Brakes",
-    id: "5854t349",
-    position: "1",
-    items: [],
-  },
-  {
-    name: "$Part",
-    id: "583t54t49",
-    position: "1000",
-    items: [],
-  },
-];
+// export const QUICK_BUTTON_NAMES = [
+//   {
+//     name: "Tune-Up",
+//     id: "1234",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Tube & Tire",
+//     id: "58349",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Brakes",
+//     id: "5834fg9",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Shifting",
+//     id: "583r49",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Drivetrain",
+//     id: "58trt349",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Cable",
+//     id: "583sfg49",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Spoke",
+//     id: "58349",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Cleaning",
+//     id: "583fgs49",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Scooter",
+//     id: "5834nh9",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Pickup",
+//     id: "5855r349",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "Diagnostics",
+//     id: "58fgs349",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "$Labor",
+//     id: "58sgf349",
+//     position: "999",
+//     items: [],
+//   },
+//   {
+//     name: "Brakes",
+//     id: "5854t349",
+//     position: "1",
+//     items: [],
+//   },
+//   {
+//     name: "$Part",
+//     id: "583t54t49",
+//     position: "1000",
+//     items: [],
+//   },
+// ];
 
 export const FOCUS_NAMES = {
   cell: "cell",
@@ -154,7 +138,7 @@ export const FOCUS_NAMES = {
   notes: "notes",
 };
 
-/////////// object prototypes
+/////////// object prototypes ///////////////////////////////////////////////////
 export const APP_USER = {
   first: "",
   last: "",
@@ -163,6 +147,13 @@ export const APP_USER = {
   phone: "",
   pin: "",
   alternatePin: "",
+};
+
+export const TIME_PUNCH_PROTO = {
+  millis: "",
+  userID: "",
+  id: "",
+  punchType: "",
 };
 
 export const ALERT_BOX_PROTO = {
@@ -176,6 +167,27 @@ export const ALERT_BOX_PROTO = {
   showBox: false,
   onModalDismiss: () => {},
   canExitOnOuterClick: true,
+};
+
+export const SMS_PROTO = {
+  firstName: "",
+  lastName: "",
+  phoneNumber: "",
+  canRespond: false,
+  millis: "",
+  message: "",
+  customerID: "",
+  read: false,
+  id: "",
+  type: "",
+  deliverySuccess: false,
+  senderUserObj: "",
+};
+
+export const DISCOUNT_OBJ_PROTO = {
+  discountName: "",
+  discountValue: "",
+  discountType: "",
 };
 
 export const WORKORDER_PROTO = {
@@ -201,35 +213,17 @@ export const WORKORDER_PROTO = {
   customerNotes: [],
   dueBy: "",
   status: "Newly Created",
-};
-
-export const SMS_PROTO = {
-  firstName: "",
-  lastName: "",
-  phoneNumber: "",
-  canRespond: false,
-  millis: "",
-  message: "",
-  customerID: "",
-  read: false,
-  id: "",
-  type: "",
-  deliverySuccess: false,
-  senderUserObj: "",
-};
-
-export const DISCOUNT_OBJ_PROTO = {
-  name: "",
-  value: "",
-  type: "",
+  numItems: 1,
 };
 
 export const WORKORDER_ITEM_PROTO = {
+  itemName: "",
   qty: 1,
   notes: "",
   invItemID: "",
   discountObj: { ...DISCOUNT_OBJ_PROTO },
   id: "",
+  price: "",
 };
 
 export const CUSTOMER_PROTO = {
@@ -260,65 +254,76 @@ export const CUSTOMER_PREVIEW_PROTO = {
   id: "",
 };
 
+// RECEIPT
 export const RECEIPT_TYPES = {
   workorder: "Workorder",
   sales: "Sales",
+  intake: "Intake",
+  estimate: "Estimate",
 };
 
-export const RECEIPT_WORKORDER_PROTO = {
-  heading: "",
-  dateTime: "",
-  workorderNumber: "",
-  customerContactBlurb: "",
-  workorderItem: "",
-  workorderNumber: "",
-  customerContactBlurb: "",
-  startedOnStr: "",
-  itemArr: [{ item: "", qty: "", price: "", discount: "" }],
-  laborCharges: "",
-  partsCharges: "",
-  taxCharges: "",
-  discountTotal: "",
-  total: "",
-  customerNotes: "",
-  internalNotes: "",
-  barcode: "",
-  id: "",
-  receiptType: "",
-  location: "",
+export const PRINTER_NAMES = ["Left Printer", "Right Printer", "Back Printer"];
+
+export const RECEIPT_LINE_ITEM_OBJ_PROTO = {
+  itemName: "Brake Pads - Standard - BB Brand",
+  notes: "Front and back",
+  discountName: "10% Off",
+  discountSavings: "-$1.22",
+  totalPrice: "$3.23",
+  itemPrice: "1.24",
+  qty: "2",
 };
 
-const receiptHeading = () => {
-  let str = "";
-  str += "9102 Bonita Beach Rd SE\n";
-  str += "Bonita Springs, FL 34135\n";
-  str += "(239) 281 9396\n";
-  str += "support@bonitabikes.com\n";
-  str += "www.bonitabikes.com";
+export const SALES_TRANSACTION_TYPES = {
+  cash: "Cash",
+  card: "Card",
+  check: "Check",
 };
 
 export const RECEIPT_PROTO = {
-  heading: {
-    title: "Bonita Bikes LLC",
-    subHeading: receiptHeading,
-  },
+  salesTransactionBlurb: "",
+  salesTransactionType: SALES_TRANSACTION_TYPES.card,
+  heading: "",
   dateTime: "",
+  numSalesReceipts: "2",
+  receiptNumber: "1",
   workorderNumber: "",
-  customerName: "",
-  customerContactBlurb: "",
-  workorderItem: "",
+  workorderItemBrand: "",
+  workorderItemType: "",
+  workorderItemColor: "",
+  workorderNumber: "",
+  customerFirstName: "",
+  customerLastName: "",
+  customerCell: "",
+  customerLandline: "",
+  customerEmail: "",
+  customerAddress: "",
+  customerContactRestriction: "",
   startedOnStr: "",
-  itemArr: [{ item: "", qty: "", price: "", discount: "" }],
+  lineItemArr: [],
   laborCharges: "",
   partsCharges: "",
   taxCharges: "",
   discountTotal: "",
-  total: "",
-  customerNotes: "",
-  paymentDetails: "",
-  footer: "",
+  totalPrice: "",
+  customerNotes: [],
+  internalNotes: [],
+  workorderBarcode: "",
+  id: "",
+  receiptType: "",
+  location: "",
+  printerName: "",
   barcode: "",
+  shopContactBlurb:
+    "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
+    "(239) 291-9396\n" +
+    "support@bonitabikes.com\n" +
+    "www.bonitabikes.com",
+  shopName: "Bonita Bikes LLC",
+  thankYouBlurb:
+    "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
 };
+// END RECEIPT
 
 export const INVENTORY_ITEM_PROTO = {
   formalName: "",
@@ -396,9 +401,6 @@ export const SETTINGS_PROTO = {
       name: "Waiting",
       members: ["Customer Not Responding"],
     },
-    // { color: "orange", name: "Ordering" },
-    // { color: "whitesmoke", name: "Communication" },
-    // { color: "lightblue", name: "Waiting" },
   ],
 
   quickItemButtonNames: [
@@ -418,6 +420,11 @@ export const SETTINGS_PROTO = {
       items: [],
     },
     {
+      name: "Cable",
+      position: "1",
+      items: [],
+    },
+    {
       name: "Shifting",
       position: "1",
       items: [],
@@ -427,11 +434,7 @@ export const SETTINGS_PROTO = {
       position: "1",
       items: [],
     },
-    {
-      name: "Cable",
-      position: "1",
-      items: [],
-    },
+
     {
       name: "Spoke",
       position: "1",
@@ -448,7 +451,7 @@ export const SETTINGS_PROTO = {
       items: [],
     },
     {
-      name: "Pickup",
+      name: "Pickup/Delivery",
       position: "1",
       items: [],
     },
@@ -462,11 +465,7 @@ export const SETTINGS_PROTO = {
       position: "999",
       items: [],
     },
-    {
-      name: "Brakes",
-      position: "1",
-      items: [],
-    },
+
     {
       name: "$Part",
       position: "1000",
@@ -571,7 +570,6 @@ export const SETTINGS_PROTO = {
   ],
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
-  printerNames: [],
   loginTimeout: 15,
   users: [
     {
@@ -600,130 +598,3 @@ export const SHADOW_RADIUS_NOTHING = {
   shadowRadius: 0,
   shadowColor: "transparent",
 };
-
-///////// variables to import from DB ///////////////////////////////
-export const workorder_status = [
-  { name: "Service", position: 0 },
-  { name: "Finished", position: 1 },
-];
-export const printer_names = {
-  left: "Left Desk Printer",
-  right: "Right Desk Printer",
-};
-export const bike_brands_db = {
-  brands1: ["Trek", "Specialized", "Sun", "Marin"],
-  brands1Title: "Pedal Bikes",
-  brands2: ["Euphree", "Lectric", "Hiboy"],
-  brands2Title: "E-Bikes",
-};
-export const discounts_db = [
-  { name: "50% Off Item", value: "50", type: "percent" },
-  { name: "10% Off Item", value: "10", type: "percent" },
-  { name: "20% Off Item", value: "20", type: "percent" },
-  { name: "30% Off Item", value: "30", type: "percent" },
-  { name: "40% Off Item", value: "40", type: "percent" },
-  { name: "50% Off Item", value: "50", type: "percent" },
-  { name: "2-bike purchase, $100 Off Each Bike", value: "100", type: "dollar" },
-  { name: "$10 Off", value: "10", type: "dollar" },
-];
-
-export const system_users_db = {
-  1389343: {
-    first: "Fritz",
-    last: "Hieb",
-    pin: 44,
-    startedOn: new Date().getTime(),
-    id: "1389343",
-  },
-};
-export const bike_descriptions_db = [
-  "Hybrid",
-  "E-Bike",
-  "Cruiser",
-  "Road Bike",
-];
-export const part_sources_db = ["JBI", "QBP", "Amazon", "Ebay", "Customer"];
-
-export let bike_colors_arr_db = [
-  {
-    textColor: "black",
-    backgroundColor: "whitesmoke",
-    label: "White",
-  },
-  {
-    textColor: "white",
-    backgroundColor: "blue",
-    label: "Blue",
-  },
-  {
-    textColor: "black",
-    backgroundColor: "lightblue",
-    label: "Light-blue",
-  },
-  {
-    textColor: "white",
-    backgroundColor: "red",
-    label: "Red",
-  },
-  {
-    textColor: "white",
-    backgroundColor: "green",
-    label: "Green",
-  },
-
-  {
-    textColor: "whitesmoke",
-    backgroundColor: "black",
-    label: "Black",
-  },
-  {
-    textColor: "black",
-    backgroundColor: "yellow",
-    label: "Yellow",
-  },
-  {
-    textColor: "white",
-    backgroundColor: "maroon",
-    label: "Maroon",
-  },
-  {
-    textColor: "white",
-    backgroundColor: "rgb(139,69,19)",
-    label: "Brown",
-  },
-  {
-    textColor: "black",
-    backgroundColor: "rgb(192,192,192)",
-    label: "Silver",
-  },
-  {
-    textColor: "black",
-    backgroundColor: "rgb(255,165,0)",
-    label: "Orange",
-  },
-  {
-    textColor: "black",
-    backgroundColor: "tan",
-    label: "Tan",
-  },
-  {
-    textColor: "black",
-    backgroundColor: "beige",
-    label: "Beige",
-  },
-  {
-    textColor: "white",
-    backgroundColor: "darkgray",
-    label: "Gray",
-  },
-  {
-    textColor: "black",
-    backgroundColor: "lightgray",
-    label: "Light-gray",
-  },
-  {
-    textColor: "black",
-    backgroundColor: "pink",
-    label: "Pink",
-  },
-];

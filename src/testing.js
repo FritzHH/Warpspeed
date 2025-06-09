@@ -2,16 +2,18 @@
 
 import { cloneDeep } from "lodash";
 import {
-  bike_brands_db,
-  bike_descriptions_db,
   CUSTOMER_PROTO,
   INVENTORY_CATEGORIES,
   INVENTORY_ITEM_PROTO,
+  PRINTER_NAMES,
+  RECEIPT_LINE_ITEM_OBJ_PROTO,
+  RECEIPT_PROTO,
+  RECEIPT_TYPES,
   SETTINGS_PROTO,
   SMS_PROTO,
   WORKORDER_PROTO,
 } from "./data";
-import { setInventoryItem, setOpenWorkorder } from "./db";
+import { setInventoryItem, setOpenWorkorder, setRealtimeNodeItem } from "./db";
 import {
   formatDateTime,
   generateBarcode,
@@ -108,4 +110,73 @@ export function fillPreferences() {
   // getRealtimeNodeItem("SETTINGS").then((res) => log("res", res));
 }
 
-export function initWorkorder() {}
+export function fillReceipt() {
+  let receipt = cloneDeep(RECEIPT_PROTO);
+  receipt.printerName = PRINTER_NAMES[0];
+  receipt.customerFirstName = "Customer";
+  receipt.customerLastName = "Last Name";
+  receipt.customerCell = "(239) 336-9177";
+  receipt.workorderNumber = "12345";
+  receipt.dateTime = "Mon, March 26, 2035, 10:45 pm";
+  receipt.startedOnStr = "Sun, March 24, 2025, 11:45 pm";
+  receipt.workorderItemColor = "Green";
+  receipt.workorderItemBrand = "Cannondale";
+  receipt.workorderItemType = "Road Bike";
+  receipt.barcode = "123456789123";
+  receipt.customerAddress = "1234 N Lane\nBonita Springs, FL";
+  receipt.totalPrice = "134.34";
+  receipt.receiptType = RECEIPT_TYPES.intake;
+  receipt.numSalesReceipts = "1";
+  receipt.id = "1234";
+  receipt.salesTransactionBlurb =
+    "xxxxx1223343\ndkfjdkfjdfd\ndkfjdkfjkdajjf\ndkfjdkjfd";
+  receipt.lineItemArr = [
+    { ...RECEIPT_LINE_ITEM_OBJ_PROTO, discountName: "" },
+    { ...RECEIPT_LINE_ITEM_OBJ_PROTO },
+    { ...RECEIPT_LINE_ITEM_OBJ_PROTO },
+    { ...RECEIPT_LINE_ITEM_OBJ_PROTO },
+  ];
+
+  receipt.internalNotes = [
+    {
+      name: "Fritz H",
+      value: "first internal note here",
+    },
+    {
+      name: "Fritz H",
+      value: "second internal note here \nhere is a new line",
+    },
+    {
+      name: "Fritz H",
+      value: "third internal note here",
+    },
+    {
+      name: "Fritz H",
+      value: "fourth internal note here",
+    },
+  ];
+  receipt.customerNotes = [
+    {
+      name: "Fritz H",
+      value: "first CUSTOMER note here",
+    },
+    {
+      name: "Fritz H",
+      value: "second CUSTOMER note here",
+    },
+    {
+      name: "Fritz H",
+      value: "third CUSTOMER note here",
+    },
+    {
+      name: "Fritz H",
+      value: "fourth CUSTOMER note here \nhere is a new line",
+    },
+  ];
+
+  setRealtimeNodeItem("PRINTERS/to_print", { [receipt.id]: receipt });
+}
+
+export function fillPrinterNames() {
+  setRealtimeNodeItem("PRINTERS/printer_names", PRINTER_NAMES);
+}

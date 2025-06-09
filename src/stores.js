@@ -158,8 +158,8 @@ export const useCustomerSearchStore = create((set, get) => ({
 
 export const useAppCurrentUserStore = create((set, get) => ({
   userObj: null,
-  getCurrentUser: () => get().userObj,
-  setCurrentUser: (obj) => set((state) => ({ userObj: obj })),
+  getCurrentUserObj: () => get().userObj,
+  setCurrentUserObj: (obj) => set((state) => ({ userObj: obj })),
 }));
 
 export const useCurrentWorkorderStore = create((set, get) => ({
@@ -172,6 +172,23 @@ export const useCurrentWorkorderStore = create((set, get) => ({
 }));
 
 // database  //////////////////////////////////////////////////
+export const usePunchClockStore = create((set, get) => ({
+  loggedInUsers: [],
+  userClockArr: [],
+  getLoggedInUser: () => get().loggedInUsers,
+  getUserClockArr: () => get().userClockArr,
+  setUserClockArr: (userClockArr) => {
+    set((state) => ({ userClockArr }));
+  },
+  setLoggedInUser: (userObj) => {
+    let loggedInUsers1 = get().loggedInUsers;
+    if (!loggedInUsers1.find((o) => o.id === user.id)) {
+      loggedInUsers1.push(userObj);
+      set((state) => ({ loggedInUsers: loggedInUsers1 }));
+    }
+  },
+}));
+
 export const useCustomerPreviewStore = create((set, get) => ({
   previewArr: [],
   getCustPreviewArr: () => get().previewArr,

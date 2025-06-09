@@ -1291,8 +1291,10 @@ export const CheckBox = ({
   outerButtonStyle = {},
   textStyle = {},
   viewStyle = {},
+  checkedColor,
+  uncheckedColor,
   mouseOverOptions = {
-    enable: true,
+    enable: false,
     opacity: 0.7,
     highlightColor: "dimgrey",
   },
@@ -1315,7 +1317,9 @@ export const CheckBox = ({
     }
   } else {
     backgroundColor =
-      isChecked || sIsChecked ? Colors.tabMenuButton : "lightgray";
+      isChecked || sIsChecked
+        ? checkedColor || Colors.tabMenuButton
+        : uncheckedColor || "lightgray";
   }
 
   let dim = 25;

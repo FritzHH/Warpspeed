@@ -24,7 +24,7 @@ import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
 import { getRealtimeNodeItem } from "../db";
-import { fillPreferences } from "../testing";
+import { fillPreferences, fillPrinterNames, fillReceipt } from "../testing";
 import {
   customerPreviewListSubscribe,
   inventorySubscribe,
@@ -91,6 +91,8 @@ export function WorkorderScreen() {
   // testing
   async function initialize() {
     if (!sInitFlag) {
+      fillReceipt();
+      // fillPrinterNames();
       // fillPreferences();
       _setInitFlag(true);
     }
@@ -144,6 +146,7 @@ export function WorkorderScreen() {
                 width: "66%",
                 height: "100%",
                 backgroundColor: Colors.opacityBackgroundLight,
+                // backgroundColor: "red",
                 ...SHADOW_RADIUS_PROTO,
               }}
             >

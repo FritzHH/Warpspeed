@@ -14,14 +14,13 @@ import {
 } from "../../components";
 import { Colors } from "../../styles";
 import {
-  discounts_db,
   WORKORDER_PROTO,
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   SETTINGS_PROTO,
   DISCOUNT_OBJ_PROTO,
 } from "../../data";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCurrentWorkorderStore,
@@ -50,6 +49,55 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   ///////////////////////////////////////////////////////////////////////////
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
+  const [sTotalPrice, _setTotalPrice] = useState("");
+  const [sTotalDiscount, _setTotalDiscount] = useState("");
+  const [sNumItems, _setNumItems] = useState("");
+  // const [sWorkorderObj, _setWorkorderObj] = useState(null);
+
+  // make sure the discount object prices are up to date with inventory changes
+  useEffect(() => {
+    let wo = cloneDeep(zWorkorderObj);
+    zWorkorderObj.workorderLines.forEach((line, idx) => {
+      let newWOLine = cloneDeep(line);
+      let discountObj = line.discountObj;
+      let inventoryItem = zInventoryArr.find(
+        (item) => item.id == line.invItemID
+      );
+
+      newWOLine.price = inventoryItem.price;
+      if (discountObj.name) {
+        let newDiscountObj = applyDiscountToWorkorderItem(
+          newWOLine.discountObj,
+          newWOLine,
+          inventoryItem
+        );
+        if (discountObj.newPrice > 0) newWOLine.discountObj = newDiscountObj;
+      }
+      wo.workorderLines[idx] = newWOLine;
+    });
+    _zSetWorkorderObj(wo);
+    dbSetOpenWorkorderItem(wo);
+  }, []);
+
+  useEffect(() => {
+    let runningTotal = 0;
+    let runningDiscount = 0;
+    let runningQty = 0;
+    zWorkorderObj.workorderLines.forEach((line, idx) => {
+      let qty = line.qty;
+      let discountPrice = line.discountObj.newPrice;
+      let price = line.price;
+      if (discountPrice) {
+        runningTotal = runningTotal + Number(discountPrice);
+        runningDiscount = runningDiscount + Number(discountPrice);
+      } else {
+      }
+      runningQty += qty;
+    });
+    _setNumItems(runningQty);
+    _setTotalDiscount(trimToTwoDecimals(runningDiscount));
+    _setTotalPrice(trimToTwoDecimals(runningTotal));
+  }, [zWorkorderObj]);
 
   function deleteWorkorderLineItem(index) {
     let fun = () => {
@@ -90,13 +138,15 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   function setWorkorderLineItem(workorderLine) {
+    // log(workorderLine.qty);
     let fun = () => {
       let idx = zWorkorderObj.workorderLines.findIndex(
         (o) => o.id == workorderLine.id
       );
       let wo = cloneDeep(zWorkorderObj);
-      wo[idx] = workorderLine;
+      wo.workorderLines[idx] = workorderLine;
       _zSetWorkorderObj(wo);
+      dbSetOpenWorkorderItem(wo);
     };
 
     _zExecute(fun);
@@ -179,12 +229,13 @@ export const Items_WorkorderItemsTab = ({}) => {
     <View
       style={{
         width: "100%",
-        height: "100%",
-        justifyContent: "flex-start",
+        height: "95%",
+        justifyContent: "space-between",
+        // backgroundColor: "blue",
       }}
     >
       <FlatList
-        style={{ marginVertical: 3, marginRight: 5 }}
+        style={{ marginTop: 3, marginRight: 5 }}
         data={zWorkorderObj.workorderLines}
         keyExtractor={(item, idx) => idx}
         renderItem={(item) => {
@@ -211,6 +262,34 @@ export const Items_WorkorderItemsTab = ({}) => {
           );
         }}
       />
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "flex-end",
+          width: "100%",
+          height: 30,
+          marginTop: 5,
+        }}
+      >
+        <Text style={{ fontSize: 18 }}>
+          Number of items:{" "}
+          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+            {sNumItems}
+          </Text>
+        </Text>
+        <Text style={{ fontSize: 18 }}>
+          {"Total Discount: "}
+          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+            {"$" + sTotalDiscount}
+          </Text>
+        </Text>
+        <Text style={{ fontSize: 18 }}>
+          Total Price:{" "}
+          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+            {"$" + sTotalPrice}
+          </Text>
+        </Text>
+      </View>
     </View>
   );
 };
@@ -249,13 +328,10 @@ export const LineItemComponent = ({
   }
 
   // clog("item", workorderLine);
-  // return null;
   return (
     <View
       style={{
         width: "100%",
-        backgroundColor: "whitesmoke",
-        marginVertical: 1,
       }}
     >
       <View
@@ -263,7 +339,7 @@ export const LineItemComponent = ({
           flexDirection: "row",
           width: "100%",
           alignItems: "center",
-          backgroundColor: "whitesmoke",
+          backgroundColor: "white",
           paddingVertical: 0,
           paddingHorizontal: 2,
           marginVertical: 1,
@@ -302,9 +378,9 @@ export const LineItemComponent = ({
             textStyle={{ color: "lightgray", fontSize: 17, fontWeight: 600 }}
           />
           <View>
-            {workorderLine.discountObj.name ? (
+            {workorderLine.discountObj.discountName ? (
               <Text style={{ color: "magenta" }}>
-                {workorderLine.discountObj.name || "discount goes here"}
+                {workorderLine.discountObj.discountName || "discount goes here"}
               </Text>
             ) : null}
             <Text
@@ -354,20 +430,31 @@ export const LineItemComponent = ({
               onPress={() =>
                 __modQtyPressed(inventoryItem, workorderLine, "up", index)
               }
-              buttonStyle={{ borderRadius: 3, width: null, height: null }}
-              textStyle={{ color: Colors.tabMenuButton, fontSize: 20 }}
+              buttonStyle={{
+                borderRadius: 3,
+                width: 30,
+                height: 40,
+                marginRight: 10,
+              }}
+              textStyle={{ color: Colors.tabMenuButton, fontSize: 30 }}
               text={"\u2B06"}
               shadow={false}
             />
-            <Button
+            {/* <Button
               onPress={() =>
                 __modQtyPressed(inventoryItem, workorderLine, "down", index)
               }
-              buttonStyle={{ borderRadius: 3, width: null, height: null }}
-              textStyle={{ color: Colors.tabMenuButton, fontSize: 20 }}
+              buttonStyle={{
+                marginHorizontal: 5,
+                // marginLeft: 10,
+                borderRadius: 3,
+                width: 20,
+                height: 35,
+              }}
+              textStyle={{ color: Colors.tabMenuButton, fontSize: 30 }}
               text={"\u2B07"}
               shadow={false}
-            />
+            /> */}
             <TextInput
               style={{
                 marginLeft: 4,
@@ -391,7 +478,7 @@ export const LineItemComponent = ({
                   _setTempQtyVal(null);
                 }
                 let line = structuredClone(workorderLine);
-                line.qty = val;
+                line.qty = Number(val);
                 __setWorkorderLineItem(line);
               }}
             />
@@ -414,7 +501,7 @@ export const LineItemComponent = ({
             {workorderLine.discountObj.savings ? (
               <Text
                 style={{
-                  paddingHorizontal: 5,
+                  paddingHorizontal: 0,
                   minWidth: 30,
                   color: "magenta",
                 }}
@@ -422,19 +509,22 @@ export const LineItemComponent = ({
                 {"$ -" + workorderLine.discountObj.savings}
               </Text>
             ) : null}
-            {workorderLine.discountObj.newPrice ? (
-              <Text
-                style={{
-                  fontWeight: "bold",
-                  minWidth: 30,
-                  marginTop: 7,
-                  paddingHorizontal: 5,
-                  color: Colors.darkText,
-                }}
-              >
-                {"$ " + workorderLine.discountObj.newPrice}
-              </Text>
-            ) : null}
+            <Text
+              style={{
+                fontWeight: "bold",
+                minWidth: 30,
+                marginTop: 0,
+                paddingHorizontal: 0,
+                color: Colors.darkText,
+              }}
+            >
+              {workorderLine.discountObj.newPrice
+                ? "$ " + workorderLine.discountObj.newPrice
+                : workorderLine.qty > 1
+                ? "$" +
+                  trimToTwoDecimals(inventoryItem.price * workorderLine.qty)
+                : ""}
+            </Text>
           </View>
           <View
             style={{
@@ -477,9 +567,9 @@ export const LineItemComponent = ({
         <View
           style={{
             flexDirection: "row",
-            // backgroundColor: "lightgray",
+            // backgroundColor: "white",
             justifyContent: "flex-end",
-            marginBottom: 2,
+            marginVertical: 5,
             width: "100%",
           }}
         >
@@ -496,7 +586,8 @@ export const LineItemComponent = ({
                 shadowOffset: { width: 1, height: 1 },
                 marginHorizontal: 2,
                 width: null,
-                height: null,
+                height: 25,
+                paddingHorizontal: 4,
               }}
             />
           ) : null}
@@ -505,6 +596,9 @@ export const LineItemComponent = ({
               backgroundColor: Colors.mainBackground,
               shadowOffset: { width: 1, height: 1 },
               marginHorizontal: 2,
+              marginLeft: 10,
+              height: 25,
+              // marginVertical: 2,
             }}
             buttonTextStyle={{
               fontSize: 11,
@@ -516,7 +610,9 @@ export const LineItemComponent = ({
             showButtonIcon={false}
             modalVisible={sShowDiscountModal === workorderLine.id}
             handleOuterClick={() => _setShowDiscountModal(null)}
-            handleButtonPress={() => _setShowDiscountModal(workorderLine.id)}
+            handleButtonPress={() => {
+              _setShowDiscountModal(workorderLine.id);
+            }}
             modalCoordinateVars={{ x: -0, y: 30 }}
             ref={ref}
             Component={() => {
@@ -546,6 +642,7 @@ export const LineItemComponent = ({
                               index
                             );
                             _setShowDiscountModal(null);
+                            __setButtonsRowID(null);
                           }}
                           shadow={false}
                           text={item.name}

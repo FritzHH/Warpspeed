@@ -137,6 +137,8 @@ export function WorkorderScreen() {
             <View
               style={{
                 width: "33%",
+                // height: "40%",
+                // backgro
               }}
             >
               <Info_Section />

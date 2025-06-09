@@ -191,6 +191,7 @@ export const DISCOUNT_OBJ_PROTO = {
 };
 
 export const WORKORDER_PROTO = {
+  isStandalaloneSale: false,
   id: "",
   customerID: "",
   customerFirst: "",

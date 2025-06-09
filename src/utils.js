@@ -165,8 +165,6 @@ export function removeDashesFromPhone(num = "") {
   return newVal;
 }
 
-export function addDashesToPhone(num = "") {}
-
 export const dim = {
   windowWidth: window.innerWidth,
   windowHeight: window.innerHeight,

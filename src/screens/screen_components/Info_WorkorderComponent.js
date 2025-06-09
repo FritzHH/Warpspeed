@@ -538,6 +538,8 @@ const TextInputOnMainBackground = ({
         paddingHorizontal: 4,
         fontSize: 16,
         outlineWidth: 0,
+        // width: "100%",
+        // marginVertical: 5,
         ...style,
       }}
       onChangeText={(val) => onTextChange(val)}

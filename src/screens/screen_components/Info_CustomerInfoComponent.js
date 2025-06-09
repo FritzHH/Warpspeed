@@ -16,7 +16,6 @@ import {
   SHADOW_RADIUS_PROTO,
   LoginScreenModalComponent,
 } from "../../components";
-import { ButtonStyles, Colors } from "../../styles";
 import {
   CUSTOMER_PROTO,
   FOCUS_NAMES,
@@ -36,11 +35,10 @@ import {
   useCustMessagesStore,
   useLoginStore,
 } from "../../stores";
-import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
 import { messagesSubscribe } from "../../db_subscriptions";
 const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
 const NUMS = "1234567890-";
-export function CustomerInfoScreenComponent({}) {
+export function Info_CustomerInfoComponent({}) {
   // setters ////////////////////////////////////////////////////////////////
   const _zSetIncomingMessage = useCustMessagesStore(
     (state) => state.setIncomingMessage
@@ -206,15 +204,15 @@ export function CustomerInfoScreenComponent({}) {
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   return (
-    <View style={{ width: "100%", height: "100%" }}>
+    <View style={{ width: "100%", height: "100%", backgroundColor: null }}>
       <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
 
       <View
         style={{
-          marginTop: "50%",
           width: "90%",
           justifyContent: "space-between",
-          // backgroundColor: "green",
+          alignItems: "center",
+          marginTop: 50,
         }}
       >
         <View>

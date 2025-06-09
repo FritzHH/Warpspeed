@@ -201,7 +201,8 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   if (
     !zWorkorderObj?.workorderLines ||
-    zWorkorderObj?.workorderLines.length == 0
+    zWorkorderObj?.workorderLines.length == 0 ||
+    zWorkorderObj.isStandalaloneSale
   ) {
     return (
       <View
@@ -220,11 +221,14 @@ export const Items_WorkorderItemsTab = ({}) => {
             fontSize: 120,
           }}
         >
-          {zWorkorderObj ? "Empty Workorder" : "New \nCustomer"}
+          {zWorkorderObj.isStandalaloneSale
+            ? "Empty\nSale"
+            : "Empty\nWorkorder"}
         </Text>
       </View>
     );
   }
+
   return (
     <View
       style={{
@@ -266,9 +270,10 @@ export const Items_WorkorderItemsTab = ({}) => {
         style={{
           flexDirection: "row",
           justifyContent: "flex-end",
+          alignItems: "center",
           width: "100%",
           height: 30,
-          marginTop: 5,
+          marginVertical: 3,
         }}
       >
         <Text style={{ fontSize: 18 }}>
@@ -289,6 +294,17 @@ export const Items_WorkorderItemsTab = ({}) => {
             {"$" + sTotalPrice}
           </Text>
         </Text>
+        <Button
+          textStyle={{ color: "white" }}
+          buttonStyle={{
+            height: null,
+            padding: 2,
+            backgroundColor: "green",
+            marginRight: 5,
+          }}
+          text={"Check Out"}
+          onPress={() => {}}
+        />
       </View>
     </View>
   );

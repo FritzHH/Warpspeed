@@ -171,6 +171,11 @@ export const useCurrentWorkorderStore = create((set, get) => ({
   },
 }));
 
+export const useCheckoutStore = create((set, get) => ({
+  workorderObj: null,
+  getWorkorderObj: () => get().workorderObj,
+}));
+
 // database  //////////////////////////////////////////////////
 export const usePunchClockStore = create((set, get) => ({
   loggedInUsers: [],

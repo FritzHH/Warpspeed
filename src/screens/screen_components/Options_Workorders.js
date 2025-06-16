@@ -55,7 +55,7 @@ export function WorkordersComponent({}) {
 
   function workorderSelected(obj) {
     // log("obj", obj);
-    obj = { ...obj };
+    obj = cloneDeep(obj);
     dbGetCustomerObj(obj.customerID).then((custObj) => {
       _zSetCurrentCustomer(custObj);
     });
@@ -71,6 +71,7 @@ export function WorkordersComponent({}) {
   }
 
   function sortWorkorders(openWorkordersArr) {
+    // return openWorkordersArr || [];
     if (!openWorkordersArr) return [];
     if (!zSettingsObj.statusGroups) return [];
     let statusGroups = zSettingsObj.statusGroups;

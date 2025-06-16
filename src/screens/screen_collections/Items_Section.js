@@ -6,19 +6,17 @@ import { Tab } from "react-tabs";
 import { View, Text } from "react-native-web";
 import React from "react";
 
-import { TAB_NAMES } from "../../data";
+import { TAB_NAMES, WORKORDER_ITEM_PROTO, WORKORDER_PROTO } from "../../data";
 import { TabMenuButton } from "../../components";
 import { TabMenuDivider as Divider } from "../../components";
-import { log } from "../../utils";
+import { clog, log } from "../../utils";
 import { Colors } from "../../styles";
 import { Items_Dashboard } from "../screen_components/Items_Dashboard";
 import { CustomerSearchListComponent } from "../screen_components/Items_CustomerSearchList";
 import { WorkorderPreview } from "../screen_components/Items_WorkorderPreview";
 import {
   useCurrentWorkorderStore,
-  useCustomerPreviewStore,
   useCustomerSearchStore,
-  useOpenWorkordersStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../stores";
@@ -31,9 +29,9 @@ export function Items_Section({}) {
   const zWorkorderPreview = useWorkorderPreviewStore((state) =>
     state.getPreviewObj()
   );
-  const zWorkorderObj = useCurrentWorkorderStore((state) =>
-    state.getWorkorderObj()
-  );
+
+  let zWorkorderObj = WORKORDER_PROTO;
+  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
   const zCustomerSearchArr = useCustomerSearchStore((state) =>
     state.getSearchResultsArr()
   );
@@ -72,6 +70,7 @@ export function Items_Section({}) {
 }
 
 const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
+  clog(zWorkorderObj);
   return (
     <View
       style={{
@@ -88,14 +87,18 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
         {zWorkorderObj?.id ? (
           <TabMenuButton
             onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
-            text={TAB_NAMES.itemsTab.workorderItems}
+            text={
+              zWorkorderObj.isStandaloneSale
+                ? "Sale Items"
+                : TAB_NAMES.itemsTab.workorderItems
+            }
             isSelected={
               zItemsTabName === TAB_NAMES.itemsTab.workorderItems ? true : false
             }
           />
         ) : null}
         <Divider />
-        {zWorkorderObj?.id ? (
+        {zWorkorderObj?.id && !zWorkorderObj.isStandaloneSale ? (
           <TabMenuButton
             onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}

@@ -2,6 +2,8 @@
 import { View, Text, TextInput, FlatList } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
+  calculateRunningTotals,
+  calculateTaxes,
   clog,
   generateRandomID,
   log,
@@ -23,6 +25,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
+  useCheckoutStore,
   useCurrentWorkorderStore,
   useInventoryStore,
   useLoginStore,
@@ -39,6 +42,9 @@ export const Items_WorkorderItemsTab = ({}) => {
     (state) => state.setWorkorderObj
   );
   const _zExecute = useLoginStore((state) => state.execute);
+  const _zSetIsCheckingOut = useCheckoutStore(
+    (state) => state.setIsCheckingOut
+  );
 
   // getters ///////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
@@ -46,16 +52,15 @@ export const Items_WorkorderItemsTab = ({}) => {
   zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 
   ///////////////////////////////////////////////////////////////////////////
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
   const [sTotalPrice, _setTotalPrice] = useState("");
   const [sTotalDiscount, _setTotalDiscount] = useState("");
   const [sNumItems, _setNumItems] = useState("");
-  // const [sWorkorderObj, _setWorkorderObj] = useState(null);
 
-  // make sure the discount object prices are up to date with inventory changes
-  useEffect(() => {
+  function calculateLineItems() {
     let wo = cloneDeep(zWorkorderObj);
     zWorkorderObj.workorderLines.forEach((line, idx) => {
       let newWOLine = cloneDeep(line);
@@ -75,29 +80,34 @@ export const Items_WorkorderItemsTab = ({}) => {
       }
       wo.workorderLines[idx] = newWOLine;
     });
+
+    return wo;
+  }
+
+  // make sure the previous session discount object prices are up to date with inventory changes
+  useEffect(() => {
+    if (!zWorkorderObj.workorderLines) return;
+    let wo = calculateLineItems();
     _zSetWorkorderObj(wo);
-    dbSetOpenWorkorderItem(wo);
+    if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
   }, []);
 
+  // calculate running sale totaLS
   useEffect(() => {
-    let runningTotal = 0;
-    let runningDiscount = 0;
-    let runningQty = 0;
-    zWorkorderObj.workorderLines.forEach((line, idx) => {
-      let qty = line.qty;
-      let discountPrice = line.discountObj.newPrice;
-      let price = line.price;
-      if (discountPrice) {
-        runningTotal = runningTotal + Number(discountPrice);
-        runningDiscount = runningDiscount + Number(discountPrice);
-      } else {
-      }
-      runningQty += qty;
-    });
+    // log("here");
+    if (!zWorkorderObj?.workorderLines) return;
+    let wo = calculateLineItems();
+    const { runningQty, runningTotal, runningDiscount } =
+      calculateRunningTotals(wo, zInventoryArr);
     _setNumItems(runningQty);
-    _setTotalDiscount(trimToTwoDecimals(runningDiscount));
-    _setTotalPrice(trimToTwoDecimals(runningTotal));
-  }, [zWorkorderObj]);
+    _setTotalDiscount(runningDiscount);
+    _setTotalPrice(runningTotal);
+  }, [zWorkorderObj, zInventoryArr]);
+
+  ///////////////////////////////////////////////////
+  function checkoutPressed() {
+    _zSetIsCheckingOut(!zIsCheckingOut);
+  }
 
   function deleteWorkorderLineItem(index) {
     let fun = () => {
@@ -105,7 +115,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       woCopy.workorderLines.splice(index, 1);
       // log("res", WO);
       _zSetWorkorderObj(woCopy);
-      dbSetOpenWorkorderItem(woCopy);
+      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(woCopy);
     };
     _zExecute(fun);
   }
@@ -132,21 +142,33 @@ export const Items_WorkorderItemsTab = ({}) => {
       wo.workorderLines[idx] = newWOLine;
 
       _zSetWorkorderObj(wo);
-      dbSetOpenWorkorderItem(wo);
+      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
     };
     _zExecute(fun);
   }
 
-  function setWorkorderLineItem(workorderLine) {
+  function editWorkorderLine(workorderLine, inventoryItem) {
+    // log("adding new wo line");
     // log(workorderLine.qty);
+
     let fun = () => {
+      let newWOLine = cloneDeep(workorderLine);
+      if (newWOLine.discountObj.name) {
+        let discountObj = applyDiscountToWorkorderItem(
+          newWOLine.discountObj,
+          newWOLine,
+          inventoryItem
+        );
+        if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
+      }
+
       let idx = zWorkorderObj.workorderLines.findIndex(
         (o) => o.id == workorderLine.id
       );
       let wo = cloneDeep(zWorkorderObj);
-      wo.workorderLines[idx] = workorderLine;
+      wo.workorderLines[idx] = newWOLine;
       _zSetWorkorderObj(wo);
-      dbSetOpenWorkorderItem(wo);
+      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
     };
 
     _zExecute(fun);
@@ -164,11 +186,11 @@ export const Items_WorkorderItemsTab = ({}) => {
         if (newDiscountObj.newPrice <= 0) return;
       }
 
-      // log(discountObj);
+      // log(newDiscountObj);
       let woCopy = cloneDeep(zWorkorderObj);
       woCopy.workorderLines[index].discountObj = newDiscountObj;
       _zSetWorkorderObj(woCopy);
-      dbSetOpenWorkorderItem(woCopy);
+      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(woCopy);
     };
     _zExecute(fun);
   }
@@ -196,13 +218,12 @@ export const Items_WorkorderItemsTab = ({}) => {
       // wo.workorderLines.push(newLine);
     }
     _zSetWorkorderObj(wo);
-    dbSetOpenWorkorderItem(wo);
+    if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
   }
 
   if (
-    !zWorkorderObj?.workorderLines ||
-    zWorkorderObj?.workorderLines.length == 0 ||
-    zWorkorderObj.isStandalaloneSale
+    !zWorkorderObj ||
+    (zWorkorderObj.isStandaloneSale && zWorkorderObj.workorderLines.length == 0)
   ) {
     return (
       <View
@@ -221,9 +242,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             fontSize: 120,
           }}
         >
-          {zWorkorderObj.isStandalaloneSale
-            ? "Empty\nSale"
-            : "Empty\nWorkorder"}
+          {zWorkorderObj?.isStandaloneSale ? "Empty\nSale" : "Empty\nWorkorder"}
         </Text>
       </View>
     );
@@ -234,8 +253,6 @@ export const Items_WorkorderItemsTab = ({}) => {
       style={{
         width: "100%",
         height: "95%",
-        justifyContent: "space-between",
-        // backgroundColor: "blue",
       }}
     >
       <FlatList
@@ -251,7 +268,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             <LineItemComponent
               __deleteWorkorderLine={deleteWorkorderLineItem}
               // __setWorkorderObj={_zSetWorkorderObj}
-              __setWorkorderLineItem={setWorkorderLineItem}
+              __setWorkorderLineItem={editWorkorderLine}
               inventoryItem={invItem}
               workorderLine={item}
               zWorkorderObj={zWorkorderObj}
@@ -269,42 +286,73 @@ export const Items_WorkorderItemsTab = ({}) => {
       <View
         style={{
           flexDirection: "row",
-          justifyContent: "flex-end",
+          justifyContent: "space-around",
           alignItems: "center",
           width: "100%",
           height: 30,
           marginVertical: 3,
         }}
       >
-        <Text style={{ fontSize: 18 }}>
-          Number of items:{" "}
-          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+        <Text style={{ fontSize: 16 }}>
+          {"Items: "}
+          <Text
+            style={{
+              marginRight: 10,
+              fontWeight: "bold",
+            }}
+          >
             {sNumItems}
           </Text>
         </Text>
-        <Text style={{ fontSize: 18 }}>
-          {"Total Discount: "}
-          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-            {"$" + sTotalDiscount}
+        {sTotalDiscount > 0 ? (
+          <Text style={{ fontSize: 16 }}>
+            {"Discount: "}
+            <Text
+              style={{
+                marginRight: 10,
+                fontWeight: "bold",
+              }}
+            >
+              {"$" + sTotalDiscount}
+            </Text>
           </Text>
-        </Text>
-        <Text style={{ fontSize: 18 }}>
-          Total Price:{" "}
+        ) : null}
+        <Text style={{ fontSize: 16 }}>
+          {"Subtotal: "}
           <Text style={{ marginRight: 10, fontWeight: "bold" }}>
             {"$" + sTotalPrice}
           </Text>
         </Text>
-        <Button
-          textStyle={{ color: "white" }}
-          buttonStyle={{
-            height: null,
-            padding: 2,
-            backgroundColor: "green",
-            marginRight: 5,
-          }}
-          text={"Check Out"}
-          onPress={() => {}}
-        />
+        <Text style={{ fontSize: 16 }}>
+          {"Tax: "}
+          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+            {"$" + calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj).tax}
+          </Text>
+        </Text>
+        <Text style={{ fontSize: 16 }}>
+          {"Total: "}
+          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+            {"$" +
+              calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj)
+                .totalAmount}
+          </Text>
+        </Text>
+        {!zWorkorderObj?.isStandaloneSale ? (
+          <Button
+            textStyle={{ color: "white" }}
+            buttonStyle={{
+              height: 25,
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+              borderRadius: 5,
+              width: 150,
+              backgroundColor: zIsCheckingOut ? "red" : "green",
+              // marginRight: 5,
+            }}
+            text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
+            onPress={checkoutPressed}
+          />
+        ) : null}
       </View>
     </View>
   );
@@ -415,7 +463,7 @@ export const LineItemComponent = ({
                 onChangeText={(val) => {
                   let line = structuredClone(workorderLine);
                   line.intakeNotes = val;
-                  __setWorkorderLineItem(line);
+                  __setWorkorderLineItem(line, inventoryItem);
                 }}
                 placeholder="Intake and service notes..."
                 placeholderTextColor={"gray"}
@@ -495,7 +543,7 @@ export const LineItemComponent = ({
                 }
                 let line = structuredClone(workorderLine);
                 line.qty = Number(val);
-                __setWorkorderLineItem(line);
+                __setWorkorderLineItem(line, inventoryItem);
               }}
             />
           </View>

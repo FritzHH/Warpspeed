@@ -104,7 +104,7 @@ export function MessagesComponent({}) {
     >
       <View
         style={{
-          width: "100%",
+          // width: "100%",
           height: dim.windowHeight * 0.8,
           backgroundColor: "transparent",
         }}

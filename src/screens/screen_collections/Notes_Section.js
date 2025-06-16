@@ -1,3 +1,5 @@
+/*eslint-disable*/
+
 import { on } from "events";
 import { Items_WorkorderItemsTab } from "../screen_components/Items_WorkorderItems";
 import { Tab } from "react-tabs";

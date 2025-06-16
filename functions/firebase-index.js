@@ -4,6 +4,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
 const serviceAccount = require("./creds.json");
+const Stripe = require("stripe");
 
 // firebase
 admin.initializeApp({
@@ -18,6 +19,9 @@ const twilioClient = require("twilio")(
   "AC8a368bba2aac361fb084b3e117069d62",
   "1a405e19658914851cb3ac6f96863f9f"
 );
+
+// Stripe
+const stripe = Stripe("sk_test_..."); // Replace with your Stripe secret key
 
 const SMS_PROTO = {
   firstName: "",
@@ -75,6 +79,49 @@ const sendTwilioMessage = (messageObj) => {
       return null;
     });
 };
+
+exports.connectionToken = onRequest({ cors: true }, async (req, res) => {
+  try {
+    const connectionToken = await stripe.terminal.connectionTokens.create();
+    res.json({ secret: connectionToken.secret });
+  } catch (error) {
+    res.status(500).send(error.toString());
+  }
+});
+
+// Create a PaymentIntent for in-person payments
+exports.createPaymentIntent = onRequest({ cors: true }, async (req, res) => {
+  try {
+    const { amount, currency } = req.body;
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency,
+      payment_method_types: ["card_present"],
+      capture_method: "manual",
+    });
+    res.json({
+      client_secret: paymentIntent.client_secret,
+      payment_intent_id: paymentIntent.id,
+    });
+  } catch (error) {
+    res.status(500).send(error.toString());
+  }
+});
+
+// Capture a PaymentIntent after collecting payment
+exports.capturePaymentIntent = onRequest({ cors: true }, async (req, res) => {
+  try {
+    const { payment_intent_id } = req.body;
+    const paymentIntent = await stripe.paymentIntents.capture(
+      payment_intent_id
+    );
+    res.json(paymentIntent);
+  } catch (error) {
+    res.status(500).send(error.toString());
+  }
+});
+
+// exports.capturePaymentIntent = onRequest((req, res) => {});
 
 exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
   let body = request.body;

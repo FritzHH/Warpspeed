@@ -91,7 +91,7 @@ export function WorkorderScreen() {
   // testing
   async function initialize() {
     if (!sInitFlag) {
-      fillReceipt();
+      // fillReceipt();
       // fillPrinterNames();
       // fillPreferences();
       _setInitFlag(true);

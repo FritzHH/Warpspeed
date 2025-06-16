@@ -24,11 +24,7 @@ import {
   useInventoryStore,
   useLoginStore,
 } from "../../stores";
-import {
-  dbSetInventoryItem,
-  dbSetOpenWorkorderItem,
-  dbSetSettings,
-} from "../../db_calls";
+import { dbSetOpenWorkorderItem, dbSetSettings } from "../../db_calls";
 
 const SEARCH_STRING_TIMER = 45 * 1000;
 
@@ -100,10 +96,13 @@ export function QuickItemComponent({}) {
   }
 
   function handleSearchItemSelected(item) {
-    if (!zWorkorderObj.id) {
+    // log(item);
+    // return;
+    if (!zWorkorderObj) {
       _setModalInventoryObj(item);
-      // return;
+      return;
     }
+
     let wo = cloneDeep(zWorkorderObj);
     if (!wo.workorderLines) wo.workorderLines = [];
     // log("item", item);
@@ -112,7 +111,7 @@ export function QuickItemComponent({}) {
     lineItem.id = generateRandomID();
     wo.workorderLines.push(lineItem);
     _zSetWorkorderObj(wo);
-    dbSetOpenWorkorderItem(wo);
+    if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
   }
 
   function handleQuickButtonPress(buttonObj) {
@@ -152,85 +151,20 @@ export function QuickItemComponent({}) {
     _setSearchResults(arr);
   }
 
-  function handleCreateItemPressed(item) {
-    _zModInventoryItem(item, "add");
-    dbSetInventoryItem(item);
-  }
-
-  function handleChangeItem(item) {
-    // _zModInventoryItem(item, "change");
-    // // log("item", item);
-    // _setModalInventoryObj(item);
-    // dbSetInventoryItem(item);
-  }
-  function handleDeleteItemPressed(item) {
-    _zModInventoryItem(item, "remove");
-    dbSetInventoryItem(item, true);
-  }
-
-  function handleQuickButtonRemove(qBItemToRemove, obj) {
-    // log("quick button to remove \n\n", qBItemToRemove);
-    // log("inventory obj to remove the button from \n\n", obj);
-    let idx = zSettingsObj.quickItemButtonNames.findIndex(
-      (o) => o.name === qBItemToRemove.name
-    );
-    let assignments = { ...zSettingsObj.quickItemButtonNames[idx] }.assignments;
-    let newAssignmentsArr = assignments.filter((id) => id != obj.id);
-    let newSettingsObj = { ...zSettingsObj };
-    newSettingsObj.quickItemButtonNames[idx] = newAssignmentsArr;
-    _zSetSettings(newSettingsObj);
-    dbSetSettings(newSettingsObj);
-    // log(newAssignmentsArr);
-  }
-
-  function handleQuickButtonAdd(itemName, invItem) {
-    let settingsObj = { ...zSettingsObj };
-    let idx = zSettingsObj.quickItemButtonNames.findIndex(
-      (o) => o.name === itemName
-    );
-    let obj = settingsObj.quickItemButtonNames[idx];
-    // log("obj", obj);
-    // return;
-    if (!obj.assignments) {
-      obj.assignments = [];
-      obj.assignments.push(invItem.id);
-    } else if (obj.assignments.find((o) => o === invItem.id)) {
-      return;
-    } else {
-      obj.assignments.push(invItem.id);
-    }
-    // log(obj.assignments);
-    settingsObj.quickItemButtonNames[idx] = obj;
-    _zSetSettings(settingsObj);
-    dbSetSettings(settingsObj);
-  }
-
   function clearSearch() {
     _setSearchResults([]);
     _setSearchTerm("");
   }
 
-  function getQuickButtonAssignmentsForInvItem(invItem) {
-    if (!invItem) return;
-    let arr = [];
-    zSettingsObj.quickItemButtonNames.forEach((quickItemButtonNameObj) => {
-      let assignmentsArr = quickItemButtonNameObj.assignments;
-      if (!assignmentsArr) return;
-      assignmentsArr.forEach((assignmentID) => {
-        if (assignmentID === invItem.id) arr.push(quickItemButtonNameObj);
-      });
-    });
-    return arr;
-  }
   //////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////
   // log("refs", randomWordGenerator());
   return (
-    <View style={{ width: "100%", height: dim.windowHeight * 0.96 }}>
+    <View style={{ width: "100%", height: "95%" }}>
       <View
         style={{
-          width: "100%",
-          marginTop: 10,
+          // width: "100%",
+          marginTop: 20,
           flexDirection: "row",
           marginHorizontal: 4,
           // marginTop: 10,
@@ -271,6 +205,7 @@ export function QuickItemComponent({}) {
         <FlatList
           style={{
             marginLeft: 5,
+            // backgroundColor: "green",
           }}
           data={zSettingsObj.quickItemButtonNames}
           keyExtractor={(item, index) => index.toString()}

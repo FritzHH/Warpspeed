@@ -25,6 +25,7 @@ import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
 import React, { useRef } from "react";
 import { cloneDeep } from "lodash";
 import {
+  useCheckoutStore,
   useCurrentCustomerStore,
   useCurrentWorkorderStore,
   useLoginStore,
@@ -55,6 +56,7 @@ export const Info_WorkorderComponent = ({}) => {
   var zSettingsObj = SETTINGS_PROTO;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
+  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 
   ////////////////////////////////////////////////////////////////////
   const [sShowCustomerInfoModal, _setShowCustomerInfoModal] =
@@ -102,10 +104,10 @@ export const Info_WorkorderComponent = ({}) => {
     // _setS;
   }
 
-  function getBackgroundColor(workorderObj) {
+  function getBackgroundColor() {
     let backgroundColor;
     let textColor;
-    let color = zSettingsObj.statusGroups.find((o) => {
+    zSettingsObj.statusGroups.find((o) => {
       let members = o.members;
 
       members.forEach((member) => {
@@ -121,7 +123,14 @@ export const Info_WorkorderComponent = ({}) => {
   }
 
   return (
-    <View style={{ height: "100%", width: "100%", paddingRight: 7 }}>
+    <View
+      style={{
+        height: "100%",
+        width: "100%",
+        paddingRight: 7,
+        backgroundColor: null,
+      }}
+    >
       <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
 
       <View
@@ -169,22 +178,22 @@ export const Info_WorkorderComponent = ({}) => {
           )}
         />
 
-        <Button
+        {/* <Button
           onPress={() => {
             _zSetCustomerObj(null);
             _zSetWorkorderObj(null);
             _zSetInfoTabName(TAB_NAMES.infoTab.customer);
             _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders);
           }}
-          text={"+"}
+          text={"i"}
           shadow={false}
           buttonStyle={{ width: null }}
           textStyle={{
             padding: 5,
-            fontSize: 50,
+            fontSize: 30,
             color: "red",
           }}
-        />
+        /> */}
       </View>
       <View>
         <View
@@ -236,27 +245,28 @@ export const Info_WorkorderComponent = ({}) => {
             width: "100%",
           }}
         >
-          <View style={{}}>
-            <TextInputOnMainBackground
-              placeholderText={"Brand"}
-              style={{ marginRight: 5 }}
-              value={zWorkorderObj.brand}
-              onTextChange={(val) => {
-                // log(val);
-                let wo = cloneDeep(zWorkorderObj);
-                wo.brand = val;
-                setWorkorderObj(wo);
-              }}
-            />
-          </View>
+          {/* <View style={{}}> */}
+          <TextInputOnMainBackground
+            placeholderText={"Brand"}
+            style={{ marginRight: 5 }}
+            value={zWorkorderObj.brand}
+            onTextChange={(val) => {
+              // log(val);
+              let wo = cloneDeep(zWorkorderObj);
+              wo.brand = val;
+              setWorkorderObj(wo);
+            }}
+          />
+          {/* </View> */}
           <View
             style={{
               // marginTop: 10,
               width: "50%",
               flexDirection: "row",
-              paddingLeft: 5,
-              justifyContent: "space-between",
+              paddingLeft: 0,
+              justifyContent: "flex-start",
               alignItems: "center",
+              // backgroundColor: "green",
             }}
           >
             <View
@@ -295,12 +305,18 @@ export const Info_WorkorderComponent = ({}) => {
               />
             </View>
             <View style={{ width: 5 }} />
-            <View style={{ width: "48%" }}>
+            <View
+              style={{
+                width: "48%",
+                alignItems: null,
+                justifyContent: "center",
+              }}
+            >
               <ModalDropdown
                 itemListStyle={{ width: 100 }}
                 modalStyle={{
                   alignSelf: "flex-start",
-                  marginVertical: "2%",
+                  // marginVertical: "2%",
                   width: "30%",
                 }}
                 buttonStyle={{

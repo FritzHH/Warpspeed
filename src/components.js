@@ -31,6 +31,7 @@ import {
 } from "./stores";
 import { dbSetInventoryItem, dbSetSettings } from "./db_calls";
 import { setInventoryItem } from "./db";
+import {} from "@stripe/react-stripe-js";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -1102,6 +1103,85 @@ export const LoginScreenModalComponent = ({ modalVisible }) => {
       )}
     />
   );
+};
+
+export const PaymentComponent = ({}) => {
+  const [terminal, setTerminal] = useState(null);
+  const [reader, setReader] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [paymentIntentId, setPaymentIntentId] = useState("");
+
+  useEffect(async () => {
+    const initTerminal = async () => {
+      const terminalInstance = await loadStripeTerminal();
+      terminalInstance.setConnectionToken(async () => {
+        const res = await fetch(
+          `https://${FIREBASE_REGION}-YOUR_PROJECT_ID.cloudfunctions.net/connectionToken`,
+          { method: "POST" }
+        );
+        const data = await res.json();
+        return data.secret;
+      });
+      setTerminal(terminalInstance);
+      return;
+    };
+
+    const discoverReaders = async () => {
+      const result = await terminal.discoverReaders({ simulated: false });
+      if (result.error) {
+        setPaymentStatus(result.error.message);
+      } else {
+        setReader(result.discoveredReaders[0]);
+      }
+    };
+
+    const connectReader = async () => {
+      if (!reader) return;
+      const result = await terminal.connectReader(reader);
+      if (result.error) {
+        setPaymentStatus(result.error.message);
+      } else {
+        setPaymentStatus("Reader connected!");
+      }
+    };
+    await initTerminal();
+    await discoverReaders();
+    await connectReader();
+  }, []);
+
+  // Start payment
+  const startPayment = async ({ amount }) => {
+    // Create a PaymentIntent on the server
+    const res = await fetch(
+      `https://${FIREBASE_REGION}-YOUR_PROJECT_ID.cloudfunctions.net/createPaymentIntent`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, currency: "usd" }),
+      }
+    );
+    const data = await res.json();
+    setPaymentIntentId(data.payment_intent_id);
+
+    // Collect payment
+    const result = await terminal.collectPaymentMethod(data.client_secret);
+    if (result.error) {
+      setPaymentStatus(result.error.message);
+    } else {
+      setPaymentStatus("Payment method collected, capturing...");
+      // Tell backend to capture the payment
+      const captureRes = await fetch(
+        `https://${FIREBASE_REGION}-YOUR_PROJECT_ID.cloudfunctions.net/capturePaymentIntent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payment_intent_id: data.payment_intent_id }),
+        }
+      );
+      const captureData = await captureRes.json();
+      setPaymentStatus(`Payment ${captureData.status}`);
+    }
+  };
 };
 
 // export const

@@ -115,7 +115,7 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: TAB_NAMES.itemsTab.dashboard,
-  optionsTabName: TAB_NAMES.optionsTab.workorders,
+  optionsTabName: TAB_NAMES.optionsTab.quickItems,
   infoTabName: TAB_NAMES.infoTab.customer,
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
@@ -157,13 +157,21 @@ export const useCustomerSearchStore = create((set, get) => ({
 }));
 
 export const useAppCurrentUserStore = create((set, get) => ({
-  userObj: null,
+  userObj: {
+    first: "Fritz",
+    last: "Hieb",
+    id: "1234",
+    permissions: "owner",
+    phone: "2393369177",
+    pin: "33",
+    alternatePin: "jj",
+  },
   getCurrentUserObj: () => get().userObj,
   setCurrentUserObj: (obj) => set((state) => ({ userObj: obj })),
 }));
 
 export const useCurrentWorkorderStore = create((set, get) => ({
-  workorderObj: {},
+  workorderObj: null,
   getWorkorderObj: () => get().workorderObj,
   setWorkorderObj: (workorderObj) => {
     // log("here");
@@ -172,8 +180,13 @@ export const useCurrentWorkorderStore = create((set, get) => ({
 }));
 
 export const useCheckoutStore = create((set, get) => ({
-  workorderObj: null,
-  getWorkorderObj: () => get().workorderObj,
+  isCheckingOut: false,
+  getIsCheckingOut: () => get().isCheckingOut,
+  setIsCheckingOut: (isCheckingOut) => {
+    set((state) => ({
+      isCheckingOut,
+    }));
+  },
 }));
 
 // database  //////////////////////////////////////////////////

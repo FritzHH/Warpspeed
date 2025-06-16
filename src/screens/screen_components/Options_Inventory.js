@@ -137,7 +137,7 @@ export function InventoryComponent({}) {
     wo.workorderLines.push(lineItem);
     _zExecute(() => {
       _zSetWorkorderObj(wo);
-      dbSetOpenWorkorderItem(wo);
+      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
       _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     });
   }
@@ -159,7 +159,7 @@ export function InventoryComponent({}) {
     <View style={{ width: "100%", height: dim.windowHeight * 0.96 }}>
       <View
         style={{
-          width: "100%",
+          // width: "100%",
           marginTop: 10,
           flexDirection: "row",
           marginHorizontal: 4,

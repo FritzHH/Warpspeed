@@ -9,7 +9,13 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import { dim, generateRandomID, log, trimToTwoDecimals } from "../../utils";
+import {
+  clog,
+  dim,
+  generateRandomID,
+  log,
+  trimToTwoDecimals,
+} from "../../utils";
 import {
   HorzSpacer,
   TabMenuButton,
@@ -48,8 +54,6 @@ export function Notes_MainComponent() {
   const [internalNotesHeight, setInternalNotesHeight] = useState([20]); // Initial height
   const [sFocusIdx, _setFocusIdx] = useState(null);
 
-  if (!zWorkorderObj) return null;
-
   function formatUserShowName() {
     return (
       "(" +
@@ -60,7 +64,6 @@ export function Notes_MainComponent() {
     );
   }
 
-  // log(zWorkorderObj);
   function outsideClicked(option) {
     let wo = cloneDeep(zWorkorderObj);
     let notesArr;
@@ -158,47 +161,9 @@ export function Notes_MainComponent() {
     setInternalNotesHeight(ar);
   };
 
-  function internalOutsideClicked() {
-    let newObj = { ...zWorkorderObj };
-    let notesArr = newObj.internalNotes;
-    notesArr.push("");
-    newObj.internalNotes = notesArr;
-    _zSetWorkorderObj(newObj);
-    dbSetOpenWorkorderItem(newObj);
-  }
+  // clog(zWorkorderObj);
+  if (!zWorkorderObj) return null;
 
-  function deleteInternalItem(item, index) {
-    // log("deleting", index);
-    let newObj = { ...zWorkorderObj };
-    let arr = newObj.internalNotes.filter((item, index1) => index != index1);
-    newObj.internalNotes = arr;
-    _zSetWorkorderObj(newObj);
-    dbSetOpenWorkorderItem(newObj);
-
-    // let arr = zWorkorderObj
-  }
-
-  function internalTextChanged(newVal, index) {
-    // log("incoming", newVal);
-    let newObj = { ...zWorkorderObj };
-    let prevItem = newObj.internalNotes[index];
-    if (newVal.length > prevItem.length && newVal.startsWith(prevItem)) {
-      // log("added");
-      prevItem = newVal;
-    } else if (newVal.length < prevItem.length && prevItem.startsWith(newVal)) {
-      if (!newVal.startsWith("(" + zCurrentUserObj.first + ") ")) {
-        prevItem.val = "(" + zCurrentUserObj.first + ") ";
-      } else {
-        prevItem = newVal;
-      }
-    }
-    newObj.internalNotes[index] = prevItem;
-
-    _zSetWorkorderObj(newObj);
-    dbSetOpenWorkorderItem(newObj);
-  }
-
-  if (!zWorkorderObj.id) return null;
   return (
     <View style={{ width: "100%", height: "100%", paddingTop: 20 }}>
       <View

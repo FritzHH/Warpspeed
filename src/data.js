@@ -191,7 +191,7 @@ export const DISCOUNT_OBJ_PROTO = {
 };
 
 export const WORKORDER_PROTO = {
-  isStandalaloneSale: false,
+  isStandaloneSale: false,
   id: "",
   customerID: "",
   customerFirst: "",
@@ -215,6 +215,7 @@ export const WORKORDER_PROTO = {
   dueBy: "",
   status: "Newly Created",
   numItems: 1,
+  taxFree: false,
 };
 
 export const WORKORDER_ITEM_PROTO = {
@@ -572,6 +573,7 @@ export const SETTINGS_PROTO = {
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   loginTimeout: 15,
+  salesTax: 0.065,
   users: [
     {
       first: "Fritz",

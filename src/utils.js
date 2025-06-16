@@ -34,13 +34,42 @@ export function clog(one, two) {
   if (two) console.log(two);
 }
 
-// export function fetchIt(url) {
-//   // log("fetching this url", url);
-//   return fetch(url).then((res) => {
-//     // log("fetch url result", res);
-//     return res.json().then((json) => json);
-//   });
-// }
+export function calculateRunningTotals(workorderObj, inventoryArr) {
+  let runningTotal = 0;
+  let runningDiscount = 0;
+  let runningQty = 0;
+  let runningTax = 0;
+  // log("inv", workorderObj);
+  // log("items", workorderObj.workorderLines);
+  workorderObj.workorderLines.forEach((line, idx) => {
+    // log("line", inventoryArr.length);
+    let invItem = inventoryArr?.find((o) => o.id == line.invItemID);
+    if (!invItem) return;
+    let qty = line.qty;
+    let discountObj = line.discountObj;
+    // log("discount obj", discountObj);
+    let discountPrice = line.discountObj.newPrice;
+    let price = invItem.price;
+    let discountSavings = line.discountObj.savings;
+    // log("price", price);
+    if (discountPrice) {
+      runningTotal = runningTotal + Number(discountPrice);
+      runningDiscount = runningDiscount + Number(discountSavings);
+    } else {
+      runningTotal = runningTotal + Number(price) * qty;
+    }
+    runningQty += qty;
+  });
+  // log(workorderObj);
+  // log("total", trimToTwoDecimals(runningDiscount));
+  let obj = {
+    runningTotal: trimToTwoDecimals(runningTotal),
+    runningDiscount: trimToTwoDecimals(runningDiscount),
+    runningQty,
+  };
+  // clog(obj);
+  return obj;
+}
 
 export function formatDateTime(dateObj, millis) {
   let now = dateObj;
@@ -105,7 +134,53 @@ export function formatDateTime(dateObj, millis) {
   };
 }
 
+export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
+  let returnObj = {
+    totalAmount: 0,
+    totalTax: 0,
+  };
+  if (workorderObj.taxFree) return returnObj;
+  // log("total", totalAmount * zSettingsObj.salesTax);
+  let tax = Number(totalAmount) * Number(settingsObj.salesTax);
+  let total = tax + Number(totalAmount);
+  return {
+    totalAmount: trimToTwoDecimals(total),
+    tax: trimToTwoDecimals(tax),
+  };
+}
+
 export function trimToTwoDecimals(num) {
+  // num = "4";
+  // log("trimming", num);
+  let strNum = num.toString();
+  let split = strNum.split(".");
+
+  // log("split", split);
+  if (split.length == 1 || split[0] == "") {
+    if (split.length == 1) {
+      // no trailing numbers
+      strNum = strNum + ".00";
+    } else {
+      // no leading numbers
+      // log(split);
+      if (split[1].length == 1) {
+        strNum = "0." + split[1] + "0";
+      } else {
+        strNum = "0." + split[1];
+      }
+    }
+  }
+
+  let split1 = strNum.split(".")[1];
+  split1 = split1 + "233434";
+  if (split1.length > 2) {
+    let newval = split1[0] + split1[1];
+    strNum = split[0] + "." + newval;
+  }
+
+  // log(strNum);
+  return strNum;
+
   let val = Math.floor(num * 100) / 100;
   let valString = val.toString();
   // log("fresh val", valString);
@@ -202,13 +277,15 @@ export function applyDiscountToWorkorderItem(
     multiplier = 1 - Number("." + multiplier);
     newPrice = inventoryObj.price * workorderLineObj.qty * multiplier;
     savings = inventoryObj.price * workorderLineObj.qty - newPrice;
+    // log("newprice", trimToTwoDecimals(newPrice));
+    // log("savings", savings);
   } else {
     newPrice =
       inventoryObj.price * workorderLineObj.qty -
       workorderLineObj.qty * discountObj.value;
     savings = inventoryObj.price * workorderLineObj.qty - newPrice;
   }
-
+  // log("newprice", newPrice);
   return {
     type: discountObj.type,
     value: discountObj.value,

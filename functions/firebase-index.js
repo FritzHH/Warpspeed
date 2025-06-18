@@ -79,49 +79,19 @@ const sendTwilioMessage = (messageObj) => {
       return null;
     });
 };
-
-exports.connectionToken = onRequest({ cors: true }, async (req, res) => {
+exports.createPaymentIntent = onRequest(async (req, res) => {
   try {
-    const connectionToken = await stripe.terminal.connectionTokens.create();
-    res.json({ secret: connectionToken.secret });
-  } catch (error) {
-    res.status(500).send(error.toString());
-  }
-});
-
-// Create a PaymentIntent for in-person payments
-exports.createPaymentIntent = onRequest({ cors: true }, async (req, res) => {
-  try {
-    const { amount, currency } = req.body;
     const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency,
+      amount: req.body.amount,
       payment_method_types: ["card_present"],
-      capture_method: "manual",
+      capture_method: req.body.captureMethod || "automatic",
+      currency: "usd",
     });
-    res.json({
-      client_secret: paymentIntent.client_secret,
-      payment_intent_id: paymentIntent.id,
-    });
+    res.status(200).send(paymentIntent);
   } catch (error) {
-    res.status(500).send(error.toString());
+    res.status(500).send({ error: error.message });
   }
 });
-
-// Capture a PaymentIntent after collecting payment
-exports.capturePaymentIntent = onRequest({ cors: true }, async (req, res) => {
-  try {
-    const { payment_intent_id } = req.body;
-    const paymentIntent = await stripe.paymentIntents.capture(
-      payment_intent_id
-    );
-    res.json(paymentIntent);
-  } catch (error) {
-    res.status(500).send(error.toString());
-  }
-});
-
-// exports.capturePaymentIntent = onRequest((req, res) => {});
 
 exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
   let body = request.body;

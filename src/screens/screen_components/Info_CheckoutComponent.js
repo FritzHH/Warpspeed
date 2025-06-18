@@ -7,7 +7,15 @@ import {
   useOpenWorkordersStore,
   useTabNamesStore,
 } from "../../stores";
-import { Button, CheckBox } from "../../components";
+import * as XLSX from "xlsx";
+
+import {
+  Button,
+  CheckBox,
+  FileInput,
+  PaymentComponent,
+  ScreenModal,
+} from "../../components";
 import { cloneDeep } from "lodash";
 import {
   calculateRunningTotals,
@@ -16,6 +24,16 @@ import {
   log,
 } from "../../utils";
 import { useEffect, useState } from "react";
+import {
+  CardElement,
+  CheckoutProvider,
+  Elements,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import { dbGetStripePaymentIntent } from "../../db_calls";
+// import DocumentPicker from "react-native-document-picker";
 
 export const Info_CheckoutComponent = ({}) => {
   // setters
@@ -92,6 +110,41 @@ export const Info_CheckoutComponent = ({}) => {
     return workorders;
   }
 
+  const stripePromise = loadStripe(
+    "pk_live_51RRLAyG8PZMnVdxF7LTXh3FhPbppqOVq6SrS6oXUfm8rqEt9oldBcSl4irJrow6K58VRReaktDVio5wFvS3tlt1Q00gWo17xTp"
+  );
+
+  const PaymentComponent1 = ({}) => {
+    const stripe = useStripe();
+    const elements = useElements();
+
+    const handleSubmit = async (event) => {
+      const paymentIntent = await dbGetStripePaymentIntent(100);
+    };
+
+    return (
+      <View
+        style={{
+          width: "100%",
+          height: "100%",
+          // backgroundColor: "magenta",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+        }}
+      >
+        <CardElement />
+      </View>
+    );
+  };
+
+  const handleUpload = (data) => {
+    let readedData = XLSX.read(data, { type: "binary" });
+    const wsname = readedData.SheetNames[0];
+    const ws = readedData.Sheets[wsname];
+
+    const sheet = XLSX.utils.sheet_to_json(ws, { header: 1 });
+  };
+
   return (
     <View
       style={{
@@ -99,9 +152,15 @@ export const Info_CheckoutComponent = ({}) => {
         height: "100%",
         // backgroundColor: "magenta",
         justifyContent: "space-between",
-        alignItems: "flex-end",
+        alignItems: "center",
       }}
     >
+      <FileInput handleBinaryString={handleUpload} />
+      {/* <View style={{ backgroundColor: null, width: "100%", height: "100%" }}>
+        <Elements stripe={stripePromise} options={{}}>
+          <PaymentComponent1 />
+        </Elements>
+      </View> */}
       {!zIsCheckingOut ? (
         <View
           style={{

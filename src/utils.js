@@ -3,6 +3,7 @@ import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef } from "./db";
 import { CUSTOMER_PROTO } from "./data";
 import { generate } from "random-words";
+// const fs = require("node:fs");
 
 export function log(one, two) {
   let str = "";
@@ -317,9 +318,20 @@ export async function randomWordGenerator() {
   return generate({ minLength: 4, maxLength: 8 });
 }
 
-// export function jclone(item = {}) {
-//   return structuredClone(item);
-// }
+export async function readAsBinaryString(file) {
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    var data = e.target.result;
+    let readedData = XLSX.read(data, { type: "binary" });
+    const wsname = readedData.SheetNames[0];
+    const ws = readedData.Sheets[wsname];
+
+    /* Convert array to json*/
+    const dataParse = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    // setFileUploaded(dataParse);
+  };
+  reader.readAsBinaryString(file);
+}
 
 export function searchArray(
   searchTerms = [],

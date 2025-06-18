@@ -345,17 +345,35 @@ export function sendSMS(messageBody) {
       }
       return res;
     })
-    // .then((res) => {
-    //   if (res) {
-    //     res.json().then((res) => {
-    //       log("COMPLETE!", res);
-    //       return res;
-    //     });
-    //   }
-    //   log("no res to exist for .json operation IN SENDSMS");
-    //   return null;
-    // })
+
     .catch((e) => {
       log("error in Fetch sendSMS", e);
+    });
+}
+
+export function getPaymentIntent(amount) {
+  return fetch(SMS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+    body: JSON.stringify(messageBody),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        log("FETCH FAILURE IN STRIPE HERE IS THE REASON ==> ", res);
+        return null;
+      } else {
+        res.json().then((res) => {
+          log("STRIPE COMPLETE!", res);
+          return res;
+        });
+      }
+      return res;
+    })
+
+    .catch((e) => {
+      log("error in Stripe call", e);
     });
 }

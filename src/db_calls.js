@@ -2,6 +2,7 @@ import { CUSTOMER_PREVIEW_PROTO, SMS_PROTO } from "./data";
 import {
   getCollectionItem,
   getNodeObject,
+  getPaymentIntent,
   getRealtimeNodeItem,
   sendSMS,
   setFirestoreCollectionItem,
@@ -75,4 +76,8 @@ export function dbGetCustomerObj(id) {
 
 export function dbSendMessageToCustomer(messageObj) {
   return sendSMS(messageObj);
+}
+
+export function dbGetStripePaymentIntent(amount) {
+  return getPaymentIntent(amount);
 }

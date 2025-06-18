@@ -9,8 +9,8 @@ import {
   TextInput,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import React, { Component, useEffect, useRef } from "react";
-import { clog, generateRandomID, log } from "./utils";
+import React, { Component, useCallback, useEffect, useRef } from "react";
+import { clog, generateRandomID, log, readAsBinaryString } from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
 import {
@@ -31,7 +31,12 @@ import {
 } from "./stores";
 import { dbSetInventoryItem, dbSetSettings } from "./db_calls";
 import { setInventoryItem } from "./db";
-import {} from "@stripe/react-stripe-js";
+import { CheckoutProvider } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
+import { useFilePicker } from "use-file-picker";
+import { useDropzone } from "react-dropzone";
+import Dropzone from "react-dropzone";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -1105,87 +1110,75 @@ export const LoginScreenModalComponent = ({ modalVisible }) => {
   );
 };
 
-export const PaymentComponent = ({}) => {
-  const [terminal, setTerminal] = useState(null);
-  const [reader, setReader] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState("");
-  const [paymentIntentId, setPaymentIntentId] = useState("");
+export const FileInput = ({
+  handleBinaryString,
+  buttonStyle = {},
+  textStyle = {},
+}) => {
+  const fileInputRef = useRef(null);
+  // const onDrop = useCallback((acceptedFiles) => {
+  //   log("accepted", acceptedFiles);
+  //   // Do something with the files
+  // }, []);
+  // const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
-  useEffect(async () => {
-    const initTerminal = async () => {
-      const terminalInstance = await loadStripeTerminal();
-      terminalInstance.setConnectionToken(async () => {
-        const res = await fetch(
-          `https://${FIREBASE_REGION}-YOUR_PROJECT_ID.cloudfunctions.net/connectionToken`,
-          { method: "POST" }
-        );
-        const data = await res.json();
-        return data.secret;
-      });
-      setTerminal(terminalInstance);
-      return;
-    };
+  const onDrop = useCallback((acceptedFiles) => {
+    acceptedFiles.forEach((file) => {
+      const reader = new FileReader();
 
-    const discoverReaders = async () => {
-      const result = await terminal.discoverReaders({ simulated: false });
-      if (result.error) {
-        setPaymentStatus(result.error.message);
-      } else {
-        setReader(result.discoveredReaders[0]);
-      }
-    };
-
-    const connectReader = async () => {
-      if (!reader) return;
-      const result = await terminal.connectReader(reader);
-      if (result.error) {
-        setPaymentStatus(result.error.message);
-      } else {
-        setPaymentStatus("Reader connected!");
-      }
-    };
-    await initTerminal();
-    await discoverReaders();
-    await connectReader();
+      reader.onabort = () => console.log("file reading was aborted");
+      reader.onerror = () => console.log("file reading has failed");
+      reader.onload = () => {
+        // Do whatever you want with the file contents
+        const binaryStr = reader.result;
+        handleBinaryString(binaryStr);
+        // console.log(binaryStr);
+      };
+      reader.readAsArrayBuffer(file);
+    });
   }, []);
 
-  // Start payment
-  const startPayment = async ({ amount }) => {
-    // Create a PaymentIntent on the server
-    const res = await fetch(
-      `https://${FIREBASE_REGION}-YOUR_PROJECT_ID.cloudfunctions.net/createPaymentIntent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, currency: "usd" }),
-      }
-    );
-    const data = await res.json();
-    setPaymentIntentId(data.payment_intent_id);
-
-    // Collect payment
-    const result = await terminal.collectPaymentMethod(data.client_secret);
-    if (result.error) {
-      setPaymentStatus(result.error.message);
-    } else {
-      setPaymentStatus("Payment method collected, capturing...");
-      // Tell backend to capture the payment
-      const captureRes = await fetch(
-        `https://${FIREBASE_REGION}-YOUR_PROJECT_ID.cloudfunctions.net/capturePaymentIntent`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ payment_intent_id: data.payment_intent_id }),
-        }
-      );
-      const captureData = await captureRes.json();
-      setPaymentStatus(`Payment ${captureData.status}`);
-    }
+  const handleFileUpload = (e) => {
+    // const file = e.target.files[0];
+    // e.target.value = null;
+    clog("files", e.target);
+    return file;
+    const binaryStr = readAsBinaryString(file);
+    handleBinaryString(binaryStr);
   };
+  return (
+    <Dropzone onDrop={onDrop}>
+      {({ getRootProps, getInputProps }) => (
+        <section>
+          <div {...getRootProps()}>
+            <input {...getInputProps()} />
+            <p>Drag 'n' drop some files here, or click to select files</p>
+          </div>
+        </section>
+      )}
+    </Dropzone>
+  );
+  return (
+    <TouchableOpacity onClick={() => openFilePicker()}>
+      <View
+        style={{
+          width: 200,
+          height: 30,
+          backgroundColor: null,
+          ...buttonStyle,
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          // style={{ display: "none" }}
+          type="file"
+          onChange={(e) => handleFileUpload(e)}
+        />
+        <Text style={{ ...textStyle }}>Upload File</Text>
+      </View>
+    </TouchableOpacity>
+  );
 };
-
-// export const
-
 export const SHADOW_RADIUS_PROTO = {
   shadowColor: "black",
   shadowOffset: { width: 2, height: 2 },

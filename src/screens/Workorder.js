@@ -93,7 +93,7 @@ export function WorkorderScreen() {
     if (!sInitFlag) {
       // fillReceipt();
       // fillPrinterNames();
-      // fillPreferences();
+      fillPreferences();
       _setInitFlag(true);
     }
   }

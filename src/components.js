@@ -1146,17 +1146,26 @@ export const FileInput = ({
     const binaryStr = readAsBinaryString(file);
     handleBinaryString(binaryStr);
   };
+
   return (
-    <Dropzone onDrop={onDrop}>
-      {({ getRootProps, getInputProps }) => (
-        <section>
-          <div {...getRootProps()}>
-            <input {...getInputProps()} />
-            <p>Drag 'n' drop some files here, or click to select files</p>
-          </div>
-        </section>
-      )}
-    </Dropzone>
+    <TouchableOpacity onPress={() => fileInputRef.current.open()}>
+      <View style={{ width: 200, height: 20, backgroundColor: "blue" }}>
+        <Text>Drag/Click Here</Text>
+        <Dropzone onDrop={onDrop} ref={fileInputRef}>
+          {({ getRootProps, getInputProps }) => (
+            <section>
+              {/* <div {...getRootProps()}> */}
+              <input {...getInputProps()} />
+              {/* <View>
+              <Text>Drag/Click Here</Text>
+            </View> */}
+              {/* <p>Drag 'n' drop some files here, or click to select files</p> */}
+              {/* </div> */}
+            </section>
+          )}
+        </Dropzone>
+      </View>
+    </TouchableOpacity>
   );
   return (
     <TouchableOpacity onClick={() => openFilePicker()}>

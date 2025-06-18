@@ -143,6 +143,7 @@ export const Info_CheckoutComponent = ({}) => {
     const ws = readedData.Sheets[wsname];
 
     const sheet = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    log(sheet);
   };
 
   return (

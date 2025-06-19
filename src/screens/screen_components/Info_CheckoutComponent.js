@@ -11,7 +11,9 @@ import * as XLSX from "xlsx";
 
 import {
   Button,
+  CashSaleModalComponent,
   CheckBox,
+  CreditCardModalComponent,
   FileInput,
   PaymentComponent,
   ScreenModal,
@@ -20,8 +22,11 @@ import { cloneDeep } from "lodash";
 import {
   calculateRunningTotals,
   clog,
+  fillInventoryFromLightspeedObjArr,
   generateRandomID,
   log,
+  readJBIOrderBinary,
+  readLightspeedInventoryBinary,
 } from "../../utils";
 import { useEffect, useState } from "react";
 import {
@@ -33,7 +38,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { dbGetStripePaymentIntent } from "../../db_calls";
-// import DocumentPicker from "react-native-document-picker";
+import { Colors } from "../../styles";
 
 export const Info_CheckoutComponent = ({}) => {
   // setters
@@ -57,12 +62,13 @@ export const Info_CheckoutComponent = ({}) => {
   );
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   //////////////////////////////////////////////////////////////////////
-  const [sHasOtherOpenWorkorders, _zSetHasOtherOpenworkorders] = useState(null);
+  const [sHasOtherOpenWorkorders, _sSetHasOtherOpenworkorders] = useState(null);
   const [sTotalsObj, _zSetTotalsObj] = useState({
     runningQty: "0.00",
     runningTotal: "0.00",
     runningDiscount: "0.00",
   });
+  const [sShowCreditCardModal, _sSetShowCreditCardModal] = useState(true);
 
   useEffect(() => {
     // log("z", zWorkorderObj);
@@ -111,39 +117,14 @@ export const Info_CheckoutComponent = ({}) => {
   }
 
   const stripePromise = loadStripe(
-    "pk_live_51RRLAyG8PZMnVdxF7LTXh3FhPbppqOVq6SrS6oXUfm8rqEt9oldBcSl4irJrow6K58VRReaktDVio5wFvS3tlt1Q00gWo17xTp"
+    "pk_test_51RRLAyG8PZMnVdxFyWNM3on9DMqNo4tGT0haBl8fYnOpMrFgEplfYacqq7bAbcwgeWmIIokTNdybj6pVuUVBNcP300s7r5CIeM"
   );
 
-  const PaymentComponent1 = ({}) => {
-    const stripe = useStripe();
-    const elements = useElements();
+  const handleCreditCardPaymentAmount = async (amount) => {
+    const paymentIntent = await dbGetStripePaymentIntent(amount);
 
-    const handleSubmit = async (event) => {
-      const paymentIntent = await dbGetStripePaymentIntent(100);
-    };
-
-    return (
-      <View
-        style={{
-          width: "100%",
-          height: "100%",
-          // backgroundColor: "magenta",
-          justifyContent: "space-between",
-          alignItems: "flex-end",
-        }}
-      >
-        <CardElement />
-      </View>
-    );
-  };
-
-  const handleUpload = (data) => {
-    let readedData = XLSX.read(data, { type: "binary" });
-    const wsname = readedData.SheetNames[0];
-    const ws = readedData.Sheets[wsname];
-
-    const sheet = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    log(sheet);
+    // log("intent", paymentIntent.secret);
+    // const terminal =
   };
 
   return (
@@ -156,7 +137,31 @@ export const Info_CheckoutComponent = ({}) => {
         alignItems: "center",
       }}
     >
-      <FileInput handleBinaryString={handleUpload} />
+      <ScreenModal
+        buttonStyle={{
+          width: 150,
+          height: 40,
+          backgroundColor: "green",
+          borderRadius: 80,
+        }}
+        handleButtonPress={() =>
+          _sSetShowCreditCardModal(!sShowCreditCardModal)
+        }
+        showOuterModal={true}
+        modalVisible={sShowCreditCardModal}
+        buttonLabel="Card"
+        Component={() => (
+          // <CreditCardModalComponent
+          //   onCancel={() => _sSetShowCreditCardModal(false)}
+          //   setPaymentAmount={handleCreditCardPaymentAmount}
+          // />
+          <CashSaleModalComponent
+            onCancel={() => _sSetShowCreditCardModal(false)}
+          />
+        )}
+      />
+
+      {/* <FileInput handleBinaryString={handleUpload} /> */}
       {/* <View style={{ backgroundColor: null, width: "100%", height: "100%" }}>
         <Elements stripe={stripePromise} options={{}}>
           <PaymentComponent1 />
@@ -193,7 +198,7 @@ export const Info_CheckoutComponent = ({}) => {
               flexDirection: "row",
             }}
           >
-            <Button
+            {/* <Button
               textStyle={{ color: "white" }}
               buttonStyle={{
                 width: 150,
@@ -202,7 +207,7 @@ export const Info_CheckoutComponent = ({}) => {
                 borderRadius: 80,
               }}
               text={"Card"}
-            />
+            /> */}
             <Button
               textStyle={{ color: "white" }}
               buttonStyle={{
@@ -293,14 +298,9 @@ export const Info_CheckoutComponent = ({}) => {
         <Button
           textStyle={{ color: "white" }}
           buttonStyle={{
-            marginRight: 10,
-            marginBottom: 3,
-            height: null,
-            paddingHorizontal: 7,
-            paddingVertical: 5,
-            borderRadius: 5,
+            backgroundColor: Colors.tabMenuButton,
+            height: 35,
             width: 150,
-            backgroundColor: !zWorkorderObj?.isStandaloneSale ? "green" : "red",
           }}
           text={"Start Workorder"}
           onPress={actionButtonPressed}
@@ -308,14 +308,9 @@ export const Info_CheckoutComponent = ({}) => {
         <Button
           textStyle={{ color: "white" }}
           buttonStyle={{
-            marginRight: 10,
-            marginBottom: 3,
-            height: null,
-            paddingHorizontal: 7,
-            paddingVertical: 5,
-            borderRadius: 5,
+            backgroundColor: Colors.tabMenuButton,
+            height: 35,
             width: 150,
-            backgroundColor: !zWorkorderObj?.isStandaloneSale ? "green" : "red",
           }}
           text={!zWorkorderObj?.isStandaloneSale ? "New Sale" : "Cancel Sale"}
           onPress={actionButtonPressed}

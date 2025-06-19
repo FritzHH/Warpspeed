@@ -10,7 +10,14 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import React, { Component, useCallback, useEffect, useRef } from "react";
-import { clog, generateRandomID, log, readAsBinaryString } from "./utils";
+import {
+  clog,
+  generateRandomID,
+  LETTERS,
+  log,
+  NUMS,
+  readAsBinaryString,
+} from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
 import {
@@ -29,17 +36,93 @@ import {
   useSettingsStore,
   useLoginStore,
 } from "./stores";
-import { dbSetInventoryItem, dbSetSettings } from "./db_calls";
+import {
+  dbGetStripeConnectionToken,
+  dbSetInventoryItem,
+  dbSetSettings,
+} from "./db_calls";
 import { setInventoryItem } from "./db";
 import { CheckoutProvider } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
+import { loadStripeTerminal } from "@stripe/terminal-js";
 import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import { useFilePicker } from "use-file-picker";
 import { useDropzone } from "react-dropzone";
 import Dropzone from "react-dropzone";
+// import { CheckBox as RNCheckBox } from "@rneui/themed";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
+const styles = {
+  container: {
+    // margin: 20,
+  },
+  button: {
+    // padding: 5,
+    backgroundColor: Colors.blueButtonBackground,
+    borderRadius: 1,
+  },
+  buttonText: {
+    color: Colors.blueButtonText,
+    textAlign: "center",
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "40%",
+    backgroundColor: "white",
+    borderRadius: 10,
+    padding: 20,
+  },
+  option: {
+    padding: 18,
+  },
+  optionText: {
+    fontSize: 16,
+  },
+  closeButton: {
+    // width: 100,
+    marginTop: 10,
+    padding: 10,
+    paddingHorizontal: 20,
+    backgroundColor: "#e74c3c",
+    borderRadius: 5,
+  },
+  removeButton: {
+    // width: 200,
+    marginTop: 10,
+    padding: 10,
+    paddingHorizontal: 20,
+    backgroundColor: "#e74c3c",
+    borderRadius: 5,
+  },
+  closeText: {
+    color: "white",
+    textAlign: "center",
+  },
+  removeText: {
+    color: "white",
+    textAlign: "center",
+    width: 200,
+  },
+};
+
+export const SHADOW_RADIUS_PROTO = {
+  shadowColor: "black",
+  shadowOffset: { width: 2, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 1,
+};
+
+export const SHADOW_RADIUS_NOTHING = {
+  shadowOffset: { width: 0, height: 0 },
+  shadowRadius: 0,
+  shadowColor: "transparent",
+};
 
 export const TabMenuDivider = () => {
   return (
@@ -1110,18 +1193,168 @@ export const LoginScreenModalComponent = ({ modalVisible }) => {
   );
 };
 
+export const CashSaleModalComponent = ({ amount, onCancel }) => {
+  const [sPaymentAmount, _setPaymentAmount] = useState("20.12");
+
+  function handleTextChange(val) {
+    if (LETTERS.includes(val[val.length - 1])) return;
+    _setPaymentAmount(val);
+  }
+
+  return (
+    <View
+      style={{
+        alignItems: "center",
+        paddingTop: 20,
+        width: 500,
+        height: 300,
+        backgroundColor: "lightgray",
+      }}
+    >
+      <Text>Cash Sale</Text>
+      {/* <RNCheckBox title={"click"} /> */}
+      <View style={{ flexDirection: "row", marginTop: 20 }}>
+        <Text style={{ marginRight: 2 }}>$</Text>
+        <TextInput
+          placeholder="Cash amount..."
+          placeholderTextColor={"gray"}
+          value={sPaymentAmount}
+          onChangeText={handleTextChange}
+        />
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-around",
+          width: "100%",
+          marginTop: 20,
+        }}
+      >
+        {/* <Button onPress={discoverReaders} text={"Reader"} /> */}
+        <Button onPress={() => {}} text={"Process Amount"} />
+        <Button onPress={onCancel} text={"Cancel"} />
+      </View>
+    </View>
+  );
+};
+
+export const CreditCardModalComponent = ({ setPaymentAmount, onCancel }) => {
+  <script src="https://js.stripe.com/terminal/v1/"></script>;
+  const [sTerminal, _sSetTerminal] = useState(null);
+  const [readers, setReaders] = useState([]);
+  const [connectedReader, setConnectedReader] = useState(null);
+  const [status, setStatus] = useState("Idle");
+
+  const fetchConnectionToken = async () => {
+    const response = await fetch("http://localhost:4242/connection_token", {
+      method: "POST",
+    });
+    const data = await response.json();
+    return data.secret;
+  };
+
+  useEffect(() => {
+    async function initTerminal() {
+      // const terminal = await loadStripeTerminal();
+      let token = await dbGetStripeConnectionToken();
+      log("token", token);
+      const terminal = StripeTerminal.create({
+        onFetchConnectionToken: dbGetStripeConnectionToken,
+        onUnexpectedReaderDisconnect: () => log("unexpected reader disconnect"),
+      });
+      _sSetTerminal(terminal);
+      // log("terminal", terminal);
+    }
+    initTerminal();
+  }, []);
+
+  async function discoverReaders() {
+    // log("status", sTerminal.Connection);
+    // log("term", terminal);
+    // try {
+    const config = { simulated: false, location: "tml_GCsldAwakkr9vM" };
+    const discoverResult = await sTerminal.discoverReaders(config);
+
+    log("Discovered!", discoverResult);
+    if (discoverResult.error) {
+      console.log("Failed to discover: ", discoverResult.error);
+    } else if (discoverResult.discoveredReaders.length === 0) {
+      console.log("No available readers.");
+    } else {
+      // You should show the list of discoveredReaders to the
+      // cashier here and let them select which to connect to (see below).
+      log("discovered", discoverResult);
+      // connectReader(discoverResult);
+    }
+    // } catch (e) {
+    // log("error discovering reader", e);
+    // }
+  }
+
+  const connectReader = async (reader) => {
+    setStatus("Connecting to reader...");
+    const connectResult = await sTerminal.connectReader(reader);
+    if (connectResult.error) {
+      setStatus(`Error connecting: ${connectResult.error.message}`);
+      return;
+    }
+    setConnectedReader(connectResult.reader);
+    setStatus(`Connected to ${connectResult.reader.label}`);
+  };
+  //////////////////////////////////////////////////////////////////
+  const [sPaymentAmount, _setPaymentAmount] = useState("2.12");
+
+  function handleTextChange(val) {
+    if (LETTERS.includes(val[val.length - 1])) return;
+    _setPaymentAmount(val);
+  }
+
+  return (
+    <View
+      style={{
+        alignItems: "center",
+        paddingTop: 20,
+        width: 500,
+        height: 300,
+        backgroundColor: "lightgray",
+      }}
+    >
+      <Text>Credit Card Sale</Text>
+      <View style={{ flexDirection: "row", marginTop: 20 }}>
+        <Text style={{ marginRight: 2 }}>$</Text>
+        <TextInput
+          placeholder="Enter card amount..."
+          placeholderTextColor={"gray"}
+          value={sPaymentAmount}
+          onChangeText={handleTextChange}
+        />
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-around",
+          width: "100%",
+          marginTop: 20,
+        }}
+      >
+        <Button onPress={discoverReaders} text={"Reader"} />
+        <Button
+          onPress={() => setPaymentAmount(sPaymentAmount)}
+          text={"Process Amount"}
+        />
+        <Button onPress={onCancel} text={"Cancel"} />
+      </View>
+    </View>
+  );
+};
+
 export const FileInput = ({
   handleBinaryString,
   buttonStyle = {},
   textStyle = {},
+  text,
 }) => {
   const fileInputRef = useRef(null);
-  // const onDrop = useCallback((acceptedFiles) => {
-  //   log("accepted", acceptedFiles);
-  //   // Do something with the files
-  // }, []);
-  // const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
-
   const onDrop = useCallback((acceptedFiles) => {
     acceptedFiles.forEach((file) => {
       const reader = new FileReader();
@@ -1129,10 +1362,8 @@ export const FileInput = ({
       reader.onabort = () => console.log("file reading was aborted");
       reader.onerror = () => console.log("file reading has failed");
       reader.onload = () => {
-        // Do whatever you want with the file contents
         const binaryStr = reader.result;
         handleBinaryString(binaryStr);
-        // console.log(binaryStr);
       };
       reader.readAsArrayBuffer(file);
     });
@@ -1149,18 +1380,22 @@ export const FileInput = ({
 
   return (
     <TouchableOpacity onPress={() => fileInputRef.current.open()}>
-      <View style={{ width: 200, height: 20, backgroundColor: "blue" }}>
-        <Text>Drag/Click Here</Text>
+      <View
+        style={{
+          width: 170,
+          height: 30,
+          backgroundColor: null,
+          alignItems: "center",
+          justifyContent: "center",
+          ...SHADOW_RADIUS_PROTO,
+          ...buttonStyle,
+        }}
+      >
+        <Text style={{ ...textStyle }}>{text || "Drag File / Click Here"}</Text>
         <Dropzone onDrop={onDrop} ref={fileInputRef}>
-          {({ getRootProps, getInputProps }) => (
+          {({ getInputProps }) => (
             <section>
-              {/* <div {...getRootProps()}> */}
               <input {...getInputProps()} />
-              {/* <View>
-              <Text>Drag/Click Here</Text>
-            </View> */}
-              {/* <p>Drag 'n' drop some files here, or click to select files</p> */}
-              {/* </div> */}
             </section>
           )}
         </Dropzone>
@@ -1187,76 +1422,6 @@ export const FileInput = ({
       </View>
     </TouchableOpacity>
   );
-};
-export const SHADOW_RADIUS_PROTO = {
-  shadowColor: "black",
-  shadowOffset: { width: 2, height: 2 },
-  shadowOpacity: 0.25,
-  shadowRadius: 1,
-};
-
-export const SHADOW_RADIUS_NOTHING = {
-  shadowOffset: { width: 0, height: 0 },
-  shadowRadius: 0,
-  shadowColor: "transparent",
-};
-
-const styles = {
-  container: {
-    // margin: 20,
-  },
-  button: {
-    // padding: 5,
-    backgroundColor: Colors.blueButtonBackground,
-    borderRadius: 1,
-  },
-  buttonText: {
-    color: Colors.blueButtonText,
-    textAlign: "center",
-  },
-  modalBackground: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "40%",
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 20,
-  },
-  option: {
-    padding: 18,
-  },
-  optionText: {
-    fontSize: 16,
-  },
-  closeButton: {
-    // width: 100,
-    marginTop: 10,
-    padding: 10,
-    paddingHorizontal: 20,
-    backgroundColor: "#e74c3c",
-    borderRadius: 5,
-  },
-  removeButton: {
-    // width: 200,
-    marginTop: 10,
-    padding: 10,
-    paddingHorizontal: 20,
-    backgroundColor: "#e74c3c",
-    borderRadius: 5,
-  },
-  closeText: {
-    color: "white",
-    textAlign: "center",
-  },
-  removeText: {
-    color: "white",
-    textAlign: "center",
-    width: 200,
-  },
 };
 
 export const Button = ({

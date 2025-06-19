@@ -1,9 +1,19 @@
 /* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
-import { getNewCollectionRef } from "./db";
-import { CUSTOMER_PROTO } from "./data";
+import { getNewCollectionRef, setInventoryItem } from "./db";
+import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO } from "./data";
 import { generate } from "random-words";
+import * as XLSX from "xlsx";
+import { cloneDeep } from "lodash";
+
 // const fs = require("node:fs");
+export const dim = {
+  windowWidth: window.innerWidth,
+  windowHeight: window.innerHeight,
+};
+
+export const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
+export const NUMS = "1234567890-";
 
 export function log(one, two) {
   let str = "";
@@ -201,6 +211,11 @@ export function trimToTwoDecimals(num) {
   return valString;
 }
 
+// search functions ///////////////////////////////////////
+// export function checkStringForNumber(str) {
+
+// }
+
 export function searchPhoneNum(searchTerm, customerArrToSearch) {
   let resObj = {};
   for (let i = 0; i <= customerArrToSearch.length - 1; i++) {
@@ -240,11 +255,6 @@ export function removeDashesFromPhone(num = "") {
   split.forEach((s) => (newVal += s));
   return newVal;
 }
-
-export const dim = {
-  windowWidth: window.innerWidth,
-  windowHeight: window.innerHeight,
-};
 
 export function useInterval(callback, delay) {
   const savedCallback = useRef();
@@ -318,21 +328,6 @@ export async function randomWordGenerator() {
   return generate({ minLength: 4, maxLength: 8 });
 }
 
-export async function readAsBinaryString(file) {
-  var reader = new FileReader();
-  reader.onload = function (e) {
-    var data = e.target.result;
-    let readedData = XLSX.read(data, { type: "binary" });
-    const wsname = readedData.SheetNames[0];
-    const ws = readedData.Sheets[wsname];
-
-    /* Convert array to json*/
-    const dataParse = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    // setFileUploaded(dataParse);
-  };
-  reader.readAsBinaryString(file);
-}
-
 export function searchArray(
   searchTerms = [],
   arrOfObjToSearch = [],
@@ -375,4 +370,68 @@ export function combine2ArraysOrderByMillis(arr1, arr2) {
     if (a.millis <= b.millis) return -1;
   });
   return newArr;
+}
+
+function readXLSXBinaryReturnRows(binaryStr) {
+  let readedData = XLSX.read(binaryStr, { type: "binary" });
+  const wsname = readedData.SheetNames[0];
+  const ws = readedData.Sheets[wsname];
+
+  let sheet = XLSX.utils.sheet_to_json(ws, { header: 1 });
+  sheet = sheet.slice(1, sheet.length - 1);
+  return sheet;
+}
+
+export function readLightspeedInventoryBinary(binaryStr) {
+  // log("here");
+  let rows = readXLSXBinaryReturnRows(binaryStr);
+  let res = [];
+  let resObj = {
+    upc: "",
+    description: "",
+    price: "",
+    cost: "",
+  };
+  rows.forEach((row) => {
+    let o = { ...resObj };
+    o.upc = row[1] || generateBarcode();
+    o.description = row[6];
+    o.price = row[7];
+    o.cost = row[8];
+    res.push(o);
+  });
+  return res;
+}
+
+export function readJBIOrderBinary(binaryStr) {
+  let rows = readXLSXBinaryReturnRows(binaryStr);
+  let res = [];
+  let resObj = {
+    upc: "",
+    description: "",
+    cost: "",
+    qty: "",
+  };
+  rows.forEach((row) => {
+    let o = { ...resObj };
+    o.upc = row[9] || generateBarcode();
+    o.description = row[2];
+    o.cost = row[8];
+    o.qty = row[4];
+    res.push(o);
+  });
+  return res;
+}
+
+export function fillInventoryFromLightspeedObjArr(lightspeedObjArr) {
+  for (let i = 0; i <= lightspeedObjArr.length - 1; i++) {
+    let obj = lightspeedObjArr[i];
+    let inv = cloneDeep(INVENTORY_ITEM_PROTO);
+    inv.id = generateRandomID();
+    inv.formalName = obj.description;
+    inv.upc = obj.upc;
+    inv.cost = trimToTwoDecimals(obj.cost);
+    inv.price = trimToTwoDecimals(obj.cost * 2);
+    setInventoryItem(inv);
+  }
 }

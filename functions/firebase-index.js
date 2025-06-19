@@ -21,7 +21,9 @@ const twilioClient = require("twilio")(
 );
 
 // Stripe
-const stripe = Stripe("sk_test_..."); // Replace with your Stripe secret key
+const stripe = Stripe(
+  "sk_test_51RRLAyG8PZMnVdxFmjW3yHGYAnXkSHpxuhLxuqv9bXyznMH73X5HBElKAosjHgx6iUok0ns5j93UIIhCADDXbrgy00C3c57g3s"
+); // Replace with your Stripe secret key
 
 const SMS_PROTO = {
   firstName: "",
@@ -79,19 +81,35 @@ const sendTwilioMessage = (messageObj) => {
       return null;
     });
 };
-exports.createPaymentIntent = onRequest(async (req, res) => {
+exports.createPaymentIntent = onRequest({ cors: true }, async (req, res) => {
+  log("payment intent request body", req.body);
+  let body = req.body;
   try {
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: req.body.amount,
+      amount: Number(body.amount) * 100,
       payment_method_types: ["card_present"],
       capture_method: req.body.captureMethod || "automatic",
       currency: "usd",
     });
     res.status(200).send(paymentIntent);
   } catch (error) {
+    log("stripe error", error.message);
     res.status(500).send({ error: error.message });
   }
 });
+
+exports.createStripeConnectionToken = onRequest(
+  { cors: true },
+  async (req, res) => {
+    try {
+      const connectionToken = await stripe.terminal.connectionTokens.create();
+      res.status(200).send(connectionToken);
+    } catch (e) {
+      log("stripe error", error.message);
+      res.status(500).send({ error: error.message });
+    }
+  }
+);
 
 exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
   let body = request.body;

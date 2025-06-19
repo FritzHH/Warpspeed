@@ -4,7 +4,9 @@ import { View, TextInput } from "react-native-web";
 import {
   dim,
   generateRandomID,
+  LETTERS,
   log,
+  NUMS,
   removeDashesFromPhone,
   searchCustomerNames,
   searchPhoneNum,
@@ -36,8 +38,6 @@ import {
   useLoginStore,
 } from "../../stores";
 import { messagesSubscribe } from "../../db_subscriptions";
-const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
-const NUMS = "1234567890-";
 export function Info_CustomerInfoComponent({}) {
   // setters ////////////////////////////////////////////////////////////////
   const _zSetIncomingMessage = useCustMessagesStore(

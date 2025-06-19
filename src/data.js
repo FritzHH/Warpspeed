@@ -256,85 +256,15 @@ export const CUSTOMER_PREVIEW_PROTO = {
   id: "",
 };
 
-// RECEIPT
-export const RECEIPT_TYPES = {
-  workorder: "Workorder",
-  sales: "Sales",
-  intake: "Intake",
-  estimate: "Estimate",
-};
-
-export const PRINTER_NAMES = ["Left Printer", "Right Printer", "Back Printer"];
-
-export const RECEIPT_LINE_ITEM_OBJ_PROTO = {
-  itemName: "Brake Pads - Standard - BB Brand",
-  notes: "Front and back",
-  discountName: "10% Off",
-  discountSavings: "-$1.22",
-  totalPrice: "$3.23",
-  itemPrice: "1.24",
-  qty: "2",
-};
-
-export const SALES_TRANSACTION_TYPES = {
-  cash: "Cash",
-  card: "Card",
-  check: "Check",
-};
-
-export const RECEIPT_PROTO = {
-  salesTransactionBlurb: "",
-  salesTransactionType: SALES_TRANSACTION_TYPES.card,
-  heading: "",
-  dateTime: "",
-  numSalesReceipts: "2",
-  receiptNumber: "1",
-  workorderNumber: "",
-  workorderItemBrand: "",
-  workorderItemType: "",
-  workorderItemColor: "",
-  workorderNumber: "",
-  customerFirstName: "",
-  customerLastName: "",
-  customerCell: "",
-  customerLandline: "",
-  customerEmail: "",
-  customerAddress: "",
-  customerContactRestriction: "",
-  startedOnStr: "",
-  lineItemArr: [],
-  laborCharges: "",
-  partsCharges: "",
-  taxCharges: "",
-  discountTotal: "",
-  totalPrice: "",
-  customerNotes: [],
-  internalNotes: [],
-  workorderBarcode: "",
-  id: "",
-  receiptType: "",
-  location: "",
-  printerName: "",
-  barcode: "",
-  shopContactBlurb:
-    "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
-    "(239) 291-9396\n" +
-    "support@bonitabikes.com\n" +
-    "www.bonitabikes.com",
-  shopName: "Bonita Bikes LLC",
-  thankYouBlurb:
-    "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
-};
-// END RECEIPT
-
 export const INVENTORY_ITEM_PROTO = {
   formalName: "",
   informalName: "",
   price: 0,
-  salePrice: "",
-  category: INVENTORY_CATEGORIES.other,
+  salePrice: 0,
+  // category: ,
   id: "",
   upc: "",
+  cost: "",
 };
 
 export const SETTINGS_PROTO = {
@@ -585,7 +515,80 @@ export const SETTINGS_PROTO = {
       alternatePin: "jj",
     },
   ],
+  cardReaders: [{ label: "", id: "" }],
 };
+
+// RECEIPT ////////////////////////////////////////////////////
+export const RECEIPT_TYPES = {
+  workorder: "Workorder",
+  sales: "Sales",
+  intake: "Intake",
+  estimate: "Estimate",
+  register: "pop-register",
+};
+
+export const PRINTER_NAMES = ["Left Printer", "Right Printer", "Back Printer"];
+
+export const RECEIPT_LINE_ITEM_OBJ_PROTO = {
+  itemName: "Brake Pads - Standard - BB Brand",
+  notes: "Front and back",
+  discountName: "10% Off",
+  discountSavings: "-$1.22",
+  totalPrice: "$3.23",
+  itemPrice: "1.24",
+  qty: "2",
+};
+
+export const SALES_TRANSACTION_TYPES = {
+  cash: "Cash",
+  card: "Card",
+  check: "Check",
+};
+
+export const RECEIPT_PROTO = {
+  salesTransactionBlurb: "",
+  salesTransactionType: SALES_TRANSACTION_TYPES.card,
+  heading: "",
+  dateTime: "",
+  numSalesReceipts: "2",
+  receiptNumber: "1",
+  workorderNumber: "",
+  workorderItemBrand: "",
+  workorderItemType: "",
+  workorderItemColor: "",
+  workorderNumber: "",
+  customerFirstName: "",
+  customerLastName: "",
+  customerCell: "",
+  customerLandline: "",
+  customerEmail: "",
+  customerAddress: "",
+  customerContactRestriction: "",
+  startedOnStr: "",
+  lineItemArr: [],
+  laborCharges: "",
+  partsCharges: "",
+  taxCharges: "",
+  discountTotal: "",
+  totalPrice: "",
+  customerNotes: [],
+  internalNotes: [],
+  workorderBarcode: "",
+  id: "",
+  receiptType: "",
+  location: "",
+  printerName: "",
+  barcode: "",
+  shopContactBlurb:
+    "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
+    "(239) 291-9396\n" +
+    "support@bonitabikes.com\n" +
+    "www.bonitabikes.com",
+  shopName: "Bonita Bikes LLC",
+  thankYouBlurb:
+    "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
+};
+// END RECEIPT /////////////////////////////////////////////
 
 export const PRIVILEDGE_LEVELS = {
   admin: "Admin",

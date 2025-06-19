@@ -39,6 +39,10 @@ import { useRef } from "react";
 // import { isArray } from "lodash";
 const SMS_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/sendSMS";
+const PAYMENT_INTENT_URL =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createPaymentIntent";
+const STRIPE_CONNECTION_TOKEN_FIREBASE_URL =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createStripeConnectionToken";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM",
@@ -352,28 +356,58 @@ export function sendSMS(messageBody) {
 }
 
 export function getPaymentIntent(amount) {
-  return fetch(SMS_URL, {
+  return fetch(PAYMENT_INTENT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
     },
-    body: JSON.stringify(messageBody),
+    body: JSON.stringify({
+      amount: Number(amount),
+    }),
   })
     .then((res) => {
       if (!res.ok) {
         log("FETCH FAILURE IN STRIPE HERE IS THE REASON ==> ", res);
         return null;
       } else {
-        res.json().then((res) => {
-          log("STRIPE COMPLETE!", res);
+        return res.json().then((res) => {
+          log("STRIPE COMPLETE!");
           return res;
         });
       }
-      return res;
     })
-
     .catch((e) => {
       log("error in Stripe call", e);
+    });
+}
+
+export function getStripeConnectionToken(amount) {
+  return fetch(STRIPE_CONNECTION_TOKEN_FIREBASE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+    // body: JSON.stringify({
+    //   amount: Number(amount),
+    // }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        log(
+          "FETCH FAILURE IN STRIPE CONNECTION TOKEN HERE IS THE REASON ==> ",
+          res
+        );
+        return null;
+      } else {
+        return res.json().then((res) => {
+          log("STRIPE CONNECTION TOKEN COMPLETE!");
+          return res;
+        });
+      }
+    })
+    .catch((e) => {
+      log("error in Stripe CONECTION TOKEN call", e);
     });
 }

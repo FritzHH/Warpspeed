@@ -4,6 +4,7 @@ import {
   getNodeObject,
   getPaymentIntent,
   getRealtimeNodeItem,
+  getStripeConnectionToken,
   sendSMS,
   setFirestoreCollectionItem,
   setRealtimeNodeItem,
@@ -80,4 +81,9 @@ export function dbSendMessageToCustomer(messageObj) {
 
 export function dbGetStripePaymentIntent(amount) {
   return getPaymentIntent(amount);
+}
+
+export async function dbGetStripeConnectionToken() {
+  let res = await getStripeConnectionToken();
+  return res.secret;
 }

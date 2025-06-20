@@ -85,5 +85,6 @@ export function dbGetStripePaymentIntent(amount) {
 
 export async function dbGetStripeConnectionToken() {
   let res = await getStripeConnectionToken();
+  // log("token", res.secret);
   return res.secret;
 }

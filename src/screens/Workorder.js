@@ -64,6 +64,7 @@ export function WorkorderScreen() {
   const zModalVisible = useLoginStore((state) => state.getModalVisible());
   //////////////////////////////////////////////////////////////////////////////
   const [sInitFlag, _setInitFlag] = React.useState(false);
+  <script src="https://js.stripe.com/terminal/v1/"></script>;
 
   // subscribe to database listeners
   useEffect(() => {

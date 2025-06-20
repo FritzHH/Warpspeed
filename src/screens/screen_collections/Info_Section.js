@@ -37,13 +37,13 @@ export const Info_Section = ({}) => {
   };
 
   return (
-    <View style={{ height: "100%" }}>
-      <View style={{ height: "50%", backgroundColor: null }}>
-        <TopHalf />
-      </View>
-      <View style={{ height: "50%", backgroundColor: null }}>
-        <Info_CheckoutComponent />
-      </View>
+    // <View style={{ height: "100%" }}>
+    // <View style={{ height: "50%", backgroundColor: null }}>
+    // <TopHalf />
+    // </View>
+    <View style={{ height: "100%", backgroundColor: null }}>
+      <Info_CheckoutComponent />
+      {/* </View> */}
     </View>
   );
 

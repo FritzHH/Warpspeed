@@ -50,6 +50,7 @@ import { useFilePicker } from "use-file-picker";
 import { useDropzone } from "react-dropzone";
 import Dropzone from "react-dropzone";
 // import { CheckBox as RNCheckBox } from "@rneui/themed";
+import { CheckBox as RNCheckBox } from "react-native-web";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -1212,7 +1213,6 @@ export const CashSaleModalComponent = ({ amount, onCancel }) => {
       }}
     >
       <Text>Cash Sale</Text>
-      {/* <RNCheckBox title={"click"} /> */}
       <View style={{ flexDirection: "row", marginTop: 20 }}>
         <Text style={{ marginRight: 2 }}>$</Text>
         <TextInput
@@ -1238,69 +1238,77 @@ export const CashSaleModalComponent = ({ amount, onCancel }) => {
   );
 };
 
-export const CreditCardModalComponent = ({ setPaymentAmount, onCancel }) => {
-  <script src="https://js.stripe.com/terminal/v1/"></script>;
+export const CreditCardModalComponent = ({
+  setPaymentAmount,
+  onCancel,
+  zSettingsObj = SETTINGS_PROTO,
+}) => {
+  // <script src="https://js.stripe.com/terminal/v1/"></script>;
   const [sTerminal, _sSetTerminal] = useState(null);
-  const [readers, setReaders] = useState([]);
+  const [sReader, _sSetReader] = useState([]);
   const [connectedReader, setConnectedReader] = useState(null);
   const [status, setStatus] = useState("Idle");
 
-  const fetchConnectionToken = async () => {
-    const response = await fetch("http://localhost:4242/connection_token", {
-      method: "POST",
-    });
-    const data = await response.json();
-    return data.secret;
-  };
-
   useEffect(() => {
     async function initTerminal() {
-      // const terminal = await loadStripeTerminal();
-      let token = await dbGetStripeConnectionToken();
-      log("token", token);
       const terminal = StripeTerminal.create({
         onFetchConnectionToken: dbGetStripeConnectionToken,
         onUnexpectedReaderDisconnect: () => log("unexpected reader disconnect"),
       });
+      // log("termnal", terminal);
       _sSetTerminal(terminal);
-      // log("terminal", terminal);
     }
     initTerminal();
   }, []);
 
-  async function discoverReaders() {
-    // log("status", sTerminal.Connection);
-    // log("term", terminal);
-    // try {
-    const config = { simulated: false, location: "tml_GCsldAwakkr9vM" };
-    const discoverResult = await sTerminal.discoverReaders(config);
-
-    log("Discovered!", discoverResult);
-    if (discoverResult.error) {
-      console.log("Failed to discover: ", discoverResult.error);
-    } else if (discoverResult.discoveredReaders.length === 0) {
-      console.log("No available readers.");
-    } else {
-      // You should show the list of discoveredReaders to the
-      // cashier here and let them select which to connect to (see below).
-      log("discovered", discoverResult);
-      // connectReader(discoverResult);
-    }
-    // } catch (e) {
-    // log("error discovering reader", e);
-    // }
+  function doInterval() {
+    setInterval(() => {
+      if (!sTerminal) {
+        // discoverReaders();
+      }
+    }, 1000);
   }
+  doInterval();
 
   const connectReader = async (reader) => {
+    log("connecting to reader...");
     setStatus("Connecting to reader...");
     const connectResult = await sTerminal.connectReader(reader);
     if (connectResult.error) {
+      log("connect result error", connectResult.error);
       setStatus(`Error connecting: ${connectResult.error.message}`);
       return;
     }
+    log("connect result success!!", connectResult);
     setConnectedReader(connectResult.reader);
     setStatus(`Connected to ${connectResult.reader.label}`);
+    log(`Connected to ${connectResult.reader.label}`);
   };
+
+  async function discoverReaders() {
+    try {
+      const config = { simulated: false, location: "tml_GCsldAwakkr9vM" };
+      const discoverResult = await sTerminal.discoverReaders(config);
+      if (discoverResult.error) {
+        console.log("Failed to discover: ", discoverResult.error);
+      } else if (discoverResult.discoveredReaders.length === 0) {
+        console.log("No available readers.");
+      } else {
+        // log("discovered readers", discoverResult.discoveredReaders);
+        let reader = discoverResult.discoveredReaders.find(
+          (o) => o.label == zSettingsObj.selectedCardReaderObj.label
+        );
+        if (reader) {
+          _sSetReader(reader);
+          connectReader(reader);
+        }
+        log("reader", reader);
+      }
+    } catch (e) {
+      log("error discovering reader", e);
+    }
+  }
+
   //////////////////////////////////////////////////////////////////
   const [sPaymentAmount, _setPaymentAmount] = useState("2.12");
 
@@ -1570,6 +1578,28 @@ export const CheckBox = ({
   }
 
   let dim = 25;
+
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        if (makeEntireViewCheckable) {
+          _setIsChecked(!sIsChecked);
+          onCheck(item, !sIsChecked);
+        }
+      }}
+    >
+      <View style={{ flexDirection: "row" }}>
+        <RNCheckBox
+          style={{ width: 20, height: 20, marginRight: 5 }}
+          value={sIsChecked}
+          color={Colors.tabMenuButton}
+          onValueChange={_setIsChecked}
+        />
+        <Text>{text}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
     <TouchableOpacity
       onPress={() => {

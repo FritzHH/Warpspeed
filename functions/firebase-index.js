@@ -22,7 +22,7 @@ const twilioClient = require("twilio")(
 
 // Stripe
 const stripe = Stripe(
-  "sk_test_51RRLAyG8PZMnVdxFmjW3yHGYAnXkSHpxuhLxuqv9bXyznMH73X5HBElKAosjHgx6iUok0ns5j93UIIhCADDXbrgy00C3c57g3s"
+  "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"
 ); // Replace with your Stripe secret key
 
 const SMS_PROTO = {

@@ -22,22 +22,10 @@ import { cloneDeep } from "lodash";
 import {
   calculateRunningTotals,
   clog,
-  fillInventoryFromLightspeedObjArr,
   generateRandomID,
   log,
-  readJBIOrderBinary,
-  readLightspeedInventoryBinary,
 } from "../../utils";
 import { useEffect, useState } from "react";
-import {
-  CardElement,
-  CheckoutProvider,
-  Elements,
-  useElements,
-  useStripe,
-} from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
-import { dbGetStripePaymentIntent } from "../../db_calls";
 import { Colors } from "../../styles";
 
 export const Info_CheckoutComponent = ({}) => {
@@ -69,6 +57,7 @@ export const Info_CheckoutComponent = ({}) => {
     runningDiscount: "0.00",
   });
   const [sShowCreditCardModal, _sSetShowCreditCardModal] = useState(true);
+  const [sShowCashSaleModal, _sSetShowCashSaleModal] = useState(false);
 
   useEffect(() => {
     // log("z", zWorkorderObj);
@@ -116,16 +105,7 @@ export const Info_CheckoutComponent = ({}) => {
     return workorders;
   }
 
-  const stripePromise = loadStripe(
-    "pk_test_51RRLAyG8PZMnVdxFyWNM3on9DMqNo4tGT0haBl8fYnOpMrFgEplfYacqq7bAbcwgeWmIIokTNdybj6pVuUVBNcP300s7r5CIeM"
-  );
-
-  const handleCreditCardPaymentAmount = async (amount) => {
-    const paymentIntent = await dbGetStripePaymentIntent(amount);
-
-    // log("intent", paymentIntent.secret);
-    // const terminal =
-  };
+  const handleCreditCardPaymentAmount = async (amount) => {};
 
   return (
     <View
@@ -138,27 +118,25 @@ export const Info_CheckoutComponent = ({}) => {
       }}
     >
       <ScreenModal
-        buttonStyle={{
-          width: 150,
-          height: 40,
-          backgroundColor: "green",
-          borderRadius: 80,
-        }}
-        handleButtonPress={() =>
-          _sSetShowCreditCardModal(!sShowCreditCardModal)
-        }
+        buttonVisible={false}
         showOuterModal={true}
-        modalVisible={sShowCreditCardModal}
-        buttonLabel="Card"
-        Component={() => (
-          // <CreditCardModalComponent
-          //   onCancel={() => _sSetShowCreditCardModal(false)}
-          //   setPaymentAmount={handleCreditCardPaymentAmount}
-          // />
-          <CashSaleModalComponent
-            onCancel={() => _sSetShowCreditCardModal(false)}
-          />
-        )}
+        modalVisible={sShowCreditCardModal || sShowCashSaleModal}
+        // buttonLabel="Card"
+        Component={() => {
+          if (sShowCreditCardModal)
+            return (
+              <CreditCardModalComponent
+                onCancel={() => _sSetShowCreditCardModal(false)}
+                setPaymentAmount={handleCreditCardPaymentAmount}
+              />
+            );
+          return (
+            <CashSaleModalComponent
+              onCancel={() => _sSetShowCreditCardModal(false)}
+              amount={"20.45"}
+            />
+          );
+        }}
       />
 
       {/* <FileInput handleBinaryString={handleUpload} /> */}

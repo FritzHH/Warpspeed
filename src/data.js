@@ -515,7 +515,12 @@ export const SETTINGS_PROTO = {
       alternatePin: "jj",
     },
   ],
-  cardReaders: [{ label: "", id: "" }],
+  cardReaders: [{ label: "Front Right Desk", id: "tmr_GFKNEgYkwcsIFF" }],
+  selectedCardReaderObj: {
+    label: "Front Right Desk",
+    id: "tmr_GFKNEgYkwcsIFF",
+  },
+  stripeBusinessLocationCode: "tml_GCsldAwakkr9vM",
 };
 
 // RECEIPT ////////////////////////////////////////////////////

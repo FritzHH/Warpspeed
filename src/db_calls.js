@@ -1,9 +1,9 @@
-import { CUSTOMER_PREVIEW_PROTO, SMS_PROTO } from "./data";
 import {
+  cancelStripeActivePaymentIntents,
   getCollectionItem,
-  getNodeObject,
   getPaymentIntent,
   getRealtimeNodeItem,
+  getStripeActivePaymentIntents,
   getStripeConnectionToken,
   sendSMS,
   setFirestoreCollectionItem,
@@ -87,4 +87,12 @@ export async function dbGetStripeConnectionToken() {
   let res = await getStripeConnectionToken();
   // log("token", res.secret);
   return res.secret;
+}
+
+export function dbGetStripeActivePaymentIntents() {
+  return getStripeActivePaymentIntents();
+}
+
+export function dbCancelPaymentIntents(paymentIntentListArr) {
+  return cancelStripeActivePaymentIntents(paymentIntentListArr);
 }

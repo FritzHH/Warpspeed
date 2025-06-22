@@ -1,0 +1,82 @@
+{
+  "paymentIntent": {
+    "amount": "50",
+    "amount_capturable": "0",
+    "amount_details": { "tip": {} },
+    "amount_received": "50",
+    "application_fee_amount": "0",
+    "canceled_at": "0",
+    "capture_method": "automatic",
+    "charges": {
+      "data": [
+        {
+          "amount": "50",
+          "amount_refunded": "0",
+          "application_fee_amount": "0",
+          "authorization_code": "07200B",
+          "balance_transaction": "txn_3RcZeLG8PZMnVdxF0QIUHRqt",
+          "calculated_statement_descriptor": "BONITA BIKES LLC",
+          "captured": true,
+          "created": "1750543959",
+          "currency": "usd",
+          "id": "ch_3RcZeLG8PZMnVdxF0Gh57maD",
+          "livemode": true,
+          "metadata": {},
+          "paid": true,
+          "payment_intent": "pi_3RcZeLG8PZMnVdxF0HqLMBJr",
+          "payment_method": "pm_1RcZeMG8PZMnVdxFtBShGuBH",
+          "payment_method_details": {
+            "card_present": {
+              "brand": "visa",
+              "cardholder_name": "CARDHOLDER/VISA",
+              "country": "US",
+              "description": "Visa Traditional",
+              "emv_auth_data": "8A0230309F090200969F2701809F34033F00009F3501219F410400000002",
+              "exp_month": 6,
+              "exp_year": 2027,
+              "funding": "credit",
+              "incremental_authorization_supported": false,
+              "issuer": "FIRST BANK & TRUST",
+              "last4": "1984",
+              "network": "visa",
+              "preferred_locales": [],
+              "read_method": "contactless_emv",
+              "receipt": {
+                "account_type": "credit",
+                "application_cryptogram": "74471A298BA32786",
+                "application_preferred_name": "VISA Debit/Credit (Classic)",
+                "authorization_code": "07200B",
+                "authorization_response_code": "3030",
+                "cardholder_verification_method": "approval",
+                "dedicated_file_name": "A0000000031010",
+                "terminal_verification_results": "0000000000",
+                "transaction_status_information": "0000"
+              }
+            },
+            "type": "card_present"
+          },
+          "receipt_url": "https://pay.stripe.com/receipts/payment/CAcQARoXChVhY2N0XzFSUkxBeUc4UFpNblZkeEYo2NzcwgYyBqDk1RCj5josFlhsNh8-ZbTnDl3b9DxYfTH2z2V3Mahgsqju99K5jvS4dfsrksoSQm3Vgro",
+          "refunded": false,
+          "status": "succeeded"
+        }
+      ]
+    },
+    "client_secret": "pi_3RcZeLG8PZMnVdxF0HqLMBJr_secret_HqM7Zee78shKjaVDgSsjU5nI8",
+    "confirmation_method": "automatic",
+    "created": "1750543957",
+    "currency": "usd",
+    "id": "pi_3RcZeLG8PZMnVdxF0HqLMBJr",
+    "livemode": true,
+    "metadata": {},
+    "payment_method": "pm_1RcZeMG8PZMnVdxFtBShGuBH",
+    "payment_method_options": {
+      "card": { "request_three_d_secure": "automatic" },
+      "card_present": {
+        "request_extended_authorization": false,
+        "request_incremental_authorization_support": false
+      }
+    },
+    "payment_method_types": ["card_present", "card"],
+    "status": "succeeded"
+  }
+}

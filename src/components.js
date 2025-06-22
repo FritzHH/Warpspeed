@@ -17,6 +17,7 @@ import {
   log,
   NUMS,
   readAsBinaryString,
+  trimToTwoDecimals,
 } from "./utils";
 import { Colors } from "./styles";
 import { useState } from "react";
@@ -37,19 +38,19 @@ import {
   useLoginStore,
 } from "./stores";
 import {
+  dbCancelPaymentIntents,
+  dbGetStripeActivePaymentIntents,
   dbGetStripeConnectionToken,
+  dbGetStripePaymentIntent,
   dbSetInventoryItem,
   dbSetSettings,
 } from "./db_calls";
-import { setInventoryItem } from "./db";
 import { CheckoutProvider } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { loadStripeTerminal } from "@stripe/terminal-js";
 import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import { useFilePicker } from "use-file-picker";
-import { useDropzone } from "react-dropzone";
 import Dropzone from "react-dropzone";
-// import { CheckBox as RNCheckBox } from "@rneui/themed";
 import { CheckBox as RNCheckBox } from "react-native-web";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
@@ -1242,75 +1243,185 @@ export const CreditCardModalComponent = ({
   setPaymentAmount,
   onCancel,
   zSettingsObj = SETTINGS_PROTO,
+  refundObj = {
+    paymentIntent: null,
+    last4: null,
+    cardType: null,
+    totalAmount: null,
+  },
+  onCardDetailObj = () => {},
 }) => {
-  // <script src="https://js.stripe.com/terminal/v1/"></script>;
   const [sTerminal, _sSetTerminal] = useState(null);
-  const [sReader, _sSetReader] = useState([]);
-  const [connectedReader, setConnectedReader] = useState(null);
-  const [status, setStatus] = useState("Idle");
+  const [sReader, _sSetReader] = useState();
+  const [sConnectedReader, _sSetConnectedReader] = useState(null);
+  const [sStatus, _sSetStatus] = useState("");
+  const [sStatusTextColor, _sSetStatusTextColor] = useState("green");
+  const [sPaymentAmount, _setPaymentAmount] = useState(".50");
+  const [sPaymentIntent, _setPaymentIntent] = useState(null);
+  const [sReaderReady, _setReaderReady] = useState(false);
+  //////////////////////////////////////////////////////////////////
 
   useEffect(() => {
     async function initTerminal() {
       const terminal = StripeTerminal.create({
         onFetchConnectionToken: dbGetStripeConnectionToken,
-        onUnexpectedReaderDisconnect: () => log("unexpected reader disconnect"),
+        onUnexpectedReaderDisconnect: onReaderDisconnect,
       });
-      // log("termnal", terminal);
+      _sSetStatusTextColor("green");
+      _sSetStatus("Stripe Terminal found...");
       _sSetTerminal(terminal);
     }
     initTerminal();
   }, []);
 
-  function doInterval() {
-    setInterval(() => {
-      if (!sTerminal) {
-        // discoverReaders();
-      }
-    }, 1000);
-  }
-  doInterval();
-
-  const connectReader = async (reader) => {
-    log("connecting to reader...");
-    setStatus("Connecting to reader...");
-    const connectResult = await sTerminal.connectReader(reader);
-    if (connectResult.error) {
-      log("connect result error", connectResult.error);
-      setStatus(`Error connecting: ${connectResult.error.message}`);
-      return;
+  useEffect(() => {
+    if (sTerminal && !sReader) {
+      discoverReaders();
     }
-    log("connect result success!!", connectResult);
-    setConnectedReader(connectResult.reader);
-    setStatus(`Connected to ${connectResult.reader.label}`);
-    log(`Connected to ${connectResult.reader.label}`);
+  }, [sReader, sTerminal]);
+
+  const onReaderDisconnect = () => {
+    _sSetStatusTextColor("red");
+    _sSetStatus(
+      "Card Reader Disconnected! Refresh page then restart payment process."
+    );
   };
 
   async function discoverReaders() {
     try {
-      const config = { simulated: false, location: "tml_GCsldAwakkr9vM" };
+      _sSetStatusTextColor("green");
+      const config = {
+        simulated: false,
+        location: zSettingsObj.stripeBusinessLocationCode,
+      };
       const discoverResult = await sTerminal.discoverReaders(config);
       if (discoverResult.error) {
+        _sSetStatusTextColor("red");
         console.log("Failed to discover: ", discoverResult.error);
+        _sSetStatus(
+          sStatus + "\nError during device discovery: " + discoverResult.error
+        );
       } else if (discoverResult.discoveredReaders.length === 0) {
+        _sSetStatusTextColor("red");
         console.log("No available readers.");
+        _sSetStatus("No available card readers! Check connections...");
       } else {
         // log("discovered readers", discoverResult.discoveredReaders);
         let reader = discoverResult.discoveredReaders.find(
           (o) => o.label == zSettingsObj.selectedCardReaderObj.label
         );
         if (reader) {
+          _sSetStatusTextColor("green");
           _sSetReader(reader);
-          connectReader(reader);
+          if (zSettingsObj.autoConnectToCardReader) connectReader(reader);
         }
-        log("reader", reader);
+        // log("reader", reader);
       }
     } catch (e) {
+      _sSetStatusTextColor("red");
+      _sSetStatus(sStatus + "\nError discovering readers: " + e);
       log("error discovering reader", e);
     }
   }
 
-  //////////////////////////////////////////////////////////////////
-  const [sPaymentAmount, _setPaymentAmount] = useState("2.12");
+  const connectReader = async (reader) => {
+    log("connecting to reader...");
+    _sSetStatusTextColor("green");
+    _sSetStatus("Connecting to reader...");
+    const connectResult = await sTerminal.connectReader(reader, {
+      fail_if_in_use: false,
+    });
+
+    if (connectResult.error) {
+      log("connect result error", connectResult.error);
+      sTerminal.disconnectReader();
+      _sSetStatusTextColor("red");
+      _sSetStatus("STRIPE CONNECTION ERRROR: " + connectResult.error.message);
+      return;
+    }
+    // log("connect result success!!", connectResult);
+    _sSetConnectedReader(connectResult.reader);
+    _sSetStatus("Connected to: " + connectResult.reader.label);
+    _setReaderReady(true);
+    log(`Stripe Connected to ${connectResult.reader.label}`);
+  };
+
+  async function startPayment() {
+    let paymentIntent;
+    if (
+      sPaymentIntent &&
+      Number(sPaymentIntent.amount) == Number(sPaymentAmount) * 100
+    ) {
+      log("Using previous payment intent");
+      paymentIntent = sPaymentIntent;
+    } else {
+      log("Retrieving new payment intent...");
+      _sSetStatus("Retrieving secure Payment Intent...");
+      paymentIntent = await dbGetStripePaymentIntent(sPaymentAmount);
+      _setPaymentIntent(paymentIntent);
+    }
+
+    clog("Active payment intent", paymentIntent);
+    _sSetStatus("Payment Intent retrieved...");
+    let res = await sTerminal.collectPaymentMethod(
+      paymentIntent.client_secret,
+      {
+        config_override: {
+          enable_customer_cancellation: true,
+          update_payment_intent: true,
+        },
+      }
+    );
+    let paymentMethod = res.paymentIntent.payment_method;
+    const card = paymentMethod?.card_present ?? paymentMethod?.interac_present;
+    // clog("method", paymentMethod);
+    // clog("card", card);
+
+    // return;
+    const paymentResult = await sTerminal.processPayment(res.paymentIntent);
+    _setPaymentIntent(paymentResult.paymentIntent);
+    if (paymentResult.error) {
+      log("payment result error", e);
+      _sSetStatus("Payment processing error: ", e.error);
+      // Placeholder for handling result.error
+    } else if (paymentResult.paymentIntent) {
+      _sSetStatus("");
+      clog("payment result", paymentResult);
+      let intent = paymentResult.paymentIntent;
+      let res = {
+        cardType: card.brand.toUpperCase(),
+        lastFour: card.last4,
+        expMonth: card.exp_month,
+        expYear: card.exp_year,
+        issuer: card.issuer,
+        millis: new Date().getTime(),
+        amount: trimToTwoDecimals(Number(intent.amount) / 100),
+        paymentIntent: intent.id,
+      };
+      log("payment detail obj", res);
+      onCardDetailObj(res);
+      onCancel();
+
+      // Placeholder for notifying your backend to capture result.paymentIntent.id
+    }
+  }
+
+  async function startRefund() {}
+
+  const cancelReaderAction = async () => {
+    log("canceling reader action");
+    _sSetStatus("Canceling reader sale...");
+    _setReaderReady(false);
+    try {
+      await sTerminal.disconnectReader();
+      _sSetStatus("Sale Canceled!");
+      connectReader(sReader);
+    } catch (e) {
+      _sSetStatus("Error canceling sale. Please refresh page.");
+      log("error disconnecting", e);
+    }
+    onCancel();
+  };
 
   function handleTextChange(val) {
     if (LETTERS.includes(val[val.length - 1])) return;
@@ -1323,18 +1434,42 @@ export const CreditCardModalComponent = ({
         alignItems: "center",
         paddingTop: 20,
         width: 500,
-        height: 300,
-        backgroundColor: "lightgray",
+        height: 350,
+        backgroundColor: "white",
       }}
     >
-      <Text>Credit Card Sale</Text>
-      <View style={{ flexDirection: "row", marginTop: 20 }}>
-        <Text style={{ marginRight: 2 }}>$</Text>
+      <Text
+        style={{
+          fontSize: 30,
+          color: "dimgray",
+        }}
+      >
+        Credit Card Sale
+      </Text>
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: "dimgray",
+          flexDirection: "row",
+          marginTop: 20,
+          width: 100,
+          paddingVertical: 5,
+          paddingHorizontal: 3,
+        }}
+      >
+        <Text style={{ fontSize: 15, marginRight: 5 }}>$</Text>
         <TextInput
-          placeholder="Enter card amount..."
-          placeholderTextColor={"gray"}
+          style={{
+            width: "100%",
+            outlineWidth: 0,
+            fontSize: 25,
+            textAlign: "right",
+          }}
+          placeholder="0.00"
+          placeholderTextColor={"darkgray"}
           value={sPaymentAmount}
           onChangeText={handleTextChange}
+          onFocus={() => _setPaymentAmount("")}
         />
       </View>
       <View
@@ -1345,13 +1480,40 @@ export const CreditCardModalComponent = ({
           marginTop: 20,
         }}
       >
-        <Button onPress={discoverReaders} text={"Reader"} />
+        {/* <Button onPress={discoverReaders} text={"Reader"} /> */}
         <Button
-          onPress={() => setPaymentAmount(sPaymentAmount)}
-          text={"Process Amount"}
+          onPress={() => {
+            refundObj.cardType ? startRefund() : startPayment();
+          }}
+          text={refundObj.cardType ? "Process Refund" : "Process Amount"}
         />
-        <Button onPress={onCancel} text={"Cancel"} />
+        <Button onPress={cancelReaderAction} text={"Cancel"} />
       </View>
+      <Text
+        style={{
+          width: "80%",
+          textAlign: "center",
+          marginTop: 20,
+          color: "dimgray",
+        }}
+      >
+        {"Status:"}
+      </Text>
+      <Text
+        style={{
+          width: "80%",
+          textAlign: "center",
+          marginTop: 13,
+          color: sStatusTextColor,
+        }}
+      >
+        {sStatus}
+      </Text>
+      {sReaderReady ? (
+        <Text style={{ marginTop: 5, fontSize: 22, color: "green" }}>
+          Ready for Payment!
+        </Text>
+      ) : null}
     </View>
   );
 };

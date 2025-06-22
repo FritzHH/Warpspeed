@@ -39,10 +39,14 @@ import { useRef } from "react";
 // import { isArray } from "lodash";
 const SMS_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/sendSMS";
-const PAYMENT_INTENT_URL =
+const STRIPE_CREATE_PAYMENT_INTENT_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createPaymentIntent";
 const STRIPE_CONNECTION_TOKEN_FIREBASE_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createStripeConnectionToken";
+const STRIPE_ACTIVE_PAYMENT_INTENTS_URL =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/getActivePaymentIntents";
+const STRIPE_CANCEL_PAYMENT_INTENT_URL =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/cancelPaymentIntent";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM",
@@ -356,7 +360,7 @@ export function sendSMS(messageBody) {
 }
 
 export function getPaymentIntent(amount) {
-  return fetch(PAYMENT_INTENT_URL, {
+  return fetch(STRIPE_CREATE_PAYMENT_INTENT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -368,21 +372,24 @@ export function getPaymentIntent(amount) {
   })
     .then((res) => {
       if (!res.ok) {
-        log("FETCH FAILURE IN STRIPE HERE IS THE REASON ==> ", res);
+        log(
+          "FETCH FAILURE IN STRIPE GET PAYMENT INTENT HERE IS THE REASON ==> ",
+          res
+        );
         return null;
       } else {
         return res.json().then((res) => {
-          log("STRIPE COMPLETE!");
+          log("STRIPE FETCH PAYMENT COMPLETE!");
           return res;
         });
       }
     })
     .catch((e) => {
-      log("error in Stripe call", e);
+      log("error in Stripe GET PAYMENT INTENT call", e);
     });
 }
 
-export function getStripeConnectionToken(amount) {
+export function getStripeConnectionToken() {
   return fetch(STRIPE_CONNECTION_TOKEN_FIREBASE_URL, {
     method: "POST",
     headers: {
@@ -409,5 +416,67 @@ export function getStripeConnectionToken(amount) {
     })
     .catch((e) => {
       log("error in Stripe CONECTION TOKEN call", e);
+    });
+}
+
+export function getStripeActivePaymentIntents() {
+  return fetch(STRIPE_ACTIVE_PAYMENT_INTENTS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+    // body: JSON.stringify({
+    //   amount: Number(amount),
+    // }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        log(
+          "FETCH FAILURE IN STRIPE GET ACTIVE PAYMENT INTENTS HERE IS THE REASON ==> ",
+          res
+        );
+        return null;
+      } else {
+        return res.json().then((res) => {
+          log("STRIPE GETTING ACTIVE PAYMENT INTENTS COMPLETE!");
+          return res;
+        });
+      }
+    })
+    .catch((e) => {
+      log("error in Stripe GET ACTIVE PAYMENT INTENTS call", e);
+    });
+}
+
+export function cancelStripeActivePaymentIntents(paymentIntentSecretArr) {
+  return fetch(STRIPE_CANCEL_PAYMENT_INTENT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+    body: paymentIntentSecretArr
+      ? JSON.stringify({
+          intentList: paymentIntentSecretArr,
+        })
+      : null,
+  })
+    .then((res) => {
+      if (!res.ok) {
+        log(
+          "FETCH FAILURE IN STRIPE CANCEL ACTIVE PAYMENT INTENTS HERE IS THE REASON ==> ",
+          res
+        );
+        return res;
+      } else {
+        return res.json().then((res) => {
+          log("STRIPE CANCEL ACTIVE PAYMENTS INTENTS COMPLETE!");
+          return res;
+        });
+      }
+    })
+    .catch((e) => {
+      log("error in Stripe CANCEL ACTIVE PAYMENT INTENTS call", e);
     });
 }

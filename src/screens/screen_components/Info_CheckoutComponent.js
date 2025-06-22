@@ -17,6 +17,7 @@ import {
   FileInput,
   PaymentComponent,
   ScreenModal,
+  SHADOW_RADIUS_PROTO,
 } from "../../components";
 import { cloneDeep } from "lodash";
 import {
@@ -58,6 +59,14 @@ export const Info_CheckoutComponent = ({}) => {
   });
   const [sShowCreditCardModal, _sSetShowCreditCardModal] = useState(true);
   const [sShowCashSaleModal, _sSetShowCashSaleModal] = useState(false);
+  const [sStripeTerminalReady, _sSetStripeTerminalReady] = useState(false);
+  const [sCardPaymenDetailsObj, _sSetCardPaymentDetailsObj] = useState({
+    cardType: "",
+    lastFour: "",
+    expMonth: "",
+    expYear: "",
+    issuer: "",
+  });
 
   useEffect(() => {
     // log("z", zWorkorderObj);
@@ -75,6 +84,11 @@ export const Info_CheckoutComponent = ({}) => {
     );
     // log("others", otherWorkorders);
   }, []);
+
+  // for testing, wait for stripe terminal to load
+  useEffect(() => {
+    if (zInventoryArr.length > 0) _sSetStripeTerminalReady(true);
+  }, [zInventoryArr]);
 
   function actionButtonPressed() {
     _zSetIsCheckingOut(!zIsCheckingOut);
@@ -121,13 +135,16 @@ export const Info_CheckoutComponent = ({}) => {
         buttonVisible={false}
         showOuterModal={true}
         modalVisible={sShowCreditCardModal || sShowCashSaleModal}
+        showShadow={true}
+        shadowStyle={{ ...SHADOW_RADIUS_PROTO }}
         // buttonLabel="Card"
         Component={() => {
-          if (sShowCreditCardModal)
+          if (sShowCreditCardModal && sStripeTerminalReady)
             return (
               <CreditCardModalComponent
                 onCancel={() => _sSetShowCreditCardModal(false)}
                 setPaymentAmount={handleCreditCardPaymentAmount}
+                onCardDetailObj={(val) => _sSetCardPaymentDetailsObj(val)}
               />
             );
           return (

@@ -161,9 +161,43 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
 }
 
 export function trimToTwoDecimals(num) {
+  log("incoming num", num);
   // num = "4";
   // log("trimming", num);
   let strNum = num.toString();
+  let res = "";
+  if (strNum.includes(".")) {
+    let split = strNum.split(".");
+    log("split", split);
+    let countOnRight = split[1].length;
+    if (countOnRight == 2) {
+      log("one");
+      if (split[0] == "") strNum = "0" + strNum;
+      return strNum;
+      return strNum;
+    } else if (countOnRight == 1) {
+      log("two");
+      let res = strNum + "0";
+      if (split[0] == "") res = "0" + res;
+      return res;
+    } else if (countOnRight == 0 && split[1] != "") {
+      log("three");
+      return strNum + "00";
+    } else {
+      log("four");
+      let last2 = split[1].slice(0, 2);
+      let res = split[0] + "." + last2;
+      // log("zero", split[0]);
+      if (split[0] == "") res = "0" + res;
+      // log("res", res);
+      return res;
+    }
+  }
+
+  return strNum + ".00";
+
+  return;
+
   let split = strNum.split(".");
 
   // log("split", split);

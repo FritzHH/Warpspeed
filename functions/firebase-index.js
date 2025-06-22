@@ -5,6 +5,7 @@ const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
 const serviceAccount = require("./creds.json");
 const Stripe = require("stripe");
+const { isArray } = require("lodash");
 
 // firebase
 admin.initializeApp({
@@ -23,7 +24,11 @@ const twilioClient = require("twilio")(
 // Stripe
 const stripe = Stripe(
   "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"
-); // Replace with your Stripe secret key
+); // Secret key
+
+// const stripe = Stripe(
+//   "sk_test_51RRLAyG8PZMnVdxFmjW3yHGYAnXkSHpxuhLxuqv9bXyznMH73X5HBElKAosjHgx6iUok0ns5j93UIIhCADDXbrgy00C3c57g3s"
+// ); // Test key
 
 const SMS_PROTO = {
   firstName: "",
@@ -81,13 +86,14 @@ const sendTwilioMessage = (messageObj) => {
       return null;
     });
 };
+
 exports.createPaymentIntent = onRequest({ cors: true }, async (req, res) => {
   log("payment intent request body", req.body);
   let body = req.body;
   try {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Number(body.amount) * 100,
-      payment_method_types: ["card_present"],
+      payment_method_types: ["card_present", "card", "link"],
       capture_method: req.body.captureMethod || "automatic",
       currency: "usd",
     });
@@ -98,6 +104,76 @@ exports.createPaymentIntent = onRequest({ cors: true }, async (req, res) => {
   }
 });
 
+exports.createRefund = onRequest({ cors: true }, async (req, res) => {
+  log("creating refund");
+  try {
+    const refund = await stripe.refunds.create({
+      payment_intent: req.body.paymentIntent,
+      amount: Number(req.body.amount),
+    });
+    log("refund successful", refund);
+    res.status(200).send(refund);
+  } catch (e) {
+    res.status(500).send({ error: e.message });
+  }
+});
+
+exports.getActivePaymentIntents = onRequest(
+  { cors: true },
+  async (req, res) => {
+    log("getting active payment intents");
+    try {
+      let paymentIntents = await stripe.paymentIntents.list();
+      res.status(200).send(paymentIntents);
+    } catch (error) {
+      log("stripe error", error.message);
+      res.status(500).send({ error: error.message });
+    }
+  }
+);
+
+exports.cancelCardReaderAction = onRequest({ cors: true }, async (req, res) => {
+  try {
+    res = await stripe.terminal.readers.cancelAction(req.body.reader);
+    log("Result canceling card reader action", res);
+    res.status(200).send("Server says finished canceling card reader action!");
+  } catch (e) {
+    log("Error canceling card reader action", e);
+    res
+      .status(500)
+      .send("Server says error canceling card reader action: " + e.message);
+  }
+});
+
+exports.cancelPaymentIntent = onRequest({ cors: true }, async (req, res) => {
+  try {
+    let intentList = req.body.intentList;
+    if (intentList && isArray(intentList)) {
+      log("canceling these payment intents from APP", intentList);
+      intentList.forEach(async (intentSecret) => {
+        await stripe.paymentIntents.cancel(intentSecret);
+      });
+    } else {
+      log("getting all active payment intents to cancel");
+      let paymentIntents = await stripe.paymentIntents.list();
+      log("payment intents", paymentIntents);
+      // paymentIntents = await paymentIntents;
+      paymentIntents.data.forEach(async (intent) => {
+        log("intent to cancel", intent.id);
+        try {
+          let res = await stripe.paymentIntents.cancel(intent.id);
+          log("Result canceling payment intent", res);
+        } catch (e) {
+          log("Error canceling payment intent", e);
+        }
+      });
+    }
+    res.status(200).send("finished canceling intents");
+  } catch (error) {
+    log("stripe error", error.message);
+    res.status(500).send({ error: error.message });
+  }
+});
 exports.createStripeConnectionToken = onRequest(
   { cors: true },
   async (req, res) => {

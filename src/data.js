@@ -521,6 +521,7 @@ export const SETTINGS_PROTO = {
     id: "tmr_GFKNEgYkwcsIFF",
   },
   stripeBusinessLocationCode: "tml_GCsldAwakkr9vM",
+  autoConnectToCardReader: "true",
 };
 
 // RECEIPT ////////////////////////////////////////////////////

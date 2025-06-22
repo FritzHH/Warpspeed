@@ -41,7 +41,7 @@ import {
   useLoginStore,
 } from "../stores";
 
-export function WorkorderScreen() {
+export function BaseScreen() {
   // setters ////////////////////////////////////////////////////////////////
   const _zModCustPreviewItem = useCustomerPreviewStore(
     (state) => state.modItem

@@ -42,6 +42,7 @@ import {
   dbGetStripeActivePaymentIntents,
   dbGetStripeConnectionToken,
   dbGetStripePaymentIntent,
+  dbProcessServerDrivenStripePayment,
   dbSetInventoryItem,
   dbSetSettings,
 } from "./db_calls";
@@ -1208,9 +1209,9 @@ export const CashSaleModalComponent = ({ amount, onCancel }) => {
       style={{
         alignItems: "center",
         paddingTop: 20,
-        width: 500,
-        height: 300,
-        backgroundColor: "lightgray",
+        width: 600,
+        height: 400,
+        backgroundColor: "white",
       }}
     >
       <Text>Cash Sale</Text>
@@ -1247,7 +1248,7 @@ export const CreditCardModalComponent = ({
     paymentIntent: null,
     last4: null,
     cardType: null,
-    totalAmount: null,
+    originalAmount: null,
   },
   onCardDetailObj = () => {},
 }) => {
@@ -1261,24 +1262,24 @@ export const CreditCardModalComponent = ({
   const [sReaderReady, _setReaderReady] = useState(false);
   //////////////////////////////////////////////////////////////////
 
-  useEffect(() => {
-    async function initTerminal() {
-      const terminal = StripeTerminal.create({
-        onFetchConnectionToken: dbGetStripeConnectionToken,
-        onUnexpectedReaderDisconnect: onReaderDisconnect,
-      });
-      _sSetStatusTextColor("green");
-      _sSetStatus("Stripe Terminal found...");
-      _sSetTerminal(terminal);
-    }
-    initTerminal();
-  }, []);
+  // useEffect(() => {
+  //   async function initTerminal() {
+  //     const terminal = StripeTerminal.create({
+  //       onFetchConnectionToken: dbGetStripeConnectionToken,
+  //       onUnexpectedReaderDisconnect: onReaderDisconnect,
+  //     });
+  //     _sSetStatusTextColor("green");
+  //     _sSetStatus("Stripe token fetched...");
+  //     _sSetTerminal(terminal);
+  //   }
+  //   initTerminal();
+  // }, []);
 
-  useEffect(() => {
-    if (sTerminal && !sReader) {
-      discoverReaders();
-    }
-  }, [sReader, sTerminal]);
+  // useEffect(() => {
+  //   if (sTerminal && !sReader) {
+  //     discoverReaders();
+  //   }
+  // }, [sReader, sTerminal]);
 
   const onReaderDisconnect = () => {
     _sSetStatusTextColor("red");
@@ -1303,14 +1304,18 @@ export const CreditCardModalComponent = ({
         );
       } else if (discoverResult.discoveredReaders.length === 0) {
         _sSetStatusTextColor("red");
-        console.log("No available readers.");
+        console.log("No available Stripe readers.");
         _sSetStatus("No available card readers! Check connections...");
       } else {
-        // log("discovered readers", discoverResult.discoveredReaders);
+        log(
+          "discovered Stripe readers array",
+          discoverResult.discoveredReaders
+        );
         let reader = discoverResult.discoveredReaders.find(
           (o) => o.label == zSettingsObj.selectedCardReaderObj.label
         );
         if (reader) {
+          log("Our Stripe reader: ", reader);
           _sSetStatusTextColor("green");
           _sSetReader(reader);
           if (zSettingsObj.autoConnectToCardReader) connectReader(reader);
@@ -1326,24 +1331,24 @@ export const CreditCardModalComponent = ({
 
   const connectReader = async (reader) => {
     log("connecting to reader...");
-    _sSetStatusTextColor("green");
     _sSetStatus("Connecting to reader...");
     const connectResult = await sTerminal.connectReader(reader, {
-      fail_if_in_use: false,
+      fail_if_in_use: true,
     });
 
     if (connectResult.error) {
-      log("connect result error", connectResult.error);
-      sTerminal.disconnectReader();
       _sSetStatusTextColor("red");
+      log("Stripe terminal connect result error", connectResult.error);
+      sTerminal.disconnectReader();
       _sSetStatus("STRIPE CONNECTION ERRROR: " + connectResult.error.message);
       return;
     }
     // log("connect result success!!", connectResult);
+    _sSetStatusTextColor("green");
     _sSetConnectedReader(connectResult.reader);
-    _sSetStatus("Connected to: " + connectResult.reader.label);
+    _sSetStatus("Connected to card reader: " + connectResult.reader.label);
     _setReaderReady(true);
-    log(`Stripe Connected to ${connectResult.reader.label}`);
+    log(`Stripe successfully connected to ${connectResult.reader.label}`);
   };
 
   async function startPayment() {
@@ -1405,6 +1410,17 @@ export const CreditCardModalComponent = ({
       // Placeholder for notifying your backend to capture result.paymentIntent.id
     }
   }
+
+  async function startServerDrivenStripePaymentIntent() {
+    log("starting server driven payment attempt");
+    let readerResult = dbProcessServerDrivenStripePayment(
+      sPaymentAmount,
+      "tmr_GFPsvwVUtvBZsJ"
+    );
+    log("reader result", readerResult);
+  }
+
+  async function cancelServerDrivenStripePaymentIntent() {}
 
   async function startRefund() {}
 
@@ -1483,7 +1499,9 @@ export const CreditCardModalComponent = ({
         {/* <Button onPress={discoverReaders} text={"Reader"} /> */}
         <Button
           onPress={() => {
-            refundObj.cardType ? startRefund() : startPayment();
+            refundObj.cardType
+              ? startRefund()
+              : startServerDrivenStripePaymentIntent();
           }}
           text={refundObj.cardType ? "Process Refund" : "Process Amount"}
         />

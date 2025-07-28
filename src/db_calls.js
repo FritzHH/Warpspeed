@@ -5,6 +5,8 @@ import {
   getRealtimeNodeItem,
   getStripeActivePaymentIntents,
   getStripeConnectionToken,
+  processPaymentIntent,
+  processServerDrivenStripePayment,
   sendSMS,
   setFirestoreCollectionItem,
   setRealtimeNodeItem,
@@ -75,6 +77,7 @@ export function dbGetCustomerObj(id) {
 
 // firebase functions ///////////////////////////////////////////////
 
+// client driven (old)
 export function dbSendMessageToCustomer(messageObj) {
   return sendSMS(messageObj);
 }
@@ -95,4 +98,9 @@ export function dbGetStripeActivePaymentIntents() {
 
 export function dbCancelPaymentIntents(paymentIntentListArr) {
   return cancelStripeActivePaymentIntents(paymentIntentListArr);
+}
+
+// server driven (new)
+export function dbProcessServerDrivenStripePayment(saleAmount, terminalID) {
+  let reader = processServerDrivenStripePayment(saleAmount, terminalID);
 }

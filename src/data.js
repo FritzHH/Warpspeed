@@ -515,7 +515,10 @@ export const SETTINGS_PROTO = {
       alternatePin: "jj",
     },
   ],
-  cardReaders: [{ label: "Front Right Desk", id: "tmr_GFKNEgYkwcsIFF" }],
+  cardReaders: [
+    { label: "Front Right Desk", id: "tmr_GFKNEgYkwcsIFF" },
+    { label: "Front Left Desk", id: "" },
+  ],
   selectedCardReaderObj: {
     label: "Front Right Desk",
     id: "tmr_GFKNEgYkwcsIFF",

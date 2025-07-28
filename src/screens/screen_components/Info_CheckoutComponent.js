@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { FlatList, View, Text } from "react-native-web";
 import { TAB_NAMES, WORKORDER_PROTO } from "../../data";
 import {
@@ -57,7 +58,7 @@ export const Info_CheckoutComponent = ({}) => {
     runningTotal: "0.00",
     runningDiscount: "0.00",
   });
-  const [sShowCreditCardModal, _sSetShowCreditCardModal] = useState(true);
+  const [sShowCreditCardModal, _sSetShowCreditCardModal] = useState(false);
   const [sShowCashSaleModal, _sSetShowCashSaleModal] = useState(false);
   const [sStripeTerminalReady, _sSetStripeTerminalReady] = useState(false);
   const [sCardPaymenDetailsObj, _sSetCardPaymentDetailsObj] = useState({
@@ -66,6 +67,7 @@ export const Info_CheckoutComponent = ({}) => {
     expMonth: "",
     expYear: "",
     issuer: "",
+    transactionNum: "",
   });
 
   useEffect(() => {
@@ -139,7 +141,7 @@ export const Info_CheckoutComponent = ({}) => {
         shadowStyle={{ ...SHADOW_RADIUS_PROTO }}
         // buttonLabel="Card"
         Component={() => {
-          if (sShowCreditCardModal && sStripeTerminalReady)
+          if (sShowCreditCardModal)
             return (
               <CreditCardModalComponent
                 onCancel={() => _sSetShowCreditCardModal(false)}
@@ -149,7 +151,7 @@ export const Info_CheckoutComponent = ({}) => {
             );
           return (
             <CashSaleModalComponent
-              onCancel={() => _sSetShowCreditCardModal(false)}
+              onCancel={() => _sSetShowCashSaleModal(false)}
               amount={"20.45"}
             />
           );
@@ -162,7 +164,7 @@ export const Info_CheckoutComponent = ({}) => {
           <PaymentComponent1 />
         </Elements>
       </View> */}
-      {!zIsCheckingOut ? (
+      {/* {!zIsCheckingOut ? (
         <View
           style={{
             height: "85%",
@@ -174,115 +176,118 @@ export const Info_CheckoutComponent = ({}) => {
           }}
         ></View>
       ) : null}
-      {zIsCheckingOut ? (
+      {zIsCheckingOut ? ( */}
+      <View
+        style={{
+          height: "85%",
+          width: "100%",
+          backgroundColor: "blue",
+          alignItems: "center",
+          justifyContent: "flex-start",
+        }}
+      >
         <View
           style={{
-            height: "85%",
+            height: "20%",
             width: "100%",
+            backgroundColor: "white",
+            justifyContent: "space-around",
             alignItems: "center",
-            justifyContent: "flex-start",
+            flexDirection: "column",
           }}
         >
-          <View
-            style={{
-              height: "20%",
-              width: "100%",
-              // backgroundColor: "white",
-              justifyContent: "space-around",
-              alignItems: "center",
-              flexDirection: "row",
+          <Button
+            textStyle={{ color: "white" }}
+            buttonStyle={{
+              width: 200,
+              height: 40,
+              backgroundColor: "green",
+              borderRadius: 80,
             }}
-          >
-            {/* <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                width: 150,
-                height: 40,
-                backgroundColor: "green",
-                borderRadius: 80,
-              }}
-              text={"Card"}
-            /> */}
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                width: 200,
-                height: 40,
-                backgroundColor: "green",
-                borderRadius: 80,
-              }}
-              text={"Cash / Check"}
-            />
-          </View>
-          <View
-            style={{
-              height: "80%",
-              backgroundColor: null,
-              width: "100%",
-              // flexDirection: "row",
+            text={"Cash / Check"}
+            onPress={() => _sSetShowCashSaleModal(true)}
+          />
+          <Button
+            textStyle={{ color: "white" }}
+            buttonStyle={{
+              width: 150,
+              height: 40,
+              backgroundColor: "green",
+              borderRadius: 80,
             }}
-          >
-            <FlatList
-              data={getAllCustomerOpenWorkorders()}
-              renderItem={(item, index) => {
-                item = item.item;
-                let total = calculateRunningTotals(item, zInventoryArr);
-                return (
-                  <View
-                    style={{
-                      width: "100%",
-                      flexDirection: "row",
-                    }}
-                  >
-                    <View style={{ width: "95%" }}>
-                      <View style={{ flexDirection: "row" }}>
-                        <Text style={{ marginRight: 10 }}>
-                          {item.brand || "No brand..."}
-                        </Text>
-                        <Text>{item.description || "No description..."}</Text>
-                      </View>
-                      <View
-                        style={{
-                          width: "90%",
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                          <Text style={{ fontWeight: 400 }}>Num. Items: </Text>
-                          {total.runningQty}
-                        </Text>
-                        <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                          <Text style={{ fontWeight: 400 }}>Discount: </Text>
-                          {total.runningDiscount}
-                        </Text>
-                        <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                          <Text style={{ fontWeight: 400 }}>Total: </Text>
-                          {total.runningTotal}
-                        </Text>
-                      </View>
+            text={"Card"}
+            onPress={() => _sSetShowCreditCardModal(true)}
+          />
+        </View>
+        <View
+          style={{
+            height: "80%",
+            backgroundColor: null,
+            width: "100%",
+            // flexDirection: "row",
+          }}
+        >
+          <FlatList
+            data={getAllCustomerOpenWorkorders()}
+            renderItem={(item, index) => {
+              item = item.item;
+              let total = calculateRunningTotals(item, zInventoryArr);
+              return (
+                <View
+                  style={{
+                    width: "100%",
+                    flexDirection: "row",
+                  }}
+                >
+                  <View style={{ width: "95%" }}>
+                    <View style={{ flexDirection: "row" }}>
+                      <Text style={{ marginRight: 10 }}>
+                        {item.brand || "No brand..."}
+                      </Text>
+                      <Text>{item.description || "No description..."}</Text>
                     </View>
                     <View
                       style={{
-                        width: "5%",
-                        justifyContent: "center",
-                        height: "100%",
-                        alignItems: "center",
-                        // backgroundColor: "green",
+                        width: "90%",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
                       }}
                     >
-                      <CheckBox
-                        onCheck={() => {}}
-                        buttonStyle={{ marginRight: 10 }}
-                      />
+                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                        <Text style={{ fontWeight: 400 }}>Num. Items: </Text>
+                        {total.runningQty}
+                      </Text>
+                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                        <Text style={{ fontWeight: 400 }}>Discount: </Text>
+                        {total.runningDiscount}
+                      </Text>
+                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                        <Text style={{ fontWeight: 400 }}>Total: </Text>
+                        {total.runningTotal}
+                      </Text>
                     </View>
                   </View>
-                );
-              }}
-            />
-          </View>
+                  <View
+                    style={{
+                      width: "5%",
+                      justifyContent: "center",
+                      height: "100%",
+                      alignItems: "center",
+                      // backgroundColor: "green",
+                    }}
+                  >
+                    <CheckBox
+                      onCheck={() => {}}
+                      buttonStyle={{ marginRight: 10 }}
+                    />
+                  </View>
+                </View>
+              );
+            }}
+          />
         </View>
-      ) : null}
+      </View>
+      {/* ) : null} */}
       <View
         style={{
           width: "100%",
@@ -300,7 +305,7 @@ export const Info_CheckoutComponent = ({}) => {
           text={"Start Workorder"}
           onPress={actionButtonPressed}
         />
-        <Button
+        {/* <Button
           textStyle={{ color: "white" }}
           buttonStyle={{
             backgroundColor: Colors.tabMenuButton,
@@ -309,7 +314,7 @@ export const Info_CheckoutComponent = ({}) => {
           }}
           text={!zWorkorderObj?.isStandaloneSale ? "New Sale" : "Cancel Sale"}
           onPress={actionButtonPressed}
-        />
+        /> */}
       </View>
     </View>
   );

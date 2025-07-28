@@ -45,8 +45,10 @@ const STRIPE_CONNECTION_TOKEN_FIREBASE_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createStripeConnectionToken";
 const STRIPE_ACTIVE_PAYMENT_INTENTS_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/getActivePaymentIntents";
-const STRIPE_CANCEL_PAYMENT_INTENT_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/cancelPaymentIntent";
+const STRIPE_CANCEL_PAYMENT_INTENT_URL = "";
+("https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/cancelPaymentIntent");
+const STRIPE_PROCESS_SERVER_DRIVEN_PAYMENT =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/processServerDrivenStripePayment";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM",
@@ -359,6 +361,7 @@ export function sendSMS(messageBody) {
     });
 }
 
+// client driven (old)
 export function getPaymentIntent(amount) {
   return fetch(STRIPE_CREATE_PAYMENT_INTENT_URL, {
     method: "POST",
@@ -478,5 +481,37 @@ export function cancelStripeActivePaymentIntents(paymentIntentSecretArr) {
     })
     .catch((e) => {
       log("error in Stripe CANCEL ACTIVE PAYMENT INTENTS call", e);
+    });
+}
+
+// server driven (new)
+export function processServerDrivenStripePayment(saleAmount, terminalID) {
+  return fetch(STRIPE_PROCESS_SERVER_DRIVEN_PAYMENT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+    body: JSON.stringify({
+      amount: Number(saleAmount),
+      readerID: terminalID,
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        log(
+          "FETCH FAILURE IN STRIPE PROCESS SERVER DRIVEN PAYMENT HERE IS THE REASON ==> ",
+          res
+        );
+        return null;
+      } else {
+        return res.json().then((reader) => {
+          log("STRIPE SERVER DRIVEN PAYMENT PROCESS COMPLETE!", reader);
+          return reader;
+        });
+      }
+    })
+    .catch((e) => {
+      log("error in Stripe processServerDrivenStripePayment() call", e);
     });
 }

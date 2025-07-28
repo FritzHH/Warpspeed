@@ -22,9 +22,9 @@ const twilioClient = require("twilio")(
 );
 
 // Stripe
-const stripe = Stripe(
-  "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"
-); // Secret key
+// const stripe = Stripe(
+//   "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"
+// ); // Secret key
 
 // const stripe = Stripe(
 //   "sk_test_51RRLAyG8PZMnVdxFmjW3yHGYAnXkSHpxuhLxuqv9bXyznMH73X5HBElKAosjHgx6iUok0ns5j93UIIhCADDXbrgy00C3c57g3s"
@@ -87,6 +87,106 @@ const sendTwilioMessage = (messageObj) => {
     });
 };
 
+// server driven (new)
+exports.processServerDrivenStripePayment = onRequest(
+  { cors: true },
+  async (req, res) => {
+    log("Processing server-driven payment", req.body);
+    let body = req.body;
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Number(body.amount) * 100,
+        payment_method_types: ["card_present", "card", "link"],
+        capture_method: req.body.captureMethod || "automatic",
+        currency: "usd",
+      });
+      log(
+        "Payment intent gathered, processing Stripe server-driven payment intent",
+        paymentIntent
+      );
+
+      var attempt = 0;
+      const tries = 3;
+      while (true) {
+        attempt++;
+        try {
+          const reader = await stripe.terminal.readers.processPaymentIntent(
+            body.readerID,
+            {
+              payment_intent: paymentIntent.id,
+            }
+          );
+          log("Stripe server-driven payment process complete!", reader);
+          return sendSuccessfulResult(res, reader);
+        } catch (error) {
+          log("Stripe server-driven payment process ERROR ERROR ERROR!", error);
+          console.log(error);
+          switch (error.code) {
+            // case "terminal_reader_timeout":
+            //   // Temporary networking blip, automatically retry a few times.
+            //   if (attempt == tries) {
+            //     return res.status(500).send(error);
+            //   }
+            //   break;
+            // case "terminal_reader_offline":
+            //   // Reader is offline and won't respond to API requests. Make sure the reader is powered on
+            //   // and connected to the internet before retrying.
+            //   return res.status(500).send(error);
+            // case "terminal_reader_busy":
+            //   // Reader is currently busy processing another request, installing updates or changing settings.
+            //   // Remember to disable the pay button in your point-of-sale application while waiting for a
+            //   // reader to respond to an API request.
+            //   return res.status(500).send(error);
+            // case "intent_invalid_state":
+            //   // Check PaymentIntent status because it's not ready to be processed. It might have been already
+            //   // successfully processed or canceled.
+            //   const paymentIntent = await stripe.paymentIntents.retrieve(
+            //     req.body.payment_intent_id
+            //   );
+            // console.log(
+            //   "PaymentIntent is already in " +
+            //     paymentIntent.status +
+            //     " state."
+            // );
+            // return res.status(500).send(error);
+            default:
+              return sendUnsuccessfulResult(res, error);
+          }
+        }
+      }
+    } catch (error) {
+      log("stripe server driven payment attempt error", error.message);
+      return sendUnsuccessfulResult(res, error);
+    }
+  }
+);
+
+const checkForWebhook = async () => {
+  try {
+    const webhookEndpoints = await stripe.webhookEndpoints.list();
+    log("Webhook Endpoints:", webhookEndpoints.data);
+    return webhookEndpoints.data;
+  } catch (error) {
+    console.error("Error listing webhook endpoints:", error);
+    return [];
+  }
+};
+checkForWebhook();
+
+// stripe.webhookEndpoints.create({
+//   enabled_events: [
+//     "terminal.reader.action_succeeded",
+//     "terminal.reader.action_failed",
+//   ],
+//   url: "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/stripeEventWebhook",
+// });
+
+exports.stripeEventWebhook = onRequest({ cors: true }, async (req, res) => {
+  log("Incoming Stripe webhook event body", req.body);
+});
+
+////////////////////////////////////////////////////////////////////////
+// client driven (old)
 exports.createPaymentIntent = onRequest({ cors: true }, async (req, res) => {
   log("payment intent request body", req.body);
   let body = req.body;
@@ -174,6 +274,7 @@ exports.cancelPaymentIntent = onRequest({ cors: true }, async (req, res) => {
     res.status(500).send({ error: error.message });
   }
 });
+
 exports.createStripeConnectionToken = onRequest(
   { cors: true },
   async (req, res) => {
@@ -187,6 +288,7 @@ exports.createStripeConnectionToken = onRequest(
   }
 );
 
+/////////////////////////////////////////////////////////////////////////////////
 exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
   let body = request.body;
   log("Incoming SMS body from APP", body);
@@ -195,7 +297,7 @@ exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
   let dbRef = RDB.ref("OUTGOING_MESSAGES/" + body.customerID);
   if (res.status != 400) dbRef.update({ [body.id]: { ...body } });
 
-  sendResult(response, res);
+  sendSuccessfulResult(response, res);
 });
 
 exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
@@ -273,5 +375,9 @@ exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
   dbRef.update({ [body.SmsSid]: { ...message } });
 });
 
-const sendResult = (response, body) =>
+///////////////////////////////////////////////////////////////////////////////
+const sendSuccessfulResult = (response, body) =>
   response.status(200).send(JSON.stringify(body));
+
+const sendUnsuccessfulResult = (response, body) =>
+  response.status(500).send(JSON.stringify(body));

@@ -15,21 +15,6 @@ admin.initializeApp({
 const RDB = admin.database();
 const DB = getFirestore();
 
-// twilio
-const twilioClient = require("twilio")(
-  "AC8a368bba2aac361fb084b3e117069d62",
-  "1a405e19658914851cb3ac6f96863f9f"
-);
-
-// Stripe
-// const stripe = Stripe(
-//   "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"
-// ); // Secret key
-
-// const stripe = Stripe(
-//   "sk_test_51RRLAyG8PZMnVdxFmjW3yHGYAnXkSHpxuhLxuqv9bXyznMH73X5HBElKAosjHgx6iUok0ns5j93UIIhCADDXbrgy00C3c57g3s"
-// ); // Test key
-
 const SMS_PROTO = {
   firstName: "",
   lastName: "",

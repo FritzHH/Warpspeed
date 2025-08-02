@@ -11,7 +11,7 @@ import { log } from "../../utils";
 import { useSettingsStore } from "../../stores";
 import { Button } from "../../components";
 import { cloneDeep, set } from "lodash";
-import { dbSetSettings } from "../../db_calls";
+import { dbSetSettings } from "../../db_call_wrapper";
 
 export function Items_Modal_DashboardAdmin({}) {
   // setters

@@ -32,7 +32,10 @@ import {
   useSettingsStore,
   useTabNamesStore,
 } from "../../stores";
-import { dbSetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
+import {
+  dbSetCustomerObj,
+  dbSetOpenWorkorderItem,
+} from "../../db_call_wrapper";
 
 export const Info_WorkorderComponent = ({}) => {
   // setters /////////////////////////////////////////////////////////////////

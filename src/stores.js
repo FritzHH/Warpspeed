@@ -181,10 +181,91 @@ export const useCurrentWorkorderStore = create((set, get) => ({
 
 export const useCheckoutStore = create((set, get) => ({
   isCheckingOut: false,
+  splitPayment: false,
+  paymentArr: [],
+  splitPayment: false,
+  totalAmount: "69.69",
+  isRefund: false,
+  isPartialPayment: false,
+  getTotalCaptured: () => {
+    let total = 0;
+    get().paymentArr.forEach((payment) => {
+      total += payment.amount;
+    });
+    return total;
+  },
+  getIsPartialPayment: () => get().isPartialPayment,
+  getIsRefund: () => get().isRefund,
+  getTotalAmount: () => get().totalAmount,
+  getSplitPayment: () => get().splitPayment,
+  getPaymentArr: () => get().paymentArr,
+  getSplitPayment: () => get().splitPayment,
   getIsCheckingOut: () => get().isCheckingOut,
+  setSplitPayment: (splitPayment) => {
+    set(() => ({ splitPayment }));
+  },
+  setIsPartialPayment: (isPartialPayment) => {
+    set(() => ({ isPartialPayment }));
+  },
+  setIsRefund: (isRefund) => {
+    set(() => ({ isRefund }));
+  },
+  setTotalAmount: (totalAmount) => {
+    set(() => ({ totalAmount }));
+  },
+  setPaymentArr: (paymentArr) => {
+    set(() => ({ paymentArr }));
+  },
   setIsCheckingOut: (isCheckingOut) => {
     set((state) => ({
       isCheckingOut,
+    }));
+  },
+  setSplitPayment: (splitPayment) => {
+    set(() => ({ splitPayment }));
+  },
+  reset: () => {
+    set(() => ({
+      splitPayment: false,
+      paymentArr: [],
+      isRefund: false,
+      totalAmount: 0,
+    }));
+  },
+}));
+
+export const useStripePaymentStore = create((set, get) => ({
+  paymentIntentID: null,
+  reader: null,
+  readersArr: null,
+  paymentAmount: 0.53,
+  getReadersArr: () => get().readersArr,
+  getPaymentAmount: () => get().paymentAmount,
+  getPaymentIntentID: () => get().paymentIntentID,
+  getReader: () => get().reader,
+  //
+
+  setReadersArr: (readersArr) => {
+    set(() => ({
+      readersArr,
+    }));
+  },
+  setPaymentIntentID: (paymentIntentID) => {
+    log("setting pi id in zustand", paymentIntentID);
+    set(() => ({
+      paymentIntentID,
+    }));
+  },
+  setPaymentAmount: (paymentAmount) => {
+    set(() => ({ paymentAmount }));
+  },
+  setReader: (reader) => {
+    set(() => ({ reader }));
+  },
+  reset: () => {
+    set(() => ({
+      paymentIntentID: null,
+      paymentAmount: 0,
     }));
   },
 }));

@@ -21,7 +21,7 @@ import {
   log,
   randomWordGenerator,
 } from "./utils";
-import { dbSetCustomerObj, dbSetSettings } from "./db_calls";
+import { dbSetCustomerObj, dbSetSettings } from "./db_call_wrapper";
 
 export function testPayment() {}
 

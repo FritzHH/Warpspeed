@@ -27,6 +27,16 @@ export const Colors = {
   darkTextOnMainBackground: "rgb(30, 30, 30)",
 };
 
+export const Fonts = {
+  colors: {},
+  weight: {
+    textRegular: "400",
+    textHeavy: "600",
+    textSuperheavy: "800",
+  },
+  style: {},
+};
+
 export const ViewStyles = {
   fullScreen: {
     width: dim.windowWidth,

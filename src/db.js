@@ -19,6 +19,7 @@ import {
 import {
   get,
   getDatabase,
+  off,
   onChildAdded,
   onChildChanged,
   onChildRemoved,
@@ -34,37 +35,30 @@ import {
   INVENTORY_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "./data";
+import {
+  FCM_MESSAGING_URL,
+  firebaseConfig,
+  STRIPE_EVENT_WEBHOOK_URL,
+} from "./app_user_constants";
+import { firebaseApp } from "./init";
 import { isArray } from "lodash";
-import { useRef } from "react";
-// import { isArray } from "lodash";
-const SMS_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/sendSMS";
-const STRIPE_CREATE_PAYMENT_INTENT_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createPaymentIntent";
-const STRIPE_CONNECTION_TOKEN_FIREBASE_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createStripeConnectionToken";
-const STRIPE_ACTIVE_PAYMENT_INTENTS_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/getActivePaymentIntents";
-const STRIPE_CANCEL_PAYMENT_INTENT_URL = "";
-("https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/cancelPaymentIntent");
-const STRIPE_PROCESS_SERVER_DRIVEN_PAYMENT =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/processServerDrivenStripePayment";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM",
-  authDomain: "warpspeed-bonitabikes.firebaseapp.com",
-  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com",
-  projectId: "warpspeed-bonitabikes",
-  storageBucket: "warpspeed-bonitabikes.firebasestorage.app",
-  messagingSenderId: "357992532514",
-  appId: "1:357992532514:web:dc7d8f6408ea96ea72187b",
-  measurementId: "G-HE8GCTBEEK",
-};
+//todo move these to database and call on page load
+import {
+  SMS_URL,
+  STRIPE_CONNECTION_TOKEN_FIREBASE_URL,
+  STRIPE_SERVER_DRIVEN_CANCEL_PAYMENT_INTENT_URL,
+  STRIPE_SERVER_DRIVEN_INITIATE_PAYMENT_INTENT_URL,
+  STRIPE_SERVER_DRIVEN_GET_AVAIALABLE_STRIPE_READERS_URL,
+} from "./app_user_constants";
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const DB = getFirestore(app);
+const DB = getFirestore(firebaseApp);
 const RDB = getDatabase();
+
+////////////////////////////////////////////////////////////////////////
+//////// Firestore calls ///////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
 export function getNewCollectionRef(collectionName) {
   let ref = doc(collection(DB, collectionName));
@@ -159,17 +153,22 @@ export function subscribeToCollectionNode(collectionName, callback) {
 ///////////////////////////////////////////////////////////////////////
 ////// Realtime Database calls ////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
+
 function createRealtimeRef(path) {
   return ref(RDB, path);
 }
 
 // getters
 function getNodeObject(dbRef) {
-  return get(dbRef).then((snap) => {
-    // log("snap", snap.val());
-    if (snap.exists) return snap.val();
-    return null;
-  });
+  try {
+    return get(dbRef).then((snap) => {
+      // log("snap", snap.val());
+      if (snap.exists) return snap.val();
+      return null;
+    });
+  } catch (e) {
+    log("db error", e);
+  }
 }
 
 export function getCustomerMessages(customerPhone) {
@@ -332,6 +331,13 @@ export function subscribeToNodeAddition(
   });
 }
 
+export function subscriptionManualRemove(path) {
+  let ref1 = ref(RDB, path);
+  off(ref1, "value", (res) => {
+    log("result of manual removal", res);
+  });
+}
+
 ////// Firebase Function calls ///////////////////////////////////////
 
 export function sendSMS(messageBody) {
@@ -361,157 +367,79 @@ export function sendSMS(messageBody) {
     });
 }
 
-// client driven (old)
-export function getPaymentIntent(amount) {
-  return fetch(STRIPE_CREATE_PAYMENT_INTENT_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-    body: JSON.stringify({
-      amount: Number(amount),
-    }),
-  })
-    .then((res) => {
-      if (!res.ok) {
-        log(
-          "FETCH FAILURE IN STRIPE GET PAYMENT INTENT HERE IS THE REASON ==> ",
-          res
-        );
-        return null;
-      } else {
-        return res.json().then((res) => {
-          log("STRIPE FETCH PAYMENT COMPLETE!");
-          return res;
-        });
-      }
-    })
-    .catch((e) => {
-      log("error in Stripe GET PAYMENT INTENT call", e);
-    });
-}
-
-export function getStripeConnectionToken() {
-  return fetch(STRIPE_CONNECTION_TOKEN_FIREBASE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-    // body: JSON.stringify({
-    //   amount: Number(amount),
-    // }),
-  })
-    .then((res) => {
-      if (!res.ok) {
-        log(
-          "FETCH FAILURE IN STRIPE CONNECTION TOKEN HERE IS THE REASON ==> ",
-          res
-        );
-        return null;
-      } else {
-        return res.json().then((res) => {
-          log("STRIPE CONNECTION TOKEN COMPLETE!");
-          return res;
-        });
-      }
-    })
-    .catch((e) => {
-      log("error in Stripe CONECTION TOKEN call", e);
-    });
-}
-
-export function getStripeActivePaymentIntents() {
-  return fetch(STRIPE_ACTIVE_PAYMENT_INTENTS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-    // body: JSON.stringify({
-    //   amount: Number(amount),
-    // }),
-  })
-    .then((res) => {
-      if (!res.ok) {
-        log(
-          "FETCH FAILURE IN STRIPE GET ACTIVE PAYMENT INTENTS HERE IS THE REASON ==> ",
-          res
-        );
-        return null;
-      } else {
-        return res.json().then((res) => {
-          log("STRIPE GETTING ACTIVE PAYMENT INTENTS COMPLETE!");
-          return res;
-        });
-      }
-    })
-    .catch((e) => {
-      log("error in Stripe GET ACTIVE PAYMENT INTENTS call", e);
-    });
-}
-
-export function cancelStripeActivePaymentIntents(paymentIntentSecretArr) {
-  return fetch(STRIPE_CANCEL_PAYMENT_INTENT_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-    body: paymentIntentSecretArr
-      ? JSON.stringify({
-          intentList: paymentIntentSecretArr,
-        })
-      : null,
-  })
-    .then((res) => {
-      if (!res.ok) {
-        log(
-          "FETCH FAILURE IN STRIPE CANCEL ACTIVE PAYMENT INTENTS HERE IS THE REASON ==> ",
-          res
-        );
-        return res;
-      } else {
-        return res.json().then((res) => {
-          log("STRIPE CANCEL ACTIVE PAYMENTS INTENTS COMPLETE!");
-          return res;
-        });
-      }
-    })
-    .catch((e) => {
-      log("error in Stripe CANCEL ACTIVE PAYMENT INTENTS call", e);
-    });
-}
-
+/////////////////////////////////////////////////////////////////////////////////
 // server driven (new)
-export function processServerDrivenStripePayment(saleAmount, terminalID) {
-  return fetch(STRIPE_PROCESS_SERVER_DRIVEN_PAYMENT, {
+export function processServerDrivenStripePayment(
+  saleAmount,
+  readerID,
+  warmUp,
+  paymentIntentID
+) {
+  return fetch(STRIPE_SERVER_DRIVEN_INITIATE_PAYMENT_INTENT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
     },
     body: JSON.stringify({
       amount: Number(saleAmount),
-      readerID: terminalID,
+      readerID,
+      warmUp,
+      paymentIntentID,
     }),
   })
     .then((res) => {
       if (!res.ok) {
-        log(
-          "FETCH FAILURE IN STRIPE PROCESS SERVER DRIVEN PAYMENT HERE IS THE REASON ==> ",
-          res
-        );
         return null;
       } else {
-        return res.json().then((reader) => {
-          log("STRIPE SERVER DRIVEN PAYMENT PROCESS COMPLETE!", reader);
-          return reader;
-        });
+        return res.json();
       }
     })
     .catch((e) => {
       log("error in Stripe processServerDrivenStripePayment() call", e);
+    });
+}
+
+export function cancelServerDrivenStripePayment(readerID, paymentIntentID) {
+  return fetch(STRIPE_SERVER_DRIVEN_CANCEL_PAYMENT_INTENT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      readerID,
+      paymentIntentID,
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        return null;
+      } else {
+        return res.json();
+      }
+    })
+    .catch((e) => {
+      log("error in Stripe cancelServerDrivenStripePayment() call", e);
+    });
+}
+
+export function retrieveAvailableStripeReaders(readerID) {
+  return fetch(STRIPE_SERVER_DRIVEN_GET_AVAIALABLE_STRIPE_READERS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      readerID,
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) {
+        return null;
+      } else {
+        return res.json();
+      }
+    })
+    .catch((e) => {
+      log("error in Stripe retrieveAvailableStripeReaders() call", e);
     });
 }

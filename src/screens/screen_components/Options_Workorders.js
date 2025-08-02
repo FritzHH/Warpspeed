@@ -16,7 +16,10 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../stores";
-import { dbGetCustomerObj, dbSetOpenWorkorderItem } from "../../db_calls";
+import {
+  dbGetCustomerObj,
+  dbSetOpenWorkorderItem,
+} from "../../db_call_wrapper";
 import { messagesSubscribe } from "../../db_subscriptions";
 
 export function WorkordersComponent({}) {

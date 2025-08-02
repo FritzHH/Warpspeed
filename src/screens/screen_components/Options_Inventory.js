@@ -45,7 +45,7 @@ import {
   dbSetInventoryItem,
   dbSetOpenWorkorderItem,
   dbSetSettings,
-} from "../../db_calls";
+} from "../../db_call_wrapper";
 
 const tabMargin = 20;
 export function InventoryComponent({}) {

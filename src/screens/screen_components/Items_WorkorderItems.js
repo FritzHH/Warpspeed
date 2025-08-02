@@ -34,7 +34,7 @@ import {
 import {
   dbSetClosedWorkorderItem,
   dbSetOpenWorkorderItem,
-} from "../../db_calls";
+} from "../../db_call_wrapper";
 
 export const Items_WorkorderItemsTab = ({}) => {
   // setters ///////////////////////////////////////////////////////////////

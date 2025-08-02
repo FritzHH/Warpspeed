@@ -504,6 +504,7 @@ export const SETTINGS_PROTO = {
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   loginTimeout: 15,
   salesTax: 0.065,
+  acceptChecks: true,
   users: [
     {
       first: "Fritz",

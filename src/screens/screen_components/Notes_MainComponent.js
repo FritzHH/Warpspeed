@@ -33,7 +33,7 @@ import {
   useLoginStore,
 } from "../../stores";
 import { WORKORDER_PROTO } from "../../data";
-import { dbSetOpenWorkorderItem } from "../../db_calls";
+import { dbSetOpenWorkorderItem } from "../../db_call_wrapper";
 
 /// Notes Tab Component
 export function Notes_MainComponent() {

@@ -1,4 +1,5 @@
 import {
+  cancelServerDrivenStripePayment,
   cancelStripeActivePaymentIntents,
   getCollectionItem,
   getPaymentIntent,
@@ -7,6 +8,7 @@ import {
   getStripeConnectionToken,
   processPaymentIntent,
   processServerDrivenStripePayment,
+  retrieveAvailableStripeReaders,
   sendSMS,
   setFirestoreCollectionItem,
   setRealtimeNodeItem,
@@ -77,30 +79,29 @@ export function dbGetCustomerObj(id) {
 
 // firebase functions ///////////////////////////////////////////////
 
-// client driven (old)
 export function dbSendMessageToCustomer(messageObj) {
   return sendSMS(messageObj);
 }
 
-export function dbGetStripePaymentIntent(amount) {
-  return getPaymentIntent(amount);
+// server driven Stripe payment processing (new)
+export function dbProcessServerDrivenStripePayment(
+  saleAmount,
+  terminalID,
+  warmUp,
+  paymentIntentID
+) {
+  return processServerDrivenStripePayment(
+    saleAmount,
+    terminalID,
+    warmUp,
+    paymentIntentID
+  );
 }
 
-export async function dbGetStripeConnectionToken() {
-  let res = await getStripeConnectionToken();
-  // log("token", res.secret);
-  return res.secret;
+export function dbCancelServerDrivenStripePayment(readerID, paymentIntentID) {
+  return cancelServerDrivenStripePayment(readerID, paymentIntentID);
 }
 
-export function dbGetStripeActivePaymentIntents() {
-  return getStripeActivePaymentIntents();
-}
-
-export function dbCancelPaymentIntents(paymentIntentListArr) {
-  return cancelStripeActivePaymentIntents(paymentIntentListArr);
-}
-
-// server driven (new)
-export function dbProcessServerDrivenStripePayment(saleAmount, terminalID) {
-  let reader = processServerDrivenStripePayment(saleAmount, terminalID);
+export function dbRetrieveAvailableStripeReaders() {
+  return retrieveAvailableStripeReaders();
 }

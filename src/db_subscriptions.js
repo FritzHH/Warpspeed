@@ -23,6 +23,8 @@ let incomingMessagesSub, outgoingMessagesSub;
 let custPreviewChangeSub, custPreviewAddSub, custPreviewRemoveSub;
 let customerObjSub;
 let settingsSub;
+let paymentIntentAddSub;
+let paymentIntentChangeSub;
 
 // subscriptions /////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -78,7 +80,7 @@ export async function customerPreviewListSubscribe(_zModItemCustPreviewItem) {
 // realtime database
 export async function settingsSubscribe(_zSetSettingsItem) {
   settingsSub = await subscribeToNodeChange("SETTINGS", (type, key, val) => {
-    // log("incoming", key);
+    // log("incoming", val);
     _zSetSettingsItem(key, val);
   });
 }
@@ -103,6 +105,24 @@ export async function messagesSubscribe(
   );
 }
 
+// rdb payment process sub
+export async function paymentIntentSubscribe(
+  paymentIntentID,
+  callback,
+  zPaymentIntentID
+) {
+  paymentIntentAddSub = await subscribeToNodeChange(
+    "PAYMENT_PROCESSING/" + paymentIntentID,
+    (type, key, val) => callback(type, key, val, zPaymentIntentID)
+  );
+  paymentIntentChangeSub = await subscribeToNodeAddition(
+    "PAYMENT_PROCESSING/" + paymentIntentID,
+    (type, key, val) => callback(type, key, val, zPaymentIntentID)
+  );
+
+  return [paymentIntentAddSub, paymentIntentChangeSub];
+}
+
 // firestore
 export async function customerSubscribe(id, _zCustomerObj) {
   customerObjSub = subscribeToDocument("CUSTOMERS", id, (obj) =>
@@ -111,6 +131,16 @@ export async function customerSubscribe(id, _zCustomerObj) {
 }
 
 // remove subscriptions ///////////////////////////////////////////////////
+export function removePaymentIntentSub() {
+  try {
+    // log("sub", paymentIntentAddSub);
+    paymentIntentAddSub();
+    paymentIntentChangeSub();
+  } catch (e) {
+    log("error removing sub", e);
+  }
+}
+
 export function removeCustomerSub() {
   try {
     customerObjSub();

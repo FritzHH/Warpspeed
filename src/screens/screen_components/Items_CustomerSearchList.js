@@ -27,7 +27,7 @@ import {
   useTabNamesStore,
 } from "../../stores";
 import { messagesSubscribe } from "../../db_subscriptions";
-import { dbGetCustomerObj } from "../../db_calls";
+import { dbGetCustomerObj } from "../../db_call_wrapper";
 
 export function CustomerSearchListComponent({}) {
   // setters //////////////////////////////////////////////////////////////////////

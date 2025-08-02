@@ -10,6 +10,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import React, { Component, useCallback, useEffect, useRef } from "react";
+import { Animated, Easing, Image } from "react-native-web";
 import {
   clog,
   generateRandomID,
@@ -19,7 +20,7 @@ import {
   readAsBinaryString,
   trimToTwoDecimals,
 } from "./utils";
-import { Colors } from "./styles";
+import { Colors, Fonts } from "./styles";
 import { useState } from "react";
 import {
   FOCUS_NAMES,
@@ -36,16 +37,24 @@ import {
   useInvModalStore,
   useSettingsStore,
   useLoginStore,
+  useStripePaymentStore,
+  useCheckoutStore,
 } from "./stores";
 import {
   dbCancelPaymentIntents,
+  dbCancelServerDrivenStripePayment,
   dbGetStripeActivePaymentIntents,
   dbGetStripeConnectionToken,
   dbGetStripePaymentIntent,
   dbProcessServerDrivenStripePayment,
+  dbRetrieveAvailableStripeReaders,
   dbSetInventoryItem,
   dbSetSettings,
-} from "./db_calls";
+} from "./db_call_wrapper";
+import {
+  paymentIntentSubscribe,
+  removePaymentIntentSub,
+} from "./db_subscriptions";
 import { CheckoutProvider } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { loadStripeTerminal } from "@stripe/terminal-js";
@@ -53,6 +62,7 @@ import { useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import { useFilePicker } from "use-file-picker";
 import Dropzone from "react-dropzone";
 import { CheckBox as RNCheckBox } from "react-native-web";
+import { subscriptionManualRemove } from "./db";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -1196,296 +1206,521 @@ export const LoginScreenModalComponent = ({ modalVisible }) => {
   );
 };
 
-export const CashSaleModalComponent = ({ amount, onCancel }) => {
-  const [sPaymentAmount, _setPaymentAmount] = useState("20.12");
+const checkoutScreenStyle = {
+  base: {
+    alignItems: "center",
+    paddingTop: 20,
+    width: 500,
+    height: 380,
+    backgroundColor: "white",
+  },
+  titleText: {
+    fontSize: 30,
+    color: "dimgray",
+  },
+  boxDollarSign: {
+    fontSize: 15,
+    // marginRight: 5,
+  },
+  totalText: {
+    fontSize: 10,
+    color: "darkgray",
+  },
+  boxText: {
+    outlineWidth: 0,
+    fontSize: 25,
+    textAlign: "right",
+    placeholderTextColor: "lightgray",
+    // backgroundColor: "green",
+    width: "90%",
+  },
+  buttonText: {
+    fontSize: 13,
+    fontWeight: Fonts.weight.textRegular,
+  },
+  boxStyle: {
+    marginTop: 5,
+    borderColor: Colors.tabMenuButton,
+    borderWidth: 2,
+    backgroundColor: "whitesmoke",
+    padding: 5,
+    width: 100,
+    height: 50,
+    alignItems: "space-between",
+    justifyContent: "space-between",
+    flexDirection: "row",
+  },
+  totalTextStyle: {
+    marginTop: 15,
+  },
+  titleStyle: {
+    marginTop: 20,
+  },
+  buttonRowStyle: {
+    marginTop: 20,
+  },
+  statusText: {
+    width: "80%",
+    textAlign: "center",
+    marginTop: 15,
+    color: "green",
+    fontSize: 15,
+    fontWeight: 600,
+  },
+  loadingIndicatorStyle: {
+    marginTop: 10,
+  },
+};
+
+export const CashSaleModalComponent = ({
+  totalAmount = 12.45,
+  onCancel,
+  isRefund,
+  splitPayment = false,
+  onComplete,
+  acceptsChecks,
+}) => {
+  const [sTenderAmount, _setTenderAmount] = useState(0);
+  const [sRequestedAmount, _setRequestedAmount] = useState(0);
+  const [sStatusMessage, _setStatusMessage] = useState("");
+  const [sSaleAmountTooLow, _setSaleAmountTooLow] = useState(false);
+  const [sProcessButtonLabel, _setProcessButtonLabel] = useState("");
+  const [sIsCheck, _setIsCheck] = useState(false);
+  const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
 
   function handleTextChange(val) {
     if (LETTERS.includes(val[val.length - 1])) return;
-    _setPaymentAmount(val);
+    _setTenderAmount(val);
+    val = Number(val);
+    let buttonLabel = "";
+    if (splitPayment && val > 0) {
+      buttonLabel = "Process";
+    } else if (splitPayment && !(val > 0)) {
+      buttonLabel = "";
+    } else {
+      if (val < Number(totalAmount)) {
+        buttonLabel = "";
+      } else {
+        buttonLabel = "Process";
+      }
+    }
+
+    _setProcessButtonLabel(buttonLabel);
   }
 
+  function handleProcessButtonPress() {
+    onComplete({
+      cashAmountTaken: 0,
+      cashAmountTendered: Number(sTenderAmount),
+      isCheck: sIsCheck,
+    });
+    onCancel();
+  }
+
+  function handleKeyPress(event) {
+    // log("event", event.nativeEvent.key);
+    if (event.nativeEvent.key == "Enter") {
+      if (!splitPayment) {
+        handleProcessButtonPress();
+      } else {
+        if (sTenderAmount >= sRequestedAmount) {
+          handleProcessButtonPress();
+        } else {
+          _setInputBoxFocus("tender");
+        }
+      }
+    }
+  }
   return (
     <View
       style={{
-        alignItems: "center",
-        paddingTop: 20,
-        width: 600,
-        height: 400,
-        backgroundColor: "white",
+        ...checkoutScreenStyle.base,
       }}
     >
-      <Text>Cash Sale</Text>
-      <View style={{ flexDirection: "row", marginTop: 20 }}>
-        <Text style={{ marginRight: 2 }}>$</Text>
-        <TextInput
-          placeholder="Cash amount..."
-          placeholderTextColor={"gray"}
-          value={sPaymentAmount}
-          onChangeText={handleTextChange}
+      <Text
+        style={{
+          ...checkoutScreenStyle.titleText,
+        }}
+      >
+        Cash / Check Sale
+      </Text>
+      {acceptsChecks ? (
+        <CheckBox
+          textStyle={{ fontSize: 12 }}
+          boxStyle={{ width: 14, height: 14 }}
+          text={"Paper Check"}
+          onCheck={() => _setIsCheck(!sIsCheck)}
+          isChecked={sIsCheck}
+          viewStyle={{ marginTop: 5 }}
         />
+      ) : null}
+      {splitPayment ? (
+        <Text
+          style={{
+            marginTop: 10,
+            fontSize: 14,
+            fontStyle: "italic",
+            color: "green",
+          }}
+        >
+          Split Payment
+        </Text>
+      ) : null}
+      <Text style={{ ...checkoutScreenStyle.totalTextStyle }}>
+        {"Total: $ " + totalAmount}
+      </Text>
+      {splitPayment ? (
+        <View
+          style={{
+            ...checkoutScreenStyle.boxStyle,
+            paddingBottom: 6,
+            paddingRight: 7,
+          }}
+        >
+          <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
+
+          <View
+            style={{
+              width: "100%",
+              height: "100%",
+              // backgroundColor: "green",
+              alignItems: "flex-end",
+              paddingRight: 5,
+            }}
+          >
+            <TextInput
+              style={{
+                ...checkoutScreenStyle.boxText,
+                height: "70%",
+                // backgroundColor: "blue",
+              }}
+              placeholder="0.00"
+              placeholderTextColor={
+                checkoutScreenStyle.boxText.placeholderTextColor
+              }
+              value={sTenderAmount}
+              onChangeText={handleTextChange}
+              autoFocus={true}
+              onKeyPress={handleKeyPress}
+              // onFocus={() => _zSetPaymentAmount("")}
+            />
+            <Text
+              style={{
+                fontStyle: "italic",
+                color: "darkgray",
+                fontSize: 12,
+              }}
+            >
+              Pay Amount
+            </Text>
+          </View>
+        </View>
+      ) : null}
+      <View
+        style={{
+          ...checkoutScreenStyle.boxStyle,
+          paddingBottom: 6,
+          paddingRight: 7,
+        }}
+      >
+        <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
+
+        <View
+          style={{
+            width: "100%",
+            height: "100%",
+            // backgroundColor: "green",
+            alignItems: "flex-end",
+            paddingRight: 5,
+          }}
+        >
+          <TextInput
+            style={{
+              ...checkoutScreenStyle.boxText,
+              height: "70%",
+              // backgroundColor: "blue",
+            }}
+            placeholder="0.00"
+            placeholderTextColor={
+              checkoutScreenStyle.boxText.placeholderTextColor
+            }
+            value={sTenderAmount}
+            onChangeText={handleTextChange}
+            autoFocus={sInputBoxFocus == "tender"}
+            onKeyPress={handleKeyPress}
+            // onFocus={() => _zSetPaymentAmount("")}
+          />
+          <Text
+            style={{
+              fontStyle: "italic",
+              color: "darkgray",
+              fontSize: 12,
+            }}
+          >
+            Tender
+          </Text>
+        </View>
       </View>
+
       <View
         style={{
           flexDirection: "row",
           justifyContent: "space-around",
           width: "100%",
-          marginTop: 20,
+          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
         }}
       >
-        {/* <Button onPress={discoverReaders} text={"Reader"} /> */}
-        <Button onPress={() => {}} text={"Process Amount"} />
+        <Button
+          buttonStyle={{ backgroundColor: "green" }}
+          textStyle={{ color: "white" }}
+          visible={sProcessButtonLabel}
+          onPress={handleProcessButtonPress}
+          text={sProcessButtonLabel ? sProcessButtonLabel : ""}
+        />
         <Button onPress={onCancel} text={"Cancel"} />
       </View>
+      <Text
+        style={{
+          ...checkoutScreenStyle.statusText,
+          color: "red",
+        }}
+      >
+        {sStatusMessage}
+      </Text>
+
+      {/* <View style={{ ...checkoutScreenStyle.loadingIndicatorStyle }}>
+        <LoadingIndicator visible={sStatus} />
+      </View> */}
     </View>
   );
 };
 
-export const CreditCardModalComponent = ({
-  setPaymentAmount,
+export const StripeCreditCardModalComponent = ({
   onCancel,
-  zSettingsObj = SETTINGS_PROTO,
-  refundObj = {
-    paymentIntent: null,
-    last4: null,
-    cardType: null,
-    originalAmount: null,
-  },
-  onCardDetailObj = () => {},
+  autostart = true,
+  isRefund = false,
+  splitPayment,
+  amount = "",
+  cardDetailsObj,
+  onComplete,
 }) => {
-  const [sTerminal, _sSetTerminal] = useState(null);
-  const [sReader, _sSetReader] = useState();
-  const [sConnectedReader, _sSetConnectedReader] = useState(null);
-  const [sStatus, _sSetStatus] = useState("");
+  // store setters
+  const _zSetPaymentAmount = useStripePaymentStore(
+    (state) => state.setPaymentAmount
+  );
+  const _zSetPaymentArr = useCheckoutStore((state) => state.setPaymentArr);
+  const _zSetPaymentIntentID = useStripePaymentStore(
+    (state) => state.setPaymentIntentID
+  );
+  const zResetStripeStore = useStripePaymentStore((state) => state.reset);
+
+  // store getters
+  const zPaymentAmount = useStripePaymentStore((state) =>
+    state.getPaymentAmount()
+  );
+  const zReader = useStripePaymentStore((state) => state.getReader());
+  const zReadersArr = useStripePaymentStore((state) => state.getReadersArr());
+  const zPaymentIntentID = useStripePaymentStore((state) =>
+    state.getPaymentIntentID()
+  );
+
+  /////////////////////////////////////////////////////////////////////////
+  const [sStatus, _sSetStatus] = useState(false);
+  const [sStatusMessage, _sSetStatusMessage] = useState(
+    autostart ? "Starting payment intent..." : "Ready"
+  );
   const [sStatusTextColor, _sSetStatusTextColor] = useState("green");
-  const [sPaymentAmount, _setPaymentAmount] = useState(".50");
-  const [sPaymentIntent, _setPaymentIntent] = useState(null);
-  const [sReaderReady, _setReaderReady] = useState(false);
+  const [sListenerArr, _sSetListenerArr] = useState(null);
+  const [sCardWasDeclined, _sSetCardWasDeclined] = useState(false);
+  const [sReaderBusy, _sSetReaderBudy] = useState(false);
+  const [sAmount, _setAmount] = useState(amount);
   //////////////////////////////////////////////////////////////////
 
-  // useEffect(() => {
-  //   async function initTerminal() {
-  //     const terminal = StripeTerminal.create({
-  //       onFetchConnectionToken: dbGetStripeConnectionToken,
-  //       onUnexpectedReaderDisconnect: onReaderDisconnect,
-  //     });
-  //     _sSetStatusTextColor("green");
-  //     _sSetStatus("Stripe token fetched...");
-  //     _sSetTerminal(terminal);
-  //   }
-  //   initTerminal();
-  // }, []);
-
-  // useEffect(() => {
-  //   if (sTerminal && !sReader) {
-  //     discoverReaders();
-  //   }
-  // }, [sReader, sTerminal]);
-
-  const onReaderDisconnect = () => {
-    _sSetStatusTextColor("red");
-    _sSetStatus(
-      "Card Reader Disconnected! Refresh page then restart payment process."
-    );
-  };
-
-  async function discoverReaders() {
-    try {
-      _sSetStatusTextColor("green");
-      const config = {
-        simulated: false,
-        location: zSettingsObj.stripeBusinessLocationCode,
-      };
-      const discoverResult = await sTerminal.discoverReaders(config);
-      if (discoverResult.error) {
-        _sSetStatusTextColor("red");
-        console.log("Failed to discover: ", discoverResult.error);
-        _sSetStatus(
-          sStatus + "\nError during device discovery: " + discoverResult.error
-        );
-      } else if (discoverResult.discoveredReaders.length === 0) {
-        _sSetStatusTextColor("red");
-        console.log("No available Stripe readers.");
-        _sSetStatus("No available card readers! Check connections...");
-      } else {
-        log(
-          "discovered Stripe readers array",
-          discoverResult.discoveredReaders
-        );
-        let reader = discoverResult.discoveredReaders.find(
-          (o) => o.label == zSettingsObj.selectedCardReaderObj.label
-        );
-        if (reader) {
-          log("Our Stripe reader: ", reader);
-          _sSetStatusTextColor("green");
-          _sSetReader(reader);
-          if (zSettingsObj.autoConnectToCardReader) connectReader(reader);
-        }
-        // log("reader", reader);
+  useEffect(() => {
+    if (autostart) startServerDrivenStripePaymentIntent();
+    return () => {
+      zResetStripeStore();
+      log("removing payment intent subs");
+      if (sListenerArr) {
+        sListenerArr.forEach((listener) => listener());
       }
-    } catch (e) {
-      _sSetStatusTextColor("red");
-      _sSetStatus(sStatus + "\nError discovering readers: " + e);
-      log("error discovering reader", e);
-    }
-  }
+    };
+  }, []);
 
-  const connectReader = async (reader) => {
-    log("connecting to reader...");
-    _sSetStatus("Connecting to reader...");
-    const connectResult = await sTerminal.connectReader(reader, {
-      fail_if_in_use: true,
-    });
-
-    if (connectResult.error) {
-      _sSetStatusTextColor("red");
-      log("Stripe terminal connect result error", connectResult.error);
-      sTerminal.disconnectReader();
-      _sSetStatus("STRIPE CONNECTION ERRROR: " + connectResult.error.message);
-      return;
-    }
-    // log("connect result success!!", connectResult);
-    _sSetStatusTextColor("green");
-    _sSetConnectedReader(connectResult.reader);
-    _sSetStatus("Connected to card reader: " + connectResult.reader.label);
-    _setReaderReady(true);
-    log(`Stripe successfully connected to ${connectResult.reader.label}`);
-  };
-
-  async function startPayment() {
-    let paymentIntent;
-    if (
-      sPaymentIntent &&
-      Number(sPaymentIntent.amount) == Number(sPaymentAmount) * 100
-    ) {
-      log("Using previous payment intent");
-      paymentIntent = sPaymentIntent;
-    } else {
-      log("Retrieving new payment intent...");
-      _sSetStatus("Retrieving secure Payment Intent...");
-      paymentIntent = await dbGetStripePaymentIntent(sPaymentAmount);
-      _setPaymentIntent(paymentIntent);
-    }
-
-    clog("Active payment intent", paymentIntent);
-    _sSetStatus("Payment Intent retrieved...");
-    let res = await sTerminal.collectPaymentMethod(
-      paymentIntent.client_secret,
-      {
-        config_override: {
-          enable_customer_cancellation: true,
-          update_payment_intent: true,
-        },
-      }
-    );
-    let paymentMethod = res.paymentIntent.payment_method;
-    const card = paymentMethod?.card_present ?? paymentMethod?.interac_present;
-    // clog("method", paymentMethod);
-    // clog("card", card);
-
-    // return;
-    const paymentResult = await sTerminal.processPayment(res.paymentIntent);
-    _setPaymentIntent(paymentResult.paymentIntent);
-    if (paymentResult.error) {
-      log("payment result error", e);
-      _sSetStatus("Payment processing error: ", e.error);
-      // Placeholder for handling result.error
-    } else if (paymentResult.paymentIntent) {
-      _sSetStatus("");
-      clog("payment result", paymentResult);
-      let intent = paymentResult.paymentIntent;
-      let res = {
-        cardType: card.brand.toUpperCase(),
-        lastFour: card.last4,
-        expMonth: card.exp_month,
-        expYear: card.exp_year,
-        issuer: card.issuer,
-        millis: new Date().getTime(),
-        amount: trimToTwoDecimals(Number(intent.amount) / 100),
-        paymentIntent: intent.id,
-      };
-      log("payment detail obj", res);
-      onCardDetailObj(res);
-      onCancel();
-
-      // Placeholder for notifying your backend to capture result.paymentIntent.id
-    }
+  // todo
+  function setCurrentReader(reader) {
+    // log("cur", reader);
+    if (reader?.id) _zSetReader(reader);
   }
 
   async function startServerDrivenStripePaymentIntent() {
-    log("starting server driven payment attempt");
-    let readerResult = dbProcessServerDrivenStripePayment(
+    _sSetStatus(true);
+    _sSetStatusTextColor("red");
+    _sSetStatusMessage("Retrieving card reader activation...");
+    log("starting server driven payment attempt, amount", sAmount);
+    return;
+
+    // readerResult obj contains readerResult object key/val and paymentIntentID key/val
+    let paymentIntentID = zPaymentIntentID;
+    let readerResult = await dbProcessServerDrivenStripePayment(
       sPaymentAmount,
-      "tmr_GFPsvwVUtvBZsJ"
+      zReader.id,
+      false,
+      paymentIntentID
     );
-    log("reader result", readerResult);
+    console.log("reader result", readerResult);
+
+    if (readerResult == "in_progress") {
+      handleStripeReaderActivationError(readerResult);
+      _sSetReaderBudy(true);
+    } else {
+      _sSetReaderBudy(false);
+      _sSetStatusTextColor("green");
+      _sSetStatusMessage("Waiting for customer...");
+      _zSetPaymentIntentID(readerResult.paymentIntentID);
+      // log("pi id", readerResult.paymentIntentID);
+      let listenerArr = await paymentIntentSubscribe(
+        readerResult.paymentIntentID,
+        handleStripeCardPaymentDBSubscriptionUpdate,
+        readerResult.paymentIntentID
+      );
+      _sSetListenerArr(listenerArr);
+    }
   }
 
-  async function cancelServerDrivenStripePaymentIntent() {}
-
-  async function startRefund() {}
-
-  const cancelReaderAction = async () => {
-    log("canceling reader action");
-    _sSetStatus("Canceling reader sale...");
-    _setReaderReady(false);
-    try {
-      await sTerminal.disconnectReader();
-      _sSetStatus("Sale Canceled!");
-      connectReader(sReader);
-    } catch (e) {
-      _sSetStatus("Error canceling sale. Please refresh page.");
-      log("error disconnecting", e);
+  async function handleStripeReaderActivationError(error) {
+    _sSetStatusTextColor("red");
+    _sSetStatus(false);
+    log("Handling Stripe reader activation error", error);
+    let message = "";
+    if (error == "in_progress") {
+      message =
+        "Card Reader in use. Please wait until screen clears, or use a different reader.\n\n If not in use, try resetting the card reader";
+    } else {
+      switch (error.code) {
+        case "terminal_reader_timeout":
+          message =
+            "Could not connect to reader, possible network issue\n" +
+            error.code;
+          break;
+        case "terminal_reader_offline":
+          message =
+            "Reader appears to be offline. Please check power and internet connection\n" +
+            error.code;
+          break;
+        case "terminal_reader_busy":
+          message = "Reader busy. Please try a different reader\n" + error.code;
+          break;
+        case "intent_invalid_state":
+          message =
+            "Invalid payment intent state. Please clear the reader and try again";
+          break;
+        default:
+          message = "Unknown processing error: \n" + error.code;
+      }
     }
+    _sSetStatusMessage(message);
+  }
+
+  function handleStripeCardPaymentDBSubscriptionUpdate(
+    type,
+    key,
+    val,
+    zzPaymentIntentID
+  ) {
+    log("Stripe webhook properties", type + " : " + key);
+    clog("Stripe webhook update Obj", val);
+    let failureCode = val?.failure_code;
+    if (failureCode == "card_declined") {
+      let paymentIntentID = val?.process_payment_intent?.payment_intent;
+      // log("payment intent id", paymentIntentID);
+      // log("z payment intent id", zzPaymentIntentID);
+      if (paymentIntentID == zzPaymentIntentID) {
+        _sSetCardWasDeclined(true);
+        _sSetStatusTextColor("red");
+        _sSetStatusMessage("Card Declined");
+        _sSetStatus(false);
+      }
+    } else if (key == "complete") {
+      _sSetCardWasDeclined(false);
+      _sSetStatusTextColor("green");
+      _sSetStatusMessage("Payment Complete!");
+      _sSetStatus(false);
+      clog("Payment complete object", val);
+      let paymentMethodDetails = val.payment_method_details.card_present;
+      let paymentDetailsObj = {
+        last4: paymentMethodDetails.last4,
+        cardType: paymentMethodDetails.description,
+        issuer: paymentMethodDetails.receipt.application_preferred_name,
+        authorizationCode: paymentMethodDetails.receipt.authorization_code,
+        paymentIntentID: val.payment_intent,
+        chargeID: val.id,
+        amount: val.amount_captured,
+        paymentProcessor: "stripe",
+      };
+      clog("Successful Payment details obj", paymentDetailsObj);
+      cardDetailsObj(paymentDetailsObj);
+      setTimeout(() => {
+        onCancel();
+      }, 1500);
+    }
+  }
+
+  async function cancelServerDrivenStripePaymentIntent() {
+    _sSetStatusTextColor("red");
+    _sSetStatusMessage("Canceling payment request...");
+    log("canceling server driven payment attempt", zReader);
+    let readerResult = await dbCancelServerDrivenStripePayment(
+      zReader?.id,
+      zPaymentIntentID
+    );
+
     onCancel();
-  };
+  }
 
   function handleTextChange(val) {
     if (LETTERS.includes(val[val.length - 1])) return;
-    _setPaymentAmount(val);
+    _setAmount(val);
+  }
+
+  function handleKeyPress(event) {
+    // log("event", event.nativeEvent.key);
+    if (event.nativeEvent.key == "Enter" && Number(sAmount) > Number(amount)) {
+      startServerDrivenStripePaymentIntent();
+    }
   }
 
   return (
     <View
       style={{
-        alignItems: "center",
-        paddingTop: 20,
-        width: 500,
-        height: 350,
-        backgroundColor: "white",
+        ...checkoutScreenStyle.base,
       }}
     >
       <Text
         style={{
-          fontSize: 30,
-          color: "dimgray",
+          ...checkoutScreenStyle.titleText,
         }}
       >
         Credit Card Sale
       </Text>
       <View
         style={{
-          borderWidth: 1,
-          borderColor: "dimgray",
-          flexDirection: "row",
-          marginTop: 20,
-          width: 100,
-          paddingVertical: 5,
-          paddingHorizontal: 3,
+          ...checkoutScreenStyle.boxStyle,
         }}
       >
-        <Text style={{ fontSize: 15, marginRight: 5 }}>$</Text>
+        <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
         <TextInput
           style={{
-            width: "100%",
-            outlineWidth: 0,
-            fontSize: 25,
-            textAlign: "right",
+            ...checkoutScreenStyle.boxText,
           }}
           placeholder="0.00"
-          placeholderTextColor={"darkgray"}
-          value={sPaymentAmount}
+          placeholderTextColor={
+            checkoutScreenStyle.boxText.placeholderTextColor
+          }
+          value={sAmount}
           onChangeText={handleTextChange}
-          onFocus={() => _setPaymentAmount("")}
+          autoFocus={true}
+          onKeyPress={handleKeyPress}
         />
       </View>
       <View
@@ -1493,45 +1728,33 @@ export const CreditCardModalComponent = ({
           flexDirection: "row",
           justifyContent: "space-around",
           width: "100%",
-          marginTop: 20,
+          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
         }}
       >
-        {/* <Button onPress={discoverReaders} text={"Reader"} /> */}
         <Button
-          onPress={() => {
-            refundObj.cardType
-              ? startRefund()
-              : startServerDrivenStripePaymentIntent();
-          }}
-          text={refundObj.cardType ? "Process Refund" : "Process Amount"}
+          onPress={startServerDrivenStripePaymentIntent}
+          text={isRefund ? "Process Refund" : "Process Amount"}
+          textStyle={{}}
+          buttonStyle={{}}
         />
-        <Button onPress={cancelReaderAction} text={"Cancel"} />
+        <Button
+          onPress={cancelServerDrivenStripePaymentIntent}
+          text={"Cancel"}
+        />
       </View>
       <Text
         style={{
-          width: "80%",
-          textAlign: "center",
-          marginTop: 20,
-          color: "dimgray",
-        }}
-      >
-        {"Status:"}
-      </Text>
-      <Text
-        style={{
-          width: "80%",
-          textAlign: "center",
-          marginTop: 13,
+          // fontFamily: "Inter",
+          ...checkoutScreenStyle.statusText,
           color: sStatusTextColor,
         }}
       >
-        {sStatus}
+        {sStatusMessage}
       </Text>
-      {sReaderReady ? (
-        <Text style={{ marginTop: 5, fontSize: 22, color: "green" }}>
-          Ready for Payment!
-        </Text>
-      ) : null}
+
+      <View style={{ ...checkoutScreenStyle.loadingIndicatorStyle }}>
+        <LoadingIndicator visible={sStatus} />
+      </View>
     </View>
   );
 };
@@ -1613,6 +1836,7 @@ export const FileInput = ({
 };
 
 export const Button = ({
+  visible = true,
   ref,
   onPress,
   onLongPress,
@@ -1634,6 +1858,13 @@ export const Button = ({
   if (!shadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   /////////////////////////////////////////////////////
   //////////////////////////////////////////////////////
+  const HEIGHT = 50;
+  const WIDTH = 130;
+
+  if (!visible) {
+    return <View style={{ width: WIDTH, height: HEIGHT }}></View>;
+  }
+
   return (
     <TouchableOpacity
       ref={ref}
@@ -1641,15 +1872,15 @@ export const Button = ({
       onMouseLeave={() => {
         _setMouseOver(false);
       }}
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={visible ? onPress : () => {}}
+      onLongPress={visible ? onLongPress : () => {}}
     >
       <View
         style={{
           alignItems: "center",
           justifyContent: "center",
-          width: 130,
-          height: 50,
+          width: WIDTH,
+          height: HEIGHT,
           ...shadowStyle,
           ...buttonStyle,
           backgroundColor: sMouseOver
@@ -1714,16 +1945,58 @@ export const TabMenuButton = ({
   );
 };
 
+export const LoadingIndicator = ({
+  width = 100,
+  height = 100,
+  type = "bicycle",
+  visible = false,
+}) => {
+  if (!visible) return <View style={{ width, height }} />;
+  if (type == "bicycle") return BicycleSpinner({ width, height });
+};
+
+const BicycleSpinner = ({ width = 100, height = 100 }) => {
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.linear,
+      })
+    ).start();
+  }, []);
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  return (
+    <View style={{}}>
+      {/* Assuming you have a local image of a bicycle wheel */}
+      <Animated.Image
+        style={{
+          resizeMode: "contain",
+          width,
+          height,
+          transform: [{ rotate: spin }],
+        }}
+        source={require("./assets/bicycle.png")}
+      />
+    </View>
+  );
+};
+
 export const CheckBox = ({
   text,
   onCheck,
   item,
   makeEntireViewCheckable = true,
   roundButton = false,
-  handleCheckInternal = false,
-  isChecked = false,
+  isChecked,
   buttonStyle = {},
-  outerButtonStyle = {},
   textStyle = {},
   viewStyle = {},
   checkedColor,
@@ -1733,15 +2006,16 @@ export const CheckBox = ({
     opacity: 0.7,
     highlightColor: "dimgrey",
   },
+  boxStyle = {},
 }) => {
   const [sMouseOver, _setMouseOver] = React.useState(false);
-  const [sIsChecked, _setIsChecked] = useState(false);
+  // const [isChecked, onCheck] = useState(false);
   const rgbText = "rgba(50,50,50,1)";
   if (roundButton) buttonStyle = { ...buttonStyle, borderRadius: 100 };
 
   let backgroundColor;
   if (sMouseOver) {
-    if (!isChecked && !sIsChecked) {
+    if (!isChecked && !isChecked) {
       if (mouseOverOptions.enable) {
         if (mouseOverOptions.highlightColor) {
           backgroundColor = mouseOverOptions.highlightColor;
@@ -1752,97 +2026,192 @@ export const CheckBox = ({
     }
   } else {
     backgroundColor =
-      isChecked || sIsChecked
+      isChecked || isChecked
         ? checkedColor || Colors.tabMenuButton
         : uncheckedColor || "lightgray";
   }
 
-  let dim = 25;
-
   return (
     <TouchableOpacity
       onPress={() => {
         if (makeEntireViewCheckable) {
-          _setIsChecked(!sIsChecked);
-          onCheck(item, !sIsChecked);
+          onCheck(!isChecked);
+          onCheck(item, !isChecked);
         }
       }}
-    >
-      <View style={{ flexDirection: "row" }}>
-        <RNCheckBox
-          style={{ width: 20, height: 20, marginRight: 5 }}
-          value={sIsChecked}
-          color={Colors.tabMenuButton}
-          onValueChange={_setIsChecked}
-        />
-        <Text>{text}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  return (
-    <TouchableOpacity
-      onPress={() => {
-        if (makeEntireViewCheckable) {
-          if (handleCheckInternal) {
-            _setIsChecked(!sIsChecked);
-            onCheck(item, !sIsChecked);
-          } else {
-            onCheck(item);
-          }
-        }
-      }}
+      style={{ padding: 1 }}
     >
       <View
-        onMouseOver={() =>
-          mouseOverOptions.enable ? _setMouseOver(true) : null
-        }
-        onMouseLeave={() => {
-          _setMouseOver(false);
-        }}
         style={{
           flexDirection: "row",
-          justifyContent: "flex-start",
           alignItems: "center",
+          // backgroundColor: "green",
           ...viewStyle,
         }}
       >
-        <TouchableOpacity
-          onPress={() => {
-            if (handleCheckInternal) {
-              _setIsChecked(!sIsChecked);
-              onCheck(item, !sIsChecked);
-            } else {
-              onCheck(item);
-            }
-          }}
+        <RNCheckBox
           style={{
-            width: buttonStyle.width || dim,
-            height: buttonStyle.height || dim,
-            borderRadius: 100,
-            flexDirection: "row",
-            justifyContent: "center",
-            justifyItems: "center",
-            alignItems: "center",
-            paddingLeft: 7,
-            ...outerButtonStyle,
+            width: 17,
+            height: 17,
+            borderColor: "lightgray",
+            marginRight: 3,
+            ...boxStyle,
           }}
-        >
-          <View
-            style={{
-              width: dim - 10,
-              height: dim - 10,
-              opacity: isChecked ? 1 : 0.4,
-              backgroundColor,
-              marginRight: 7,
-              ...buttonStyle,
-            }}
-          />
-        </TouchableOpacity>
-        <Text style={{ fontSize: 14, color: rgbText, ...textStyle }}>
-          {text}
-        </Text>
+          value={isChecked}
+          color={Colors.tabMenuButton}
+          onValueChange={onCheck}
+        />
+        <Text style={{ ...textStyle }}>{text}</Text>
       </View>
     </TouchableOpacity>
   );
 };
+
+// useEffect(() => {
+//   async function initTerminal() {
+//     const terminal = StripeTerminal.create({
+//       onFetchConnectionToken: dbGetStripeConnectionToken,
+//       onUnexpectedReaderDisconnect: onReaderDisconnect,
+//     });
+//     _sSetStatusTextColor("green");
+//     _sSetStatus("Stripe token fetched...");
+//     _sSetTerminal(terminal);
+//   }
+//   initTerminal();
+// }, []);
+
+// useEffect(() => {
+//   if (sTerminal && !sReader) {
+//     discoverReaders();
+//   }
+// }, [sReader, sTerminal]);
+
+// const onReaderDisconnect = () => {
+//   _sSetStatusTextColor("red");
+//   _sSetStatus(
+//     "Card Reader Disconnected! Refresh page then restart payment process."
+//   );
+// };
+
+// async function discoverReaders() {
+//   try {
+//     _sSetStatusTextColor("green");
+//     const config = {
+//       simulated: false,
+//       location: zSettingsObj.stripeBusinessLocationCode,
+//     };
+//     const discoverResult = await sTerminal.discoverReaders(config);
+//     if (discoverResult.error) {
+//       _sSetStatusTextColor("red");
+//       console.log("Failed to discover: ", discoverResult.error);
+//       _sSetStatus(
+//         sStatus + "\nError during device discovery: " + discoverResult.error
+//       );
+//     } else if (discoverResult.discoveredReaders.length === 0) {
+//       _sSetStatusTextColor("red");
+//       console.log("No available Stripe readers.");
+//       _sSetStatus("No available card readers! Check connections...");
+//     } else {
+//       log(
+//         "discovered Stripe readers array",
+//         discoverResult.discoveredReaders
+//       );
+//       let reader = discoverResult.discoveredReaders.find(
+//         (o) => o.label == zSettingsObj.selectedCardReaderObj.label
+//       );
+//       if (reader) {
+//         log("Our Stripe reader: ", reader);
+//         _sSetStatusTextColor("green");
+//         _sSetReader(reader);
+//         if (zSettingsObj.autoConnectToCardReader) connectReader(reader);
+//       }
+//       // log("reader", reader);
+//     }
+//   } catch (e) {
+//     _sSetStatusTextColor("red");
+//     _sSetStatus(sStatus + "\nError discovering readers: " + e);
+//     log("error discovering reader", e);
+//   }
+// }
+
+// const connectReader = async (reader) => {
+//   log("connecting to reader...");
+//   _sSetStatus("Connecting to reader...");
+//   const connectResult = await sTerminal.connectReader(reader, {
+//     fail_if_in_use: true,
+//   });
+
+//   if (connectResult.error) {
+//     _sSetStatusTextColor("red");
+//     log("Stripe terminal connect result error", connectResult.error);
+//     sTerminal.disconnectReader();
+//     _sSetStatus("STRIPE CONNECTION ERRROR: " + connectResult.error.message);
+//     return;
+//   }
+//   // log("connect result success!!", connectResult);
+//   _sSetStatusTextColor("green");
+//   _sSetConnectedReader(connectResult.reader);
+//   _sSetStatus("Connected to card reader: " + connectResult.reader.label);
+//   _setReaderReady(true);
+//   log(`Stripe successfully connected to ${connectResult.reader.label}`);
+// };
+
+// async function startPayment() {
+//   let paymentIntent;
+//   if (
+//     sPaymentIntent &&
+//     Number(sPaymentIntent.amount) == Number(sPaymentAmount) * 100
+//   ) {
+//     log("Using previous payment intent");
+//     paymentIntent = sPaymentIntent;
+//   } else {
+//     log("Retrieving new payment intent...");
+//     _sSetStatus("Retrieving secure Payment Intent...");
+//     paymentIntent = await dbGetStripePaymentIntent(sPaymentAmount);
+//     _setPaymentIntent(paymentIntent);
+//   }
+
+//   clog("Active payment intent", paymentIntent);
+//   _sSetStatus("Payment Intent retrieved...");
+//   let res = await sTerminal.collectPaymentMethod(
+//     paymentIntent.client_secret,
+//     {
+//       config_override: {
+//         enable_customer_cancellation: true,
+//         update_payment_intent: true,
+//       },
+//     }
+//   );
+//   let paymentMethod = res.paymentIntent.payment_method;
+//   const card = paymentMethod?.card_present ?? paymentMethod?.interac_present;
+//   // clog("method", paymentMethod);
+//   // clog("card", card);
+
+//   // return;
+//   const paymentResult = await sTerminal.processPayment(res.paymentIntent);
+//   _setPaymentIntent(paymentResult.paymentIntent);
+//   if (paymentResult.error) {
+//     log("payment result error", e);
+//     _sSetStatus("Payment processing error: ", e.error);
+//     // Placeholder for handling result.error
+//   } else if (paymentResult.paymentIntent) {
+//     _sSetStatus("");
+//     clog("payment result", paymentResult);
+//     let intent = paymentResult.paymentIntent;
+//     let res = {
+//       cardType: card.brand.toUpperCase(),
+//       lastFour: card.last4,
+//       expMonth: card.exp_month,
+//       expYear: card.exp_year,
+//       issuer: card.issuer,
+//       millis: new Date().getTime(),
+//       amount: trimToTwoDecimals(Number(intent.amount) / 100),
+//       paymentIntent: intent.id,
+//     };
+//     log("payment detail obj", res);
+//     onCardDetailObj(res);
+//     onCancel();
+
+//     // Placeholder for notifying your backend to capture result.paymentIntent.id
+//   }
+// }

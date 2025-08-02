@@ -1,21 +1,25 @@
 /* eslint-disable */
-import { FlatList, View, Text } from "react-native-web";
+import { FlatList, View, Text, TextInput } from "react-native-web";
 import { TAB_NAMES, WORKORDER_PROTO } from "../../data";
 import {
   useCheckoutStore,
   useCurrentWorkorderStore,
   useInventoryStore,
   useOpenWorkordersStore,
+  useSettingsStore,
+  useStripePaymentStore,
   useTabNamesStore,
 } from "../../stores";
 import * as XLSX from "xlsx";
 
 import {
+  BicycleSpinner,
   Button,
   CashSaleModalComponent,
   CheckBox,
-  CreditCardModalComponent,
+  StripeCreditCardModalComponent,
   FileInput,
+  LoadingIndicator,
   PaymentComponent,
   ScreenModal,
   SHADOW_RADIUS_PROTO,
@@ -29,9 +33,14 @@ import {
 } from "../../utils";
 import { useEffect, useState } from "react";
 import { Colors } from "../../styles";
+import { sendFCMMessage } from "../../db";
+import {
+  dbProcessServerDrivenStripePayment,
+  dbRetrieveAvailableStripeReaders,
+} from "../../db_call_wrapper";
 
 export const Info_CheckoutComponent = ({}) => {
-  // setters
+  // store setters
   const _zSetOpenWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
@@ -42,8 +51,17 @@ export const Info_CheckoutComponent = ({}) => {
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
+  const _zSetStripeReaderID = useStripePaymentStore(
+    (state) => state.setReaderID
+  );
+  const _zSetReader = useStripePaymentStore((state) => state.setReader);
+  const _zSetReadersArr = useStripePaymentStore((state) => state.setReadersArr);
+  const _zSetSplitPayment = useCheckoutStore((state) => state.setSplitPayment);
+  const _zSetPaymentArr = useCheckoutStore((state) => state.setPaymentArr);
+  const _zSetTotalAmount = useCheckoutStore((state) => state.setTotalAmount);
+  const _zSetIsRefund = useCheckoutStore((state) => state.setIsRefund);
 
-  // getters
+  // store getters
   let zWorkorderObj = WORKORDER_PROTO;
   zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
   const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
@@ -51,9 +69,19 @@ export const Info_CheckoutComponent = ({}) => {
     state.getWorkorderArr()
   );
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zStripeReader = useStripePaymentStore((state) => state.getReader());
+  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zReadersArr = useStripePaymentStore((state) => state.getReadersArr());
+  const zSplitPayment = useCheckoutStore((state) => state.getSplitPayment());
+  const zReader = useStripePaymentStore((state) => state.getReader());
+  const zPaymentsArr = useCheckoutStore((state) => state.getPaymentArr());
+  const zTotalAmount = useCheckoutStore((state) => state.getTotalAmount());
+  const zIsRefund = useCheckoutStore((state) => state.getIsRefund());
+  const zTotalCaptured = useCheckoutStore((state) => state.getTotalCaptured());
+
   //////////////////////////////////////////////////////////////////////
   const [sHasOtherOpenWorkorders, _sSetHasOtherOpenworkorders] = useState(null);
-  const [sTotalsObj, _zSetTotalsObj] = useState({
+  const [sTotalsObj, _sSetTotalsObj] = useState({
     runningQty: "0.00",
     runningTotal: "0.00",
     runningDiscount: "0.00",
@@ -69,28 +97,52 @@ export const Info_CheckoutComponent = ({}) => {
     issuer: "",
     transactionNum: "",
   });
+  const [sRefundScan, _sSetRefundScan] = useState("");
+
+  // todo set reader available flag
+  useEffect(() => {
+    getAllAvailableStripeReaders();
+  }, []);
+
+  // when a card payment succeeds, check for split payment
+  useEffect(() => {
+    log("card details obj", sCardPaymenDetailsObj);
+    if (sCardPaymenDetailsObj?.last4) {
+      log("splitting payment");
+    }
+  }, [sCardPaymenDetailsObj]);
+
+  useEffect(() => {
+    if (zReader?.id) {
+      // log("warming up Stripe reader");
+      dbProcessServerDrivenStripePayment(0, zReader.id, true);
+    }
+  }, [zReader]);
+
+  async function getAllAvailableStripeReaders() {
+    let readers = await dbRetrieveAvailableStripeReaders();
+    _zSetReadersArr(readers.data);
+    _zSetReader(readers.data[0]); // dev
+    log("connected card readers", readers.data);
+  }
 
   useEffect(() => {
     // log("z", zWorkorderObj);
     if (!zWorkorderObj?.workorderLines) return;
     const { runningQty, runningTotal, runningDiscount } =
       calculateRunningTotals(zWorkorderObj, zInventoryArr);
-    _zSetTotalsObj({ runningQty, runningTotal, runningDiscount });
+    _sSetTotalsObj({ runningQty, runningTotal, runningDiscount });
   }, [zWorkorderObj]);
 
   // check for other open workorders
   useEffect(() => {
     if (!zWorkorderObj || zWorkorderObj.isStandaloneSale) return;
+
     let otherWorkorders = zOpenWorkordersArr.find(
       (o) => o.customerID == zWorkorderObj.customerID
     );
     // log("others", otherWorkorders);
   }, []);
-
-  // for testing, wait for stripe terminal to load
-  useEffect(() => {
-    if (zInventoryArr.length > 0) _sSetStripeTerminalReady(true);
-  }, [zInventoryArr]);
 
   function actionButtonPressed() {
     _zSetIsCheckingOut(!zIsCheckingOut);
@@ -121,16 +173,45 @@ export const Info_CheckoutComponent = ({}) => {
     return workorders;
   }
 
-  const handleCreditCardPaymentAmount = async (amount) => {};
+  const handlePaymentSuccess = async ({
+    isCheck,
+    cardObj,
+    cashAmountTendered,
+    cashAmountTaken,
+  }) => {
+    let paymentObj = { isCheck, amountTendered, cardObj };
+    let paymentsArr = cloneDeep(zPaymentsArr);
+    paymentsArr.push(paymentObj);
+    // clog(paymentsArr);
+    let complete = false;
+    let total = 0;
+    paymentsArr.forEach((paymentObj) => {});
+  };
+
+  const handleRefundSuccess = async (amount, type) => {};
+
+  const handleRefundScan = async (text) => {
+    log("incoming refund text", text);
+    _sSetRefundScan(text);
+  };
+
+  const handleSplitPaymentPress = () => {
+    if (zPaymentsArr.length > 0 && zSplitPayment) {
+      log("fix later");
+      // todo error message cannot unsplit payment box after a payment is made towards the total
+    } else {
+      _zSetSplitPayment(!zSplitPayment);
+    }
+  };
 
   return (
     <View
       style={{
         width: "100%",
         height: "100%",
-        // backgroundColor: "magenta",
-        justifyContent: "space-between",
+        justifyContent: "flex-start",
         alignItems: "center",
+        // backgroundColor: "green",
       }}
     >
       <ScreenModal
@@ -139,70 +220,102 @@ export const Info_CheckoutComponent = ({}) => {
         modalVisible={sShowCreditCardModal || sShowCashSaleModal}
         showShadow={true}
         shadowStyle={{ ...SHADOW_RADIUS_PROTO }}
-        // buttonLabel="Card"
         Component={() => {
           if (sShowCreditCardModal)
             return (
-              <CreditCardModalComponent
-                onCancel={() => _sSetShowCreditCardModal(false)}
-                setPaymentAmount={handleCreditCardPaymentAmount}
-                onCardDetailObj={(val) => _sSetCardPaymentDetailsObj(val)}
+              <StripeCreditCardModalComponent
+                onCancel={() => {
+                  _sSetShowCreditCardModal(false);
+                  _zSetIsRefund(false);
+                }}
+                cardDetailsObj={(val) => _sSetCardPaymentDetailsObj(val)}
+                isRefund={zIsRefund}
+                totalAmount={zTotalAmount}
+                splitPayment={zSplitPayment}
+                onComplete={handlePaymentSuccess}
               />
             );
           return (
             <CashSaleModalComponent
               onCancel={() => _sSetShowCashSaleModal(false)}
-              amount={"20.45"}
+              totalAmount={zTotalAmount}
+              onComplete={handlePaymentSuccess}
+              isRefund={zIsRefund}
+              splitPayment={zSplitPayment}
+              acceptsChecks={zSettingsObj.acceptChecks}
             />
           );
         }}
       />
-
-      {/* <FileInput handleBinaryString={handleUpload} /> */}
-      {/* <View style={{ backgroundColor: null, width: "100%", height: "100%" }}>
-        <Elements stripe={stripePromise} options={{}}>
-          <PaymentComponent1 />
-        </Elements>
-      </View> */}
-      {/* {!zIsCheckingOut ? (
-        <View
-          style={{
-            height: "85%",
-            width: "100%",
-            // backgroundColor: "yellow",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            // paddingTop: 100,
-          }}
-        ></View>
-      ) : null}
-      {zIsCheckingOut ? ( */}
       <View
         style={{
-          height: "85%",
           width: "100%",
-          backgroundColor: "blue",
+          flexDirection: "row",
+          justifyContent: "space-between",
+          height: 50,
           alignItems: "center",
-          justifyContent: "flex-start",
+          marginTop: "1%",
+          paddingHorizontal: 8,
         }}
       >
         <View
           style={{
-            height: "20%",
-            width: "100%",
-            backgroundColor: "white",
-            justifyContent: "space-around",
+            width: "70%",
+            flexDirection: "row",
+            justifyContent: "flex-start",
             alignItems: "center",
-            flexDirection: "column",
+          }}
+        >
+          <CheckBox
+            viewStyle={{ marginRight: 5 }}
+            text={"Refund"}
+            isChecked={zIsRefund}
+            onCheck={() => _zSetIsRefund(!zIsRefund)}
+          />
+          {zIsRefund ? (
+            <TextInput
+              style={{
+                outlineWidth: 0,
+                borderColor: "lightgray",
+                borderWidth: 1,
+                paddingHorizontal: 3,
+                height: 30,
+                marginLeft: 10,
+                width: "70%",
+              }}
+              autoFocus={true}
+              placeholder="Scan or enter workorder #"
+              placeholderTextColor={"lightgray"}
+              value={sRefundScan}
+              onChangeText={(val) => handleRefundScan(val)}
+            />
+          ) : null}
+        </View>
+        <CheckBox
+          text={"Split Payment"}
+          isChecked={zSplitPayment}
+          onCheck={handleSplitPaymentPress}
+        />
+      </View>
+      <View
+        style={{
+          width: "100%",
+        }}
+      >
+        <View
+          style={{
+            width: "100%",
+            flexDirection: "row",
+            justifyContent: "space-evenly",
           }}
         >
           <Button
             textStyle={{ color: "white" }}
             buttonStyle={{
-              width: 200,
+              width: 150,
               height: 40,
               backgroundColor: "green",
-              borderRadius: 80,
+              borderRadius: 2,
             }}
             text={"Cash / Check"}
             onPress={() => _sSetShowCashSaleModal(true)}
@@ -213,99 +326,150 @@ export const Info_CheckoutComponent = ({}) => {
               width: 150,
               height: 40,
               backgroundColor: "green",
-              borderRadius: 80,
+              borderRadius: 2,
             }}
             text={"Card"}
             onPress={() => _sSetShowCreditCardModal(true)}
           />
         </View>
-        <View
-          style={{
-            height: "80%",
-            backgroundColor: null,
-            width: "100%",
-            // flexDirection: "row",
-          }}
-        >
-          <FlatList
-            data={getAllCustomerOpenWorkorders()}
-            renderItem={(item, index) => {
-              item = item.item;
-              let total = calculateRunningTotals(item, zInventoryArr);
-              return (
-                <View
-                  style={{
-                    width: "100%",
-                    flexDirection: "row",
-                  }}
-                >
-                  <View style={{ width: "95%" }}>
-                    <View style={{ flexDirection: "row" }}>
-                      <Text style={{ marginRight: 10 }}>
-                        {item.brand || "No brand..."}
-                      </Text>
-                      <Text>{item.description || "No description..."}</Text>
-                    </View>
-                    <View
-                      style={{
-                        width: "90%",
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                        <Text style={{ fontWeight: 400 }}>Num. Items: </Text>
-                        {total.runningQty}
-                      </Text>
-                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                        <Text style={{ fontWeight: 400 }}>Discount: </Text>
-                        {total.runningDiscount}
-                      </Text>
-                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                        <Text style={{ fontWeight: 400 }}>Total: </Text>
-                        {total.runningTotal}
-                      </Text>
-                    </View>
+      </View>
+      <View
+        style={{
+          marginTop: 10,
+          width: "100%",
+          height: 20,
+        }}
+      >
+        {zTotalAmount == zTotalCaptured ? (
+          <View
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              justifyContent: "space-around",
+            }}
+          >
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                width: 100,
+                height: 20,
+                backgroundColor: "gray",
+                borderRadius: 2,
+              }}
+              text={"Email"}
+              onPress={() => {}}
+            />
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                width: 100,
+                height: 20,
+                backgroundColor: "gray",
+                borderRadius: 2,
+              }}
+              text={"Print"}
+              onPress={() => {}}
+            />
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                width: 100,
+                height: 20,
+                backgroundColor: "gray",
+                borderRadius: 2,
+              }}
+              text={"Text"}
+              onPress={() => {}}
+            />
+          </View>
+        ) : null}
+      </View>
+      {/* </View> */}
+      <View
+        style={{
+          height: "80%",
+          backgroundColor: null,
+          width: "100%",
+          // flexDirection: "row",
+        }}
+      >
+        <FlatList
+          data={getAllCustomerOpenWorkorders()}
+          renderItem={(item, index) => {
+            item = item.item;
+            let total = calculateRunningTotals(item, zInventoryArr);
+            return (
+              <View
+                style={{
+                  width: "100%",
+                  flexDirection: "row",
+                }}
+              >
+                <View style={{ width: "95%" }}>
+                  <View style={{ flexDirection: "row" }}>
+                    <Text style={{ marginRight: 10 }}>
+                      {item.brand || "No brand..."}
+                    </Text>
+                    <Text>{item.description || "No description..."}</Text>
                   </View>
                   <View
                     style={{
-                      width: "5%",
-                      justifyContent: "center",
-                      height: "100%",
-                      alignItems: "center",
-                      // backgroundColor: "green",
+                      width: "90%",
+                      flexDirection: "row",
+                      justifyContent: "space-between",
                     }}
                   >
-                    <CheckBox
-                      onCheck={() => {}}
-                      buttonStyle={{ marginRight: 10 }}
-                    />
+                    <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                      <Text style={{ fontWeight: 400 }}>Num. Items: </Text>
+                      {total.runningQty}
+                    </Text>
+                    <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                      <Text style={{ fontWeight: 400 }}>Discount: </Text>
+                      {total.runningDiscount}
+                    </Text>
+                    <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                      <Text style={{ fontWeight: 400 }}>Total: </Text>
+                      {total.runningTotal}
+                    </Text>
                   </View>
                 </View>
-              );
-            }}
-          />
-        </View>
-      </View>
-      {/* ) : null} */}
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          justifyContent: "space-around",
-        }}
-      >
-        <Button
-          textStyle={{ color: "white" }}
-          buttonStyle={{
-            backgroundColor: Colors.tabMenuButton,
-            height: 35,
-            width: 150,
+                <View
+                  style={{
+                    width: "5%",
+                    justifyContent: "center",
+                    height: "100%",
+                    alignItems: "center",
+                    // backgroundColor: "green",
+                  }}
+                >
+                  <CheckBox
+                    onCheck={() => {}}
+                    buttonStyle={{ marginRight: 10 }}
+                  />
+                </View>
+              </View>
+            );
           }}
-          text={"Start Workorder"}
-          onPress={actionButtonPressed}
         />
-        {/* <Button
+        {/* </View> */}
+        <View
+          style={{
+            width: "100%",
+            flexDirection: "row",
+            justifyContent: "space-around",
+          }}
+        >
+          <Button
+            textStyle={{ color: "white" }}
+            buttonStyle={{
+              backgroundColor: Colors.tabMenuButton,
+              height: 35,
+              width: 150,
+            }}
+            text={"Exit Checkout"}
+            onPress={actionButtonPressed}
+          />
+          {/* <Button
           textStyle={{ color: "white" }}
           buttonStyle={{
             backgroundColor: Colors.tabMenuButton,
@@ -315,7 +479,9 @@ export const Info_CheckoutComponent = ({}) => {
           text={!zWorkorderObj?.isStandaloneSale ? "New Sale" : "Cancel Sale"}
           onPress={actionButtonPressed}
         /> */}
+        </View>
       </View>
+      {/* ) : null} */}
     </View>
   );
 };

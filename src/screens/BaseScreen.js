@@ -64,7 +64,6 @@ export function BaseScreen() {
   const zModalVisible = useLoginStore((state) => state.getModalVisible());
   //////////////////////////////////////////////////////////////////////////////
   const [sInitFlag, _setInitFlag] = React.useState(false);
-  <script src="https://js.stripe.com/terminal/v1/"></script>;
 
   // subscribe to database listeners
   useEffect(() => {
@@ -94,7 +93,7 @@ export function BaseScreen() {
     if (!sInitFlag) {
       // fillReceipt();
       // fillPrinterNames();
-      fillPreferences();
+      // fillPreferences();
       _setInitFlag(true);
     }
   }

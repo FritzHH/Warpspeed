@@ -30,7 +30,7 @@ import {
   useCustMessagesStore,
   useLoginStore,
 } from "../../stores";
-import { dbSendMessageToCustomer } from "../../db_calls";
+import { dbSendMessageToCustomer } from "../../db_call_wrapper";
 
 export function MessagesComponent({}) {
   // setters /////////////////////////////////////////////////////////////

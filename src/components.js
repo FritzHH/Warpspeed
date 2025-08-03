@@ -13,6 +13,7 @@ import React, { Component, useCallback, useEffect, useRef } from "react";
 import { Animated, Easing, Image } from "react-native-web";
 import {
   clog,
+  formatDecimal,
   generateRandomID,
   LETTERS,
   log,
@@ -1276,50 +1277,37 @@ export const CashSaleModalComponent = ({
   totalAmount,
   onCancel,
   isRefund,
-  splitPayment = false,
+  splitPayment,
   onComplete,
   acceptsChecks,
   paymentsArr,
 }) => {
-  const [sTenderAmount, _setTenderAmount] = useState("");
-  const [sRequestedAmount, _setRequestedAmount] = useState("");
+  const [sTenderAmount, _setTenderAmount] = useState(100.0);
+  const [sRequestedAmount, _setRequestedAmount] = useState(30.0);
+  const [sSplitTotalPaidAlready, _setSplitTotalPaidAlready] = useState("");
+  const [sAmountLeftToPay, _setAmountLeftToPay] = useState("");
   const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sProcessButtonLabel, _setProcessButtonLabel] = useState("");
+  const [sProcessButtonLabel, _setProcessButtonLabel] = useState("Process");
   const [sIsCheck, _setIsCheck] = useState(false);
   const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
 
   useEffect(() => {
-    let totalPaid = 0;
-    paymentsArr.forEach((payment) => {
-      if (payment.cashObj) {
-      } else {
-      }
+    let totalPaid = 0.0;
+    paymentsArr.forEach((paymentObj) => {
+      totalPaid += paymentObj.amount;
     });
+
+    _setSplitTotalPaidAlready(trimToTwoDecimals(totalPaid));
+    _setAmountLeftToPay(trimToTwoDecimals(totalAmount - totalPaid));
   }, []);
 
-  function formatDecimal(val) {
-    // log("incoming", val);
-    if (!val) return null;
-    let text = "";
-    text = val.toString();
-    text = text.split(".").join("");
-
-    if (text.length <= 2) {
-      text = "." + text;
-    } else if (text.length > 2) {
-      let last2 = text.substring(text.length - 2, text.length);
-      let firstDigits = text.slice(0, text.length - 2);
-      text = firstDigits + "." + last2;
-    }
-    return text;
-  }
-
   function handleTextChange(val, boxName) {
+    // log("text change val", val);
     if (LETTERS.includes(val[val.length - 1])) return;
     let formattedVal = val != "." ? formatDecimal(val) : "";
 
     val = Number(formattedVal);
-    log(totalAmount, formattedVal);
+    // log("formattedVal", formattedVal);
 
     let buttonLabel = "";
     if (boxName != "tender" && Number(formattedVal) > Number(totalAmount)) {
@@ -1355,8 +1343,8 @@ export const CashSaleModalComponent = ({
 
   function handleProcessButtonPress() {
     onComplete({
-      cashAmountTendered: Number(sTenderAmount),
-      cashAmountRequested: Number(sRequestedAmount),
+      amountTendered: Number(sTenderAmount),
+      amount: Number(sRequestedAmount),
       isCheck: sIsCheck,
     });
     onCancel();
@@ -1399,21 +1387,36 @@ export const CashSaleModalComponent = ({
           viewStyle={{ marginTop: 5 }}
         />
       ) : null}
-      {splitPayment ? (
-        <Text
-          style={{
-            marginTop: 10,
-            fontSize: 14,
-            fontStyle: "italic",
-            color: "green",
-          }}
-        >
-          Split Payment
-        </Text>
-      ) : null}
+
       <Text style={{ ...checkoutScreenStyle.totalTextStyle }}>
         {"Total: $ " + totalAmount}
       </Text>
+      {splitPayment ? (
+        <View style={{ alignItems: "flex-end" }}>
+          <Text
+            style={{
+              marginTop: 10,
+              fontSize: 14,
+              // fontStyle: "italic",
+              color: "gray",
+            }}
+          >
+            {"Amount paid: "}
+            <Text style={{ color: "green" }}> {sSplitTotalPaidAlready}</Text>
+          </Text>
+
+          <Text
+            style={{
+              marginTop: 10,
+              fontSize: 14,
+              color: "gray",
+            }}
+          >
+            {"Amount left: "}
+            <Text style={{ color: "red" }}>{"$" + sAmountLeftToPay}</Text>
+          </Text>
+        </View>
+      ) : null}
       <View style={{ flexDirection: "row" }}>
         {splitPayment ? (
           <View
@@ -1545,11 +1548,9 @@ export const CashSaleModalComponent = ({
 
 export const StripeCreditCardModalComponent = ({
   onCancel,
-  autostart = true,
-  isRefund = false,
+  isRefund,
   splitPayment,
   amount = "",
-  cardDetailsObj,
   onComplete,
   paymentsArr,
 }) => {
@@ -1569,7 +1570,7 @@ export const StripeCreditCardModalComponent = ({
   /////////////////////////////////////////////////////////////////////////
   const [sStatus, _sSetStatus] = useState(false);
   const [sStatusMessage, _sSetStatusMessage] = useState(
-    autostart ? "Starting payment intent..." : "Ready"
+    !splitPayment ? "Starting payment intent..." : "Reader ready"
   );
   const [sStatusTextColor, _sSetStatusTextColor] = useState("green");
   const [sListenerArr, _sSetListenerArr] = useState(null);
@@ -1579,7 +1580,7 @@ export const StripeCreditCardModalComponent = ({
   //////////////////////////////////////////////////////////////////
 
   useEffect(() => {
-    if (autostart && !splitPayment) startServerDrivenStripePaymentIntent();
+    if (!splitPayment) startServerDrivenStripePaymentIntent();
     return () => {
       zResetStripeStore();
       log("removing payment intent subs");
@@ -1591,6 +1592,19 @@ export const StripeCreditCardModalComponent = ({
 
   useEffect(() => {});
 
+  function handleTextChange(val) {
+    if (LETTERS.includes(val[val.length - 1])) return;
+    let formattedVal = val != "." ? formatDecimal(val) : "";
+    _setAmount(formattedVal);
+  }
+
+  function handleKeyPress(event) {
+    // log("event", event.nativeEvent.key);
+    if (event.nativeEvent.key == "Enter" && Number(sAmount) > Number(amount)) {
+      startServerDrivenStripePaymentIntent();
+    }
+  }
+
   // todo
   function setCurrentReader(reader) {
     // log("cur", reader);
@@ -1598,11 +1612,12 @@ export const StripeCreditCardModalComponent = ({
   }
 
   async function startServerDrivenStripePaymentIntent() {
+    if (!(sAmount > 0)) return;
     _sSetStatus(true);
     _sSetStatusTextColor("red");
     _sSetStatusMessage("Retrieving card reader activation...");
     log("starting server driven payment attempt, amount", sAmount);
-    return;
+    // return;
 
     // readerResult obj contains readerResult object key/val and paymentIntentID key/val
     let paymentIntentID = zPaymentIntentID;
@@ -1672,8 +1687,8 @@ export const StripeCreditCardModalComponent = ({
     val,
     zzPaymentIntentID
   ) {
-    log("Stripe webhook properties", type + " : " + key);
-    clog("Stripe webhook update Obj", val);
+    // log("Stripe webhook properties", type + " : " + key);
+    // clog("Stripe webhook update Obj", val);
     let failureCode = val?.failure_code;
     if (failureCode == "card_declined") {
       let paymentIntentID = val?.process_payment_intent?.payment_intent;
@@ -1703,7 +1718,7 @@ export const StripeCreditCardModalComponent = ({
         paymentProcessor: "stripe",
       };
       clog("Successful Payment details obj", paymentDetailsObj);
-      cardDetailsObj(paymentDetailsObj);
+      onComplete(paymentDetailsObj);
       setTimeout(() => {
         onCancel();
       }, 1500);
@@ -1714,24 +1729,16 @@ export const StripeCreditCardModalComponent = ({
     _sSetStatusTextColor("red");
     _sSetStatusMessage("Canceling payment request...");
     log("canceling server driven payment attempt", zReader);
+    if (!zPaymentIntentID) {
+      onCancel();
+      return;
+    }
     let readerResult = await dbCancelServerDrivenStripePayment(
       zReader?.id,
       zPaymentIntentID
     );
 
     onCancel();
-  }
-
-  function handleTextChange(val) {
-    if (LETTERS.includes(val[val.length - 1])) return;
-    _setAmount(val);
-  }
-
-  function handleKeyPress(event) {
-    // log("event", event.nativeEvent.key);
-    if (event.nativeEvent.key == "Enter" && Number(sAmount) > Number(amount)) {
-      startServerDrivenStripePaymentIntent();
-    }
   }
 
   return (

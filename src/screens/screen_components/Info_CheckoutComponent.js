@@ -30,6 +30,7 @@ import {
   clog,
   generateRandomID,
   log,
+  trimToTwoDecimals,
 } from "../../utils";
 import { useEffect, useState } from "react";
 import { Colors } from "../../styles";
@@ -77,7 +78,6 @@ export const Info_CheckoutComponent = ({}) => {
   const zPaymentsArr = useCheckoutStore((state) => state.getPaymentArr());
   const zTotalAmount = useCheckoutStore((state) => state.getTotalAmount());
   const zIsRefund = useCheckoutStore((state) => state.getIsRefund());
-  const zTotalCaptured = useCheckoutStore((state) => state.getTotalCaptured());
 
   //////////////////////////////////////////////////////////////////////
   const [sHasOtherOpenWorkorders, _sSetHasOtherOpenworkorders] = useState(null);
@@ -86,6 +86,9 @@ export const Info_CheckoutComponent = ({}) => {
     runningTotal: "0.00",
     runningDiscount: "0.00",
   });
+  const [sTotalAmountCaptured, _setTotalAmountCaptured] = useState(0);
+  const [sPaymentComplete, _setPaymentComplete] = useState(false);
+  const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
   const [sShowCreditCardModal, _sSetShowCreditCardModal] = useState(false);
   const [sShowCashSaleModal, _sSetShowCashSaleModal] = useState(false);
   const [sStripeTerminalReady, _sSetStripeTerminalReady] = useState(false);
@@ -104,14 +107,14 @@ export const Info_CheckoutComponent = ({}) => {
     getAllAvailableStripeReaders();
   }, []);
 
-  // when a card payment succeeds, check for split payment
+  // cleanup function
   useEffect(() => {
-    log("card details obj", sCardPaymenDetailsObj);
-    if (sCardPaymenDetailsObj?.last4) {
-      log("splitting payment");
-    }
-  }, [sCardPaymenDetailsObj]);
+    return () => {
+      // todo cleanup
+    };
+  }, []);
 
+  // Stripe reader warm-up (not sure if this actually does anything, may need to grab an actual payment intent and then quickly cancel it)
   useEffect(() => {
     if (zReader?.id) {
       // log("warming up Stripe reader");
@@ -119,13 +122,8 @@ export const Info_CheckoutComponent = ({}) => {
     }
   }, [zReader]);
 
-  async function getAllAvailableStripeReaders() {
-    let readers = await dbRetrieveAvailableStripeReaders();
-    _zSetReadersArr(readers.data);
-    _zSetReader(readers.data[0]); // dev
-    log("connected card readers", readers.data);
-  }
-
+  // get total from open workorder/sale
+  // TODO need to add in combined workorders after completed the next effect
   useEffect(() => {
     // log("z", zWorkorderObj);
     if (!zWorkorderObj?.workorderLines) return;
@@ -134,7 +132,7 @@ export const Info_CheckoutComponent = ({}) => {
     _sSetTotalsObj({ runningQty, runningTotal, runningDiscount });
   }, [zWorkorderObj]);
 
-  // check for other open workorders
+  // TODO check for other open workorders and add them in a checklist to combine
   useEffect(() => {
     if (!zWorkorderObj || zWorkorderObj.isStandaloneSale) return;
 
@@ -143,6 +141,14 @@ export const Info_CheckoutComponent = ({}) => {
     );
     // log("others", otherWorkorders);
   }, []);
+
+  // server find all available stripe readers
+  async function getAllAvailableStripeReaders() {
+    let readers = await dbRetrieveAvailableStripeReaders();
+    _zSetReadersArr(readers.data);
+    _zSetReader(readers.data[0]); // dev
+    log("connected card readers", readers.data);
+  }
 
   function actionButtonPressed() {
     _zSetIsCheckingOut(!zIsCheckingOut);
@@ -173,21 +179,28 @@ export const Info_CheckoutComponent = ({}) => {
     return workorders;
   }
 
-  const handlePaymentSuccess = async ({ cardObj, cashObj }) => {
-    let paymentObj = {
-      cardObj,
-      cashObj,
-    };
+  const handlePaymentSuccess = async (paymentObj) => {
+    log("incoming payment obj", paymentObj);
+    let cardSale = paymentObj.last4;
     let paymentsArr = cloneDeep(zPaymentsArr);
     paymentsArr.push(paymentObj);
-    clog(paymentsArr);
-    let complete = false;
-    let total = 0;
-    paymentsArr.forEach((paymentObj) => {});
     _zSetPaymentArr(paymentsArr);
+
+    let totalCaptured = 0;
+    paymentsArr.forEach((paymentObj) => (totalCaptured += paymentObj.amount));
+    // log("total captured", totalCaptured);
+
+    let changeNeeded;
+    if (!cardSale)
+      changeNeeded = trimToTwoDecimals(
+        paymentObj.amountTendered - paymentObj.amount
+      );
+    if (zTotalAmount == totalCaptured) _setPaymentComplete(true);
+    _setCashChangeNeeded(changeNeeded);
+    _setTotalAmountCaptured(totalCaptured);
   };
 
-  const handleRefundSuccess = async (amount, type) => {};
+  const handleRefundSuccess = async (paymentObj) => {};
 
   const handleRefundScan = async (text) => {
     log("incoming refund text", text);
@@ -227,7 +240,6 @@ export const Info_CheckoutComponent = ({}) => {
                   _sSetShowCreditCardModal(false);
                   _zSetIsRefund(false);
                 }}
-                cardDetailsObj={(val) => _sSetCardPaymentDetailsObj(val)}
                 isRefund={zIsRefund}
                 totalAmount={zTotalAmount}
                 splitPayment={zSplitPayment}
@@ -271,7 +283,10 @@ export const Info_CheckoutComponent = ({}) => {
             viewStyle={{ marginRight: 5 }}
             text={"Refund"}
             isChecked={zIsRefund}
-            onCheck={() => _zSetIsRefund(!zIsRefund)}
+            onCheck={() => {
+              if (!zIsRefund) _zSetSplitPayment(false);
+              sTotalAmountCaptured ? null : _zSetIsRefund(!zIsRefund);
+            }}
           />
           {zIsRefund ? (
             <TextInput
@@ -295,7 +310,10 @@ export const Info_CheckoutComponent = ({}) => {
         <CheckBox
           text={"Split Payment"}
           isChecked={zSplitPayment}
-          onCheck={handleSplitPaymentPress}
+          onCheck={() => {
+            if (!zSplitPayment) _zSetIsRefund(false);
+            handleSplitPaymentPress();
+          }}
         />
       </View>
       <View
@@ -318,6 +336,7 @@ export const Info_CheckoutComponent = ({}) => {
               backgroundColor: "green",
               borderRadius: 2,
             }}
+            visible={sTotalAmountCaptured != zTotalAmount}
             text={"Cash / Check"}
             onPress={() => _sSetShowCashSaleModal(true)}
           />
@@ -329,6 +348,7 @@ export const Info_CheckoutComponent = ({}) => {
               backgroundColor: "green",
               borderRadius: 2,
             }}
+            visible={sTotalAmountCaptured != zTotalAmount}
             text={"Card"}
             onPress={() => _sSetShowCreditCardModal(true)}
           />
@@ -338,54 +358,90 @@ export const Info_CheckoutComponent = ({}) => {
         style={{
           marginTop: 10,
           width: "100%",
-          height: 20,
+          // height: 20,
         }}
       >
-        {zTotalAmount == zTotalCaptured ? (
-          <View
-            style={{
-              flexDirection: "row",
-              width: "100%",
-              justifyContent: "space-around",
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-around",
+            alignItems: "center",
+          }}
+        >
+          {sTotalAmountCaptured == zTotalAmount ? (
+            <Text>Sale Complete!</Text>
+          ) : null}
+          {zSplitPayment && sCashChangeNeeded ? (
+            <View>
+              <Text style={{ color: "" }}>
+                {"Partial payment complete!\n\n"}
+              </Text>
+              {zPaymentsArr.map((item) => (
+                <Text>
+                  {item.last4 ? "Card payment: $" : "Cash payment: $"}
+                  <Text></Text>
+                  {trimToTwoDecimals(item.amount)}
+                </Text>
+              ))}
+              <Text>
+                {"\nLeft to pay: "}
+                <Text>
+                  {trimToTwoDecimals(zTotalAmount - sTotalAmountCaptured)}
+                </Text>
+              </Text>
+            </View>
+          ) : null}
+          {zIsRefund && sCashChangeNeeded ? <Text>{"Refund "}</Text> : null}
+          {sCashChangeNeeded > 0 ? (
+            <Text>
+              {zIsRefund ? "change: " : "Change: "}
+              <Text>{"$" + trimToTwoDecimals(sCashChangeNeeded)}</Text>
+            </Text>
+          ) : null}
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            width: "100%",
+            justifyContent: "space-around",
+            marginTop: 10,
+          }}
+        >
+          <Button
+            textStyle={{ color: "white" }}
+            buttonStyle={{
+              width: 100,
+              height: 20,
+              backgroundColor: "gray",
+              borderRadius: 2,
             }}
-          >
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                width: 100,
-                height: 20,
-                backgroundColor: "gray",
-                borderRadius: 2,
-              }}
-              text={"Email"}
-              onPress={() => {}}
-            />
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                width: 100,
-                height: 20,
-                backgroundColor: "gray",
-                borderRadius: 2,
-              }}
-              text={"Print"}
-              onPress={() => {}}
-            />
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                width: 100,
-                height: 20,
-                backgroundColor: "gray",
-                borderRadius: 2,
-              }}
-              text={"Text"}
-              onPress={() => {}}
-            />
-          </View>
-        ) : null}
+            text={"Email"}
+            onPress={() => {}}
+          />
+          <Button
+            textStyle={{ color: "white" }}
+            buttonStyle={{
+              width: 100,
+              height: 20,
+              backgroundColor: "gray",
+              borderRadius: 2,
+            }}
+            text={"Print"}
+            onPress={() => {}}
+          />
+          <Button
+            textStyle={{ color: "white" }}
+            buttonStyle={{
+              width: 100,
+              height: 20,
+              backgroundColor: "gray",
+              borderRadius: 2,
+            }}
+            text={"Text"}
+            onPress={() => {}}
+          />
+        </View>
       </View>
-      {/* </View> */}
       <View
         style={{
           height: "80%",

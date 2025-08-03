@@ -161,94 +161,63 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
 }
 
 export function trimToTwoDecimals(num) {
-  log("incoming num", num);
+  // log("incoming num to trim to 2 decimals", num);
   // num = "4";
   // log("trimming", num);
   let strNum = num.toString();
-  let res = "";
+  let res;
   if (strNum.includes(".")) {
     let split = strNum.split(".");
-    log("split", split);
+    // log("split", split);
     let countOnRight = split[1].length;
     if (countOnRight == 2) {
-      log("one");
-      if (split[0] == "") strNum = "0" + strNum;
-      return strNum;
-      return strNum;
+      // have decimal with 2 on right
+      // log("one");
+      if (split[0] == "") {
+        // no leading 0, add
+        strNum = "0" + strNum;
+      }
+      res = strNum;
     } else if (countOnRight == 1) {
-      log("two");
+      // 1 character on right, add another
+      // log("two");
       let res = strNum + "0";
       if (split[0] == "") res = "0" + res;
-      return res;
     } else if (countOnRight == 0 && split[1] != "") {
-      log("three");
-      return strNum + "00";
+      // log("three");
+      res = strNum + "00";
     } else {
-      log("four");
+      // log("four");
       let last2 = split[1].slice(0, 2);
-      let res = split[0] + "." + last2;
-      // log("zero", split[0]);
-      if (split[0] == "") res = "0" + res;
-      // log("res", res);
-      return res;
+      res = split[0] + "." + last2;
     }
-  }
-
-  return strNum + ".00";
-
-  return;
-
-  let split = strNum.split(".");
-
-  // log("split", split);
-  if (split.length == 1 || split[0] == "") {
-    if (split.length == 1) {
-      // no trailing numbers
-      strNum = strNum + ".00";
-    } else {
-      // no leading numbers
-      // log(split);
-      if (split[1].length == 1) {
-        strNum = "0." + split[1] + "0";
-      } else {
-        strNum = "0." + split[1];
-      }
-    }
-  }
-
-  let split1 = strNum.split(".")[1];
-  split1 = split1 + "233434";
-  if (split1.length > 2) {
-    let newval = split1[0] + split1[1];
-    strNum = split[0] + "." + newval;
-  }
-
-  // log(strNum);
-  return strNum;
-
-  let val = Math.floor(num * 100) / 100;
-  let valString = val.toString();
-  // log("fresh val", valString);
-
-  let hasDecimal = valString.includes(".");
-  if (!hasDecimal) {
-    valString = valString + ".00";
   } else {
-    let position = valString[valString.length - 3];
-    if (position != ".") {
-      let arr = valString.split(".");
-      valString = arr[0];
-      valString = valString += ".00";
-    }
+    res = strNum + ".00";
   }
-  // log("valstrin finished", valString);
-  return valString;
+  // log("trim 2 decimals val", res);
+  return res;
 }
 
-// search functions ///////////////////////////////////////
-// export function checkStringForNumber(str) {
+// takes text input and inserts the decimal at the correct place as the user types numbers for correct currency display without having to press the decimal button
+export function formatDecimal(val) {
+  // log("incoming", val);
+  if (!val) return null;
+  let text = "";
+  text = val.toString();
+  // text = trimToTwoDecimals(text);
+  text = text.split(".").join("");
 
-// }
+  if (text.length <= 2) {
+    text = "." + text;
+  } else if (text.length > 2) {
+    let last2 = text.substring(text.length - 2, text.length);
+    let firstDigits = text.slice(0, text.length - 2);
+    text = firstDigits + "." + last2;
+  }
+
+  // return text;
+  return text;
+}
 
 export function searchPhoneNum(searchTerm, customerArrToSearch) {
   let resObj = {};

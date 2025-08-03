@@ -173,19 +173,18 @@ export const Info_CheckoutComponent = ({}) => {
     return workorders;
   }
 
-  const handlePaymentSuccess = async ({
-    isCheck,
-    cardObj,
-    cashAmountTendered,
-    cashAmountTaken,
-  }) => {
-    let paymentObj = { isCheck, amountTendered, cardObj };
+  const handlePaymentSuccess = async ({ cardObj, cashObj }) => {
+    let paymentObj = {
+      cardObj,
+      cashObj,
+    };
     let paymentsArr = cloneDeep(zPaymentsArr);
     paymentsArr.push(paymentObj);
-    // clog(paymentsArr);
+    clog(paymentsArr);
     let complete = false;
     let total = 0;
     paymentsArr.forEach((paymentObj) => {});
+    _zSetPaymentArr(paymentsArr);
   };
 
   const handleRefundSuccess = async (amount, type) => {};
@@ -233,6 +232,7 @@ export const Info_CheckoutComponent = ({}) => {
                 totalAmount={zTotalAmount}
                 splitPayment={zSplitPayment}
                 onComplete={handlePaymentSuccess}
+                paymentsArr={zPaymentsArr}
               />
             );
           return (
@@ -243,6 +243,7 @@ export const Info_CheckoutComponent = ({}) => {
               isRefund={zIsRefund}
               splitPayment={zSplitPayment}
               acceptsChecks={zSettingsObj.acceptChecks}
+              paymentsArr={zPaymentsArr}
             />
           );
         }}

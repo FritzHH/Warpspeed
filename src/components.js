@@ -1273,29 +1273,71 @@ const checkoutScreenStyle = {
 };
 
 export const CashSaleModalComponent = ({
-  totalAmount = 12.45,
+  totalAmount,
   onCancel,
   isRefund,
   splitPayment = false,
   onComplete,
   acceptsChecks,
+  paymentsArr,
 }) => {
-  const [sTenderAmount, _setTenderAmount] = useState(0);
-  const [sRequestedAmount, _setRequestedAmount] = useState(0);
+  const [sTenderAmount, _setTenderAmount] = useState("");
+  const [sRequestedAmount, _setRequestedAmount] = useState("");
   const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sSaleAmountTooLow, _setSaleAmountTooLow] = useState(false);
   const [sProcessButtonLabel, _setProcessButtonLabel] = useState("");
   const [sIsCheck, _setIsCheck] = useState(false);
   const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
 
-  function handleTextChange(val) {
+  useEffect(() => {
+    let totalPaid = 0;
+    paymentsArr.forEach((payment) => {
+      if (payment.cashObj) {
+      } else {
+      }
+    });
+  }, []);
+
+  function formatDecimal(val) {
+    // log("incoming", val);
+    if (!val) return null;
+    let text = "";
+    text = val.toString();
+    text = text.split(".").join("");
+
+    if (text.length <= 2) {
+      text = "." + text;
+    } else if (text.length > 2) {
+      let last2 = text.substring(text.length - 2, text.length);
+      let firstDigits = text.slice(0, text.length - 2);
+      text = firstDigits + "." + last2;
+    }
+    return text;
+  }
+
+  function handleTextChange(val, boxName) {
     if (LETTERS.includes(val[val.length - 1])) return;
-    _setTenderAmount(val);
-    val = Number(val);
+    let formattedVal = val != "." ? formatDecimal(val) : "";
+
+    val = Number(formattedVal);
+    log(totalAmount, formattedVal);
+
     let buttonLabel = "";
-    if (splitPayment && val > 0) {
+    if (boxName != "tender" && Number(formattedVal) > Number(totalAmount)) {
+      buttonLabel = "";
+      return;
+    } else if (
+      boxName != "tender" &&
+      Number(formattedVal) > Number(sTenderAmount)
+    ) {
+      buttonLabel = "";
+    } else if (
+      splitPayment &&
+      val > 0 &&
+      Number(sRequestedAmount) > 0 &&
+      val >= Number(sRequestedAmount)
+    ) {
       buttonLabel = "Process";
-    } else if (splitPayment && !(val > 0)) {
+    } else if (splitPayment) {
       buttonLabel = "";
     } else {
       if (val < Number(totalAmount)) {
@@ -1305,13 +1347,16 @@ export const CashSaleModalComponent = ({
       }
     }
 
+    boxName == "tender"
+      ? _setTenderAmount(formattedVal)
+      : _setRequestedAmount(formattedVal);
     _setProcessButtonLabel(buttonLabel);
   }
 
   function handleProcessButtonPress() {
     onComplete({
-      cashAmountTaken: 0,
       cashAmountTendered: Number(sTenderAmount),
+      cashAmountRequested: Number(sRequestedAmount),
       isCheck: sIsCheck,
     });
     onCancel();
@@ -1342,7 +1387,7 @@ export const CashSaleModalComponent = ({
           ...checkoutScreenStyle.titleText,
         }}
       >
-        Cash / Check Sale
+        Cash Sale
       </Text>
       {acceptsChecks ? (
         <CheckBox
@@ -1369,12 +1414,61 @@ export const CashSaleModalComponent = ({
       <Text style={{ ...checkoutScreenStyle.totalTextStyle }}>
         {"Total: $ " + totalAmount}
       </Text>
-      {splitPayment ? (
+      <View style={{ flexDirection: "row" }}>
+        {splitPayment ? (
+          <View
+            style={{
+              ...checkoutScreenStyle.boxStyle,
+              paddingBottom: 6,
+              paddingRight: 7,
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
+
+            <View
+              style={{
+                width: "100%",
+                height: "100%",
+                // backgroundColor: "green",
+                alignItems: "flex-end",
+                paddingRight: 5,
+              }}
+            >
+              <TextInput
+                style={{
+                  ...checkoutScreenStyle.boxText,
+                  height: "70%",
+                  // backgroundColor: "blue",
+                }}
+                placeholder="0.00"
+                placeholderTextColor={
+                  checkoutScreenStyle.boxText.placeholderTextColor
+                }
+                value={sRequestedAmount}
+                onChangeText={(val) => handleTextChange(val)}
+                autoFocus={true}
+                onKeyPress={handleKeyPress}
+              />
+              <Text
+                style={{
+                  fontStyle: "italic",
+                  color: "darkgray",
+                  fontSize: 12,
+                }}
+              >
+                Pay Amount
+              </Text>
+            </View>
+          </View>
+        ) : null}
         <View
           style={{
+            marginLeft: 20,
             ...checkoutScreenStyle.boxStyle,
             paddingBottom: 6,
             paddingRight: 7,
+            marginTop: 10,
           }}
         >
           <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
@@ -1399,8 +1493,8 @@ export const CashSaleModalComponent = ({
                 checkoutScreenStyle.boxText.placeholderTextColor
               }
               value={sTenderAmount}
-              onChangeText={handleTextChange}
-              autoFocus={true}
+              onChangeText={(val) => handleTextChange(val, "tender")}
+              autoFocus={sInputBoxFocus == "tender" || !splitPayment}
               onKeyPress={handleKeyPress}
               // onFocus={() => _zSetPaymentAmount("")}
             />
@@ -1411,57 +1505,11 @@ export const CashSaleModalComponent = ({
                 fontSize: 12,
               }}
             >
-              Pay Amount
+              Tender
             </Text>
           </View>
         </View>
-      ) : null}
-      <View
-        style={{
-          ...checkoutScreenStyle.boxStyle,
-          paddingBottom: 6,
-          paddingRight: 7,
-        }}
-      >
-        <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
-
-        <View
-          style={{
-            width: "100%",
-            height: "100%",
-            // backgroundColor: "green",
-            alignItems: "flex-end",
-            paddingRight: 5,
-          }}
-        >
-          <TextInput
-            style={{
-              ...checkoutScreenStyle.boxText,
-              height: "70%",
-              // backgroundColor: "blue",
-            }}
-            placeholder="0.00"
-            placeholderTextColor={
-              checkoutScreenStyle.boxText.placeholderTextColor
-            }
-            value={sTenderAmount}
-            onChangeText={handleTextChange}
-            autoFocus={sInputBoxFocus == "tender"}
-            onKeyPress={handleKeyPress}
-            // onFocus={() => _zSetPaymentAmount("")}
-          />
-          <Text
-            style={{
-              fontStyle: "italic",
-              color: "darkgray",
-              fontSize: 12,
-            }}
-          >
-            Tender
-          </Text>
-        </View>
       </View>
-
       <View
         style={{
           flexDirection: "row",
@@ -1503,21 +1551,15 @@ export const StripeCreditCardModalComponent = ({
   amount = "",
   cardDetailsObj,
   onComplete,
+  paymentsArr,
 }) => {
   // store setters
-  const _zSetPaymentAmount = useStripePaymentStore(
-    (state) => state.setPaymentAmount
-  );
-  const _zSetPaymentArr = useCheckoutStore((state) => state.setPaymentArr);
   const _zSetPaymentIntentID = useStripePaymentStore(
     (state) => state.setPaymentIntentID
   );
   const zResetStripeStore = useStripePaymentStore((state) => state.reset);
 
   // store getters
-  const zPaymentAmount = useStripePaymentStore((state) =>
-    state.getPaymentAmount()
-  );
   const zReader = useStripePaymentStore((state) => state.getReader());
   const zReadersArr = useStripePaymentStore((state) => state.getReadersArr());
   const zPaymentIntentID = useStripePaymentStore((state) =>
@@ -1537,7 +1579,7 @@ export const StripeCreditCardModalComponent = ({
   //////////////////////////////////////////////////////////////////
 
   useEffect(() => {
-    if (autostart) startServerDrivenStripePaymentIntent();
+    if (autostart && !splitPayment) startServerDrivenStripePaymentIntent();
     return () => {
       zResetStripeStore();
       log("removing payment intent subs");
@@ -1546,6 +1588,8 @@ export const StripeCreditCardModalComponent = ({
       }
     };
   }, []);
+
+  useEffect(() => {});
 
   // todo
   function setCurrentReader(reader) {

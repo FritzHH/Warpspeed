@@ -1,12 +1,14 @@
 import { dim } from "./utils";
 
 export const Colors = {
-  // mainBackground: "rgb(10,109,152)",
+  // mainBackground: "white",
   mainBackground: "rgb(61, 180, 231)",
 
-  secondBackground: "rgb(68,143,164)",
+  // secondBackground: "rgb(68,143,164)",
+  secondBackground: "white",
+
   opacityBackgoundDark: "rgb(63, 118, 141)",
-  // opacityBackgoundDark: "rgb(80, 154, 185)",
+  // opacityBackgoundDark: "white",
 
   // opacityBackgroundLight: "rgb(74, 133, 159)",
   opacityBackgroundLight: "rgb(140, 206, 235)",

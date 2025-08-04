@@ -1282,12 +1282,12 @@ export const CashSaleModalComponent = ({
   acceptsChecks,
   paymentsArr,
 }) => {
-  const [sTenderAmount, _setTenderAmount] = useState(100.0);
-  const [sRequestedAmount, _setRequestedAmount] = useState(30.0);
+  const [sTenderAmount, _setTenderAmount] = useState("");
+  const [sRequestedAmount, _setRequestedAmount] = useState("");
   const [sSplitTotalPaidAlready, _setSplitTotalPaidAlready] = useState("");
   const [sAmountLeftToPay, _setAmountLeftToPay] = useState("");
   const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sProcessButtonLabel, _setProcessButtonLabel] = useState("Process");
+  const [sProcessButtonLabel, _setProcessButtonLabel] = useState("");
   const [sIsCheck, _setIsCheck] = useState(false);
   const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
 
@@ -1392,29 +1392,48 @@ export const CashSaleModalComponent = ({
         {"Total: $ " + totalAmount}
       </Text>
       {splitPayment ? (
-        <View style={{ alignItems: "flex-end" }}>
-          <Text
-            style={{
-              marginTop: 10,
-              fontSize: 14,
-              // fontStyle: "italic",
-              color: "gray",
-            }}
-          >
-            {"Amount paid: "}
-            <Text style={{ color: "green" }}> {sSplitTotalPaidAlready}</Text>
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ alignItems: "flex-end", marginRight: 10 }}>
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 14,
+                color: "gray",
+              }}
+            >
+              {"Amount paid:"}
+            </Text>
 
-          <Text
-            style={{
-              marginTop: 10,
-              fontSize: 14,
-              color: "gray",
-            }}
-          >
-            {"Amount left: "}
-            <Text style={{ color: "red" }}>{"$" + sAmountLeftToPay}</Text>
-          </Text>
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 14,
+                color: "gray",
+              }}
+            >
+              {"Amount left:"}
+            </Text>
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 14,
+                color: "",
+              }}
+            >
+              {"$" + sSplitTotalPaidAlready}
+            </Text>
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 14,
+                color: "red",
+              }}
+            >
+              {"$" + sAmountLeftToPay}
+            </Text>
+          </View>
         </View>
       ) : null}
       <View style={{ flexDirection: "row" }}>
@@ -1551,6 +1570,7 @@ export const StripeCreditCardModalComponent = ({
   isRefund,
   splitPayment,
   amount = "",
+  totalAmount,
   onComplete,
   paymentsArr,
 }) => {
@@ -1576,8 +1596,23 @@ export const StripeCreditCardModalComponent = ({
   const [sListenerArr, _sSetListenerArr] = useState(null);
   const [sCardWasDeclined, _sSetCardWasDeclined] = useState(false);
   const [sReaderBusy, _sSetReaderBudy] = useState(false);
-  const [sAmount, _setAmount] = useState(amount);
+  const [sPaymentAmount, _setPaymentAmount] = useState(amount);
+  const [sSplitTotalPaidAlready, _setSplitTotalPaidAlready] = useState("");
+  const [sAmountLeftToPay, _setAmountLeftToPay] = useState("");
+  const [sProcessButtonLabel, _setProcessButtonLabel] = useState("");
+
   //////////////////////////////////////////////////////////////////
+
+  useEffect(() => {
+    let totalPaid = 0.0;
+    paymentsArr.forEach((paymentObj) => {
+      totalPaid += paymentObj.amount;
+    });
+
+    // totalPaid = 50;
+    _setSplitTotalPaidAlready(trimToTwoDecimals(totalPaid));
+    _setAmountLeftToPay(trimToTwoDecimals(totalAmount - totalPaid));
+  }, []);
 
   useEffect(() => {
     if (!splitPayment) startServerDrivenStripePaymentIntent();
@@ -1595,12 +1630,21 @@ export const StripeCreditCardModalComponent = ({
   function handleTextChange(val) {
     if (LETTERS.includes(val[val.length - 1])) return;
     let formattedVal = val != "." ? formatDecimal(val) : "";
-    _setAmount(formattedVal);
+    let num = Number(formattedVal);
+    let label = "";
+    if (splitPayment && num <= sAmountLeftToPay && num >= 0.5)
+      label = "Process";
+    if (!splitPayment && num <= totalAmount && num >= 0.5) label = "Process";
+    _setProcessButtonLabel(label);
+    _setPaymentAmount(formattedVal);
   }
 
   function handleKeyPress(event) {
     // log("event", event.nativeEvent.key);
-    if (event.nativeEvent.key == "Enter" && Number(sAmount) > Number(amount)) {
+    if (
+      event.nativeEvent.key == "Enter" &&
+      Number(sPaymentAmount) > Number(amount)
+    ) {
       startServerDrivenStripePaymentIntent();
     }
   }
@@ -1612,11 +1656,11 @@ export const StripeCreditCardModalComponent = ({
   }
 
   async function startServerDrivenStripePaymentIntent() {
-    if (!(sAmount > 0)) return;
+    if (!(sPaymentAmount > 0)) return;
     _sSetStatus(true);
     _sSetStatusTextColor("red");
     _sSetStatusMessage("Retrieving card reader activation...");
-    log("starting server driven payment attempt, amount", sAmount);
+    log("starting server driven payment attempt, amount", sPaymentAmount);
     // return;
 
     // readerResult obj contains readerResult object key/val and paymentIntentID key/val
@@ -1716,6 +1760,7 @@ export const StripeCreditCardModalComponent = ({
         chargeID: val.id,
         amount: val.amount_captured,
         paymentProcessor: "stripe",
+        totalCaptured: val.amount_captured,
       };
       clog("Successful Payment details obj", paymentDetailsObj);
       onComplete(paymentDetailsObj);
@@ -1754,6 +1799,52 @@ export const StripeCreditCardModalComponent = ({
       >
         Credit Card Sale
       </Text>
+      {splitPayment ? (
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ alignItems: "flex-end", marginRight: 10 }}>
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 14,
+                color: "gray",
+              }}
+            >
+              {"Amount paid:"}
+            </Text>
+
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 14,
+                color: "gray",
+              }}
+            >
+              {"Amount left:"}
+            </Text>
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 14,
+                color: "gray",
+              }}
+            >
+              {"$" + sSplitTotalPaidAlready}
+            </Text>
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 14,
+                color: "red",
+                fontWeight: "500",
+              }}
+            >
+              {"$" + sAmountLeftToPay}
+            </Text>
+          </View>
+        </View>
+      ) : null}
       <View
         style={{
           ...checkoutScreenStyle.boxStyle,
@@ -1768,7 +1859,7 @@ export const StripeCreditCardModalComponent = ({
           placeholderTextColor={
             checkoutScreenStyle.boxText.placeholderTextColor
           }
-          value={sAmount}
+          value={sPaymentAmount}
           onChangeText={handleTextChange}
           autoFocus={true}
           onKeyPress={handleKeyPress}
@@ -1785,8 +1876,9 @@ export const StripeCreditCardModalComponent = ({
         <Button
           onPress={startServerDrivenStripePaymentIntent}
           text={isRefund ? "Process Refund" : "Process Amount"}
-          textStyle={{}}
-          buttonStyle={{}}
+          textStyle={{ color: "white" }}
+          buttonStyle={{ backgroundColor: "green" }}
+          visible={sProcessButtonLabel}
         />
         <Button
           onPress={cancelServerDrivenStripePaymentIntent}

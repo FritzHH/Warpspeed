@@ -191,13 +191,16 @@ export const Info_CheckoutComponent = ({}) => {
     // log("total captured", totalCaptured);
 
     let changeNeeded;
-    if (!cardSale)
+    if (!cardSale) {
       changeNeeded = trimToTwoDecimals(
         paymentObj.amountTendered - paymentObj.amount
       );
+    }
+
     if (zTotalAmount == totalCaptured) _setPaymentComplete(true);
     _setCashChangeNeeded(changeNeeded);
     _setTotalAmountCaptured(totalCaptured);
+    _zSetPaymentArr(paymentsArr);
   };
 
   const handleRefundSuccess = async (paymentObj) => {};
@@ -215,6 +218,7 @@ export const Info_CheckoutComponent = ({}) => {
       _zSetSplitPayment(!zSplitPayment);
     }
   };
+  // return null;
 
   return (
     <View
@@ -333,8 +337,8 @@ export const Info_CheckoutComponent = ({}) => {
             buttonStyle={{
               width: 150,
               height: 40,
-              backgroundColor: "green",
-              borderRadius: 2,
+              backgroundColor: Colors.tabMenuButton,
+              borderRadius: 0,
             }}
             visible={sTotalAmountCaptured != zTotalAmount}
             text={"Cash / Check"}
@@ -345,8 +349,8 @@ export const Info_CheckoutComponent = ({}) => {
             buttonStyle={{
               width: 150,
               height: 40,
-              backgroundColor: "green",
-              borderRadius: 2,
+              backgroundColor: Colors.tabMenuButton,
+              borderRadius: 0,
             }}
             visible={sTotalAmountCaptured != zTotalAmount}
             text={"Card"}
@@ -373,74 +377,105 @@ export const Info_CheckoutComponent = ({}) => {
           ) : null}
           {zSplitPayment && sCashChangeNeeded ? (
             <View>
-              <Text style={{ color: "" }}>
-                {"Partial payment complete!\n\n"}
-              </Text>
               {zPaymentsArr.map((item) => (
-                <Text>
-                  {item.last4 ? "Card payment: $" : "Cash payment: $"}
-                  <Text></Text>
-                  {trimToTwoDecimals(item.amount)}
-                </Text>
+                <View
+                  style={{ flexDirection: "row", justifyContent: "center" }}
+                >
+                  <Text>
+                    {item.last4 ? "Card payment: $" : "Cash payment: $"}
+                  </Text>
+                  <Text>{trimToTwoDecimals(item.amount)}</Text>
+                </View>
               ))}
-              <Text>
-                {"\nLeft to pay: "}
-                <Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  marginVertical: 10,
+                }}
+              >
+                <Text style={{ fontSize: 20, fontWeight: 500 }}>
+                  {"Left to pay:"}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    marginLeft: 10,
+                    color: "red",
+                    fontWeight: 500,
+                  }}
+                >
                   {trimToTwoDecimals(zTotalAmount - sTotalAmountCaptured)}
                 </Text>
-              </Text>
+              </View>
             </View>
           ) : null}
-          {zIsRefund && sCashChangeNeeded ? <Text>{"Refund "}</Text> : null}
-          {sCashChangeNeeded > 0 ? (
-            <Text>
-              {zIsRefund ? "change: " : "Change: "}
-              <Text>{"$" + trimToTwoDecimals(sCashChangeNeeded)}</Text>
+        </View>
+
+        {sPaymentComplete ? (
+          <View
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              justifyContent: "space-around",
+              marginTop: 10,
+            }}
+          >
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                width: 100,
+                height: 20,
+                backgroundColor: "gray",
+                borderRadius: 0,
+              }}
+              shadow={true}
+              text={"Email"}
+              onPress={() => {}}
+            />
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                width: 100,
+                height: 20,
+                backgroundColor: "gray",
+                borderRadius: 0,
+                padding: 5,
+              }}
+              shadow={true}
+              text={"Print"}
+              onPress={() => {}}
+            />
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                width: 100,
+                height: 20,
+                backgroundColor: "gray",
+                borderRadius: 0,
+              }}
+              text={"Text"}
+              onPress={() => {}}
+            />
+          </View>
+        ) : null}
+        {sCashChangeNeeded ? (
+          <View
+            style={{
+              width: "100%",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 20, marginRight: 10, color: "" }}>
+              Cash change needed:
             </Text>
-          ) : null}
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            width: "100%",
-            justifyContent: "space-around",
-            marginTop: 10,
-          }}
-        >
-          <Button
-            textStyle={{ color: "white" }}
-            buttonStyle={{
-              width: 100,
-              height: 20,
-              backgroundColor: "gray",
-              borderRadius: 2,
-            }}
-            text={"Email"}
-            onPress={() => {}}
-          />
-          <Button
-            textStyle={{ color: "white" }}
-            buttonStyle={{
-              width: 100,
-              height: 20,
-              backgroundColor: "gray",
-              borderRadius: 2,
-            }}
-            text={"Print"}
-            onPress={() => {}}
-          />
-          <Button
-            textStyle={{ color: "white" }}
-            buttonStyle={{
-              width: 100,
-              height: 20,
-              backgroundColor: "gray",
-              borderRadius: 2,
-            }}
-            text={"Text"}
-            onPress={() => {}}
-          />
-        </View>
+            <Text style={{ fontSize: 20, fontWeight: 500, color: "green" }}>
+              {sCashChangeNeeded}
+            </Text>
+          </View>
+        ) : null}
       </View>
       <View
         style={{

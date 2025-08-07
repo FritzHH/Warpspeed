@@ -9,6 +9,7 @@ import {
   processPaymentIntent,
   processServerDrivenStripePayment,
   retrieveAvailableStripeReaders,
+  searchCollection,
   sendSMS,
   setFirestoreCollectionItem,
   setRealtimeNodeItem,
@@ -60,7 +61,7 @@ export function dbSetSaleItem(item, removeOption = false) {
   return setFirestoreCollectionItem("SALES", id, item);
 }
 
-// getters ///////////////////////////////////////////////////////////
+// database getters ///////////////////////////////////////////////////////////
 export function dbGetClosedWorkorderItem(id) {
   return getCollectionItem("CLOSED-WORKORDERS", id);
 }
@@ -75,6 +76,57 @@ export function dbGetSaleItem(id) {
 
 export function dbGetCustomerObj(id) {
   return getCollectionItem("CUSTOMERS", id);
+}
+
+// database searchers /////////////////////////////////////////////////
+
+export function dbSearchForPhoneNumber(searchTerm) {
+  return new Promise((resolve, reject) => {
+    let resObj = {};
+    let cellQueryRes = null;
+    let landlineQueryRes = null;
+    searchCollection("CUSTOMERS", "cell", searchTerm).then((res) => {
+      cellQueryRes = true;
+      res.forEach((obj) => {
+        resObj[obj.id] = obj;
+      });
+      if (landlineQueryRes) resolve(Object.values(resObj));
+    });
+    searchCollection("CUSTOMERS", "landline", searchTerm).then((res) => {
+      landlineQueryRes = true;
+      res.forEach((obj) => {
+        // log("obj", obj);
+        resObj[obj.id] = obj;
+      });
+      if (cellQueryRes) resolve(Object.values(resObj));
+    });
+  });
+}
+
+export function dbSearchForName(searchTerm) {
+  // log("db search term", searchTerm);
+  return new Promise((resolve, reject) => {
+    let resObj = {};
+    let firstNameQueryRes = null;
+    let lastNameQueryRes = null;
+    searchCollection("CUSTOMERS", "first", searchTerm).then((res) => {
+      firstNameQueryRes = true;
+      res.forEach((obj) => {
+        // log("obj", obj);
+        resObj[obj.id] = obj;
+      });
+      if (lastNameQueryRes) resolve(Object.values(resObj));
+    });
+
+    searchCollection("CUSTOMERS", "last", searchTerm).then((res) => {
+      lastNameQueryRes = true;
+      res.forEach((obj) => {
+        // log("obj", obj);
+        resObj[obj.id] = obj;
+      });
+      if (firstNameQueryRes) resolve(Object.values(resObj));
+    });
+  });
 }
 
 // firebase functions ///////////////////////////////////////////////

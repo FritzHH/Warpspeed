@@ -11,11 +11,13 @@ import { Button } from "react-native-web";
 import { Colors, ViewStyles } from "../styles";
 
 import {
+  clog,
   dim,
   formatDateTime,
   generateBarcode,
   generateRandomID,
   log,
+  searchPhoneNum,
   useInterval,
 } from "../utils";
 import { LoginScreenModalComponent, SHADOW_RADIUS_PROTO } from "../components";
@@ -23,7 +25,7 @@ import { Info_Section } from "./screen_collections/Info_Section";
 import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
-import { getRealtimeNodeItem } from "../db";
+import { getRealtimeNodeItem, searchCollection } from "../db";
 import { fillPreferences, fillPrinterNames, fillReceipt } from "../testing";
 import {
   customerPreviewListSubscribe,
@@ -40,6 +42,7 @@ import {
   useAppCurrentUserStore,
   useLoginStore,
 } from "../stores";
+import { dbSearchForPhoneNumber } from "../db_call_wrapper";
 
 export function BaseScreen() {
   // setters ////////////////////////////////////////////////////////////////
@@ -88,7 +91,7 @@ export function BaseScreen() {
     return () => clearInterval(id);
   }, []);
 
-  // testing
+  // testing and building fake fill database
   async function initialize() {
     if (!sInitFlag) {
       // fillReceipt();
@@ -123,7 +126,6 @@ export function BaseScreen() {
           style={{
             width: "65%",
             backgroundColor: Colors.mainBackground,
-            paddingLeft: 5,
           }}
         >
           <View

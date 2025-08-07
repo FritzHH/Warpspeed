@@ -2,6 +2,7 @@
 
 import { View, TextInput } from "react-native-web";
 import {
+  clog,
   dim,
   generateRandomID,
   LETTERS,
@@ -10,20 +11,20 @@ import {
   removeDashesFromPhone,
   searchCustomerNames,
   searchPhoneNum,
-} from "../../utils";
+} from "../../../utils";
 import {
   ScreenModal,
   Button,
   CustomerInfoScreenModalComponent,
   SHADOW_RADIUS_PROTO,
   LoginScreenModalComponent,
-} from "../../components";
+} from "../../../components";
 import {
   CUSTOMER_PROTO,
   FOCUS_NAMES,
   TAB_NAMES,
   WORKORDER_PROTO,
-} from "../../data";
+} from "../../../data";
 import React, { useEffect, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -36,10 +37,15 @@ import {
   useCurrentWorkorderStore,
   useCustMessagesStore,
   useLoginStore,
-} from "../../stores";
-import { messagesSubscribe } from "../../db_subscriptions";
-export function Info_CustomerInfoComponent({}) {
-  // setters ////////////////////////////////////////////////////////////////
+} from "../../../stores";
+import { messagesSubscribe } from "../../../db_subscriptions";
+import { Colors } from "../../../styles";
+import {
+  dbSearchForName,
+  dbSearchForPhoneNumber,
+} from "../../../db_call_wrapper";
+export function NewWorkorderComponent({}) {
+  // store setters ////////////////////////////////////////////////////////////////
   const _zSetIncomingMessage = useCustMessagesStore(
     (state) => state.setIncomingMessage
   );
@@ -66,8 +72,11 @@ export function Info_CustomerInfoComponent({}) {
     (state) => state.setCustomerObj
   );
   const _zExecute = useLoginStore((state) => state.execute);
+  const _zStartStandaloneSale = useCurrentWorkorderStore(
+    (state) => state.startStandaloneSale
+  );
 
-  // getters ///////////////////////////////////////////////////////////////
+  // store getters ///////////////////////////////////////////////////////////////
   const zCustPreviewArr = useCustomerPreviewStore((state) =>
     state.getCustPreviewArr()
   );
@@ -75,7 +84,7 @@ export function Info_CustomerInfoComponent({}) {
   const zCurrentUser = useLoginStore((state) => state.getCurrentUserObj());
 
   //////////////////////////////////////////////////////////////////////
-  const [sBox1Val, _setBox1Val] = React.useState("239336917");
+  const [sBox1Val, _setBox1Val] = React.useState("");
   const [sBox2Val, _setBox2Val] = React.useState("");
   const [sSearchingByName, _setSearchingByName] = React.useState(false);
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
@@ -93,11 +102,22 @@ export function Info_CustomerInfoComponent({}) {
 
     let formattedText = incomingText;
     if (!sSearchingByName) formattedText = removeDashesFromPhone(incomingText);
+    if (sSearchingByName) {
+      formattedText = formattedText.toLowerCase();
+      let char1 = formattedText[0].toUpperCase();
+      // log("char", char1);
+      let substr = formattedText.substring(1, formattedText.length);
+      formattedText = char1 + substr;
+    }
+    // log("format", formattedText);
 
     // check for valid inputs for each box
 
     if (sSearchingByName) {
-      if (LETTERS.includes(formattedText[formattedText.length - 1])) {
+      if (
+        LETTERS.includes(formattedText[formattedText.length - 1]) ||
+        LETTERS.toUpperCase().includes(formattedText[formattedText.length - 1])
+      ) {
         _setBox1Val(formattedText);
       } else {
         return;
@@ -114,16 +134,19 @@ export function Info_CustomerInfoComponent({}) {
     // run searches
     ///////////////////////
     let searchResults = [];
+    // log("arr", zCustPreviewArr);
     if (sSearchingByName) {
-      searchResults = searchCustomerNames(
-        formattedText,
-        sBox2Val,
-        zCustPreviewArr
-      );
+      dbSearchForName(formattedText).then((res) => {
+        searchResults = res;
+        clog("NAME SEARCH RESULT", res);
+      });
     } else {
-      searchResults = searchPhoneNum(formattedText, zCustPreviewArr);
-      // log(searchResults);
+      dbSearchForPhoneNumber(formattedText).then((res) => {
+        searchResults = res;
+        clog("PHONE NUMBER SEARCH RESULT", res);
+      });
     }
+
     _zSetSearchResults(searchResults);
     if (searchResults.length > 0) {
       _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
@@ -137,15 +160,25 @@ export function Info_CustomerInfoComponent({}) {
       );
   }
 
-  function handleBox2TextChange(formattedText = "") {
-    if (formattedText.length === 0) {
+  function handleBox2TextChange(incomingText = "") {
+    if (incomingText === "") {
       _setBox2Val("");
+      // _zSetSearchResults([]);
       return;
     }
-    if (!LETTERS.includes(formattedText[formattedText.length - 1])) {
-      return;
-    } else {
+    let formattedText = incomingText;
+    formattedText = formattedText.toLowerCase();
+    let char1 = formattedText[0].toUpperCase();
+    // log("char", char1);
+    let substr = formattedText.substring(1, formattedText.length);
+    formattedText = char1 + substr;
+    if (
+      LETTERS.includes(formattedText[formattedText.length - 1]) ||
+      LETTERS.toUpperCase().includes(formattedText[formattedText.length - 1])
+    ) {
       _setBox2Val(formattedText);
+    } else {
+      return;
     }
   }
 
@@ -204,42 +237,71 @@ export function Info_CustomerInfoComponent({}) {
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   return (
-    <View style={{ width: "100%", height: "100%", backgroundColor: null }}>
-      <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
-
+    <View
+      style={{
+        width: "100%",
+        height: "100%",
+        backgroundColor: null,
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
       <View
         style={{
-          width: "90%",
-          justifyContent: "space-between",
+          width: "100%",
+          justifyContent: "flex-start",
           alignItems: "center",
-          marginTop: 50,
+          // marginTop: 100,
+          // backgroundColor: "green",
         }}
       >
-        <View>
-          <TextInput
-            style={{
-              borderBottomWidth: 1,
-              width: 200,
-              height: 40,
-              paddingHorizontal: 3,
-              outlineStyle: "none",
-              borderColor: sBox1Val.length < 0 ? "gray" : "dimgray",
-              fontSize: 16,
-              color: sBox1Val.length < 0 ? "gray" : "dimgray",
+        <View style={{ width: "100%", alignItems: "flex-end" }}>
+          <Button
+            buttonStyle={{
+              width: 80,
+              // height: 30,
+              ...SHADOW_RADIUS_PROTO,
+              marginTop: 10,
+              marginRight: 10,
+              // padding: 5,
+              paddingHorizontal: 0,
             }}
-            autoFocus={true}
-            placeholder={sSearchingByName ? "First Name..." : "Phone number..."}
-            placeholderTextColor={"gray"}
-            value={sBox1Val}
-            onChangeText={(val) => handleBox1TextChange(val)}
+            textStyle={{ fontSize: 13, color: "white" }}
+            onPress={() => {
+              _setBox1Val("");
+              _setBox2Val("");
+              _setSearchingByName(!sSearchingByName);
+              _zSetSearchResults([]);
+              _setShowCreateCustomerBtn(false);
+            }}
+            text={sSearchingByName ? "Search By Phone" : "Search By Name"}
           />
         </View>
+        <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+        <TextInput
+          style={{
+            marginTop: 100,
+            borderBottomWidth: 1,
+            width: 200,
+            height: 40,
+            paddingHorizontal: 3,
+            outlineStyle: "none",
+            borderColor: "gray",
+            fontSize: 16,
+            color: sBox1Val.length < 0 ? "gray" : "dimgray",
+          }}
+          autoFocus={true}
+          placeholder={sSearchingByName ? "First Name..." : "Phone number..."}
+          placeholderTextColor={"gray"}
+          value={sBox1Val}
+          onChangeText={(val) => handleBox1TextChange(val)}
+        />
         <View style={{ width: 10 }} />
         {sSearchingByName && (
           <View>
             <TextInput
               placeholder={"Last name..."}
-              placeholderTextColor={"darkgray"}
+              placeholderTextColor={"gray"}
               style={{
                 padding: 3,
                 borderBottomWidth: 1,
@@ -254,66 +316,56 @@ export function Info_CustomerInfoComponent({}) {
             />
           </View>
         )}
-        <Button
+
+        {/** customer info modal */}
+        <ScreenModal
+          showOuterModal={true}
+          outerModalStyle={{}}
           buttonStyle={{
-            width: 160,
-            height: 30,
-            padding: 7,
-            ...SHADOW_RADIUS_PROTO,
-            // backgroundColor: "",
+            height: 50,
             marginVertical: 10,
-            marginTop: 20,
+            marginTop: 50,
+            width: null,
           }}
-          textStyle={{ color: "dimgray" }}
-          onPress={() => {
-            _setBox1Val("");
-            _setBox2Val("");
-            _setSearchingByName(!sSearchingByName);
-            _zSetSearchResults([]);
-            _setShowCreateCustomerBtn(false);
-          }}
-          text={sSearchingByName ? "Use Phone #" : "Use Name"}
+          buttonVisible={sShowCreateCustomerButton}
+          buttonTextStyle={{ color: "dimgray" }}
+          handleButtonPress={() =>
+            _zExecute(() => handleModalCreateCustomerBtnPressed())
+          }
+          buttonLabel={"Create New Customer"}
+          modalVisible={sCustomerInfo}
+          canExitOnOuterClick={false}
+          Component={() => (
+            <CustomerInfoScreenModalComponent
+              sCustomerInfo={sCustomerInfo || {}}
+              button1Text={"Create Customer"}
+              button2Text={"Cancel"}
+              ssInfoTextFocus={sInfoTextFocus}
+              __setInfoTextFocus={_setInfoTextFocus}
+              handleButton1Press={handleCreateNewCustomerPressed}
+              __setCustomerInfo={_setCustomerInfo}
+              handleButton2Press={() => {
+                // cancel button
+                _setBox1Val("");
+                _setBox2Val("");
+                _setSearchingByName(false);
+                _zResetSearch();
+                _setShowCreateCustomerBtn(false);
+                _setCustomerInfo(null);
+              }}
+            />
+          )}
         />
       </View>
 
-      {/** customer info modal */}
-      <ScreenModal
-        showOuterModal={true}
-        outerModalStyle={{}}
-        buttonStyle={{
-          height: 50,
-          marginVertical: 10,
-          marginTop: 50,
-          width: null,
+      <Button
+        text={"New Sale"}
+        // buttonStyle={}
+        onPress={() => {
+          _zStartStandaloneSale();
+          _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
+          _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
         }}
-        buttonVisible={sShowCreateCustomerButton}
-        buttonTextStyle={{ color: "dimgray" }}
-        handleButtonPress={() =>
-          _zExecute(() => handleModalCreateCustomerBtnPressed())
-        }
-        buttonLabel={"Create New Customer"}
-        modalVisible={sCustomerInfo}
-        canExitOnOuterClick={false}
-        Component={() => (
-          <CustomerInfoScreenModalComponent
-            sCustomerInfo={sCustomerInfo || {}}
-            button1Text={"Create Customer"}
-            button2Text={"Cancel"}
-            ssInfoTextFocus={sInfoTextFocus}
-            __setInfoTextFocus={_setInfoTextFocus}
-            handleButton1Press={handleCreateNewCustomerPressed}
-            __setCustomerInfo={_setCustomerInfo}
-            handleButton2Press={() => {
-              // cancel button
-              _setBox1Val("");
-              _setBox2Val("");
-              _setSearchingByName(false);
-              _zResetSearch();
-              _setShowCreateCustomerBtn(false);
-              _setCustomerInfo(null);
-            }}
-          />
-        )}
       />
     </View>
   );

@@ -6,8 +6,10 @@ import {
   INVENTORY_ITEM_PROTO,
   PRIVILEDGE_LEVELS,
   TAB_NAMES,
+  WORKORDER_PROTO,
 } from "./data";
 import { checkArr, log } from "./utils";
+import { cloneDeep } from "lodash";
 
 // internal use  /////////////////////////////////////////////////////
 export const useLoginStore = create((set, get) => ({
@@ -114,7 +116,7 @@ export const useInvModalStore = create((set, get) => ({
 }));
 
 export const useTabNamesStore = create((set, get) => ({
-  itemsTabName: TAB_NAMES.itemsTab.dashboard,
+  itemsTabName: TAB_NAMES.itemsTab.empty,
   optionsTabName: TAB_NAMES.optionsTab.quickItems,
   infoTabName: TAB_NAMES.infoTab.customer,
   getItemsTabName: () => get().itemsTabName,
@@ -177,35 +179,27 @@ export const useCurrentWorkorderStore = create((set, get) => ({
     // log("here");
     set((state) => ({ workorderObj }));
   },
+  startStandaloneSale: () => {
+    set((state) => ({
+      workorderObj: { ...cloneDeep(WORKORDER_PROTO), isStandaloneSale: true },
+    }));
+  },
 }));
 
 export const useCheckoutStore = create((set, get) => ({
-  isCheckingOut: false,
+  // isCheckingOut: false,
   splitPayment: false,
   paymentArr: [],
-  splitPayment: true,
-  totalAmount: "5.00",
+  splitPayment: false,
+  totalAmount: null,
   isRefund: false,
-  isPartialPayment: false,
-  getTotalCaptured: () => {
-    let total = 0;
-    get().paymentArr.forEach((payment) => {
-      total += payment.amount;
-    });
-    return total;
-  },
-  getIsPartialPayment: () => get().isPartialPayment,
   getIsRefund: () => get().isRefund,
   getTotalAmount: () => get().totalAmount,
   getSplitPayment: () => get().splitPayment,
   getPaymentArr: () => get().paymentArr,
-  getSplitPayment: () => get().splitPayment,
-  getIsCheckingOut: () => get().isCheckingOut,
+  // getIsCheckingOut: () => get().isCheckingOut,
   setSplitPayment: (splitPayment) => {
     set(() => ({ splitPayment }));
-  },
-  setIsPartialPayment: (isPartialPayment) => {
-    set(() => ({ isPartialPayment }));
   },
   setIsRefund: (isRefund) => {
     set(() => ({ isRefund }));
@@ -216,11 +210,11 @@ export const useCheckoutStore = create((set, get) => ({
   setPaymentArr: (paymentArr) => {
     set(() => ({ paymentArr }));
   },
-  setIsCheckingOut: (isCheckingOut) => {
-    set((state) => ({
-      isCheckingOut,
-    }));
-  },
+  // setIsCheckingOut: (isCheckingOut) => {
+  //   set((state) => ({
+  //     isCheckingOut,
+  //   }));
+  // },
   setSplitPayment: (splitPayment) => {
     set(() => ({ splitPayment }));
   },

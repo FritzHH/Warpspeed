@@ -14,22 +14,21 @@ import {
   generateRandomID,
   log,
   trimToTwoDecimals,
-} from "../../utils";
+} from "../../../utils";
 import {
   TabMenuDivider as Divider,
   ScreenModal,
   Button,
   InventoryItemScreeenModalComponent,
   CheckBox,
-} from "../../components";
-import { Colors } from "../../styles";
+} from "../../../components";
+import { Colors } from "../../../styles";
 import {
   INVENTORY_ITEM_PROTO,
   INVENTORY_CATEGORIES,
   TAB_NAMES,
   WORKORDER_ITEM_PROTO,
-} from "../../data";
-import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
+} from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -40,12 +39,12 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
-} from "../../stores";
+} from "../../../stores";
 import {
   dbSetInventoryItem,
   dbSetOpenWorkorderItem,
   dbSetSettings,
-} from "../../db_call_wrapper";
+} from "../../../db_call_wrapper";
 
 const tabMargin = 20;
 export function InventoryComponent({}) {

@@ -8,20 +8,20 @@ import {
   generateRandomID,
   log,
   trimToTwoDecimals,
-} from "../../utils";
+} from "../../../utils";
 import {
   TabMenuDivider as Divider,
   Button,
   ScreenModal,
-} from "../../components";
-import { Colors } from "../../styles";
+} from "../../../components";
+import { Colors } from "../../../styles";
 import {
   WORKORDER_PROTO,
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   SETTINGS_PROTO,
   DISCOUNT_OBJ_PROTO,
-} from "../../data";
+} from "../../../data";
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -30,11 +30,11 @@ import {
   useInventoryStore,
   useLoginStore,
   useSettingsStore,
-} from "../../stores";
+} from "../../../stores";
 import {
   dbSetClosedWorkorderItem,
   dbSetOpenWorkorderItem,
-} from "../../db_call_wrapper";
+} from "../../../db_call_wrapper";
 
 export const Items_WorkorderItemsTab = ({}) => {
   // setters ///////////////////////////////////////////////////////////////
@@ -52,7 +52,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
-  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
+  // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 
   ///////////////////////////////////////////////////////////////////////////
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
@@ -106,7 +106,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   ///////////////////////////////////////////////////
   function checkoutPressed() {
-    _zSetIsCheckingOut(!zIsCheckingOut);
+    // _zSetIsCheckingOut(!zIsCheckingOut);
   }
 
   function deleteWorkorderLineItem(index) {
@@ -346,10 +346,11 @@ export const Items_WorkorderItemsTab = ({}) => {
               paddingVertical: 2,
               borderRadius: 5,
               width: 150,
-              backgroundColor: zIsCheckingOut ? "red" : "green",
+              // backgroundColor: zIsCheckingOut ? "red" : "green",
               // marginRight: 5,
             }}
-            text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
+            // text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
+            text={"Check Out"}
             onPress={checkoutPressed}
           />
         ) : null}

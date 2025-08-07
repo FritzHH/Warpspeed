@@ -1,10 +1,9 @@
 /* eslint-disable */
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
-import { clog, dim, log, trimToTwoDecimals, useInterval } from "../../utils";
-import { TabMenuDivider as Divider, CheckBox } from "../../components";
-import { Colors } from "../../styles";
-import { TAB_NAMES } from "../../data";
-import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
+import { clog, dim, log, trimToTwoDecimals, useInterval } from "../../../utils";
+import { TabMenuDivider as Divider, CheckBox } from "../../../components";
+import { Colors } from "../../../styles";
+import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -15,12 +14,12 @@ import {
   useSettingsStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
-} from "../../stores";
+} from "../../../stores";
 import {
   dbGetCustomerObj,
   dbSetOpenWorkorderItem,
-} from "../../db_call_wrapper";
-import { messagesSubscribe } from "../../db_subscriptions";
+} from "../../../db_call_wrapper";
+import { messagesSubscribe } from "../../../db_subscriptions";
 
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////

@@ -15,7 +15,7 @@ import {
   generateRandomID,
   log,
   trimToTwoDecimals,
-} from "../../utils";
+} from "../../../utils";
 import {
   HorzSpacer,
   TabMenuButton,
@@ -23,17 +23,17 @@ import {
   ModalDropdown,
   TextInputOnMainBackground,
   TextInputLabelOnMainBackground,
-} from "../../components";
-import { Colors } from "../../styles";
+} from "../../../components";
+import { Colors } from "../../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useAppCurrentUserStore,
   useCurrentWorkorderStore,
   useLoginStore,
-} from "../../stores";
-import { WORKORDER_PROTO } from "../../data";
-import { dbSetOpenWorkorderItem } from "../../db_call_wrapper";
+} from "../../../stores";
+import { WORKORDER_PROTO } from "../../../data";
+import { dbSetOpenWorkorderItem } from "../../../db_call_wrapper";
 
 /// Notes Tab Component
 export function Notes_MainComponent() {

@@ -14,23 +14,27 @@ import {
   formatDateTime,
   generateRandomID,
   log,
-} from "../../utils";
-import { TabMenuDivider as Divider, Button, CheckBox } from "../../components";
-import { Colors } from "../../styles";
+} from "../../../utils";
+import {
+  TabMenuDivider as Divider,
+  Button,
+  CheckBox,
+} from "../../../components";
+import { Colors } from "../../../styles";
 import {
   SMS_PROTO,
   WORKORDER_PROTO,
   CUSTOMER_PROTO,
   SETTINGS_PROTO,
-} from "../../data";
+} from "../../../data";
 import React, { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   useCurrentCustomerStore,
   useCurrentWorkorderStore,
   useCustMessagesStore,
   useLoginStore,
-} from "../../stores";
-import { dbSendMessageToCustomer } from "../../db_call_wrapper";
+} from "../../../stores";
+import { dbSendMessageToCustomer } from "../../../db_call_wrapper";
 
 export function MessagesComponent({}) {
   // setters /////////////////////////////////////////////////////////////

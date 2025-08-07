@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { FlatList, View, Text, TextInput } from "react-native-web";
-import { TAB_NAMES, WORKORDER_PROTO } from "../../data";
+import { TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import {
   useCheckoutStore,
   useCurrentWorkorderStore,
@@ -9,7 +9,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../stores";
+} from "../../../stores";
 import * as XLSX from "xlsx";
 
 import {
@@ -23,7 +23,7 @@ import {
   PaymentComponent,
   ScreenModal,
   SHADOW_RADIUS_PROTO,
-} from "../../components";
+} from "../../../components";
 import { cloneDeep } from "lodash";
 import {
   calculateRunningTotals,
@@ -31,16 +31,16 @@ import {
   generateRandomID,
   log,
   trimToTwoDecimals,
-} from "../../utils";
+} from "../../../utils";
 import { useEffect, useState } from "react";
-import { Colors } from "../../styles";
-import { sendFCMMessage } from "../../db";
+import { Colors } from "../../../styles";
+import { sendFCMMessage } from "../../../db";
 import {
   dbProcessServerDrivenStripePayment,
   dbRetrieveAvailableStripeReaders,
-} from "../../db_call_wrapper";
+} from "../../../db_call_wrapper";
 
-export const Info_CheckoutComponent = ({}) => {
+export const CheckoutComponent = ({}) => {
   // store setters
   const _zSetOpenWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
@@ -61,11 +61,12 @@ export const Info_CheckoutComponent = ({}) => {
   const _zSetPaymentArr = useCheckoutStore((state) => state.setPaymentArr);
   const _zSetTotalAmount = useCheckoutStore((state) => state.setTotalAmount);
   const _zSetIsRefund = useCheckoutStore((state) => state.setIsRefund);
+  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
 
   // store getters
   let zWorkorderObj = WORKORDER_PROTO;
   zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
-  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
+  // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
   const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
     state.getWorkorderArr()
   );
@@ -150,22 +151,6 @@ export const Info_CheckoutComponent = ({}) => {
     log("connected card readers", readers.data);
   }
 
-  function actionButtonPressed() {
-    _zSetIsCheckingOut(!zIsCheckingOut);
-    if (zWorkorderObj?.isStandaloneSale) {
-      _zSetOpenWorkorderObj(null);
-      _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders);
-      return;
-    }
-
-    let wo = cloneDeep(WORKORDER_PROTO);
-    wo.isStandaloneSale = true;
-    wo.id = generateRandomID();
-    _zSetOpenWorkorderObj(wo);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-  }
-
   function getAllCustomerOpenWorkorders() {
     let workorders = [];
     zOpenWorkordersArr.forEach((openWO) => {
@@ -224,6 +209,24 @@ export const Info_CheckoutComponent = ({}) => {
       _zSetSplitPayment(!zSplitPayment);
     }
   };
+
+  function actionButtonPressed() {
+    // _zSetIsCheckingOut(!zIsCheckingOut);
+    if (zWorkorderObj?.isStandaloneSale) {
+      _zSetOpenWorkorderObj(null);
+      _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders);
+      _zSetInfoTabName(TAB_NAMES.infoTab.customer);
+      _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
+      return;
+    }
+
+    let wo = cloneDeep(WORKORDER_PROTO);
+    wo.isStandaloneSale = true;
+    wo.id = generateRandomID();
+    _zSetOpenWorkorderObj(wo);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+  }
 
   return (
     <View

@@ -12,11 +12,10 @@ import { WORKORDER_PROTO, TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import React, { useRef, useState } from "react";
 import { cloneDeep } from "lodash";
-import { WorkordersComponent } from "../screen_components/Options_Workorders";
-import { QuickItemComponent } from "../screen_components/Options_QuickItems";
-import { InventoryComponent } from "../screen_components/Options_Inventory";
-import { WorkorderPreview } from "../screen_components/Items_WorkorderPreview";
-import { MessagesComponent } from "../screen_components/Options_Messages";
+import { WorkordersComponent } from "../screen_components/Options_Screen/Options_Workorders";
+import { QuickItemComponent } from "../screen_components/Options_Screen/Options_QuickItems";
+import { InventoryComponent } from "../screen_components/Options_Screen/Options_Inventory";
+import { MessagesComponent } from "../screen_components/Options_Screen/Options_Messages";
 import { useTabNamesStore, useLoginStore } from "../../stores";
 
 export function Options_Section({

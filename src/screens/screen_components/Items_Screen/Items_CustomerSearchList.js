@@ -2,13 +2,13 @@
 
 import React from "react";
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
-import { generateRandomID, log } from "../../utils";
+import { generateRandomID, log } from "../../../utils";
 import {
   Button,
   CustomerInfoScreenModalComponent,
   ScreenModal,
   SHADOW_RADIUS_PROTO,
-} from "../../components";
+} from "../../../components";
 import { cloneDeep } from "lodash";
 import {
   APP_USER,
@@ -16,7 +16,7 @@ import {
   TAB_NAMES,
   WORKORDER_PROTO,
   WORKORDER_STATUS_NAMES,
-} from "../../data";
+} from "../../../data";
 import {
   useCurrentCustomerStore,
   useCurrentWorkorderStore,
@@ -25,9 +25,9 @@ import {
   useLoginStore,
   useOpenWorkordersStore,
   useTabNamesStore,
-} from "../../stores";
-import { messagesSubscribe } from "../../db_subscriptions";
-import { dbGetCustomerObj } from "../../db_call_wrapper";
+} from "../../../stores";
+import { messagesSubscribe } from "../../../db_subscriptions";
+import { dbGetCustomerObj } from "../../../db_call_wrapper";
 
 export function CustomerSearchListComponent({}) {
   // setters //////////////////////////////////////////////////////////////////////

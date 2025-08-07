@@ -1,8 +1,5 @@
 /* eslint-disable */
 
-// import { getNewCollectionRef } from "./dbCalls";
-import { formatDateTime, generateRandomID, log } from "./utils";
-
 ////////// names ////////////////////////////
 export const INVENTORY_CATEGORIES = {
   parts: "Parts",
@@ -21,13 +18,15 @@ export const TAB_NAMES = {
   infoTab: {
     customer: "Customer Entry",
     workorder: "Workorder View",
+    checkout: "Checkout Screen",
   },
   itemsTab: {
     workorderItems: "Workorder Items",
     changeLog: "Change Log",
     dashboard: "Dashboard",
-    customerList: "",
+    customerList: "Customer List",
     preview: "Preview",
+    empty: "Empty",
   },
   optionsTab: {
     quickItems: "Quick Items",
@@ -36,93 +35,6 @@ export const TAB_NAMES = {
     messages: "Messages",
   },
 };
-
-// export const QUICK_BUTTON_NAMES = [
-//   {
-//     name: "Tune-Up",
-//     id: "1234",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Tube & Tire",
-//     id: "58349",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Brakes",
-//     id: "5834fg9",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Shifting",
-//     id: "583r49",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Drivetrain",
-//     id: "58trt349",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Cable",
-//     id: "583sfg49",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Spoke",
-//     id: "58349",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Cleaning",
-//     id: "583fgs49",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Scooter",
-//     id: "5834nh9",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Pickup",
-//     id: "5855r349",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "Diagnostics",
-//     id: "58fgs349",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "$Labor",
-//     id: "58sgf349",
-//     position: "999",
-//     items: [],
-//   },
-//   {
-//     name: "Brakes",
-//     id: "5854t349",
-//     position: "1",
-//     items: [],
-//   },
-//   {
-//     name: "$Part",
-//     id: "583t54t49",
-//     position: "1000",
-//     items: [],
-//   },
-// ];
 
 export const FOCUS_NAMES = {
   cell: "cell",

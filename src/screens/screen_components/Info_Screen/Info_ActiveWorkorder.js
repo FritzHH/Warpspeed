@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { View, Text, TextInput } from "react-native-web";
-import { dim, log, trimToTwoDecimals } from "../../utils";
+import { dim, log, trimToTwoDecimals } from "../../../utils";
 import {
   TabMenuDivider as Divider,
   ModalDropdown,
@@ -13,15 +13,14 @@ import {
   SHADOW_RADIUS_NOTHING,
   SHADOW_RADIUS_PROTO,
   LoginScreenModalComponent,
-} from "../../components";
-import { Colors } from "../../styles";
+} from "../../../components";
+import { Colors } from "../../../styles";
 import {
   SETTINGS_PROTO,
   WORKORDER_PROTO,
   CUSTOMER_PROTO,
   TAB_NAMES,
-} from "../../data";
-import { IncomingCustomerComponent } from "./Info_CustomerInfoComponent";
+} from "../../../data";
 import React, { useRef } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -31,13 +30,13 @@ import {
   useLoginStore,
   useSettingsStore,
   useTabNamesStore,
-} from "../../stores";
+} from "../../../stores";
 import {
   dbSetCustomerObj,
   dbSetOpenWorkorderItem,
-} from "../../db_call_wrapper";
+} from "../../../db_call_wrapper";
 
-export const Info_WorkorderComponent = ({}) => {
+export const ActiveWorkorderComponent = ({}) => {
   // setters /////////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
@@ -59,7 +58,7 @@ export const Info_WorkorderComponent = ({}) => {
   var zSettingsObj = SETTINGS_PROTO;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
-  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
+  // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 
   ////////////////////////////////////////////////////////////////////
   const [sShowCustomerInfoModal, _setShowCustomerInfoModal] =

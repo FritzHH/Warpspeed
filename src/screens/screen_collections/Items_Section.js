@@ -1,7 +1,6 @@
 /* eslint-disable */
 
 import { on } from "events";
-import { Items_WorkorderItemsTab } from "../screen_components/Items_WorkorderItems";
 import { Tab } from "react-tabs";
 import { View, Text } from "react-native-web";
 import React from "react";
@@ -11,15 +10,18 @@ import { TabMenuButton } from "../../components";
 import { TabMenuDivider as Divider } from "../../components";
 import { clog, log } from "../../utils";
 import { Colors } from "../../styles";
-import { Items_Dashboard } from "../screen_components/Items_Dashboard";
-import { CustomerSearchListComponent } from "../screen_components/Items_CustomerSearchList";
-import { WorkorderPreview } from "../screen_components/Items_WorkorderPreview";
+import { Items_Dashboard } from "../screen_components/Items_Screen/Items_Dashboard";
+import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
+import { WorkorderPreview } from "../screen_components/Items_Screen/Items_WorkorderPreview";
+import { Items_WorkorderItemsTab } from "../screen_components/Items_Screen/Items_WorkorderItems";
+
 import {
   useCurrentWorkorderStore,
   useCustomerSearchStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../stores";
+import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 
 export function Items_Section({}) {
   // setters ///////////////////////////////////////////////////////////////////
@@ -39,22 +41,24 @@ export function Items_Section({}) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  function selectComponent() {
-    if (zWorkorderPreview) return <WorkorderPreview />;
-    if (
-      zCustomerSearchArr.length > 1 &&
-      zItemsTabName === TAB_NAMES.itemsTab.customerList
-    )
-      return <CustomerSearchListComponent />;
-    if (zItemsTabName == TAB_NAMES.itemsTab.workorderItems)
-      return <Items_WorkorderItemsTab />;
-    if (zItemsTabName == TAB_NAMES.itemsTab.changeLog)
-      return (
-        <View>
-          <Text>Change Log Tab</Text>
-        </View>
-      );
-    return <Items_Dashboard />;
+  function ScreenComponent(tabName) {
+    switch (tabName) {
+      case TAB_NAMES.itemsTab.changeLog:
+        return <Text>Change Log Tab</Text>;
+      case TAB_NAMES.itemsTab.customerList:
+        // if (zCustomerSearchArr.length > 1)
+        return <CustomerSearchListComponent />;
+        break;
+      case TAB_NAMES.itemsTab.dashboard:
+        return <Items_Dashboard />;
+      case TAB_NAMES.itemsTab.preview:
+        return <WorkorderPreview />;
+      case TAB_NAMES.itemsTab.workorderItems:
+        return <Items_WorkorderItemsTab />;
+      case TAB_NAMES.itemsTab.empty:
+        return <EmptyItemsComponent />;
+    }
+    return null;
   }
 
   return (
@@ -64,13 +68,12 @@ export function Items_Section({}) {
         zItemsTabName={zItemsTabName}
         zWorkorderObj={zWorkorderObj}
       />
-      {selectComponent()}
+      {ScreenComponent(zItemsTabName)}
     </View>
   );
 }
 
 const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
-  clog(zWorkorderObj);
   return (
     <View
       style={{
@@ -85,19 +88,25 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
         }}
       >
         {zWorkorderObj?.id ? (
-          <TabMenuButton
-            onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)}
-            text={
-              zWorkorderObj.isStandaloneSale
-                ? "Sale Items"
-                : TAB_NAMES.itemsTab.workorderItems
-            }
-            isSelected={
-              zItemsTabName === TAB_NAMES.itemsTab.workorderItems ? true : false
-            }
-          />
+          <View>
+            <TabMenuButton
+              onPress={() =>
+                _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)
+              }
+              text={
+                zWorkorderObj.isStandaloneSale
+                  ? "Sale Items"
+                  : TAB_NAMES.itemsTab.workorderItems
+              }
+              isSelected={
+                zItemsTabName === TAB_NAMES.itemsTab.workorderItems
+                  ? true
+                  : false
+              }
+            />
+            <Divider />
+          </View>
         ) : null}
-        <Divider />
         {zWorkorderObj?.id && !zWorkorderObj.isStandaloneSale ? (
           <TabMenuButton
             onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.changeLog)}

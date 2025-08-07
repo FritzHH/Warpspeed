@@ -6,25 +6,33 @@ import {
   INVENTORY_ITEM_PROTO,
   WORKORDER_PROTO,
   SETTINGS_PROTO,
-} from "../../data";
-import { Colors } from "../../styles";
+} from "../../../data";
+import { Colors } from "../../../styles";
 
-import { dim, generateRandomID, log, randomWordGenerator } from "../../utils";
+import {
+  dim,
+  generateRandomID,
+  log,
+  randomWordGenerator,
+} from "../../../utils";
 import {
   AlertBox,
   Button,
   InventoryItemScreeenModalComponent,
   ScreenModal,
   SHADOW_RADIUS_NOTHING,
-} from "../../components";
+} from "../../../components";
 import { cloneDeep } from "lodash";
 import {
   useSettingsStore,
   useCurrentWorkorderStore,
   useInventoryStore,
   useLoginStore,
-} from "../../stores";
-import { dbSetOpenWorkorderItem, dbSetSettings } from "../../db_call_wrapper";
+} from "../../../stores";
+import {
+  dbSetOpenWorkorderItem,
+  dbSetSettings,
+} from "../../../db_call_wrapper";
 
 const SEARCH_STRING_TIMER = 45 * 1000;
 

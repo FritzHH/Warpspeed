@@ -2067,10 +2067,10 @@ export const Button = ({
   onLongPress,
   text,
   numLines = null,
+  enableMouseOver = true,
   mouseOverOptions = {
-    enable: true,
-    opacity: 0.7,
-    highlightColor: Colors.tabMenuButton,
+    // opacity: 0.7,
+    // highlightColor: Colors.tabMenuButton,
   },
   shadow = true,
   allCaps = false,
@@ -2083,8 +2083,8 @@ export const Button = ({
   if (!shadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   /////////////////////////////////////////////////////
   //////////////////////////////////////////////////////
-  const HEIGHT = 50;
-  const WIDTH = 130;
+  // const HEIGHT = 50;
+  // const WIDTH = 130;
 
   if (!visible) {
     return <View style={{ width: WIDTH, height: HEIGHT }}></View>;
@@ -2093,7 +2093,7 @@ export const Button = ({
   return (
     <TouchableOpacity
       ref={ref}
-      onMouseOver={() => (mouseOverOptions.enable ? _setMouseOver(true) : null)}
+      onMouseOver={() => (enableMouseOver ? _setMouseOver(true) : null)}
       onMouseLeave={() => {
         _setMouseOver(false);
       }}
@@ -2104,27 +2104,27 @@ export const Button = ({
         style={{
           alignItems: "center",
           justifyContent: "center",
-          width: WIDTH,
-          height: HEIGHT,
+          paddingHorizontal: 15,
+          paddingVertical: 5,
+          // width: WIDTH,
+          // height: HEIGHT,
+          backgroundColor: Colors.tabMenuButton,
           ...shadowStyle,
           ...buttonStyle,
           backgroundColor: sMouseOver
             ? mouseOverOptions.highlightColor
-            : buttonStyle.backgroundColor,
+            : buttonStyle.backgroundColor || Colors.tabMenuButton,
           opacity: sMouseOver ? mouseOverOptions.opacity : buttonStyle.opacity,
         }}
       >
         <Text
-          numberOfLines={numLines}
+          numberOfLines={2}
           style={{
-            // paddingHorizontal: 10,
-            // paddingVertical: 5,
             textAlign: "center",
             textAlignVertical: "center",
             fontSize: 17,
             ...textStyle,
-            color: sMouseOver ? "white" : textStyle.color,
-            // backgroundColor: "green",
+            color: sMouseOver ? "black" : textStyle.color || "white",
           }}
         >
           {text || "Button"}

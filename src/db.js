@@ -14,6 +14,7 @@ import {
   onSnapshot,
   query,
   arrayRemove,
+  where,
 } from "firebase/firestore";
 
 import {
@@ -28,7 +29,7 @@ import {
   set,
 } from "firebase/database";
 import { initializeApp } from "firebase/app";
-import { log } from "./utils";
+import { clog, log } from "./utils";
 import {
   CUSTOMER_PREVIEW_PROTO,
   CUSTOMER_PROTO,
@@ -148,6 +149,25 @@ export function subscribeToCollectionNode(collectionName, callback) {
     });
     callback(arr);
   });
+}
+
+export async function searchCollection(collectionPath, fieldName, searchTerm) {
+  let text = searchTerm.toString();
+  // log("search term", text);
+  let q = query(
+    collection(DB, collectionPath),
+    where(fieldName, ">=", text),
+    where(fieldName, "<=", text + "\uf8ff")
+  );
+
+  let queryRes = [];
+  let querySnapshot = await getDocs(q);
+  // log("snap empty", querySnapshot.empty.toString());
+  querySnapshot.forEach((doc) => {
+    // log("doc", doc.data());
+    queryRes.push(doc.data());
+  });
+  return queryRes;
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -297,6 +317,7 @@ export function subscribeToNodeChange(
   let dbRef = ref(RDB, nodePath);
   return onChildChanged(dbRef, (snap) => {
     if (snap.val()) {
+      // log("subscription change", snap.val());
       callback("changed", snap.key, snap.val(), targetData, targetSetter);
     }
   });
@@ -325,8 +346,8 @@ export function subscribeToNodeAddition(
   let dbRef = ref(RDB, nodePath);
   return onChildAdded(dbRef, (snap) => {
     if (snap.val()) {
-      // log("added", snap.val());
-      callback("added", snap.key, snap.val());
+      // clog("added", snap.val());
+      callback("subscription added", snap.key, snap.val());
     }
   });
 }
@@ -334,7 +355,7 @@ export function subscribeToNodeAddition(
 export function subscriptionManualRemove(path) {
   let ref1 = ref(RDB, path);
   off(ref1, "value", (res) => {
-    log("result of manual removal", res);
+    // log("result of manual removal", res);
   });
 }
 

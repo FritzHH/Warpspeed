@@ -184,7 +184,7 @@ export const useCheckoutStore = create((set, get) => ({
   splitPayment: false,
   paymentArr: [],
   splitPayment: true,
-  totalAmount: "69.69",
+  totalAmount: "5.00",
   isRefund: false,
   isPartialPayment: false,
   getTotalCaptured: () => {

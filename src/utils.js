@@ -162,8 +162,7 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
 
 export function trimToTwoDecimals(num) {
   // log("incoming num to trim to 2 decimals", num);
-  // num = "4";
-  // log("trimming", num);
+
   let strNum = num.toString();
   let res;
   if (strNum.includes(".")) {
@@ -181,8 +180,10 @@ export function trimToTwoDecimals(num) {
     } else if (countOnRight == 1) {
       // 1 character on right, add another
       // log("two");
-      let res = strNum + "0";
-      if (split[0] == "") res = "0" + res;
+      res = strNum + "0";
+      if (split[0] == "") {
+        res = "0" + res;
+      }
     } else if (countOnRight == 0 && split[1] != "") {
       // log("three");
       res = strNum + "00";
@@ -192,6 +193,7 @@ export function trimToTwoDecimals(num) {
       res = split[0] + "." + last2;
     }
   } else {
+    // log("five");
     res = strNum + ".00";
   }
   // log("trim 2 decimals val", res);

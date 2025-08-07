@@ -180,24 +180,30 @@ export const Info_CheckoutComponent = ({}) => {
   }
 
   const handlePaymentSuccess = async (paymentObj) => {
-    log("incoming payment obj", paymentObj);
+    log("incoming payment success obj in Checkout Component", paymentObj);
     let cardSale = paymentObj.last4;
     let paymentsArr = cloneDeep(zPaymentsArr);
     paymentsArr.push(paymentObj);
-    _zSetPaymentArr(paymentsArr);
 
     let totalCaptured = 0;
-    paymentsArr.forEach((paymentObj) => (totalCaptured += paymentObj.amount));
+    paymentsArr.forEach(
+      (paymentObj) => (totalCaptured += Number(paymentObj.amount))
+    );
     // log("total captured", totalCaptured);
 
     let changeNeeded;
     if (!cardSale) {
       changeNeeded = trimToTwoDecimals(
-        paymentObj.amountTendered - paymentObj.amount
+        Number(paymentObj.amountTendered) - Number(paymentObj.amount)
       );
     }
 
-    if (zTotalAmount == totalCaptured) _setPaymentComplete(true);
+    // log("total caputured", totalCaptured);
+    if (Number(zTotalAmount) == totalCaptured) {
+      _setPaymentComplete(true);
+      log("Payment complete!");
+    }
+
     _setCashChangeNeeded(changeNeeded);
     _setTotalAmountCaptured(totalCaptured);
     _zSetPaymentArr(paymentsArr);
@@ -218,7 +224,6 @@ export const Info_CheckoutComponent = ({}) => {
       _zSetSplitPayment(!zSplitPayment);
     }
   };
-  // return null;
 
   return (
     <View
@@ -340,7 +345,7 @@ export const Info_CheckoutComponent = ({}) => {
               backgroundColor: Colors.tabMenuButton,
               borderRadius: 0,
             }}
-            visible={sTotalAmountCaptured != zTotalAmount}
+            visible={!sPaymentComplete}
             text={"Cash / Check"}
             onPress={() => _sSetShowCashSaleModal(true)}
           />
@@ -352,7 +357,7 @@ export const Info_CheckoutComponent = ({}) => {
               backgroundColor: Colors.tabMenuButton,
               borderRadius: 0,
             }}
-            visible={sTotalAmountCaptured != zTotalAmount}
+            visible={!sPaymentComplete}
             text={"Card"}
             onPress={() => _sSetShowCreditCardModal(true)}
           />
@@ -375,7 +380,7 @@ export const Info_CheckoutComponent = ({}) => {
           {sTotalAmountCaptured == zTotalAmount ? (
             <Text>Sale Complete!</Text>
           ) : null}
-          {zSplitPayment && sCashChangeNeeded ? (
+          {zSplitPayment ? (
             <View>
               {zPaymentsArr.map((item) => (
                 <View
@@ -472,7 +477,7 @@ export const Info_CheckoutComponent = ({}) => {
               Cash change needed:
             </Text>
             <Text style={{ fontSize: 20, fontWeight: 500, color: "green" }}>
-              {sCashChangeNeeded}
+              {trimToTwoDecimals(sCashChangeNeeded)}
             </Text>
           </View>
         ) : null}

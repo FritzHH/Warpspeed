@@ -91,12 +91,13 @@ export function NewWorkorderComponent({}) {
   const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] = useState(true);
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
 
-  function handleBox1TextChange(incomingText = "") {
+  async function handleBox1TextChange(incomingText = "") {
     // log("incoming box 1", incomingText);
     // if all input erased
-    if (incomingText === "") {
+    if (incomingText === "" || !incomingText) {
       _setBox1Val("");
       _zSetSearchResults([]);
+      _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
       return;
     }
 
@@ -109,10 +110,8 @@ export function NewWorkorderComponent({}) {
       let substr = formattedText.substring(1, formattedText.length);
       formattedText = char1 + substr;
     }
-    // log("format", formattedText);
 
     // check for valid inputs for each box
-
     if (sSearchingByName) {
       if (
         LETTERS.includes(formattedText[formattedText.length - 1]) ||
@@ -136,22 +135,19 @@ export function NewWorkorderComponent({}) {
     let searchResults = [];
     // log("arr", zCustPreviewArr);
     if (sSearchingByName) {
-      dbSearchForName(formattedText).then((res) => {
-        searchResults = res;
-        clog("NAME SEARCH RESULT", res);
-      });
+      searchResults = await dbSearchForName(formattedText);
     } else {
-      dbSearchForPhoneNumber(formattedText).then((res) => {
-        searchResults = res;
-        clog("PHONE NUMBER SEARCH RESULT", res);
-      });
+      searchResults = await dbSearchForPhoneNumber(formattedText);
     }
+    // log("results", searchResults);
 
     _zSetSearchResults(searchResults);
     if (searchResults.length > 0) {
       _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
+    } else {
+      _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
     }
-    // log("res", searchResults);
+
     // show the create customer button if input conditions are met
     if (sSearchingByName) _setShowCreateCustomerBtn(formattedText.length >= 2);
     if (!sSearchingByName)
@@ -236,73 +232,75 @@ export function NewWorkorderComponent({}) {
 
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
-  return (
-    <View
-      style={{
-        width: "100%",
-        height: "100%",
-        backgroundColor: null,
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
+  function setComponent() {
+    return (
       <View
         style={{
           width: "100%",
-          justifyContent: "flex-start",
+          height: "100%",
+          backgroundColor: null,
+          justifyContent: "space-between",
           alignItems: "center",
-          // marginTop: 100,
-          // backgroundColor: "green",
         }}
       >
-        <View style={{ width: "100%", alignItems: "flex-end" }}>
-          <Button
-            buttonStyle={{
-              width: 80,
-              // height: 30,
-              ...SHADOW_RADIUS_PROTO,
-              marginTop: 10,
-              marginRight: 10,
-              // padding: 5,
-              paddingHorizontal: 0,
-            }}
-            textStyle={{ fontSize: 13, color: "white" }}
-            onPress={() => {
-              _setBox1Val("");
-              _setBox2Val("");
-              _setSearchingByName(!sSearchingByName);
-              _zSetSearchResults([]);
-              _setShowCreateCustomerBtn(false);
-            }}
-            text={sSearchingByName ? "Search By Phone" : "Search By Name"}
-          />
-        </View>
-        <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
-        <TextInput
+        <View
           style={{
-            marginTop: 100,
-            borderBottomWidth: 1,
-            width: 200,
-            height: 40,
-            paddingHorizontal: 3,
-            outlineStyle: "none",
-            borderColor: "gray",
-            fontSize: 16,
-            color: sBox1Val.length < 0 ? "gray" : "dimgray",
+            width: "100%",
+            justifyContent: "flex-start",
+            alignItems: "center",
+            // marginTop: 100,
+            // backgroundColor: "green",
           }}
-          autoFocus={true}
-          placeholder={sSearchingByName ? "First Name..." : "Phone number..."}
-          placeholderTextColor={"gray"}
-          value={sBox1Val}
-          onChangeText={(val) => handleBox1TextChange(val)}
-        />
-        <View style={{ width: 10 }} />
-        {sSearchingByName && (
-          <View>
+        >
+          <View style={{ width: "100%", alignItems: "flex-end" }}>
+            <Button
+              buttonStyle={{
+                width: 80,
+                // height: 30,
+                ...SHADOW_RADIUS_PROTO,
+                marginTop: 10,
+                marginRight: 10,
+                // padding: 5,
+                paddingHorizontal: 0,
+              }}
+              textStyle={{ fontSize: 13, color: "white" }}
+              onPress={() => {
+                _setBox1Val("");
+                _setBox2Val("");
+                _setSearchingByName(!sSearchingByName);
+                _zSetSearchResults([]);
+                _setShowCreateCustomerBtn(false);
+              }}
+              text={sSearchingByName ? "Search By Phone" : "Search By Name"}
+            />
+          </View>
+          <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+          <TextInput
+            style={{
+              marginTop: 100,
+              borderBottomWidth: 1,
+              width: 200,
+              height: 40,
+              paddingHorizontal: 3,
+              outlineStyle: "none",
+              borderColor: "gray",
+              fontSize: 16,
+              color: sBox1Val.length < 0 ? "gray" : "dimgray",
+            }}
+            autoFocus={true}
+            placeholder={sSearchingByName ? "First Name..." : "Phone number..."}
+            placeholderTextColor={"gray"}
+            value={sBox1Val}
+            onChangeText={(val) => handleBox1TextChange(val)}
+          />
+          <View style={{ width: 10 }} />
+          {sSearchingByName && (
+            // <View>
             <TextInput
               placeholder={"Last name..."}
               placeholderTextColor={"gray"}
               style={{
+                marginTop: 20,
                 padding: 3,
                 borderBottomWidth: 1,
                 fontSize: 16,
@@ -314,59 +312,66 @@ export function NewWorkorderComponent({}) {
               value={sBox2Val}
               onChangeText={(val) => handleBox2TextChange(val)}
             />
-          </View>
-        )}
-
-        {/** customer info modal */}
-        <ScreenModal
-          showOuterModal={true}
-          outerModalStyle={{}}
-          buttonStyle={{
-            height: 50,
-            marginVertical: 10,
-            marginTop: 50,
-            width: null,
-          }}
-          buttonVisible={sShowCreateCustomerButton}
-          buttonTextStyle={{ color: "dimgray" }}
-          handleButtonPress={() =>
-            _zExecute(() => handleModalCreateCustomerBtnPressed())
-          }
-          buttonLabel={"Create New Customer"}
-          modalVisible={sCustomerInfo}
-          canExitOnOuterClick={false}
-          Component={() => (
-            <CustomerInfoScreenModalComponent
-              sCustomerInfo={sCustomerInfo || {}}
-              button1Text={"Create Customer"}
-              button2Text={"Cancel"}
-              ssInfoTextFocus={sInfoTextFocus}
-              __setInfoTextFocus={_setInfoTextFocus}
-              handleButton1Press={handleCreateNewCustomerPressed}
-              __setCustomerInfo={_setCustomerInfo}
-              handleButton2Press={() => {
-                // cancel button
-                _setBox1Val("");
-                _setBox2Val("");
-                _setSearchingByName(false);
-                _zResetSearch();
-                _setShowCreateCustomerBtn(false);
-                _setCustomerInfo(null);
-              }}
-            />
+            // </View>
           )}
+
+          {/** customer info modal */}
+          <ScreenModal
+            showOuterModal={true}
+            outerModalStyle={{}}
+            buttonStyle={{
+              height: 50,
+              marginVertical: 10,
+              marginTop: 50,
+              width: null,
+            }}
+            buttonVisible={sShowCreateCustomerButton}
+            buttonTextStyle={{ color: "dimgray" }}
+            handleButtonPress={() =>
+              _zExecute(() => handleModalCreateCustomerBtnPressed())
+            }
+            buttonLabel={"Create New Customer"}
+            modalVisible={sCustomerInfo}
+            canExitOnOuterClick={false}
+            Component={() => (
+              <CustomerInfoScreenModalComponent
+                sCustomerInfo={sCustomerInfo || {}}
+                button1Text={"Create Customer"}
+                button2Text={"Cancel"}
+                ssInfoTextFocus={sInfoTextFocus}
+                __setInfoTextFocus={_setInfoTextFocus}
+                handleButton1Press={handleCreateNewCustomerPressed}
+                __setCustomerInfo={_setCustomerInfo}
+                handleButton2Press={() => {
+                  // cancel button
+                  _setBox1Val("");
+                  _setBox2Val("");
+                  _setSearchingByName(false);
+                  _zResetSearch();
+                  _setShowCreateCustomerBtn(false);
+                  _setCustomerInfo(null);
+                }}
+              />
+            )}
+          />
+        </View>
+
+        <Button
+          text={"New Sale"}
+          // buttonStyle={}
+          onPress={() => {
+            _zStartStandaloneSale();
+            _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
+            _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
+          }}
         />
       </View>
+    );
+  }
 
-      <Button
-        text={"New Sale"}
-        // buttonStyle={}
-        onPress={() => {
-          _zStartStandaloneSale();
-          _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
-          _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
-        }}
-      />
-    </View>
-  );
+  try {
+    return setComponent();
+  } catch (e) {
+    log("Error returning NewWorkorderComponent", e);
+  }
 }

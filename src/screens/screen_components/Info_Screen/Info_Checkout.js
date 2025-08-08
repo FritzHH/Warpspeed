@@ -228,348 +228,349 @@ export const CheckoutComponent = ({}) => {
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
 
-  return (
-    <View
-      style={{
-        width: "100%",
-        height: "100%",
-        justifyContent: "flex-start",
-        alignItems: "center",
-        // backgroundColor: "green",
-      }}
-    >
-      <ScreenModal
-        buttonVisible={false}
-        showOuterModal={true}
-        modalVisible={sShowCreditCardModal || sShowCashSaleModal}
-        showShadow={true}
-        shadowStyle={{ ...SHADOW_RADIUS_PROTO }}
-        Component={() => {
-          if (sShowCreditCardModal)
+  function setComponent() {
+    return (
+      <View
+        style={{
+          width: "100%",
+          height: "100%",
+          justifyContent: "flex-start",
+          alignItems: "center",
+          // backgroundColor: "green",
+        }}
+      >
+        <ScreenModal
+          buttonVisible={false}
+          showOuterModal={true}
+          modalVisible={sShowCreditCardModal || sShowCashSaleModal}
+          showShadow={true}
+          shadowStyle={{ ...SHADOW_RADIUS_PROTO }}
+          Component={() => {
+            if (sShowCreditCardModal)
+              return (
+                <StripeCreditCardModalComponent
+                  onCancel={() => {
+                    _sSetShowCreditCardModal(false);
+                    _zSetIsRefund(false);
+                  }}
+                  isRefund={zIsRefund}
+                  totalAmount={zTotalAmount}
+                  splitPayment={zSplitPayment}
+                  onComplete={handlePaymentSuccess}
+                  paymentsArr={zPaymentsArr}
+                />
+              );
             return (
-              <StripeCreditCardModalComponent
-                onCancel={() => {
-                  _sSetShowCreditCardModal(false);
-                  _zSetIsRefund(false);
-                }}
-                isRefund={zIsRefund}
+              <CashSaleModalComponent
+                onCancel={() => _sSetShowCashSaleModal(false)}
                 totalAmount={zTotalAmount}
-                splitPayment={zSplitPayment}
                 onComplete={handlePaymentSuccess}
+                isRefund={zIsRefund}
+                splitPayment={zSplitPayment}
+                acceptsChecks={zSettingsObj.acceptChecks}
                 paymentsArr={zPaymentsArr}
               />
             );
-          return (
-            <CashSaleModalComponent
-              onCancel={() => _sSetShowCashSaleModal(false)}
-              totalAmount={zTotalAmount}
-              onComplete={handlePaymentSuccess}
-              isRefund={zIsRefund}
-              splitPayment={zSplitPayment}
-              acceptsChecks={zSettingsObj.acceptChecks}
-              paymentsArr={zPaymentsArr}
-            />
-          );
-        }}
-      />
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          justifyContent: "space-between",
-          height: 50,
-          alignItems: "center",
-          marginTop: "1%",
-          paddingHorizontal: 8,
-        }}
-      >
-        <View
-          style={{
-            width: "70%",
-            flexDirection: "row",
-            justifyContent: "flex-start",
-            alignItems: "center",
-          }}
-        >
-          <CheckBox
-            viewStyle={{ marginRight: 5 }}
-            text={"Refund"}
-            isChecked={zIsRefund}
-            onCheck={() => {
-              if (!zIsRefund) _zSetSplitPayment(false);
-              sTotalAmountCaptured ? null : _zSetIsRefund(!zIsRefund);
-            }}
-          />
-          {zIsRefund ? (
-            <TextInput
-              style={{
-                outlineWidth: 0,
-                borderColor: "lightgray",
-                borderWidth: 1,
-                paddingHorizontal: 3,
-                height: 30,
-                marginLeft: 10,
-                width: "70%",
-              }}
-              autoFocus={true}
-              placeholder="Scan or enter workorder #"
-              placeholderTextColor={"lightgray"}
-              value={sRefundScan}
-              onChangeText={(val) => handleRefundScan(val)}
-            />
-          ) : null}
-        </View>
-        <CheckBox
-          text={"Split Payment"}
-          isChecked={zSplitPayment}
-          onCheck={() => {
-            if (!zSplitPayment) _zSetIsRefund(false);
-            handleSplitPaymentPress();
           }}
         />
-      </View>
-      <View
-        style={{
-          width: "100%",
-        }}
-      >
         <View
           style={{
             width: "100%",
             flexDirection: "row",
-            justifyContent: "space-evenly",
+            justifyContent: "space-between",
+            height: 50,
+            alignItems: "center",
+            marginTop: "1%",
+            paddingHorizontal: 8,
           }}
         >
-          <Button
-            textStyle={{ color: "white" }}
-            buttonStyle={{
-              width: 150,
-              height: 40,
-              backgroundColor: Colors.tabMenuButton,
-              borderRadius: 0,
+          <View
+            style={{
+              width: "70%",
+              flexDirection: "row",
+              justifyContent: "flex-start",
+              alignItems: "center",
             }}
-            visible={!sPaymentComplete}
-            text={"Cash / Check"}
-            onPress={() => _sSetShowCashSaleModal(true)}
-          />
-          <Button
-            textStyle={{ color: "white" }}
-            buttonStyle={{
-              width: 150,
-              height: 40,
-              backgroundColor: Colors.tabMenuButton,
-              borderRadius: 0,
+          >
+            <CheckBox
+              viewStyle={{ marginRight: 5 }}
+              text={"Refund"}
+              isChecked={zIsRefund}
+              onCheck={() => {
+                if (!zIsRefund) _zSetSplitPayment(false);
+                sTotalAmountCaptured ? null : _zSetIsRefund(!zIsRefund);
+              }}
+            />
+            {zIsRefund ? (
+              <TextInput
+                style={{
+                  outlineWidth: 0,
+                  borderColor: "lightgray",
+                  borderWidth: 1,
+                  paddingHorizontal: 3,
+                  height: 30,
+                  marginLeft: 10,
+                  width: "70%",
+                }}
+                autoFocus={true}
+                placeholder="Scan or enter workorder #"
+                placeholderTextColor={"lightgray"}
+                value={sRefundScan}
+                onChangeText={(val) => handleRefundScan(val)}
+              />
+            ) : null}
+          </View>
+          <CheckBox
+            text={"Split Payment"}
+            isChecked={zSplitPayment}
+            onCheck={() => {
+              if (!zSplitPayment) _zSetIsRefund(false);
+              handleSplitPaymentPress();
             }}
-            visible={!sPaymentComplete}
-            text={"Card"}
-            onPress={() => _sSetShowCreditCardModal(true)}
           />
         </View>
-      </View>
-      <View
-        style={{
-          marginTop: 10,
-          width: "100%",
-          // height: 20,
-        }}
-      >
         <View
           style={{
-            flexDirection: "row",
-            justifyContent: "space-around",
-            alignItems: "center",
+            width: "100%",
           }}
         >
-          {sTotalAmountCaptured == zTotalAmount ? (
-            <Text>Sale Complete!</Text>
-          ) : null}
-          {zSplitPayment ? (
-            <View>
-              {zPaymentsArr.map((item) => (
+          <View
+            style={{
+              width: "100%",
+              flexDirection: "row",
+              justifyContent: "space-evenly",
+            }}
+          >
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                width: 150,
+                height: 40,
+                backgroundColor: Colors.tabMenuButton,
+                borderRadius: 0,
+              }}
+              visible={!sPaymentComplete}
+              text={"Cash / Check"}
+              onPress={() => _sSetShowCashSaleModal(true)}
+            />
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                width: 150,
+                height: 40,
+                backgroundColor: Colors.tabMenuButton,
+                borderRadius: 0,
+              }}
+              visible={!sPaymentComplete}
+              text={"Card"}
+              onPress={() => _sSetShowCreditCardModal(true)}
+            />
+          </View>
+        </View>
+        <View
+          style={{
+            marginTop: 10,
+            width: "100%",
+            // height: 20,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-around",
+              alignItems: "center",
+            }}
+          >
+            {sTotalAmountCaptured == zTotalAmount ? (
+              <Text>Sale Complete!</Text>
+            ) : null}
+            {zSplitPayment ? (
+              <View>
+                {zPaymentsArr.map((item) => (
+                  <View
+                    style={{ flexDirection: "row", justifyContent: "center" }}
+                  >
+                    <Text>
+                      {item.last4 ? "Card payment: $" : "Cash payment: $"}
+                    </Text>
+                    <Text>{trimToTwoDecimals(item.amount)}</Text>
+                  </View>
+                ))}
                 <View
-                  style={{ flexDirection: "row", justifyContent: "center" }}
-                >
-                  <Text>
-                    {item.last4 ? "Card payment: $" : "Cash payment: $"}
-                  </Text>
-                  <Text>{trimToTwoDecimals(item.amount)}</Text>
-                </View>
-              ))}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  marginVertical: 10,
-                }}
-              >
-                <Text style={{ fontSize: 20, fontWeight: 500 }}>
-                  {"Left to pay:"}
-                </Text>
-                <Text
                   style={{
-                    fontSize: 20,
-                    marginLeft: 10,
-                    color: "red",
-                    fontWeight: 500,
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    marginVertical: 10,
                   }}
                 >
-                  {trimToTwoDecimals(zTotalAmount - sTotalAmountCaptured)}
-                </Text>
+                  <Text style={{ fontSize: 20, fontWeight: 500 }}>
+                    {"Left to pay:"}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      marginLeft: 10,
+                      color: "red",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {trimToTwoDecimals(zTotalAmount - sTotalAmountCaptured)}
+                  </Text>
+                </View>
               </View>
+            ) : null}
+          </View>
+
+          {sPaymentComplete ? (
+            <View
+              style={{
+                flexDirection: "row",
+                width: "100%",
+                justifyContent: "space-around",
+                marginTop: 10,
+              }}
+            >
+              <Button
+                textStyle={{ color: "white" }}
+                buttonStyle={{
+                  width: 100,
+                  height: 20,
+                  backgroundColor: "gray",
+                  borderRadius: 0,
+                }}
+                shadow={true}
+                text={"Email"}
+                onPress={() => {}}
+              />
+              <Button
+                textStyle={{ color: "white" }}
+                buttonStyle={{
+                  width: 100,
+                  height: 20,
+                  backgroundColor: "gray",
+                  borderRadius: 0,
+                  padding: 5,
+                }}
+                shadow={true}
+                text={"Print"}
+                onPress={() => {}}
+              />
+              <Button
+                textStyle={{ color: "white" }}
+                buttonStyle={{
+                  width: 100,
+                  height: 20,
+                  backgroundColor: "gray",
+                  borderRadius: 0,
+                }}
+                text={"Text"}
+                onPress={() => {}}
+              />
+            </View>
+          ) : null}
+          {sCashChangeNeeded ? (
+            <View
+              style={{
+                width: "100%",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 20, marginRight: 10, color: "" }}>
+                Cash change needed:
+              </Text>
+              <Text style={{ fontSize: 20, fontWeight: 500, color: "green" }}>
+                {trimToTwoDecimals(sCashChangeNeeded)}
+              </Text>
             </View>
           ) : null}
         </View>
-
-        {sPaymentComplete ? (
-          <View
-            style={{
-              flexDirection: "row",
-              width: "100%",
-              justifyContent: "space-around",
-              marginTop: 10,
-            }}
-          >
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                width: 100,
-                height: 20,
-                backgroundColor: "gray",
-                borderRadius: 0,
-              }}
-              shadow={true}
-              text={"Email"}
-              onPress={() => {}}
-            />
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                width: 100,
-                height: 20,
-                backgroundColor: "gray",
-                borderRadius: 0,
-                padding: 5,
-              }}
-              shadow={true}
-              text={"Print"}
-              onPress={() => {}}
-            />
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                width: 100,
-                height: 20,
-                backgroundColor: "gray",
-                borderRadius: 0,
-              }}
-              text={"Text"}
-              onPress={() => {}}
-            />
-          </View>
-        ) : null}
-        {sCashChangeNeeded ? (
-          <View
-            style={{
-              width: "100%",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text style={{ fontSize: 20, marginRight: 10, color: "" }}>
-              Cash change needed:
-            </Text>
-            <Text style={{ fontSize: 20, fontWeight: 500, color: "green" }}>
-              {trimToTwoDecimals(sCashChangeNeeded)}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-      <View
-        style={{
-          height: "80%",
-          backgroundColor: null,
-          width: "100%",
-          // flexDirection: "row",
-        }}
-      >
-        <FlatList
-          data={getAllCustomerOpenWorkorders()}
-          renderItem={(item, index) => {
-            item = item.item;
-            let total = calculateRunningTotals(item, zInventoryArr);
-            return (
-              <View
-                style={{
-                  width: "100%",
-                  flexDirection: "row",
-                }}
-              >
-                <View style={{ width: "95%" }}>
-                  <View style={{ flexDirection: "row" }}>
-                    <Text style={{ marginRight: 10 }}>
-                      {item.brand || "No brand..."}
-                    </Text>
-                    <Text>{item.description || "No description..."}</Text>
+        <View
+          style={{
+            height: "80%",
+            backgroundColor: null,
+            width: "100%",
+            // flexDirection: "row",
+          }}
+        >
+          <FlatList
+            data={getAllCustomerOpenWorkorders()}
+            renderItem={(item, index) => {
+              item = item.item;
+              let total = calculateRunningTotals(item, zInventoryArr);
+              return (
+                <View
+                  style={{
+                    width: "100%",
+                    flexDirection: "row",
+                  }}
+                >
+                  <View style={{ width: "95%" }}>
+                    <View style={{ flexDirection: "row" }}>
+                      <Text style={{ marginRight: 10 }}>
+                        {item.brand || "No brand..."}
+                      </Text>
+                      <Text>{item.description || "No description..."}</Text>
+                    </View>
+                    <View
+                      style={{
+                        width: "90%",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                        <Text style={{ fontWeight: 400 }}>Num. Items: </Text>
+                        {total.runningQty}
+                      </Text>
+                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                        <Text style={{ fontWeight: 400 }}>Discount: </Text>
+                        {total.runningDiscount}
+                      </Text>
+                      <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+                        <Text style={{ fontWeight: 400 }}>Total: </Text>
+                        {total.runningTotal}
+                      </Text>
+                    </View>
                   </View>
                   <View
                     style={{
-                      width: "90%",
-                      flexDirection: "row",
-                      justifyContent: "space-between",
+                      width: "5%",
+                      justifyContent: "center",
+                      height: "100%",
+                      alignItems: "center",
+                      // backgroundColor: "green",
                     }}
                   >
-                    <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                      <Text style={{ fontWeight: 400 }}>Num. Items: </Text>
-                      {total.runningQty}
-                    </Text>
-                    <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                      <Text style={{ fontWeight: 400 }}>Discount: </Text>
-                      {total.runningDiscount}
-                    </Text>
-                    <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-                      <Text style={{ fontWeight: 400 }}>Total: </Text>
-                      {total.runningTotal}
-                    </Text>
+                    <CheckBox
+                      onCheck={() => {}}
+                      buttonStyle={{ marginRight: 10 }}
+                    />
                   </View>
                 </View>
-                <View
-                  style={{
-                    width: "5%",
-                    justifyContent: "center",
-                    height: "100%",
-                    alignItems: "center",
-                    // backgroundColor: "green",
-                  }}
-                >
-                  <CheckBox
-                    onCheck={() => {}}
-                    buttonStyle={{ marginRight: 10 }}
-                  />
-                </View>
-              </View>
-            );
-          }}
-        />
-        {/* </View> */}
-        <View
-          style={{
-            width: "100%",
-            flexDirection: "row",
-            justifyContent: "space-around",
-          }}
-        >
-          <Button
-            textStyle={{ color: "white" }}
-            buttonStyle={{
-              backgroundColor: Colors.tabMenuButton,
-              height: 35,
-              width: 150,
+              );
             }}
-            text={"Exit Checkout"}
-            onPress={actionButtonPressed}
           />
-          {/* <Button
+          {/* </View> */}
+          <View
+            style={{
+              width: "100%",
+              flexDirection: "row",
+              justifyContent: "space-around",
+            }}
+          >
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                backgroundColor: Colors.tabMenuButton,
+                height: 35,
+                width: 150,
+              }}
+              text={"Exit Checkout"}
+              onPress={actionButtonPressed}
+            />
+            {/* <Button
           textStyle={{ color: "white" }}
           buttonStyle={{
             backgroundColor: Colors.tabMenuButton,
@@ -579,9 +580,15 @@ export const CheckoutComponent = ({}) => {
           text={!zWorkorderObj?.isStandaloneSale ? "New Sale" : "Cancel Sale"}
           onPress={actionButtonPressed}
         /> */}
+          </View>
         </View>
+        {/* ) : null} */}
       </View>
-      {/* ) : null} */}
-    </View>
-  );
+    );
+  }
+  try {
+    return setComponent();
+  } catch (e) {
+    log("Error returning CheckoutComponent", e);
+  }
 };

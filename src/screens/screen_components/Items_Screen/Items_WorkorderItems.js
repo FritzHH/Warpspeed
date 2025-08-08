@@ -221,142 +221,154 @@ export const Items_WorkorderItemsTab = ({}) => {
     if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
   }
 
-  if (
-    !zWorkorderObj ||
-    (zWorkorderObj.isStandaloneSale && zWorkorderObj.workorderLines.length == 0)
-  ) {
+  // if (
+  //   !zWorkorderObj ||
+  //   (zWorkorderObj.isStandaloneSale && zWorkorderObj.workorderLines.length == 0)
+  // ) {
+  //   return (
+  //     <View
+  //       style={{
+  //         width: "100%",
+  //         height: "100%",
+  //         justifyContent: "center",
+  //         alignItems: "center",
+  //       }}
+  //     >
+  //       <Text
+  //         style={{
+  //           textAlign: "center",
+  //           opacity: 0.05,
+  //           color: "black",
+  //           fontSize: 120,
+  //         }}
+  //       >
+  //         {zWorkorderObj?.isStandaloneSale ? "Empty\nSale" : "Empty\nWorkorder"}
+  //       </Text>
+  //     </View>
+  //   );
+  // }
+
+  function setComponent() {
     return (
       <View
         style={{
           width: "100%",
-          height: "100%",
-          justifyContent: "center",
-          alignItems: "center",
+          height: "95%",
         }}
       >
-        <Text
+        <FlatList
+          style={{ marginTop: 3, marginRight: 5 }}
+          data={zWorkorderObj.workorderLines}
+          keyExtractor={(item, idx) => idx}
+          renderItem={(item) => {
+            let idx = item.index;
+            item = item.item;
+            let invItem = zInventoryArr.find(
+              (obj) => obj.id === item.invItemID
+            );
+            return (
+              <LineItemComponent
+                __deleteWorkorderLine={deleteWorkorderLineItem}
+                // __setWorkorderObj={_zSetWorkorderObj}
+                __setWorkorderLineItem={editWorkorderLine}
+                inventoryItem={invItem}
+                workorderLine={item}
+                zWorkorderObj={zWorkorderObj}
+                __splitItems={splitItems}
+                __modQtyPressed={modQtyPressed}
+                index={idx}
+                applyDiscount={applyDiscount}
+                zSettingsObj={zSettingsObj}
+                ssButtonsRowID={sButtonsRowID}
+                __setButtonsRowID={_setButtonsRowID}
+              />
+            );
+          }}
+        />
+        <View
           style={{
-            textAlign: "center",
-            opacity: 0.05,
-            color: "black",
-            fontSize: 120,
+            flexDirection: "row",
+            justifyContent: "space-around",
+            alignItems: "center",
+            width: "100%",
+            borderTopWidth: 1,
+            borderTopColor: "gray",
+            paddingTop: 5,
+            paddingBottom: 5,
+            opacity: sNumItems > 0 ? 1 : 0.2,
           }}
         >
-          {zWorkorderObj?.isStandaloneSale ? "Empty\nSale" : "Empty\nWorkorder"}
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View
-      style={{
-        width: "100%",
-        height: "95%",
-      }}
-    >
-      <FlatList
-        style={{ marginTop: 3, marginRight: 5 }}
-        data={zWorkorderObj.workorderLines}
-        keyExtractor={(item, idx) => idx}
-        renderItem={(item) => {
-          // log("index", idx.);
-          let idx = item.index;
-          item = item.item;
-          let invItem = zInventoryArr.find((obj) => obj.id === item.invItemID);
-          return (
-            <LineItemComponent
-              __deleteWorkorderLine={deleteWorkorderLineItem}
-              // __setWorkorderObj={_zSetWorkorderObj}
-              __setWorkorderLineItem={editWorkorderLine}
-              inventoryItem={invItem}
-              workorderLine={item}
-              zWorkorderObj={zWorkorderObj}
-              __splitItems={splitItems}
-              __modQtyPressed={modQtyPressed}
-              index={idx}
-              applyDiscount={applyDiscount}
-              zSettingsObj={zSettingsObj}
-              ssButtonsRowID={sButtonsRowID}
-              __setButtonsRowID={_setButtonsRowID}
-            />
-          );
-        }}
-      />
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-around",
-          alignItems: "center",
-          width: "100%",
-          height: 30,
-          marginVertical: 3,
-        }}
-      >
-        <Text style={{ fontSize: 16 }}>
-          {"Items: "}
-          <Text
-            style={{
-              marginRight: 10,
-              fontWeight: "bold",
-            }}
-          >
-            {sNumItems}
-          </Text>
-        </Text>
-        {sTotalDiscount > 0 ? (
           <Text style={{ fontSize: 16 }}>
-            {"Discount: "}
+            {"Items: "}
             <Text
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
               }}
             >
-              {"$" + sTotalDiscount}
+              {sNumItems}
             </Text>
           </Text>
-        ) : null}
-        <Text style={{ fontSize: 16 }}>
-          {"Subtotal: "}
-          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-            {"$" + sTotalPrice}
+          {sTotalDiscount > 0 ? (
+            <Text style={{ fontSize: 16 }}>
+              {"Discount: "}
+              <Text
+                style={{
+                  marginRight: 10,
+                  fontWeight: "bold",
+                }}
+              >
+                {"$" + sTotalDiscount}
+              </Text>
+            </Text>
+          ) : null}
+          <Text style={{ fontSize: 16 }}>
+            {"Subtotal: "}
+            <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+              {"$" + sTotalPrice}
+            </Text>
           </Text>
-        </Text>
-        <Text style={{ fontSize: 16 }}>
-          {"Tax: "}
-          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-            {"$" + calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj).tax}
+          <Text style={{ fontSize: 16 }}>
+            {"Tax: "}
+            <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+              {"$" +
+                calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj).tax}
+            </Text>
           </Text>
-        </Text>
-        <Text style={{ fontSize: 16 }}>
-          {"Total: "}
-          <Text style={{ marginRight: 10, fontWeight: "bold" }}>
-            {"$" +
-              calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj)
-                .totalAmount}
+          <Text style={{ fontSize: 16 }}>
+            {"Total: "}
+            <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+              {"$" +
+                calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj)
+                  .totalAmount}
+            </Text>
           </Text>
-        </Text>
-        {!zWorkorderObj?.isStandaloneSale ? (
-          <Button
-            textStyle={{ color: "white" }}
-            buttonStyle={{
-              height: 25,
-              paddingHorizontal: 7,
-              paddingVertical: 2,
-              borderRadius: 5,
-              width: 150,
-              // backgroundColor: zIsCheckingOut ? "red" : "green",
-              // marginRight: 5,
-            }}
-            // text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
-            text={"Check Out"}
-            onPress={checkoutPressed}
-          />
-        ) : null}
+          {!zWorkorderObj?.isStandaloneSale ? (
+            <Button
+              textStyle={{ color: "white" }}
+              buttonStyle={{
+                height: 25,
+                paddingHorizontal: 7,
+                paddingVertical: 2,
+                borderRadius: 5,
+                width: 150,
+                // backgroundColor: zIsCheckingOut ? "red" : "green",
+                // marginRight: 5,
+              }}
+              // text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
+              text={"Check Out"}
+              onPress={checkoutPressed}
+            />
+          ) : null}
+        </View>
       </View>
-    </View>
-  );
+    );
+  }
+  try {
+    setComponent();
+  } catch (e) {
+    log("Error returning Items_WorkorderItemsTab", e);
+  }
 };
 
 export const LineItemComponent = ({
@@ -393,119 +405,121 @@ export const LineItemComponent = ({
   }
 
   // clog("item", workorderLine);
-  return (
-    <View
-      style={{
-        width: "100%",
-      }}
-    >
+  function setComponent() {
+    return (
       <View
         style={{
-          flexDirection: "row",
           width: "100%",
-          alignItems: "center",
-          backgroundColor: "white",
-          paddingVertical: 0,
-          paddingHorizontal: 2,
-          marginVertical: 1,
-          marginHorizontal: 5,
         }}
       >
         <View
           style={{
-            width: "73%",
-            justifyContent: "flex-start",
-            alignItems: "center",
             flexDirection: "row",
-            // backgroundColor: "green",
-          }}
-        >
-          <Button
-            onPress={() => __deleteWorkorderLine(index)}
-            text={"X"}
-            buttonStyle={{
-              width: null,
-              height: null,
-              backgroundColor: "transparent",
-              // shadowOffset: { width: 1, height: 1 },
-              marginHorizontal: 1,
-              marginRight: 10,
-              padding: 5,
-              paddingVertical: 10,
-              borderRadius: 3,
-            }}
-            mouseOverOptions={{
-              enable: true,
-              opacity: 0.7,
-              highlightColor: "red",
-            }}
-            shadow={false}
-            textStyle={{ color: "lightgray", fontSize: 17, fontWeight: 600 }}
-          />
-          <View>
-            {workorderLine.discountObj.discountName ? (
-              <Text style={{ color: "magenta" }}>
-                {workorderLine.discountObj.discountName || "discount goes here"}
-              </Text>
-            ) : null}
-            <Text
-              style={{
-                fontSize: 15,
-                color: Colors.darkText,
-                fontWeight: "500",
-              }}
-            >
-              {inventoryItem.formalName}
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-              <TextInput
-                numberOfLines={4}
-                style={{ outlineWidth: 0, color: "dimgray" }}
-                onChangeText={(val) => {
-                  let line = structuredClone(workorderLine);
-                  line.intakeNotes = val;
-                  __setWorkorderLineItem(line, inventoryItem);
-                }}
-                placeholder="Intake and service notes..."
-                placeholderTextColor={"gray"}
-                value={workorderLine.intakeNotes}
-              />
-            </View>
-          </View>
-        </View>
-        <View
-          style={{
-            width: "27%",
-            flexDirection: "row",
-            justifyContent: "flex-end",
+            width: "100%",
             alignItems: "center",
-            height: "100%",
-            // backgroundColor: "green",
+            backgroundColor: "white",
+            paddingVertical: 0,
+            paddingHorizontal: 2,
+            marginVertical: 1,
+            marginHorizontal: 5,
           }}
         >
           <View
             style={{
-              flexDirection: "row",
+              width: "73%",
+              justifyContent: "flex-start",
               alignItems: "center",
-              justifyContent: "center",
-              // marginRight: 5,
+              flexDirection: "row",
+              // backgroundColor: "green",
             }}
           >
             <Button
-              onPress={() =>
-                __modQtyPressed(inventoryItem, workorderLine, "up", index)
-              }
+              onPress={() => __deleteWorkorderLine(index)}
+              text={"X"}
               buttonStyle={{
-                borderRadius: 3,
-                width: 30,
-                height: 40,
+                width: null,
+                height: null,
+                backgroundColor: "transparent",
+                // shadowOffset: { width: 1, height: 1 },
+                marginHorizontal: 1,
                 marginRight: 10,
+                padding: 5,
+                paddingVertical: 10,
+                borderRadius: 3,
               }}
-              textStyle={{ color: Colors.tabMenuButton, fontSize: 30 }}
-              text={"\u2B06"}
+              mouseOverOptions={{
+                enable: true,
+                opacity: 0.7,
+                highlightColor: "red",
+              }}
               shadow={false}
+              textStyle={{ color: "lightgray", fontSize: 17, fontWeight: 600 }}
             />
-            {/* <Button
+            <View>
+              {workorderLine.discountObj.discountName ? (
+                <Text style={{ color: "magenta" }}>
+                  {workorderLine.discountObj.discountName ||
+                    "discount goes here"}
+                </Text>
+              ) : null}
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: Colors.darkText,
+                  fontWeight: "500",
+                }}
+              >
+                {inventoryItem.formalName}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                <TextInput
+                  numberOfLines={4}
+                  style={{ outlineWidth: 0, color: "dimgray" }}
+                  onChangeText={(val) => {
+                    let line = structuredClone(workorderLine);
+                    line.intakeNotes = val;
+                    __setWorkorderLineItem(line, inventoryItem);
+                  }}
+                  placeholder="Intake and service notes..."
+                  placeholderTextColor={"gray"}
+                  value={workorderLine.intakeNotes}
+                />
+              </View>
+            </View>
+          </View>
+          <View
+            style={{
+              width: "27%",
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              height: "100%",
+              // backgroundColor: "green",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                // marginRight: 5,
+              }}
+            >
+              <Button
+                onPress={() =>
+                  __modQtyPressed(inventoryItem, workorderLine, "up", index)
+                }
+                buttonStyle={{
+                  borderRadius: 3,
+                  width: 30,
+                  height: 40,
+                  marginRight: 10,
+                }}
+                textStyle={{ color: Colors.tabMenuButton, fontSize: 30 }}
+                text={"\u2B06"}
+                shadow={false}
+              />
+              {/* <Button
               onPress={() =>
                 __modQtyPressed(inventoryItem, workorderLine, "down", index)
               }
@@ -520,207 +534,215 @@ export const LineItemComponent = ({
               text={"\u2B07"}
               shadow={false}
             /> */}
-            <TextInput
+              <TextInput
+                style={{
+                  marginLeft: 4,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  width: 35,
+                  textAlign: "center",
+                  color: "dimgray",
+                  paddingVertical: 3,
+                  borderWidth: workorderLine.qty === 0 ? 3 : 1,
+                  borderColor: workorderLine.qty === 0 ? "red" : "lightgray",
+                  outlineWidth: 0,
+                }}
+                value={sTempQtyVal === "" ? sTempQtyVal : workorderLine.qty}
+                onChangeText={(val) => {
+                  if (isNaN(val) || val < 0) return;
+                  if (val === "") {
+                    _setTempQtyVal("");
+                    val = 0;
+                  } else {
+                    _setTempQtyVal(null);
+                  }
+                  let line = structuredClone(workorderLine);
+                  line.qty = Number(val);
+                  __setWorkorderLineItem(line, inventoryItem);
+                }}
+              />
+            </View>
+            <View
               style={{
-                marginLeft: 4,
-                fontSize: 18,
-                fontWeight: 700,
-                width: 35,
-                textAlign: "center",
-                color: "dimgray",
-                paddingVertical: 3,
-                borderWidth: workorderLine.qty === 0 ? 3 : 1,
-                borderColor: workorderLine.qty === 0 ? "red" : "lightgray",
-                outlineWidth: 0,
-              }}
-              value={sTempQtyVal === "" ? sTempQtyVal : workorderLine.qty}
-              onChangeText={(val) => {
-                if (isNaN(val) || val < 0) return;
-                if (val === "") {
-                  _setTempQtyVal("");
-                  val = 0;
-                } else {
-                  _setTempQtyVal(null);
-                }
-                let line = structuredClone(workorderLine);
-                line.qty = Number(val);
-                __setWorkorderLineItem(line, inventoryItem);
-              }}
-            />
-          </View>
-          <View
-            style={{
-              alignItems: "flex-end",
-              minWidth: 80,
-              // backgroundColor: "green",
-              marginRight: 1,
-            }}
-          >
-            <Text
-              style={{
-                paddingHorizontal: 0,
+                alignItems: "flex-end",
+                minWidth: 80,
+                // backgroundColor: "green",
+                marginRight: 1,
               }}
             >
-              {"$ " + trimToTwoDecimals(inventoryItem.price)}
-            </Text>
-            {workorderLine.discountObj.savings ? (
               <Text
                 style={{
                   paddingHorizontal: 0,
-                  minWidth: 30,
-                  color: "magenta",
                 }}
               >
-                {"$ -" + workorderLine.discountObj.savings}
+                {"$ " + trimToTwoDecimals(inventoryItem.price)}
               </Text>
-            ) : null}
-            <Text
+              {workorderLine.discountObj.savings ? (
+                <Text
+                  style={{
+                    paddingHorizontal: 0,
+                    minWidth: 30,
+                    color: "magenta",
+                  }}
+                >
+                  {"$ -" + workorderLine.discountObj.savings}
+                </Text>
+              ) : null}
+              <Text
+                style={{
+                  fontWeight: "bold",
+                  minWidth: 30,
+                  marginTop: 0,
+                  paddingHorizontal: 0,
+                  color: Colors.darkText,
+                }}
+              >
+                {workorderLine.discountObj.newPrice
+                  ? "$ " + workorderLine.discountObj.newPrice
+                  : workorderLine.qty > 1
+                  ? "$" +
+                    trimToTwoDecimals(inventoryItem.price * workorderLine.qty)
+                  : ""}
+              </Text>
+            </View>
+            <View
               style={{
-                fontWeight: "bold",
-                minWidth: 30,
-                marginTop: 0,
-                paddingHorizontal: 0,
-                color: Colors.darkText,
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                marginLeft: 3,
               }}
             >
-              {workorderLine.discountObj.newPrice
-                ? "$ " + workorderLine.discountObj.newPrice
-                : workorderLine.qty > 1
-                ? "$" +
-                  trimToTwoDecimals(inventoryItem.price * workorderLine.qty)
-                : ""}
-            </Text>
+              <Button
+                onPress={() =>
+                  __setButtonsRowID(
+                    workorderLine.id === ssButtonsRowID
+                      ? null
+                      : workorderLine.id
+                  )
+                }
+                mouseOverOptions={{
+                  enable: true,
+                  highlightColor: Colors.tabMenuButton,
+                }}
+                shadow={false}
+                text={ssButtonsRowID === workorderLine.id ? "-" : "+"}
+                textStyle={{
+                  color:
+                    ssButtonsRowID === workorderLine.id
+                      ? "red"
+                      : Colors.mainBackground,
+                  fontSize: 28,
+                }}
+                buttonStyle={{
+                  width: 25,
+                  marginRight: 10,
+                  alignItems: "center",
+                  borderRadius: 3,
+                  marginLeft: 2,
+                }}
+              />
+            </View>
           </View>
+        </View>
+        {ssButtonsRowID === workorderLine.id ? (
           <View
             style={{
               flexDirection: "row",
+              // backgroundColor: "white",
               justifyContent: "flex-end",
-              marginLeft: 3,
+              marginVertical: 5,
+              width: "100%",
             }}
           >
-            <Button
-              onPress={() =>
-                __setButtonsRowID(
-                  workorderLine.id === ssButtonsRowID ? null : workorderLine.id
-                )
-              }
-              mouseOverOptions={{
-                enable: true,
-                highlightColor: Colors.tabMenuButton,
-              }}
-              shadow={false}
-              text={ssButtonsRowID === workorderLine.id ? "-" : "+"}
-              textStyle={{
-                color:
-                  ssButtonsRowID === workorderLine.id
-                    ? "red"
-                    : Colors.mainBackground,
-                fontSize: 28,
-              }}
-              buttonStyle={{
-                width: 25,
-                marginRight: 10,
-                alignItems: "center",
-                borderRadius: 3,
-                marginLeft: 2,
-              }}
-            />
-          </View>
-        </View>
-      </View>
-      {ssButtonsRowID === workorderLine.id ? (
-        <View
-          style={{
-            flexDirection: "row",
-            // backgroundColor: "white",
-            justifyContent: "flex-end",
-            marginVertical: 5,
-            width: "100%",
-          }}
-        >
-          {workorderLine.qty > 1 ? (
-            <Button
-              textStyle={{ fontSize: 13 }}
-              onPress={() => {
-                __splitItems(inventoryItem, workorderLine, index);
-                __setButtonsRowID(null);
-              }}
-              text={"Split Items"}
+            {workorderLine.qty > 1 ? (
+              <Button
+                textStyle={{ fontSize: 13 }}
+                onPress={() => {
+                  __splitItems(inventoryItem, workorderLine, index);
+                  __setButtonsRowID(null);
+                }}
+                text={"Split Items"}
+                buttonStyle={{
+                  backgroundColor: Colors.mainBackground,
+                  shadowOffset: { width: 1, height: 1 },
+                  marginHorizontal: 2,
+                  width: null,
+                  height: 25,
+                  paddingHorizontal: 4,
+                }}
+              />
+            ) : null}
+            <ScreenModal
               buttonStyle={{
                 backgroundColor: Colors.mainBackground,
                 shadowOffset: { width: 1, height: 1 },
                 marginHorizontal: 2,
-                width: null,
+                marginLeft: 10,
                 height: 25,
-                paddingHorizontal: 4,
+                // marginVertical: 2,
+              }}
+              buttonTextStyle={{
+                fontSize: 11,
+                paddingHorizontal: 10,
+                paddingVertical: 2,
+              }}
+              // modalVisible={}
+              buttonLabel="Discount"
+              showButtonIcon={false}
+              modalVisible={sShowDiscountModal === workorderLine.id}
+              handleOuterClick={() => _setShowDiscountModal(null)}
+              handleButtonPress={() => {
+                _setShowDiscountModal(workorderLine.id);
+              }}
+              modalCoordinateVars={{ x: -0, y: 30 }}
+              ref={ref}
+              Component={() => {
+                return (
+                  <View>
+                    <FlatList
+                      data={formatDiscountsArr(zSettingsObj.discounts)}
+                      keyExtractor={(i, x) => x}
+                      renderItem={(item) => {
+                        let idx = item.index;
+                        item = item.item;
+                        return (
+                          <Button
+                            buttonStyle={{
+                              borderTopWidth: idx === 0 ? 0 : 1,
+                              borderColor: "whitesmoke",
+                              width: null,
+                              height: null,
+                              paddingVertical: 10,
+                              backgroundColor: "lightgray",
+                            }}
+                            onPress={() => {
+                              applyDiscount(
+                                inventoryItem,
+                                workorderLine,
+                                item,
+                                index
+                              );
+                              _setShowDiscountModal(null);
+                              __setButtonsRowID(null);
+                            }}
+                            shadow={false}
+                            text={item.name}
+                          />
+                        );
+                      }}
+                    />
+                  </View>
+                );
               }}
             />
-          ) : null}
-          <ScreenModal
-            buttonStyle={{
-              backgroundColor: Colors.mainBackground,
-              shadowOffset: { width: 1, height: 1 },
-              marginHorizontal: 2,
-              marginLeft: 10,
-              height: 25,
-              // marginVertical: 2,
-            }}
-            buttonTextStyle={{
-              fontSize: 11,
-              paddingHorizontal: 10,
-              paddingVertical: 2,
-            }}
-            // modalVisible={}
-            buttonLabel="Discount"
-            showButtonIcon={false}
-            modalVisible={sShowDiscountModal === workorderLine.id}
-            handleOuterClick={() => _setShowDiscountModal(null)}
-            handleButtonPress={() => {
-              _setShowDiscountModal(workorderLine.id);
-            }}
-            modalCoordinateVars={{ x: -0, y: 30 }}
-            ref={ref}
-            Component={() => {
-              return (
-                <View>
-                  <FlatList
-                    data={formatDiscountsArr(zSettingsObj.discounts)}
-                    keyExtractor={(i, x) => x}
-                    renderItem={(item) => {
-                      let idx = item.index;
-                      item = item.item;
-                      return (
-                        <Button
-                          buttonStyle={{
-                            borderTopWidth: idx === 0 ? 0 : 1,
-                            borderColor: "whitesmoke",
-                            width: null,
-                            height: null,
-                            paddingVertical: 10,
-                            backgroundColor: "lightgray",
-                          }}
-                          onPress={() => {
-                            applyDiscount(
-                              inventoryItem,
-                              workorderLine,
-                              item,
-                              index
-                            );
-                            _setShowDiscountModal(null);
-                            __setButtonsRowID(null);
-                          }}
-                          shadow={false}
-                          text={item.name}
-                        />
-                      );
-                    }}
-                  />
-                </View>
-              );
-            }}
-          />
-        </View>
-      ) : null}
-    </View>
-  );
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+  try {
+    return setComponent();
+  } catch (e) {
+    log("Error returning LineItemComponent", e);
+  }
 };

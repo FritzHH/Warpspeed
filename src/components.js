@@ -2106,7 +2106,7 @@ export const Button = ({
           justifyContent: "center",
           paddingHorizontal: 15,
           paddingVertical: 5,
-          // width: WIDTH,
+          // width: null,
           // height: HEIGHT,
           backgroundColor: Colors.tabMenuButton,
           ...shadowStyle,

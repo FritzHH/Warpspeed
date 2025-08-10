@@ -134,10 +134,8 @@ export const useTabNamesStore = create((set, get) => ({
 }));
 
 export const useCustomerSearchStore = create((set, get) => ({
-  // searchTerm: "",
   selectedItem: null,
   searchResultsArr: [],
-  // getSearchTerm: () => get().searchTerm,
   getSearchResultsArr: () => get().searchResultsArr,
   getSelectedItem: () => get().selectedItem,
   setSelectedItem: (item) => {
@@ -145,14 +143,10 @@ export const useCustomerSearchStore = create((set, get) => ({
       selectedItem: item,
     }));
   },
-  // setSearchTerm: (term) => {
-  //   set((state) => ({ searchTerm: term }));
-  // },
   setSearchResultsArr: (arr) => {
     set((state) => ({ searchResultsArr: arr }));
   },
   reset: () => {
-    // set((state) => ({ searchTerm: "" }));
     set((state) => ({ searchResultsArr: [] }));
     set((state) => ({ selectedItem: null }));
   },
@@ -272,6 +266,7 @@ export const useStripePaymentStore = create((set, get) => ({
 }));
 
 // database  //////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
 export const usePunchClockStore = create((set, get) => ({
   loggedInUsers: [],
   userClockArr: [],

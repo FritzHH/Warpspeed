@@ -2,6 +2,8 @@
 
 import { View, TextInput } from "react-native-web";
 import {
+  addDashesToPhone,
+  capitalizeFirstLetterOfString,
   clog,
   dim,
   generateRandomID,
@@ -82,14 +84,31 @@ export function NewWorkorderComponent({}) {
   );
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
   const zCurrentUser = useLoginStore((state) => state.getCurrentUserObj());
+  const zSearchResults = useCustomerSearchStore((state) =>
+    state.getSearchResultsArr()
+  );
 
   //////////////////////////////////////////////////////////////////////
-  const [sBox1Val, _setBox1Val] = React.useState("");
+  const [sBox1Val, _setBox1Val] = React.useState("222-222-2222");
   const [sBox2Val, _setBox2Val] = React.useState("");
   const [sSearchingByName, _setSearchingByName] = React.useState(false);
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
-  const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] = useState(true);
+  const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] =
+    useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
+
+  // watch inputs to see if we need to show Create Customer button
+  useEffect(() => {
+    let showButton = false;
+    if (sSearchingByName) {
+      if (sBox1Val.length > 1) showButton = true;
+    } else {
+      let noDashes = removeDashesFromPhone(sBox1Val);
+      if (noDashes.length == 10 && zSearchResults.length == 0)
+        showButton = true;
+    }
+    _setShowCreateCustomerBtn(showButton);
+  }, [sBox1Val, sBox2Val, zSearchResults]);
 
   async function handleBox1TextChange(incomingText = "") {
     // log("incoming box 1", incomingText);
@@ -104,11 +123,13 @@ export function NewWorkorderComponent({}) {
     let formattedText = incomingText;
     if (!sSearchingByName) formattedText = removeDashesFromPhone(incomingText);
     if (sSearchingByName) {
-      formattedText = formattedText.toLowerCase();
-      let char1 = formattedText[0].toUpperCase();
+      // make first letter uppercase
+      // formattedText = formattedText.toLowerCase();
+      // let char1 = formattedText[0].toUpperCase();
       // log("char", char1);
-      let substr = formattedText.substring(1, formattedText.length);
-      formattedText = char1 + substr;
+      // let substr = formattedText.substring(1, formattedText.length);
+      // formattedText = char1 + substr;
+      formattedText = capitalizeFirstLetterOfString(formattedText);
     }
 
     // check for valid inputs for each box
@@ -125,7 +146,9 @@ export function NewWorkorderComponent({}) {
       NUMS.includes(formattedText[formattedText.length - 1]) &&
       formattedText.length <= 10
     ) {
-      _setBox1Val(formattedText);
+      let dashed = addDashesToPhone(formattedText);
+      // log("dash", dashed);
+      _setBox1Val(dashed);
     } else {
       return;
     }
@@ -149,11 +172,6 @@ export function NewWorkorderComponent({}) {
     }
 
     // show the create customer button if input conditions are met
-    if (sSearchingByName) _setShowCreateCustomerBtn(formattedText.length >= 2);
-    if (!sSearchingByName)
-      _setShowCreateCustomerBtn(
-        formattedText.length === 10 && searchResults.length === 0
-      );
   }
 
   function handleBox2TextChange(incomingText = "") {
@@ -163,11 +181,7 @@ export function NewWorkorderComponent({}) {
       return;
     }
     let formattedText = incomingText;
-    formattedText = formattedText.toLowerCase();
-    let char1 = formattedText[0].toUpperCase();
-    // log("char", char1);
-    let substr = formattedText.substring(1, formattedText.length);
-    formattedText = char1 + substr;
+    formattedText = capitalizeFirstLetterOfString(formattedText);
     if (
       LETTERS.includes(formattedText[formattedText.length - 1]) ||
       LETTERS.toUpperCase().includes(formattedText[formattedText.length - 1])
@@ -180,11 +194,6 @@ export function NewWorkorderComponent({}) {
 
   function handleCreateNewCustomerPressed() {
     // log("create new customer pressed", log(zCurrentUser));
-    // setInterval(() => {
-    //   log(zCurrentUser);
-    // }, 500);
-
-    // return;
     let newWorkorder = cloneDeep(WORKORDER_PROTO);
     newWorkorder.id = generateRandomID();
     newWorkorder.customerFirst = sCustomerInfo.first;
@@ -217,7 +226,7 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleModalCreateCustomerBtnPressed() {
-    let custInfo = { ...CUSTOMER_PROTO };
+    let custInfo = cloneDeep(CUSTOMER_PROTO);
     if (sSearchingByName) {
       custInfo.first = sBox1Val;
       custInfo.last = sBox2Val;
@@ -226,7 +235,7 @@ export function NewWorkorderComponent({}) {
       _setInfoTextFocus(FOCUS_NAMES.first);
       custInfo.cell = sBox1Val;
     }
-    custInfo.id = generateRandomID();
+    log(custInfo);
     _setCustomerInfo(custInfo);
   }
 
@@ -259,14 +268,21 @@ export function NewWorkorderComponent({}) {
             width: "100%",
             justifyContent: "flex-start",
             alignItems: "center",
-            // marginTop: 100,
             // backgroundColor: "green",
           }}
         >
-          <View style={{ width: "100%", alignItems: "flex-end" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingHorizontal: 5,
+            }}
+          >
             <Button
               buttonStyle={{
-                width: 80,
+                width: 110,
                 // height: 30,
                 ...SHADOW_RADIUS_PROTO,
                 marginTop: 10,
@@ -283,6 +299,22 @@ export function NewWorkorderComponent({}) {
                 _setShowCreateCustomerBtn(false);
               }}
               text={sSearchingByName ? "Search By Phone" : "Search By Name"}
+            />
+            <Button
+              buttonStyle={{
+                width: 110,
+                // height: 30,
+                ...SHADOW_RADIUS_PROTO,
+                marginTop: 10,
+                marginRight: 10,
+                // padding: 5,
+                paddingHorizontal: 0,
+              }}
+              text={"New Sale"}
+              textStyle={{ fontSize: 13, color: "white" }}
+              onPress={() => {
+                handleStartStandaloneSalePress();
+              }}
             />
           </View>
           <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
@@ -306,7 +338,6 @@ export function NewWorkorderComponent({}) {
           />
           <View style={{ width: 10 }} />
           {sSearchingByName && (
-            // <View>
             <TextInput
               placeholder={"Last name..."}
               placeholderTextColor={"gray"}
@@ -323,7 +354,6 @@ export function NewWorkorderComponent({}) {
               value={sBox2Val}
               onChangeText={(val) => handleBox2TextChange(val)}
             />
-            // </View>
           )}
 
           {/** customer info modal */}
@@ -346,13 +376,13 @@ export function NewWorkorderComponent({}) {
             canExitOnOuterClick={false}
             Component={() => (
               <CustomerInfoScreenModalComponent
-                sCustomerInfo={sCustomerInfo || {}}
+                ssCustomerInfoObj={sCustomerInfo}
+                __setCustomerInfoObj={_setCustomerInfo}
                 button1Text={"Create Customer"}
                 button2Text={"Cancel"}
                 ssInfoTextFocus={sInfoTextFocus}
                 __setInfoTextFocus={_setInfoTextFocus}
-                handleButton1Press={handleCreateNewCustomerPressed}
-                __setCustomerInfo={_setCustomerInfo}
+                // handleButton1Press={handleCreateNewCustomerPressed}
                 handleButton2Press={() => {
                   // cancel button
                   _setBox1Val("");
@@ -366,14 +396,6 @@ export function NewWorkorderComponent({}) {
             )}
           />
         </View>
-
-        <Button
-          text={"New Sale"}
-          // buttonStyle={}
-          onPress={() => {
-            handleStartStandaloneSalePress();
-          }}
-        />
       </View>
     );
   }

@@ -24,62 +24,47 @@ export function Options_Section({
   ssAdjustableUserPreferences,
   __setWorkorderObj,
 }) {
-  // setters
+  // store setters
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
-  // const _zSetShowLoginScreen = useWaitForLoginStore(
-  //   (state) => state.setShowLoginScreen
-  // );
-  // getters
+
+  // store getters
   const zOptionsTabName = useTabNamesStore((state) =>
     state.getOptionsTabName()
   );
-  // const zShowLoginScreen = useWaitForLoginStore((state) =>
-  //   state.getShowLoginScreen()
-  // );
-  // const zLoginFunctionCallback = useWaitForLoginStore((state) =>
-  //   state.getLoginFunctionCallback()
-  // );
 
   /////////////////////////////////////////////////////////////////////////////
   const [sShowWorkorderModal, _setShowWorkorderModal] = React.useState(false);
   const [sShowInventoryModal, _setShowInventoryModal] = React.useState(false);
 
-  /////////////////////////////////////////////////////////////////
-  ////////////////////////////////////////////////////////////////
+  function ScreenComponent(tabName) {
+    switch (tabName) {
+      case TAB_NAMES.optionsTab.inventory:
+        return <InventoryComponent />;
+      case TAB_NAMES.optionsTab.messages:
+        return <MessagesComponent />;
+      case TAB_NAMES.optionsTab.quickItems:
+        return <QuickItemComponent />;
+      case TAB_NAMES.optionsTab.workorders:
+        <WorkordersComponent />;
+        return;
+    }
+    return null;
+  }
+
   return (
-    <View style={{}}>
+    <View style={{ height: "100%" }}>
       <TabBar
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}
-        __setShowInventoryModal={_setShowInventoryModal}
-        __setShowWorkorderModal={_setShowWorkorderModal}
       />
-      {/* <LoginScreenComponent
-        modalVisible={zShowLoginScreen}
-        loginCallback={() => zLoginFunctionCallback()}
-        _setModalVisibility={() => _zSetShowLoginScreen(false)}
-      /> */}
-      {zOptionsTabName === TAB_NAMES.optionsTab.quickItems && (
-        <QuickItemComponent
-          ssWorkorderObj={{}}
-          __setWorkorderObj={__setWorkorderObj}
-          ssAdjustableUserPreferences={ssAdjustableUserPreferences}
-          ssInventoryArr={ssInventoryArr}
-        />
-      )}
-      {zOptionsTabName === TAB_NAMES.optionsTab.inventory && (
-        <InventoryComponent />
-      )}
-      {zOptionsTabName === TAB_NAMES.optionsTab.workorders && (
-        <WorkordersComponent />
-      )}
-      {zOptionsTabName === TAB_NAMES.optionsTab.messages && (
-        <MessagesComponent />
-      )}
+      {ScreenComponent(zOptionsTabName)}
     </View>
   );
+
+  /////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////
 }
 
 const TabBar = ({

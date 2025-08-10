@@ -13,9 +13,9 @@ export function Notes_Section({
 }) {
   return (
     <Notes_MainComponent
-      ssCurrentUser={ssCurrentUser}
-      ssWorkorderObj={ssWorderObj}
-      __setWorkorderObj={__setWorkorderObj}
+    // ssCurrentUser={ssCurrentUser}
+    // ssWorkorderObj={ssWorderObj}
+    // __setWorkorderObj={__setWorkorderObj}
     />
   );
 }

@@ -12,6 +12,9 @@ import {
 import React, { Component, useCallback, useEffect, useRef } from "react";
 import { Animated, Easing, Image } from "react-native-web";
 import {
+  addDashesToPhone,
+  capitalizeAllWordsInSentence,
+  capitalizeFirstLetterOfString,
   clog,
   formatDecimal,
   generateRandomID,
@@ -19,6 +22,7 @@ import {
   log,
   NUMS,
   readAsBinaryString,
+  removeDashesFromPhone,
   trimToTwoDecimals,
 } from "./utils";
 import { Colors, Fonts } from "./styles";
@@ -40,6 +44,10 @@ import {
   useLoginStore,
   useStripePaymentStore,
   useCheckoutStore,
+  useCurrentCustomerStore,
+  useOpenWorkordersStore,
+  useCurrentWorkorderStore,
+  useTabNamesStore,
 } from "./stores";
 import {
   dbCancelPaymentIntents,
@@ -49,6 +57,7 @@ import {
   dbGetStripePaymentIntent,
   dbProcessServerDrivenStripePayment,
   dbRetrieveAvailableStripeReaders,
+  dbSetCustomerObj,
   dbSetInventoryItem,
   dbSetSettings,
 } from "./db_call_wrapper";
@@ -58,6 +67,7 @@ import {
 } from "./db_subscriptions";
 import Dropzone from "react-dropzone";
 import { CheckBox as RNCheckBox } from "react-native-web";
+import { messagesSubscribe } from "./db_subscriptions";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -883,15 +893,44 @@ export const InventoryItemScreeenModalComponent = ({
 };
 
 export const CustomerInfoScreenModalComponent = ({
-  sCustomerInfo = CUSTOMER_PROTO,
+  ssCustomerInfoObj = CUSTOMER_PROTO,
+  __setCustomerInfoObj,
   button1Text,
   button2Text,
-  ssInfoTextFocus,
-  __setInfoTextFocus,
   handleButton1Press,
   handleButton2Press,
-  __setCustomerInfo,
+  ssInfoTextFocus,
+  __setInfoTextFocus,
 }) => {
+  // store setters
+  const _zSetCurrentCustomer = useCurrentCustomerStore(
+    (state) => state.setCustomerObj
+  );
+  const _zSetNewWorkorderInArr = useOpenWorkordersStore(
+    (state) => state.modItem
+  );
+  const _zSetOpenWorkorder = useCurrentWorkorderStore(
+    (state) => state.setWorkorderObj
+  );
+  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
+  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
+  const _zSetOptionsTabName = useTabNamesStore(
+    (state) => state.setOptionsTabName
+  );
+
+  // store getters
+
+  /////////////////////////////////////////////////////////////////////
+
+  // automatically save customer if it is NOT a new customer creation
+  useEffect(() => {
+    if (ssCustomerInfoObj?.id)
+      _zExecute(() => {
+        _zSetCurrentCustomer(ssCustomerInfoObj);
+        dbSetCustomerObj(ssCustomerInfoObj);
+      });
+  }, [ssCustomerInfoObj]);
+
   const TEXT_INPUT_STYLE = {
     width: 200,
     height: 40,
@@ -900,253 +939,298 @@ export const CustomerInfoScreenModalComponent = ({
     marginLeft: 20,
     marginTop: 10,
     paddingHorizontal: 3,
+    outlineWidth: 0,
   };
-  // log("here");
-  return (
-    <TouchableWithoutFeedback>
-      <View
-        style={{
-          width: "60%",
-          backgroundColor: "whitesmoke",
-          height: "70%",
-          flexDirection: "row",
-          shadowProps: {
-            shadowColor: "black",
-            shadowOffset: { width: 2, height: 2 },
-            shadowOpacity: 0.3,
-            shadowRadius: 5,
-          },
-        }}
-      >
-        <View>
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.cell = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Cell phone"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.cell}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.cell}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.cell)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.landline = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Landline"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.landline}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.land}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.land)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.first = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="First name"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.first}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.first}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.first)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.last = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Last name"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.last}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.last}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.last)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.email = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Email address"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.email}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.email}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.email)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.streetAddress = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Street address"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.streetAddress}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.street}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.street)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.unit = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Unit"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.unit}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.unit}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.unit)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.city = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="City"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.city}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.city}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.city)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.state = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="State"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.state}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.state}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.state)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.zip = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Zip code"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.zip}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.zip}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.zip)}
-          />
-          <TextInput
-            onChangeText={(val) => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              sCustomerInfo.notes = val;
-              __setCustomerInfo(sCustomerInfo);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Address notes"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.notes}
-            autoComplete="none"
-            autoFocus={ssInfoTextFocus === FOCUS_NAMES.notes}
-            onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
-          />
-          <CheckBox
-            label={"Call Only"}
-            isChecked={sCustomerInfo.contactRestriction === "CALL"}
-            onCheck={() => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              __setInfoTextFocus(null);
-              if (sCustomerInfo.contactRestriction === "CALL") {
-                sCustomerInfo.contactRestriction = "";
-              } else {
-                sCustomerInfo.contactRestriction = "CALL";
-              }
-              __setCustomerInfo(sCustomerInfo);
-            }}
-          />
-          <CheckBox
-            label={"Email Only"}
-            isChecked={sCustomerInfo.contactRestriction === "EMAIL"}
-            onCheck={() => {
-              sCustomerInfo = cloneDeep(sCustomerInfo);
-              __setInfoTextFocus(null);
-              // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
-              // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
-              //   sCustomerInfo.callOnlyOption = false;
-              if (sCustomerInfo.contactRestriction === "EMAIL") {
-                sCustomerInfo.contactRestriction = "";
-              } else {
-                sCustomerInfo.contactRestriction = "EMAIL";
-              }
-              __setCustomerInfo(sCustomerInfo);
-            }}
-          />
-          <View
-            style={{ flexDirection: "row", justifyContent: "space-between" }}
-          >
-            {button1Text ? (
-              <Button
-                onPress={handleButton1Press}
-                viewStyle={{
-                  marginTop: 30,
-                  marginLeft: 20,
-                  backgroundColor: "lightgray",
-                  height: 40,
-                  width: 200,
-                }}
-                textStyle={{ color: "dimgray" }}
-                text={button1Text}
-              />
-            ) : null}
-            {button2Text ? (
-              <Button
-                onPress={handleButton2Press}
-                viewStyle={{
-                  marginTop: 30,
-                  marginLeft: 20,
-                  backgroundColor: "lightgray",
-                  height: 40,
-                  width: 200,
-                }}
-                textStyle={{ color: "dimgray" }}
-                text={button2Text}
-              />
-            ) : null}
+
+  function handleCreateNewCustomerPressed() {
+    // log("create new customer pressed", log(zCurrentUser));
+    let newWorkorder = cloneDeep(WORKORDER_PROTO);
+    newWorkorder.id = generateRandomID();
+    newWorkorder.customerFirst = ssCustomerInfoObj.first;
+    newWorkorder.customerLast = ssCustomerInfoObj.last;
+    newWorkorder.customerPhone =
+      ssCustomerInfoObj.cell || ssCustomerInfoObj.landline;
+    newWorkorder.customerID = ssCustomerInfoObj.id;
+    newWorkorder.startedBy = zCurrentUser.first;
+    newWorkorder.status = "Service";
+    newWorkorder.changeLog.push(
+      "Started by: " + zCurrentUser.first + " " + zCurrentUser.last
+    );
+    let newCustomerObj = cloneDeep(ssCustomerInfoObj);
+    newCustomerObj.id = generateRandomID();
+    newCustomerObj.dateCreated = new Date().getTime();
+    newCustomerObj.workorders.push(newWorkorder.id);
+
+    _zSetCurrentCustomer(newCustomerObj);
+    // dbSetCustomerObj(newCustomerObj);
+    // dbSetOpenWorkorderItem(newWorkorder);
+    _zSetNewWorkorderInArr(newWorkorder, "add");
+    _zSetOpenWorkorder(newWorkorder);
+    // _zResetSearch();
+    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    messagesSubscribe(
+      newCustomerObj.id,
+      _zSetIncomingMessage,
+      _zSetOutgoingMessage
+    );
+  }
+  // clog(sCustomerInfoObj);
+
+  function setComponent() {
+    return (
+      <TouchableWithoutFeedback>
+        <View
+          style={{
+            width: "60%",
+            backgroundColor: "whitesmoke",
+            height: "70%",
+            flexDirection: "row",
+            shadowProps: {
+              shadowColor: "black",
+              shadowOffset: { width: 2, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 5,
+            },
+          }}
+        >
+          <View>
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.cell = removeDashesFromPhone(val);
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Cell phone"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={addDashesToPhone(ssCustomerInfoObj.cell)}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.cell}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.cell)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.landline = removeDashesFromPhone(val);
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Landline"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={addDashesToPhone(ssCustomerInfoObj.landline)}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.land}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.land)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.first = capitalizeFirstLetterOfString(val);
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="First name"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.first}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.first}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.first)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.last = capitalizeFirstLetterOfString(val);
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Last name"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.last}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.last}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.last)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.email = val.toLowerCase();
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Email address"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.email}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.email}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.email)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.streetAddress = capitalizeAllWordsInSentence(val);
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Street address"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.streetAddress}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.street}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.street)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.unit = val;
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Unit"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.unit}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.unit}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.unit)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.city = capitalizeAllWordsInSentence(val);
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="City"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.city}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.city}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.city)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.state = val.toUpperCase();
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="State"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.state}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.state}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.state)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.zip = val;
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Zip code"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.zip}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.zip}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.zip)}
+            />
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                obj.notes = capitalizeFirstLetterOfString(val);
+                __setCustomerInfoObj(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Address notes"
+              style={{ ...TEXT_INPUT_STYLE }}
+              value={ssCustomerInfoObj.notes}
+              autoComplete="none"
+              autoFocus={ssInfoTextFocus === FOCUS_NAMES.notes}
+              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
+            />
+            <CheckBox
+              label={"Call Only"}
+              isChecked={ssCustomerInfoObj.contactRestriction === "CALL"}
+              onCheck={() => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                __setInfoTextFocus(null);
+                if (obj.contactRestriction === "CALL") {
+                  obj.contactRestriction = "";
+                } else {
+                  obj.contactRestriction = "CALL";
+                }
+                __setCustomerInfoObj(obj);
+              }}
+            />
+            <CheckBox
+              label={"Email Only"}
+              isChecked={ssCustomerInfoObj.contactRestriction === "EMAIL"}
+              onCheck={() => {
+                let obj = cloneDeep(ssCustomerInfoObj);
+                __setInfoTextFocus(null);
+                // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
+                // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
+                //   sCustomerInfo.callOnlyOption = false;
+                if (obj.contactRestriction === "EMAIL") {
+                  obj.contactRestriction = "";
+                } else {
+                  obj.contactRestriction = "EMAIL";
+                }
+                __setCustomerInfoObj(obj);
+              }}
+            />
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              {button1Text ? (
+                <Button
+                  onPress={handleButton1Press}
+                  viewStyle={{
+                    marginTop: 30,
+                    marginLeft: 20,
+                    backgroundColor: "lightgray",
+                    height: 40,
+                    width: 200,
+                  }}
+                  textStyle={{ color: "dimgray" }}
+                  text={button1Text}
+                />
+              ) : null}
+              {button2Text ? (
+                <Button
+                  onPress={handleButton2Press}
+                  viewStyle={{
+                    marginTop: 30,
+                    marginLeft: 20,
+                    backgroundColor: "lightgray",
+                    height: 40,
+                    width: 200,
+                  }}
+                  textStyle={{ color: "dimgray" }}
+                  text={button2Text}
+                />
+              ) : null}
+            </View>
+          </View>
+
+          <View>
+            <View style={{ borderWidth: 1, width: 300, height: 300 }} />
+            <Text>Workorder list</Text>
+            <View style={{ borderWidth: 1, width: 300, height: 300 }} />
+            <Text>Payments</Text>
           </View>
         </View>
-
-        <View>
-          <View style={{ borderWidth: 1, width: 300, height: 300 }} />
-          <Text>Workorder list</Text>
-          <View style={{ borderWidth: 1, width: 300, height: 300 }} />
-          <Text>Payments</Text>
-        </View>
-      </View>
-    </TouchableWithoutFeedback>
-  );
+      </TouchableWithoutFeedback>
+    );
+  }
+  try {
+    let comp = setComponent();
+    return comp;
+  } catch (e) {
+    // log("Error setting component CustomerInfoScreenModal", e);
+  }
 };
 
 export const LoginScreenModalComponent = ({ modalVisible }) => {
@@ -2034,82 +2118,6 @@ export const StripeCreditCardModalComponent = ({
   );
 };
 
-export const FileInput = ({
-  handleBinaryString,
-  buttonStyle = {},
-  textStyle = {},
-  text,
-}) => {
-  const fileInputRef = useRef(null);
-  const onDrop = useCallback((acceptedFiles) => {
-    acceptedFiles.forEach((file) => {
-      const reader = new FileReader();
-
-      reader.onabort = () => console.log("file reading was aborted");
-      reader.onerror = () => console.log("file reading has failed");
-      reader.onload = () => {
-        const binaryStr = reader.result;
-        handleBinaryString(binaryStr);
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  }, []);
-
-  const handleFileUpload = (e) => {
-    // const file = e.target.files[0];
-    // e.target.value = null;
-    clog("files", e.target);
-    return file;
-    const binaryStr = readAsBinaryString(file);
-    handleBinaryString(binaryStr);
-  };
-
-  return (
-    <TouchableOpacity onPress={() => fileInputRef.current.open()}>
-      <View
-        style={{
-          width: 170,
-          height: 30,
-          backgroundColor: null,
-          alignItems: "center",
-          justifyContent: "center",
-          ...SHADOW_RADIUS_PROTO,
-          ...buttonStyle,
-        }}
-      >
-        <Text style={{ ...textStyle }}>{text || "Drag File / Click Here"}</Text>
-        <Dropzone onDrop={onDrop} ref={fileInputRef}>
-          {({ getInputProps }) => (
-            <section>
-              <input {...getInputProps()} />
-            </section>
-          )}
-        </Dropzone>
-      </View>
-    </TouchableOpacity>
-  );
-  return (
-    <TouchableOpacity onClick={() => openFilePicker()}>
-      <View
-        style={{
-          width: 200,
-          height: 30,
-          backgroundColor: null,
-          ...buttonStyle,
-        }}
-      >
-        <input
-          ref={fileInputRef}
-          // style={{ display: "none" }}
-          type="file"
-          onChange={(e) => handleFileUpload(e)}
-        />
-        <Text style={{ ...textStyle }}>Upload File</Text>
-      </View>
-    </TouchableOpacity>
-  );
-};
-
 export const Button = ({
   visible = true,
   ref,
@@ -2136,8 +2144,8 @@ export const Button = ({
   if (!shadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   /////////////////////////////////////////////////////
   //////////////////////////////////////////////////////
-  // const HEIGHT = 50;
-  // const WIDTH = 130;
+  const HEIGHT = 50;
+  const WIDTH = 130;
 
   if (!visible) {
     return <View style={{ width: WIDTH, height: HEIGHT }}></View>;
@@ -2354,152 +2362,3 @@ export const CheckBox = ({
     </TouchableOpacity>
   );
 };
-
-// useEffect(() => {
-//   async function initTerminal() {
-//     const terminal = StripeTerminal.create({
-//       onFetchConnectionToken: dbGetStripeConnectionToken,
-//       onUnexpectedReaderDisconnect: onReaderDisconnect,
-//     });
-//     _sSetStatusTextColor("green");
-//     _sSetStatus("Stripe token fetched...");
-//     _sSetTerminal(terminal);
-//   }
-//   initTerminal();
-// }, []);
-
-// useEffect(() => {
-//   if (sTerminal && !sReader) {
-//     discoverReaders();
-//   }
-// }, [sReader, sTerminal]);
-
-// const onReaderDisconnect = () => {
-//   _sSetStatusTextColor("red");
-//   _sSetStatus(
-//     "Card Reader Disconnected! Refresh page then restart payment process."
-//   );
-// };
-
-// async function discoverReaders() {
-//   try {
-//     _sSetStatusTextColor("green");
-//     const config = {
-//       simulated: false,
-//       location: zSettingsObj.stripeBusinessLocationCode,
-//     };
-//     const discoverResult = await sTerminal.discoverReaders(config);
-//     if (discoverResult.error) {
-//       _sSetStatusTextColor("red");
-//       console.log("Failed to discover: ", discoverResult.error);
-//       _sSetStatus(
-//         sStatus + "\nError during device discovery: " + discoverResult.error
-//       );
-//     } else if (discoverResult.discoveredReaders.length === 0) {
-//       _sSetStatusTextColor("red");
-//       console.log("No available Stripe readers.");
-//       _sSetStatus("No available card readers! Check connections...");
-//     } else {
-//       log(
-//         "discovered Stripe readers array",
-//         discoverResult.discoveredReaders
-//       );
-//       let reader = discoverResult.discoveredReaders.find(
-//         (o) => o.label == zSettingsObj.selectedCardReaderObj.label
-//       );
-//       if (reader) {
-//         log("Our Stripe reader: ", reader);
-//         _sSetStatusTextColor("green");
-//         _sSetReader(reader);
-//         if (zSettingsObj.autoConnectToCardReader) connectReader(reader);
-//       }
-//       // log("reader", reader);
-//     }
-//   } catch (e) {
-//     _sSetStatusTextColor("red");
-//     _sSetStatus(sStatus + "\nError discovering readers: " + e);
-//     log("error discovering reader", e);
-//   }
-// }
-
-// const connectReader = async (reader) => {
-//   log("connecting to reader...");
-//   _sSetStatus("Connecting to reader...");
-//   const connectResult = await sTerminal.connectReader(reader, {
-//     fail_if_in_use: true,
-//   });
-
-//   if (connectResult.error) {
-//     _sSetStatusTextColor("red");
-//     log("Stripe terminal connect result error", connectResult.error);
-//     sTerminal.disconnectReader();
-//     _sSetStatus("STRIPE CONNECTION ERRROR: " + connectResult.error.message);
-//     return;
-//   }
-//   // log("connect result success!!", connectResult);
-//   _sSetStatusTextColor("green");
-//   _sSetConnectedReader(connectResult.reader);
-//   _sSetStatus("Connected to card reader: " + connectResult.reader.label);
-//   _setReaderReady(true);
-//   log(`Stripe successfully connected to ${connectResult.reader.label}`);
-// };
-
-// async function startPayment() {
-//   let paymentIntent;
-//   if (
-//     sPaymentIntent &&
-//     Number(sPaymentIntent.amount) == Number(sPaymentAmount) * 100
-//   ) {
-//     log("Using previous payment intent");
-//     paymentIntent = sPaymentIntent;
-//   } else {
-//     log("Retrieving new payment intent...");
-//     _sSetStatus("Retrieving secure Payment Intent...");
-//     paymentIntent = await dbGetStripePaymentIntent(sPaymentAmount);
-//     _setPaymentIntent(paymentIntent);
-//   }
-
-//   clog("Active payment intent", paymentIntent);
-//   _sSetStatus("Payment Intent retrieved...");
-//   let res = await sTerminal.collectPaymentMethod(
-//     paymentIntent.client_secret,
-//     {
-//       config_override: {
-//         enable_customer_cancellation: true,
-//         update_payment_intent: true,
-//       },
-//     }
-//   );
-//   let paymentMethod = res.paymentIntent.payment_method;
-//   const card = paymentMethod?.card_present ?? paymentMethod?.interac_present;
-//   // clog("method", paymentMethod);
-//   // clog("card", card);
-
-//   // return;
-//   const paymentResult = await sTerminal.processPayment(res.paymentIntent);
-//   _setPaymentIntent(paymentResult.paymentIntent);
-//   if (paymentResult.error) {
-//     log("payment result error", e);
-//     _sSetStatus("Payment processing error: ", e.error);
-//     // Placeholder for handling result.error
-//   } else if (paymentResult.paymentIntent) {
-//     _sSetStatus("");
-//     clog("payment result", paymentResult);
-//     let intent = paymentResult.paymentIntent;
-//     let res = {
-//       cardType: card.brand.toUpperCase(),
-//       lastFour: card.last4,
-//       expMonth: card.exp_month,
-//       expYear: card.exp_year,
-//       issuer: card.issuer,
-//       millis: new Date().getTime(),
-//       amount: trimToTwoDecimals(Number(intent.amount) / 100),
-//       paymentIntent: intent.id,
-//     };
-//     log("payment detail obj", res);
-//     onCardDetailObj(res);
-//     onCancel();
-
-//     // Placeholder for notifying your backend to capture result.paymentIntent.id
-//   }
-// }

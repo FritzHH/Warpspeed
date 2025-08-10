@@ -3,7 +3,6 @@ import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef, setInventoryItem } from "./db";
 import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO } from "./data";
 import { generate } from "random-words";
-import * as XLSX from "xlsx";
 import { cloneDeep } from "lodash";
 
 // const fs = require("node:fs");
@@ -200,25 +199,95 @@ export function trimToTwoDecimals(num) {
   return res;
 }
 
+export const FileInputComponent = ({
+  handleBinaryString,
+  buttonStyle = {},
+  textStyle = {},
+  text,
+}) => {
+  const fileInputRef = useRef(null);
+  const onDrop = useCallback((acceptedFiles) => {
+    acceptedFiles.forEach((file) => {
+      const reader = new FileReader();
+
+      reader.onabort = () => console.log("file reading was aborted");
+      reader.onerror = () => console.log("file reading has failed");
+      reader.onload = () => {
+        const binaryStr = reader.result;
+        handleBinaryString(binaryStr);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }, []);
+
+  const handleFileUpload = (e) => {
+    // const file = e.target.files[0];
+    // e.target.value = null;
+    clog("files", e.target);
+    return file;
+    const binaryStr = readAsBinaryString(file);
+    handleBinaryString(binaryStr);
+  };
+
+  return (
+    <TouchableOpacity onPress={() => fileInputRef.current.open()}>
+      <View
+        style={{
+          width: 170,
+          height: 30,
+          backgroundColor: null,
+          alignItems: "center",
+          justifyContent: "center",
+          ...SHADOW_RADIUS_PROTO,
+          ...buttonStyle,
+        }}
+      >
+        <Text style={{ ...textStyle }}>{text || "Drag File / Click Here"}</Text>
+        <Dropzone onDrop={onDrop} ref={fileInputRef}>
+          {({ getInputProps }) => (
+            <section>
+              <input {...getInputProps()} />
+            </section>
+          )}
+        </Dropzone>
+      </View>
+    </TouchableOpacity>
+  );
+  return (
+    <TouchableOpacity onClick={() => openFilePicker()}>
+      <View
+        style={{
+          width: 200,
+          height: 30,
+          backgroundColor: null,
+          ...buttonStyle,
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          // style={{ display: "none" }}
+          type="file"
+          onChange={(e) => handleFileUpload(e)}
+        />
+        <Text style={{ ...textStyle }}>Upload File</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 // takes text input and inserts the decimal at the correct place as the user types numbers for correct currency display without having to press the decimal button
-export function formatDecimal(val) {
+export function formatDecimal(value) {
   // log("incoming", val);
-  if (!val) return null;
-  let text = "";
-  text = val.toString();
-  // text = trimToTwoDecimals(text);
-  text = text.split(".").join("");
-
-  if (text.length <= 2) {
-    text = "." + text;
-  } else if (text.length > 2) {
-    let last2 = text.substring(text.length - 2, text.length);
-    let firstDigits = text.slice(0, text.length - 2);
-    text = firstDigits + "." + last2;
-  }
-
-  // return text;
-  return text;
+  // Remove all non-digit characters
+  const cleaned = value.replace(/\D/g, "");
+  // Parse as cents, so pad or cut to two decimal places
+  let num = parseFloat(cleaned);
+  if (isNaN(num)) num = 0;
+  // Always treat input as cents
+  num = num / 100;
+  // Format to USD currency
+  num = num.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  return num.slice(1);
 }
 
 export function searchPhoneNum(searchTerm, customerArrToSearch) {
@@ -259,6 +328,32 @@ export function removeDashesFromPhone(num = "") {
   let newVal = "";
   split.forEach((s) => (newVal += s));
   return newVal;
+}
+
+export function addDashesToPhone(num) {
+  let phone = num.toString();
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  if (digits.length <= 10)
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  // If longer than 10 digits, format first 10, append rest
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(
+    6,
+    10
+  )} ${digits.slice(10)}`;
+}
+
+export function capitalizeFirstLetterOfString(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+export function capitalizeAllWordsInSentence(sentence) {
+  if (!sentence) return "";
+  return sentence.replace(/\b\w/g, function (char) {
+    return char.toUpperCase();
+  });
 }
 
 export function useInterval(callback, delay) {
@@ -375,68 +470,4 @@ export function combine2ArraysOrderByMillis(arr1, arr2) {
     if (a.millis <= b.millis) return -1;
   });
   return newArr;
-}
-
-function readXLSXBinaryReturnRows(binaryStr) {
-  let readedData = XLSX.read(binaryStr, { type: "binary" });
-  const wsname = readedData.SheetNames[0];
-  const ws = readedData.Sheets[wsname];
-
-  let sheet = XLSX.utils.sheet_to_json(ws, { header: 1 });
-  sheet = sheet.slice(1, sheet.length - 1);
-  return sheet;
-}
-
-export function readLightspeedInventoryBinary(binaryStr) {
-  // log("here");
-  let rows = readXLSXBinaryReturnRows(binaryStr);
-  let res = [];
-  let resObj = {
-    upc: "",
-    description: "",
-    price: "",
-    cost: "",
-  };
-  rows.forEach((row) => {
-    let o = { ...resObj };
-    o.upc = row[1] || generateBarcode();
-    o.description = row[6];
-    o.price = row[7];
-    o.cost = row[8];
-    res.push(o);
-  });
-  return res;
-}
-
-export function readJBIOrderBinary(binaryStr) {
-  let rows = readXLSXBinaryReturnRows(binaryStr);
-  let res = [];
-  let resObj = {
-    upc: "",
-    description: "",
-    cost: "",
-    qty: "",
-  };
-  rows.forEach((row) => {
-    let o = { ...resObj };
-    o.upc = row[9] || generateBarcode();
-    o.description = row[2];
-    o.cost = row[8];
-    o.qty = row[4];
-    res.push(o);
-  });
-  return res;
-}
-
-export function fillInventoryFromLightspeedObjArr(lightspeedObjArr) {
-  for (let i = 0; i <= lightspeedObjArr.length - 1; i++) {
-    let obj = lightspeedObjArr[i];
-    let inv = cloneDeep(INVENTORY_ITEM_PROTO);
-    inv.id = generateRandomID();
-    inv.formalName = obj.description;
-    inv.upc = obj.upc;
-    inv.cost = trimToTwoDecimals(obj.cost);
-    inv.price = trimToTwoDecimals(obj.cost * 2);
-    setInventoryItem(inv);
-  }
 }

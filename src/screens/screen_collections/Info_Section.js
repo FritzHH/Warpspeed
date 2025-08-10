@@ -25,7 +25,8 @@ export const Info_Section = ({}) => {
   function ScreenComponent(tabName) {
     switch (tabName) {
       case TAB_NAMES.infoTab.workorder:
-        if (zOpenWorkorder?.id) return <ActiveWorkorderComponent />;
+        // if (zOpenWorkorder?.id) return <ActiveWorkorderComponent />;
+        return <ActiveWorkorderComponent />;
         break;
       case TAB_NAMES.infoTab.customer:
         return <NewWorkorderComponent />;

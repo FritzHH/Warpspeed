@@ -247,7 +247,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   //     </View>
   //   );
   // }
-
+  // log("wo", zWorkorderObj);
   function setComponent() {
     return (
       <View
@@ -293,6 +293,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             width: "100%",
             borderTopWidth: 1,
             borderTopColor: "gray",
+            // backgroundColor: "green",
             paddingTop: 5,
             paddingBottom: 5,
             opacity: sNumItems > 0 ? 1 : 0.2,

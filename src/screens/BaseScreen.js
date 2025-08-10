@@ -72,16 +72,17 @@ export function BaseScreen() {
   useEffect(() => {
     openWorkordersSubscribe(_zModWorkorderItem);
     inventorySubscribe(_zModInventoryItem);
-    customerPreviewListSubscribe(_zModCustPreviewItem);
     settingsSubscribe(_zSetSettingsItem); // subscribe to changes only
+    // have to do a one-off get due to only subscribing to changes in SETTINGS
     getRealtimeNodeItem("SETTINGS").then((res) => _zSetSettingsObj(res));
   }, []);
 
   useEffect(() => {
-    if (zSettingsObj.loginTimeout) _zSetLoginTimeout(zSettingsObj.loginTimeout);
-
-    // testing take out this is your user obj
-    if (zSettingsObj.users) _zSetCurrentUserObj(zSettingsObj.users[0]);
+    try {
+      _zSetLoginTimeout(zSettingsObj?.loginTimeout);
+      // testing take out this is your user obj
+      _zSetCurrentUserObj(zSettingsObj?.users[0]);
+    } catch (e) {}
   }, [zSettingsObj]);
 
   // timer
@@ -91,16 +92,12 @@ export function BaseScreen() {
     return () => clearInterval(id);
   }, []);
 
-  // testing and building fake fill database
-  async function initialize() {
-    if (!sInitFlag) {
-      // fillReceipt();
-      // fillPrinterNames();
-      // fillPreferences();
-      _setInitFlag(true);
-    }
-  }
-  initialize();
+  // testing, build db items
+  useEffect(() => {
+    // fillReceipt();
+    // fillPrinterNames();
+    // fillPreferences();
+  }, []);
 
   return (
     <div

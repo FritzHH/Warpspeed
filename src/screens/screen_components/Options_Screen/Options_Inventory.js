@@ -65,16 +65,16 @@ export function InventoryComponent({}) {
   const [sCheckboxValue, _setCheckboxValue] = React.useState(null);
   const [sNewItemObj, _setNewItemObject] = useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
-  // testing
+
   useEffect(() => {
-    if (zInventoryArr.length > 0 && !sCheckboxValue) {
-      _setCheckboxValue("Parts");
-      let res = [];
-      zInventoryArr.forEach((invItem) => {
-        if (invItem.category === "Parts") res.push(invItem);
-      });
-      _setSearchResults(res);
+    let count = 0;
+    let arr = [];
+    if (sSearchResults.length > 20) return;
+    for (let i = 0; i <= 20; i++) {
+      // log(zInventoryArr[i]);
+      if (zInventoryArr[i]) arr.push(zInventoryArr[i]);
     }
+    _setSearchResults(arr);
   }, [zInventoryArr]);
 
   function clearSearch() {
@@ -121,11 +121,7 @@ export function InventoryComponent({}) {
   }
 
   function inventoryItemSelected(item) {
-    if (!zWorkorderObj?.id) {
-      let idx = zInventoryArr.findIndex((o) => o.id == item.id);
-      _setModalInventoryObjIdx(idx);
-      return;
-    }
+    // standalone sale
 
     let wo = cloneDeep(zWorkorderObj);
     if (!wo.workorderLines) wo.workorderLines = [];
@@ -141,109 +137,63 @@ export function InventoryComponent({}) {
     });
   }
 
-  function checkboxPressed(checkboxName) {
-    if (checkboxName === sCheckboxValue) checkboxName = null;
-    _setCheckboxValue(checkboxName);
-    // log(checkboxName);
-    let res = [];
-    zInventoryArr.forEach((invItem) => {
-      if (invItem.category === checkboxName) res.push(invItem);
-    });
-    _setSearchResults(res);
-    // log(res);
+  function inventoryItemViewPressed(item) {
+    let idx = zInventoryArr.findIndex((o) => o.id == item.id);
+    _setModalInventoryObjIdx(idx);
   }
+
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
-  return (
-    <View style={{ width: "100%", height: dim.windowHeight * 0.96 }}>
-      <View
-        style={{
-          // width: "100%",
-          marginTop: 10,
-          flexDirection: "row",
-          marginHorizontal: 4,
-        }}
-      >
-        <Button
-          onPress={() => clearSearch()}
-          text={"reset"}
-          textStyle={{ color: "gray" }}
-          buttonStyle={{ height: 30, width: 70 }}
-        />
-        <TextInput
+
+  function setComponent() {
+    return (
+      <View style={{ width: "100%", height: dim.windowHeight * 0.96 }}>
+        <View
           style={{
-            borderBottomWidth: 1,
-            borderBottomColor: sSearchTerm.length > 0 ? "dimgray" : "darkgray",
-            fontSize: 20,
-            color: Colors.darkTextOnMainBackground,
-            outlineWidth: 0,
-            width: "100%",
-            marginLeft: 20,
-            marginRight: 30,
+            // width: "100%",
+            marginTop: 10,
+            flexDirection: "row",
+            marginHorizontal: 4,
           }}
-          placeholder="Search inventory..."
-          placeholderTextColor={"darkgray"}
-          value={sSearchTerm}
-          onChangeText={(val) => search(val)}
-          // onChange={(ev) => log(ev)}
-          // onSubmitEditing={(ev) => log(ev)}
-          // onKeyPress={(ev) => log(ev)}
-        />
-      </View>
-      <View
-        style={{
-          marginTop: 10,
-          paddingRight: 50,
-          flexDirection: "row",
-          width: "100%",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <View style={{ flexDirection: "row" }}>
-          <CheckBox
-            viewStyle={{ marginRight: tabMargin, marginLeft: 10 }}
-            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
-            roundButton={true}
-            text={INVENTORY_CATEGORIES.parts}
-            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.parts)}
-            isChecked={INVENTORY_CATEGORIES.parts === sCheckboxValue}
+        >
+          <Button
+            onPress={() => clearSearch()}
+            text={"reset"}
+            textStyle={{ color: "gray" }}
+            buttonStyle={{ height: 30, width: 70 }}
           />
-          <CheckBox
-            viewStyle={{ marginRight: tabMargin }}
-            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
-            roundButton={true}
-            text={INVENTORY_CATEGORIES.accessories}
-            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.accessories)}
-            isChecked={INVENTORY_CATEGORIES.accessories === sCheckboxValue}
-          />
-          <CheckBox
-            viewStyle={{ marginRight: tabMargin }}
-            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
-            roundButton={true}
-            text={INVENTORY_CATEGORIES.labor}
-            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.labor)}
-            isChecked={INVENTORY_CATEGORIES.labor === sCheckboxValue}
-          />
-          <CheckBox
-            viewStyle={{ marginRight: tabMargin }}
-            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
-            roundButton={true}
-            text={INVENTORY_CATEGORIES.bikes}
-            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.bikes)}
-            isChecked={INVENTORY_CATEGORIES.bikes === sCheckboxValue}
-          />
-          <CheckBox
-            viewStyle={{ marginRight: 0 }}
-            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
-            roundButton={true}
-            text={INVENTORY_CATEGORIES.other}
-            onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.other)}
-            isChecked={INVENTORY_CATEGORIES.other === sCheckboxValue}
+          <TextInput
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor:
+                sSearchTerm.length > 0 ? "dimgray" : "darkgray",
+              fontSize: 20,
+              color: Colors.darkTextOnMainBackground,
+              outlineWidth: 0,
+              width: "100%",
+              marginLeft: 20,
+              marginRight: 30,
+            }}
+            placeholder="Search inventory..."
+            placeholderTextColor={"darkgray"}
+            value={sSearchTerm}
+            onChangeText={(val) => search(val)}
+            // onChange={(ev) => log(ev)}
+            // onSubmitEditing={(ev) => log(ev)}
+            // onKeyPress={(ev) => log(ev)}
           />
         </View>
-        {/** MODAL Plus button full screen inventory modal */}
-        {
+        <View
+          style={{
+            marginTop: 10,
+            paddingRight: 50,
+            flexDirection: "row",
+            width: "100%",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          {/** MODAL Plus button full screen inventory modal */}
           <Button
             text={"+"}
             onPress={() => {
@@ -251,83 +201,76 @@ export function InventoryComponent({}) {
               _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
             }}
           />
-        }
-      </View>
-      {/* inventory results flatLIST */}
-      <FlatList
-        style={{
-          marginRight: 20,
-          marginTop: 10,
-          marginLeft: 10,
-          // backgroundColor: "green",
-        }}
-        data={sSearchResults}
-        renderItem={(item) => {
-          if (!item) return null;
-          let itemIndex = item.index;
-          item = item.item;
-          return (
-            <TouchableOpacity onPress={() => inventoryItemSelected(item)}>
+        </View>
+        {/* inventory results flatLIST */}
+        <FlatList
+          style={{
+            marginRight: 20,
+            marginTop: 10,
+            marginLeft: 10,
+            width: "100%",
+          }}
+          data={sSearchResults}
+          ItemSeparatorComponent={() => (
+            <View
+              style={{
+                width: "100%",
+                backgroundColor: "gray",
+                height: 1,
+                // marginVertical: 1,
+              }}
+            />
+          )}
+          renderItem={(item) => {
+            // if (!item.item) return null;
+            let itemIndex = item.index;
+            item = item.item;
+            // log("item", item);
+            return (
               <View
                 style={{
+                  // backgroundColor: "green",
                   flexDirection: "row",
-                  justifyContent: "flex-start",
-                  borderBottomWidth: 1,
-                  borderColor: "darkgray",
-                  paddingVertical: 1,
                   width: "100%",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    width: "90%",
-                    alignItems: "center",
-                    // background: "red",
-                  }}
-                >
-                  {/* *MODAL search result list item full screen modal */}
-                  {/* <ScreenModal
-                    buttonVisible={zCurrentWorkorderObj.id ? true : false}
-                    buttonLabel={"i"}
-                    buttonTextStyle={{ color: "dimgray", fontSize: 17 }}
-                    showShadow={false}
-                    buttonStyle={{
-                      marginRight: 2,
-                    }}
-                    mouseOverOptions={{
-                      enable: true,
-                      highlightColor: Colors.tabMenuButton,
-                    }}
-                    handleButtonPress={() => {
-                      log("button pressed");
-                    }}
-                    handleOuterClick={() => _setModalInventoryObjIdx(null)}
-                    modalVisible={sModalInventoryObjIdx == itemIndex}
-                    textStyle={{ fontSize: 14 }}
-                    showOuterModal={true}
-                    outerModalStyle={{
-                      backgroundColor: "rgba(50,50,50,.5)",
-                    }}
-                    Component={() => {
-                      return (
-                        <InventoryItemInModal
-                          itemIdx={sModalInventoryObjIdx}
-                          handleClosePress={() =>
-                            _setModalInventoryObjIdx(null)
-                          }
-                        />
-                      );
-                    }}
-                  /> */}
-                  <Button
-                    textStyle={{
-                      textAlign: "left",
-                      width: "100%",
-                      fontSize: 14,
-                    }}
-                    text={
-                      <Text style={{ fontSize: 15 }}>
+                <Button
+                  onPress={() =>
+                    zWorkorderObj
+                      ? inventoryItemSelected(item)
+                      : inventoryItemViewPressed(item)
+                  }
+                  shadow={false}
+                  // mouseOverOptions={{ opacity: 1 }}
+                  buttonStyle={{ backgroundColor: "transparent" }}
+                  viewStyle={{ width: "100%" }}
+                  TextComponent={() => (
+                    <View
+                      style={{
+                        width: "100%",
+                        flexDirection: "row",
+                        // backgroundColor: "blue",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Button
+                        mouseOverOptions={{ highlightColor: "red" }}
+                        buttonStyle={{
+                          backgroundColor: "transparent",
+                          // width: "8%",
+                        }}
+                        text={"i"}
+                        onPress={() => {
+                          _setModalInventoryObjIdx(-1);
+                          _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
+                        }}
+                      />
+                      <Text
+                        style={{ width: "85%", fontSize: 14, marginLeft: 20 }}
+                      >
                         {item.informalName || item.formalName}
                         {item.informalName ? (
                           <Text style={{ fontSize: 12, color: "gray" }}>
@@ -335,68 +278,123 @@ export function InventoryComponent({}) {
                           </Text>
                         ) : null}
                       </Text>
-                    }
-                    shadow={false}
-                    onPress={() => {
-                      inventoryItemSelected(item);
-                    }}
-                    buttonStyle={{
-                      width: "100%",
-                      minHeight: 10,
-                      // backgroundColor: "blue",
-                    }}
-                    mouseOverOptions={{
-                      enable: true,
-                      opacity: 0.9,
-                    }}
-                  />
-                </View>
-                <TouchableWithoutFeedback>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "flex-start",
-                      alignItems: "center",
-                      width: "20%",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 13,
-                      }}
-                    >
-                      {"$ "}
-                      <Text style={{ fontSize: 16 }}>{item.price}</Text>
-                    </Text>
-                  </View>
-                </TouchableWithoutFeedback>
+                      <View
+                        style={{
+                          borderLeftWidth: 1,
+                          borderColor: "gray",
+                          paddingLeft: 5,
+                          width: "10%",
+                          alignItems: "flex-end",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: "dimgray",
+                            // width: "100%",
+                          }}
+                        >
+                          {"$ "}
+                          <Text style={{ fontSize: 16, color: null }}>
+                            {item.price}
+                          </Text>
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                />
+                <View style={{ width: "20%", backgroundColor: null }}></View>
               </View>
-            </TouchableOpacity>
-          );
-        }}
-      />
-      <ScreenModal
-        buttonVisible={false}
-        handleOuterClick={() => {
-          _setModalInventoryObjIdx(null);
-          _setNewItemObject(null);
-        }}
-        modalVisible={sModalInventoryObjIdx}
-        textStyle={{ fontSize: 14 }}
-        showOuterModal={true}
-        outerModalStyle={{
-          backgroundColor: "rgba(50,50,50,.5)",
-        }}
-        Component={() => {
-          return (
-            <InventoryItemScreeenModalComponent
-              itemIdx={sModalInventoryObjIdx}
-              handleClosePress={() => _setModalInventoryObjIdx(null)}
-              newItemObj={sNewItemObj}
-            />
-          );
-        }}
-      />
-    </View>
-  );
+            );
+          }}
+        />
+        {/* Full screen inventory item modal */}
+        <ScreenModal
+          buttonVisible={false}
+          handleOuterClick={() => {
+            log("screen modal clicked");
+            _setModalInventoryObjIdx(null);
+            _setNewItemObject(null);
+          }}
+          modalVisible={sModalInventoryObjIdx}
+          textStyle={{ fontSize: 14 }}
+          showOuterModal={true}
+          outerModalStyle={{
+            backgroundColor: "rgba(50,50,50,.5)",
+          }}
+          Component={() => {
+            return (
+              <InventoryItemScreeenModalComponent
+                itemIdx={sModalInventoryObjIdx}
+                handleClosePress={() => _setModalInventoryObjIdx(null)}
+                newItemObj={sNewItemObj}
+              />
+            );
+          }}
+        />
+      </View>
+    );
+  }
+  try {
+    return setComponent();
+  } catch (e) {
+    log("Error setting component InventoryComponent", e);
+    return null;
+  }
 }
+
+// function checkboxPressed(checkboxName) {
+//   if (checkboxName === sCheckboxValue) checkboxName = null;
+//   _setCheckboxValue(checkboxName);
+//   // log(checkboxName);
+//   let res = [];
+//   zInventoryArr.forEach((invItem) => {
+//     if (invItem.category === checkboxName) res.push(invItem);
+//   });
+//   _setSearchResults(res);
+//   // log(res);
+// }
+
+/// old parts/accessoreis/labor/bikes/other checkbox row
+// <View style={{ flexDirection: "row" }}>
+//   <CheckBox
+//     viewStyle={{ marginRight: tabMargin, marginLeft: 10 }}
+//     buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
+//     roundButton={true}
+//     text={INVENTORY_CATEGORIES.parts}
+//     onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.parts)}
+//     isChecked={INVENTORY_CATEGORIES.parts === sCheckboxValue}
+//   />
+//   <CheckBox
+//     viewStyle={{ marginRight: tabMargin }}
+//     buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
+//     roundButton={true}
+//     text={INVENTORY_CATEGORIES.accessories}
+//     onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.accessories)}
+//     isChecked={INVENTORY_CATEGORIES.accessories === sCheckboxValue}
+//   />
+//   <CheckBox
+//     viewStyle={{ marginRight: tabMargin }}
+//     buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
+//     roundButton={true}
+//     text={INVENTORY_CATEGORIES.labor}
+//     onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.labor)}
+//     isChecked={INVENTORY_CATEGORIES.labor === sCheckboxValue}
+//   />
+//   <CheckBox
+//     viewStyle={{ marginRight: tabMargin }}
+//     buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
+//     roundButton={true}
+//     text={INVENTORY_CATEGORIES.bikes}
+//     onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.bikes)}
+//     isChecked={INVENTORY_CATEGORIES.bikes === sCheckboxValue}
+//   />
+//   <CheckBox
+//     viewStyle={{ marginRight: 0 }}
+//     buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
+//     roundButton={true}
+//     text={INVENTORY_CATEGORIES.other}
+//     onCheck={() => checkboxPressed(INVENTORY_CATEGORIES.other)}
+//     isChecked={INVENTORY_CATEGORIES.other === sCheckboxValue}
+//   />
+// </View>

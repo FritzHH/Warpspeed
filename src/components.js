@@ -400,7 +400,9 @@ export const ScreenModal = ({
               left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
             }}
           >
+            {/* <TouchableWithoutFeedback onClick={() => log("clicked")}> */}
             <Component />
+            {/* </TouchableWithoutFeedback> */}
           </View>
         </Modal>
       </View>
@@ -583,7 +585,9 @@ export const InventoryItemScreeenModalComponent = ({
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
 
   ////////////////////////////////////////////////////////////////////
-  const [sItem, _setItem] = React.useState({});
+  const [sItem, _setItem] = React.useState(null);
+  const [sNewItem, _setNewItem] = React.useState(false);
+
   const isMounted = useRef(false);
   const FOCUS_NAMES = {
     formalName: "name",
@@ -595,21 +599,17 @@ export const InventoryItemScreeenModalComponent = ({
   };
 
   useEffect(() => {
-    if (newItemObj) {
-      _setItem(newItemObj);
-    } else {
-      _setItem(cloneDeep(zInventoryArr[itemIdx]));
-    }
+    _setItem(zInventoryArr[itemIdx]);
   }, []);
 
-  function handleChangeItem(item1, focusName) {
+  function handleChangeItem(item, focusName) {
     _zSetFocus(focusName);
-    _setItem(item1);
+    _setItem(item);
 
-    if (!newItemObj)
+    if (!sNewItem)
       _zExecute(() => {
-        _zModInventoryItem(item1, "change");
-        dbSetInventoryItem(item1);
+        _zModInventoryItem(item, "change");
+        dbSetInventoryItem(item);
       }, PRIVILEDGE_LEVELS.superUser);
   }
 
@@ -665,171 +665,221 @@ export const InventoryItemScreeenModalComponent = ({
       handleClosePress();
     }, "Admin");
   }
-  if (!sItem) return null;
-  return (
-    <TouchableWithoutFeedback
-      onLongPress={() => {
-        () => handleRemoveItem();
-      }}
-    >
-      <View
-        style={{
-          width: "40%",
-          height: "60%",
-          // backgroundColor: Colors.opacityBackgroundLight,
-          ...SHADOW_RADIUS_PROTO,
-          shadowOffset: { width: 3, height: 3 },
-          padding: 15,
-          backgroundColor: "white",
-        }}
-      >
-        <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+
+  function setComponent() {
+    return (
+      <TouchableWithoutFeedback>
         <View
           style={{
-            width: "100%",
-            flexDirection: "row",
-            justifyContent: "space-between",
+            width: "40%",
+            height: "60%",
+            // backgroundColor: Colors.opacityBackgroundLight,
+            ...SHADOW_RADIUS_PROTO,
+            shadowOffset: { width: 3, height: 3 },
+            padding: 15,
+            backgroundColor: "white",
           }}
         >
-          <View>
-            <Text>{"Catalog Name"}</Text>
-            <TextInput
-              numberOfLines={3}
-              style={{
-                marginTop: 10,
-                fontSize: 16,
-                color: "black",
-                borderWidth: 1,
-              }}
-              autoFocus={zFocus === FOCUS_NAMES.formalName}
-              onClick={() => _zSetFocus(FOCUS_NAMES.formalName)}
-              onChangeText={(val) => {
-                let newItem = cloneDeep(sItem);
-                newItem.formalName = val;
-                handleChangeItem(newItem, FOCUS_NAMES.formalName);
-              }}
-              value={sItem.formalName}
-            />
-            <Text>Keyword Name</Text>
-            <TextInput
-              numberOfLines={3}
-              style={{
-                marginTop: 10,
-                fontSize: 16,
-                color: "black",
-                borderWidth: 1,
-              }}
-              autoFocus={zFocus === FOCUS_NAMES.informalName}
-              onClick={() => _zSetFocus(FOCUS_NAMES.informalName)}
-              onChangeText={(val) => {
-                let newItem = cloneDeep(sItem);
-                newItem.informalName = val;
-                handleChangeItem(newItem, FOCUS_NAMES.informalName);
-              }}
-              value={sItem.informalName}
-            />
-          </View>
-          <View>
-            <Text style={{ color: "red", fontSize: 13 }}>
-              {"Regular $ "}
-              <TextInput
-                autoFocus={zFocus === FOCUS_NAMES.price}
-                onClick={() => _zSetFocus(FOCUS_NAMES.price)}
-                onChangeText={(val) => {
-                  let newItem = cloneDeep(sItem);
-                  newItem.price = val;
-                  handleChangeItem(newItem, FOCUS_NAMES.price);
-                }}
-                value={sItem.price}
-                style={{ fontSize: 16 }}
-              />
-            </Text>
-            <Text style={{ alignSelf: "flex-end", color: "red", fontSize: 13 }}>
-              {"Sale $ "}
-              <TextInput
-                autoFocus={zFocus === FOCUS_NAMES.sale}
-                onClick={() => _zSetFocus(FOCUS_NAMES.sale)}
-                onChangeText={(val) => {
-                  let newItem = cloneDeep(sItem);
-                  newItem.salePrice = val;
-                  handleChangeItem(newItem, FOCUS_NAMES.sale);
-                }}
-                value={sItem.salePrice}
-                style={{ fontSize: 16 }}
-              />
-            </Text>
-          </View>
-        </View>
-        <View
-          style={{ flexDirection: "row", alignItems: "center", marginTop: 20 }}
-        >
-          <Text style={{ marginLeft: 10 }}>{sItem.catMain}</Text>
-        </View>
-
-        <View style={{ flexDirection: "row" }}>
-          <Text
+          <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+          <View
             style={{
-              width: 70,
-              marginTop: 0,
-              fontSize: 12,
-              marginRight: 10,
+              width: "100%",
+              // height: "100%",
+              // flexDirection: "row",
+              justifyContent: "space-between",
             }}
           >
-            Barcode:
-          </Text>
+            <View>
+              <Text style={{ fontStyle: "italic", color: "gray" }}>
+                {"Catalog Name"}
+              </Text>
+              <TextInput
+                numberOfLines={3}
+                style={{
+                  marginTop: 2,
+                  fontSize: 16,
+                  color: "black",
+                  // borderBottomWidth: 1,
+                }}
+                autoFocus={zFocus === FOCUS_NAMES.formalName}
+                onClick={() => _zSetFocus(FOCUS_NAMES.formalName)}
+                onChangeText={(val) => {
+                  let newItem = cloneDeep(sItem);
+                  newItem.formalName = val;
+                  handleChangeItem(newItem, FOCUS_NAMES.formalName);
+                }}
+                value={sItem.formalName}
+              />
+              <Text
+                style={{ marginTop: 20, fontStyle: "italic", color: "gray" }}
+              >
+                Keyword/Short Name
+              </Text>
+              <TextInput
+                numberOfLines={3}
+                style={{
+                  marginTop: 2,
+                  fontSize: 16,
+                  color: "black",
+                  // borderWidth: 1,
+                }}
+                autoFocus={zFocus === FOCUS_NAMES.informalName}
+                onClick={() => _zSetFocus(FOCUS_NAMES.informalName)}
+                onChangeText={(val) => {
+                  let newItem = cloneDeep(sItem);
+                  newItem.informalName = val;
+                  handleChangeItem(newItem, FOCUS_NAMES.informalName);
+                }}
+                value={sItem.informalName}
+              />
+            </View>
+            <View
+              style={{
+                flexDirection: "row",
+              }}
+            >
+              <View
+                style={{
+                  alignItems: "flex-end",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "red",
+                    fontSize: 16,
+                  }}
+                >
+                  {"Regular"}
+                </Text>
+                <Text style={{ color: "red", fontSize: 16 }}>{"Sale"}</Text>
+              </View>
+              <View
+                style={{
+                  marginLeft: 10,
+                  // alignItems: "flex-start",
+                  // justifyContent: "center",
+                }}
+              >
+                <TextInput
+                  autoFocus={zFocus === FOCUS_NAMES.price}
+                  onClick={() => _zSetFocus(FOCUS_NAMES.price)}
+                  onChangeText={(val) => {
+                    let newItem = cloneDeep(sItem);
+                    newItem.price = val;
+                    handleChangeItem(newItem, FOCUS_NAMES.price);
+                  }}
+                  value={"$" + sItem.price}
+                  style={{ fontSize: 16 }}
+                />
+                <TextInput
+                  autoFocus={zFocus === FOCUS_NAMES.sale}
+                  onClick={() => _zSetFocus(FOCUS_NAMES.sale)}
+                  onChangeText={(val) => {
+                    let newItem = cloneDeep(sItem);
+                    newItem.salePrice = val;
+                    handleChangeItem(newItem, FOCUS_NAMES.sale);
+                  }}
+                  value={"$" + sItem.salePrice}
+                  style={{ fontSize: 16 }}
+                />
+              </View>
+            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 20,
+            }}
+          >
+            <Text style={{ marginLeft: 10 }}>{sItem.catMain}</Text>
+          </View>
 
-          <TextInput
-            autoFocus={zFocus === FOCUS_NAMES.upc}
-            onClick={() => _zSetFocus(FOCUS_NAMES.upc)}
-            style={{ fontSize: 16, color: "black", marginTop: 0 }}
-            value={sItem.upc}
-            onChangeText={(val) => {
-              let newItem = cloneDeep(sItem);
-              newItem.upc = val;
-              handleChangeItem(newItem, FOCUS_NAMES.upc);
+          <View style={{ color: "dimgray", flexDirection: "row" }}>
+            <Text
+              style={{
+                fontSize: 12,
+                marginRight: 5,
+              }}
+            >
+              Barcode:
+            </Text>
+
+            <TextInput
+              autoFocus={zFocus === FOCUS_NAMES.upc}
+              onClick={() => _zSetFocus(FOCUS_NAMES.upc)}
+              style={{ fontSize: 12, color: "black", marginTop: 0 }}
+              value={sItem.upc}
+              onChangeText={(val) => {
+                let newItem = cloneDeep(sItem);
+                newItem.upc = val;
+                handleChangeItem(newItem, FOCUS_NAMES.upc);
+              }}
+            />
+          </View>
+          <ModalDropdown
+            buttonLabel={"Quick Items"}
+            buttonStyle={{ width: 125, marginTop: 15, marginBottom: 25 }}
+            data={
+              zSettingsObj.quickItemButtonNames
+                ? zSettingsObj.quickItemButtonNames.map((o) => o.name)
+                : []
+            }
+            onSelect={(itemName) => handleQuickButtonAdd(itemName)}
+          />
+          <FlatList
+            data={zSettingsObj.quickItemButtonNames.map((nameObj) => {
+              let found;
+              nameObj.assignments?.forEach((id) => {
+                if (id == sItem.id) found = nameObj;
+              });
+              return found;
+            })}
+            renderItem={(item) => {
+              // log("i", item);
+              if (!item.item) return null;
+              item = item.item;
+              return (
+                <TouchableWithoutFeedback
+                  onLongPress={() => handleQuickButtonRemove(item)}
+                >
+                  <Text>{item.name}</Text>
+                </TouchableWithoutFeedback>
+              );
             }}
           />
+          <View
+            style={{
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexDirection: "row",
+            }}
+          >
+            <Button
+              buttonStyle={{ width: 125, marginVertical: 10 }}
+              text={"Create Item"}
+              onPress={handleNewItemPress}
+            />
+
+            <Button
+              buttonStyle={{ width: 125, marginVertical: 10 }}
+              text={"Delete Item"}
+              onPress={handleRemoveItem}
+            />
+
+            {/* ) : null} */}
+          </View>
         </View>
-
-        {/* {newItemObj ? ( */}
-        <Button text={"Create Item"} onPress={handleNewItemPress} />
-        <Button text={"Delete Item"} onPress={handleRemoveItem} />
-
-        {/* ) : null} */}
-        <ModalDropdown
-          buttonLabel={"Quick Items"}
-          buttonStyle={{ width: 200 }}
-          data={
-            zSettingsObj.quickItemButtonNames
-              ? zSettingsObj.quickItemButtonNames.map((o) => o.name)
-              : []
-          }
-          onSelect={(itemName) => handleQuickButtonAdd(itemName)}
-        />
-        <FlatList
-          data={zSettingsObj.quickItemButtonNames.map((nameObj) => {
-            let found;
-            nameObj.assignments?.forEach((id) => {
-              if (id == sItem.id) found = nameObj;
-            });
-            return found;
-          })}
-          renderItem={(item) => {
-            // log("i", item);
-            if (!item.item) return null;
-            item = item.item;
-            return (
-              <TouchableWithoutFeedback
-                onLongPress={() => handleQuickButtonRemove(item)}
-              >
-                <Text>{item.name}</Text>
-              </TouchableWithoutFeedback>
-            );
-          }}
-        />
-      </View>
-    </TouchableWithoutFeedback>
-  );
+      </TouchableWithoutFeedback>
+    );
+  }
+  try {
+    return setComponent();
+  } catch (e) {
+    // log("Error setting component InventoryItemScreenModalComponent", e);
+    return null;
+  }
 };
 
 export const CustomerInfoScreenModalComponent = ({
@@ -2065,17 +2115,20 @@ export const Button = ({
   ref,
   onPress,
   onLongPress,
+  numLines = 1,
   text,
-  numLines = null,
   enableMouseOver = true,
+  TextComponent,
   mouseOverOptions = {
-    // opacity: 0.7,
-    // highlightColor: Colors.tabMenuButton,
+    opacity: 0.7,
+    highlightColor: Colors.tabMenuButton,
+    textColor: "white",
   },
   shadow = true,
   allCaps = false,
   buttonStyle = {},
   textStyle = {},
+  viewStyle = {},
 }) => {
   const [sMouseOver, _setMouseOver] = React.useState(false);
   if (allCaps) text = text.toUpperCase();
@@ -2090,14 +2143,22 @@ export const Button = ({
     return <View style={{ width: WIDTH, height: HEIGHT }}></View>;
   }
 
+  function handleButtonPress() {
+    if (visible) {
+      _setMouseOver(false);
+      onPress();
+    }
+  }
+
   return (
     <TouchableOpacity
+      style={{ ...viewStyle }}
       ref={ref}
       onMouseOver={() => (enableMouseOver ? _setMouseOver(true) : null)}
       onMouseLeave={() => {
         _setMouseOver(false);
       }}
-      onPress={visible ? onPress : () => {}}
+      onPress={handleButtonPress}
       onLongPress={visible ? onLongPress : () => {}}
     >
       <View
@@ -2106,8 +2167,6 @@ export const Button = ({
           justifyContent: "center",
           paddingHorizontal: 15,
           paddingVertical: 5,
-          // width: null,
-          // height: HEIGHT,
           backgroundColor: Colors.tabMenuButton,
           ...shadowStyle,
           ...buttonStyle,
@@ -2117,18 +2176,22 @@ export const Button = ({
           opacity: sMouseOver ? mouseOverOptions.opacity : buttonStyle.opacity,
         }}
       >
-        <Text
-          numberOfLines={2}
-          style={{
-            textAlign: "center",
-            textAlignVertical: "center",
-            fontSize: 17,
-            ...textStyle,
-            color: sMouseOver ? "black" : textStyle.color || "white",
-          }}
-        >
-          {text || "Button"}
-        </Text>
+        {TextComponent ? (
+          <TextComponent />
+        ) : (
+          <Text
+            numberOfLines={numLines}
+            style={{
+              textAlign: "center",
+              textAlignVertical: "center",
+              fontSize: 17,
+              ...textStyle,
+              color: sMouseOver ? "black" : textStyle.color || "white",
+            }}
+          >
+            {text || "Button"}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );

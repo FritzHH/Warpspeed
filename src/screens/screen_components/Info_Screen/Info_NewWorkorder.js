@@ -230,6 +230,17 @@ export function NewWorkorderComponent({}) {
     _setCustomerInfo(custInfo);
   }
 
+  function handleStartStandaloneSalePress() {
+    let wo = cloneDeep(WORKORDER_PROTO);
+    wo.isStandaloneSale = true;
+    wo.id = generateRandomID();
+    wo.startedBy = zCurrentUser.id;
+
+    _zSetOpenWorkorder(wo);
+    _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
+    _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
+  }
+
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   function setComponent() {
@@ -360,9 +371,7 @@ export function NewWorkorderComponent({}) {
           text={"New Sale"}
           // buttonStyle={}
           onPress={() => {
-            _zStartStandaloneSale();
-            _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
-            _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
+            handleStartStandaloneSalePress();
           }}
         />
       </View>

@@ -8,7 +8,7 @@ import {
   TAB_NAMES,
   WORKORDER_PROTO,
 } from "./data";
-import { checkArr, log } from "./utils";
+import { checkArr, generateRandomID, log } from "./utils";
 import { cloneDeep } from "lodash";
 
 // internal use  /////////////////////////////////////////////////////
@@ -117,7 +117,7 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: TAB_NAMES.itemsTab.empty,
-  optionsTabName: TAB_NAMES.optionsTab.quickItems,
+  optionsTabName: TAB_NAMES.optionsTab.inventory,
   infoTabName: TAB_NAMES.infoTab.customer,
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
@@ -181,8 +181,15 @@ export const useCurrentWorkorderStore = create((set, get) => ({
   },
   startStandaloneSale: () => {
     set((state) => ({
-      workorderObj: { ...cloneDeep(WORKORDER_PROTO), isStandaloneSale: true },
+      workorderObj: {
+        ...cloneDeep(WORKORDER_PROTO),
+        isStandaloneSale: true,
+        id: generateRandomID(),
+      },
     }));
+  },
+  reset: () => {
+    set((state) => ({ workorderObj: null }));
   },
 }));
 

@@ -109,6 +109,7 @@ export function WorkordersComponent({}) {
     dbSetOpenWorkorderItem(workorderObj, true);
   }
 
+  // clog(zOpenWorkordersArr);
   return (
     <View
       style={{

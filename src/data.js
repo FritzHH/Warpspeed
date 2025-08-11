@@ -179,6 +179,84 @@ export const INVENTORY_ITEM_PROTO = {
   cost: "",
 };
 
+export const COLORS = {
+  white: {
+    textColor: "black",
+    backgroundColor: "whitesmoke",
+    label: "White",
+  },
+  blue: {
+    textColor: "white",
+    backgroundColor: "blue",
+    label: "Blue",
+  },
+  light_blue: {
+    textColor: "black",
+    backgroundColor: "lightblue",
+    label: "Light-blue",
+  },
+  red: {
+    textColor: "white",
+    backgroundColor: "red",
+    label: "Red",
+  },
+  green: {
+    textColor: "white",
+    backgroundColor: "green",
+    label: "Green",
+  },
+  black: {
+    textColor: "whitesmoke",
+    backgroundColor: "black",
+    label: "Black",
+  },
+  yellow: {
+    textColor: "black",
+    backgroundColor: "yellow",
+    label: "Yellow",
+  },
+  maroon: {
+    textColor: "white",
+    backgroundColor: "maroon",
+    label: "Maroon",
+  },
+  brown: {
+    textColor: "white",
+    backgroundColor: "rgb(139,69,19)",
+    label: "Brown",
+  },
+  silver: {
+    textColor: "black",
+    backgroundColor: "rgb(192,192,192)",
+    label: "Silver",
+  },
+  tan: {
+    textColor: "black",
+    backgroundColor: "tan",
+    label: "Tan",
+  },
+  beige: {
+    textColor: "black",
+    backgroundColor: "beige",
+    label: "Beige",
+  },
+  gray: {
+    textColor: "white",
+    backgroundColor: "darkgray",
+    label: "Gray",
+  },
+  light_gray: {
+    textColor: "black",
+    backgroundColor: "lightgray",
+    label: "Light-gray",
+  },
+  pink: {
+    textColor: "black",
+    backgroundColor: "pink",
+    label: "Pink",
+  },
+};
+
 export const SETTINGS_PROTO = {
   statuses: [
     "Newly Created",

@@ -45,10 +45,7 @@ import {
 import { dbSearchForPhoneNumber } from "../db_call_wrapper";
 
 export function BaseScreen() {
-  // setters ////////////////////////////////////////////////////////////////
-  const _zModCustPreviewItem = useCustomerPreviewStore(
-    (state) => state.modItem
-  );
+  // store setters ////////////////////////////////////////////////////////////////
   const _zModWorkorderItem = useOpenWorkordersStore((state) => state.modItem);
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
   const _zSetSettingsItem = useSettingsStore((state) => state.setSettingsItem);
@@ -61,12 +58,13 @@ export function BaseScreen() {
   // testing
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
-  // getters /////////////////////////////////////////////////////////////////
+  // store getters /////////////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
   const zModalVisible = useLoginStore((state) => state.getModalVisible());
+
   //////////////////////////////////////////////////////////////////////////////
-  const [sInitFlag, _setInitFlag] = React.useState(false);
+  //////////////////////////////////////////////////////////////////////////////
 
   // subscribe to database listeners
   useEffect(() => {
@@ -123,6 +121,7 @@ export function BaseScreen() {
           style={{
             width: "65%",
             backgroundColor: Colors.mainBackground,
+            height: "100%",
           }}
         >
           <View

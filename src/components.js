@@ -292,8 +292,8 @@ export const AlertBox = ({
 export const ScreenModal = ({
   ref,
   modalCoordinateVars = {
-    x: -30,
-    y: 40,
+    // x: -30,
+    // y: 40,
   },
   mouseOverOptions = {
     enable: true,
@@ -421,6 +421,7 @@ export const ScreenModal = ({
 };
 
 export const ModalDropdown = ({
+  // ref,
   data,
   onSelect,
   buttonLabel,
@@ -432,20 +433,16 @@ export const ModalDropdown = ({
   textStyle = {},
   outerModalStyle = {},
   innerModalStyle = {},
+  modalCoordinateVars = {
+    x: 200,
+    y: -300,
+  },
   // modalStyle = {},
 }) => {
   const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedValue, setSelectedValue] = useState(null);
-
-  const toggleModal = () => setModalVisible(!isModalVisible);
-
-  const handleSelect = (item) => {
-    setSelectedValue(item);
-    onSelect(item);
-    toggleModal();
-  };
-  // log(data);
+  const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     _zSetModalVisible(true);
@@ -454,8 +451,30 @@ export const ModalDropdown = ({
     };
   });
 
+  useEffect(() => {
+    // const el = ref ? ref.current : null;
+    // if (el) {
+    //   log("el", el);
+    //   let rect = el.getBoundingClientRect();
+    //   _setModalCoordinates({ x: rect.x, y: rect.y });
+    // }
+  }, []);
+
+  const toggleModal = () => setModalVisible(!isModalVisible);
+  if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
+
+  const handleSelect = (item) => {
+    setSelectedValue(item);
+    onSelect(item);
+    toggleModal();
+  };
+  // log(data);
+  // log("ref", ref);
   return (
-    <TouchableWithoutFeedback onPress={() => toggleModal()}>
+    <TouchableWithoutFeedback
+      // ref={ref ? ref : null}
+      onPress={() => toggleModal()}
+    >
       <View>
         <TouchableOpacity onPress={toggleModal}>
           <View
@@ -467,6 +486,9 @@ export const ModalDropdown = ({
               padding: 3,
               alignItems: "center",
               justifyContent: "center",
+              // position: ref ? "absolute" : null,
+              // top: ref ? sModalCoordinates.y + modalCoordinateVars.y : null,
+              // left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
               ...SHADOW_RADIUS_PROTO,
               ...buttonStyle,
             }}
@@ -917,12 +939,14 @@ export const CustomerInfoScreenModalComponent = ({
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
+  const _zExecute = useLoginStore((state) => state.execute);
 
   // store getters
 
   /////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////
 
-  // automatically save customer if it is NOT a new customer creation
+  // automatically save customer changes if it is NOT a new customer creation
   useEffect(() => {
     if (ssCustomerInfoObj?.id)
       _zExecute(() => {
@@ -942,40 +966,6 @@ export const CustomerInfoScreenModalComponent = ({
     outlineWidth: 0,
   };
 
-  function handleCreateNewCustomerPressed() {
-    // log("create new customer pressed", log(zCurrentUser));
-    let newWorkorder = cloneDeep(WORKORDER_PROTO);
-    newWorkorder.id = generateRandomID();
-    newWorkorder.customerFirst = ssCustomerInfoObj.first;
-    newWorkorder.customerLast = ssCustomerInfoObj.last;
-    newWorkorder.customerPhone =
-      ssCustomerInfoObj.cell || ssCustomerInfoObj.landline;
-    newWorkorder.customerID = ssCustomerInfoObj.id;
-    newWorkorder.startedBy = zCurrentUser.first;
-    newWorkorder.status = "Service";
-    newWorkorder.changeLog.push(
-      "Started by: " + zCurrentUser.first + " " + zCurrentUser.last
-    );
-    let newCustomerObj = cloneDeep(ssCustomerInfoObj);
-    newCustomerObj.id = generateRandomID();
-    newCustomerObj.dateCreated = new Date().getTime();
-    newCustomerObj.workorders.push(newWorkorder.id);
-
-    _zSetCurrentCustomer(newCustomerObj);
-    // dbSetCustomerObj(newCustomerObj);
-    // dbSetOpenWorkorderItem(newWorkorder);
-    _zSetNewWorkorderInArr(newWorkorder, "add");
-    _zSetOpenWorkorder(newWorkorder);
-    // _zResetSearch();
-    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    messagesSubscribe(
-      newCustomerObj.id,
-      _zSetIncomingMessage,
-      _zSetOutgoingMessage
-    );
-  }
   // clog(sCustomerInfoObj);
 
   function setComponent() {
@@ -1151,7 +1141,7 @@ export const CustomerInfoScreenModalComponent = ({
               onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
             />
             <CheckBox
-              label={"Call Only"}
+              text={"Call Only"}
               isChecked={ssCustomerInfoObj.contactRestriction === "CALL"}
               onCheck={() => {
                 let obj = cloneDeep(ssCustomerInfoObj);
@@ -1165,7 +1155,7 @@ export const CustomerInfoScreenModalComponent = ({
               }}
             />
             <CheckBox
-              label={"Email Only"}
+              text={"Email Only"}
               isChecked={ssCustomerInfoObj.contactRestriction === "EMAIL"}
               onCheck={() => {
                 let obj = cloneDeep(ssCustomerInfoObj);
@@ -2360,5 +2350,19 @@ export const CheckBox = ({
         <Text style={{ ...textStyle }}>{text}</Text>
       </View>
     </TouchableOpacity>
+  );
+};
+
+export const ColorSelectorModalComponent = ({ onSelect }) => {
+  return (
+    <View
+      style={{
+        width: 200,
+        height: "90%",
+        // alignSelf: "center",
+        // justifySelf: "center",
+        backgroundColor: "green",
+      }}
+    ></View>
   );
 };

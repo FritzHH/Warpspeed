@@ -47,8 +47,7 @@ export function Options_Section({
       case TAB_NAMES.optionsTab.quickItems:
         return <QuickItemComponent />;
       case TAB_NAMES.optionsTab.workorders:
-        <WorkordersComponent />;
-        return;
+        return <WorkordersComponent />;
     }
     return null;
   }

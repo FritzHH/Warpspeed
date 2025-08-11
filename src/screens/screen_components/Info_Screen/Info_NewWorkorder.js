@@ -20,6 +20,7 @@ import {
   CustomerInfoScreenModalComponent,
   SHADOW_RADIUS_PROTO,
   LoginScreenModalComponent,
+  ColorSelectorModalComponent,
 } from "../../../components";
 import {
   CUSTOMER_PROTO,
@@ -89,19 +90,21 @@ export function NewWorkorderComponent({}) {
   );
 
   //////////////////////////////////////////////////////////////////////
-  const [sBox1Val, _setBox1Val] = React.useState("222-222-2222");
+  const [sBox1Val, _setBox1Val] = React.useState("");
+  // const [sBox1Val, _setBox1Val] = React.useState("222-222-2222");
+
   const [sBox2Val, _setBox2Val] = React.useState("");
   const [sSearchingByName, _setSearchingByName] = React.useState(false);
-  const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
+  const [sCustomerInfoObj, _setCustomerInfoObj] = React.useState(null);
   const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] =
     useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
 
-  // watch inputs to see if we need to show Create Customer button
+  // watch inputs to see if we need to show Create Customer button (show button after 10 digits phone or 2 digits first name)
   useEffect(() => {
     let showButton = false;
     if (sSearchingByName) {
-      if (sBox1Val.length > 1) showButton = true;
+      if (sBox1Val.length > 1 || sBox2Val.length > 1) showButton = true;
     } else {
       let noDashes = removeDashesFromPhone(sBox1Val);
       if (noDashes.length == 10 && zSearchResults.length == 0)
@@ -192,40 +195,7 @@ export function NewWorkorderComponent({}) {
     }
   }
 
-  function handleCreateNewCustomerPressed() {
-    // log("create new customer pressed", log(zCurrentUser));
-    let newWorkorder = cloneDeep(WORKORDER_PROTO);
-    newWorkorder.id = generateRandomID();
-    newWorkorder.customerFirst = sCustomerInfo.first;
-    newWorkorder.customerLast = sCustomerInfo.last;
-    newWorkorder.customerPhone = sCustomerInfo.cell || sCustomerInfo.landline;
-    newWorkorder.customerID = sCustomerInfo.id;
-    newWorkorder.startedBy = zCurrentUser.first;
-    newWorkorder.status = "Service";
-    newWorkorder.changeLog.push(
-      "Started by: " + zCurrentUser.first + " " + zCurrentUser.last
-    );
-    let newCustomerObj = cloneDeep(sCustomerInfo);
-    newCustomerObj.dateCreated = new Date().getTime();
-    newCustomerObj.workorders.push(newWorkorder.id);
-
-    _zSetCurrentCustomer(newCustomerObj);
-    // dbSetCustomerObj(newCustomerObj);
-    // dbSetOpenWorkorderItem(newWorkorder);
-    _zSetNewWorkorderInArr(newWorkorder, "add");
-    _zSetOpenWorkorder(newWorkorder);
-    _zResetSearch();
-    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    messagesSubscribe(
-      newCustomerObj.id,
-      _zSetIncomingMessage,
-      _zSetOutgoingMessage
-    );
-  }
-
-  function handleModalCreateCustomerBtnPressed() {
+  function handleCreateCustomerBtnPressed() {
     let custInfo = cloneDeep(CUSTOMER_PROTO);
     if (sSearchingByName) {
       custInfo.first = sBox1Val;
@@ -235,8 +205,9 @@ export function NewWorkorderComponent({}) {
       _setInfoTextFocus(FOCUS_NAMES.first);
       custInfo.cell = sBox1Val;
     }
-    log(custInfo);
-    _setCustomerInfo(custInfo);
+    // log(custInfo);
+    // do not set the customer id this is how the next screen knows it is a new customer. we will set the id in the modal automatically on creation
+    _setCustomerInfoObj(custInfo);
   }
 
   function handleStartStandaloneSalePress() {
@@ -248,6 +219,53 @@ export function NewWorkorderComponent({}) {
     _zSetOpenWorkorder(wo);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
+  }
+
+  function handleCancelCreateNewCustomerPress() {
+    _setBox1Val("");
+    _setBox2Val("");
+    _setSearchingByName(false);
+    _zResetSearch();
+    _setShowCreateCustomerBtn(false);
+    _setCustomerInfoObj(null);
+  }
+
+  function handleCreateNewCustomerPressed() {
+    // log("create new customer pressed", log(zCurrentUser));
+    // first create new customer
+    let newCustomerObj = cloneDeep(sCustomerInfoObj);
+    newCustomerObj.id = generateRandomID();
+    newCustomerObj.dateCreated = new Date().getTime();
+    newCustomerObj.workorders.push(newWorkorder.id);
+
+    // next create empty workorder for next screen
+    let newWorkorder = cloneDeep(WORKORDER_PROTO);
+    newWorkorder.id = generateRandomID();
+    newWorkorder.customerFirst = sCustomerInfoObj.first;
+    newWorkorder.customerLast = sCustomerInfoObj.last;
+    newWorkorder.customerPhone =
+      sCustomerInfoObj.cell || sCustomerInfoObj.landline;
+    newWorkorder.customerID = sCustomerInfoObj.id;
+    newWorkorder.startedBy = zCurrentUser.first;
+    newWorkorder.status = "Service";
+    newWorkorder.changeLog.push(
+      "Started by: " + zCurrentUser.first + " " + zCurrentUser.last
+    );
+
+    _zSetCurrentCustomer(newCustomerObj);
+    // dbSetCustomerObj(newCustomerObj);
+    // dbSetOpenWorkorderItem(newWorkorder);
+    _zSetNewWorkorderInArr(newWorkorder, "add");
+    _zSetOpenWorkorder(newWorkorder);
+    // _zResetSearch();
+    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    messagesSubscribe(
+      newCustomerObj.id,
+      _zSetIncomingMessage,
+      _zSetOutgoingMessage
+    );
   }
 
   //////////////////////////////////////////////////////////////////////
@@ -331,7 +349,7 @@ export function NewWorkorderComponent({}) {
               color: sBox1Val.length < 0 ? "gray" : "dimgray",
             }}
             autoFocus={true}
-            placeholder={sSearchingByName ? "First Name..." : "Phone number..."}
+            placeholder={sSearchingByName ? "First Name" : "Phone number"}
             placeholderTextColor={"gray"}
             value={sBox1Val}
             onChangeText={(val) => handleBox1TextChange(val)}
@@ -339,7 +357,7 @@ export function NewWorkorderComponent({}) {
           <View style={{ width: 10 }} />
           {sSearchingByName && (
             <TextInput
-              placeholder={"Last name..."}
+              placeholder={"Last name"}
               placeholderTextColor={"gray"}
               style={{
                 marginTop: 20,
@@ -369,29 +387,21 @@ export function NewWorkorderComponent({}) {
             buttonVisible={sShowCreateCustomerButton}
             buttonTextStyle={{ color: "dimgray" }}
             handleButtonPress={() =>
-              _zExecute(() => handleModalCreateCustomerBtnPressed())
+              _zExecute(() => handleCreateCustomerBtnPressed())
             }
             buttonLabel={"Create New Customer"}
-            modalVisible={sCustomerInfo}
+            modalVisible={sCustomerInfoObj}
             canExitOnOuterClick={false}
             Component={() => (
               <CustomerInfoScreenModalComponent
-                ssCustomerInfoObj={sCustomerInfo}
-                __setCustomerInfoObj={_setCustomerInfo}
+                ssCustomerInfoObj={sCustomerInfoObj}
+                __setCustomerInfoObj={_setCustomerInfoObj}
                 button1Text={"Create Customer"}
                 button2Text={"Cancel"}
                 ssInfoTextFocus={sInfoTextFocus}
                 __setInfoTextFocus={_setInfoTextFocus}
-                // handleButton1Press={handleCreateNewCustomerPressed}
-                handleButton2Press={() => {
-                  // cancel button
-                  _setBox1Val("");
-                  _setBox2Val("");
-                  _setSearchingByName(false);
-                  _zResetSearch();
-                  _setShowCreateCustomerBtn(false);
-                  _setCustomerInfo(null);
-                }}
+                handleButton1Press={handleCreateNewCustomerPressed}
+                handleButton2Press={handleCancelCreateNewCustomerPress}
               />
             )}
           />

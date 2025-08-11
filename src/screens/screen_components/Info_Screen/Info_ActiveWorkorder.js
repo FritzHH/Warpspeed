@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { View, Text, TextInput } from "react-native-web";
-import { dim, log, trimToTwoDecimals } from "../../../utils";
+import { addDashesToPhone, dim, log, trimToTwoDecimals } from "../../../utils";
 import {
   TabMenuDivider as Divider,
   ModalDropdown,
@@ -37,7 +37,7 @@ import {
 } from "../../../db_call_wrapper";
 
 export const ActiveWorkorderComponent = ({}) => {
-  // setters /////////////////////////////////////////////////////////////////
+  // store setters /////////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useCurrentWorkorderStore(
     (state) => state.setWorkorderObj
   );
@@ -50,7 +50,7 @@ export const ActiveWorkorderComponent = ({}) => {
   );
   const _zExecute = useLoginStore((state) => state.execute);
 
-  // getters ///////////////////////////////////////////////////////////////////
+  // store getters ///////////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
   zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
   let zCustomerObj = CUSTOMER_PROTO;
@@ -61,10 +61,12 @@ export const ActiveWorkorderComponent = ({}) => {
   // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 
   ////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////////
   const [sShowCustomerInfoModal, _setShowCustomerInfoModal] =
     React.useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = React.useState(null);
-  //
+  const ref = useRef();
+
   function setWorkorderObj(obj) {
     _zSetWorkorderObj(obj);
     dbSetOpenWorkorderItem(obj);
@@ -159,9 +161,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 paddingRight: 10,
               }}
               mouseOverOptions={{ highlightColor: "transparent" }}
-              handleButtonPress={() =>
-                _zExecute(() => _setShowCustomerInfoModal(true))
-              }
+              handleButtonPress={() => _setShowCustomerInfoModal(true)}
               buttonTextStyle={{
                 fontSize: 25,
                 color: Colors.lightText,
@@ -170,12 +170,12 @@ export const ActiveWorkorderComponent = ({}) => {
               handleOuterClick={() => _setShowCustomerInfoModal(false)}
               Component={() => (
                 <CustomerInfoScreenModalComponent
-                  sCustomerInfo={zCustomerObj}
-                  __setCustomerInfo={setCustomerObj}
-                  handleButton1Press={() => _setShowCustomerInfoModal(false)}
+                  ssCustomerInfoObj={zCustomerObj}
+                  __setCustomerInfoObj={_zSetCustomerObj}
                   button1Text={"Close"}
                   ssInfoTextFocus={sInfoTextFocus}
                   __setInfoTextFocus={_setInfoTextFocus}
+                  handleButton1Press={() => _setShowCustomerInfoModal(false)}
                 />
               )}
             />
@@ -189,12 +189,12 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               {zCustomerObj.cell.length > 0 ? (
                 <Text style={{ color: Colors.darkText }}>
-                  {"Cell:  " + zCustomerObj.cell}
+                  {"Cell:  " + addDashesToPhone(zCustomerObj.cell)}
                 </Text>
               ) : null}
               {zCustomerObj.landline.length > 0 ? (
                 <Text style={{ color: Colors.darkText }}>
-                  {"Land:  " + zCustomerObj.landline}
+                  {"Land:  " + addDashesToPhone(zCustomerObj.landline)}
                 </Text>
               ) : null}
               {zCustomerObj.contactRestriction === "CALL" ? (
@@ -247,9 +247,9 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 >
                   <ModalDropdown
+                    // ref={ref}
                     itemListStyle={{ width: 80 }}
                     modalStyle={{
-                      alignSelf: "flex-start",
                       marginVertical: "2%",
                       width: "30%",
                     }}
@@ -302,7 +302,6 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     onRemoveSelection={() => {
                       let wo = cloneDeep(zWorkorderObj);
-
                       wo.brand = "";
                       _zExecute(() => setWorkorderObj(wo));
                     }}

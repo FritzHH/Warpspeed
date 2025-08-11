@@ -11,7 +11,7 @@ export function WorkorderPreview() {
     state.getPreviewObj()
   );
   return (
-    <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,.2)" }}>
+    <View style={{ width: "100%", height: "100%", backgroundColor: "green" }}>
       <Text>
         {zWorkorderPreview.customerFirst + " " + zWorkorderPreview.customerLast}
       </Text>

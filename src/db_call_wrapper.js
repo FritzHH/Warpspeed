@@ -29,7 +29,6 @@ export function dbSetCustomerObj(customerObj, removeOption = false) {
     previewObj = null;
     customerObj = null;
   }
-  setRealtimeNodeItem("CUSTOMER-PREVIEWS/" + id, previewObj);
   return setFirestoreCollectionItem("CUSTOMERS", id, customerObj);
 }
 

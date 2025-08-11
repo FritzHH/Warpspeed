@@ -62,7 +62,7 @@ export function Items_Section({}) {
   }
 
   return (
-    <View style={{ height: "100%" }}>
+    <View style={{ flex: 1 }}>
       <TabBar
         _zSetItemsTabName={_zSetItemsTabName}
         zItemsTabName={zItemsTabName}
@@ -80,6 +80,8 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
         flexDirection: "row",
         width: "100%",
         justifyContent: "space-between",
+        // backgroundColor: "green",
+        // height: 50,
       }}
     >
       <View

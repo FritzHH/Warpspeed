@@ -420,6 +420,94 @@ export const ScreenModal = ({
   );
 };
 
+export const DropdownMenu = ({
+  dataArr = [],
+  onSelect,
+  currentSelectionIdx,
+  itemTextStyle = {},
+  itemViewStyle = {},
+  buttonStyle = {},
+  buttonTextStyle = {},
+  buttonText,
+  ref,
+  modalCoordinateVars = {
+    x: 0,
+    y: 50,
+  },
+  mouseOverOptions = {
+    enable: true,
+    opacity: 1,
+    highlightColor: Colors.tabMenuButton,
+  },
+  showButtonShadow,
+  shadowStyle = { ...SHADOW_RADIUS_PROTO },
+  itemSeparatorStyle = {},
+  enableMouseoverListItem = true,
+}) => {
+  const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
+  const [sModalVisible, _setModalVisible] = useState(false);
+  const DropdownComponent = () => {
+    return (
+      <FlatList
+        data={dataArr}
+        ItemSeparatorComponent={() => (
+          <View
+            style={{
+              height: 1,
+              backgroundColor: "lightgray",
+              width: "100%",
+              ...itemSeparatorStyle,
+            }}
+          />
+        )}
+        renderItem={(item) => {
+          let idx = item.idx;
+          item = item.item;
+          // log(item);
+          return (
+            <Button
+              mouseOverOptions={mouseOverOptions}
+              enableMouseOver={enableMouseoverListItem}
+              buttonStyle={{
+                padding: 10,
+                backgroundColor: item.backgroundColor,
+                height: 40,
+                width: 130,
+                ...itemViewStyle,
+              }}
+              textStyle={{ color: item.textColor, ...itemTextStyle }}
+              // mouseOverOptions={{ opacity: 1 }}
+              text={item.label || item}
+              onPress={() => {
+                onSelect(item, idx);
+                _setModalVisible(false);
+              }}
+            />
+          );
+        }}
+      />
+    );
+  };
+
+  return (
+    <ScreenModal
+      Component={() => <DropdownComponent />}
+      modalVisible={sModalVisible}
+      handleButtonPress={() => _setModalVisible(!sModalVisible)}
+      buttonStyle={buttonStyle}
+      buttonTextStyle={buttonTextStyle}
+      buttonLabel={buttonText}
+      ref={ref}
+      modalCoordinateVars={modalCoordinateVars}
+      showShadow={showButtonShadow}
+      mouseOverOptions={mouseOverOptions}
+      shadowStyle={shadowStyle}
+      // showOuterModal={true}
+      handleOuterClick={() => _setModalVisible(false)}
+    />
+  );
+};
+
 export const ModalDropdown = ({
   // ref,
   data,
@@ -437,6 +525,7 @@ export const ModalDropdown = ({
     x: 200,
     y: -300,
   },
+
   // modalStyle = {},
 }) => {
   const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
@@ -2118,7 +2207,7 @@ export const Button = ({
   enableMouseOver = true,
   TextComponent,
   mouseOverOptions = {
-    opacity: 0.7,
+    opacity: 1,
     highlightColor: Colors.tabMenuButton,
     textColor: "white",
   },
@@ -2134,8 +2223,8 @@ export const Button = ({
   if (!shadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   /////////////////////////////////////////////////////
   //////////////////////////////////////////////////////
-  const HEIGHT = 50;
-  const WIDTH = 130;
+  const HEIGHT = null;
+  const WIDTH = null;
 
   if (!visible) {
     return <View style={{ width: WIDTH, height: HEIGHT }}></View>;
@@ -2163,7 +2252,7 @@ export const Button = ({
         style={{
           alignItems: "center",
           justifyContent: "center",
-          paddingHorizontal: 15,
+          paddingHorizontal: 12,
           paddingVertical: 5,
           backgroundColor: Colors.tabMenuButton,
           ...shadowStyle,

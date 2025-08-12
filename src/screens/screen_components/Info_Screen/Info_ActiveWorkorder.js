@@ -13,6 +13,7 @@ import {
   SHADOW_RADIUS_NOTHING,
   SHADOW_RADIUS_PROTO,
   LoginScreenModalComponent,
+  DropdownMenu,
 } from "../../../components";
 import { Colors } from "../../../styles";
 import {
@@ -124,19 +125,37 @@ export const ActiveWorkorderComponent = ({}) => {
     _zSetInfoTabName(TAB_NAMES.infoTab.customer);
   }
 
+  const dropdownButtonStyle = {
+    width: "100%",
+    backgroundColor: null,
+    ...SHADOW_RADIUS_NOTHING,
+    borderColor: "lightgray",
+    borderWidth: 1,
+    paddingVertical: 2,
+  };
+
+  const dropdownButtonTextStyle = {
+    fontSize: 16,
+    color: "white",
+  };
+
   function setComponent() {
     return (
       <View
         style={{
-          height: "100%",
-          width: "100%",
+          flex: 1,
           justifyContent: "space-between",
           alignItems: "center",
-          paddingRight: 7,
+          // paddingRight: 7,
           backgroundColor: null,
         }}
       >
-        <View style={{ width: "100%", paddingHorizontal: 5 }}>
+        <View
+          style={{
+            width: "100%",
+            // paddingHorizontal: 5,
+          }}
+        >
           <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
           <View
             style={{
@@ -212,12 +231,13 @@ export const ActiveWorkorderComponent = ({}) => {
                 justifyContent: "flex-start",
                 alignItems: "center",
                 width: "100%",
+                // backgroundColor: "blue",
               }}
             >
               {/* <View style={{}}> */}
               <TextInputOnMainBackground
                 placeholderText={"Brand"}
-                style={{ marginRight: 5 }}
+                style={{ width: "50%" }}
                 value={zWorkorderObj.brand}
                 onTextChange={(val) => {
                   // log(val);
@@ -232,7 +252,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   // marginTop: 10,
                   width: "50%",
                   flexDirection: "row",
-                  paddingLeft: 0,
+                  paddingLeft: 5,
                   justifyContent: "flex-start",
                   alignItems: "center",
                   // backgroundColor: "green",
@@ -246,31 +266,19 @@ export const ActiveWorkorderComponent = ({}) => {
                     // marginTop: 10,
                   }}
                 >
-                  <ModalDropdown
-                    // ref={ref}
-                    itemListStyle={{ width: 80 }}
-                    modalStyle={{
-                      marginVertical: "2%",
-                      width: "30%",
-                    }}
-                    buttonStyle={{
-                      width: "100%",
-                      height: "100%",
-                      // width: "25%",
-                    }}
-                    buttonLabel={zSettingsObj.bikeBrandsName}
-                    data={zSettingsObj.bikeBrands}
-                    currentSelectionName={zWorkorderObj.brand}
-                    onSelect={(val) => {
+                  <DropdownMenu
+                    dataArr={zSettingsObj.bikeBrands}
+                    onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
-                      wo.brand = val;
-                      _zExecute(() => setWorkorderObj(wo));
+                      wo.brand = item;
+                      _zSetWorkorderObj(wo);
                     }}
-                    onRemoveSelection={() => {
-                      let wo = cloneDeep(zWorkorderObj);
-                      wo.brand = "";
-                      _zExecute(() => setWorkorderObj(wo));
-                    }}
+                    itemViewStyle={{ backgroundColor: "gray" }}
+                    itemTextStyle={{ fontSize: 14, color: "black" }}
+                    buttonStyle={dropdownButtonStyle}
+                    buttonTextStyle={dropdownButtonTextStyle}
+                    ref={ref}
+                    buttonText={zSettingsObj.bikeBrandsName}
                   />
                 </View>
                 <View style={{ width: 5 }} />
@@ -281,30 +289,19 @@ export const ActiveWorkorderComponent = ({}) => {
                     justifyContent: "center",
                   }}
                 >
-                  <ModalDropdown
-                    itemListStyle={{ width: 100 }}
-                    modalStyle={{
-                      alignSelf: "flex-start",
-                      // marginVertical: "2%",
-                      width: "30%",
-                    }}
-                    buttonStyle={{
-                      width: "100%",
-                    }}
-                    data={zSettingsObj.bikeOptionalBrands}
-                    buttonLabel={zSettingsObj.bikeOptionalBrandsName}
-                    closeButtonText={"Close"}
-                    currentSelectionName={zWorkorderObj.brand}
-                    onSelect={(val) => {
+                  <DropdownMenu
+                    dataArr={zSettingsObj.bikeOptionalBrands}
+                    onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
-                      wo.brand = val;
-                      _zExecute(() => setWorkorderObj(wo));
+                      wo.brand = item;
+                      _zSetWorkorderObj(wo);
                     }}
-                    onRemoveSelection={() => {
-                      let wo = cloneDeep(zWorkorderObj);
-                      wo.brand = "";
-                      _zExecute(() => setWorkorderObj(wo));
-                    }}
+                    itemViewStyle={{ backgroundColor: "gray" }}
+                    itemTextStyle={{ fontSize: 14, color: "black" }}
+                    buttonStyle={dropdownButtonStyle}
+                    buttonTextStyle={dropdownButtonTextStyle}
+                    ref={ref}
+                    buttonText={zSettingsObj.bikeOptionalBrandsName}
                   />
                 </View>
               </View>
@@ -320,7 +317,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInputOnMainBackground
                 placeholderText={"Model/Description"}
-                style={{ marginRight: 2 }}
+                style={{ width: "50%" }}
                 value={zWorkorderObj.description}
                 onTextChange={(val) => {
                   let wo = cloneDeep(zWorkorderObj);
@@ -329,30 +326,32 @@ export const ActiveWorkorderComponent = ({}) => {
                   _zExecute(() => setWorkorderObj(wo));
                 }}
               />
-              <ModalDropdown
-                itemListStyle={{ width: 100 }}
-                modalStyle={{
-                  alignSelf: "flex-start",
-                  marginVertical: "2%",
-                  width: "30%",
+              <View
+                style={{
+                  // marginTop: 10,
+                  width: "50%",
+                  flexDirection: "row",
+                  paddingLeft: 5,
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                  // backgroundColor: "green",
                 }}
-                data={zSettingsObj.bikeDescriptions}
-                buttonLabel={"Descriptions"}
-                closeButtonText={"Close"}
-                buttonStyle={{ width: 90 }}
-                removeButtonText={"Remove"}
-                currentSelectionName={zWorkorderObj.description}
-                onSelect={(val) => {
-                  let wo = cloneDeep(zWorkorderObj);
-                  wo.description = val;
-                  _zExecute(() => setWorkorderObj(wo));
-                }}
-                onRemoveSelection={() => {
-                  let wo = cloneDeep(zWorkorderObj);
-                  wo.description = "";
-                  _zExecute(() => setWorkorderObj(wo));
-                }}
-              />
+              >
+                <DropdownMenu
+                  dataArr={zSettingsObj.bikeDescriptions}
+                  onSelect={(item, idx) => {
+                    let wo = cloneDeep(zWorkorderObj);
+                    wo.description = item;
+                    _zSetWorkorderObj(wo);
+                  }}
+                  itemViewStyle={{ backgroundColor: "gray" }}
+                  itemTextStyle={{ fontSize: 14, color: "black" }}
+                  buttonStyle={dropdownButtonStyle}
+                  buttonTextStyle={dropdownButtonTextStyle}
+                  ref={ref}
+                  buttonText={"Descriptions"}
+                />
+              </View>
             </View>
 
             <View
@@ -368,45 +367,46 @@ export const ActiveWorkorderComponent = ({}) => {
                 placeholderText={"Color"}
                 value={zWorkorderObj.color.label}
                 style={{
-                  marginRight: 2,
+                  width: "50%",
                   backgroundColor: zWorkorderObj.color.backgroundColor,
                   color: zWorkorderObj.color.textColor,
                 }}
                 onTextChange={(val) => {
-                  _zExecute(() => setBikeColor(val));
+                  setBikeColor(val);
                 }}
               />
-              <ModalDropdown
-                itemListStyle={{
-                  width: 120,
+              <View
+                style={{
+                  // marginTop: 10,
+                  width: "50%",
+                  flexDirection: "row",
+                  paddingLeft: 5,
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                  // backgroundColor: "green",
                 }}
-                modalStyle={{
-                  alignSelf: "flex-start",
-                  marginVertical: "2%",
-                  width: "30%",
-                }}
-                data={zSettingsObj.bikeColors}
-                closeButtonText={"Close"}
-                buttonStyle={{ width: 90 }}
-                removeButtonText={"Remove Color"}
-                buttonLabel={"Colors"}
-                currentSelection={zWorkorderObj.color}
-                onSelect={(val) => {
-                  let wo = cloneDeep(zWorkorderObj);
-
-                  wo.color = val;
-                  _zExecute(() => setWorkorderObj(wo));
-                }}
-                onRemoveSelection={() => {
-                  let newObj = cloneDeep(zWorkorderObj);
-                  newObj.color = {
-                    label: "",
-                    backgroundColor: "",
-                    textColor: "",
-                  };
-                  _zExecute(() => setWorkorderObj(newObj));
-                }}
-              />
+              >
+                <DropdownMenu
+                  itemSeparatorStyle={{ height: 0 }}
+                  mouseOverOptions={{
+                    enable: true,
+                    opacity: 0.6,
+                    highlightColor: "white",
+                  }}
+                  dataArr={zSettingsObj.bikeColors}
+                  onSelect={(item, idx) => {
+                    let wo = cloneDeep(zWorkorderObj);
+                    wo.color = item;
+                    _zSetWorkorderObj(wo);
+                  }}
+                  itemViewStyle={{}}
+                  itemTextStyle={{ fontSize: 14 }}
+                  buttonStyle={{ ...dropdownButtonStyle }}
+                  ref={ref}
+                  buttonText={"Colors"}
+                  buttonTextStyle={dropdownButtonTextStyle}
+                />
+              </View>
             </View>
             <View
               style={{
@@ -419,7 +419,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInputOnMainBackground
                 placeholderText={"Part Ordered"}
-                style={{ marginRight: 2 }}
+                style={{ width: "50%" }}
                 value={zWorkorderObj.partOrdered}
                 onTextChange={(val) => {
                   let wo = cloneDeep(zWorkorderObj);
@@ -443,37 +443,39 @@ export const ActiveWorkorderComponent = ({}) => {
               <TextInputOnMainBackground
                 value={zWorkorderObj.partSource}
                 placeholderText={"Part Source"}
-                style={{ marginRight: 2 }}
+                style={{ width: "50%" }}
                 onTextChange={(val) => {
                   let wo = cloneDeep(zWorkorderObj);
                   wo.partSource = val;
                   _zExecute(() => setWorkorderObj(wo));
                 }}
               />
-              <ModalDropdown
-                itemListStyle={{ width: 90 }}
-                modalStyle={{
-                  alignSelf: "flex-start",
-                  marginVertical: "2%",
-                  width: "30%",
+              <View
+                style={{
+                  // marginTop: 10,
+                  width: "50%",
+                  flexDirection: "row",
+                  paddingLeft: 5,
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                  // backgroundColor: "green",
                 }}
-                data={zSettingsObj.partSources}
-                closeButtonText={"Close"}
-                removeButtonText={"Remove"}
-                buttonStyle={{ width: 90 }}
-                buttonLabel={"Sources"}
-                currentSelectionName={zWorkorderObj.partSource}
-                onSelect={(val) => {
-                  let wo = cloneDeep(zWorkorderObj);
-                  wo.partSource = val;
-                  _zExecute(() => setWorkorderObj(wo));
-                }}
-                onRemoveSelection={() => {
-                  let wo = cloneDeep(zWorkorderObj);
-                  wo.partSource = "";
-                  _zExecute(() => setWorkorderObj(wo));
-                }}
-              />
+              >
+                <DropdownMenu
+                  dataArr={zSettingsObj.partSources}
+                  onSelect={(item, idx) => {
+                    let wo = cloneDeep(zWorkorderObj);
+                    wo.partSource = item;
+                    _zSetWorkorderObj(wo);
+                  }}
+                  itemViewStyle={{ backgroundColor: "gray" }}
+                  itemTextStyle={{ fontSize: 14, color: "black" }}
+                  buttonStyle={dropdownButtonStyle}
+                  buttonTextStyle={dropdownButtonTextStyle}
+                  ref={ref}
+                  buttonText={"Part Sources"}
+                />
+              </View>
             </View>
 
             <ModalDropdown

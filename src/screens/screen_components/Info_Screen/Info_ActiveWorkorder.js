@@ -66,7 +66,12 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowCustomerInfoModal, _setShowCustomerInfoModal] =
     React.useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = React.useState(null);
-  const ref = useRef();
+  const bikesRef = useRef();
+  const partSourcesRef = useRef();
+  const descriptionRef = useRef();
+  const color1Ref = useRef();
+  const ebikeRef = useRef();
+  const color2Ref = useRef();
 
   function setWorkorderObj(obj) {
     _zSetWorkorderObj(obj);
@@ -79,13 +84,13 @@ export const ActiveWorkorderComponent = ({}) => {
     // });
   }
 
-  function setBikeColor(incomingColorVal) {
+  function setBikeColor(incomingColorVal, fieldName) {
     let foundColor = false;
     let newColorObj = {};
     zSettingsObj.bikeColors.forEach((bikeColorObj) => {
       if (bikeColorObj.label.toLowerCase() === incomingColorVal.toLowerCase()) {
         foundColor = true;
-        newColorObj = { ...bikeColorObj };
+        newColorObj = cloneDeep(bikeColorObj);
       }
     });
     if (!foundColor) {
@@ -96,8 +101,8 @@ export const ActiveWorkorderComponent = ({}) => {
     }
 
     // log("setting", newColorObj);
-    let wo = { ...zWorkorderObj };
-    wo.color = newColorObj;
+    let wo = cloneDeep(zWorkorderObj);
+    wo[fieldName] = newColorObj;
     setWorkorderObj(wo);
   }
 
@@ -277,7 +282,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={dropdownButtonStyle}
                     buttonTextStyle={dropdownButtonTextStyle}
-                    ref={ref}
+                    ref={bikesRef}
                     buttonText={zSettingsObj.bikeBrandsName}
                   />
                 </View>
@@ -300,7 +305,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={dropdownButtonStyle}
                     buttonTextStyle={dropdownButtonTextStyle}
-                    ref={ref}
+                    ref={ebikeRef}
                     buttonText={zSettingsObj.bikeOptionalBrandsName}
                   />
                 </View>
@@ -348,7 +353,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   itemTextStyle={{ fontSize: 14, color: "black" }}
                   buttonStyle={dropdownButtonStyle}
                   buttonTextStyle={dropdownButtonTextStyle}
-                  ref={ref}
+                  ref={descriptionRef}
                   buttonText={"Descriptions"}
                 />
               </View>
@@ -364,15 +369,27 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
             >
               <TextInputOnMainBackground
-                placeholderText={"Color"}
-                value={zWorkorderObj.color.label}
+                placeholderText={"Color 1"}
+                value={zWorkorderObj.color1.label}
                 style={{
-                  width: "50%",
-                  backgroundColor: zWorkorderObj.color.backgroundColor,
-                  color: zWorkorderObj.color.textColor,
+                  width: "25%",
+                  backgroundColor: zWorkorderObj.color1.backgroundColor,
+                  color: zWorkorderObj.color1.textColor,
                 }}
                 onTextChange={(val) => {
-                  setBikeColor(val);
+                  setBikeColor(val, "color1");
+                }}
+              />
+              <TextInputOnMainBackground
+                placeholderText={"Color 2"}
+                value={zWorkorderObj.color2.label}
+                style={{
+                  width: "25%",
+                  backgroundColor: zWorkorderObj.color2.backgroundColor,
+                  color: zWorkorderObj.color2.textColor,
+                }}
+                onTextChange={(val) => {
+                  setBikeColor(val, "color2");
                 }}
               />
               <View
@@ -386,26 +403,61 @@ export const ActiveWorkorderComponent = ({}) => {
                   // backgroundColor: "green",
                 }}
               >
-                <DropdownMenu
-                  itemSeparatorStyle={{ height: 0 }}
-                  mouseOverOptions={{
-                    enable: true,
-                    opacity: 0.6,
-                    highlightColor: "white",
+                <View
+                  style={{
+                    width: "48%",
+                    height: "100%",
+                    justifyContent: "center",
+                    // marginTop: 10,
                   }}
-                  dataArr={zSettingsObj.bikeColors}
-                  onSelect={(item, idx) => {
-                    let wo = cloneDeep(zWorkorderObj);
-                    wo.color = item;
-                    _zSetWorkorderObj(wo);
+                >
+                  <DropdownMenu
+                    itemSeparatorStyle={{ height: 0 }}
+                    dataArr={zSettingsObj.bikeColors}
+                    onSelect={(item, idx) => {
+                      let wo = cloneDeep(zWorkorderObj);
+                      wo.color1 = item;
+                      _zSetWorkorderObj(wo);
+                      dbSetOpenWorkorderItem(wo);
+                    }}
+                    itemViewStyle={{}}
+                    itemTextStyle={{ fontSize: 14 }}
+                    buttonStyle={{ ...dropdownButtonStyle }}
+                    ref={color1Ref}
+                    buttonText={"Color 1"}
+                    buttonTextStyle={dropdownButtonTextStyle}
+                  />
+                </View>
+                <View
+                  style={{
+                    width: "48%",
+                    height: "100%",
+                    justifyContent: "center",
+                    // marginTop: 10,
                   }}
-                  itemViewStyle={{}}
-                  itemTextStyle={{ fontSize: 14 }}
-                  buttonStyle={{ ...dropdownButtonStyle }}
-                  ref={ref}
-                  buttonText={"Colors"}
-                  buttonTextStyle={dropdownButtonTextStyle}
-                />
+                >
+                  <DropdownMenu
+                    itemSeparatorStyle={{ height: 0 }}
+                    mouseOverOptions={{
+                      enable: true,
+                      opacity: 0.6,
+                      highlightColor: "white",
+                    }}
+                    dataArr={zSettingsObj.bikeColors}
+                    onSelect={(item, idx) => {
+                      let wo = cloneDeep(zWorkorderObj);
+                      wo.color2 = item;
+                      _zSetWorkorderObj(wo);
+                      dbSetOpenWorkorderItem(wo);
+                    }}
+                    itemViewStyle={{}}
+                    itemTextStyle={{ fontSize: 14 }}
+                    buttonStyle={dropdownButtonStyle}
+                    ref={color2Ref}
+                    buttonText={"Color 2"}
+                    buttonTextStyle={dropdownButtonTextStyle}
+                  />
+                </View>
               </View>
             </View>
             <View
@@ -472,7 +524,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   itemTextStyle={{ fontSize: 14, color: "black" }}
                   buttonStyle={dropdownButtonStyle}
                   buttonTextStyle={dropdownButtonTextStyle}
-                  ref={ref}
+                  ref={partSourcesRef}
                   buttonText={"Part Sources"}
                 />
               </View>

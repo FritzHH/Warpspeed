@@ -111,7 +111,12 @@ export const WORKORDER_PROTO = {
   customerPhone: "",
   brand: "",
   description: "",
-  color: {
+  color1: {
+    textColor: "",
+    backgroundColor: "",
+    label: "",
+  },
+  color2: {
     textColor: "",
     backgroundColor: "",
     label: "",
@@ -490,6 +495,7 @@ export const SETTINGS_PROTO = {
     },
     { name: "$10 Off", value: "10", type: DISCOUNT_TYPES.dollar },
   ],
+  waitTimes: ["Today", "1-2 Days", "2-3 Days", "3-4 Days", "No Estimate"],
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   loginTimeout: 15,

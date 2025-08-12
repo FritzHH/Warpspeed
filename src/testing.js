@@ -72,7 +72,7 @@ export function fillOpenWorkorders() {
     wo.brand = SETTINGS_PROTO.bikeBrands[j];
     j = i;
     if (j > 13) j = 4;
-    wo.color = SETTINGS_PROTO.bikeColors[j];
+    wo.color1 = SETTINGS_PROTO.bikeColors[j];
     j = i;
     if (j > 3) j = 2;
     wo.description = SETTINGS_PROTO.bikeDescriptions[j];

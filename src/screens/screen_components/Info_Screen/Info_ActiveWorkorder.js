@@ -152,6 +152,7 @@ export const ActiveWorkorderComponent = ({}) => {
           justifyContent: "space-between",
           alignItems: "center",
           // paddingRight: 7,
+          paddingHorizontal: 5,
           backgroundColor: null,
         }}
       >
@@ -464,6 +465,84 @@ export const ActiveWorkorderComponent = ({}) => {
               style={{
                 flexDirection: "row",
                 justifyContent: "flex-start",
+                width: "100%",
+                alignItems: "center",
+                marginTop: 5,
+              }}
+            >
+              <TextInputOnMainBackground
+                placeholderText={"Estimated Wait"}
+                style={{ width: "50%" }}
+                value={zWorkorderObj.waitTime}
+                onTextChange={(val) => {
+                  let wo = cloneDeep(zWorkorderObj);
+
+                  wo.waitTime = val;
+                  setWorkorderObj(wo);
+                  dbSetOpenWorkorderItem(wo);
+                }}
+              />
+              <View
+                style={{
+                  // marginTop: 10,
+                  width: "50%",
+                  flexDirection: "row",
+                  paddingLeft: 5,
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                  // backgroundColor: "green",
+                }}
+              >
+                <DropdownMenu
+                  dataArr={zSettingsObj.waitTimes}
+                  onSelect={(item, idx) => {
+                    let wo = cloneDeep(zWorkorderObj);
+                    wo.waitTime = item;
+                    _zSetWorkorderObj(wo);
+                    dbSetOpenWorkorderItem(wo);
+                  }}
+                  itemViewStyle={{ backgroundColor: "gray", width: null }}
+                  itemTextStyle={{ fontSize: 14, color: "black" }}
+                  buttonStyle={dropdownButtonStyle}
+                  buttonTextStyle={dropdownButtonTextStyle}
+                  ref={descriptionRef}
+                  buttonText={"Wait Times"}
+                />
+              </View>
+            </View>
+            <ModalDropdown
+              modalStyle={{
+                alignSelf: "flex-start",
+                marginVertical: "2%",
+                width: "30%",
+              }}
+              data={zSettingsObj.statuses}
+              closeButtonText={"Close"}
+              buttonStyle={{
+                width: "100%",
+                backgroundColor: getBackgroundColor().backgroundColor,
+                paddingVertical: 10,
+                marginTop: 10,
+              }}
+              textStyle={{ color: getBackgroundColor().textColor }}
+              buttonLabel={"Status: " + zWorkorderObj.status}
+              onSelect={(val) => {
+                let wo = cloneDeep(zWorkorderObj);
+                wo.status = val;
+                _zExecute(() => setWorkorderObj(wo));
+              }}
+            />
+            <View
+              style={{
+                height: 1,
+                backgroundColor: "lightgray",
+                marginVertical: 30,
+              }}
+            />
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "flex-start",
                 alignItems: "center",
                 width: "100%",
                 marginTop: 5,
@@ -529,29 +608,6 @@ export const ActiveWorkorderComponent = ({}) => {
                 />
               </View>
             </View>
-
-            <ModalDropdown
-              modalStyle={{
-                alignSelf: "flex-start",
-                marginVertical: "2%",
-                width: "30%",
-              }}
-              data={zSettingsObj.statuses}
-              closeButtonText={"Close"}
-              buttonStyle={{
-                width: "100%",
-                backgroundColor: getBackgroundColor().backgroundColor,
-                paddingVertical: 10,
-                marginTop: 10,
-              }}
-              textStyle={{ color: getBackgroundColor().textColor }}
-              buttonLabel={"Status: " + zWorkorderObj.status}
-              onSelect={(val) => {
-                let wo = cloneDeep(zWorkorderObj);
-                wo.status = val;
-                _zExecute(() => setWorkorderObj(wo));
-              }}
-            />
           </View>
         </View>
         <Button

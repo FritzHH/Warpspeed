@@ -215,7 +215,7 @@ export function NewWorkorderComponent({}) {
     wo.id = generateRandomID();
     wo.startedBy = zCurrentUser.id;
 
-    _zSetOpenWorkorder(wo);
+    _zSetOpenWorkorder(wo, false);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);

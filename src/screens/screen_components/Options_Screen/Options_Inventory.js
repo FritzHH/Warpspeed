@@ -47,29 +47,34 @@ import {
 
 const tabMargin = 20;
 export function InventoryComponent({}) {
-  /// setters ///////////////////////////////////////////////////////////////
+  /// store setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
   const _zExecute = useLoginStore((state) => state.execute);
-  /// getters /////////////////////////////////////////////////////////////
+
+  /// store getters /////////////////////////////////////////////////////////////
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   const zWorkorderObj = useOpenWorkordersStore((state) =>
     state.getWorkorderObj()
   );
-  /////////////////////////////////////////////////////////////
+
+  // local state ////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sCheckboxValue, _setCheckboxValue] = React.useState(null);
   const [sNewItemObj, _setNewItemObject] = useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
 
+  //////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////
+
   useEffect(() => {
     let count = 0;
     let arr = [];
     if (sSearchResults.length > 20) return;
-    for (let i = 0; i <= 20; i++) {
+    for (let i = 0; i <= 10; i++) {
       // log(zInventoryArr[i]);
       if (zInventoryArr[i]) arr.push(zInventoryArr[i]);
     }
@@ -120,7 +125,12 @@ export function InventoryComponent({}) {
   }
 
   function inventoryItemSelected(item) {
-    // standalone sale
+    // log(item);
+    // return;
+    if (!zWorkorderObj?.id) {
+      _setModalInventoryObj(item);
+      return;
+    }
 
     let wo = cloneDeep(zWorkorderObj);
     if (!wo.workorderLines) wo.workorderLines = [];
@@ -129,11 +139,21 @@ export function InventoryComponent({}) {
     lineItem.invItemID = item.id;
     lineItem.id = generateRandomID();
     wo.workorderLines.push(lineItem);
-    _zExecute(() => {
-      _zSetWorkorderObj(wo);
-      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
-      _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    });
+    _zSetWorkorderObj(wo);
+    return;
+
+    // if (!zWorkorderObj?.id) return;
+    // let wo = cloneDeep(zWorkorderObj);
+    // if (!wo.workorderLines) wo.workorderLines = [];
+    // // log("item", item);
+    // let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
+    // lineItem.invItemID = item.id;
+    // lineItem.id = generateRandomID();
+    // wo.workorderLines.push(lineItem);
+
+    // only save to db if not standalone sale
+    _zSetWorkorderObj(wo, zWorkorderObj.isStandaloneSale);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
 
   function inventoryItemViewPressed(item) {
@@ -143,7 +163,7 @@ export function InventoryComponent({}) {
 
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
-
+  // log("wo", zWorkorderObj);
   function setComponent() {
     return (
       <View style={{ width: "100%", height: dim.windowHeight * 0.96 }}>
@@ -237,7 +257,7 @@ export function InventoryComponent({}) {
               >
                 <Button
                   onPress={() =>
-                    zWorkorderObj
+                    zWorkorderObj?.id
                       ? inventoryItemSelected(item)
                       : inventoryItemViewPressed(item)
                   }
@@ -311,7 +331,7 @@ export function InventoryComponent({}) {
         <ScreenModal
           buttonVisible={false}
           handleOuterClick={() => {
-            log("screen modal clicked");
+            // log("screen modal clicked");
             _setModalInventoryObjIdx(null);
             _setNewItemObject(null);
           }}
@@ -326,7 +346,6 @@ export function InventoryComponent({}) {
               <InventoryItemScreeenModalComponent
                 itemIdx={sModalInventoryObjIdx}
                 handleClosePress={() => _setModalInventoryObjIdx(null)}
-                newItemObj={sNewItemObj}
               />
             );
           }}

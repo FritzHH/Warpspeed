@@ -54,6 +54,9 @@ export function WorkordersComponent({}) {
   const _zModOpenWorkorderArrItem = useOpenWorkordersStore(
     (state) => state.modItem
   );
+  const _zSetOpenWorkorder = useOpenWorkordersStore(
+    (state) => state.setOpenWorkorder
+  );
 
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
@@ -68,18 +71,20 @@ export function WorkordersComponent({}) {
     // log("obj", obj);
     obj = cloneDeep(obj);
     dbGetCustomerObj(obj.customerID).then((custObj) => {
+      // log("cust obj", custObj);
       _zSetCurrentCustomer(custObj);
     });
-    let idx = zOpenWorkordersArr.findIndex((o) => o.id == obj.id);
-    _zSetCurrentWorkorderIdx(idx);
+    _zSetOpenWorkorder(obj);
+
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    messagesSubscribe(
-      obj.customerID,
-      _zSetIncomingMessage,
-      _zSetOutgoingMessage
-    );
+    _zSetPreviewObj(null);
+    // messagesSubscribe(
+    //   obj.customerID,
+    //   _zSetIncomingMessage,
+    //   _zSetOutgoingMessage
+    // );
   }
 
   function sortWorkorders(openWorkordersArr) {
@@ -112,11 +117,6 @@ export function WorkordersComponent({}) {
       });
     });
     return arr;
-  }
-
-  function workorderDeleted(workorderObj) {
-    _zModOpenWorkorderArrItem(workorderObj, "remove");
-    dbSetOpenWorkorderItem(workorderObj, true);
   }
 
   // clog(zOpenWorkordersArr);
@@ -178,7 +178,7 @@ function RowItemComponent({
   const [sLastHoverInsideMillis, _setLastHoverInsideMilles] = useState(
     new Date().getTime() * 2
   );
-  // log("item", itemObj);
+  // log("item", workorder);
   /////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////
   return (
@@ -194,7 +194,6 @@ function RowItemComponent({
           _zSetPreviewObj(null);
         }}
         onPress={() => {
-          _zSetPreviewObj(null);
           onWorkorderSelected(workorder);
         }}
       >

@@ -271,13 +271,13 @@ export const WORKORDER_PROTO = {
 };
 
 export const WORKORDER_ITEM_PROTO = {
-  itemName: "",
+  // itemName: "",
   qty: 1,
   notes: "",
   invItemID: "",
   discountObj: { ...DISCOUNT_OBJ_PROTO },
   id: "",
-  price: "",
+  // priceOverride: "",
 };
 
 export const CUSTOMER_PROTO = {
@@ -311,6 +311,7 @@ export const CUSTOMER_PREVIEW_PROTO = {
 export const INVENTORY_ITEM_PROTO = {
   formalName: "",
   informalName: "",
+  brand: "",
   price: 0,
   salePrice: 0,
   // category: ,
@@ -324,6 +325,12 @@ export const WAIT_TIME_PROTO = {
   time1: "",
   time2: "",
   waitTimeValue: "",
+};
+
+export const MENU_BUTTON_PROTO = {
+  type: "",
+  name: "",
+  items: [],
 };
 
 // Objects with initial data
@@ -404,69 +411,81 @@ export const SETTINGS_OBJ = {
   quickItemButtonNames: [
     {
       name: "Tune-Up",
-      position: "1",
+      type: "menu",
       items: [],
     },
     {
       name: "Tube & Tire",
-      position: "1",
-      items: [],
+      type: "supermenu",
+      items: [
+        {
+          name: "Tube",
+          type: "menu",
+          items: [],
+        },
+        {
+          name: "Tire",
+          type: "menu",
+          items: [],
+        },
+      ],
     },
     {
       name: "Brakes",
-      position: "1",
+      type: "submenu",
       items: [],
     },
     {
       name: "Cable",
-      position: "1",
+      type: "menu",
       items: [],
     },
     {
       name: "Shifting",
-      position: "1",
+      type: "menu",
       items: [],
     },
     {
       name: "Drivetrain",
-      position: "1",
+      type: "menu",
       items: [],
     },
 
     {
       name: "Spoke",
-      position: "1",
+      type: "menu",
       items: [],
     },
     {
       name: "Cleaning",
-      position: "1",
+      type: "menu",
       items: [],
     },
     {
       name: "Scooter",
-      position: "1",
+      type: "menu",
       items: [],
     },
     {
       name: "Pickup/Delivery",
-      position: "1",
+      type: "menu",
       items: [],
     },
     {
       name: "Diagnostics",
-      position: "1",
+      type: "menu",
       items: [],
     },
     {
       name: "$Labor",
-      position: "999",
+      type: "menu",
+
       items: [],
     },
 
     {
       name: "$Part",
-      position: "1000",
+      type: "menu",
       items: [],
     },
   ],

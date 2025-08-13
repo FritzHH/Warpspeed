@@ -37,7 +37,7 @@ import {
 } from "../../../db_call_wrapper";
 
 export const Items_WorkorderItemsTab = ({}) => {
-  // setters ///////////////////////////////////////////////////////////////
+  // store setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
@@ -46,7 +46,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     (state) => state.setIsCheckingOut
   );
 
-  // getters ///////////////////////////////////////////////////////////////
+  // store getters ///////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
   let zSettingsObj = SETTINGS_OBJ;
   zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
@@ -59,6 +59,9 @@ export const Items_WorkorderItemsTab = ({}) => {
   const [sTotalPrice, _setTotalPrice] = useState("");
   const [sTotalDiscount, _setTotalDiscount] = useState("");
   const [sNumItems, _setNumItems] = useState("");
+
+  ///////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////
 
   function calculateLineItems() {
     let wo = cloneDeep(zWorkorderObj);
@@ -86,7 +89,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // make sure the previous session discount object prices are up to date with inventory changes
   useEffect(() => {
-    if (!zWorkorderObj.workorderLines) return;
+    if (!zWorkorderObj?.workorderLines) return;
     let wo = calculateLineItems();
     _zSetWorkorderObj(wo);
     if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
@@ -221,33 +224,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
   }
 
-  // if (
-  //   !zWorkorderObj ||
-  //   (zWorkorderObj.isStandaloneSale && zWorkorderObj.workorderLines.length == 0)
-  // ) {
-  //   return (
-  //     <View
-  //       style={{
-  //         width: "100%",
-  //         height: "100%",
-  //         justifyContent: "center",
-  //         alignItems: "center",
-  //       }}
-  //     >
-  //       <Text
-  //         style={{
-  //           textAlign: "center",
-  //           opacity: 0.05,
-  //           color: "black",
-  //           fontSize: 120,
-  //         }}
-  //       >
-  //         {zWorkorderObj?.isStandaloneSale ? "Empty\nSale" : "Empty\nWorkorder"}
-  //       </Text>
-  //     </View>
-  //   );
-  // }
-  // log("wo", zWorkorderObj);
+  // clog("wo", zWorkorderObj.workorderLines);
   function setComponent() {
     return (
       <View
@@ -266,6 +243,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             let invItem = zInventoryArr.find(
               (obj) => obj.id === item.invItemID
             );
+            // log("item", item);
             return (
               <LineItemComponent
                 __deleteWorkorderLine={deleteWorkorderLineItem}
@@ -366,7 +344,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     );
   }
   try {
-    setComponent();
+    return setComponent();
   } catch (e) {
     log("Error returning Items_WorkorderItemsTab", e);
   }
@@ -387,14 +365,12 @@ export const LineItemComponent = ({
   ssButtonsRowID,
   __setButtonsRowID,
 }) => {
-  // setters ///////////////////////////////////////////////////////////
-
-  // getters //////////////////////////////////////////////////////////
-
-  //////////////////////////////////////////////////////////////////////
   const [sTempQtyVal, _setTempQtyVal] = useState(null);
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
   const ref = useRef();
+
+  /////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////
 
   function formatDiscountsArr(discountArr) {
     if (discountArr[discountArr.length - 1].name === "No Discount")

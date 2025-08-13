@@ -16,7 +16,15 @@ import { dbSetOpenWorkorderItem } from "./db_call_wrapper";
 export const useLoginStore = create((set, get) => ({
   adminPrivilege: "",
   loginTimeout: 0,
-  currentUserObj: null,
+  currentUserObj: {
+    first: "Fritz",
+    last: "Hieb",
+    id: "1234",
+    permissions: "owner",
+    phone: "2393369177",
+    pin: "33",
+    alternatePin: "jj",
+  },
   modalVisible: false,
   lastActionMillis: 0,
   postLoginFunctionCallback: () => {},
@@ -118,11 +126,13 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: TAB_NAMES.itemsTab.empty,
-  optionsTabName: TAB_NAMES.optionsTab.workorders,
+  optionsTabName: TAB_NAMES.optionsTab.inventory,
   infoTabName: TAB_NAMES.infoTab.customer,
+
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
   getInfoTabName: () => get().infoTabName,
+
   setInfoTabName: (name) => {
     set((state) => ({ infoTabName: name }));
   },
@@ -313,21 +323,46 @@ export const useInventoryStore = create((set, get) => ({
 export const useOpenWorkordersStore = create((set, get) => ({
   workorderArr: [],
   openWorkorderIdx: null,
+  standaloneSaleWorkorderObj: null,
 
-  getOpenWorkorderIdx: () => get().openWorkorderIdx,
+  // getOpenWorkorderIdx: () => get().openWorkorderIdx,
   getWorkorderObj: () => {
-    let idx = get().openWorkorderIdx;
-    return get().workorderArr[idx];
+    let idx = Number(get().openWorkorderIdx);
+    // log(idx.toString());
+    if (idx >= 0) {
+      // let wo = get().workorderArr[idx];
+      // log("idx", idx.toString());
+      return get().workorderArr[idx];
+    } else {
+      return get().standaloneSaleWorkorderObj;
+    }
   },
   getWorkorderArr: () => get().workorderArr,
 
-  setOpenWorkorderIdx: (openWorkorderIdx) =>
-    set((state) => ({ openWorkorderIdx })),
-  setWorkorderObj: (item) => {
-    set((state) => ({
-      workorderArr: changeItem(get().workorderArr, item),
-    }));
-    dbSetOpenWorkorderItem(item);
+  // setOpenWorkorderIdx: (openWorkorderIdx) =>
+  //   set((state) => ({ openWorkorderIdx })),
+  setOpenWorkorder: (wo) => {
+    let openWorkorderIdx = Number(
+      get().workorderArr.findIndex((o) => o.id == wo.id)
+    );
+    // log(openWorkorderIdx.toString());
+    if (openWorkorderIdx >= 0) {
+      set((state) => ({ openWorkorderIdx }));
+    } else {
+      set((state) => ({ standaloneSaleWorkorderObj: wo }));
+    }
+  },
+  setWorkorderObj: (wo, saveToDB = true) => {
+    let openWorkorderIdx = get().workorderArr.findIndex((o) => o.id == wo.id);
+    // log("open idx", openWorkorderIdx.toString());
+    if (openWorkorderIdx) {
+      set((state) => ({
+        workorderArr: changeItem(get().workorderArr, wo),
+      }));
+      dbSetOpenWorkorderItem(wo);
+    } else {
+      set((state) => ({ standaloneSaleWorkorderObj: wo }));
+    }
   },
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
 

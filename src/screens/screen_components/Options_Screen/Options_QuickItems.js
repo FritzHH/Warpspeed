@@ -37,7 +37,7 @@ import {
 const SEARCH_STRING_TIMER = 45 * 1000;
 
 export function QuickItemComponent({}) {
-  // setters ///////////////////////////////////////////////////////////////
+  // store setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
@@ -52,7 +52,7 @@ export function QuickItemComponent({}) {
   const _zExecute = useLoginStore((state) => state.execute);
   const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
 
-  // getters //////////////////////////////////////////////////////////////
+  // store getters //////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
   let zSettingsObj = SETTINGS_OBJ;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
@@ -65,17 +65,17 @@ export function QuickItemComponent({}) {
   const [sModalInventoryObj, _setModalInventoryObj] = React.useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
 
-  let lastSearchMillis = new Date().getTime();
-  function setSearchTimer() {
-    setInterval(() => {
-      let curTime = new Date().getTime();
-      let diff = curTime - lastSearchMillis;
-      if (diff > SEARCH_STRING_TIMER) {
-        clearSearch();
-        lastSearchMillis = curTime;
-      }
-    }, SEARCH_STRING_TIMER);
-  }
+  useEffect(() => {
+    let arr = [];
+    if (sSearchResults.length > 20) return;
+    for (let i = 0; i <= 10; i++) {
+      // log(zInventoryArr[i]);
+      if (zInventoryArr[i]) arr.push(zInventoryArr[i]);
+    }
+    _setSearchResults(arr);
+  }, [zInventoryArr]);
+  ///////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////
 
   function search(searchTerm) {
     lastSearchMillis = new Date().getTime();
@@ -118,8 +118,7 @@ export function QuickItemComponent({}) {
     lineItem.invItemID = item.id;
     lineItem.id = generateRandomID();
     wo.workorderLines.push(lineItem);
-    _zSetWorkorderObj(wo);
-    if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
+    _zSetWorkorderObj(wo, !zWorkorderObj.isStandaloneSale);
   }
 
   function handleQuickButtonPress(buttonObj) {

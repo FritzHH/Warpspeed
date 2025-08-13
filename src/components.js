@@ -683,9 +683,8 @@ export const ModalDropdown = ({
 export const InventoryItemScreeenModalComponent = ({
   itemIdx,
   handleClosePress,
-  newItemObj,
 }) => {
-  // setters ////////////////////////////////////////////////////////
+  // store setters ////////////////////////////////////////////////////////
   const _zSetFocus = useInvModalStore((state) => state.setFocus);
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
   const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
@@ -698,18 +697,19 @@ export const InventoryItemScreeenModalComponent = ({
   const _zExecute = useLoginStore((state) => state.execute);
   // const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
 
-  // getters ///////////////////////////////////////////////////////
+  // store getters ///////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zFocus = useInvModalStore((state) => state.getFocus());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
 
-  ////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////
+
   const [sItem, _setItem] = React.useState(null);
   const [sNewItem, _setNewItem] = React.useState(false);
 
-  const isMounted = useRef(false);
-  const FOCUS_NAMES = {
+  // for automatic focus
+  const INPUT_FIELD_NAMES = {
     formalName: "name",
     informalName: "informalName",
     price: "price",
@@ -721,6 +721,8 @@ export const InventoryItemScreeenModalComponent = ({
   useEffect(() => {
     _setItem(zInventoryArr[itemIdx]);
   }, []);
+
+  ///////////////////////////////////////////////////////////////////////
 
   function handleChangeItem(item, focusName) {
     _zSetFocus(focusName);
@@ -821,12 +823,12 @@ export const InventoryItemScreeenModalComponent = ({
                   color: "black",
                   // borderBottomWidth: 1,
                 }}
-                autoFocus={zFocus === FOCUS_NAMES.formalName}
-                onClick={() => _zSetFocus(FOCUS_NAMES.formalName)}
+                autoFocus={zFocus === INPUT_FIELD_NAMES.formalName}
+                onClick={() => _zSetFocus(INPUT_FIELD_NAMES.formalName)}
                 onChangeText={(val) => {
                   let newItem = cloneDeep(sItem);
                   newItem.formalName = val;
-                  handleChangeItem(newItem, FOCUS_NAMES.formalName);
+                  handleChangeItem(newItem, INPUT_FIELD_NAMES.formalName);
                 }}
                 value={sItem.formalName}
               />
@@ -843,12 +845,12 @@ export const InventoryItemScreeenModalComponent = ({
                   color: "black",
                   // borderWidth: 1,
                 }}
-                autoFocus={zFocus === FOCUS_NAMES.informalName}
-                onClick={() => _zSetFocus(FOCUS_NAMES.informalName)}
+                autoFocus={zFocus === INPUT_FIELD_NAMES.informalName}
+                onClick={() => _zSetFocus(INPUT_FIELD_NAMES.informalName)}
                 onChangeText={(val) => {
                   let newItem = cloneDeep(sItem);
                   newItem.informalName = val;
-                  handleChangeItem(newItem, FOCUS_NAMES.informalName);
+                  handleChangeItem(newItem, INPUT_FIELD_NAMES.informalName);
                 }}
                 value={sItem.informalName}
               />
@@ -882,23 +884,23 @@ export const InventoryItemScreeenModalComponent = ({
                 }}
               >
                 <TextInput
-                  autoFocus={zFocus === FOCUS_NAMES.price}
-                  onClick={() => _zSetFocus(FOCUS_NAMES.price)}
+                  autoFocus={zFocus === INPUT_FIELD_NAMES.price}
+                  onClick={() => _zSetFocus(INPUT_FIELD_NAMES.price)}
                   onChangeText={(val) => {
                     let newItem = cloneDeep(sItem);
                     newItem.price = val;
-                    handleChangeItem(newItem, FOCUS_NAMES.price);
+                    handleChangeItem(newItem, INPUT_FIELD_NAMES.price);
                   }}
                   value={"$" + sItem.price}
                   style={{ fontSize: 16 }}
                 />
                 <TextInput
-                  autoFocus={zFocus === FOCUS_NAMES.sale}
-                  onClick={() => _zSetFocus(FOCUS_NAMES.sale)}
+                  autoFocus={zFocus === INPUT_FIELD_NAMES.sale}
+                  onClick={() => _zSetFocus(INPUT_FIELD_NAMES.sale)}
                   onChangeText={(val) => {
                     let newItem = cloneDeep(sItem);
                     newItem.salePrice = val;
-                    handleChangeItem(newItem, FOCUS_NAMES.sale);
+                    handleChangeItem(newItem, INPUT_FIELD_NAMES.sale);
                   }}
                   value={"$" + sItem.salePrice}
                   style={{ fontSize: 16 }}
@@ -927,14 +929,14 @@ export const InventoryItemScreeenModalComponent = ({
             </Text>
 
             <TextInput
-              autoFocus={zFocus === FOCUS_NAMES.upc}
-              onClick={() => _zSetFocus(FOCUS_NAMES.upc)}
+              autoFocus={zFocus === INPUT_FIELD_NAMES.upc}
+              onClick={() => _zSetFocus(INPUT_FIELD_NAMES.upc)}
               style={{ fontSize: 12, color: "black", marginTop: 0 }}
               value={sItem.upc}
               onChangeText={(val) => {
                 let newItem = cloneDeep(sItem);
                 newItem.upc = val;
-                handleChangeItem(newItem, FOCUS_NAMES.upc);
+                handleChangeItem(newItem, INPUT_FIELD_NAMES.upc);
               }}
             />
           </View>

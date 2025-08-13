@@ -57,6 +57,10 @@ export const ActiveWorkorderComponent = ({}) => {
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
+  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
+  // const _zSetOpenWorkorderIdx = useOpenWorkordersStore(
+  //   (state) => state.setOpenWorkorderIdx
+  // );
   const _zExecute = useLoginStore((state) => state.execute);
 
   // store getters ///////////////////////////////////////////////////////////////////
@@ -91,10 +95,10 @@ export const ActiveWorkorderComponent = ({}) => {
 
   ///////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
-  function setWorkorderObj(obj) {
-    _zSetWorkorderObj(obj);
-    dbSetOpenWorkorderItem(obj);
-  }
+  // function setWorkorderObj(obj) {
+  //   _zSetWorkorderObj(obj);
+  //   dbSetOpenWorkorderItem(obj);
+  // }
 
   function setCustomerObj(obj) {
     _zSetCustomerObj(obj);
@@ -121,7 +125,7 @@ export const ActiveWorkorderComponent = ({}) => {
     // log("setting", newColorObj);
     let wo = cloneDeep(zWorkorderObj);
     wo[fieldName] = newColorObj;
-    setWorkorderObj(wo);
+    _zSetWorkorderObj(wo);
   }
 
   function getBackgroundColor() {
@@ -148,7 +152,6 @@ export const ActiveWorkorderComponent = ({}) => {
     wo.id = generateRandomID();
     wo.startedBy = zCurrentUser.id;
 
-    _zSetOpenWorkorder(wo);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
@@ -278,7 +281,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 onTextChange={(val) => {
                   // log(val);
                   wo.brand = val;
-                  setWorkorderObj(wo);
+                  _zSetWorkorderObj(wo);
                 }}
               />
               {/* </View> */}
@@ -359,7 +362,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   let wo = cloneDeep(zWorkorderObj);
 
                   wo.description = val;
-                  setWorkorderObj(wo);
+                  _zSetWorkorderObj(wo);
                 }}
               />
               <View
@@ -513,7 +516,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 onTextChange={(val) => {
                   let wo = cloneDeep(zWorkorderObj);
                   wo.waitTime = val;
-                  setWorkorderObj(wo);
+                  _zSetWorkorderObj(wo);
                   dbSetOpenWorkorderItem(wo);
                 }}
               />
@@ -559,7 +562,7 @@ export const ActiveWorkorderComponent = ({}) => {
               onSelect={(val) => {
                 let wo = cloneDeep(zWorkorderObj);
                 wo.status = val;
-                setWorkorderObj(wo);
+                _zSetWorkorderObj(wo);
               }}
               itemViewStyle={{ backgroundColor: "gray", width: null }}
               itemTextStyle={{ color: getBackgroundColor().textColor }}
@@ -600,7 +603,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   let wo = cloneDeep(zWorkorderObj);
 
                   wo.partOrdered = val;
-                  _zExecute(() => setWorkorderObj(wo));
+                  _zExecute(() => _zSetWorkorderObj(wo));
                 }}
               />
             </View>
@@ -622,7 +625,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 onTextChange={(val) => {
                   let wo = cloneDeep(zWorkorderObj);
                   wo.partSource = val;
-                  _zExecute(() => setWorkorderObj(wo));
+                  _zExecute(() => _zSetWorkorderObj(wo));
                 }}
               />
               <View

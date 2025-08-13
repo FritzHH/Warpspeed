@@ -3,13 +3,13 @@
 import { cloneDeep } from "lodash";
 import {
   CUSTOMER_PROTO,
-  INVENTORY_CATEGORIES,
+  INVENTORY_CATEGORY_NAMES,
   INVENTORY_ITEM_PROTO,
   PRINTER_NAMES,
   RECEIPT_LINE_ITEM_OBJ_PROTO,
   RECEIPT_PROTO,
   RECEIPT_TYPES,
-  SETTINGS_PROTO,
+  SETTINGS_OBJ,
   SMS_PROTO,
   WORKORDER_PROTO,
 } from "./data";
@@ -40,7 +40,7 @@ export function sendTestMessage() {
 }
 
 export async function fillInventory() {
-  let keys = Object.keys(INVENTORY_CATEGORIES);
+  let keys = Object.keys(INVENTORY_CATEGORY_NAMES);
   for (let i = 1; i <= 5; i++) {
     let inv = { ...INVENTORY_ITEM_PROTO, id: generateRandomID() };
     inv.formalName =
@@ -56,7 +56,7 @@ export async function fillInventory() {
       (await randomWordGenerator());
     inv.price = i * 4 + "." + i + i * 2;
     if (i === 1 || i === 3) inv.salePrice = i * 2 + "." + i + i * 2;
-    inv.category = INVENTORY_CATEGORIES[keys[i - 1]];
+    inv.category = INVENTORY_CATEGORY_NAMES[keys[i - 1]];
     inv.upc = generateBarcode();
     setInventoryItem(inv);
   }
@@ -69,17 +69,17 @@ export function fillOpenWorkorders() {
     let wo = { ...WORKORDER_PROTO, id: generateRandomID() };
     j = i;
     if (j > 3) j = 2;
-    wo.brand = SETTINGS_PROTO.bikeBrands[j];
+    wo.brand = SETTINGS_OBJ.bikeBrands[j];
     j = i;
     if (j > 13) j = 4;
-    wo.color1 = SETTINGS_PROTO.bikeColors[j];
+    wo.color1 = SETTINGS_OBJ.colors[j];
     j = i;
     if (j > 3) j = 2;
-    wo.description = SETTINGS_PROTO.bikeDescriptions[j];
+    wo.description = SETTINGS_OBJ.bikeDescriptions[j];
     wo.startedBy = "Test User";
     j = i;
     if (statusCount == 14) statusCount = 0;
-    wo.status = SETTINGS_PROTO.statuses[statusCount];
+    wo.status = SETTINGS_OBJ.statuses[statusCount];
     statusCount++;
     wo.customerFirst = "Test";
     wo.customerLast = "Customer";
@@ -106,7 +106,7 @@ export function fillCustomers() {
 
 export function fillPreferences() {
   // log(SETTINGS_PROTO);
-  dbSetSettings(SETTINGS_PROTO);
+  dbSetSettings(SETTINGS_OBJ);
   // getRealtimeNodeItem("SETTINGS").then((res) => log("res", res));
 }
 

@@ -3,7 +3,6 @@ import { FlatList, View, Text, TextInput } from "react-native-web";
 import { TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import {
   useCheckoutStore,
-  useCurrentWorkorderStore,
   useInventoryStore,
   useOpenWorkordersStore,
   useSettingsStore,
@@ -42,7 +41,7 @@ import {
 
 export const CheckoutComponent = ({}) => {
   // store setters
-  const _zSetOpenWorkorderObj = useCurrentWorkorderStore(
+  const _zSetOpenWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const _zSetOptionsTabName = useTabNamesStore(
@@ -65,7 +64,7 @@ export const CheckoutComponent = ({}) => {
 
   // store getters
   let zWorkorderObj = WORKORDER_PROTO;
-  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
+  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
   // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
   const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
     state.getWorkorderArr()

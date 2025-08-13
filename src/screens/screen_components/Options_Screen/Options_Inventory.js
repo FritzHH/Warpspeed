@@ -25,7 +25,7 @@ import {
 import { Colors } from "../../../styles";
 import {
   INVENTORY_ITEM_PROTO,
-  INVENTORY_CATEGORIES,
+  INVENTORY_CATEGORY_NAMES,
   TAB_NAMES,
   WORKORDER_ITEM_PROTO,
 } from "../../../data";
@@ -33,7 +33,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
-  useCurrentWorkorderStore,
   useInventoryStore,
   useLoginStore,
   useOpenWorkordersStore,
@@ -49,14 +48,14 @@ import {
 const tabMargin = 20;
 export function InventoryComponent({}) {
   /// setters ///////////////////////////////////////////////////////////////
-  const _zSetWorkorderObj = useCurrentWorkorderStore(
+  const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
   const _zExecute = useLoginStore((state) => state.execute);
   /// getters /////////////////////////////////////////////////////////////
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
-  const zWorkorderObj = useCurrentWorkorderStore((state) =>
+  const zWorkorderObj = useOpenWorkordersStore((state) =>
     state.getWorkorderObj()
   );
   /////////////////////////////////////////////////////////////

@@ -8,7 +8,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
-  useCurrentWorkorderStore,
   useCustMessagesStore,
   useOpenWorkordersStore,
   useSettingsStore,
@@ -19,7 +18,7 @@ import {
   dbGetCustomerObj,
   dbSetOpenWorkorderItem,
 } from "../../../db_call_wrapper";
-import { messagesSubscribe } from "../../../db_subscriptions";
+import { messagesSubscribe } from "../../../db_subscription_wrapper";
 
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
@@ -27,6 +26,9 @@ export function WorkordersComponent({}) {
     state.getWorkorderArr()
   );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getWorkorderObj()
+  );
 
   // setters ////////////////////////////////////////////////////////
   const _zSetIncomingMessage = useCustMessagesStore(
@@ -35,8 +37,8 @@ export function WorkordersComponent({}) {
   const _zSetOutgoingMessage = useCustMessagesStore(
     (state) => state.setOutgoingMessage
   );
-  const _zSetCurrentWorkorder = useCurrentWorkorderStore(
-    (state) => state.setWorkorderObj
+  const _zSetCurrentWorkorderIdx = useOpenWorkordersStore(
+    (state) => state.setOpenWorkorderIdx
   );
   const _zSetPreviewObj = useWorkorderPreviewStore(
     (state) => state.setPreviewObj
@@ -52,8 +54,15 @@ export function WorkordersComponent({}) {
   const _zModOpenWorkorderArrItem = useOpenWorkordersStore(
     (state) => state.modItem
   );
+
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
+  // useEffect(() => {
+  //   log("open", zOpenWorkorder);
+  // }, [zOpenWorkordersArr]);
+
+  ///////////////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////////////
 
   function workorderSelected(obj) {
     // log("obj", obj);
@@ -61,7 +70,8 @@ export function WorkordersComponent({}) {
     dbGetCustomerObj(obj.customerID).then((custObj) => {
       _zSetCurrentCustomer(custObj);
     });
-    _zSetCurrentWorkorder(obj);
+    let idx = zOpenWorkordersArr.findIndex((o) => o.id == obj.id);
+    _zSetCurrentWorkorderIdx(idx);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
@@ -133,13 +143,13 @@ export function WorkordersComponent({}) {
         textStyle={{ color: "lightgray", marginRight: 10 }}
       />
       <FlatList
-        data={sortWorkorders(zOpenWorkordersArr)}
+        data={zOpenWorkordersArr}
         keyExtractor={(item, index) => index}
         renderItem={(item) => {
-          let workorder = item.item.workorder;
-          let backgroundColor = item.item.backgroundColor;
+          let workorder = item.item;
+          // let backgroundColor = item.item.backgroundColor;
           // item = item.item;
-          // clog(item);
+          // clog("item", workorder);
 
           return (
             <RowItemComponent
@@ -147,8 +157,8 @@ export function WorkordersComponent({}) {
               _zSetPreviewObj={_zSetPreviewObj}
               onWorkorderSelected={workorderSelected}
               workorder={workorder}
-              backgroundColor={backgroundColor}
-              deleteWorkorder={workorderDeleted}
+              // backgroundColor={backgroundColor}
+              // deleteWorkorder={workorderDeleted}
             />
           );
         }}
@@ -201,7 +211,7 @@ function RowItemComponent({
             <Text>{workorder.description || "Descripion goes here"}</Text>
           </View>
           <View>
-            <Text>{workorder.status}</Text>
+            <Text>{workorder.status.label}</Text>
             {/* <Text>{workorder.status.group}</Text> */}
           </View>
         </View>

@@ -1,7 +1,143 @@
 /* eslint-disable */
 
-////////// names ////////////////////////////
-export const INVENTORY_CATEGORIES = {
+////////// hardcoded settings and options ///////
+export const SHADOW_RADIUS_NOTHING = {
+  shadowOffset: { width: 0, height: 0 },
+  shadowRadius: 0,
+  shadowColor: "transparent",
+};
+
+export const COLORS = [
+  {
+    textColor: "black",
+    backgroundColor: "whitesmoke",
+    label: "White",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "blue",
+    label: "Blue",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "lightblue",
+    label: "Light-blue",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "red",
+    label: "Red",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "green",
+    label: "Green",
+  },
+
+  {
+    textColor: "whitesmoke",
+    backgroundColor: "black",
+    label: "Black",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "yellow",
+    label: "Yellow",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "maroon",
+    label: "Maroon",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "rgb(139,69,19)",
+    label: "Brown",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "rgb(192,192,192)",
+    label: "Silver",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "tan",
+    label: "Tan",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "beige",
+    label: "Beige",
+  },
+  {
+    textColor: "white",
+    backgroundColor: "darkgray",
+    label: "Gray",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "lightgray",
+    label: "Light-gray",
+  },
+  {
+    textColor: "black",
+    backgroundColor: "pink",
+    label: "Pink",
+  },
+];
+
+export const NONREMOVABLE_STATUSES = [
+  {
+    label: "Newly Created",
+    textColor: "white",
+    backgroundColor: "red",
+    removable: false,
+    order: 1,
+  },
+  {
+    textColor: "black",
+    backgroundColor: "lightgray",
+    label: "Service",
+    removable: false,
+    order: 2,
+  },
+  {
+    textColor: "white",
+    backgroundColor: "green",
+    label: "Finished",
+    removable: false,
+    order: 3,
+  },
+];
+
+export const WAIT_TIME_INCREMENTS = {
+  day: "Days",
+  week: "Weeks",
+};
+
+export const NONREMOVABLE_WAIT_TIMES = [
+  {
+    label: "Waiting",
+    min: 1,
+    max: 1,
+    waitTimeValue: WAIT_TIME_INCREMENTS.day,
+  },
+  {
+    label: "Today",
+    min: 1,
+    max: 1,
+    waitTimeValue: WAIT_TIME_INCREMENTS.day,
+  },
+  {
+    label: "Tomorrow",
+    min: 1,
+    max: 2,
+    waitTimeValue: WAIT_TIME_INCREMENTS.day,
+  },
+];
+
+////////// names of stuff ////////////////////////////
+export const INVENTORY_CATEGORY_NAMES = {
   parts: "Parts",
   labor: "Labor",
   bikes: "Bikes",
@@ -130,9 +266,7 @@ export const WORKORDER_PROTO = {
   workorderLines: [],
   internalNotes: [],
   customerNotes: [],
-  dueBy: "",
-  status: "Newly Created",
-  numItems: 1,
+  status: "",
   taxFree: false,
 };
 
@@ -185,103 +319,39 @@ export const INVENTORY_ITEM_PROTO = {
   cost: "",
 };
 
-export const COLORS = {
-  white: {
-    textColor: "black",
-    backgroundColor: "whitesmoke",
-    label: "White",
-  },
-  blue: {
-    textColor: "white",
-    backgroundColor: "blue",
-    label: "Blue",
-  },
-  light_blue: {
-    textColor: "black",
-    backgroundColor: "lightblue",
-    label: "Light-blue",
-  },
-  red: {
-    textColor: "white",
-    backgroundColor: "red",
-    label: "Red",
-  },
-  green: {
-    textColor: "white",
-    backgroundColor: "green",
-    label: "Green",
-  },
-  black: {
-    textColor: "whitesmoke",
-    backgroundColor: "black",
-    label: "Black",
-  },
-  yellow: {
-    textColor: "black",
-    backgroundColor: "yellow",
-    label: "Yellow",
-  },
-  maroon: {
-    textColor: "white",
-    backgroundColor: "maroon",
-    label: "Maroon",
-  },
-  brown: {
-    textColor: "white",
-    backgroundColor: "rgb(139,69,19)",
-    label: "Brown",
-  },
-  silver: {
-    textColor: "black",
-    backgroundColor: "rgb(192,192,192)",
-    label: "Silver",
-  },
-  tan: {
-    textColor: "black",
-    backgroundColor: "tan",
-    label: "Tan",
-  },
-  beige: {
-    textColor: "black",
-    backgroundColor: "beige",
-    label: "Beige",
-  },
-  gray: {
-    textColor: "white",
-    backgroundColor: "darkgray",
-    label: "Gray",
-  },
-  light_gray: {
-    textColor: "black",
-    backgroundColor: "lightgray",
-    label: "Light-gray",
-  },
-  pink: {
-    textColor: "black",
-    backgroundColor: "pink",
-    label: "Pink",
-  },
+export const WAIT_TIME_PROTO = {
+  label: "",
+  time1: "",
+  time2: "",
+  waitTimeValue: "",
 };
 
-export const SETTINGS_PROTO = {
+// Objects with initial data
+export const SETTINGS_OBJ = {
   statuses: [
-    "Newly Created",
-    "Work in Progress",
-    "Work in Progress - On Hold",
-    "Service - Commuter",
-    "Service",
-    "Service - Priority",
-    "Finished",
-    "Finished - Waiting to Contact",
-    "Finished - Customer Away",
-    "Finished - Customer Not Responding",
-    "Part Ordered",
-    "Bicycle Ordered",
-    "Customer Bringing Part",
-    "Order for Customer",
-    "Messaging With Customer",
-    "Emailing With Company",
-    "Customer Not Responding",
+    ...NONREMOVABLE_STATUSES,
+    {
+      textColor: "white",
+      backgroundColor: "orange",
+      label: "Order Part for Customer",
+      removable: true,
+      order: 4,
+    },
+    {
+      textColor: "white",
+      backgroundColor: "orange",
+      label: "Part Ordered",
+      removable: true,
+      order: 5,
+    },
+    {
+      textColor: "white",
+      backgroundColor: "blue",
+      label: "Messaging Customer",
+      removable: true,
+
+      order: 6,
+    },
   ],
   statusGroups: [
     {
@@ -400,84 +470,7 @@ export const SETTINGS_PROTO = {
       items: [],
     },
   ],
-  bikeColors: [
-    {
-      textColor: "black",
-      backgroundColor: "whitesmoke",
-      label: "White",
-    },
-    {
-      textColor: "white",
-      backgroundColor: "blue",
-      label: "Blue",
-    },
-    {
-      textColor: "black",
-      backgroundColor: "lightblue",
-      label: "Light-blue",
-    },
-    {
-      textColor: "white",
-      backgroundColor: "red",
-      label: "Red",
-    },
-    {
-      textColor: "white",
-      backgroundColor: "green",
-      label: "Green",
-    },
-
-    {
-      textColor: "whitesmoke",
-      backgroundColor: "black",
-      label: "Black",
-    },
-    {
-      textColor: "black",
-      backgroundColor: "yellow",
-      label: "Yellow",
-    },
-    {
-      textColor: "white",
-      backgroundColor: "maroon",
-      label: "Maroon",
-    },
-    {
-      textColor: "white",
-      backgroundColor: "rgb(139,69,19)",
-      label: "Brown",
-    },
-    {
-      textColor: "black",
-      backgroundColor: "rgb(192,192,192)",
-      label: "Silver",
-    },
-    {
-      textColor: "black",
-      backgroundColor: "tan",
-      label: "Tan",
-    },
-    {
-      textColor: "black",
-      backgroundColor: "beige",
-      label: "Beige",
-    },
-    {
-      textColor: "white",
-      backgroundColor: "darkgray",
-      label: "Gray",
-    },
-    {
-      textColor: "black",
-      backgroundColor: "lightgray",
-      label: "Light-gray",
-    },
-    {
-      textColor: "black",
-      backgroundColor: "pink",
-      label: "Pink",
-    },
-  ],
+  // colors:
   bikeBrands: ["Trek", "Specialized", "Sun", "Marin", "Cannondale", "Jamis"],
   bikeBrandsName: "Bikes",
   bikeOptionalBrands: ["Euphree", "Lectric", "Hiboy", "Ridstar", "Velowave"],
@@ -497,13 +490,43 @@ export const SETTINGS_PROTO = {
     { name: "$10 Off", value: "10", type: DISCOUNT_TYPES.dollar },
   ],
   waitTimes: [
-    "Today",
-    "Tomorrow",
-    "1-2 Days",
-    "2-3 Days",
-    "3-4 Days",
-    "Research/Order Part",
-    "No Estimate",
+    ...NONREMOVABLE_WAIT_TIMES,
+    {
+      label: "1-2 Days",
+      min: 1,
+      max: 2,
+      waitTimeValue: WAIT_TIME_INCREMENTS.day,
+    },
+    {
+      label: "2-3 Days",
+      min: 2,
+      max: 3,
+      waitTimeValue: WAIT_TIME_INCREMENTS.day,
+    },
+    {
+      label: "3-5 Days",
+      min: 3,
+      max: 5,
+      waitTimeValue: WAIT_TIME_INCREMENTS.day,
+    },
+    {
+      label: "1 Week",
+      min: 1,
+      max: 1,
+      waitTimeValue: WAIT_TIME_INCREMENTS.day,
+    },
+    {
+      label: "1-2 Weeks",
+      min: 1,
+      max: 2,
+      waitTimeValue: WAIT_TIME_INCREMENTS.week,
+    },
+    {
+      label: "No Estimate",
+      min: null,
+      max: null,
+      waitTimeValue: WAIT_TIME_INCREMENTS.week,
+    },
   ],
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
@@ -533,7 +556,7 @@ export const SETTINGS_PROTO = {
   autoConnectToCardReader: "true",
 };
 
-// RECEIPT ////////////////////////////////////////////////////
+// RECEIPT STUFF ////////////////////////////////////////////////////
 export const RECEIPT_TYPES = {
   workorder: "Workorder",
   sales: "Sales",
@@ -603,19 +626,11 @@ export const RECEIPT_PROTO = {
   thankYouBlurb:
     "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
 };
-// END RECEIPT /////////////////////////////////////////////
+// END RECEIPT STUFF /////////////////////////////////////////////
 
 export const PRIVILEDGE_LEVELS = {
   admin: "Admin",
   superUser: "Editor",
   owner: "Owner",
   user: "User",
-};
-
-////////// hardcoded settings and options ///////
-
-export const SHADOW_RADIUS_NOTHING = {
-  shadowOffset: { width: 0, height: 0 },
-  shadowRadius: 0,
-  shadowColor: "transparent",
 };

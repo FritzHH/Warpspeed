@@ -35,13 +35,12 @@ import {
   useAppCurrentUserStore,
   useCustomerPreviewStore,
   useCustomerSearchStore,
-  useOpenWorkordersStore,
   useTabNamesStore,
-  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
   useCustMessagesStore,
   useLoginStore,
 } from "../../../stores";
-import { messagesSubscribe } from "../../../db_subscriptions";
+import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { Colors } from "../../../styles";
 import {
   dbSearchForName,
@@ -68,14 +67,14 @@ export function NewWorkorderComponent({}) {
   const _zSetNewWorkorderInArr = useOpenWorkordersStore(
     (state) => state.modItem
   );
-  const _zSetOpenWorkorder = useCurrentWorkorderStore(
+  const _zSetOpenWorkorder = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const _zSetCurrentCustomer = useCurrentCustomerStore(
     (state) => state.setCustomerObj
   );
   const _zExecute = useLoginStore((state) => state.execute);
-  const _zStartStandaloneSale = useCurrentWorkorderStore(
+  const _zStartStandaloneSale = useOpenWorkordersStore(
     (state) => state.startStandaloneSale
   );
 
@@ -219,6 +218,7 @@ export function NewWorkorderComponent({}) {
     _zSetOpenWorkorder(wo);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 
   function handleCancelCreateNewCustomerPress() {

@@ -19,14 +19,14 @@ import {
   WORKORDER_PROTO,
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
-  SETTINGS_PROTO,
+  SETTINGS_OBJ,
   DISCOUNT_OBJ_PROTO,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCheckoutStore,
-  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
   useInventoryStore,
   useLoginStore,
   useSettingsStore,
@@ -38,7 +38,7 @@ import {
 
 export const Items_WorkorderItemsTab = ({}) => {
   // setters ///////////////////////////////////////////////////////////////
-  const _zSetWorkorderObj = useCurrentWorkorderStore(
+  const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const _zExecute = useLoginStore((state) => state.execute);
@@ -48,8 +48,8 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // getters ///////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
-  let zSettingsObj = SETTINGS_PROTO;
-  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
+  let zSettingsObj = SETTINGS_OBJ;
+  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
@@ -375,7 +375,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 export const LineItemComponent = ({
   inventoryItem = INVENTORY_ITEM_PROTO,
   workorderLine = WORKORDER_ITEM_PROTO,
-  zSettingsObj = SETTINGS_PROTO,
+  zSettingsObj = SETTINGS_OBJ,
   __deleteWorkorderLine,
   __modQtyPressed,
   __setWorkorderObj,

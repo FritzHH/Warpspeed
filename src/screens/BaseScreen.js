@@ -32,7 +32,7 @@ import {
   inventorySubscribe,
   openWorkordersSubscribe,
   settingsSubscribe,
-} from "../db_subscriptions";
+} from "../db_subscription_wrapper";
 import {
   useCustomerPreviewStore,
   useInventoryStore,

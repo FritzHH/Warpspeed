@@ -13,7 +13,7 @@ import { cloneDeep } from "lodash";
 import {
   APP_USER,
   FOCUS_NAMES,
-  SETTINGS_PROTO,
+  SETTINGS_OBJ,
   TAB_NAMES,
   WORKORDER_PROTO,
   WORKORDER_STATUS_NAMES,
@@ -21,14 +21,13 @@ import {
 import {
   useAppCurrentUserStore,
   useCurrentCustomerStore,
-  useCurrentWorkorderStore,
   useCustMessagesStore,
   useCustomerSearchStore,
   useLoginStore,
   useOpenWorkordersStore,
   useTabNamesStore,
 } from "../../../stores";
-import { messagesSubscribe } from "../../../db_subscriptions";
+import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { dbGetCustomerObj } from "../../../db_call_wrapper";
 
 export function CustomerSearchListComponent({}) {
@@ -45,7 +44,7 @@ export function CustomerSearchListComponent({}) {
   const _zSetCurrentCustomer = useCurrentCustomerStore(
     (state) => state.setCustomerObj
   );
-  const _zSetOpenWorkorder = useCurrentWorkorderStore(
+  const _zSetOpenWorkorder = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
@@ -75,7 +74,7 @@ export function CustomerSearchListComponent({}) {
     wo.customerLast = customerObj.last;
     wo.customerPhone = customerObj.cell || customerObj.landline;
     wo.id = generateRandomID();
-    wo.status = SETTINGS_PROTO.statuses[0];
+    wo.status = SETTINGS_OBJ.statuses[0];
     _zSetOpenWorkorder(wo);
     _zSetCurrentCustomer(customerObj);
     messagesSubscribe(

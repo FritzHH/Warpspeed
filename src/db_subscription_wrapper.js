@@ -35,11 +35,11 @@ export async function openWorkordersSubscribe(_zModWorkorderItem) {
     "OPEN-WORKORDERS",
     (type, key, val) => _zModWorkorderItem(val, "add")
   );
-  workorderRemoveSub = await subscribeToNodeRemoval(
+  workorderChangeSub = await subscribeToNodeChange(
     "OPEN-WORKORDERS",
     (type, key, val) => _zModWorkorderItem(val, "change")
   );
-  workorderChangeSub = await subscribeToNodeChange(
+  workorderRemoveSub = await subscribeToNodeRemoval(
     "OPEN-WORKORDERS",
     (type, key, val) => _zModWorkorderItem(val, "remove")
   );

@@ -9,7 +9,7 @@ import { NewWorkorderComponent } from "../screen_components/Info_Screen/Info_New
 import { CheckoutComponent } from "../screen_components/Info_Screen/Info_Checkout";
 import React from "react";
 import {
-  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
   useTabNamesStore,
   useCheckoutStore,
 } from "../../stores";
@@ -18,7 +18,7 @@ import { clog } from "../../utils";
 export const Info_Section = ({}) => {
   // store getters
   const zInfoTabName = useTabNamesStore((state) => state.getInfoTabName());
-  const zOpenWorkorder = useCurrentWorkorderStore((state) =>
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
     state.getWorkorderObj()
   );
 

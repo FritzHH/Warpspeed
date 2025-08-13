@@ -30,8 +30,8 @@ import { useState } from "react";
 import {
   FOCUS_NAMES,
   INVENTORY_ITEM_PROTO,
-  INVENTORY_CATEGORIES,
-  SETTINGS_PROTO,
+  INVENTORY_CATEGORY_NAMES,
+  SETTINGS_OBJ,
   PRIVILEDGE_LEVELS,
 } from "./data";
 import { cloneDeep } from "lodash";
@@ -46,7 +46,6 @@ import {
   useCheckoutStore,
   useCurrentCustomerStore,
   useOpenWorkordersStore,
-  useCurrentWorkorderStore,
   useTabNamesStore,
 } from "./stores";
 import {
@@ -64,10 +63,10 @@ import {
 import {
   paymentIntentSubscribe,
   removePaymentIntentSub,
-} from "./db_subscriptions";
+} from "./db_subscription_wrapper";
 import Dropzone from "react-dropzone";
 import { CheckBox as RNCheckBox } from "react-native-web";
-import { messagesSubscribe } from "./db_subscriptions";
+import { messagesSubscribe } from "./db_subscription_wrapper";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -431,7 +430,7 @@ export const DropdownMenu = ({
   buttonText,
   ref,
   modalCoordinateVars = {
-    x: 0,
+    x: -15,
     y: 50,
   },
   mouseOverOptions = {
@@ -470,12 +469,12 @@ export const DropdownMenu = ({
               enableMouseOver={enableMouseoverListItem}
               buttonStyle={{
                 padding: 10,
-                backgroundColor: item.backgroundColor,
                 height: 40,
                 width: 130,
                 ...itemViewStyle,
+                backgroundColor: item.backgroundColor,
               }}
-              textStyle={{ color: item.textColor, ...itemTextStyle }}
+              textStyle={{ ...itemTextStyle, color: item.textColor }}
               // mouseOverOptions={{ opacity: 1 }}
               text={item.label || item}
               onPress={() => {
@@ -1020,7 +1019,7 @@ export const CustomerInfoScreenModalComponent = ({
   const _zSetNewWorkorderInArr = useOpenWorkordersStore(
     (state) => state.modItem
   );
-  const _zSetOpenWorkorder = useCurrentWorkorderStore(
+  const _zSetOpenWorkorder = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
@@ -1324,7 +1323,7 @@ export const LoginScreenModalComponent = ({ modalVisible }) => {
     (state) => state.runPostLoginFunction
   );
   const zAdminPrivilege = useLoginStore((state) => state.getAdminPrivilege());
-  let zSettingsObj = SETTINGS_PROTO;
+  let zSettingsObj = SETTINGS_OBJ;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   /////////////////////////////////////////////////////////////////////
   const [sBackgroundColor, _setBackgroundColor] = useState("green");

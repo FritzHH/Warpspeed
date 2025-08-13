@@ -8,8 +8,9 @@ import {
   TAB_NAMES,
   WORKORDER_PROTO,
 } from "./data";
-import { checkArr, generateRandomID, log } from "./utils";
+import { checkArr, clog, generateRandomID, log } from "./utils";
 import { cloneDeep } from "lodash";
+import { dbSetOpenWorkorderItem } from "./db_call_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
 export const useLoginStore = create((set, get) => ({
@@ -117,7 +118,7 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: TAB_NAMES.itemsTab.empty,
-  optionsTabName: TAB_NAMES.optionsTab.inventory,
+  optionsTabName: TAB_NAMES.optionsTab.workorders,
   infoTabName: TAB_NAMES.infoTab.customer,
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
@@ -166,27 +167,6 @@ export const useAppCurrentUserStore = create((set, get) => ({
   setCurrentUserObj: (obj) => set((state) => ({ userObj: obj })),
 }));
 
-export const useCurrentWorkorderStore = create((set, get) => ({
-  workorderObj: null,
-  getWorkorderObj: () => get().workorderObj,
-  setWorkorderObj: (workorderObj) => {
-    // log("here");
-    set((state) => ({ workorderObj }));
-  },
-  startStandaloneSale: () => {
-    set((state) => ({
-      workorderObj: {
-        ...cloneDeep(WORKORDER_PROTO),
-        isStandaloneSale: true,
-        id: generateRandomID(),
-      },
-    }));
-  },
-  reset: () => {
-    set((state) => ({ workorderObj: null }));
-  },
-}));
-
 export const useCheckoutStore = create((set, get) => ({
   // isCheckingOut: false,
   splitPayment: false,
@@ -229,6 +209,7 @@ export const useCheckoutStore = create((set, get) => ({
   },
 }));
 
+// internal & database //////////////////////////////////////////////
 export const useStripePaymentStore = create((set, get) => ({
   paymentIntentID: null,
   reader: null,
@@ -266,7 +247,6 @@ export const useStripePaymentStore = create((set, get) => ({
 }));
 
 // database  //////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////
 export const usePunchClockStore = create((set, get) => ({
   loggedInUsers: [],
   userClockArr: [],
@@ -332,19 +312,38 @@ export const useInventoryStore = create((set, get) => ({
 
 export const useOpenWorkordersStore = create((set, get) => ({
   workorderArr: [],
+  openWorkorderIdx: null,
+
+  getOpenWorkorderIdx: () => get().openWorkorderIdx,
+  getWorkorderObj: () => {
+    let idx = get().openWorkorderIdx;
+    return get().workorderArr[idx];
+  },
   getWorkorderArr: () => get().workorderArr,
+
+  setOpenWorkorderIdx: (openWorkorderIdx) =>
+    set((state) => ({ openWorkorderIdx })),
+  setWorkorderObj: (item) => {
+    set((state) => ({
+      workorderArr: changeItem(get().workorderArr, item),
+    }));
+    dbSetOpenWorkorderItem(item);
+  },
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
+
+  // handles live DB subscription changes
   modItem: (item, option) => {
+    // log(item, option);
     if (option === "change")
-      return set((state) => ({
+      set((state) => ({
         workorderArr: changeItem(get().workorderArr, item),
       }));
     if (option === "add")
-      return set((state) => ({
+      set((state) => ({
         workorderArr: addItem(get().workorderArr, item),
       }));
     if (option === "remove")
-      return set((state) => ({
+      set((state) => ({
         workorderArr: removeItem(get().workorderArr, item),
       }));
   },

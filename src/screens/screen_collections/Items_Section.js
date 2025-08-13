@@ -16,7 +16,7 @@ import { WorkorderPreview } from "../screen_components/Items_Screen/Items_Workor
 import { Items_WorkorderItemsTab } from "../screen_components/Items_Screen/Items_WorkorderItems";
 
 import {
-  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
   useCustomerSearchStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
@@ -33,7 +33,7 @@ export function Items_Section({}) {
   );
 
   let zWorkorderObj = WORKORDER_PROTO;
-  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
+  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
   const zCustomerSearchArr = useCustomerSearchStore((state) =>
     state.getSearchResultsArr()
   );

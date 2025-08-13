@@ -5,7 +5,7 @@ import {
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   WORKORDER_PROTO,
-  SETTINGS_PROTO,
+  SETTINGS_OBJ,
 } from "../../../data";
 import { Colors } from "../../../styles";
 
@@ -25,7 +25,7 @@ import {
 import { cloneDeep } from "lodash";
 import {
   useSettingsStore,
-  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
   useInventoryStore,
   useLoginStore,
 } from "../../../stores";
@@ -38,7 +38,7 @@ const SEARCH_STRING_TIMER = 45 * 1000;
 
 export function QuickItemComponent({}) {
   // setters ///////////////////////////////////////////////////////////////
-  const _zSetWorkorderObj = useCurrentWorkorderStore(
+  const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
@@ -54,9 +54,9 @@ export function QuickItemComponent({}) {
 
   // getters //////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
-  let zSettingsObj = SETTINGS_PROTO;
+  let zSettingsObj = SETTINGS_OBJ;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
+  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
 
   ///////////////////////////////////////////////////////////////////////

@@ -29,7 +29,7 @@ import { useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useAppCurrentUserStore,
-  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
   useLoginStore,
 } from "../../../stores";
 import { WORKORDER_PROTO } from "../../../data";
@@ -38,14 +38,14 @@ import { dbSetOpenWorkorderItem } from "../../../db_call_wrapper";
 /// Notes Tab Component
 export function Notes_MainComponent() {
   // setters /////////////////////////////////////////////////////////////////////
-  const _zSetWorkorderObj = useCurrentWorkorderStore(
+  const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
   );
   const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
   const _zExecute = useLoginStore((state) => state.execute);
 
   // getters /////////////////////////////////////////////////////////////////////
-  const zWorkorderObj = useCurrentWorkorderStore((state) =>
+  const zWorkorderObj = useOpenWorkordersStore((state) =>
     state.getWorkorderObj()
   );
 

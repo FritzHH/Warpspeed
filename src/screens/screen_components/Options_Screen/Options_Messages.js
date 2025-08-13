@@ -25,12 +25,12 @@ import {
   SMS_PROTO,
   WORKORDER_PROTO,
   CUSTOMER_PROTO,
-  SETTINGS_PROTO,
+  SETTINGS_OBJ,
 } from "../../../data";
 import React, { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   useCurrentCustomerStore,
-  useCurrentWorkorderStore,
+  useOpenWorkordersStore,
   useCustMessagesStore,
   useLoginStore,
 } from "../../../stores";
@@ -47,7 +47,7 @@ export function MessagesComponent({}) {
   let zCustomerObj = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
   zCustomerObj = useCurrentCustomerStore((state) => state.getCustomerObj());
-  zWorkorderObj = useCurrentWorkorderStore((state) => state.getWorkorderObj());
+  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
   const zIncomingMessagesArr = useCustMessagesStore((state) =>
     state.getIncomingMessagesArr()
   );

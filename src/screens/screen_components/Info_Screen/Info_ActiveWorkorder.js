@@ -62,6 +62,9 @@ export const ActiveWorkorderComponent = ({}) => {
   //   (state) => state.setOpenWorkorderIdx
   // );
   const _zExecute = useLoginStore((state) => state.execute);
+  const _zSetWorkorder = useOpenWorkordersStore(
+    (state) => state.setWorkorderObj
+  );
 
   // store getters ///////////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
@@ -109,7 +112,7 @@ export const ActiveWorkorderComponent = ({}) => {
   function setBikeColor(incomingColorVal, fieldName) {
     let foundColor = false;
     let newColorObj = {};
-    zSettingsObj.colors.forEach((bikeColorObj) => {
+    COLORS.forEach((bikeColorObj) => {
       if (bikeColorObj.label.toLowerCase() === incomingColorVal.toLowerCase()) {
         foundColor = true;
         newColorObj = cloneDeep(bikeColorObj);
@@ -117,7 +120,7 @@ export const ActiveWorkorderComponent = ({}) => {
     });
     if (!foundColor) {
       // log("not found", incomingColorVal);
-      // newColorObj.label = newColorObj.label;
+      newColorObj.label = incomingColorVal;
       newColorObj.backgroundColor = null;
       newColorObj.textColor = null;
     }
@@ -158,7 +161,7 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleNewWorkorderPress() {
-    _zSetWorkorderObj(null);
+    _zSetWorkorder(null);
     _zSetCustomerObj(null);
     _zSetInfoTabName(TAB_NAMES.infoTab.customer);
   }
@@ -460,7 +463,13 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     itemViewStyle={{}}
                     itemTextStyle={{ fontSize: 14 }}
-                    buttonStyle={{ ...dropdownButtonStyle }}
+                    buttonStyle={{
+                      ...dropdownButtonStyle,
+                      backgroundColor:
+                        zWorkorderObj.color1 || zWorkorderObj.color2
+                          ? null
+                          : "red",
+                    }}
                     ref={color1Ref}
                     buttonText={"Color 1"}
                     buttonTextStyle={dropdownButtonTextStyle}

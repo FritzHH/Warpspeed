@@ -47,11 +47,18 @@ export const Items_WorkorderItemsTab = ({}) => {
   );
 
   // store getters ///////////////////////////////////////////////////////////////
-  let zWorkorderObj = WORKORDER_PROTO;
-  let zSettingsObj = SETTINGS_OBJ;
-  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
-  zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  // let zWorkorderObj = WORKORDER_PROTO;
+  // let zSettingsObj = SETTINGS_OBJ;
+
+  const zWorkorderObj = useOpenWorkordersStore((state) =>
+    state.getWorkorderObj()
+  );
+  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+
+  const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
+    state.getWorkorderArr()
+  );
   // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 
   ///////////////////////////////////////////////////////////////////////////
@@ -59,6 +66,9 @@ export const Items_WorkorderItemsTab = ({}) => {
   const [sTotalPrice, _setTotalPrice] = useState("");
   const [sTotalDiscount, _setTotalDiscount] = useState("");
   const [sNumItems, _setNumItems] = useState("");
+  // const [zWorkorderObj, _setWorkorderObj] = useState(
+  //   zOpenWorkordersArr[zOpenWorkorderIdx]
+  // );
 
   ///////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////

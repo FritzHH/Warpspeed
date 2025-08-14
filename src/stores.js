@@ -322,46 +322,29 @@ export const useInventoryStore = create((set, get) => ({
 
 export const useOpenWorkordersStore = create((set, get) => ({
   workorderArr: [],
-  openWorkorderIdx: null,
-  standaloneSaleWorkorderObj: null,
+  openWorkorderObj: null,
 
-  // getOpenWorkorderIdx: () => get().openWorkorderIdx,
-  getWorkorderObj: () => {
-    let idx = Number(get().openWorkorderIdx);
-    // log(idx.toString());
-    if (idx >= 0) {
-      // let wo = get().workorderArr[idx];
-      // log("idx", idx.toString());
-      return get().workorderArr[idx];
-    } else {
-      return get().standaloneSaleWorkorderObj;
-    }
-  },
+  getOpenWorkorderIdx: () => get().openWorkorderIdx,
+  getWorkorderObj: () => get().openWorkorderObj,
   getWorkorderArr: () => get().workorderArr,
 
-  // setOpenWorkorderIdx: (openWorkorderIdx) =>
-  //   set((state) => ({ openWorkorderIdx })),
-  setOpenWorkorder: (wo) => {
-    let openWorkorderIdx = Number(
-      get().workorderArr.findIndex((o) => o.id == wo.id)
-    );
-    // log(openWorkorderIdx.toString());
-    if (openWorkorderIdx >= 0) {
-      set((state) => ({ openWorkorderIdx }));
-    } else {
-      set((state) => ({ standaloneSaleWorkorderObj: wo }));
-    }
-  },
   setWorkorderObj: (wo, saveToDB = true) => {
-    let openWorkorderIdx = get().workorderArr.findIndex((o) => o.id == wo.id);
-    // log("open idx", openWorkorderIdx.toString());
+    if (wo == null) {
+      // log("doing this");
+      set((state) => ({ openWorkorderObj: null }));
+      return;
+    }
+
+    let openWorkorderIdx = get().workorderArr.findIndex((o) => o.id == wo?.id);
+    // log("open idx", openWorkorderIdx?.toString() || "null");
     if (openWorkorderIdx) {
       set((state) => ({
         workorderArr: changeItem(get().workorderArr, wo),
       }));
       dbSetOpenWorkorderItem(wo);
     } else {
-      set((state) => ({ standaloneSaleWorkorderObj: wo }));
+      // standalone sale
+      set((state) => ({ openWorkorderObj: wo }));
     }
   },
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),

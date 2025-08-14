@@ -63,6 +63,27 @@ export function BaseScreen() {
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
   const zModalVisible = useLoginStore((state) => state.getModalVisible());
 
+  // local state ////////////////////////////////////////////////////////////////////////
+  const [windowDimensions, setWindowDimensions] = useState({
+    screenWidth: window.innerWidth,
+    screenHeight: window.innerHeight,
+  });
+  const [screenWidth, _setScreenWidth] = useState(window.innerWidth);
+  const [screenHeight, _setScreenHeight] = useState(window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => {
+      _setScreenWidth(window.innerWidth);
+      _setScreenHeight(window.innerHeight);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
@@ -97,81 +118,96 @@ export function BaseScreen() {
     // fillPreferences();
   }, []);
 
+  // return (
+  //   <View
+  //     style={{
+  //       // flex: 1,
+  //       width: screenWidth,
+  //       height: screenHeight,
+  //       flexDirection: "row",
+  //       justifyContent: "space-around",
+  //       backgroundColor: "green",
+  //     }}
+  //   />
+  // );
+
   return (
-    <div
-      onKeyUp={() => {
-        _zSetLastActionMillis();
+    <View
+      style={{
+        // flex: 1,
+        width: screenWidth,
+        height: screenHeight,
+        flexDirection: "row",
+        justifyContent: "space-around",
       }}
-      onMouseMove={() => {
-        _zSetLastActionMillis();
-      }}
-      style={{ width: "100%" }}
     >
+      <div
+        onKeyUp={() => {
+          _zSetLastActionMillis();
+        }}
+        onMouseMove={() => {
+          _zSetLastActionMillis();
+        }}
+        style={{ width: "100%", height: 0 }}
+      />
+
+      <LoginScreenModalComponent
+        modalVisible={zShowLoginScreen && !zModalVisible}
+      />
       <View
         style={{
-          flex: 1,
-          flexDirection: "row",
-          justifyContent: "space-around",
+          width: "65%",
+          backgroundColor: Colors.mainBackground,
+          height: "100%",
         }}
       >
-        <LoginScreenModalComponent
-          modalVisible={zShowLoginScreen && !zModalVisible}
-        />
         <View
           style={{
-            width: "65%",
-            backgroundColor: Colors.mainBackground,
-            height: "100%",
+            width: "100%",
+            height: "65%",
+            flexDirection: "row",
+            justifyContent: "flex-start",
           }}
         >
           <View
             style={{
-              width: "100%",
-              height: dim.windowHeight * 0.65,
-              flexDirection: "row",
-              justifyContent: "flex-start",
+              width: "33%",
+              // height: "40%",
+              // backgro
             }}
           >
-            <View
-              style={{
-                width: "33%",
-                // height: "40%",
-                // backgro
-              }}
-            >
-              <Info_Section />
-            </View>
-            <View
-              style={{
-                width: "66%",
-                height: "100%",
-                backgroundColor: Colors.opacityBackgroundLight,
-                // backgroundColor: "red",
-                ...SHADOW_RADIUS_PROTO,
-              }}
-            >
-              <Items_Section />
-            </View>
+            <Info_Section />
           </View>
           <View
             style={{
-              width: "100%",
-              height: dim.windowHeight * 0.35,
+              width: "66%",
+              height: "100%",
+              backgroundColor: Colors.opacityBackgroundLight,
+              // backgroundColor: "red",
+              ...SHADOW_RADIUS_PROTO,
             }}
           >
-            <Notes_Section />
+            <Items_Section />
           </View>
         </View>
         <View
           style={{
-            width: "35%",
-            height: dim.windowHeight,
-            backgroundColor: Colors.opacityBackgroundLight,
+            width: "100%",
+            height: "35%",
           }}
         >
-          <Options_Section />
+          <Notes_Section />
         </View>
       </View>
-    </div>
+      <View
+        style={{
+          width: "35%",
+          height: "100%",
+          backgroundColor: Colors.opacityBackgroundLight,
+        }}
+      >
+        <Options_Section />
+      </View>
+    </View>
   );
 }

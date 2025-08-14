@@ -126,7 +126,7 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   itemsTabName: TAB_NAMES.itemsTab.empty,
-  optionsTabName: TAB_NAMES.optionsTab.inventory,
+  optionsTabName: TAB_NAMES.optionsTab.quickItems,
   infoTabName: TAB_NAMES.infoTab.customer,
 
   getItemsTabName: () => get().itemsTabName,
@@ -329,23 +329,31 @@ export const useOpenWorkordersStore = create((set, get) => ({
   getWorkorderArr: () => get().workorderArr,
 
   setWorkorderObj: (wo, saveToDB = true) => {
+    // clog("setting", wo);
     if (wo == null) {
-      // log("doing this");
       set((state) => ({ openWorkorderObj: null }));
       return;
     }
 
-    let openWorkorderIdx = get().workorderArr.findIndex((o) => o.id == wo?.id);
-    // log("open idx", openWorkorderIdx?.toString() || "null");
-    if (openWorkorderIdx) {
-      set((state) => ({
-        workorderArr: changeItem(get().workorderArr, wo),
-      }));
-      dbSetOpenWorkorderItem(wo);
-    } else {
-      // standalone sale
+    if (wo.isStandaloneSale) {
       set((state) => ({ openWorkorderObj: wo }));
+      return;
     }
+
+    let openWorkorderIdx = get().workorderArr.findIndex((o) => o.id == wo?.id);
+    let workorderArr = cloneDeep(get().workorderArr);
+    if (openWorkorderIdx >= 0) {
+      // log("here 1");
+      workorderArr[openWorkorderIdx] = wo;
+      if (saveToDB && !wo.isStandaloneSale) dbSetOpenWorkorderItem(wo);
+    } else {
+      workorderArr.push(wo);
+    }
+
+    set((state) => ({
+      workorderArr,
+      openWorkorderObj: wo,
+    }));
   },
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
 

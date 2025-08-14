@@ -123,34 +123,41 @@ export function WorkordersComponent({}) {
   return (
     <View
       style={{
-        // flex: 1,
-        height: dim.windowHeight * 0.96,
+        flex: 1,
       }}
     >
-      <CheckBox
-        isChecked={sAllowPreview}
-        onCheck={() => _setAllowPreview(!sAllowPreview)}
-        viewStyle={{ alignSelf: "flex-end" }}
-        text={"Preview On"}
-        buttonStyle={{
-          width: 15,
-          height: 15,
-          marginRight: 20,
-          borderWidth: 1,
-          borderColor: "dimgray",
+      <View
+        style={{
+          height: "4%",
+          // backgroundColor: "blue",
+          paddingVertical: 5,
+          justifyContent: "flex-end",
+          flexDirection: "row",
+          alignItems: "center",
         }}
-        outerButtonStyle={{}}
-        textStyle={{ color: "lightgray", marginRight: 10 }}
-      />
+      >
+        <CheckBox
+          isChecked={sAllowPreview}
+          onCheck={() => _setAllowPreview(!sAllowPreview)}
+          viewStyle={{ alignSelf: "flex-end" }}
+          text={"Preview On"}
+          buttonStyle={{
+            width: 15,
+            height: 15,
+            marginRight: 20,
+            borderWidth: 1,
+            borderColor: "transparent",
+          }}
+          outerButtonStyle={{}}
+          textStyle={{ color: "dimgray", marginRight: 10 }}
+        />
+      </View>
       <FlatList
+        style={{ width: "100%", height: "96%", backgroundColor: null }}
         data={zOpenWorkordersArr}
         keyExtractor={(item, index) => index}
         renderItem={(item) => {
           let workorder = item.item;
-          // let backgroundColor = item.item.backgroundColor;
-          // item = item.item;
-          // clog("item", workorder);
-
           return (
             <RowItemComponent
               ssAllowPreview={sAllowPreview}

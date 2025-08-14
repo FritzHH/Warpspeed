@@ -2314,8 +2314,8 @@ export const TabMenuButton = ({
         width: null,
         paddingVertical: 5,
         ...SHADOW_RADIUS_NOTHING,
-        borderRadius: 0,
         ...buttonStyle,
+        borderRadius: 0,
       }}
     />
   );

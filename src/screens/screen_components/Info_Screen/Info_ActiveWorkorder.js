@@ -80,7 +80,6 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowCustomerInfoModal, _setShowCustomerInfoModal] =
     React.useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = React.useState(null);
-  // const [sWaitTimeSelected] = React.useState(zWorkorderObj.waitTime)
 
   const bikesRef = useRef();
   const ebikeRef = useRef();
@@ -91,23 +90,8 @@ export const ActiveWorkorderComponent = ({}) => {
   const partSourcesRef = useRef();
   const statusRef = useRef();
 
-  // useRef(() => {
-  //   if (zWorkorderObj.waitTime) return
-
-  // }, [zWorkorderObj])
-
   ///////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
-  // function setWorkorderObj(obj) {
-  //   _zSetWorkorderObj(obj);
-  //   dbSetOpenWorkorderItem(obj);
-  // }
-
-  function setCustomerObj(obj) {
-    _zSetCustomerObj(obj);
-    dbSetCustomerObj(obj);
-    // });
-  }
 
   function setBikeColor(incomingColorVal, fieldName) {
     let foundColor = false;
@@ -161,7 +145,7 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleNewWorkorderPress() {
-    _zSetWorkorder(null);
+    null;
     _zSetCustomerObj(null);
     _zSetInfoTabName(TAB_NAMES.infoTab.customer);
   }
@@ -316,7 +300,10 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     itemViewStyle={{ backgroundColor: "gray" }}
                     itemTextStyle={{ fontSize: 14, color: "black" }}
-                    buttonStyle={dropdownButtonStyle}
+                    buttonStyle={{
+                      ...dropdownButtonStyle,
+                      backgroundColor: zWorkorderObj.brand ? null : "red",
+                    }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={bikesRef}
                     buttonText={zSettingsObj.bikeBrandsName}
@@ -339,7 +326,10 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     itemViewStyle={{ backgroundColor: "gray" }}
                     itemTextStyle={{ fontSize: 14, color: "black" }}
-                    buttonStyle={dropdownButtonStyle}
+                    buttonStyle={{
+                      ...dropdownButtonStyle,
+                      backgroundColor: zWorkorderObj.brand ? null : "red",
+                    }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={ebikeRef}
                     buttonText={zSettingsObj.bikeOptionalBrandsName}
@@ -465,10 +455,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     itemTextStyle={{ fontSize: 14 }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      backgroundColor:
-                        zWorkorderObj.color1 || zWorkorderObj.color2
-                          ? null
-                          : "red",
+                      backgroundColor: zWorkorderObj.color1.label
+                        ? null
+                        : "red",
                     }}
                     ref={color1Ref}
                     buttonText={"Color 1"}

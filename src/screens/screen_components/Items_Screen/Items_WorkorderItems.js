@@ -47,8 +47,6 @@ export const Items_WorkorderItemsTab = ({}) => {
   );
 
   // store getters ///////////////////////////////////////////////////////////////
-  // let zWorkorderObj = WORKORDER_PROTO;
-  // let zSettingsObj = SETTINGS_OBJ;
 
   const zWorkorderObj = useOpenWorkordersStore((state) =>
     state.getWorkorderObj()
@@ -99,7 +97,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // make sure the previous session discount object prices are up to date with inventory changes
   useEffect(() => {
-    if (!zWorkorderObj?.workorderLines) return;
+    if (!zWorkorderObj?.workorderLines?.length > 0) return;
     let wo = calculateLineItems();
     _zSetWorkorderObj(wo);
     if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
@@ -234,7 +232,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
   }
 
-  // clog("wo", zWorkorderObj.workorderLines);
+  clog("wo", zWorkorderObj);
   function setComponent() {
     return (
       <View

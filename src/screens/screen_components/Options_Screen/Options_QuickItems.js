@@ -1,11 +1,12 @@
 /*eslint-disable*/
 import React, { useEffect, useRef, useState } from "react";
-import { View, FlatList, TextInput } from "react-native-web";
+import { View, FlatList, TextInput, Text } from "react-native-web";
 import {
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   WORKORDER_PROTO,
   SETTINGS_OBJ,
+  TAB_NAMES,
 } from "../../../data";
 import { Colors } from "../../../styles";
 
@@ -21,6 +22,8 @@ import {
   InventoryItemScreeenModalComponent,
   ScreenModal,
   SHADOW_RADIUS_NOTHING,
+  TabMenuButton,
+  TabMenuDivider,
 } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
@@ -28,6 +31,7 @@ import {
   useOpenWorkordersStore,
   useInventoryStore,
   useLoginStore,
+  useTabNamesStore,
 } from "../../../stores";
 import {
   dbSetOpenWorkorderItem,
@@ -36,7 +40,7 @@ import {
 
 const SEARCH_STRING_TIMER = 45 * 1000;
 
-export function QuickItemComponent({}) {
+export function QuickItemComponent({ __screenHeight }) {
   // store setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
@@ -51,6 +55,9 @@ export function QuickItemComponent({}) {
   );
   const _zExecute = useLoginStore((state) => state.execute);
   const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
+  const _zSetOptionsTabName = useTabNamesStore(
+    (state) => state.setOptionsTabName
+  );
 
   // store getters //////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
@@ -58,12 +65,16 @@ export function QuickItemComponent({}) {
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zOptionsTabName = useTabNamesStore((state) =>
+    state.getOptionsTabName()
+  );
 
   ///////////////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sModalInventoryObj, _setModalInventoryObj] = React.useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
+  const [sNewItemObj, _setNewItemObject] = useState(null);
 
   useEffect(() => {
     let arr = [];
@@ -158,6 +169,26 @@ export function QuickItemComponent({}) {
     _setSearchResults(arr);
   }
 
+  function inventoryItemSelected(item) {
+    log(item);
+    let idx = zInventoryArr.findIndex((o) => o.id == item.id);
+
+    // return;
+    if (!zWorkorderObj?.id) {
+      _setModalInventoryObjIdx(idx);
+      return;
+    }
+
+    let wo = cloneDeep(zWorkorderObj);
+    if (!wo.workorderLines) wo.workorderLines = [];
+    // log("item", item);
+    let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
+    lineItem.invItemID = item.id;
+    lineItem.id = generateRandomID();
+    wo.workorderLines.push(lineItem);
+    _zSetWorkorderObj(wo);
+  }
+
   function clearSearch() {
     _setSearchResults([]);
     _setSearchTerm("");
@@ -166,22 +197,35 @@ export function QuickItemComponent({}) {
   //////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////
   // log("refs", randomWordGenerator());
+  // log("h", __screenHeight);
+  // log(Math.round(__screenHeight * 0.03) + Math.round(__screenHeight * 0.97));
+  let height1 = Math.round(__screenHeight * 0.03);
+  let height2 = Math.round(__screenHeight * 0.97);
+
   return (
-    <View style={{ width: "100%", height: "95%" }}>
+    <View
+      style={{
+        // width: "100%",
+        backgroundColor: null,
+        // height: __screenHeight,
+        flex: 1,
+      }}
+    >
       <View
         style={{
           // width: "100%",
-          marginTop: 20,
+          height: "5%",
+          // marginTop: 20,
           flexDirection: "row",
           marginHorizontal: 4,
-          // marginTop: 10,
+          alignItems: "center",
         }}
       >
         <Button
           onPress={() => clearSearch()}
           text={"reset"}
-          textStyle={{ color: "darkgray" }}
-          buttonStyle={{ height: 35 }}
+          textStyle={{ color: "darkgray", fontSize: 14 }}
+          buttonStyle={{ height: 30 }}
         />
         <TextInput
           style={{
@@ -199,20 +243,32 @@ export function QuickItemComponent({}) {
           value={sSearchTerm}
           onChangeText={(val) => search(val)}
         />
+        <Button
+          buttonStyle={{ width: null }}
+          text={"+"}
+          onPress={() => {
+            _setModalInventoryObjIdx(-1);
+            _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
+          }}
+        />
       </View>
       <View
         style={{
           width: "100%",
           flexDirection: "row",
-          paddingTop: 15,
+          paddingTop: 10,
           justifyContent: "flex-start",
+          height: "95%",
+          // backgroundColor: "green",
         }}
       >
         {/**Quick items buttons vertical list */}
         <FlatList
           style={{
+            width: "25%",
             marginLeft: 5,
             // backgroundColor: "green",
+            height: "100%",
           }}
           data={zSettingsObj.quickItemButtonNames}
           keyExtractor={(item, index) => index.toString()}
@@ -234,83 +290,138 @@ export function QuickItemComponent({}) {
             );
           }}
         />
-        <FlatList
+
+        <View
           style={{
-            marginRight: 25,
-            marginLeft: 5,
-            width: "70%",
-            // backgroundColor: "green",
+            height: "95%",
+            width: "75%",
+            paddingTop: 10,
+            paddingLeft: 3,
+            paddingRight: 3,
           }}
-          data={sSearchResults}
-          keyExtractor={(item, idx) => idx}
-          renderItem={(item) => {
-            // log("item", item.item);
-            item = item.item;
-            return (
+        >
+          <FlatList
+            style={{
+              width: "100%",
+              height: "100%",
+            }}
+            data={sSearchResults}
+            ItemSeparatorComponent={() => (
               <View
                 style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  borderBottomWidth: 1,
-                  borderColor: Colors.opacityBackgoundDark,
+                  width: "100%",
+                  backgroundColor: "gray",
+                  height: 1,
+                  // marginVertical: 1,
                 }}
-              >
-                <View style={{ width: "75%" }}>
-                  <Button
-                    onPress={() =>
-                      _zExecute(
-                        () => handleSearchItemSelected(item),
-                        _zSetLoginFunctionCallback,
-                        _zSetShowLoginScreen
-                      )
-                    }
-                    numLines={2}
-                    text={item.informalName || item.formalName}
-                    shadow={false}
-                    textStyle={{
-                      width: "100%",
-                      fontSize: 15,
-                    }}
-                    buttonStyle={{ width: "100%" }}
-                  />
-                </View>
-
+              />
+            )}
+            renderItem={(item) => {
+              // if (!item.item) return null;
+              let itemIndex = item.index;
+              item = item.item;
+              // log("item", item);
+              return (
                 <View
                   style={{
+                    // backgroundColor: "green",
                     flexDirection: "row",
+                    width: "100%",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    width: "15%",
                   }}
                 >
-                  {/**Information full screen inventory modal */}
-                  <ScreenModal
-                    buttonLabel={"i"}
-                    handleButtonPress={() => {
-                      _setModalInventoryObjIdx(
-                        zInventoryArr.findIndex((o) => o.id == item.id)
-                      );
-                      _setModalInventoryObj(item);
-                    }}
-                    modalStyle={{ width: "40%", alignSelf: "flex-end" }}
-                    buttonStyle={{}}
-                    showShadow={false}
-                    textStyle={{ fontSize: 14 }}
-                    showOuterModal={true}
-                    modalVisible={sModalInventoryObj === item}
-                    outerModalStyle={{
-                      backgroundColor: "rgba(50,50,50,.5)",
-                    }}
-                    handleOuterClick={() => _setModalInventoryObj(null)}
-                    Component={() => (
-                      <InventoryItemScreeenModalComponent
-                        handleClosePress={() => _setModalInventoryObj(null)}
-                        itemIdx={sModalInventoryObjIdx}
-                      />
+                  <Button
+                    onPress={() => inventoryItemSelected(item)}
+                    shadow={false}
+                    // mouseOverOptions={{ opacity: 1 }}
+                    buttonStyle={{ backgroundColor: "transparent" }}
+                    viewStyle={{ width: "100%" }}
+                    TextComponent={() => (
+                      <View
+                        style={{
+                          width: "100%",
+                          flexDirection: "row",
+                          // backgroundColor: "blue",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        {zWorkorderObj?.id ? (
+                          <Button
+                            mouseOverOptions={{ highlightColor: "red" }}
+                            buttonStyle={{
+                              backgroundColor: "transparent",
+                              // width: "8%",
+                            }}
+                            text={"i"}
+                            onPress={() => inventoryItemSelected(item)}
+
+                            // onPress={() => {
+                            //   _setModalInventoryObjIdx(-1);
+                            //   // _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
+                            // }}
+                          />
+                        ) : null}
+                        <Text
+                          style={{ width: "85%", fontSize: 14, marginLeft: 20 }}
+                        >
+                          {item.informalName || item.formalName}
+                          {item.informalName ? (
+                            <Text style={{ fontSize: 12, color: "gray" }}>
+                              {"\n" + item.formalName}
+                            </Text>
+                          ) : null}
+                        </Text>
+                        <View
+                          style={{
+                            borderLeftWidth: 1,
+                            borderColor: "gray",
+                            paddingLeft: 5,
+                            width: "10%",
+                            alignItems: "flex-end",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              color: "dimgray",
+                              // width: "100%",
+                            }}
+                          >
+                            {"$ "}
+                            <Text style={{ fontSize: 14, color: null }}>
+                              {item.price}
+                            </Text>
+                          </Text>
+                        </View>
+                      </View>
                     )}
                   />
                 </View>
-              </View>
+              );
+            }}
+          />
+        </View>
+        <ScreenModal
+          buttonVisible={false}
+          handleOuterClick={() => {
+            // log("screen modal clicked");
+            _setModalInventoryObjIdx(null);
+            _setNewItemObject(null);
+          }}
+          modalVisible={sModalInventoryObjIdx}
+          textStyle={{ fontSize: 14 }}
+          showOuterModal={true}
+          outerModalStyle={{
+            backgroundColor: "rgba(50,50,50,.5)",
+          }}
+          Component={() => {
+            return (
+              <InventoryItemScreeenModalComponent
+                itemIdx={sModalInventoryObjIdx}
+                handleClosePress={() => _setModalInventoryObjIdx(null)}
+              />
             );
           }}
         />
@@ -318,3 +429,68 @@ export function QuickItemComponent({}) {
     </View>
   );
 }
+
+// <View
+//   style={{
+//     flexDirection: "row",
+//     justifyContent: "space-between",
+//     borderBottomWidth: 1,
+//     borderColor: Colors.opacityBackgoundDark,
+//   }}
+// >
+//   <View style={{ width: "75%" }}>
+//     <Button
+//       onPress={() =>
+//         _zExecute(
+//           () => handleSearchItemSelected(item),
+//           _zSetLoginFunctionCallback,
+//           _zSetShowLoginScreen
+//         )
+//       }
+//       numLines={2}
+//       text={item.informalName || item.formalName}
+//       shadow={false}
+//       textStyle={{
+//         width: "100%",
+//         fontSize: 15,
+//       }}
+//       buttonStyle={{ width: "100%" }}
+//     />
+//   </View>
+
+//   <View
+//     style={{
+//       flexDirection: "row",
+//       justifyContent: "space-between",
+//       alignItems: "center",
+//       width: "15%",
+//     }}
+//   >
+//     {/**Information full screen inventory modal */}
+//     <ScreenModal
+//       buttonLabel={"i"}
+//       handleButtonPress={() => {
+//         _setModalInventoryObjIdx(
+//           zInventoryArr.findIndex((o) => o.id == item.id)
+//         );
+//         _setModalInventoryObj(item);
+//       }}
+//       modalStyle={{ width: "40%", alignSelf: "flex-end" }}
+//       buttonStyle={{}}
+//       showShadow={false}
+//       textStyle={{ fontSize: 14 }}
+//       showOuterModal={true}
+//       modalVisible={sModalInventoryObj === item}
+//       outerModalStyle={{
+//         backgroundColor: "rgba(50,50,50,.5)",
+//       }}
+//       handleOuterClick={() => _setModalInventoryObj(null)}
+//       Component={() => (
+//         <InventoryItemScreeenModalComponent
+//           handleClosePress={() => _setModalInventoryObj(null)}
+//           itemIdx={sModalInventoryObjIdx}
+//         />
+//       )}
+//     />
+//   </View>
+// </View>

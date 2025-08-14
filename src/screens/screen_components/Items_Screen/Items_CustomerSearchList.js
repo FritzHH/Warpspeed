@@ -64,6 +64,8 @@ export function CustomerSearchListComponent({}) {
   const [sCustomerInfoObj, _setCustomerInfoObj] = useState(null);
 
   function handleCustomerSelected(customerObj) {
+    // log("here");
+    // log("cust", customerObj);
     _zSetCurrentCustomer(customerObj);
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.customerID = customerObj.id;
@@ -75,13 +77,13 @@ export function CustomerSearchListComponent({}) {
     wo.customerPhone = customerObj.cell || customerObj.landline;
     wo.id = generateRandomID();
     wo.status = SETTINGS_OBJ.statuses[0];
-    _zSetOpenWorkorder(wo);
+    _zSetOpenWorkorder(wo, false);
     _zSetCurrentCustomer(customerObj);
-    messagesSubscribe(
-      customerObj.id,
-      _zSetIncomingMessage,
-      _zSetOutgoingMessage
-    );
+    // messagesSubscribe(
+    //   customerObj.id,
+    //   _zSetIncomingMessage,
+    //   _zSetOutgoingMessage
+    // );
     _zSetSearchSelectedItem(null);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);

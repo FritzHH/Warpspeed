@@ -2238,6 +2238,15 @@ export const Button = ({
     }
   }
 
+  function getBackgroundColor() {
+    if (sMouseOver) {
+      return mouseOverOptions.highlightColor;
+    } else {
+      if (buttonStyle.backgroundColor) return buttonStyle.backgroundColor;
+      return Colors.tabMenuButton;
+    }
+  }
+
   return (
     <TouchableOpacity
       style={{ ...viewStyle }}
@@ -2246,6 +2255,7 @@ export const Button = ({
       onMouseLeave={() => {
         _setMouseOver(false);
       }}
+      // on={() => log("here")}
       onPress={handleButtonPress}
       onLongPress={visible ? onLongPress : () => {}}
     >
@@ -2255,12 +2265,9 @@ export const Button = ({
           justifyContent: "center",
           paddingHorizontal: 12,
           paddingVertical: 5,
-          backgroundColor: Colors.tabMenuButton,
           ...shadowStyle,
           ...buttonStyle,
-          backgroundColor: sMouseOver
-            ? mouseOverOptions.highlightColor
-            : buttonStyle.backgroundColor || Colors.tabMenuButton,
+          backgroundColor: getBackgroundColor(),
           opacity: sMouseOver ? mouseOverOptions.opacity : buttonStyle.opacity,
         }}
       >

@@ -75,6 +75,8 @@ export function QuickItemComponent({ __screenHeight }) {
   const [sModalInventoryObj, _setModalInventoryObj] = React.useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
   const [sNewItemObj, _setNewItemObject] = useState(null);
+  const [sLineItemBackgroundColor, _setLineItemBackgroundColor] =
+    useState("transparent");
 
   useEffect(() => {
     let arr = [];
@@ -169,13 +171,13 @@ export function QuickItemComponent({ __screenHeight }) {
     _setSearchResults(arr);
   }
 
-  function inventoryItemSelected(item) {
-    log(item);
+  function inventoryItemSelected(item, buttonName) {
     let idx = zInventoryArr.findIndex((o) => o.id == item.id);
 
     // return;
-    if (!zWorkorderObj?.id) {
+    if (!zWorkorderObj?.id || buttonName == "info") {
       _setModalInventoryObjIdx(idx);
+      // _setModalInventoryObjIdx(null);
       return;
     }
 
@@ -206,18 +208,18 @@ export function QuickItemComponent({ __screenHeight }) {
     <View
       style={{
         // width: "100%",
-        backgroundColor: null,
+        // backgroundColor: "blue",
         // height: __screenHeight,
         flex: 1,
       }}
     >
       <View
         style={{
-          // width: "100%",
+          width: "100%",
           height: "5%",
           // marginTop: 20,
           flexDirection: "row",
-          marginHorizontal: 4,
+          paddingHorizontal: 4,
           alignItems: "center",
         }}
       >
@@ -263,56 +265,56 @@ export function QuickItemComponent({ __screenHeight }) {
         }}
       >
         {/**Quick items buttons vertical list */}
-        <FlatList
+        <View
           style={{
-            width: "25%",
-            marginLeft: 5,
-            // backgroundColor: "green",
-            height: "100%",
+            justifyContent: "space-between",
+            width: "15%",
+            borderRightWidth: 1,
+            borderColor: "gray",
+            paddingHorizontal: 1,
+            paddingBottom: 20,
+            // paddingLeft: 2,
           }}
-          data={zSettingsObj.quickItemButtonNames}
-          keyExtractor={(item, index) => index.toString()}
-          renderItem={(item) => {
-            let index = item.index;
-            item = item.item;
-            // log(item);
-            if (!item) return null;
-            return (
-              <Button
-                onPress={() => handleQuickButtonPress(item)}
-                buttonStyle={{
-                  ...SHADOW_RADIUS_NOTHING,
-                  borderBottomWidth: 1,
-                  borderColor: "darkgray",
-                }}
-                text={item.name}
-              />
-            );
-          }}
-        />
+        >
+          {zSettingsObj?.quickItemButtonNames?.map((item) => (
+            <Button
+              onPress={() => handleQuickButtonPress(item)}
+              // numLines={2}
+              buttonStyle={{
+                ...SHADOW_RADIUS_NOTHING,
+                borderBottomWidth: 1,
+                borderColor: "darkgray",
+                paddingHorizontal: 3,
+              }}
+              textStyle={{ fontSize: 16 }}
+              text={item.name}
+            />
+          ))}
+        </View>
 
         <View
           style={{
-            height: "95%",
-            width: "75%",
+            height: "100%",
+            width: "85%",
             paddingTop: 10,
             paddingLeft: 3,
             paddingRight: 3,
+            // backgroundColor: "green",
           }}
         >
           <FlatList
             style={{
               width: "100%",
               height: "100%",
+              // backgroundColor: "green",
             }}
-            data={sSearchResults}
+            data={[...sSearchResults]}
             ItemSeparatorComponent={() => (
               <View
                 style={{
                   width: "100%",
                   backgroundColor: "gray",
                   height: 1,
-                  // marginVertical: 1,
                 }}
               />
             )}
@@ -327,7 +329,8 @@ export function QuickItemComponent({ __screenHeight }) {
                     // backgroundColor: "green",
                     flexDirection: "row",
                     width: "100%",
-                    justifyContent: "space-between",
+                    // height: "100%",
+                    justifyContent: "flex-start",
                     alignItems: "center",
                   }}
                 >
@@ -335,7 +338,12 @@ export function QuickItemComponent({ __screenHeight }) {
                     onPress={() => inventoryItemSelected(item)}
                     shadow={false}
                     // mouseOverOptions={{ opacity: 1 }}
-                    buttonStyle={{ backgroundColor: "transparent" }}
+                    buttonStyle={{
+                      backgroundColor: "transparent",
+                      paddingLeft: 0,
+                      paddingRight: 4,
+                      // backgroundColor: "blue",
+                    }}
                     viewStyle={{ width: "100%" }}
                     TextComponent={() => (
                       <View
@@ -345,26 +353,17 @@ export function QuickItemComponent({ __screenHeight }) {
                           // backgroundColor: "blue",
                           justifyContent: "space-between",
                           alignItems: "center",
+                          // justifyContent: "flex-start",
                         }}
                       >
-                        {zWorkorderObj?.id ? (
-                          <Button
-                            mouseOverOptions={{ highlightColor: "red" }}
-                            buttonStyle={{
-                              backgroundColor: "transparent",
-                              // width: "8%",
-                            }}
-                            text={"i"}
-                            onPress={() => inventoryItemSelected(item)}
-
-                            // onPress={() => {
-                            //   _setModalInventoryObjIdx(-1);
-                            //   // _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
-                            // }}
-                          />
-                        ) : null}
                         <Text
-                          style={{ width: "85%", fontSize: 14, marginLeft: 20 }}
+                          style={{
+                            width: "100%",
+                            fontSize: 14,
+                            paddingLeft: 7,
+                            // backgroundColor: "blue",
+                            // textAlign: "left",
+                          }}
                         >
                           {item.informalName || item.formalName}
                           {item.informalName ? (
@@ -373,12 +372,28 @@ export function QuickItemComponent({ __screenHeight }) {
                             </Text>
                           ) : null}
                         </Text>
+                        {!zWorkorderObj?.id ? (
+                          <Button
+                            mouseOverOptions={{ highlightColor: "red" }}
+                            buttonStyle={{
+                              backgroundColor: "transparent",
+                              // paddingLeft: 0,
+                              paddingHorizontal: 8,
+                              // width: "8%",
+                            }}
+                            text={"i"}
+                            onPress={() => {
+                              _setLineItemBackgroundColor("transparent");
+                              inventoryItemSelected(item, "info");
+                            }}
+                          />
+                        ) : null}
                         <View
                           style={{
-                            borderLeftWidth: 1,
-                            borderColor: "gray",
-                            paddingLeft: 5,
-                            width: "10%",
+                            // borderLeftWidth: 1,
+                            // borderColor: "gray",
+                            paddingLeft: 0,
+                            width: "12%",
                             alignItems: "flex-end",
                           }}
                         >

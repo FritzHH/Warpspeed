@@ -10,7 +10,26 @@ export function EmptyItemsComponent() {
         justifyContent: "center",
       }}
     >
-      <Text style={{ fontSize: 50, color: "gray" }}>Empty</Text>
+      <Text
+        style={{
+          textAlign: "center",
+          width: "100%",
+          fontSize: 50,
+          color: "gray",
+        }}
+      >
+        {"Warpspeed\n"}
+        <Text
+          style={{
+            textAlign: "center",
+            width: "100%",
+            fontSize: 20,
+            color: "gray",
+          }}
+        >
+          By HelioSoft
+        </Text>
+      </Text>
     </View>
   );
 }

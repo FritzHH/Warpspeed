@@ -267,13 +267,15 @@ export function QuickItemComponent({ __screenHeight }) {
         {/**Quick items buttons vertical list */}
         <View
           style={{
-            justifyContent: "space-between",
+            justifyContent: "space-around",
+            // backgroundColor: "red",
             width: "15%",
             borderRightWidth: 1,
             borderColor: "gray",
             paddingHorizontal: 1,
             paddingBottom: 20,
-            // paddingLeft: 2,
+            // height: "50%",
+            // maxHeight: "100%",
           }}
         >
           {zSettingsObj?.quickItemButtonNames?.map((item) => (
@@ -285,6 +287,8 @@ export function QuickItemComponent({ __screenHeight }) {
                 borderBottomWidth: 1,
                 borderColor: "darkgray",
                 paddingHorizontal: 3,
+                // height: 100,
+                // marginVertical: 30,
               }}
               textStyle={{ fontSize: 16 }}
               text={item.name}

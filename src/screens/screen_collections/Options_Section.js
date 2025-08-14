@@ -129,7 +129,7 @@ export const TabBar = ({
       }
     />
     <Divider />
-    <TabMenuButton
+    {/* <TabMenuButton
       // height={height}
       onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory)}
       text={TAB_NAMES.optionsTab.inventory}
@@ -146,7 +146,7 @@ export const TabBar = ({
         zOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
       }
     />
-    <Divider />
+    <Divider /> */}
     <TabMenuButton
       // height={height}
       onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}

@@ -214,6 +214,7 @@ export function NewWorkorderComponent({}) {
     wo.isStandaloneSale = true;
     wo.id = generateRandomID();
     wo.startedBy = zCurrentUser.id;
+    wo.startedOnMillis = new Date().getTime();
 
     _zSetOpenWorkorder(wo, false);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
@@ -238,9 +239,10 @@ export function NewWorkorderComponent({}) {
     newCustomerObj.dateCreated = new Date().getTime();
     newCustomerObj.workorders.push(newWorkorder.id);
 
-    // next create empty workorder for next screen
+    // next create new empty workorder for automatic population of next screen
     let newWorkorder = cloneDeep(WORKORDER_PROTO);
     newWorkorder.id = generateRandomID();
+    newWorkorder.startedOnMillis = new Date().getTime();
     newWorkorder.customerFirst = sCustomerInfoObj.first;
     newWorkorder.customerLast = sCustomerInfoObj.last;
     newWorkorder.customerPhone =

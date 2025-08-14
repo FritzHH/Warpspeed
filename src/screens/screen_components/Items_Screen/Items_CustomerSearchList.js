@@ -76,6 +76,7 @@ export function CustomerSearchListComponent({}) {
     wo.customerLast = customerObj.last;
     wo.customerPhone = customerObj.cell || customerObj.landline;
     wo.id = generateRandomID();
+    wo.startedOnMillis = new Date().getTime();
     wo.status = SETTINGS_OBJ.statuses[0];
     _zSetOpenWorkorder(wo, false);
     _zSetCurrentCustomer(customerObj);

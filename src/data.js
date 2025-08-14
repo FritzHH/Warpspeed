@@ -92,21 +92,18 @@ export const NONREMOVABLE_STATUSES = [
     textColor: "white",
     backgroundColor: "red",
     removable: false,
-    order: 1,
   },
   {
     textColor: "black",
     backgroundColor: "lightgray",
     label: "Service",
     removable: false,
-    order: 2,
   },
   {
     textColor: "white",
     backgroundColor: "green",
     label: "Finished",
     removable: false,
-    order: 3,
   },
 ];
 
@@ -118,21 +115,15 @@ export const WAIT_TIME_INCREMENTS = {
 export const NONREMOVABLE_WAIT_TIMES = [
   {
     label: "Waiting",
-    min: 1,
-    max: 1,
-    waitTimeValue: WAIT_TIME_INCREMENTS.day,
+    maxWaitTimeDays: 0,
   },
   {
     label: "Today",
-    min: 1,
-    max: 1,
-    waitTimeValue: WAIT_TIME_INCREMENTS.day,
+    maxWaitTimeDays: 0,
   },
   {
     label: "Tomorrow",
-    min: 1,
-    max: 2,
-    waitTimeValue: WAIT_TIME_INCREMENTS.day,
+    maxWaitTimeDays: 1,
   },
 ];
 
@@ -260,6 +251,7 @@ export const WORKORDER_PROTO = {
   waitTime: "",
   changeLog: [],
   startedBy: "",
+  startedOnMillis: "",
   partOrdered: "",
   partSource: "",
   itemIdArr: [],
@@ -320,13 +312,6 @@ export const INVENTORY_ITEM_PROTO = {
   cost: "",
 };
 
-export const WAIT_TIME_PROTO = {
-  label: "",
-  time1: "",
-  time2: "",
-  waitTimeValue: "",
-};
-
 export const MENU_BUTTON_PROTO = {
   type: "",
   name: "",
@@ -342,22 +327,18 @@ export const SETTINGS_OBJ = {
       backgroundColor: "orange",
       label: "Order Part for Customer",
       removable: true,
-      order: 4,
     },
     {
       textColor: "white",
       backgroundColor: "orange",
       label: "Part Ordered",
       removable: true,
-      order: 5,
     },
     {
       textColor: "white",
       backgroundColor: "blue",
       label: "Messaging Customer",
       removable: true,
-
-      order: 6,
     },
   ],
   statusGroups: [
@@ -512,41 +493,58 @@ export const SETTINGS_OBJ = {
     ...NONREMOVABLE_WAIT_TIMES,
     {
       label: "1-2 Days",
-      min: 1,
-      max: 2,
-      waitTimeValue: WAIT_TIME_INCREMENTS.day,
+      maxWaitTimeDays: 2,
     },
     {
       label: "2-3 Days",
-      min: 2,
-      max: 3,
-      waitTimeValue: WAIT_TIME_INCREMENTS.day,
+      maxWaitTimeDays: 3,
     },
     {
       label: "3-5 Days",
-      min: 3,
-      max: 5,
-      waitTimeValue: WAIT_TIME_INCREMENTS.day,
+      maxWaitTimeDays: 5,
     },
     {
       label: "1 Week",
-      min: 1,
-      max: 1,
-      waitTimeValue: WAIT_TIME_INCREMENTS.day,
+      maxWaitTimeDays: 7,
     },
     {
       label: "1-2 Weeks",
-      min: 1,
-      max: 2,
-      waitTimeValue: WAIT_TIME_INCREMENTS.week,
+      maxWaitTimeDays: 14,
     },
     {
       label: "No Estimate",
-      min: null,
-      max: null,
-      waitTimeValue: WAIT_TIME_INCREMENTS.week,
     },
   ],
+  storeHours: {
+    monday: {
+      open: "10:00 AM",
+      close: "6:00 PM",
+    },
+    tuesday: {
+      open: "10:00 AM",
+      close: "6:00 PM",
+    },
+    wednesday: {
+      open: "10:00 AM",
+      close: "6:00 PM",
+    },
+    thursday: {
+      open: "10:00 AM",
+      close: "6:00 PM",
+    },
+    friday: {
+      open: "10:00 AM",
+      close: "6:00 PM",
+    },
+    saturday: {
+      open: "10:00 AM",
+      close: "6:00 PM",
+    },
+    sunday: {
+      open: "10:00 AM",
+      close: "6:00 PM",
+    },
+  },
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   loginTimeout: 15,

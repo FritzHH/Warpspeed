@@ -511,12 +511,13 @@ export const ActiveWorkorderComponent = ({}) => {
                 placeholderText={"Estimated Wait"}
                 style={{ width: "50%" }}
                 value={zWorkorderObj.waitTime?.label}
-                onTextChange={(val) => {
-                  let wo = cloneDeep(zWorkorderObj);
-                  wo.waitTime = val;
-                  _zSetWorkorderObj(wo);
-                  dbSetOpenWorkorderItem(wo);
-                }}
+                editable={false}
+                // onTextChange={(val) => {
+                // let wo = cloneDeep(zWorkorderObj);
+                // wo.waitTime = val;
+                // _zSetWorkorderObj(wo);
+                // dbSetOpenWorkorderItem(wo);
+                // }}
               />
               <View
                 style={{
@@ -690,9 +691,11 @@ const TextInputOnMainBackground = ({
   onTextChange,
   style = {},
   placeholderText,
+  editable = true,
 }) => {
   return (
     <TextInput
+      editable={editable}
       value={value}
       placeholder={placeholderText}
       placeholderTextColor={"lightgray"}

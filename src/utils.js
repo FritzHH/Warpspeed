@@ -323,6 +323,61 @@ export function searchCustomerNames(first, last, searchArr = [CUSTOMER_PROTO]) {
   return Object.values(res);
 }
 
+export function getWordDayOfWeek(millies, abbreviated) {
+  let date = new Date();
+  if (millies) date = new Date(millies);
+  let numDay = date.getDay();
+  switch (numDay) {
+    case 0:
+      if (abbreviated) return "Sun";
+      return "sunday";
+    case 1:
+      if (abbreviated) return "Mon";
+      return "monday";
+    case 2:
+      if (abbreviated) return "Tues";
+      return "tuesday";
+    case 3:
+      if (abbreviated) return "Weds";
+      return "wednesday";
+    case 4:
+      if (abbreviated) return "Thurs";
+      return "thursday";
+    case 5:
+      if (abbreviated) return "Fri";
+      return "friday";
+    case 6:
+      if (abbreviated) return "Sat";
+      return "saturday";
+  }
+}
+
+export function getWordMonth(millis) {
+  let date = new Date();
+  if (millis) date = new Date(millis);
+  let val = date.toLocaleDateString("en-US", { month: "short" });
+  return val;
+}
+
+export function convert12to24Hour(time12h) {
+  const [time, modifier] = time12h.split(" ");
+  let [hours, minutes] = time.split(":");
+
+  if (hours === "12") {
+    hours = "00"; // Handle midnight (12 AM)
+  }
+
+  if (modifier === "PM") {
+    hours = parseInt(hours, 10) + 12; // Add 12 for PM hours (except 12 PM)
+  }
+
+  // Ensure hours and minutes are always two digits
+  hours = String(hours).padStart(2, "0");
+  minutes = String(minutes).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
+}
+
 export function removeDashesFromPhone(num = "") {
   let split = num.split("-");
   let newVal = "";
@@ -470,4 +525,18 @@ export function combine2ArraysOrderByMillis(arr1, arr2) {
     if (a.millis <= b.millis) return -1;
   });
   return newArr;
+}
+
+export function getDisplayFormatDateTime(millis, includeYear) {
+  let wordDayOfWeek = getWordDayOfWeek(millis, true);
+  let dateObj = new Date(millis);
+  let dayOfMonth = dateObj.getDate();
+  let wordDayOfMonth = getWordMonth(millis);
+  let year = dateObj.getFullYear().toString();
+
+  let str = wordDayOfWeek + ", " + wordDayOfMonth + " " + dayOfMonth;
+  if (!includeYear) return str;
+
+  str = str + ` '` + year.substring(2, 4);
+  return str;
 }

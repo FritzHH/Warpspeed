@@ -18,7 +18,7 @@ export function EmptyItemsComponent() {
           color: "gray",
         }}
       >
-        {"Warpspeed\n"}
+        {"WarpSpeed\n"}
         <Text
           style={{
             textAlign: "center",
@@ -27,7 +27,7 @@ export function EmptyItemsComponent() {
             color: "gray",
           }}
         >
-          By HelioSoft
+          By Heliosoft
         </Text>
       </Text>
     </View>

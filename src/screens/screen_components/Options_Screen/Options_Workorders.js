@@ -74,14 +74,21 @@ export function WorkordersComponent({}) {
   useEffect(() => {
     let day = 86400000; // millis in day
     let hour = 3600000;
+
+    // let twodaysagoMillis = new Date(nowMillis - day * 2 + hour * 3).getTime();
+    // let onedayagomillis = new Date(nowMillis - day + hour * 3).getTime();
+    // let threedaysagoMillis = new Date(nowMillis - day * 3 + hour * 3).getTime();
+    // let fivedaysagoMillis = new Date(nowMillis - day * 5 + hour * 3).getTime();
+
+    // log("2", twodaysagoMillis);
+    // log("3", threedaysagoMillis);
+    // log("5", fivedaysagoMillis);
+
     const intervalId = setInterval(() => {
-      let todayWord = getWordDayOfWeek();
       let nowMillis = new Date().getTime();
+      let todayWord = getWordDayOfWeek();
       let tomorrowWord = getWordDayOfWeek(nowMillis + day);
-      let twodaysagoMillis = new Date(nowMillis - day * 2 + hour * 3);
-      let onedayagomillis = new Date(nowMillis - day + hour * 3);
-      let threedaysagoMillis = new Date(nowMillis - day * 3 + hour * 3);
-      let fivedaysagoMillis = new Date(nowMillis - day * 5 + hour * 3);
+      let nextDayWord = getWordDayOfWeek(nowMillis + day * 2);
 
       let colorsObj = cloneDeep(sDotColorObj);
       zOpenWorkordersArr.forEach((wo) => {
@@ -94,14 +101,17 @@ export function WorkordersComponent({}) {
 
         let maxWaitMillis = Number(wo.waitTime?.maxWaitTimeDays * day);
         // if (!maxWaitMillis ) return;
-        let dayEndWord = getWordDayOfWeek(startedOnMillis + maxWaitMillis);
+        let dayEndWord = maxWaitMillis
+          ? getWordDayOfWeek(startedOnMillis + maxWaitMillis)
+          : null;
 
-        // log("start day", getWordDayOfWeek(startedOnMillis));
-        // log("wait days", wo.waitTime.maxWaitTimeDays);
-        // log("day end", dayEndWord);
-
+        // if (wo.brand == "Cannondale") {
+        //   log("start day", getWordDayOfWeek(startedOnMillis));
+        //   log("wait days", wo.waitTime.maxWaitTimeDays);
+        //   log("day end", dayEndWord);
+        // }
         let color;
-        // log("label", wo.waitTime.label);
+
         if (wo.waitTime.label == "Waiting" || wo.waitTime.label == "Today") {
           if (colorsObj[wo.id] == "red") {
             color = null;
@@ -112,6 +122,8 @@ export function WorkordersComponent({}) {
           color = "red";
         } else if (dayEndWord == tomorrowWord) {
           color = "yellow";
+        } else if (dayEndWord == nextDayWord) {
+          color = "green";
         }
         colorsObj[wo.id] = color;
       });
@@ -148,19 +160,17 @@ export function WorkordersComponent({}) {
 
   function sortWorkorders(inputArr) {
     let finalArr = [];
-    zSettingsObj.statuses.forEach((status) => {
+    zSettingsObj?.statuses?.forEach((status) => {
       let arr = [];
-      zOpenWorkordersArr.forEach((wo) => {
+      inputArr.forEach((wo) => {
         if (wo.status.label == status.label) arr.push(wo);
       });
-      arr.sort((a, b) => a.startedOnMillis - b.startedOnMillis);
+      arr.sort((a, b) => a.startedOnMillis > b.startedOnMillis);
+      finalArr = [...finalArr, ...arr];
     });
+    return finalArr;
   }
 
-  // clog(zOpenWorkordersArr);
-  const [sLastHoverInsideMillis, _setLastHoverInsideMilles] = useState(
-    new Date().getTime() * 2
-  );
   return (
     <View
       style={{
@@ -201,7 +211,7 @@ export function WorkordersComponent({}) {
           backgroundColor: null,
           paddingHorizontal: 5,
         }}
-        data={zOpenWorkordersArr}
+        data={sortWorkorders(zOpenWorkordersArr)}
         keyExtractor={(item, index) => index}
         ItemSeparatorComponent={() => (
           <View style={{ height: 1, backgroundColor: "gray", width: "100%" }} />
@@ -242,7 +252,7 @@ export function WorkordersComponent({}) {
                     <Text style={{ marginRight: 10 }}>
                       {workorder.brand || "Brand"}
                     </Text>
-                    <Text>{workorder.description || "Descripion"}</Text>
+                    <Text>{workorder.description}</Text>
                   </View>
                   <View
                     style={{
@@ -271,24 +281,40 @@ export function WorkordersComponent({}) {
                         <Text style={{ fontSize: 14 }}>
                           {workorder.status.label}
                         </Text>
+                        <View style={{ width: 8 }} />
+                        <Text
+                          style={{
+                            color: "gray",
+                            fontSize: 12,
+                            width: 100,
+                            textAlign: "right",
+                          }}
+                        >
+                          {"Est: "}
+                          <Text
+                            style={{
+                              color: "black",
+                              fontSize: 13,
+                              fontStyle: "italic",
+                            }}
+                          >
+                            {workorder.waitTime.label}
+                          </Text>
+                        </Text>
                       </View>
                       <View
                         style={{ flexDirection: "row", alignItems: "center" }}
                       >
                         <Text style={{ color: "gray", fontSize: 13 }}>
-                          {getDisplayFormatDateTime(workorder.startedOnMillis)}
+                          {"In: " +
+                            getDisplayFormatDateTime(workorder.startedOnMillis)}
                         </Text>
                         <View
                           style={{
-                            // width: 1,
-                            // height: 10,
                             backgroundColor: "black",
                             marginHorizontal: 4,
                           }}
                         />
-                        <Text style={{ color: "black", fontSize: 13 }}>
-                          {workorder.waitTime.label}
-                        </Text>
                       </View>
                     </View>
                     <View

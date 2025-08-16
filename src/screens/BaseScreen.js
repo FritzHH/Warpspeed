@@ -115,7 +115,7 @@ export function BaseScreen() {
   useEffect(() => {
     // fillReceipt();
     // fillPrinterNames();
-    // fillPreferences();
+    fillPreferences();
   }, []);
 
   // return (

@@ -10,26 +10,31 @@ export const SHADOW_RADIUS_NOTHING = {
 export const COLORS = [
   {
     textColor: "black",
+    altTextColor: "dimgray",
     backgroundColor: "whitesmoke",
     label: "White",
   },
   {
     textColor: "white",
+    altTextColor: "gray",
     backgroundColor: "blue",
     label: "Blue",
   },
   {
     textColor: "black",
+    altTextColor: "gray",
     backgroundColor: "lightblue",
     label: "Light-blue",
   },
   {
     textColor: "white",
+    altTextColor: "gray",
     backgroundColor: "red",
     label: "Red",
   },
   {
     textColor: "white",
+    altTextColor: "lightgray",
     backgroundColor: "green",
     label: "Green",
   },
@@ -37,50 +42,68 @@ export const COLORS = [
   {
     textColor: "whitesmoke",
     backgroundColor: "black",
+    altTextColor: "lightgray",
+
     label: "Black",
   },
   {
     textColor: "black",
+    altTextColor: "gray",
     backgroundColor: "yellow",
     label: "Yellow",
   },
   {
     textColor: "white",
+    altTextColor: "dimgray",
+    backgroundColor: "orange",
+    label: "Orange",
+  },
+  {
+    textColor: "white",
+    altTextColor: "lightgray",
     backgroundColor: "maroon",
     label: "Maroon",
   },
   {
     textColor: "white",
+    altTextColor: "lightgray",
     backgroundColor: "rgb(139,69,19)",
     label: "Brown",
   },
   {
     textColor: "black",
+    altTextColor: "dimgray",
     backgroundColor: "rgb(192,192,192)",
     label: "Silver",
   },
   {
     textColor: "black",
+    altTextColor: "gray",
     backgroundColor: "tan",
     label: "Tan",
   },
   {
     textColor: "black",
+    altTextColor: "gray",
     backgroundColor: "beige",
     label: "Beige",
   },
   {
     textColor: "white",
+    altTextColor: "dimgray",
     backgroundColor: "darkgray",
     label: "Gray",
   },
   {
     textColor: "black",
+    altTextColor: "dimgray",
+
     backgroundColor: "lightgray",
     label: "Light-gray",
   },
   {
     textColor: "black",
+    altTextColor: "dimgray",
     backgroundColor: "pink",
     label: "Pink",
   },
@@ -90,16 +113,19 @@ export const NONREMOVABLE_STATUSES = [
   {
     label: "Newly Created",
     textColor: "white",
+    altTextColor: "black",
     backgroundColor: "red",
     removable: false,
   },
   {
+    altTextColor: "dimgray",
     textColor: "black",
-    backgroundColor: "lightgray",
+    backgroundColor: "rgb(192,192,192)",
     label: "Service",
     removable: false,
   },
   {
+    altTextColor: "black",
     textColor: "white",
     backgroundColor: "green",
     label: "Finished",
@@ -318,17 +344,19 @@ export const MENU_BUTTON_PROTO = {
   items: [],
 };
 
-// Objects with initial data
+// Objects with initial data /////////////////////////////////////////
 export const SETTINGS_OBJ = {
   statuses: [
     ...NONREMOVABLE_STATUSES,
     {
       textColor: "white",
       backgroundColor: "orange",
+      altTextColor: "dimgray",
       label: "Order Part for Customer",
       removable: true,
     },
     {
+      altTextColor: "dimgray",
       textColor: "white",
       backgroundColor: "orange",
       label: "Part Ordered",
@@ -337,55 +365,9 @@ export const SETTINGS_OBJ = {
     {
       textColor: "white",
       backgroundColor: "blue",
+      altTextColor: "gray",
       label: "Messaging Customer",
       removable: true,
-    },
-  ],
-  statusGroups: [
-    {
-      color: "gray",
-      textColor: "black",
-      name: "Work in Progress",
-      members: ["Work in Progress", "Work in Progress - Waiting"],
-    },
-    {
-      color: "whitesmoke",
-      textColor: "dimgray",
-      name: "Open Service",
-      members: ["Newly Created", "Service"],
-    },
-    {
-      color: "green",
-      textColor: "white",
-      name: "Finished",
-      members: [
-        "Finished",
-        "Finished, Waiting to Contact",
-        "Finished, Customer Away",
-      ],
-    },
-    {
-      color: "orange",
-      textColor: "white",
-      name: "Communication",
-      members: ["Messaging With Customer", "Emailing With Company"],
-    },
-    {
-      color: "lightblue",
-      textColor: "dimgray",
-      name: "Ordering",
-      members: [
-        "Part Ordered",
-        "Bicycle Ordered",
-        "Customer Bringing Part",
-        "Order for Customer",
-      ],
-    },
-    {
-      color: "lightgray",
-      textColor: "black",
-      name: "Waiting",
-      members: ["Customer Not Responding"],
     },
   ],
 

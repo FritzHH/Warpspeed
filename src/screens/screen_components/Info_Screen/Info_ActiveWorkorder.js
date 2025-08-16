@@ -118,6 +118,8 @@ export const ActiveWorkorderComponent = ({}) => {
   function getBackgroundColor() {
     let backgroundColor;
     let textColor;
+    let altTextColor;
+
     zSettingsObj.statusGroups.find((o) => {
       let members = o.members;
 
@@ -509,7 +511,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInputOnMainBackground
                 placeholderText={"Estimated Wait"}
-                style={{ width: "50%" }}
+                style={{ backgroundColor: "", width: "50%" }}
                 value={zWorkorderObj.waitTime?.label}
                 editable={false}
                 // onTextChange={(val) => {
@@ -564,7 +566,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 _zSetWorkorderObj(wo);
               }}
               itemViewStyle={{ backgroundColor: "gray", width: null }}
-              itemTextStyle={{ color: getBackgroundColor().textColor }}
+              // itemTextStyle={{ color }}
               buttonStyle={{
                 width: "100%",
                 backgroundColor: zWorkorderObj.status.backgroundColor,
@@ -678,10 +680,12 @@ export const ActiveWorkorderComponent = ({}) => {
     );
   }
 
+  return setComponent();
+
   try {
     return setComponent();
   } catch (e) {
-    // log("Error returning ActiveWorkorderComponent", e);
+    log("Error returning ActiveWorkorderComponent", e);
     return null;
   }
 };

@@ -1,10 +1,12 @@
 /* eslint-disable */
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import {
+  capitalizeFirstLetterOfString,
   clog,
   dim,
   getDisplayFormatDateTime,
   getWordDayOfWeek,
+  getWordMonth,
   log,
   trimToTwoDecimals,
   useInterval,
@@ -13,7 +15,7 @@ import { TabMenuDivider as Divider, CheckBox } from "../../../components";
 import { Colors } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
-import { cloneDeep } from "lodash";
+import { cloneDeep, sortBy } from "lodash";
 import {
   useCurrentCustomerStore,
   useCustMessagesStore,
@@ -29,6 +31,8 @@ import {
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { getDatabase } from "firebase/database";
 
+const numMillisInDay = 86400000; // millis in day
+const numMillisOneWeek = numMillisInDay * 7;
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
   const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
@@ -69,71 +73,87 @@ export function WorkordersComponent({}) {
 
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
-  const [sDotColorObj, _setDotColorObj] = useState({});
+  const [sItemOptions, _setItemOptions] = useState({});
 
   useEffect(() => {
-    let day = 86400000; // millis in day
     let hour = 3600000;
-
-    // let twodaysagoMillis = new Date(nowMillis - day * 2 + hour * 3).getTime();
-    // let onedayagomillis = new Date(nowMillis - day + hour * 3).getTime();
-    // let threedaysagoMillis = new Date(nowMillis - day * 3 + hour * 3).getTime();
-    // let fivedaysagoMillis = new Date(nowMillis - day * 5 + hour * 3).getTime();
-
-    // log("2", twodaysagoMillis);
-    // log("3", threedaysagoMillis);
-    // log("5", fivedaysagoMillis);
-
     const intervalId = setInterval(() => {
-      let nowMillis = new Date().getTime();
+      let colorsObj = cloneDeep(sItemOptions);
+      let nowMillis = Number(new Date().getTime());
       let todayWord = getWordDayOfWeek();
-      let tomorrowWord = getWordDayOfWeek(nowMillis + day);
-      let nextDayWord = getWordDayOfWeek(nowMillis + day * 2);
+      let tomorrowWord = getWordDayOfWeek(nowMillis + numMillisInDay);
+      let nextDayWord = getWordDayOfWeek(nowMillis + numMillisInDay * 2);
 
-      let colorsObj = cloneDeep(sDotColorObj);
+      /////////////////////////////////////////////////////
       zOpenWorkordersArr.forEach((wo) => {
-        let startedOnMillis = Number(wo.startedOnMillis);
-        //testing
-        // startedOnMillis = Number(threedaysagoMillis);
+        const startedOnMillis = Number(wo.startedOnMillis);
+        const maxWaitMillis = Number(
+          wo.waitTime?.maxWaitTimeDays * numMillisInDay
+        );
+        const endDayMillis = startedOnMillis + maxWaitMillis;
+        const dayEndWord = getWordDayOfWeek(startedOnMillis + maxWaitMillis);
 
-        let diffMillis = nowMillis - startedOnMillis;
-        let diffHours = diffMillis / hour;
+        let waitEndMonthWord = getWordMonth(endDayMillis);
+        let todayMonthWord = getWordMonth(nowMillis);
 
-        let maxWaitMillis = Number(wo.waitTime?.maxWaitTimeDays * day);
-        // if (!maxWaitMillis ) return;
-        let dayEndWord = maxWaitMillis
-          ? getWordDayOfWeek(startedOnMillis + maxWaitMillis)
-          : null;
-
-        // if (wo.brand == "Cannondale") {
-        //   log("start day", getWordDayOfWeek(startedOnMillis));
-        //   log("wait days", wo.waitTime.maxWaitTimeDays);
-        //   log("day end", dayEndWord);
-        // }
-        let color;
-
-        if (wo.waitTime.label == "Waiting" || wo.waitTime.label == "Today") {
-          if (colorsObj[wo.id] == "red") {
-            color = null;
-          } else {
-            color = "red";
-          }
-        } else if (dayEndWord == todayWord) {
-          color = "red";
-        } else if (dayEndWord == tomorrowWord) {
-          color = "yellow";
-        } else if (dayEndWord == nextDayWord) {
-          color = "green";
+        // check to see if the due day word is same week or upcoming weeks
+        let isDueWithin7Days = true;
+        if (
+          Math.ceil((endDayMillis - nowMillis) / numMillisInDay) >= 7 ||
+          waitEndMonthWord != todayMonthWord
+        ) {
+          isDueWithin7Days = false;
         }
-        colorsObj[wo.id] = color;
+
+        // check to see if past due
+        let isPastDue = false;
+        if (
+          Number(startedOnMillis + maxWaitMillis) < nowMillis &&
+          todayWord != dayEndWord
+        )
+          isPastDue = true;
+
+        let optionsObj = {
+          color: null,
+          waitEndDay: maxWaitMillis && isDueWithin7Days ? dayEndWord : "",
+        };
+
+        //////////////////////////
+        if (wo.waitTime.label == "Waiting" || wo.waitTime.label == "Today") {
+          optionsObj.waitEndDay = "Today";
+          if (colorsObj[wo.id]?.color == "red") {
+            optionsObj.color = null;
+          } else {
+            optionsObj.color = "red";
+          }
+        } else if (isPastDue) {
+          if (colorsObj[wo.id]?.color == "pink") {
+            optionsObj.color = null;
+          } else {
+            optionsObj.color = "pink";
+          }
+          optionsObj.waitEndDay = "PAST DUE";
+        } else if (dayEndWord == todayWord && isDueWithin7Days) {
+          optionsObj.color = "red";
+          optionsObj.waitEndDay = dayEndWord;
+        } else if (dayEndWord == tomorrowWord && isDueWithin7Days) {
+          optionsObj.waitEndDay = dayEndWord;
+          optionsObj.color = "yellow";
+        } else if (dayEndWord == nextDayWord && isDueWithin7Days) {
+          optionsObj.waitEndDay = dayEndWord;
+          optionsObj.color = "green";
+        }
+        colorsObj[wo.id] = optionsObj;
       });
-      _setDotColorObj(colorsObj);
+      ////////////////////////////////////////////////////////
+
+      _setItemOptions(colorsObj);
     }, 750);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [zOpenWorkordersArr, sDotColorObj]);
+  }, [zOpenWorkordersArr, sItemOptions]);
 
   ///////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////
@@ -160,12 +180,26 @@ export function WorkordersComponent({}) {
 
   function sortWorkorders(inputArr) {
     let finalArr = [];
+    let nowMillis = new Date().getTime();
     zSettingsObj?.statuses?.forEach((status) => {
       let arr = [];
       inputArr.forEach((wo) => {
+        const startedOnMillis = Number(wo.startedOnMillis);
+        const maxWaitMillis = Number(
+          wo.waitTime?.maxWaitTimeDays * numMillisInDay
+        );
         if (wo.status.label == status.label) arr.push(wo);
       });
-      arr.sort((a, b) => a.startedOnMillis > b.startedOnMillis);
+
+      // arr = sortBy(arr, "waitTime.maxWaitTimeDays");
+      arr = sortBy(arr, (wo) => {
+        let millisToCompletion =
+          wo.startedOnMillis +
+          wo.waitTime?.maxWaitTimeDays * numMillisInDay -
+          nowMillis;
+        return millisToCompletion;
+      });
+
       finalArr = [...finalArr, ...arr];
     });
     return finalArr;
@@ -217,6 +251,15 @@ export function WorkordersComponent({}) {
           <View style={{ height: 1, backgroundColor: "gray", width: "100%" }} />
         )}
         renderItem={(item) => {
+          // if (!item.item.id) {
+          //   return (
+          //     <View style={{ width: "100%" }}>
+          //       <Text>{"Status"}</Text>
+          //       <Text>{"Status"}</Text>
+          //     </View>
+          //   );
+          // }
+
           let workorder = item.item;
           return (
             <View>
@@ -246,7 +289,7 @@ export function WorkordersComponent({}) {
                     style={{
                       marginVertical: 5,
                       flexDirection: "row",
-                      width: "75%",
+                      width: "65%",
                     }}
                   >
                     <Text style={{ marginRight: 10 }}>
@@ -256,75 +299,98 @@ export function WorkordersComponent({}) {
                   </View>
                   <View
                     style={{
-                      width: "25%",
+                      width: "35%",
                       justifyContent: "flex-end",
                       alignItems: "center",
                       flexDirection: "row",
                       // backgroundColor: "green",
                     }}
                   >
-                    <View style={{ alignItems: "flex-end", paddingRight: 20 }}>
+                    {/* <View style={{ alignItems: "flex-end", paddingRight: 20 }}> */}
+                    <View
+                      style={{
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        justifyContent: "space-between",
+                        height: "100%",
+                      }}
+                    >
                       <View
                         style={{
+                          backgroundColor: workorder.status.backgroundColor,
                           flexDirection: "row",
+                          paddingHorizontal: 15,
+                          paddingVertical: 2,
                           alignItems: "center",
+                          borderRadius: 5,
                         }}
                       >
                         <Text
                           style={{
-                            fontSize: 12,
-                            color: "gray",
+                            color: workorder.status.textColor,
+                            fontSize: 14,
                           }}
                         >
-                          {"Status:  "}
-                        </Text>
-                        <Text style={{ fontSize: 14 }}>
                           {workorder.status.label}
                         </Text>
-                        <View style={{ width: 8 }} />
-                        <Text
-                          style={{
-                            color: "gray",
-                            fontSize: 12,
-                            width: 100,
-                            textAlign: "right",
-                          }}
-                        >
-                          {"Est: "}
-                          <Text
-                            style={{
-                              color: "black",
-                              fontSize: 13,
-                              fontStyle: "italic",
-                            }}
-                          >
-                            {workorder.waitTime.label}
-                          </Text>
-                        </Text>
                       </View>
-                      <View
-                        style={{ flexDirection: "row", alignItems: "center" }}
-                      >
-                        <Text style={{ color: "gray", fontSize: 13 }}>
-                          {"In: " +
-                            getDisplayFormatDateTime(workorder.startedOnMillis)}
-                        </Text>
-                        <View
-                          style={{
-                            backgroundColor: "black",
-                            marginHorizontal: 4,
-                          }}
-                        />
-                      </View>
+                      <View style={{ width: 8 }} />
+                      <Text style={{ color: "dimgray", fontSize: 13 }}>
+                        {getDisplayFormatDateTime(workorder.startedOnMillis)}
+                      </Text>
                     </View>
                     <View
                       style={{
-                        backgroundColor: sDotColorObj[workorder.id],
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        height: "100%",
+                        paddingRight: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "dimgray",
+                          fontSize: 12,
+                          width: 100,
+                          textAlign: "right",
+                        }}
+                      >
+                        {"est: "}
+                        <Text
+                          style={{
+                            color: "dimgray",
+                            fontSize: 14,
+                            fontStyle: "italic",
+                          }}
+                        >
+                          {workorder.waitTime.label}
+                        </Text>
+                      </Text>
+                      {sItemOptions[workorder.id]?.waitEndDay ? (
+                        <Text
+                          style={{
+                            paddingLeft: 10,
+                            color: "black",
+                            fontSize: 13,
+                          }}
+                        >
+                          {"Due: " +
+                            capitalizeFirstLetterOfString(
+                              sItemOptions[workorder.id].waitEndDay
+                            )}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View
+                      style={{
+                        backgroundColor: sItemOptions[workorder.id]?.color,
                         width: 13,
                         height: 13,
                         borderRadius: 100,
                       }}
                     />
+                    {/* </View> */}
                   </View>
                 </View>
               </TouchableOpacity>

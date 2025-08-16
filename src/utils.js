@@ -353,8 +353,7 @@ export function getWordDayOfWeek(millies, abbreviated) {
 }
 
 export function getWordMonth(millis) {
-  let date = new Date();
-  if (millis) date = new Date(millis);
+  let date = new Date(millis);
   let val = date.toLocaleDateString("en-US", { month: "short" });
   return val;
 }

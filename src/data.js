@@ -498,33 +498,40 @@ export const SETTINGS_OBJ = {
     },
   ],
   storeHours: {
-    monday: {
+    Monday: {
       open: "10:00 AM",
       close: "6:00 PM",
+      isOpen: true,
     },
-    tuesday: {
+    Tuesday: {
       open: "10:00 AM",
       close: "6:00 PM",
+      isOpen: true,
     },
-    wednesday: {
+    Wednesday: {
       open: "10:00 AM",
       close: "6:00 PM",
+      isOpen: true,
     },
-    thursday: {
+    Thursday: {
       open: "10:00 AM",
       close: "6:00 PM",
+      isOpen: true,
     },
-    friday: {
+    Friday: {
       open: "10:00 AM",
       close: "6:00 PM",
+      isOpen: true,
     },
-    saturday: {
+    Saturday: {
       open: "10:00 AM",
       close: "6:00 PM",
+      isOpen: true,
     },
-    sunday: {
+    Sunday: {
       open: "10:00 AM",
       close: "6:00 PM",
+      isOpen: true,
     },
   },
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],

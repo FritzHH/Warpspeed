@@ -330,25 +330,25 @@ export function getWordDayOfWeek(millies, abbreviated) {
   switch (numDay) {
     case 0:
       if (abbreviated) return "Sun";
-      return "sunday";
+      return "Sunday";
     case 1:
       if (abbreviated) return "Mon";
-      return "monday";
+      return "Monday";
     case 2:
       if (abbreviated) return "Tues";
-      return "tuesday";
+      return "Tuesday";
     case 3:
       if (abbreviated) return "Weds";
-      return "wednesday";
+      return "Wednesday";
     case 4:
       if (abbreviated) return "Thurs";
-      return "thursday";
+      return "Thursday";
     case 5:
       if (abbreviated) return "Fri";
-      return "friday";
+      return "Friday";
     case 6:
       if (abbreviated) return "Sat";
-      return "saturday";
+      return "Saturday";
   }
 }
 

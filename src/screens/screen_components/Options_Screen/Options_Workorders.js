@@ -87,19 +87,58 @@ export function WorkordersComponent({}) {
       /////////////////////////////////////////////////////
       zOpenWorkordersArr.forEach((wo) => {
         const startedOnMillis = Number(wo.startedOnMillis);
-        const maxWaitMillis = Number(
+        let maxWaitMillis = Number(
           wo.waitTime?.maxWaitTimeDays * numMillisInDay
         );
-        const endDayMillis = startedOnMillis + maxWaitMillis;
-        const dayEndWord = getWordDayOfWeek(startedOnMillis + maxWaitMillis);
+        let endWaitMillis = startedOnMillis + maxWaitMillis;
 
-        let waitEndMonthWord = getWordMonth(endDayMillis);
+        // check to see if any shop closed days exist in the quoted wait time
+        // first get all day names that the shop is closed
+        let closedDayNamesArr = [];
+        Object.keys(zSettingsObj?.storeHours).forEach((dayName) => {
+          if (!zSettingsObj.storeHours[dayName]?.isOpen)
+            closedDayNamesArr.push(dayName);
+        });
+
+        // next get list of all day names within the time range quoted
+        const dayNames = [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ];
+        const result = [];
+        let current = new Date(wo.startedOnMillis);
+
+        // Normalize to the start of the day (midnight)
+        current.setHours(0, 0, 0, 0);
+
+        const end = new Date(endWaitMillis);
+        end.setHours(0, 0, 0, 0);
+
+        while (current <= end) {
+          result.push(dayNames[current.getDay()]);
+          // Move to next day
+          current.setDate(current.getDate() + 1);
+        }
+
+        // last check to see if any of the day names in the wait period coincide with days the shop is closed
+        let daysClosedMillis = closedDayNamesArr.length * numMillisInDay;
+        endWaitMillis = endWaitMillis + daysClosedMillis;
+
+        // const endDayMillis = startedOnMillis + maxWaitMillis;
+        const dayEndWord = getWordDayOfWeek(endWaitMillis);
+
+        let waitEndMonthWord = getWordMonth(endWaitMillis);
         let todayMonthWord = getWordMonth(nowMillis);
 
         // check to see if the due day word is same week or upcoming weeks
         let isDueWithin7Days = true;
         if (
-          Math.ceil((endDayMillis - nowMillis) / numMillisInDay) >= 7 ||
+          Math.ceil((endWaitMillis - nowMillis) / numMillisInDay) >= 7 ||
           waitEndMonthWord != todayMonthWord
         ) {
           isDueWithin7Days = false;
@@ -107,10 +146,7 @@ export function WorkordersComponent({}) {
 
         // check to see if past due
         let isPastDue = false;
-        if (
-          Number(startedOnMillis + maxWaitMillis) < nowMillis &&
-          todayWord != dayEndWord
-        )
+        if (endWaitMillis < nowMillis && todayWord != dayEndWord)
           isPastDue = true;
 
         let optionsObj = {
@@ -153,7 +189,7 @@ export function WorkordersComponent({}) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [zOpenWorkordersArr, sItemOptions]);
+  }, [zOpenWorkordersArr, sItemOptions, zSettingsObj]);
 
   ///////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////

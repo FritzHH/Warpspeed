@@ -282,6 +282,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingLeft: 5,
                   justifyContent: "flex-start",
                   alignItems: "center",
+                  justifyContent: "space-between",
                   // backgroundColor: "green",
                 }}
               >
@@ -289,7 +290,6 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{
                     width: "48%",
                     height: "100%",
-                    justifyContent: "center",
                     // marginTop: 10,
                   }}
                 >
@@ -345,6 +345,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 justifyContent: "flex-start",
                 width: "100%",
                 alignItems: "center",
+
                 marginTop: 5,
                 // backgroundColor: "blue",
               }}
@@ -394,7 +395,8 @@ export const ActiveWorkorderComponent = ({}) => {
             <View
               style={{
                 flexDirection: "row",
-                justifyContent: "flex-start",
+                justifyContent: "space-between",
+
                 alignItems: "center",
                 width: "100%",
                 marginTop: 5,
@@ -431,9 +433,8 @@ export const ActiveWorkorderComponent = ({}) => {
                   width: "50%",
                   flexDirection: "row",
                   paddingLeft: 5,
-                  justifyContent: "flex-start",
                   alignItems: "center",
-                  // backgroundColor: "green",
+                  justifyContent: "space-between",
                 }}
               >
                 <View

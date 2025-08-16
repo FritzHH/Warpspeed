@@ -165,12 +165,13 @@ export function Notes_MainComponent() {
   if (!zWorkorderObj) return null;
 
   return (
-    <View style={{ width: "100%", height: "100%", paddingTop: 20 }}>
+    <View style={{ flex: 1, paddingTop: 20 }}>
       <View
         style={{
+          paddingTop: 20,
+          paddingHorizontal: 5,
           flexDirection: "row",
-          width: "100%",
-          height: "100%",
+          // flex: 1,
         }}
       >
         <TouchableWithoutFeedback onPress={() => outsideClicked("customer")}>

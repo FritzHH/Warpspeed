@@ -20,8 +20,16 @@ import {
   SHADOW_RADIUS_PROTO,
   LoginScreenModalComponent,
   DropdownMenu,
+  Button_,
+  Icon_,
+  Image_,
 } from "../../../components";
-import { Colors } from "../../../styles";
+import {
+  APP_BASE_COLORS,
+  COLOR_GRADIENTS,
+  Colors,
+  ICONS,
+} from "../../../styles";
 import {
   SETTINGS_OBJ,
   WORKORDER_PROTO,
@@ -154,16 +162,17 @@ export const ActiveWorkorderComponent = ({}) => {
 
   const dropdownButtonStyle = {
     width: "100%",
-    backgroundColor: null,
+    backgroundColor: APP_BASE_COLORS.buttonLightGreen,
     ...SHADOW_RADIUS_NOTHING,
-    borderColor: "lightgray",
+    borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
     borderWidth: 1,
     paddingVertical: 2,
+    borderRadius: 5,
   };
 
   const dropdownButtonTextStyle = {
-    fontSize: 16,
-    color: "white",
+    fontSize: 15,
+    color: APP_BASE_COLORS.textMain,
   };
 
   function setComponent() {
@@ -235,14 +244,28 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
             >
               {zCustomerObj.cell.length > 0 ? (
-                <Text style={{ color: Colors.darkText }}>
-                  {"Cell:  " + addDashesToPhone(zCustomerObj.cell)}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Image_
+                    icon={ICONS.cellPhone}
+                    size={30}
+                    style={{ marginRight: 5 }}
+                  />
+                  <Text style={{ color: APP_BASE_COLORS.textMain }}>
+                    {addDashesToPhone(zCustomerObj.cell)}
+                  </Text>
+                </View>
               ) : null}
               {zCustomerObj.landline.length > 0 ? (
-                <Text style={{ color: Colors.darkText }}>
-                  {"Land:  " + addDashesToPhone(zCustomerObj.landline)}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Image_
+                    icon={ICONS.home}
+                    size={30}
+                    style={{ marginRight: 5 }}
+                  />
+                  <Text style={{ color: APP_BASE_COLORS.textMain }}>
+                    {addDashesToPhone(zCustomerObj.landline)}
+                  </Text>
+                </View>
               ) : null}
               {zCustomerObj.contactRestriction === "CALL" ? (
                 <Text style={{ color: Colors.darkText }}>CALL ONLY</Text>
@@ -304,7 +327,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      backgroundColor: zWorkorderObj.brand ? null : "red",
+                      backgroundColor: zWorkorderObj.brand
+                        ? dropdownButtonStyle.backgroundColor
+                        : APP_BASE_COLORS.lightred,
                     }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={bikesRef}
@@ -330,7 +355,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      backgroundColor: zWorkorderObj.brand ? null : "red",
+                      backgroundColor: zWorkorderObj.brand
+                        ? dropdownButtonStyle.backgroundColor
+                        : "red",
                     }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={ebikeRef}
@@ -409,6 +436,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   width: "48%",
                   backgroundColor: zWorkorderObj.color1.backgroundColor,
                   color: zWorkorderObj.color1.textColor,
+                  // borderRadius: 8,
                 }}
                 onTextChange={(val) => {
                   setBikeColor(val, "color1");
@@ -459,8 +487,8 @@ export const ActiveWorkorderComponent = ({}) => {
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       backgroundColor: zWorkorderObj.color1.label
-                        ? null
-                        : "red",
+                        ? dropdownButtonStyle.backgroundColor
+                        : APP_BASE_COLORS.lightred,
                     }}
                     ref={color1Ref}
                     buttonText={"Color 1"}
@@ -515,12 +543,6 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{ backgroundColor: "", width: "50%" }}
                 value={zWorkorderObj.waitTime?.label}
                 editable={false}
-                // onTextChange={(val) => {
-                // let wo = cloneDeep(zWorkorderObj);
-                // wo.waitTime = val;
-                // _zSetWorkorderObj(wo);
-                // dbSetOpenWorkorderItem(wo);
-                // }}
               />
               <View
                 style={{
@@ -549,7 +571,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      backgroundColor: zWorkorderObj.waitTime ? null : "red",
+                      backgroundColor: zWorkorderObj.waitTime
+                        ? dropdownButtonStyle.backgroundColor
+                        : APP_BASE_COLORS.lightred,
                     }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     modalCoordinateVars={{ x: 30, y: 50 }}
@@ -666,13 +690,18 @@ export const ActiveWorkorderComponent = ({}) => {
             width: "100%",
           }}
         >
-          <Button
-            buttonStyle={{ width: 150 }}
-            text={"New Workorder"}
+          <Button_
+            icon={ICONS.add}
+            // buttonStyle={{ width: 150 }}
+            text={"Workorder"}
+            colorGradientArr={COLOR_GRADIENTS.green}
+            buttonStyle={{ paddingHorizontal: 25, paddingVertical: 5 }}
             onPress={handleNewWorkorderPress}
           />
-          <Button
-            buttonStyle={{ width: 150 }}
+          <Button_
+            icon={ICONS.cashRed}
+            colorGradientArr={COLOR_GRADIENTS.green}
+            buttonStyle={{ paddingHorizontal: 25, paddingVertical: 5 }}
             text={"New Sale"}
             onPress={handleStartStandaloneSalePress}
           />
@@ -703,17 +732,18 @@ const TextInputOnMainBackground = ({
       editable={editable}
       value={value}
       placeholder={placeholderText}
-      placeholderTextColor={"lightgray"}
+      placeholderTextColor={"gray"}
       style={{
-        borderWidth: 2,
-        borderColor: "gray",
-        color: Colors.darkText,
+        borderWidth: 1,
+        borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+        color: APP_BASE_COLORS.textMain,
         paddingVertical: 3,
         paddingHorizontal: 4,
         fontSize: 16,
-        outlineWidth: 0,
-        // width: "100%",
-        // marginVertical: 5,
+        outlineWidth: 1,
+        outlineColor: APP_BASE_COLORS.green,
+        borderRadius: 5,
+        fontWeight: value ? "500" : null,
         ...style,
       }}
       onChangeText={(val) => onTextChange(val)}

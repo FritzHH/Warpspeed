@@ -92,6 +92,9 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
         {zWorkorderObj?.id ? (
           <View>
             <TabMenuButton
+              buttonStyle={{
+                borderTopLeftRadius: 15,
+              }}
               onPress={() =>
                 _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)
               }
@@ -106,7 +109,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
                   : false
               }
             />
-            <Divider />
+            {/* <View style={{ width: 20 }} /> */}
           </View>
         ) : null}
         {zWorkorderObj?.id && !zWorkorderObj.isStandaloneSale ? (
@@ -119,6 +122,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
           />
         ) : null}
       </View>
+
       <View
         style={{
           flexDirection: "row",
@@ -126,6 +130,9 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
         }}
       >
         <TabMenuButton
+          buttonStyle={{
+            borderTopRightRadius: 15,
+          }}
           onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.dashboard)}
           text={TAB_NAMES.itemsTab.dashboard}
           isSelected={

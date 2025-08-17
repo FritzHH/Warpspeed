@@ -14,8 +14,8 @@ import {
   Button,
   ScreenModal,
   GradientView,
-  _Image,
-  _Button,
+  Image_,
+  Button_,
 } from "../../../components";
 import {
   APP_BASE_COLORS,
@@ -147,32 +147,31 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   function modQtyPressed(inventoryItem, workorderLine, option, idx) {
-    log("need to fix this method");
-    return;
-    let fun = () => {
-      let newWOLine = cloneDeep(workorderLine);
-      let wo = cloneDeep(zWorkorderObj);
-      if (option === "up") {
-        newWOLine.qty = newWOLine.qty + 1;
-      } else {
-        let qty = newWOLine.qty - 1;
-        if (qty <= 0) return;
-        newWOLine.qty = qty;
-      }
-      if (newWOLine.discountObj.name) {
-        let discountObj = applyDiscountToWorkorderItem(
-          newWOLine.discountObj,
-          newWOLine,
-          inventoryItem
-        );
-        if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
-      }
-      wo.workorderLines[idx] = newWOLine;
-
-      _zSetWorkorderObj(wo);
-      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
-    };
-    _zExecute(fun);
+    // log("need to fix this method");
+    // return;
+    // let fun = () => {
+    let newWOLine = cloneDeep(workorderLine);
+    let wo = cloneDeep(zWorkorderObj);
+    if (option === "up") {
+      newWOLine.qty = newWOLine.qty + 1;
+    } else {
+      let qty = newWOLine.qty - 1;
+      if (qty <= 0) return;
+      newWOLine.qty = qty;
+    }
+    if (newWOLine.discountObj.name) {
+      let discountObj = applyDiscountToWorkorderItem(
+        newWOLine.discountObj,
+        newWOLine,
+        inventoryItem
+      );
+      if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
+    }
+    wo.workorderLines[idx] = newWOLine;
+    _zSetWorkorderObj(wo);
+    if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
+    // };
+    // _zExecute(fun);
   }
 
   function editWorkorderLine(workorderLine, inventoryItem) {
@@ -251,7 +250,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
   }
 
-  clog("wo", zWorkorderObj);
+  // clog("wo", zWorkorderObj);
   function setComponent() {
     return (
       <View
@@ -295,91 +294,144 @@ export const Items_WorkorderItemsTab = ({}) => {
             flexDirection: "row",
             justifyContent: "space-around",
             alignItems: "center",
-            width: "100%",
-            borderTopWidth: 1,
-            borderTopColor: "gray",
-            // backgroundColor: "green",
-            paddingTop: 5,
-            paddingBottom: 5,
+            width: "99%",
+            backgroundColor: APP_BASE_COLORS.backgroundGreen,
             opacity: sNumItems > 0 ? 1 : 0.2,
+            marginVertical: 5,
+            marginHorizontal: 5,
+            borderRadius: 15,
+            borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+            borderWidth: 1,
+            padding: 10,
+            alignSelf: "center",
           }}
         >
-          <Text style={{ fontSize: 16 }}>
+          <Text style={{ fontSize: 16, color: "gray" }}>
             {"Items: "}
             <Text
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
+                color: APP_BASE_COLORS.textMain,
               }}
             >
               {sNumItems}
             </Text>
           </Text>
+          <View
+            style={{
+              width: 1,
+              height: "100%",
+              backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+            }}
+          />
           {sTotalDiscount > 0 ? (
-            <Text style={{ fontSize: 16 }}>
-              {"Discount: "}
-              <Text
-                style={{
-                  marginRight: 10,
-                  fontWeight: "bold",
-                }}
-              >
-                {"$" + sTotalDiscount}
+            <View>
+              <Text style={{ fontSize: 16, color: "gray" }}>
+                {"Discount: "}
+                <Text
+                  style={{
+                    marginRight: 10,
+                    fontWeight: "bold",
+                    color: APP_BASE_COLORS.textMain,
+                  }}
+                >
+                  {"$" + sTotalDiscount}
+                </Text>
               </Text>
-            </Text>
+              <View
+                style={{
+                  width: 1,
+                  height: "100%",
+                  backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                }}
+              />
+            </View>
           ) : null}
-          <Text style={{ fontSize: 16 }}>
+          <Text style={{ fontSize: 16, color: "gray" }}>
             {"Subtotal: "}
-            <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+            <Text
+              style={{
+                marginRight: 10,
+                color: APP_BASE_COLORS.textMain,
+                fontWeight: "bold",
+              }}
+            >
               {"$" + sTotalPrice}
             </Text>
           </Text>
-          <Text style={{ fontSize: 16 }}>
+          <View
+            style={{
+              width: 1,
+              height: "100%",
+              backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+            }}
+          />
+          <Text style={{ fontSize: 16, color: "gray" }}>
             {"Tax: "}
-            <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+            <Text
+              style={{
+                marginRight: 10,
+                fontWeight: "bold",
+                color: APP_BASE_COLORS.textMain,
+              }}
+            >
               {"$" +
                 calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj).tax}
             </Text>
           </Text>
-          <Text style={{ fontSize: 16 }}>
+          <View
+            style={{
+              width: 1,
+              height: "100%",
+              backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+            }}
+          />
+
+          <Text
+            style={{
+              fontSize: 16,
+              borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+              borderRadius: 15,
+              borderWidth: 1,
+              paddingHorizontal: 15,
+              paddingVertical: 3,
+              color: "gray",
+            }}
+          >
             {"Total: "}
-            <Text style={{ marginRight: 10, fontWeight: "bold" }}>
+            <Text
+              style={{
+                marginRight: 10,
+                fontWeight: "bold",
+                color: APP_BASE_COLORS.textMain,
+              }}
+            >
               {"$" +
                 calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj)
                   .totalAmount}
             </Text>
           </Text>
           {!zWorkorderObj?.isStandaloneSale ? (
-            <LinearGradient
-              colors={[...COLOR_GRADIENTS.green]}
-              style={{
-                width: 150,
-                height: 30,
+            <Button_
+              textStyle={{ fontSize: 16 }}
+              icon={ICONS.shoppingCart}
+              text={"Check Out"}
+              colorGradientArr={COLOR_GRADIENTS.green}
+              buttonStyle={{
+                // height: 25,
+                paddingHorizontal: 20,
+                paddingVertical: 2,
                 borderRadius: 15,
-                alignItems: "center",
-                justifyContent: "center",
+                // width: 150,
+                backgroundColor: "green",
+                // marginRight: 5,
               }}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={{ color: "white" }}>Check Out</Text>
-            </LinearGradient>
-          ) : // <Button
-          //   textStyle={{ color: "white" }}
-          //   buttonStyle={{
-          //     height: 25,
-          //     paddingHorizontal: 7,
-          //     paddingVertical: 2,
-          //     borderRadius: 5,
-          //     width: 150,
-          //     // backgroundColor: zIsCheckingOut ? "red" : "green",
-          //     // marginRight: 5,
-          //   }}
-          //   // text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
-          //   text={"Check Out"}
-          //   onPress={checkoutPressed}
-          // />
-          null}
+              // text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
+              // text={"Check Out"}
+              onPress={checkoutPressed}
+            />
+          ) : null}
         </View>
       </View>
     );
@@ -436,10 +488,10 @@ export const LineItemComponent = ({
             width: "100%",
             alignItems: "center",
             backgroundColor: APP_BASE_COLORS.backgroundListWhite,
-            paddingVertical: 0,
-            paddingHorizontal: 0,
-            marginVertical: 1,
-            marginHorizontal: 5,
+            paddingVertical: 3,
+            paddingRight: 5,
+            marginVertical: 3,
+            marginHorizontal: 8,
             borderColor: "transparent",
             borderLeftColor: APP_BASE_COLORS.green,
             borderWidth: 2,
@@ -455,7 +507,7 @@ export const LineItemComponent = ({
               // backgroundColor: "green",
             }}
           >
-            <_Button
+            <Button_
               onPress={() => __deleteWorkorderLine(index)}
               icon={ICONS.close1}
               iconSize={17}
@@ -530,7 +582,7 @@ export const LineItemComponent = ({
                 // marginRight: 5,
               }}
             >
-              <_Button
+              <Button_
                 onPress={() =>
                   __modQtyPressed(inventoryItem, workorderLine, "up", index)
                 }
@@ -625,7 +677,7 @@ export const LineItemComponent = ({
                 marginLeft: 7,
               }}
             >
-              <_Image size={28} icon={ICONS.editPencil} />
+              <Image_ size={28} icon={ICONS.editPencil} />
               {/* <Button
                 onPress={() =>
                   __setButtonsRowID(

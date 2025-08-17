@@ -34,16 +34,16 @@ export const APP_BASE_COLORS = {
   purple: "",
   orange: "",
   blue: "rgb(53, 135, 210)",
+  lightred: "rgb(227, 116, 112)",
 
   backgroundWhite: "rgb(240, 241, 251)",
+  backgroundGreen: "rgb(232, 243, 239)",
   backgroundListWhite: "rgb(251, 251, 254)",
 
   listItemWhite: "rgb(254, 254, 255)",
 
   buttonLightGreen: "rgb(232, 239, 245)",
   buttonLightGreenOutline: "rgb(200, 228, 220)",
-
-  // outlineMain: ''
 
   textMain: "rgb(45, 55, 72)",
   textWhite: "rgb(255, 255, 255)",
@@ -75,6 +75,14 @@ export const ICONS = {
   upArrowOrange: require(ASSETS_PATH + "up_arrow_orange.png"),
   editPencil: require(ASSETS_PATH + "edit_pencil.png"),
   close1: require(ASSETS_PATH + "close1.png"),
+  shoppingCart: require(ASSETS_PATH + "shopping_cart.png"),
+  new: require(ASSETS_PATH + "new.png"),
+  add: require(ASSETS_PATH + "add.png"),
+  cashBag: require(ASSETS_PATH + "cash.png"),
+  cashHand: require(ASSETS_PATH + "cashHand.png"),
+  cashRed: require(ASSETS_PATH + "cashRed.png"),
+  cellPhone: require(ASSETS_PATH + "cell.png"),
+  home: require(ASSETS_PATH + "home.png"),
 };
 
 // rgb(64, 174, 113)

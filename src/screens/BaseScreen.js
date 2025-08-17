@@ -118,19 +118,6 @@ export function BaseScreen() {
     // fillPreferences();
   }, []);
 
-  // return (
-  //   <View
-  //     style={{
-  //       // flex: 1,
-  //       width: screenWidth,
-  //       height: screenHeight,
-  //       flexDirection: "row",
-  //       justifyContent: "space-around",
-  //       backgroundColor: "green",
-  //     }}
-  //   />
-  // );
-
   return (
     <View
       style={{
@@ -139,6 +126,8 @@ export function BaseScreen() {
         height: screenHeight,
         flexDirection: "row",
         justifyContent: "space-around",
+        paddingVertical: 5,
+        paddingHorizontal: 5,
       }}
     >
       <div

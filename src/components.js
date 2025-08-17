@@ -26,6 +26,7 @@ import {
   trimToTwoDecimals,
 } from "./utils";
 import {
+  APP_BASE_COLORS,
   COLOR_GRADIENT_PROFILES,
   COLOR_GRADIENTS,
   Colors,
@@ -148,7 +149,14 @@ export const SHADOW_RADIUS_NOTHING = {
 
 export const TabMenuDivider = () => {
   return (
-    <View style={{ width: 1, backgroundColor: "gray", height: "100%" }}></View>
+    <View
+      style={{
+        // marginHorizontal: 2,
+        width: 1,
+        backgroundColor: "gray",
+        height: "100%",
+      }}
+    ></View>
   );
 };
 
@@ -2297,129 +2305,6 @@ export const Button = ({
   );
 };
 
-export const _Button = ({
-  visible = true,
-  icon,
-  ref,
-  iconSize = 25,
-  onPress,
-  onLongPress,
-  numLines = 1,
-  text,
-  enableMouseOver = true,
-  TextComponent,
-  mouseOverOptions = {
-    opacity: 0.6,
-    highlightColor: "lightgray",
-    textColor: "white",
-  },
-  shadow = false,
-  allCaps = false,
-  colorGradientArr = COLOR_GRADIENTS.purple,
-  colorGradientProfile = COLOR_GRADIENT_PROFILES.standard,
-  gradientViewProps = {},
-  buttonStyle = {},
-  textStyle = {},
-  iconStyle = {},
-  // viewStyle = {},
-}) => {
-  const [sMouseOver, _setMouseOver] = React.useState(false);
-  if (allCaps) text = text.toUpperCase();
-  let shadowStyle = SHADOW_RADIUS_PROTO;
-  if (!shadow) shadowStyle = SHADOW_RADIUS_NOTHING;
-  /////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////
-  const HEIGHT = buttonStyle.height;
-  const WIDTH = buttonStyle.width;
-
-  if (!visible) {
-    return (
-      <View
-        style={{ width: WIDTH, height: HEIGHT, backgroundColor: "transparent" }}
-      ></View>
-    );
-  }
-
-  function handleButtonPress() {
-    if (visible) {
-      _setMouseOver(false);
-      onPress();
-    }
-  }
-
-  function getBackgroundColor() {
-    if (sMouseOver) {
-      return mouseOverOptions.highlightColor;
-    } else {
-      if (buttonStyle.backgroundColor) return buttonStyle.backgroundColor;
-      return Colors.tabMenuButton;
-    }
-  }
-
-  return (
-    <TouchableOpacity
-      // style={{ ...viewStyle }}
-      ref={ref}
-      onMouseOver={() => (enableMouseOver ? _setMouseOver(true) : null)}
-      onMouseLeave={() => {
-        _setMouseOver(false);
-      }}
-      // on={() => log("here")}
-      onPress={handleButtonPress}
-      onLongPress={visible ? onLongPress : () => {}}
-    >
-      <GradientView
-        colorArr={colorGradientArr}
-        style={{
-          alignItems: "center",
-          justifyContent: "center",
-          paddingHorizontal: 5,
-          borderRadius: 15,
-          paddingVertical: 5,
-          ...shadowStyle,
-          ...buttonStyle,
-          backgroundColor: icon ? null : getBackgroundColor(),
-          opacity:
-            sMouseOver && !icon
-              ? mouseOverOptions.opacity
-              : buttonStyle.opacity,
-        }}
-        {...gradientViewProps}
-      >
-        {icon ? (
-          <_Image
-            icon={icon}
-            size={iconSize}
-            style={{
-              marginHorizontal: 5,
-              ...iconStyle,
-              opacity: sMouseOver
-                ? mouseOverOptions.opacity
-                : buttonStyle.opacity,
-            }}
-          />
-        ) : null}
-        {TextComponent ? (
-          <TextComponent />
-        ) : (
-          <Text
-            numberOfLines={numLines}
-            style={{
-              textAlign: "center",
-              textAlignVertical: "center",
-              fontSize: 17,
-              ...textStyle,
-              color: sMouseOver ? "black" : textStyle.color || "white",
-            }}
-          >
-            {text}
-          </Text>
-        )}
-      </GradientView>
-    </TouchableOpacity>
-  );
-};
-
 export const TabMenuButton = ({
   onPress,
   text,
@@ -2431,26 +2316,28 @@ export const TabMenuButton = ({
   height,
 }) => {
   return (
-    <Button
+    <Button_
+      // mouseOverOptions={{ opacity: 0.7, backgroundColor: "gray" }}
       onLongPress={onLongPress}
       onPress={onPress}
       text={text}
       textStyle={{
-        textColor: Colors.tabMenuButtonText,
-        color: "whitesmoke",
+        // textColor: Colors.tabMenuButtonText,
+        color: APP_BASE_COLORS.textWhite,
         fontSize: 15,
         ...textStyle,
       }}
+      colorGradientArr={COLOR_GRADIENTS.blue}
       buttonStyle={{
         height,
-        backgroundColor: Colors.tabMenuButton,
-        opacity: isSelected ? 1 : 0.45,
+        // backgroundColor: ,
+        opacity: isSelected ? 1 : 0.5,
         paddingHorizontal: 15,
         width: null,
         paddingVertical: 5,
         ...SHADOW_RADIUS_NOTHING,
-        ...buttonStyle,
         borderRadius: 0,
+        ...buttonStyle,
       }}
     />
   );
@@ -2612,7 +2499,7 @@ export const GradientView = ({
   );
 };
 
-export const _Image = ({
+export const Image_ = ({
   size = 30,
   style = { width: 30, height: 30 },
   resizeMode = "contain",
@@ -2626,4 +2513,137 @@ export const _Image = ({
     (width = size), (height = size);
   }
   return <Image source={icon} style={{ width, height, ...style }} />;
+};
+
+export const Button_ = ({
+  visible = true,
+  icon,
+  ref,
+  iconSize = 25,
+  onPress,
+  onLongPress,
+  numLines = 1,
+  text,
+  enableMouseOver = true,
+  TextComponent,
+  mouseOverOptions = {
+    opacity: 0.6,
+    highlightColor: "lightgray",
+    textColor: "white",
+  },
+  shadow = false,
+  allCaps = false,
+  colorGradientArr = COLOR_GRADIENTS.purple,
+  colorGradientProfile = COLOR_GRADIENT_PROFILES.standard,
+  useColorGradient = true,
+  gradientViewProps = {},
+  buttonStyle = {},
+  textStyle = {},
+  iconStyle = {},
+  // viewStyle = {},
+}) => {
+  const [sMouseOver, _setMouseOver] = React.useState(false);
+  if (allCaps) text = text.toUpperCase();
+  let shadowStyle = SHADOW_RADIUS_PROTO;
+  if (!shadow) shadowStyle = SHADOW_RADIUS_NOTHING;
+  /////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////
+  const HEIGHT = buttonStyle.height;
+  const WIDTH = buttonStyle.width;
+
+  if (!visible) {
+    return (
+      <View
+        style={{ width: WIDTH, height: HEIGHT, backgroundColor: "transparent" }}
+      ></View>
+    );
+  }
+
+  function handleButtonPress() {
+    if (visible) {
+      _setMouseOver(false);
+      onPress();
+    }
+  }
+
+  function getBackgroundColor() {
+    if (sMouseOver) {
+      return mouseOverOptions.highlightColor;
+    } else {
+      if (buttonStyle.backgroundColor) return buttonStyle.backgroundColor;
+      return Colors.tabMenuButton;
+    }
+  }
+
+  function getOpacity() {
+    if (sMouseOver) {
+      return mouseOverOptions.opacity;
+    } else {
+      if (buttonStyle.opacity) return buttonStyle.opacity;
+      return 1;
+    }
+  }
+
+  return (
+    <TouchableOpacity
+      // style={{ ...viewStyle }}
+      ref={ref}
+      onMouseOver={() => (enableMouseOver ? _setMouseOver(true) : null)}
+      onMouseLeave={() => {
+        _setMouseOver(false);
+      }}
+      // on={() => log("here")}
+      onPress={handleButtonPress}
+      onLongPress={visible ? onLongPress : () => {}}
+    >
+      <GradientView
+        colorArr={useColorGradient ? colorGradientArr : []}
+        style={{
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "row",
+          paddingHorizontal: 5,
+          borderRadius: 15,
+          paddingVertical: 5,
+          ...shadowStyle,
+          ...buttonStyle,
+          backgroundColor: icon && !text ? null : getBackgroundColor(),
+          opacity: getOpacity(),
+        }}
+        {...gradientViewProps}
+      >
+        {icon ? (
+          <Image_
+            icon={icon}
+            size={iconSize}
+            style={{
+              marginRight: text ? 10 : 0,
+              ...iconStyle,
+              opacity: sMouseOver
+                ? mouseOverOptions.opacity
+                : buttonStyle.opacity,
+            }}
+          />
+        ) : null}
+        {/* {text ? <Text style={{ ...textStyle }}>{text}</Text> : null} */}
+        {TextComponent ? (
+          <TextComponent />
+        ) : (
+          <Text
+            numberOfLines={numLines}
+            style={{
+              textAlign: "center",
+              textAlignVertical: "center",
+              fontSize: 17,
+              ...textStyle,
+              // color: sMouseOver ? "black" : textStyle.color || "white",
+              color: textStyle.color || APP_BASE_COLORS.textWhite,
+            }}
+          >
+            {text}
+          </Text>
+        )}
+      </GradientView>
+    </TouchableOpacity>
+  );
 };

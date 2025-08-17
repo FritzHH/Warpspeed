@@ -104,13 +104,14 @@ export const TabBar = ({
   >
     <TabMenuButton
       // height={height}
+      buttonStyle={{ borderTopLeftRadius: 15 }}
       onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
       text={TAB_NAMES.optionsTab.quickItems}
       isSelected={
         zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
       }
     />
-    <Divider />
+    {/* <Divider /> */}
     <TabMenuButton
       // height={height}
       onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
@@ -119,7 +120,7 @@ export const TabBar = ({
         zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
       }
     />
-    <TabMenuButton
+    {/* <TabMenuButton
       // height={height}
       onPress={() => __setShowWorkorderModal(true)}
       buttonStyle={{ width: 50 }}
@@ -127,8 +128,8 @@ export const TabBar = ({
       isSelected={
         zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
       }
-    />
-    <Divider />
+    /> */}
+    {/* <Divider /> */}
     {/* <TabMenuButton
       // height={height}
       onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory)}

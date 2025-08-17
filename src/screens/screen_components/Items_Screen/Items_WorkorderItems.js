@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { View, Text, TextInput, FlatList } from "react-native-web";
+import { View, Text, TextInput, FlatList, Image } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
@@ -13,14 +13,24 @@ import {
   TabMenuDivider as Divider,
   Button,
   ScreenModal,
+  GradientView,
+  _Image,
 } from "../../../components";
-import { Colors } from "../../../styles";
+import {
+  APP_BASE_COLORS,
+  BUTTON_VARS,
+  COLOR_GRADIENTS,
+  Colors,
+  ICON_PATHS,
+  ICONS,
+} from "../../../styles";
 import {
   WORKORDER_PROTO,
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   SETTINGS_OBJ,
   DISCOUNT_OBJ_PROTO,
+  COLORS,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
@@ -35,6 +45,8 @@ import {
   dbSetClosedWorkorderItem,
   dbSetOpenWorkorderItem,
 } from "../../../db_call_wrapper";
+import LinearGradient from "react-native-web-linear-gradient";
+// import {} from '../../../assets/tools1.png'
 
 export const Items_WorkorderItemsTab = ({}) => {
   // store setters ///////////////////////////////////////////////////////////////
@@ -331,22 +343,36 @@ export const Items_WorkorderItemsTab = ({}) => {
             </Text>
           </Text>
           {!zWorkorderObj?.isStandaloneSale ? (
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                height: 25,
-                paddingHorizontal: 7,
-                paddingVertical: 2,
-                borderRadius: 5,
+            <LinearGradient
+              colors={[...COLOR_GRADIENTS.green]}
+              style={{
                 width: 150,
-                // backgroundColor: zIsCheckingOut ? "red" : "green",
-                // marginRight: 5,
+                height: 30,
+                borderRadius: 15,
+                alignItems: "center",
+                justifyContent: "center",
               }}
-              // text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
-              text={"Check Out"}
-              onPress={checkoutPressed}
-            />
-          ) : null}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={{ color: "white" }}>Check Out</Text>
+            </LinearGradient>
+          ) : // <Button
+          //   textStyle={{ color: "white" }}
+          //   buttonStyle={{
+          //     height: 25,
+          //     paddingHorizontal: 7,
+          //     paddingVertical: 2,
+          //     borderRadius: 5,
+          //     width: 150,
+          //     // backgroundColor: zIsCheckingOut ? "red" : "green",
+          //     // marginRight: 5,
+          //   }}
+          //   // text={zIsCheckingOut ? "Cancel Checkout" : "Check Out"}
+          //   text={"Check Out"}
+          //   onPress={checkoutPressed}
+          // />
+          null}
         </View>
       </View>
     );
@@ -402,11 +428,15 @@ export const LineItemComponent = ({
             flexDirection: "row",
             width: "100%",
             alignItems: "center",
-            backgroundColor: "white",
+            backgroundColor: "whitesmoke",
             paddingVertical: 0,
             paddingHorizontal: 2,
             marginVertical: 1,
             marginHorizontal: 5,
+            borderColor: "transparent",
+            borderLeftColor: "green",
+            borderWidth: 2,
+            borderRadius: 15,
           }}
         >
           <View
@@ -490,7 +520,7 @@ export const LineItemComponent = ({
                 // marginRight: 5,
               }}
             >
-              <Button
+              {/* <Button
                 onPress={() =>
                   __modQtyPressed(inventoryItem, workorderLine, "up", index)
                 }
@@ -503,49 +533,44 @@ export const LineItemComponent = ({
                 textStyle={{ color: Colors.tabMenuButton, fontSize: 30 }}
                 text={"\u2B06"}
                 shadow={false}
-              />
-              {/* <Button
-              onPress={() =>
-                __modQtyPressed(inventoryItem, workorderLine, "down", index)
-              }
-              buttonStyle={{
-                marginHorizontal: 5,
-                // marginLeft: 10,
-                borderRadius: 3,
-                width: 20,
-                height: 35,
-              }}
-              textStyle={{ color: Colors.tabMenuButton, fontSize: 30 }}
-              text={"\u2B07"}
-              shadow={false}
-            /> */}
-              <TextInput
+              /> */}
+              <_Image icon={ICONS.upArrowOrange} size={28} />
+              <GradientView
                 style={{
-                  marginLeft: 4,
-                  fontSize: 18,
-                  fontWeight: 700,
+                  marginLeft: 7,
+                  borderRadius: 15,
                   width: 35,
-                  textAlign: "center",
-                  color: "dimgray",
-                  paddingVertical: 3,
-                  borderWidth: workorderLine.qty === 0 ? 3 : 1,
-                  borderColor: workorderLine.qty === 0 ? "red" : "lightgray",
-                  outlineWidth: 0,
+                  height: 25,
                 }}
-                value={sTempQtyVal === "" ? sTempQtyVal : workorderLine.qty}
-                onChangeText={(val) => {
-                  if (isNaN(val) || val < 0) return;
-                  if (val === "") {
-                    _setTempQtyVal("");
-                    val = 0;
-                  } else {
-                    _setTempQtyVal(null);
-                  }
-                  let line = structuredClone(workorderLine);
-                  line.qty = Number(val);
-                  __setWorkorderLineItem(line, inventoryItem);
-                }}
-              />
+              >
+                <TextInput
+                  style={{
+                    // marginLeft: 4,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    // width: 40,
+                    textAlign: "center",
+                    color: APP_BASE_COLORS.textWhite,
+                    // paddingVertical: 3,
+                    // borderWidth: workorderLine.qty === 0 ? 3 : 1,
+                    // borderColor: workorderLine.qty === 0 ? "red" : "lightgray",
+                    outlineWidth: 0,
+                  }}
+                  value={sTempQtyVal === "" ? sTempQtyVal : workorderLine.qty}
+                  onChangeText={(val) => {
+                    if (isNaN(val) || val < 0) return;
+                    if (val === "") {
+                      _setTempQtyVal("");
+                      val = 0;
+                    } else {
+                      _setTempQtyVal(null);
+                    }
+                    let line = structuredClone(workorderLine);
+                    line.qty = Number(val);
+                    __setWorkorderLineItem(line, inventoryItem);
+                  }}
+                />
+              </GradientView>
             </View>
             <View
               style={{
@@ -594,10 +619,11 @@ export const LineItemComponent = ({
               style={{
                 flexDirection: "row",
                 justifyContent: "flex-end",
-                marginLeft: 3,
+                marginLeft: 7,
               }}
             >
-              <Button
+              <_Image size={28} icon={ICONS.editPencil} />
+              {/* <Button
                 onPress={() =>
                   __setButtonsRowID(
                     workorderLine.id === ssButtonsRowID
@@ -625,7 +651,7 @@ export const LineItemComponent = ({
                   borderRadius: 3,
                   marginLeft: 2,
                 }}
-              />
+              /> */}
             </View>
           </View>
         </View>

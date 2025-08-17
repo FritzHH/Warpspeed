@@ -539,3 +539,15 @@ export function getDisplayFormatDateTime(millis, includeYear) {
   str = str + ` '` + year.substring(2, 4);
   return str;
 }
+
+export function lightenRGB(r, g, b, amount) {
+  // Ensure amount is within a reasonable range (e.g., 0-100)
+  amount = Math.max(0, Math.min(100, amount));
+
+  // Increase each color component, capping at 255
+  r = Math.min(255, r + amount);
+  g = Math.min(255, g + amount);
+  b = Math.min(255, b + amount);
+
+  return { r, g, b };
+}

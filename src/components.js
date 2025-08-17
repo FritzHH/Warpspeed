@@ -25,7 +25,12 @@ import {
   removeDashesFromPhone,
   trimToTwoDecimals,
 } from "./utils";
-import { Colors, Fonts } from "./styles";
+import {
+  COLOR_GRADIENT_PROFILES,
+  COLOR_GRADIENTS,
+  Colors,
+  Fonts,
+} from "./styles";
 import { useState } from "react";
 import {
   FOCUS_NAMES,
@@ -66,7 +71,7 @@ import {
 } from "./db_subscription_wrapper";
 import Dropzone from "react-dropzone";
 import { CheckBox as RNCheckBox } from "react-native-web";
-import { messagesSubscribe } from "./db_subscription_wrapper";
+import LinearGradient from "react-native-web-linear-gradient";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -2366,7 +2371,7 @@ const BicycleSpinner = ({ width = 100, height = 100 }) => {
           height,
           transform: [{ rotate: spin }],
         }}
-        source={require("./assets/bicycle.png")}
+        // source={require("./assets/")}
       />
     </View>
   );
@@ -2462,4 +2467,44 @@ export const ColorSelectorModalComponent = ({ onSelect }) => {
       }}
     ></View>
   );
+};
+
+export const GradientView = ({
+  gradientProfile = COLOR_GRADIENT_PROFILES.standard,
+  colorArr = COLOR_GRADIENTS.blue,
+  children,
+  style,
+  props,
+}) => {
+  return (
+    <LinearGradient
+      colors={[...colorArr]}
+      start={gradientProfile.start}
+      end={gradientProfile.end}
+      style={{ justifyContent: "center", alignItems: "center", ...style }}
+      {...props}
+    >
+      {children}
+    </LinearGradient>
+  );
+};
+
+export const _Image = (
+  {
+    size = 30,
+    customSizeObj = { width: "", height: "" },
+    resizeMode = "contain",
+    icon = "",
+  },
+
+  style = {}
+) => {
+  let width, height;
+  if (customSizeObj.width) {
+    width = customSizeObj.width;
+    height = customSizeObj.height;
+  } else {
+    (width = size), (height = size);
+  }
+  return <Image source={icon} style={{ width, height, ...style }} />;
 };

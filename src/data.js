@@ -534,6 +534,7 @@ export const SETTINGS_OBJ = {
       isOpen: true,
     },
   },
+  specialStoreHours: [{ name: "4th of July", dateMillies: 123434455544 }],
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   loginTimeout: 15,

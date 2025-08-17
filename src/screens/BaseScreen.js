@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import { Button } from "react-native-web";
-import { Colors, ViewStyles } from "../styles";
+import { APP_BASE_COLORS, Colors, ViewStyles } from "../styles";
 
 import {
   clog,
@@ -157,7 +157,7 @@ export function BaseScreen() {
       <View
         style={{
           width: "65%",
-          backgroundColor: Colors.mainBackground,
+          backgroundColor: APP_BASE_COLORS.backgroundWhite,
           height: "100%",
         }}
       >
@@ -182,9 +182,18 @@ export function BaseScreen() {
             style={{
               width: "66%",
               height: "100%",
-              backgroundColor: Colors.opacityBackgroundLight,
+              backgroundColor: APP_BASE_COLORS.backgroundWhite,
+              borderColor: APP_BASE_COLORS.buttonLightGreen,
+              borderWidth: 1,
+              borderRadius: 15,
               // backgroundColor: "red",
-              ...SHADOW_RADIUS_PROTO,
+              shadowColor: APP_BASE_COLORS.green,
+              shadowOffset: {
+                width: 4,
+                height: 4,
+              },
+              shadowOpacity: 0.5,
+              shadowRadius: 15,
             }}
           >
             <Items_Section />
@@ -203,7 +212,18 @@ export function BaseScreen() {
         style={{
           width: "35%",
           height: "100%",
-          backgroundColor: Colors.opacityBackgroundLight,
+          backgroundColor: APP_BASE_COLORS.backgroundWhite,
+          borderColor: APP_BASE_COLORS.green,
+          borderWidth: 1,
+          borderRadius: 15,
+          // backgroundColor: "red",
+          shadowColor: APP_BASE_COLORS.green,
+          shadowOffset: {
+            width: 4,
+            height: 4,
+          },
+          shadowOpacity: 0.5,
+          shadowRadius: 15,
         }}
       >
         <Options_Section />

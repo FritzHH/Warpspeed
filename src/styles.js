@@ -29,6 +29,54 @@ export const Colors = {
   darkTextOnMainBackground: "rgb(30, 30, 30)",
 };
 
+export const APP_BASE_COLORS = {
+  green: "rgb(33, 148, 86)",
+  purple: "",
+  orange: "",
+  blue: "rgb(53, 135, 210)",
+
+  backgroundWhite: "rgb(240, 241, 251)",
+  backgroundListWhite: "rgb(251, 251, 254)",
+
+  listItemWhite: "rgb(254, 254, 255)",
+
+  buttonLightGreen: "rgb(232, 239, 245)",
+  buttonLightGreenOutline: "rgb(200, 228, 220)",
+
+  // outlineMain: ''
+
+  textMain: "rgb(45, 55, 72)",
+  textWhite: "rgb(255, 255, 255)",
+};
+
+export const COLOR_GRADIENTS = {
+  green: ["rgb(71,185,119)", APP_BASE_COLORS.green],
+  purple: [],
+  blue: ["rgb(96, 152, 202)", APP_BASE_COLORS.blue],
+};
+
+export const COLOR_GRADIENT_PROFILES = {
+  standard: {
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 0 },
+  },
+};
+
+export const BUTTON_VARS = {
+  radius: {
+    rounded: 15,
+    squared: 8,
+  },
+};
+
+const ASSETS_PATH = "./assets/";
+export const ICONS = {
+  tools1: require(ASSETS_PATH + "tools1.png"),
+  upArrowOrange: require(ASSETS_PATH + "up_arrow_orange.png"),
+  editPencil: require(ASSETS_PATH + "edit_pencil.png"),
+};
+
+// rgb(64, 174, 113)
 export const Fonts = {
   colors: {},
   weight: {

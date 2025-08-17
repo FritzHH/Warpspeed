@@ -15,6 +15,7 @@ import {
   ScreenModal,
   GradientView,
   _Image,
+  _Button,
 } from "../../../components";
 import {
   APP_BASE_COLORS,
@@ -133,6 +134,8 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   function deleteWorkorderLineItem(index) {
+    //     log("need to fix this method");
+    // return;
     let fun = () => {
       let woCopy = cloneDeep(zWorkorderObj);
       woCopy.workorderLines.splice(index, 1);
@@ -144,6 +147,8 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   function modQtyPressed(inventoryItem, workorderLine, option, idx) {
+    log("need to fix this method");
+    return;
     let fun = () => {
       let newWOLine = cloneDeep(workorderLine);
       let wo = cloneDeep(zWorkorderObj);
@@ -173,6 +178,8 @@ export const Items_WorkorderItemsTab = ({}) => {
   function editWorkorderLine(workorderLine, inventoryItem) {
     // log("adding new wo line");
     // log(workorderLine.qty);
+    //     log("need to fix this method");
+    // return;
 
     let fun = () => {
       let newWOLine = cloneDeep(workorderLine);
@@ -428,13 +435,13 @@ export const LineItemComponent = ({
             flexDirection: "row",
             width: "100%",
             alignItems: "center",
-            backgroundColor: "whitesmoke",
+            backgroundColor: APP_BASE_COLORS.backgroundListWhite,
             paddingVertical: 0,
-            paddingHorizontal: 2,
+            paddingHorizontal: 0,
             marginVertical: 1,
             marginHorizontal: 5,
             borderColor: "transparent",
-            borderLeftColor: "green",
+            borderLeftColor: APP_BASE_COLORS.green,
             borderWidth: 2,
             borderRadius: 15,
           }}
@@ -448,27 +455,30 @@ export const LineItemComponent = ({
               // backgroundColor: "green",
             }}
           >
-            <Button
+            <_Button
               onPress={() => __deleteWorkorderLine(index)}
-              text={"X"}
+              icon={ICONS.close1}
+              iconSize={17}
               buttonStyle={{
-                width: null,
-                height: null,
                 backgroundColor: "transparent",
-                // shadowOffset: { width: 1, height: 1 },
-                marginHorizontal: 1,
-                marginRight: 10,
-                padding: 5,
-                paddingVertical: 10,
-                borderRadius: 3,
+
+                // width: null,
+                // height: null,
+                // backgroundColor: "transparent",
+                // // shadowOffset: { width: 1, height: 1 },
+                // marginHorizontal: 1,
+                // marginRight: 10,
+                // padding: 5,
+                // paddingVertical: 10,
+                // borderRadius: 3,
               }}
-              mouseOverOptions={{
-                enable: true,
-                opacity: 0.7,
-                highlightColor: "red",
-              }}
-              shadow={false}
-              textStyle={{ color: "lightgray", fontSize: 17, fontWeight: 600 }}
+              // mouseOverOptions={{
+              //   enable: true,
+              //   opacity: 0.7,
+              //   highlightColor: "red",
+              // }}
+              // shadow={false}
+              // textStyle={{ color: "lightgray", fontSize: 17, fontWeight: 600 }}
             />
             <View>
               {workorderLine.discountObj.discountName ? (
@@ -520,41 +530,34 @@ export const LineItemComponent = ({
                 // marginRight: 5,
               }}
             >
-              {/* <Button
+              <_Button
                 onPress={() =>
                   __modQtyPressed(inventoryItem, workorderLine, "up", index)
                 }
                 buttonStyle={{
-                  borderRadius: 3,
-                  width: 30,
-                  height: 40,
-                  marginRight: 10,
+                  backgroundColor: "transparent",
+                  // width: null,
+                  // height: null,
                 }}
-                textStyle={{ color: Colors.tabMenuButton, fontSize: 30 }}
-                text={"\u2B06"}
-                shadow={false}
-              /> */}
-              <_Image icon={ICONS.upArrowOrange} size={28} />
+                icon={ICONS.upArrowOrange}
+              />
               <GradientView
                 style={{
                   marginLeft: 7,
                   borderRadius: 15,
                   width: 35,
                   height: 25,
+                  // backgroundColor: "green",
                 }}
               >
                 <TextInput
                   style={{
-                    // marginLeft: 4,
                     fontSize: 18,
                     fontWeight: 700,
-                    // width: 40,
                     textAlign: "center",
                     color: APP_BASE_COLORS.textWhite,
-                    // paddingVertical: 3,
-                    // borderWidth: workorderLine.qty === 0 ? 3 : 1,
-                    // borderColor: workorderLine.qty === 0 ? "red" : "lightgray",
                     outlineWidth: 0,
+                    width: "100%",
                   }}
                   value={sTempQtyVal === "" ? sTempQtyVal : workorderLine.qty}
                   onChangeText={(val) => {

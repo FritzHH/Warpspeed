@@ -54,7 +54,8 @@ const babelLoaderConfiguration = {
 };
 
 const imageLoaderConfiguration = {
-  test: /\.(gif|jpe?g|png|svg)$/,
+  test: /\.(gif|jpe?g|png|svg|ttf)$/,
+  include: path.resolve(__dirname, "node_modules/react-native-vector-icons"),
   use: {
     loader: "url-loader",
     options: {
@@ -79,6 +80,7 @@ module.exports = {
     extensions: [".web.js", ".js", ".json"],
     alias: {
       "react-native$": "react-native-web",
+      "react-native-linear-gradient": "react-native-web-linear-gradient",
     },
   },
   plugins: [

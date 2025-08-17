@@ -30,6 +30,8 @@ import {
 } from "../../../db_call_wrapper";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { getDatabase } from "firebase/database";
+import LinearGradient from "react-native-web-linear-gradient";
+// import Icon from "react-native-vector-icons/FontAwesome";
 
 const numMillisInDay = 86400000; // millis in day
 const numMillisOneWeek = numMillisInDay * 7;
@@ -342,6 +344,19 @@ export function WorkordersComponent({}) {
                       // backgroundColor: "green",
                     }}
                   >
+                    <LinearGradient
+                      colors={["#4c669f", "#3b5998", "#192f6a"]}
+                      style={{
+                        width: 100,
+                        height: 50,
+                        borderRadius: 15,
+                        alignItems: "center",
+                      }}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                    >
+                      <Text style={{}}>Hello</Text>
+                    </LinearGradient>
                     {/* <View style={{ alignItems: "flex-end", paddingRight: 20 }}> */}
                     <View
                       style={{
@@ -358,9 +373,21 @@ export function WorkordersComponent({}) {
                           paddingHorizontal: 15,
                           paddingVertical: 2,
                           alignItems: "center",
-                          borderRadius: 5,
+                          borderRadius: 15,
+                          borderColor: "transparent",
+
+                          borderLeftColor: workorder.status.textColor,
                         }}
                       >
+                        <Text
+                          style={{
+                            color: workorder.status.textColor,
+                            fontSize: 14,
+                          }}
+                        >
+                          {workorder.status.label}
+                        </Text>
+                        {/* </LinearGradient> */}
                         <Text
                           style={{
                             color: workorder.status.textColor,

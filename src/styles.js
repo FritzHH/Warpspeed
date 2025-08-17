@@ -51,7 +51,7 @@ export const APP_BASE_COLORS = {
 
 export const COLOR_GRADIENTS = {
   green: ["rgb(71,185,119)", APP_BASE_COLORS.green],
-  purple: [],
+  purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
   blue: ["rgb(96, 152, 202)", APP_BASE_COLORS.blue],
 };
 
@@ -83,6 +83,9 @@ export const ICONS = {
   cashRed: require(ASSETS_PATH + "cashRed.png"),
   cellPhone: require(ASSETS_PATH + "cell.png"),
   home: require(ASSETS_PATH + "home.png"),
+  reset1: require(ASSETS_PATH + "reset.png"),
+  gears1: require(ASSETS_PATH + "gears1.png"),
+  notes: require(ASSETS_PATH + "notes.png"),
 };
 
 // rgb(64, 174, 113)

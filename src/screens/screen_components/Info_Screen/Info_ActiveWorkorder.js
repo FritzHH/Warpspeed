@@ -182,9 +182,22 @@ export const ActiveWorkorderComponent = ({}) => {
           flex: 1,
           justifyContent: "space-between",
           alignItems: "center",
-          // paddingRight: 7,
+          paddingBottom: 10,
+          paddingTop: 5,
           paddingHorizontal: 5,
-          backgroundColor: null,
+          backgroundColor: APP_BASE_COLORS.backgroundListWhite,
+          borderRadius: 15,
+          shadowColor: APP_BASE_COLORS.green,
+          backgroundColor: APP_BASE_COLORS.backgroundWhite,
+          borderColor: APP_BASE_COLORS.buttonLightGreen,
+          borderWidth: 1,
+          borderRadius: 15,
+          shadowOffset: {
+            width: 2,
+            height: 2,
+          },
+          shadowOpacity: 0.5,
+          shadowRadius: 15,
         }}
       >
         <View

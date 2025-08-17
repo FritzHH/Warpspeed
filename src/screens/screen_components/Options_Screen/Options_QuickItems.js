@@ -8,7 +8,12 @@ import {
   SETTINGS_OBJ,
   TAB_NAMES,
 } from "../../../data";
-import { Colors } from "../../../styles";
+import {
+  APP_BASE_COLORS,
+  COLOR_GRADIENTS,
+  Colors,
+  ICONS,
+} from "../../../styles";
 
 import {
   dim,
@@ -19,6 +24,7 @@ import {
 import {
   AlertBox,
   Button,
+  Button_,
   InventoryItemScreeenModalComponent,
   ScreenModal,
   SHADOW_RADIUS_NOTHING,
@@ -223,11 +229,15 @@ export function QuickItemComponent({ __screenHeight }) {
           alignItems: "center",
         }}
       >
-        <Button
+        <Button_
+          icon={ICONS.reset1}
+          iconSize={30}
           onPress={() => clearSearch()}
-          text={"reset"}
-          textStyle={{ color: "darkgray", fontSize: 14 }}
-          buttonStyle={{ height: 30 }}
+          useColorGradient={false}
+          // colorGradientArr={null}
+          // text={"reset"}
+          // textStyle={{ color: "darkgray", fontSize: 14 }}
+          // buttonStyle={{ height: 30 }}
         />
         <TextInput
           style={{
@@ -240,14 +250,17 @@ export function QuickItemComponent({ __screenHeight }) {
             marginLeft: 20,
             marginRight: 30,
           }}
-          placeholder="Search inventory..."
+          placeholder="Search inventory"
           placeholderTextColor={"darkgray"}
           value={sSearchTerm}
           onChangeText={(val) => search(val)}
         />
-        <Button
-          buttonStyle={{ width: null }}
-          text={"+"}
+        <Button_
+          icon={ICONS.new}
+          iconSize={35}
+          useColorGradient={false}
+          // buttonStyle={{ width: null }}
+          // text={"+"}
           onPress={() => {
             _setModalInventoryObjIdx(-1);
             _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
@@ -267,31 +280,35 @@ export function QuickItemComponent({ __screenHeight }) {
         {/**Quick items buttons vertical list */}
         <View
           style={{
-            justifyContent: "space-around",
+            justifyContent: "flex-start",
             // backgroundColor: "red",
-            width: "15%",
-            borderRightWidth: 1,
-            borderColor: "gray",
-            paddingHorizontal: 1,
-            paddingBottom: 20,
+            width: "20%",
+            // borderRightWidth: 1,
+            // borderColor: "gray",
+            paddingHorizontal: 2,
+            // marginBottom: 30,
+            // paddingBottom: 20,
             // height: "50%",
             // maxHeight: "100%",
           }}
         >
           {zSettingsObj?.quickItemButtonNames?.map((item) => (
-            <Button
+            <Button_
               onPress={() => handleQuickButtonPress(item)}
-              // numLines={2}
+              colorGradientArr={COLOR_GRADIENTS.purple}
               buttonStyle={{
                 ...SHADOW_RADIUS_NOTHING,
-                borderBottomWidth: 1,
-                borderColor: "darkgray",
-                paddingHorizontal: 3,
+                borderWidth: 1,
+                borderRadius: 5,
+                borderColor: APP_BASE_COLORS.buttonLightGreen,
+                borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                marginBottom: 10,
+                // paddingHorizontal: 3,
                 // height: 100,
                 // marginVertical: 30,
               }}
-              textStyle={{ fontSize: 16 }}
-              text={item.name}
+              textStyle={{ fontSize: 14, fontWeight: 400 }}
+              text={item.name.toUpperCase()}
             />
           ))}
         </View>
@@ -299,7 +316,7 @@ export function QuickItemComponent({ __screenHeight }) {
         <View
           style={{
             height: "100%",
-            width: "85%",
+            width: "80%",
             paddingTop: 10,
             paddingLeft: 3,
             paddingRight: 3,

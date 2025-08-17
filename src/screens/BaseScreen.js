@@ -161,6 +161,8 @@ export function BaseScreen() {
           <View
             style={{
               width: "33%",
+              paddingRight: 10,
+              paddingLeft: 3,
               // height: "40%",
               // backgro
             }}
@@ -192,6 +194,8 @@ export function BaseScreen() {
           style={{
             width: "100%",
             height: "35%",
+            paddingTop: 20,
+            paddingHorizontal: 15,
           }}
         >
           <Notes_Section />

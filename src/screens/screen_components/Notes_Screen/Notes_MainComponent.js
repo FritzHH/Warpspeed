@@ -23,8 +23,10 @@ import {
   ModalDropdown,
   TextInputOnMainBackground,
   TextInputLabelOnMainBackground,
+  Image_,
+  SHADOW_RADIUS_PROTO,
 } from "../../../components";
-import { Colors } from "../../../styles";
+import { APP_BASE_COLORS, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -165,12 +167,31 @@ export function Notes_MainComponent() {
   if (!zWorkorderObj) return null;
 
   return (
-    <View style={{ flex: 1, paddingTop: 20 }}>
+    <View
+      style={{
+        // justifySelf: "center",
+        height: "97%",
+        backgroundColor: APP_BASE_COLORS.backgroundListWhite,
+        borderRadius: 15,
+        shadowColor: APP_BASE_COLORS.green,
+        backgroundColor: APP_BASE_COLORS.backgroundWhite,
+        borderColor: APP_BASE_COLORS.buttonLightGreen,
+        borderWidth: 1,
+        borderRadius: 15,
+        shadowOffset: {
+          width: 2,
+          height: 2,
+        },
+        shadowOpacity: 0.5,
+        shadowRadius: 15,
+      }}
+    >
       <View
         style={{
-          paddingTop: 20,
+          paddingTop: 5,
           paddingHorizontal: 5,
           flexDirection: "row",
+          // height: "100%",
           // flex: 1,
         }}
       >
@@ -188,9 +209,24 @@ export function Notes_MainComponent() {
               onPress={() => outsideClicked("customer")}
             >
               <View
-                style={{ width: "100%", height: 40, justifyContent: "center" }}
+                style={{
+                  flexDirection: "row",
+                  width: "100%",
+                  height: 40,
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                }}
               >
-                <Text style={{ color: "lightgray", marginBottom: 5 }}>
+                <Image_ icon={ICONS.notes} />
+                <Text
+                  style={{
+                    fontSize: 15,
+                    color: APP_BASE_COLORS.textMain,
+                    fontWeight: "bold",
+                    marginBottom: 5,
+                    marginLeft: 10,
+                  }}
+                >
                   {"Customer Notes"}
                 </Text>
               </View>
@@ -254,22 +290,38 @@ export function Notes_MainComponent() {
             </View>
           </View>
         </TouchableWithoutFeedback>
+        {/* <View style={{ height: "100%", width: 1, backgroundColor: "gray" }} /> */}
         <View
           style={{
             width: "50%",
             height: "100%",
             backgroundColor: null,
             flexDirection: "column",
-            borderLeftWidth: 1,
+            // borderLeftWidth: 1,
             borderColor: "lightgray",
             paddingLeft: 10,
           }}
         >
           <TouchableWithoutFeedback onPress={() => outsideClicked("internal")}>
             <View
-              style={{ width: "100%", height: 40, justifyContent: "center" }}
+              style={{
+                flexDirection: "row",
+                width: "100%",
+                height: 40,
+                justifyContent: "flex-start",
+                alignItems: "center",
+              }}
             >
-              <Text style={{ color: "lightgray", marginBottom: 5 }}>
+              <Image_ icon={ICONS.gears1} />
+              <Text
+                style={{
+                  marginLeft: 10,
+                  fontSize: 15,
+                  color: APP_BASE_COLORS.textMain,
+                  fontWeight: "bold",
+                  marginBottom: 5,
+                }}
+              >
                 {"Internal Notes"}
               </Text>
             </View>

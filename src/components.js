@@ -2533,7 +2533,7 @@ export const Button_ = ({
   },
   shadow = false,
   allCaps = false,
-  colorGradientArr = COLOR_GRADIENTS.purple,
+  colorGradientArr = [],
   colorGradientProfile = COLOR_GRADIENT_PROFILES.standard,
   useColorGradient = true,
   gradientViewProps = {},
@@ -2597,7 +2597,7 @@ export const Button_ = ({
       onLongPress={visible ? onLongPress : () => {}}
     >
       <GradientView
-        colorArr={useColorGradient ? colorGradientArr : []}
+        colorArr={colorGradientArr}
         style={{
           alignItems: "center",
           justifyContent: "center",

@@ -126,8 +126,9 @@ export function BaseScreen() {
         height: screenHeight,
         flexDirection: "row",
         justifyContent: "space-around",
-        paddingVertical: 5,
-        paddingHorizontal: 5,
+        padding: 8,
+        // paddingVertical: 8,
+        // paddingHorizontal: 8,
       }}
     >
       <div
@@ -145,6 +146,7 @@ export function BaseScreen() {
       />
       <View
         style={{
+          // marginVertical: 8,
           width: "65%",
           backgroundColor: APP_BASE_COLORS.backgroundWhite,
           height: "100%",
@@ -195,7 +197,7 @@ export function BaseScreen() {
             width: "100%",
             height: "35%",
             paddingTop: 20,
-            paddingHorizontal: 15,
+            paddingRight: 10,
           }}
         >
           <Notes_Section />

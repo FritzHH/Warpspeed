@@ -327,6 +327,7 @@ export const ScreenModal = ({
   setModalVisibility = () => {},
   shadowStyle = { ...SHADOW_RADIUS_PROTO },
   buttonIcon,
+  buttonIconStyle = {},
   handleModalActionInternally = false,
   // canExitOnOuterModalClick = true,
   handleOuterClick = () => {},
@@ -353,8 +354,6 @@ export const ScreenModal = ({
     }
   }, []);
 
-  if (showButtonIcon && !buttonIcon) buttonIcon = "\u21b4";
-  if (allCaps) buttonLabel = buttonLabel.toUpperCase();
   if (!showShadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   if (!showOuterModal)
     outerModalStyle = { ...outerModalStyle, width: null, height: null };
@@ -372,7 +371,9 @@ export const ScreenModal = ({
     >
       <View style={{}}>
         {buttonVisible ? (
-          <Button
+          <Button_
+            icon={buttonIcon}
+            iconStyle={buttonIconStyle}
             text={buttonLabel}
             onPress={() => {
               handleButtonPress();
@@ -422,9 +423,7 @@ export const ScreenModal = ({
               left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
             }}
           >
-            {/* <TouchableWithoutFeedback onClick={() => log("clicked")}> */}
             <Component />
-            {/* </TouchableWithoutFeedback> */}
           </View>
         </Modal>
       </View>
@@ -435,6 +434,7 @@ export const ScreenModal = ({
 export const DropdownMenu = ({
   dataArr = [],
   onSelect,
+  buttonIcon,
   currentSelectionIdx,
   itemTextStyle = {},
   itemViewStyle = {},
@@ -459,6 +459,7 @@ export const DropdownMenu = ({
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sModalVisible, _setModalVisible] = useState(false);
   const DropdownComponent = () => {
+    log(itemViewStyle);
     return (
       <FlatList
         data={dataArr}
@@ -477,15 +478,17 @@ export const DropdownMenu = ({
           item = item.item;
           // log(item);
           return (
-            <Button
+            <Button_
+              icon={buttonIcon}
               mouseOverOptions={mouseOverOptions}
               enableMouseOver={enableMouseoverListItem}
               buttonStyle={{
                 padding: 10,
                 height: 40,
                 width: 130,
-                ...itemViewStyle,
                 backgroundColor: item.backgroundColor,
+                ...itemViewStyle,
+                // borderRadius: 0,
               }}
               textStyle={{ ...itemTextStyle, color: item.textColor }}
               // mouseOverOptions={{ opacity: 1 }}
@@ -510,6 +513,7 @@ export const DropdownMenu = ({
       buttonTextStyle={buttonTextStyle}
       buttonLabel={buttonText}
       ref={ref}
+      buttonIcon={buttonIcon}
       modalCoordinateVars={modalCoordinateVars}
       showShadow={showButtonShadow}
       mouseOverOptions={mouseOverOptions}
@@ -742,10 +746,10 @@ export const InventoryItemScreeenModalComponent = ({
     _setItem(item);
 
     if (!sNewItem)
-      _zExecute(() => {
-        _zModInventoryItem(item, "change");
-        dbSetInventoryItem(item);
-      }, PRIVILEDGE_LEVELS.superUser);
+      // _zExecute(() => {
+      _zModInventoryItem(item, "change");
+    dbSetInventoryItem(item);
+    // }, PRIVILEDGE_LEVELS.superUser);
   }
 
   function handleQuickButtonRemove(qBItemToRemove, objIdx) {
@@ -1052,10 +1056,10 @@ export const CustomerInfoScreenModalComponent = ({
   // automatically save customer changes if it is NOT a new customer creation
   useEffect(() => {
     if (ssCustomerInfoObj?.id)
-      _zExecute(() => {
-        _zSetCurrentCustomer(ssCustomerInfoObj);
-        dbSetCustomerObj(ssCustomerInfoObj);
-      });
+      // _zExecute(() => {
+      _zSetCurrentCustomer(ssCustomerInfoObj);
+    dbSetCustomerObj(ssCustomerInfoObj);
+    // });
   }, [ssCustomerInfoObj]);
 
   const TEXT_INPUT_STYLE = {
@@ -2517,7 +2521,7 @@ export const Image_ = ({
 
 export const Button_ = ({
   visible = true,
-  icon,
+  icon = null,
   ref,
   iconSize = 25,
   onPress,
@@ -2583,6 +2587,7 @@ export const Button_ = ({
       return 1;
     }
   }
+  // log(icon, text);
 
   return (
     <TouchableOpacity
@@ -2635,6 +2640,7 @@ export const Button_ = ({
               textAlign: "center",
               textAlignVertical: "center",
               fontSize: 17,
+              // backgroundColor: "green",
               ...textStyle,
               // color: sMouseOver ? "black" : textStyle.color || "white",
               color: textStyle.color || APP_BASE_COLORS.textWhite,

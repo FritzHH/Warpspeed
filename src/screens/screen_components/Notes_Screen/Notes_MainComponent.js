@@ -170,8 +170,7 @@ export function Notes_MainComponent() {
     <View
       style={{
         // justifySelf: "center",
-        height: "97%",
-        backgroundColor: APP_BASE_COLORS.backgroundListWhite,
+        height: "100%",
         borderRadius: 15,
         shadowColor: APP_BASE_COLORS.green,
         backgroundColor: APP_BASE_COLORS.backgroundWhite,
@@ -184,6 +183,8 @@ export function Notes_MainComponent() {
         },
         shadowOpacity: 0.5,
         shadowRadius: 15,
+        // flexDirection: "row",
+        // paddingTop: 5,
       }}
     >
       <View
@@ -193,6 +194,8 @@ export function Notes_MainComponent() {
           flexDirection: "row",
           // height: "100%",
           // flex: 1,
+
+          // backgroundColor: "green",
         }}
       >
         <TouchableWithoutFeedback onPress={() => outsideClicked("customer")}>
@@ -200,7 +203,6 @@ export function Notes_MainComponent() {
             style={{
               width: "50%",
               height: "100%",
-              backgroundColor: null,
               flexDirection: "column",
               paddingRight: 10,
             }}
@@ -215,6 +217,10 @@ export function Notes_MainComponent() {
                   height: 40,
                   justifyContent: "flex-start",
                   alignItems: "center",
+                  borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                  borderWidth: 1,
+                  borderRadius: 15,
+                  marginBottom: 5,
                 }}
               >
                 <Image_ icon={ICONS.notes} />
@@ -223,7 +229,7 @@ export function Notes_MainComponent() {
                     fontSize: 15,
                     color: APP_BASE_COLORS.textMain,
                     fontWeight: "bold",
-                    marginBottom: 5,
+                    // marginBottom: 5,
                     marginLeft: 10,
                   }}
                 >
@@ -232,7 +238,12 @@ export function Notes_MainComponent() {
               </View>
             </TouchableWithoutFeedback>
 
-            <View style={{ height: "100%" }}>
+            <View
+              style={{
+                height: "100%",
+                width: "100%",
+              }}
+            >
               <FlatList
                 keyExtractor={(i, idx) => idx}
                 data={zWorkorderObj.customerNotes}
@@ -250,13 +261,14 @@ export function Notes_MainComponent() {
                           // paddingVertical: 3,
                           flexDirection: "row",
                           alignItems: "center",
+                          borderRadius: 5,
+                          backgroundColor: APP_BASE_COLORS.backgroundWhite,
                         }}
                       >
                         <Text
                           style={{
                             padding: 2,
                             height: customerNotesHeight[index] || null,
-                            backgroundColor: "rgba(0, 0, 0, 0.03)",
                             outlineWidth: 0,
                             // width: "100%",
                           }}
@@ -275,7 +287,6 @@ export function Notes_MainComponent() {
                           style={{
                             padding: 2,
                             height: customerNotesHeight[index] || null,
-                            backgroundColor: "rgba(0, 0, 0, 0.03)",
                             outlineWidth: 0,
                             width: "100%",
                           }}
@@ -295,11 +306,8 @@ export function Notes_MainComponent() {
           style={{
             width: "50%",
             height: "100%",
-            backgroundColor: null,
             flexDirection: "column",
-            // borderLeftWidth: 1,
-            borderColor: "lightgray",
-            paddingLeft: 10,
+            // paddingLeft: 10,
           }}
         >
           <TouchableWithoutFeedback onPress={() => outsideClicked("internal")}>
@@ -310,6 +318,11 @@ export function Notes_MainComponent() {
                 height: 40,
                 justifyContent: "flex-start",
                 alignItems: "center",
+                borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                borderWidth: 1,
+                borderRadius: 15,
+                marginBottom: 5,
+                paddingHorizontal: 3,
               }}
             >
               <Image_ icon={ICONS.gears1} />
@@ -319,7 +332,6 @@ export function Notes_MainComponent() {
                   fontSize: 15,
                   color: APP_BASE_COLORS.textMain,
                   fontWeight: "bold",
-                  marginBottom: 5,
                 }}
               >
                 {"Internal Notes"}
@@ -331,7 +343,7 @@ export function Notes_MainComponent() {
               style={{
                 width: "100%",
                 height: "100%",
-                backgroundColor: null,
+                // backgroundColor: APP_BASE_COLORS.backgroundListWhite,
                 flexDirection: "column",
                 paddingRight: 10,
               }}
@@ -353,14 +365,13 @@ export function Notes_MainComponent() {
                           // paddingVertical: 3,
                           flexDirection: "row",
                           alignItems: "center",
+                          backgroundColor: APP_BASE_COLORS.backgroundWhite,
                         }}
                       >
                         <Text
                           style={{
                             padding: 2,
                             height: internalNotesHeight[index] || null,
-                            backgroundColor: "rgba(0, 0, 0, 0.03)",
-                            outlineWidth: 0,
                           }}
                         >
                           {item.name}
@@ -377,7 +388,6 @@ export function Notes_MainComponent() {
                           style={{
                             padding: 2,
                             height: internalNotesHeight[index] || null,
-                            backgroundColor: "rgba(0, 0, 0, 0.03)",
                             outlineWidth: 0,
                             width: "100%",
                           }}

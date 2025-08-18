@@ -143,7 +143,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       _zSetWorkorderObj(woCopy);
       if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(woCopy);
     };
-    _zExecute(fun);
+    fun();
   }
 
   function modQtyPressed(inventoryItem, workorderLine, option, idx) {
@@ -200,7 +200,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
     };
 
-    _zExecute(fun);
+    fun();
   }
 
   function applyDiscount(inventoryItem, workorderLine, discountObj, index) {
@@ -221,7 +221,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       _zSetWorkorderObj(woCopy);
       if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(woCopy);
     };
-    _zExecute(fun);
+    fun();
   }
 
   function splitItems(inventoryItem, workorderLine, index) {

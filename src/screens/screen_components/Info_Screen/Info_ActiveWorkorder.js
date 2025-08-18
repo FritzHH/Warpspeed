@@ -23,6 +23,7 @@ import {
   Button_,
   Icon_,
   Image_,
+  GradientView,
 } from "../../../components";
 import {
   APP_BASE_COLORS,
@@ -165,14 +166,18 @@ export const ActiveWorkorderComponent = ({}) => {
     backgroundColor: APP_BASE_COLORS.buttonLightGreen,
     ...SHADOW_RADIUS_NOTHING,
     borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+    // backgroundColor: "green",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 1,
     paddingVertical: 2,
     borderRadius: 5,
   };
 
   const dropdownButtonTextStyle = {
-    fontSize: 15,
+    fontSize: 14,
     color: APP_BASE_COLORS.textMain,
+    // width: "100%",
   };
 
   function setComponent() {
@@ -203,16 +208,22 @@ export const ActiveWorkorderComponent = ({}) => {
         <View
           style={{
             width: "100%",
+            alignItems: "center",
+            // backgroundColor: "blue",
             // paddingHorizontal: 5,
           }}
         >
           <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
           <View
             style={{
-              flexDirection: "row",
               width: "100%",
-              justifyContent: "space-between",
+              justifyContent: "center",
               alignItems: "center",
+              paddingVertical: 10,
+              backgroundColor: APP_BASE_COLORS.backgroundGreen,
+              borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+              borderWidth: 1,
+              borderRadius: 15,
             }}
           >
             <ScreenModal
@@ -222,12 +233,14 @@ export const ActiveWorkorderComponent = ({}) => {
               buttonLabel={
                 zWorkorderObj.customerFirst + " " + zWorkorderObj.customerLast
               }
+              buttonIcon={ICONS.ridingBike}
+              buttonIconStyle={{ width: 35, height: 35 }}
               buttonStyle={{
-                alignItems: "flex-start",
+                alignItems: "center",
                 justifyContent: "center",
-                paddingLeft: 0,
                 paddingVertical: 5,
-                paddingRight: 10,
+                borderRadius: 5,
+                paddingHorizontal: 20,
               }}
               mouseOverOptions={{ highlightColor: "transparent" }}
               handleButtonPress={() => _setShowCustomerInfoModal(true)}
@@ -248,12 +261,16 @@ export const ActiveWorkorderComponent = ({}) => {
                 />
               )}
             />
-          </View>
-          <View>
             <View
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
+                borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                borderRadius: 15,
+                borderWidth: 1,
+                marginTop: 5,
+                padding: 5,
+                width: "95%",
               }}
             >
               {zCustomerObj.cell.length > 0 ? (
@@ -287,7 +304,9 @@ export const ActiveWorkorderComponent = ({}) => {
                 <Text style={{ color: Colors.darkText }}>EMAIL ONLY</Text>
               ) : null}
             </View>
+          </View>
 
+          <View>
             <View
               style={{
                 marginTop: 20,
@@ -337,7 +356,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                     }}
                     itemViewStyle={{ backgroundColor: "gray" }}
-                    itemTextStyle={{ fontSize: 14, color: "black" }}
+                    itemTextStyle={{ fontSize: 18, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       backgroundColor: zWorkorderObj.brand
@@ -386,7 +405,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 width: "100%",
                 alignItems: "center",
 
-                marginTop: 5,
+                marginTop: 10,
                 // backgroundColor: "blue",
               }}
             >
@@ -421,9 +440,9 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                     }}
                     modalCoordinateVars={{ x: 30, y: 30 }}
-                    itemViewStyle={{ backgroundColor: "gray" }}
+                    itemViewStyle={{ borderRadius: 0 }}
                     itemTextStyle={{ fontSize: 14, color: "black" }}
-                    buttonStyle={{ ...dropdownButtonStyle, width: "100%" }}
+                    buttonStyle={{ ...dropdownButtonStyle }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={descriptionRef}
                     buttonText={"Descriptions"}
@@ -439,7 +458,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
                 alignItems: "center",
                 width: "100%",
-                marginTop: 5,
+                marginTop: 10,
               }}
             >
               <TextInputOnMainBackground
@@ -495,7 +514,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                       dbSetOpenWorkorderItem(wo);
                     }}
-                    itemViewStyle={{}}
+                    itemViewStyle={{ borderRadius: 0 }}
                     itemTextStyle={{ fontSize: 14 }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
@@ -532,7 +551,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                       dbSetOpenWorkorderItem(wo);
                     }}
-                    itemViewStyle={{}}
+                    itemViewStyle={{ borderRadius: 0 }}
                     itemTextStyle={{ fontSize: 14 }}
                     buttonStyle={dropdownButtonStyle}
                     ref={color2Ref}
@@ -548,7 +567,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 justifyContent: "flex-start",
                 width: "100%",
                 alignItems: "center",
-                marginTop: 5,
+                marginTop: 10,
               }}
             >
               <TextInputOnMainBackground
@@ -608,7 +627,7 @@ export const ActiveWorkorderComponent = ({}) => {
               buttonStyle={{
                 width: "100%",
                 backgroundColor: zWorkorderObj.status.backgroundColor,
-                marginTop: 5,
+                marginTop: 10,
               }}
               buttonTextStyle={{
                 ...dropdownButtonTextStyle,
@@ -642,7 +661,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   let wo = cloneDeep(zWorkorderObj);
 
                   wo.partOrdered = val;
-                  _zExecute(() => _zSetWorkorderObj(wo));
+                  _zSetWorkorderObj(wo);
                 }}
               />
             </View>
@@ -654,7 +673,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 justifyContent: "flex-start",
                 alignItems: "center",
                 width: "100%",
-                marginTop: 5,
+                marginTop: 10,
               }}
             >
               <TextInputOnMainBackground
@@ -664,7 +683,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 onTextChange={(val) => {
                   let wo = cloneDeep(zWorkorderObj);
                   wo.partSource = val;
-                  _zExecute(() => _zSetWorkorderObj(wo));
+                  _zSetWorkorderObj(wo);
                 }}
               />
               <View

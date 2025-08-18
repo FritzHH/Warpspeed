@@ -388,9 +388,7 @@ export function NewWorkorderComponent({}) {
             }}
             buttonVisible={sShowCreateCustomerButton}
             buttonTextStyle={{ color: "dimgray" }}
-            handleButtonPress={() =>
-              _zExecute(() => handleCreateCustomerBtnPressed())
-            }
+            handleButtonPress={() => handleCreateCustomerBtnPressed()}
             buttonLabel={"Create New Customer"}
             modalVisible={sCustomerInfoObj}
             canExitOnOuterClick={false}

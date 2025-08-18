@@ -168,7 +168,7 @@ export function MessagesComponent({}) {
         <View style={{ width: "14%" }}>
           {sNewMessage.length > 5 ? (
             <Button
-              onPress={() => _zExecute(() => sendMessage(sNewMessage))}
+              onPress={() => endMessage(sNewMessage)}
               text={"Send"}
               buttonStyle={{ width: "100%" }}
             />

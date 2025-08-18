@@ -338,6 +338,13 @@ export const INVENTORY_ITEM_PROTO = {
   cost: "",
 };
 
+export const LABOR_ITEM_PROTO = {
+  formalName: "",
+  informalName: "",
+  options: [],
+  price: "",
+};
+
 export const MENU_BUTTON_PROTO = {
   type: "",
   name: "",

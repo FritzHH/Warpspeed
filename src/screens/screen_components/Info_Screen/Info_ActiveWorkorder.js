@@ -277,7 +277,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Image_
                     icon={ICONS.cellPhone}
-                    size={30}
+                    size={25}
                     style={{ marginRight: 5 }}
                   />
                   <Text style={{ color: APP_BASE_COLORS.textMain }}>
@@ -289,7 +289,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Image_
                     icon={ICONS.home}
-                    size={30}
+                    size={25}
                     style={{ marginRight: 5 }}
                   />
                   <Text style={{ color: APP_BASE_COLORS.textMain }}>
@@ -639,78 +639,94 @@ export const ActiveWorkorderComponent = ({}) => {
             />
             <View
               style={{
-                height: 1,
-                backgroundColor: "lightgray",
-                marginVertical: 30,
-              }}
-            />
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-start",
-                alignItems: "center",
+                marginTop: 50,
+                borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                borderWidth: 1,
+                borderRadius: 5,
+                paddingHorizontal: 5,
+                paddingVertical: 5,
+                backgroundColor: APP_BASE_COLORS.buttonLightGreen,
                 width: "100%",
-                marginTop: 5,
               }}
             >
-              <TextInputOnMainBackground
-                placeholderText={"Part Ordered"}
-                style={{ width: "50%" }}
-                value={zWorkorderObj.partOrdered}
-                onTextChange={(val) => {
-                  let wo = cloneDeep(zWorkorderObj);
-
-                  wo.partOrdered = val;
-                  _zSetWorkorderObj(wo);
-                }}
-              />
-            </View>
-
-            <View
-              style={{
-                // marginTop: 8,
-                flexDirection: "row",
-                justifyContent: "flex-start",
-                alignItems: "center",
-                width: "100%",
-                marginTop: 10,
-              }}
-            >
-              <TextInputOnMainBackground
-                value={zWorkorderObj.partSource}
-                placeholderText={"Part Source"}
-                style={{ width: "50%" }}
-                onTextChange={(val) => {
-                  let wo = cloneDeep(zWorkorderObj);
-                  wo.partSource = val;
-                  _zSetWorkorderObj(wo);
-                }}
-              />
               <View
                 style={{
-                  // marginTop: 10,
-                  width: "50%",
                   flexDirection: "row",
-                  paddingLeft: 5,
                   justifyContent: "flex-start",
                   alignItems: "center",
-                  // backgroundColor: "green",
+                  width: "100%",
+                  marginTop: 5,
                 }}
               >
-                <DropdownMenu
-                  dataArr={zSettingsObj.partSources}
-                  onSelect={(item, idx) => {
+                <TextInputOnMainBackground
+                  placeholderText={"Part Ordered"}
+                  style={{
+                    width: "100%",
+                    backgroundColor: APP_BASE_COLORS.backgroundWhite,
+                  }}
+                  value={zWorkorderObj.partOrdered}
+                  onTextChange={(val) => {
                     let wo = cloneDeep(zWorkorderObj);
-                    wo.partSource = item;
+
+                    wo.partOrdered = val;
                     _zSetWorkorderObj(wo);
                   }}
-                  itemViewStyle={{ backgroundColor: "gray" }}
-                  itemTextStyle={{ fontSize: 14, color: "black" }}
-                  buttonStyle={dropdownButtonStyle}
-                  buttonTextStyle={dropdownButtonTextStyle}
-                  ref={partSourcesRef}
-                  buttonText={"Part Sources"}
                 />
+              </View>
+
+              <View
+                style={{
+                  // marginTop: 8,
+                  flexDirection: "row",
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                  width: "100%",
+                  marginTop: 10,
+                }}
+              >
+                <TextInputOnMainBackground
+                  value={zWorkorderObj.partSource}
+                  placeholderText={"Part Source"}
+                  style={{
+                    width: "50%",
+                    backgroundColor: APP_BASE_COLORS.backgroundWhite,
+                  }}
+                  onTextChange={(val) => {
+                    let wo = cloneDeep(zWorkorderObj);
+                    wo.partSource = val;
+                    _zSetWorkorderObj(wo);
+                  }}
+                />
+                <View
+                  style={{
+                    // marginTop: 10,
+                    width: "50%",
+                    flexDirection: "row",
+                    paddingLeft: 5,
+                    justifyContent: "",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    // backgroundColor: "blue",
+                  }}
+                >
+                  <DropdownMenu
+                    dataArr={zSettingsObj.partSources}
+                    onSelect={(item, idx) => {
+                      let wo = cloneDeep(zWorkorderObj);
+                      wo.partSource = item;
+                      _zSetWorkorderObj(wo);
+                    }}
+                    itemViewStyle={{ backgroundColor: "gray" }}
+                    itemTextStyle={{ fontSize: 14, color: "black" }}
+                    buttonStyle={{
+                      ...dropdownButtonStyle,
+                      paddingHorizontal: 40,
+                    }}
+                    buttonTextStyle={dropdownButtonTextStyle}
+                    ref={partSourcesRef}
+                    buttonText={"Part Sources"}
+                  />
+                </View>
               </View>
             </View>
           </View>
@@ -724,6 +740,7 @@ export const ActiveWorkorderComponent = ({}) => {
         >
           <Button_
             icon={ICONS.add}
+            iconSize={20}
             // buttonStyle={{ width: 150 }}
             text={"Workorder"}
             colorGradientArr={COLOR_GRADIENTS.green}
@@ -732,6 +749,7 @@ export const ActiveWorkorderComponent = ({}) => {
           />
           <Button_
             icon={ICONS.cashRed}
+            iconSize={20}
             colorGradientArr={COLOR_GRADIENTS.green}
             buttonStyle={{ paddingHorizontal: 25, paddingVertical: 5 }}
             text={"New Sale"}

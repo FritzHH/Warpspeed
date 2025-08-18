@@ -507,31 +507,6 @@ export const LineItemComponent = ({
               // backgroundColor: "green",
             }}
           >
-            <Button_
-              onPress={() => __deleteWorkorderLine(index)}
-              icon={ICONS.close1}
-              iconSize={17}
-              buttonStyle={{
-                backgroundColor: "transparent",
-
-                // width: null,
-                // height: null,
-                // backgroundColor: "transparent",
-                // // shadowOffset: { width: 1, height: 1 },
-                // marginHorizontal: 1,
-                // marginRight: 10,
-                // padding: 5,
-                // paddingVertical: 10,
-                // borderRadius: 3,
-              }}
-              // mouseOverOptions={{
-              //   enable: true,
-              //   opacity: 0.7,
-              //   highlightColor: "red",
-              // }}
-              // shadow={false}
-              // textStyle={{ color: "lightgray", fontSize: 17, fontWeight: 600 }}
-            />
             <View>
               {workorderLine.discountObj.discountName ? (
                 <Text style={{ color: "magenta" }}>
@@ -592,7 +567,9 @@ export const LineItemComponent = ({
                   // height: null,
                 }}
                 icon={ICONS.upArrowOrange}
+                iconSize={25}
               />
+
               <GradientView
                 style={{
                   marginLeft: 7,
@@ -675,10 +652,12 @@ export const LineItemComponent = ({
                 flexDirection: "row",
                 justifyContent: "flex-end",
                 marginLeft: 7,
+                alignItems: "center",
               }}
             >
-              <Image_ size={28} icon={ICONS.editPencil} />
-              {/* <Button
+              <Button_
+                iconSize={23}
+                icon={ICONS.editPencil}
                 onPress={() =>
                   __setButtonsRowID(
                     workorderLine.id === ssButtonsRowID
@@ -686,27 +665,21 @@ export const LineItemComponent = ({
                       : workorderLine.id
                   )
                 }
-                mouseOverOptions={{
-                  enable: true,
-                  highlightColor: Colors.tabMenuButton,
-                }}
-                shadow={false}
-                text={ssButtonsRowID === workorderLine.id ? "-" : "+"}
-                textStyle={{
-                  color:
-                    ssButtonsRowID === workorderLine.id
-                      ? "red"
-                      : Colors.mainBackground,
-                  fontSize: 28,
-                }}
                 buttonStyle={{
-                  width: 25,
-                  marginRight: 10,
-                  alignItems: "center",
-                  borderRadius: 3,
-                  marginLeft: 2,
+                  backgroundColor: "transparent",
                 }}
-              /> */}
+              />
+              <Button_
+                onPress={() => __deleteWorkorderLine(index)}
+                icon={ICONS.close1}
+                iconSize={17}
+                buttonStyle={{
+                  marginLeft: 5,
+                  marginRight: 5,
+                  // margin
+                  backgroundColor: "transparent",
+                }}
+              />
             </View>
           </View>
         </View>

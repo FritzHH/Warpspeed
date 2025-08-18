@@ -459,7 +459,7 @@ export const DropdownMenu = ({
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sModalVisible, _setModalVisible] = useState(false);
   const DropdownComponent = () => {
-    log(itemViewStyle);
+    // log(itemViewStyle);
     return (
       <FlatList
         data={dataArr}

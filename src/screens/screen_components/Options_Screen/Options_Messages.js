@@ -6,33 +6,33 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  TouchableWithoutFeedback,
+  TouchableWithoutFeedback
 } from "react-native-web";
 import {
   combine2ArraysOrderByMillis,
   dim,
   formatDateTime,
   generateRandomID,
-  log,
+  log
 } from "../../../utils";
 import {
   TabMenuDivider as Divider,
   Button,
-  CheckBox,
+  CheckBox_
 } from "../../../components";
 import { Colors } from "../../../styles";
 import {
   SMS_PROTO,
   WORKORDER_PROTO,
   CUSTOMER_PROTO,
-  SETTINGS_OBJ,
+  SETTINGS_OBJ
 } from "../../../data";
 import React, { memo, useEffect, useReducer, useRef, useState } from "react";
 import {
   useCurrentCustomerStore,
   useOpenWorkordersStore,
   useCustMessagesStore,
-  useLoginStore,
+  useLoginStore
 } from "../../../stores";
 import { dbSendMessageToCustomer } from "../../../db_call_wrapper";
 
@@ -93,7 +93,7 @@ export function MessagesComponent({}) {
     if (arr.length - 1 > 0) {
       messageListRef.current?.scrollToIndex({
         index: arr.length - 1,
-        animated: true,
+        animated: true
       });
     }
   }, [zIncomingMessagesArr, zOutgoingMessagesArr]);
@@ -103,14 +103,14 @@ export function MessagesComponent({}) {
   return (
     <View
       style={{
-        flex: 1,
+        flex: 1
       }}
     >
       <View
         style={{
           // width: "100%",
           height: dim.windowHeight * 0.8,
-          backgroundColor: "transparent",
+          backgroundColor: "transparent"
         }}
       >
         <FlatList
@@ -119,7 +119,7 @@ export function MessagesComponent({}) {
             wait.then(() => {
               messageListRef.current?.scrollToIndex({
                 index: info.index,
-                animated: true,
+                animated: true
               });
             });
           }}
@@ -143,7 +143,7 @@ export function MessagesComponent({}) {
           marginTop: 5,
           flexDirection: "row",
           width: "100%",
-          height: dim.windowHeight * 0.16,
+          height: dim.windowHeight * 0.16
         }}
       >
         <TextInput
@@ -161,7 +161,7 @@ export function MessagesComponent({}) {
             flexWrap: "wrap",
             textWrap: "pretty",
             outlineWidth: 0,
-            width: "85%",
+            width: "85%"
           }}
           value={sNewMessage}
         />
@@ -173,7 +173,7 @@ export function MessagesComponent({}) {
               buttonStyle={{ width: "100%" }}
             />
           ) : null}
-          <CheckBox
+          <CheckBox_
             checkedColor={"red"}
             buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
             text={"Respond"}
@@ -190,22 +190,22 @@ const INNER_MSG_BOX_STYLE = {
   width: "100%",
   borderRadius: 5,
   paddingHorizontal: 5,
-  paddingVertical: 5,
+  paddingVertical: 5
 };
 const OUTER_MSG_BOX_STYLE = {
   width: "60%",
   marginVertical: 10,
-  marginHorizontal: 4,
+  marginHorizontal: 4
   // padding: 5,
 };
 
 const MESSAGE_TEXT_STYLE = {
-  fontSize: 14,
+  fontSize: 14
 };
 
 const INFO_TEXT_STYLE = {
   fontSize: 11,
-  marginTop: 2,
+  marginTop: 2
 };
 
 const IncomingMessageComponent = memo(({ msgObj }) => {
@@ -220,7 +220,7 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
         style={{
           width: "100%",
           flexDirection: "row",
-          justifyContent: "space-between",
+          justifyContent: "space-between"
         }}
       >
         <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>
@@ -244,7 +244,7 @@ const OutgoingMessageComponent = memo(({ msgObj }) => {
         style={{
           width: "100%",
           flexDirection: "row",
-          justifyContent: "space-between",
+          justifyContent: "space-between"
         }}
       >
         <Text style={{ ...INFO_TEXT_STYLE }}>

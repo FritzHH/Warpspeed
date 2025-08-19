@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   FlatList,
   TextInput,
-  TouchableWithoutFeedback,
+  TouchableWithoutFeedback
 } from "react-native-web";
 import React, { Component, useCallback, useEffect, useRef } from "react";
 import { Animated, Easing, Image } from "react-native-web";
@@ -26,7 +26,7 @@ import {
   NUMS,
   readAsBinaryString,
   removeDashesFromPhone,
-  trimToTwoDecimals,
+  trimToTwoDecimals
 } from "./utils";
 import {
   APP_BASE_COLORS,
@@ -34,6 +34,7 @@ import {
   COLOR_GRADIENTS,
   Colors,
   Fonts,
+  ICONS
 } from "./styles";
 import { useState } from "react";
 import {
@@ -41,7 +42,7 @@ import {
   INVENTORY_ITEM_PROTO,
   INVENTORY_CATEGORY_NAMES,
   SETTINGS_OBJ,
-  PRIVILEDGE_LEVELS,
+  PRIVILEDGE_LEVELS
 } from "./data";
 import { cloneDeep } from "lodash";
 import { CUSTOMER_PROTO } from "./data";
@@ -55,7 +56,7 @@ import {
   useCheckoutStore,
   useCurrentCustomerStore,
   useOpenWorkordersStore,
-  useTabNamesStore,
+  useTabNamesStore
 } from "./stores";
 import {
   dbCancelPaymentIntents,
@@ -67,15 +68,16 @@ import {
   dbRetrieveAvailableStripeReaders,
   dbSetCustomerObj,
   dbSetInventoryItem,
-  dbSetSettings,
+  dbSetSettings
 } from "./db_call_wrapper";
 import {
   paymentIntentSubscribe,
-  removePaymentIntentSub,
+  removePaymentIntentSub
 } from "./db_subscription_wrapper";
 import Dropzone from "react-dropzone";
-import { CheckBox as RNCheckBox } from "react-native-web";
+import { CheckBox_ as RNCheckBox_ } from "react-native-web";
 import LinearGradient from "react-native-web-linear-gradient";
+import { TextComponent } from "react-native";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -86,29 +88,29 @@ const styles = {
   button: {
     // padding: 5,
     backgroundColor: Colors.blueButtonBackground,
-    borderRadius: 1,
+    borderRadius: 1
   },
   buttonText: {
     color: Colors.blueButtonText,
-    textAlign: "center",
+    textAlign: "center"
   },
   modalBackground: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
-    alignItems: "center",
+    alignItems: "center"
   },
   modalContent: {
     width: "40%",
     backgroundColor: "white",
     borderRadius: 10,
-    padding: 20,
+    padding: 20
   },
   option: {
-    padding: 18,
+    padding: 18
   },
   optionText: {
-    fontSize: 16,
+    fontSize: 16
   },
   closeButton: {
     // width: 100,
@@ -116,7 +118,7 @@ const styles = {
     padding: 10,
     paddingHorizontal: 20,
     backgroundColor: "#e74c3c",
-    borderRadius: 5,
+    borderRadius: 5
   },
   removeButton: {
     // width: 200,
@@ -124,30 +126,30 @@ const styles = {
     padding: 10,
     paddingHorizontal: 20,
     backgroundColor: "#e74c3c",
-    borderRadius: 5,
+    borderRadius: 5
   },
   closeText: {
     color: "white",
-    textAlign: "center",
+    textAlign: "center"
   },
   removeText: {
     color: "white",
     textAlign: "center",
-    width: 200,
-  },
+    width: 200
+  }
 };
 
 export const SHADOW_RADIUS_PROTO = {
   shadowColor: "black",
   shadowOffset: { width: 2, height: 2 },
   shadowOpacity: 0.25,
-  shadowRadius: 1,
+  shadowRadius: 1
 };
 
 export const SHADOW_RADIUS_NOTHING = {
   shadowOffset: { width: 0, height: 0 },
   shadowRadius: 0,
-  shadowColor: "transparent",
+  shadowColor: "transparent"
 };
 
 export const TabMenuDivider = () => {
@@ -157,7 +159,7 @@ export const TabMenuDivider = () => {
         // marginHorizontal: 2,
         width: 1,
         backgroundColor: "gray",
-        height: "100%",
+        height: "100%"
       }}
     ></View>
   );
@@ -167,7 +169,7 @@ export const TextInputLabelOnMainBackground = ({ value, styleProps = {} }) => {
   const text_style = {
     color: Colors.darkTextOnMainBackground,
     fontSize: 12,
-    marginBottom: 1,
+    marginBottom: 1
   };
   return <Text style={{ ...text_style, ...styleProps }}>{value}</Text>;
 };
@@ -176,7 +178,7 @@ export const TextInputOnMainBackground = ({
   value,
   onTextChange,
   styleProps = {},
-  placeholderText,
+  placeholderText
 }) => {
   return (
     <TextInput
@@ -191,7 +193,7 @@ export const TextInputOnMainBackground = ({
         paddingHorizontal: 4,
         fontSize: 16,
         outlineWidth: 0,
-        ...styleProps,
+        ...styleProps
       }}
       onChangeText={(val) => onTextChange(val)}
     />
@@ -210,7 +212,7 @@ export const AlertBox = ({
   onModalDismiss,
   canExitOnOuterClick = true,
   modalStyle = { width: "100%", height: "100%" },
-  alertBoxStyle = { width: 700, height: 200, backgroundColor: "lightgray" },
+  alertBoxStyle = { width: 700, height: 200, backgroundColor: "lightgray" }
 }) => {
   const btnStyle = {
     width: 150,
@@ -218,12 +220,12 @@ export const AlertBox = ({
     backgroundColor: "dimgray",
     padding: 10,
     borderRadius: 4,
-    ...SHADOW_RADIUS_PROTO,
+    ...SHADOW_RADIUS_PROTO
   };
 
   const txtStyle = {
     color: "whitesmoke",
-    fontSize: 17,
+    fontSize: 17
   };
 
   let hasButtons = false;
@@ -253,7 +255,7 @@ export const AlertBox = ({
             // marginTop: 100,
             // width: 1000,
             // height: 800,
-            ...modalStyle,
+            ...modalStyle
           }}
         >
           <View
@@ -265,7 +267,7 @@ export const AlertBox = ({
               padding: 10,
               // justifyContent: "center",
               alignItems: "center",
-              ...alertBoxStyle,
+              ...alertBoxStyle
             }}
           >
             <Text
@@ -285,7 +287,7 @@ export const AlertBox = ({
                 flexDirection: "row",
                 justifyContent: "space-around",
                 width: "100%",
-                marginTop: 50,
+                marginTop: 50
               }}
             >
               {btnText1 && (
@@ -334,7 +336,7 @@ export const ScreenModal = ({
   buttonIconStyle = {},
   handleModalActionInternally = false,
   // canExitOnOuterModalClick = true,
-  handleOuterClick = () => {},
+  handleOuterClick = () => {}
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sMouseOver, _setMouseOver] = React.useState(false);
@@ -404,7 +406,7 @@ export const ScreenModal = ({
               backgroundColor: sMouseOver
                 ? mouseOverOptions.highlightColor
                 : buttonStyle.backgroundColor || "transparent",
-              opacity: sMouseOver ? mouseOverOptions.opacity : null,
+              opacity: sMouseOver ? mouseOverOptions.opacity : null
             }}
           />
         ) : null}
@@ -427,7 +429,7 @@ export const ScreenModal = ({
               ...outerModalStyle,
               position: ref ? "absolute" : null,
               top: ref ? sModalCoordinates.y + modalCoordinateVars.y : null,
-              left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
+              left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null
             }}
           >
             <Component />
@@ -447,24 +449,24 @@ export const DropdownMenu = ({
   itemViewStyle = {},
   buttonStyle = {
     // backgroundColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 50),
-    borderRadius: 25,
+    borderRadius: 25
   },
   buttonTextStyle = {},
   buttonText,
   ref,
   modalCoordinateVars = {
     x: -15,
-    y: 50,
+    y: 50
   },
   mouseOverOptions = {
     enable: true,
     opacity: 1,
-    highlightColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 10),
+    highlightColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 10)
   },
   showButtonShadow,
   shadowStyle = { ...SHADOW_RADIUS_PROTO },
   itemSeparatorStyle = {},
-  menuBorderColor,
+  menuBorderColor
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sModalVisible, _setModalVisible] = useState(false);
@@ -487,7 +489,7 @@ export const DropdownMenu = ({
           borderColor:
             menuBorderColor || APP_BASE_COLORS.buttonLightGreenOutline,
           // borderRadius: 10,
-          borderRadius: buttonStyle.borderRadius,
+          borderRadius: buttonStyle.borderRadius
         }}
       >
         <FlatList
@@ -500,7 +502,7 @@ export const DropdownMenu = ({
                 backgroundColor: APP_BASE_COLORS.buttonLightGreen,
                 width: "100%",
 
-                ...itemSeparatorStyle,
+                ...itemSeparatorStyle
               }}
             />
           )}
@@ -531,11 +533,11 @@ export const DropdownMenu = ({
                     idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
                   borderBottomRightRadius:
                     idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
-                  ...itemViewStyle,
+                  ...itemViewStyle
                 }}
                 textStyle={{
                   ...itemTextStyle,
-                  color: item.textColor || APP_BASE_COLORS.textMain,
+                  color: item.textColor || APP_BASE_COLORS.textMain
                 }}
                 text={item.label || item}
                 onPress={() => {
@@ -587,8 +589,8 @@ export const ModalDropdown = ({
   innerModalStyle = {},
   modalCoordinateVars = {
     x: 200,
-    y: -300,
-  },
+    y: -300
+  }
 
   // modalStyle = {},
 }) => {
@@ -643,7 +645,7 @@ export const ModalDropdown = ({
               // top: ref ? sModalCoordinates.y + modalCoordinateVars.y : null,
               // left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
               ...SHADOW_RADIUS_PROTO,
-              ...buttonStyle,
+              ...buttonStyle
             }}
           >
             <Text
@@ -651,7 +653,7 @@ export const ModalDropdown = ({
                 color: "white",
                 textAlign: "center",
                 fontSize: 15,
-                ...textStyle,
+                ...textStyle
               }}
             >
               {buttonLabel}
@@ -664,7 +666,7 @@ export const ModalDropdown = ({
             style={{
               width: "100%",
               height: "100%",
-              ...outerModalStyle,
+              ...outerModalStyle
             }}
           >
             <TouchableWithoutFeedback>
@@ -706,7 +708,7 @@ export const ModalDropdown = ({
                           backgroundColor,
                           // ...borderProps,
                           borderColor: "dimgray",
-                          ...itemStyleProps,
+                          ...itemStyleProps
                         }}
                         onPress={() => handleSelect(item)}
                       >
@@ -720,7 +722,7 @@ export const ModalDropdown = ({
                 <View
                   style={{
                     flexDirection: "row",
-                    justifyContent: "space-around",
+                    justifyContent: "space-around"
                   }}
                 >
                   {currentSelection && (
@@ -747,7 +749,7 @@ export const ModalDropdown = ({
 
 export const InventoryItemScreeenModalComponent = ({
   itemIdx,
-  handleClosePress,
+  handleClosePress
 }) => {
   // store setters ////////////////////////////////////////////////////////
   const _zSetFocus = useInvModalStore((state) => state.setFocus);
@@ -780,7 +782,7 @@ export const InventoryItemScreeenModalComponent = ({
     price: "price",
     category: "category",
     sale: "sale",
-    upc: "upc",
+    upc: "upc"
   };
 
   useEffect(() => {
@@ -864,7 +866,7 @@ export const InventoryItemScreeenModalComponent = ({
             ...SHADOW_RADIUS_PROTO,
             shadowOffset: { width: 3, height: 3 },
             padding: 15,
-            backgroundColor: "white",
+            backgroundColor: "white"
           }}
         >
           <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
@@ -873,7 +875,7 @@ export const InventoryItemScreeenModalComponent = ({
               width: "100%",
               // height: "100%",
               // flexDirection: "row",
-              justifyContent: "space-between",
+              justifyContent: "space-between"
             }}
           >
             <View>
@@ -885,7 +887,7 @@ export const InventoryItemScreeenModalComponent = ({
                 style={{
                   marginTop: 2,
                   fontSize: 16,
-                  color: "black",
+                  color: "black"
                   // borderBottomWidth: 1,
                 }}
                 autoFocus={zFocus === INPUT_FIELD_NAMES.formalName}
@@ -907,7 +909,7 @@ export const InventoryItemScreeenModalComponent = ({
                 style={{
                   marginTop: 2,
                   fontSize: 16,
-                  color: "black",
+                  color: "black"
                   // borderWidth: 1,
                 }}
                 autoFocus={zFocus === INPUT_FIELD_NAMES.informalName}
@@ -922,19 +924,19 @@ export const InventoryItemScreeenModalComponent = ({
             </View>
             <View
               style={{
-                flexDirection: "row",
+                flexDirection: "row"
               }}
             >
               <View
                 style={{
                   alignItems: "flex-end",
-                  justifyContent: "center",
+                  justifyContent: "center"
                 }}
               >
                 <Text
                   style={{
                     color: "red",
-                    fontSize: 16,
+                    fontSize: 16
                   }}
                 >
                   {"Regular"}
@@ -943,7 +945,7 @@ export const InventoryItemScreeenModalComponent = ({
               </View>
               <View
                 style={{
-                  marginLeft: 10,
+                  marginLeft: 10
                   // alignItems: "flex-start",
                   // justifyContent: "center",
                 }}
@@ -977,7 +979,7 @@ export const InventoryItemScreeenModalComponent = ({
             style={{
               flexDirection: "row",
               alignItems: "center",
-              marginTop: 20,
+              marginTop: 20
             }}
           >
             <Text style={{ marginLeft: 10 }}>{sItem.catMain}</Text>
@@ -987,7 +989,7 @@ export const InventoryItemScreeenModalComponent = ({
             <Text
               style={{
                 fontSize: 12,
-                marginRight: 5,
+                marginRight: 5
               }}
             >
               Barcode:
@@ -1040,7 +1042,7 @@ export const InventoryItemScreeenModalComponent = ({
             style={{
               alignItems: "center",
               justifyContent: "space-between",
-              flexDirection: "row",
+              flexDirection: "row"
             }}
           >
             <Button
@@ -1077,7 +1079,7 @@ export const CustomerInfoScreenModalComponent = ({
   handleButton1Press,
   handleButton2Press,
   ssInfoTextFocus,
-  __setInfoTextFocus,
+  __setInfoTextFocus
 }) => {
   // store setters
   const _zSetCurrentCustomer = useCurrentCustomerStore(
@@ -1118,7 +1120,7 @@ export const CustomerInfoScreenModalComponent = ({
     marginLeft: 20,
     marginTop: 10,
     paddingHorizontal: 3,
-    outlineWidth: 0,
+    outlineWidth: 0
   };
 
   // clog(sCustomerInfoObj);
@@ -1136,8 +1138,8 @@ export const CustomerInfoScreenModalComponent = ({
               shadowColor: "black",
               shadowOffset: { width: 2, height: 2 },
               shadowOpacity: 0.3,
-              shadowRadius: 5,
-            },
+              shadowRadius: 5
+            }
           }}
         >
           <View>
@@ -1295,7 +1297,7 @@ export const CustomerInfoScreenModalComponent = ({
               autoFocus={ssInfoTextFocus === FOCUS_NAMES.notes}
               onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
             />
-            <CheckBox
+            <CheckBox_
               text={"Call Only"}
               isChecked={ssCustomerInfoObj.contactRestriction === "CALL"}
               onCheck={() => {
@@ -1309,7 +1311,7 @@ export const CustomerInfoScreenModalComponent = ({
                 __setCustomerInfoObj(obj);
               }}
             />
-            <CheckBox
+            <CheckBox_
               text={"Email Only"}
               isChecked={ssCustomerInfoObj.contactRestriction === "EMAIL"}
               onCheck={() => {
@@ -1337,7 +1339,7 @@ export const CustomerInfoScreenModalComponent = ({
                     marginLeft: 20,
                     backgroundColor: "lightgray",
                     height: 40,
-                    width: 200,
+                    width: 200
                   }}
                   textStyle={{ color: "dimgray" }}
                   text={button1Text}
@@ -1351,7 +1353,7 @@ export const CustomerInfoScreenModalComponent = ({
                     marginLeft: 20,
                     backgroundColor: "lightgray",
                     height: 40,
-                    width: 200,
+                    width: 200
                   }}
                   textStyle={{ color: "dimgray" }}
                   text={button2Text}
@@ -1455,7 +1457,7 @@ export const LoginScreenModalComponent = ({ modalVisible }) => {
       modalVisible={modalVisible}
       showOuterModal={true}
       outerModalStyle={{
-        backgroundColor: "rgba(50,50,50,.5)",
+        backgroundColor: "rgba(50,50,50,.5)"
       }}
       buttonVisible={false}
       Component={() => (
@@ -1465,7 +1467,7 @@ export const LoginScreenModalComponent = ({ modalVisible }) => {
             alignItems: "center",
             backgroundColor: sBackgroundColor,
             width: 500,
-            height: 500,
+            height: 500
           }}
         >
           <TextInput
@@ -1486,19 +1488,19 @@ const checkoutScreenStyle = {
     paddingTop: 20,
     width: 500,
     height: 380,
-    backgroundColor: "white",
+    backgroundColor: "white"
   },
   titleText: {
     fontSize: 30,
-    color: "dimgray",
+    color: "dimgray"
   },
   boxDollarSign: {
-    fontSize: 15,
+    fontSize: 15
     // marginRight: 5,
   },
   totalText: {
     fontSize: 10,
-    color: "darkgray",
+    color: "darkgray"
   },
   boxText: {
     outlineWidth: 0,
@@ -1506,11 +1508,11 @@ const checkoutScreenStyle = {
     textAlign: "right",
     placeholderTextColor: "lightgray",
     // backgroundColor: "green",
-    width: "90%",
+    width: "90%"
   },
   buttonText: {
     fontSize: 13,
-    fontWeight: Fonts.weight.textRegular,
+    fontWeight: Fonts.weight.textRegular
   },
   boxStyle: {
     marginTop: 5,
@@ -1522,16 +1524,16 @@ const checkoutScreenStyle = {
     height: 50,
     alignItems: "space-between",
     justifyContent: "space-between",
-    flexDirection: "row",
+    flexDirection: "row"
   },
   totalTextStyle: {
-    marginTop: 15,
+    marginTop: 15
   },
   titleStyle: {
-    marginTop: 20,
+    marginTop: 20
   },
   buttonRowStyle: {
-    marginTop: 20,
+    marginTop: 20
   },
   statusText: {
     width: "80%",
@@ -1539,11 +1541,11 @@ const checkoutScreenStyle = {
     marginTop: 15,
     color: "green",
     fontSize: 15,
-    fontWeight: 600,
+    fontWeight: 600
   },
   loadingIndicatorStyle: {
-    marginTop: 10,
-  },
+    marginTop: 10
+  }
 };
 
 export const CashSaleModalComponent = ({
@@ -1553,7 +1555,7 @@ export const CashSaleModalComponent = ({
   splitPayment,
   onComplete,
   acceptsChecks,
-  paymentsArr,
+  paymentsArr
 }) => {
   const [sTenderAmount, _setTenderAmount] = useState("");
   const [sRequestedAmount, _setRequestedAmount] = useState("");
@@ -1633,7 +1635,7 @@ export const CashSaleModalComponent = ({
     onComplete({
       amountTendered: Number(sTenderAmount),
       amount: Number(sRequestedAmount || totalAmount),
-      isCheck: sIsCheck,
+      isCheck: sIsCheck
     });
     onCancel();
   }
@@ -1655,12 +1657,12 @@ export const CashSaleModalComponent = ({
   return (
     <View
       style={{
-        ...checkoutScreenStyle.base,
+        ...checkoutScreenStyle.base
       }}
     >
       {acceptsChecks ? (
         <View style={{ width: "100%" }}>
-          <CheckBox
+          <CheckBox_
             textStyle={{ fontSize: 12 }}
             boxStyle={{ width: 14, height: 14 }}
             text={"Paper Check"}
@@ -1672,7 +1674,7 @@ export const CashSaleModalComponent = ({
       ) : null}
       <Text
         style={{
-          ...checkoutScreenStyle.titleText,
+          ...checkoutScreenStyle.titleText
         }}
       >
         Cash Sale
@@ -1688,7 +1690,7 @@ export const CashSaleModalComponent = ({
               style={{
                 marginTop: 10,
                 fontSize: 14,
-                color: "gray",
+                color: "gray"
               }}
             >
               {"Amount paid:"}
@@ -1698,7 +1700,7 @@ export const CashSaleModalComponent = ({
               style={{
                 marginTop: 10,
                 fontSize: 14,
-                color: "gray",
+                color: "gray"
               }}
             >
               {"Amount left:"}
@@ -1709,7 +1711,7 @@ export const CashSaleModalComponent = ({
               style={{
                 marginTop: 10,
                 fontSize: 14,
-                color: "",
+                color: ""
               }}
             >
               {"$" + sSplitTotalPaidAlready}
@@ -1718,7 +1720,7 @@ export const CashSaleModalComponent = ({
               style={{
                 marginTop: 10,
                 fontSize: 14,
-                color: "red",
+                color: "red"
               }}
             >
               {"$" + sAmountLeftToPay}
@@ -1733,7 +1735,7 @@ export const CashSaleModalComponent = ({
               ...checkoutScreenStyle.boxStyle,
               paddingBottom: 6,
               paddingRight: 7,
-              marginTop: 10,
+              marginTop: 10
             }}
           >
             <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
@@ -1744,7 +1746,7 @@ export const CashSaleModalComponent = ({
                 height: "100%",
                 // backgroundColor: "green",
                 alignItems: "flex-end",
-                paddingRight: 5,
+                paddingRight: 5
               }}
             >
               <TextInput
@@ -1752,7 +1754,7 @@ export const CashSaleModalComponent = ({
                   ...checkoutScreenStyle.boxText,
                   height: "70%",
                   // backgroundColor: "blue",
-                  color: sPaymentAmountTextColor,
+                  color: sPaymentAmountTextColor
                 }}
                 placeholder="0.00"
                 placeholderTextColor={
@@ -1767,7 +1769,7 @@ export const CashSaleModalComponent = ({
                 style={{
                   fontStyle: "italic",
                   color: "darkgray",
-                  fontSize: 12,
+                  fontSize: 12
                 }}
               >
                 Pay Amount
@@ -1781,7 +1783,7 @@ export const CashSaleModalComponent = ({
             ...checkoutScreenStyle.boxStyle,
             paddingBottom: 6,
             paddingRight: 7,
-            marginTop: 10,
+            marginTop: 10
           }}
         >
           <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
@@ -1792,14 +1794,14 @@ export const CashSaleModalComponent = ({
               height: "100%",
               // backgroundColor: "green",
               alignItems: "flex-end",
-              paddingRight: 5,
+              paddingRight: 5
             }}
           >
             <TextInput
               style={{
                 ...checkoutScreenStyle.boxText,
                 height: "70%",
-                color: sPaymentAmountTextColor,
+                color: sPaymentAmountTextColor
                 // backgroundColor: "blue",
               }}
               placeholder="0.00"
@@ -1816,7 +1818,7 @@ export const CashSaleModalComponent = ({
               style={{
                 fontStyle: "italic",
                 color: "darkgray",
-                fontSize: 12,
+                fontSize: 12
               }}
             >
               Tender
@@ -1829,7 +1831,7 @@ export const CashSaleModalComponent = ({
           flexDirection: "row",
           justifyContent: "space-around",
           width: "100%",
-          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
+          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop
         }}
       >
         <Button
@@ -1844,7 +1846,7 @@ export const CashSaleModalComponent = ({
       <Text
         style={{
           ...checkoutScreenStyle.statusText,
-          color: "red",
+          color: "red"
         }}
       >
         {sStatusMessage}
@@ -1863,7 +1865,7 @@ export const StripeCreditCardModalComponent = ({
   splitPayment,
   totalAmount,
   onComplete,
-  paymentsArr,
+  paymentsArr
 }) => {
   // store setters
   const _zSetPaymentIntentID = useStripePaymentStore(
@@ -2081,7 +2083,7 @@ export const StripeCreditCardModalComponent = ({
         chargeID: val.id,
         amount: trimToTwoDecimals(val.amount_captured / 100),
         paymentProcessor: "stripe",
-        totalCaptured: trimToTwoDecimals(val.amount_captured / 100),
+        totalCaptured: trimToTwoDecimals(val.amount_captured / 100)
       };
       clog("Successful Payment details obj", paymentDetailsObj);
       onComplete(paymentDetailsObj);
@@ -2127,12 +2129,12 @@ export const StripeCreditCardModalComponent = ({
   return (
     <View
       style={{
-        ...checkoutScreenStyle.base,
+        ...checkoutScreenStyle.base
       }}
     >
       <Text
         style={{
-          ...checkoutScreenStyle.titleText,
+          ...checkoutScreenStyle.titleText
         }}
       >
         Credit Card Sale
@@ -2148,7 +2150,7 @@ export const StripeCreditCardModalComponent = ({
                 style={{
                   marginTop: 10,
                   fontSize: 14,
-                  color: "gray",
+                  color: "gray"
                 }}
               >
                 {"Amount paid:"}
@@ -2158,7 +2160,7 @@ export const StripeCreditCardModalComponent = ({
                 style={{
                   marginTop: 10,
                   fontSize: 14,
-                  color: "gray",
+                  color: "gray"
                 }}
               >
                 {"Amount left:"}
@@ -2169,7 +2171,7 @@ export const StripeCreditCardModalComponent = ({
                 style={{
                   marginTop: 10,
                   fontSize: 14,
-                  color: "gray",
+                  color: "gray"
                 }}
               >
                 {"$" + sSplitTotalPaidAlready}
@@ -2179,7 +2181,7 @@ export const StripeCreditCardModalComponent = ({
                   marginTop: 10,
                   fontSize: 14,
                   color: "red",
-                  fontWeight: "500",
+                  fontWeight: "500"
                 }}
               >
                 {"$" + sAmountLeftToPay}
@@ -2188,14 +2190,14 @@ export const StripeCreditCardModalComponent = ({
           </View>
           <View
             style={{
-              ...checkoutScreenStyle.boxStyle,
+              ...checkoutScreenStyle.boxStyle
             }}
           >
             <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
             <TextInput
               style={{
                 ...checkoutScreenStyle.boxText,
-                color: sTextColor,
+                color: sTextColor
               }}
               placeholder="0.00"
               placeholderTextColor={
@@ -2214,7 +2216,7 @@ export const StripeCreditCardModalComponent = ({
           flexDirection: "row",
           justifyContent: "space-around",
           width: "100%",
-          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
+          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop
         }}
       >
         {splitPayment ? (
@@ -2235,7 +2237,7 @@ export const StripeCreditCardModalComponent = ({
         style={{
           // fontFamily: "Inter",
           ...checkoutScreenStyle.statusText,
-          color: sStatusTextColor,
+          color: sStatusTextColor
         }}
       >
         {sStatusMessage}
@@ -2254,7 +2256,7 @@ export const StripeCreditCardModalComponent = ({
             width: null,
             padding: 5,
             marginRight: 15,
-            marginTop: 20,
+            marginTop: 20
           }}
           onPress={resetCardReader}
         />
@@ -2275,13 +2277,13 @@ export const Button = ({
   mouseOverOptions = {
     opacity: 1,
     highlightColor: Colors.tabMenuButton,
-    textColor: "white",
+    textColor: "white"
   },
   shadow = true,
   allCaps = false,
   buttonStyle = {},
   textStyle = {},
-  viewStyle = {},
+  viewStyle = {}
 }) => {
   const [sMouseOver, _setMouseOver] = React.useState(false);
   if (allCaps) text = text.toUpperCase();
@@ -2333,7 +2335,7 @@ export const Button = ({
           ...shadowStyle,
           ...buttonStyle,
           backgroundColor: getBackgroundColor(),
-          opacity: sMouseOver ? mouseOverOptions.opacity : buttonStyle.opacity,
+          opacity: sMouseOver ? mouseOverOptions.opacity : buttonStyle.opacity
         }}
       >
         {TextComponent ? (
@@ -2346,7 +2348,7 @@ export const Button = ({
               textAlignVertical: "center",
               fontSize: 17,
               ...textStyle,
-              color: sMouseOver ? "black" : textStyle.color || "white",
+              color: sMouseOver ? "black" : textStyle.color || "white"
             }}
           >
             {text || "Button"}
@@ -2365,7 +2367,7 @@ export const TabMenuButton = ({
   textStyle,
   isSelected,
   onLongPress,
-  height,
+  height
 }) => {
   return (
     <Button_
@@ -2377,7 +2379,7 @@ export const TabMenuButton = ({
         // textColor: Colors.tabMenuButtonText,
         color: APP_BASE_COLORS.textWhite,
         fontSize: 15,
-        ...textStyle,
+        ...textStyle
       }}
       colorGradientArr={COLOR_GRADIENTS.blue}
       buttonStyle={{
@@ -2389,7 +2391,7 @@ export const TabMenuButton = ({
         paddingVertical: 5,
         ...SHADOW_RADIUS_NOTHING,
         borderRadius: 0,
-        ...buttonStyle,
+        ...buttonStyle
       }}
     />
   );
@@ -2399,7 +2401,7 @@ export const LoadingIndicator = ({
   width = 100,
   height = 100,
   type = "bicycle",
-  visible = false,
+  visible = false
 }) => {
   if (!visible) return <View style={{ width, height }} />;
   if (type == "bicycle") return BicycleSpinner({ width, height });
@@ -2413,14 +2415,14 @@ const BicycleSpinner = ({ width = 100, height = 100 }) => {
       Animated.timing(spinValue, {
         toValue: 1,
         duration: 1000,
-        easing: Easing.linear,
+        easing: Easing.linear
       })
     ).start();
   }, []);
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
+    outputRange: ["0deg", "360deg"]
   });
 
   return (
@@ -2431,7 +2433,7 @@ const BicycleSpinner = ({ width = 100, height = 100 }) => {
           resizeMode: "contain",
           width,
           height,
-          transform: [{ rotate: spin }],
+          transform: [{ rotate: spin }]
         }}
         // source={require("./assets/")}
       />
@@ -2439,82 +2441,114 @@ const BicycleSpinner = ({ width = 100, height = 100 }) => {
   );
 };
 
-export const CheckBox = ({
+export const CheckBox_ = ({
   text,
   onCheck,
   item,
-  makeEntireViewCheckable = true,
-  roundButton = false,
+  iconSize = 25,
+  // makeEntireViewCheckable = true,
+  // roundButton = false,
   isChecked,
   buttonStyle = {},
   textStyle = {},
   viewStyle = {},
-  checkedColor,
-  uncheckedColor,
-  mouseOverOptions = {
-    enable: false,
-    opacity: 0.7,
-    highlightColor: "dimgrey",
-  },
-  boxStyle = {},
-}) => {
-  const [sMouseOver, _setMouseOver] = React.useState(false);
-  // const [isChecked, onCheck] = useState(false);
-  const rgbText = "rgba(50,50,50,1)";
-  if (roundButton) buttonStyle = { ...buttonStyle, borderRadius: 100 };
 
-  let backgroundColor;
-  if (sMouseOver) {
-    if (!isChecked && !isChecked) {
-      if (mouseOverOptions.enable) {
-        if (mouseOverOptions.highlightColor) {
-          backgroundColor = mouseOverOptions.highlightColor;
-        } else {
-          backgroundColor = "lightgray";
-        }
-      }
-    }
-  } else {
-    backgroundColor =
-      isChecked || isChecked
-        ? checkedColor || Colors.tabMenuButton
-        : uncheckedColor || "lightgray";
-  }
+  boxStyle = {}
+}) => {
+  // const [sMouseOver, _setMouseOver] = React.useState(false);
+  // const [isChecked, onCheck] = useState(false);
+  // const rgbText = "rgba(50,50,50,1)";
+  // if (roundButton) buttonStyle = { ...buttonStyle, borderRadius: 100 };
+
+  // if (sMouseOver) {
+  //   if (!isChecked && !isChecked) {
+  //     if (mouseOverOptions.enable) {
+  //       if (mouseOverOptions.highlightColor) {
+  //         backgroundColor = mouseOverOptions.highlightColor;
+  //       } else {
+  //         backgroundColor = "lightgray";
+  //       }
+  //     }
+  //   }
+  // } else {
+  //   backgroundColor =
+  //     isChecked || isChecked
+  //       ? checkedColor || Colors.tabMenuButton
+  //       : uncheckedColor || "lightgray";
+  // }
 
   return (
-    <TouchableOpacity
-      onPress={() => {
-        if (makeEntireViewCheckable) {
-          onCheck(!isChecked);
-          onCheck(item, !isChecked);
-        }
-      }}
-      style={{ padding: 1 }}
-    >
+    <Button_
+      icon={isChecked ? ICONS.CheckBox_ : ICONS.checkoxEmpty}
+      iconSize={15}
+      text={text}
+      buttonStyle={buttonStyle}
+      textStyle={textStyle}
+      onPress={onCheck}
+      // mouseOverOptions={
+      // enable: false
+      // }
+      enableMouseOver={false}
+    />
+  );
+
+  const Component = () => {
+    return (
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
-          // backgroundColor: "green",
-          ...viewStyle,
+          justifyContent: "space-around",
+          // width: 200,
+          width: "100%",
+          height: "100%"
         }}
       >
-        <RNCheckBox
-          style={{
-            width: 17,
-            height: 17,
-            borderColor: "lightgray",
-            marginRight: 3,
-            ...boxStyle,
-          }}
-          value={isChecked}
-          color={Colors.tabMenuButton}
-          onValueChange={onCheck}
+        <Image_
+          icon={isChecked ? ICONS.CheckBox_ : ICONS.checkoxEmpty}
+          size={iconSize}
         />
-        <Text style={{ ...textStyle }}>{text}</Text>
+        <Text>{text}</Text>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
+
+  return <Button buttonStyle={buttonStyle} TextComponent={() => Component()} />;
+
+  // return (
+  // <TouchableOpacity
+  //   onPress={() => {
+  //     if (makeEntireViewCheckable) {
+  //       onCheck(!isChecked);
+  //       onCheck(item, !isChecked);
+  //     }
+  //   }}
+  //   style={{ padding: 1 }}
+  // >
+  //   <View
+  //     style={{
+  //       flexDirection: "row",
+  //       alignItems: "center",
+  //       // backgroundColor: "green",
+  //       ...viewStyle
+  //     }}
+  //   >
+  //     <RNCheckBox_
+  //       style={{
+  //         width: 17,
+  //         height: 17,
+  //         borderColor: "lightgray",
+  //         marginRight: 3,
+  //         ...boxStyle
+  //       }}
+  //       value={isChecked}
+  //       color={Colors.tabMenuButton}
+  //       onValueChange={onCheck}
+  //     />
+  //     <Text style={{ ...textStyle }}>{text}</Text>
+  //   </View>
+  // </TouchableOpacity>
+  // );
 };
 
 export const ColorSelectorModalComponent = ({ onSelect }) => {
@@ -2525,7 +2559,7 @@ export const ColorSelectorModalComponent = ({ onSelect }) => {
         height: "90%",
         // alignSelf: "center",
         // justifySelf: "center",
-        backgroundColor: "green",
+        backgroundColor: "green"
       }}
     ></View>
   );
@@ -2536,7 +2570,7 @@ export const GradientView = ({
   colorArr = COLOR_GRADIENTS.blue,
   children,
   style,
-  props,
+  props
 }) => {
   return (
     <LinearGradient
@@ -2555,7 +2589,7 @@ export const Image_ = ({
   size = 30,
   style = { width: 30, height: 30 },
   resizeMode = "contain",
-  icon = "",
+  icon = ""
 }) => {
   let width, height;
   if (style.width) {
@@ -2583,7 +2617,7 @@ export const Button_ = ({
   mouseOverOptions = {
     opacity: 0.6,
     highlightColor: "lightgray",
-    textColor: "white",
+    textColor: "white"
   },
   shadow = false,
   allCaps = false,
@@ -2594,7 +2628,7 @@ export const Button_ = ({
   buttonStyle = {},
   textStyle = {},
   iconStyle = {},
-  viewStyle = {},
+  viewStyle = {}
 }) => {
   const [sMouseOver, _setMouseOver] = React.useState(false);
   if (allCaps) text = text.toUpperCase();
@@ -2666,7 +2700,7 @@ export const Button_ = ({
           ...shadowStyle,
           ...buttonStyle,
           backgroundColor: icon && !text ? null : getBackgroundColor(),
-          opacity: getOpacity(),
+          opacity: getOpacity()
         }}
         {...gradientViewProps}
       >
@@ -2679,7 +2713,7 @@ export const Button_ = ({
               ...iconStyle,
               opacity: sMouseOver
                 ? mouseOverOptions.opacity
-                : buttonStyle.opacity,
+                : buttonStyle.opacity
             }}
           />
         ) : null}
@@ -2696,7 +2730,7 @@ export const Button_ = ({
               // backgroundColor: "green",
               ...textStyle,
               // color: sMouseOver ? "black" : textStyle.color || "white",
-              color: textStyle.color || APP_BASE_COLORS.textWhite,
+              color: textStyle.color || APP_BASE_COLORS.textWhite
             }}
           >
             {text}

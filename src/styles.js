@@ -26,7 +26,7 @@ export const Colors = {
   darkText: "rgb(20, 20, 20)",
   lightText: "rgb(60, 60, 60)",
   lightTextOnMainBackground: "rgb(170, 210, 200)",
-  darkTextOnMainBackground: "rgb(30, 30, 30)",
+  darkTextOnMainBackground: "rgb(30, 30, 30)"
 };
 
 export const APP_BASE_COLORS = {
@@ -46,27 +46,27 @@ export const APP_BASE_COLORS = {
   buttonLightGreenOutline: "rgb(200, 228, 220)",
 
   textMain: "rgb(45, 55, 72)",
-  textWhite: "rgb(255, 255, 255)",
+  textWhite: "rgb(255, 255, 255)"
 };
 
 export const COLOR_GRADIENTS = {
   green: ["rgb(71,185,119)", APP_BASE_COLORS.green],
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
-  blue: ["rgb(96, 152, 202)", APP_BASE_COLORS.blue],
+  blue: ["rgb(96, 152, 202)", APP_BASE_COLORS.blue]
 };
 
 export const COLOR_GRADIENT_PROFILES = {
   standard: {
     start: { x: 0, y: 0 },
-    end: { x: 1, y: 0 },
-  },
+    end: { x: 1, y: 0 }
+  }
 };
 
 export const BUTTON_VARS = {
   radius: {
     rounded: 15,
-    squared: 8,
-  },
+    squared: 8
+  }
 };
 
 const ASSETS_PATH = "./assets/";
@@ -89,6 +89,8 @@ export const ICONS = {
   ridingBike: require(ASSETS_PATH + "riding_bike.png"),
   menu1: require(ASSETS_PATH + "menu1.png"),
   menu2: require(ASSETS_PATH + "menu-button.png"),
+  CheckBox_: require(ASSETS_PATH + "checkbox.png"),
+  checkoxEmpty: require(ASSETS_PATH + "checkbox-empty.png")
 };
 
 // rgb(64, 174, 113)
@@ -97,9 +99,9 @@ export const Fonts = {
   weight: {
     textRegular: "400",
     textHeavy: "600",
-    textSuperheavy: "800",
+    textSuperheavy: "800"
   },
-  style: {},
+  style: {}
 };
 
 export const ViewStyles = {
@@ -107,13 +109,13 @@ export const ViewStyles = {
     width: dim.windowWidth,
     height: dim.windowHeight * 1,
     backgroundColor: Colors.mainBackground,
-    padding: 5,
-  },
+    padding: 5
+  }
 };
 
 export const ButtonStyles = {
   darkSquare: {
     backgroundColor: Colors.buttonDarkBackground,
-    fontColor: Colors.buttonDarkFont,
-  },
+    fontColor: Colors.buttonDarkFont
+  }
 };

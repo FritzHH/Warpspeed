@@ -4,7 +4,7 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  Image,
+  Image
 } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
@@ -15,9 +15,9 @@ import {
   getWordMonth,
   log,
   trimToTwoDecimals,
-  useInterval,
+  useInterval
 } from "../../../utils";
-import { TabMenuDivider as Divider, CheckBox } from "../../../components";
+import { TabMenuDivider as Divider, CheckBox_ } from "../../../components";
 import { APP_BASE_COLORS, Colors } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
@@ -28,11 +28,11 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
-  useWorkorderPreviewStore,
+  useWorkorderPreviewStore
 } from "../../../stores";
 import {
   dbGetCustomerObj,
-  dbSetOpenWorkorderItem,
+  dbSetOpenWorkorderItem
 } from "../../../db_call_wrapper";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { getDatabase } from "firebase/database";
@@ -124,7 +124,7 @@ export function WorkordersComponent({}) {
           "Wednesday",
           "Thursday",
           "Friday",
-          "Saturday",
+          "Saturday"
         ];
         const result = [];
         let current = new Date(wo.startedOnMillis);
@@ -167,7 +167,7 @@ export function WorkordersComponent({}) {
 
         let optionsObj = {
           color: null,
-          waitEndDay: maxWaitMillis && isDueWithin7Days ? dayEndWord : "",
+          waitEndDay: maxWaitMillis && isDueWithin7Days ? dayEndWord : ""
         };
 
         //////////////////////////
@@ -260,7 +260,7 @@ export function WorkordersComponent({}) {
   return (
     <View
       style={{
-        flex: 1,
+        flex: 1
       }}
     >
       <View
@@ -270,23 +270,21 @@ export function WorkordersComponent({}) {
           paddingVertical: 5,
           justifyContent: "flex-end",
           flexDirection: "row",
-          alignItems: "center",
+          alignItems: "center"
         }}
       >
-        <CheckBox
+        <CheckBox_
           isChecked={sAllowPreview}
           onCheck={() => _setAllowPreview(!sAllowPreview)}
           viewStyle={{ alignSelf: "flex-end" }}
           text={"Preview On"}
+          iconSize={10}
           buttonStyle={{
-            width: 15,
-            height: 15,
-            marginRight: 20,
-            borderWidth: 1,
-            borderColor: "transparent",
+            borderRadius: 5,
+            backgroundColor: "transparent"
           }}
           outerButtonStyle={{}}
-          textStyle={{ color: "dimgray", marginRight: 10 }}
+          textStyle={{ color: APP_BASE_COLORS.textMain, fontSize: 13 }}
         />
       </View>
 
@@ -295,7 +293,7 @@ export function WorkordersComponent({}) {
           width: "100%",
           height: "96%",
           backgroundColor: null,
-          paddingHorizontal: 5,
+          paddingHorizontal: 5
         }}
         data={sortWorkorders(zOpenWorkordersArr)}
         keyExtractor={(item, index) => index}
@@ -333,14 +331,14 @@ export function WorkordersComponent({}) {
                     alignItems: "center",
                     paddingLeft: 5,
                     paddingRight: 2,
-                    paddingVertical: 2,
+                    paddingVertical: 2
                   }}
                 >
                   <View
                     style={{
                       marginVertical: 5,
                       flexDirection: "row",
-                      width: "65%",
+                      width: "65%"
                     }}
                   >
                     <Text style={{ marginRight: 10 }}>
@@ -354,7 +352,7 @@ export function WorkordersComponent({}) {
                       justifyContent: "flex-end",
                       alignItems: "center",
                       flexDirection: "row",
-                      height: "100%",
+                      height: "100%"
                       // backgroundColor: "green",
                     }}
                   >
@@ -363,7 +361,7 @@ export function WorkordersComponent({}) {
                         flexDirection: "column",
                         alignItems: "flex-end",
                         justifyContent: "space-between",
-                        height: "100%",
+                        height: "100%"
                       }}
                     >
                       <View
@@ -376,13 +374,13 @@ export function WorkordersComponent({}) {
                           borderRadius: 15,
                           borderColor: "transparent",
 
-                          borderLeftColor: workorder.status.textColor,
+                          borderLeftColor: workorder.status.textColor
                         }}
                       >
                         <Text
                           style={{
                             color: workorder.status.textColor,
-                            fontSize: 14,
+                            fontSize: 14
                           }}
                         >
                           {workorder.status.label}
@@ -405,7 +403,7 @@ export function WorkordersComponent({}) {
                         borderWidth: 1,
                         borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
                         borderRadius: 5,
-                        marginLeft: 5,
+                        marginLeft: 5
                       }}
                     >
                       <View style={{ flexDirection: "" }}>
@@ -414,7 +412,7 @@ export function WorkordersComponent({}) {
                             color: "dimgray",
                             fontSize: 12,
                             width: 100,
-                            textAlign: "right",
+                            textAlign: "right"
                           }}
                         >
                           {"est: "}
@@ -422,7 +420,7 @@ export function WorkordersComponent({}) {
                             style={{
                               color: APP_BASE_COLORS.textMain,
                               fontSize: 14,
-                              fontStyle: "italic",
+                              fontStyle: "italic"
                             }}
                           >
                             {workorder.waitTime.label}
@@ -434,7 +432,7 @@ export function WorkordersComponent({}) {
                               paddingLeft: 10,
                               color: "gray",
                               fontSize: 13,
-                              alignSelf: "flex-end",
+                              alignSelf: "flex-end"
                             }}
                           >
                             {"due: "}{" "}
@@ -452,7 +450,7 @@ export function WorkordersComponent({}) {
                           width: 13,
                           height: 13,
                           borderRadius: 100,
-                          marginLeft: 7,
+                          marginLeft: 7
                         }}
                       />
                     </View>

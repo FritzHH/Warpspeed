@@ -460,6 +460,13 @@ export function applyDiscountToWorkorderItem(
   };
 }
 
+export function insertOpacityIntoRGBString(rgbString, opacity) {
+  const match = rgbString.match(/^rgb\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)$/);
+  if (!match) throw new Error("Invalid RGB string format");
+  const [_, r, g, b] = match;
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
 export function getItemFromArr(value, arrKey, arr) {
   return arr.find((obj) => obj[arrKey] === value);
 }

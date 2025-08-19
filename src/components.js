@@ -18,6 +18,7 @@ import {
   clog,
   formatDecimal,
   generateRandomID,
+  insertOpacityIntoRGBString,
   LETTERS,
   log,
   NUMS,
@@ -308,24 +309,24 @@ export const ScreenModal = ({
     // y: 40,
   },
   mouseOverOptions = {
-    enable: true,
-    opacity: 1,
-    highlightColor: Colors.tabMenuButton,
+    // enable: true,
+    // opacity: 1,
+    // highlightColor: Colors.tabMenuButton,
   },
   handleButtonPress = () => {},
+  handleMouseOver,
+  handleMouseExit,
   buttonLabel = "Modal Button",
   buttonVisible = true,
-  showButtonIcon = true,
   showOuterModal = false,
   showShadow = true,
-  allCaps = false,
   buttonStyle = {},
   buttonTextStyle = {},
   Component,
   outerModalStyle = {},
   modalVisible = false,
   setModalVisibility = () => {},
-  shadowStyle = { ...SHADOW_RADIUS_PROTO },
+  shadowStyle = { ...SHADOW_RADIUS_NOTHING },
   buttonIcon,
   buttonIconStyle = {},
   handleModalActionInternally = false,
@@ -372,6 +373,8 @@ export const ScreenModal = ({
       <View style={{}}>
         {buttonVisible ? (
           <Button_
+            handleMouseExit={handleMouseExit}
+            handleMouseOver={handleMouseOver}
             icon={buttonIcon}
             iconStyle={buttonIconStyle}
             text={buttonLabel}
@@ -412,7 +415,7 @@ export const ScreenModal = ({
             style={{
               width: "100%",
               height: "100%",
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              backgroundColor: showOuterModal ? "rgba(0, 0, 0, 0.5)" : null,
               justifyContent: "center",
               alignItems: "center",
               alignSelf: "center",
@@ -432,13 +435,17 @@ export const ScreenModal = ({
 };
 
 export const DropdownMenu = ({
+  openOnMouseOver = true,
   dataArr = [],
   onSelect,
   buttonIcon,
   currentSelectionIdx,
   itemTextStyle = {},
   itemViewStyle = {},
-  buttonStyle = {},
+  buttonStyle = {
+    backgroundColor: APP_BASE_COLORS.lightred,
+    borderRadius: 10,
+  },
   buttonTextStyle = {},
   buttonText,
   ref,
@@ -449,58 +456,82 @@ export const DropdownMenu = ({
   mouseOverOptions = {
     enable: true,
     opacity: 1,
-    highlightColor: Colors.tabMenuButton,
+    highlightColor: APP_BASE_COLORS.lightred,
   },
   showButtonShadow,
   shadowStyle = { ...SHADOW_RADIUS_PROTO },
   itemSeparatorStyle = {},
-  enableMouseoverListItem = true,
+  menuBorderColor,
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sModalVisible, _setModalVisible] = useState(false);
+
   const DropdownComponent = () => {
-    // log(itemViewStyle);
     return (
-      <FlatList
-        data={dataArr}
-        ItemSeparatorComponent={() => (
-          <View
-            style={{
-              height: 1,
-              backgroundColor: "lightgray",
-              width: "100%",
-              ...itemSeparatorStyle,
-            }}
-          />
-        )}
-        renderItem={(item) => {
-          let idx = item.idx;
-          item = item.item;
-          // log(item);
-          return (
-            <Button_
-              icon={buttonIcon}
-              mouseOverOptions={mouseOverOptions}
-              enableMouseOver={enableMouseoverListItem}
-              buttonStyle={{
-                padding: 10,
-                height: 40,
-                width: 130,
-                backgroundColor: item.backgroundColor,
-                ...itemViewStyle,
-                // borderRadius: 0,
-              }}
-              textStyle={{ ...itemTextStyle, color: item.textColor }}
-              // mouseOverOptions={{ opacity: 1 }}
-              text={item.label || item}
-              onPress={() => {
-                onSelect(item, idx);
-                _setModalVisible(false);
+      <View
+        style={{
+          backgroundColor: "transparent",
+          // borderWidth: 1,
+          borderColor: menuBorderColor || APP_BASE_COLORS.green,
+          // borderRadius: 25,
+          borderRadius: buttonStyle.borderRadius,
+        }}
+      >
+        <FlatList
+          // style={{ borderRadius: 15, backgroundColor: "transparent" }}
+          data={dataArr}
+          ItemSeparatorComponent={() => (
+            <View
+              style={{
+                height: 1,
+                backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                width: "100%",
+                ...itemSeparatorStyle,
               }}
             />
-          );
-        }}
-      />
+          )}
+          renderItem={(item) => {
+            let idx = item.index;
+            // log(idx);
+            item = item.item;
+            // log(item);
+            return (
+              <Button_
+                icon={buttonIcon}
+                mouseOverOptions={mouseOverOptions}
+                // enableMouseOver={enableMouseoverListItem}
+                buttonStyle={{
+                  padding: 10,
+                  height: 40,
+                  width: 130,
+                  borderRadius: 0,
+                  backgroundColor:
+                    item.backgroundColor ||
+                    APP_BASE_COLORS.buttonLightGreenOutline,
+                  borderTopLeftRadius:
+                    idx == 0 ? buttonStyle.borderRadius : null,
+                  borderTopRightRadius:
+                    idx == 0 ? buttonStyle.borderRadius : null,
+                  borderBottomLeftRadius:
+                    idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
+                  borderBottomRightRadius:
+                    idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
+                  ...itemViewStyle,
+                }}
+                textStyle={{
+                  ...itemTextStyle,
+                  color: item.textColor || APP_BASE_COLORS.textMain,
+                }}
+                text={item.label || item}
+                onPress={() => {
+                  onSelect(item, idx);
+                  _setModalVisible(false);
+                }}
+              />
+            );
+          }}
+        />
+      </View>
     );
   };
 
@@ -509,6 +540,8 @@ export const DropdownMenu = ({
       Component={() => <DropdownComponent />}
       modalVisible={sModalVisible}
       handleButtonPress={() => _setModalVisible(!sModalVisible)}
+      // handleMouseOver={() => (openOnMouseOver ? _setModalVisible(true) : null)}
+      // handleMouseExit={() => (openOnMouseOver ? handleMouseExit() : null)}
       buttonStyle={buttonStyle}
       buttonTextStyle={buttonTextStyle}
       buttonLabel={buttonText}
@@ -518,7 +551,6 @@ export const DropdownMenu = ({
       showShadow={showButtonShadow}
       mouseOverOptions={mouseOverOptions}
       shadowStyle={shadowStyle}
-      // showOuterModal={true}
       handleOuterClick={() => _setModalVisible(false)}
     />
   );
@@ -2520,6 +2552,8 @@ export const Image_ = ({
 };
 
 export const Button_ = ({
+  handleMouseOver = () => {},
+  handleMouseExit = () => {},
   visible = true,
   icon = null,
   ref,
@@ -2575,7 +2609,7 @@ export const Button_ = ({
       return mouseOverOptions.highlightColor;
     } else {
       if (buttonStyle.backgroundColor) return buttonStyle.backgroundColor;
-      return Colors.tabMenuButton;
+      return APP_BASE_COLORS.green;
     }
   }
 
@@ -2587,14 +2621,17 @@ export const Button_ = ({
       return 1;
     }
   }
-  // log(icon, text);
 
   return (
     <TouchableOpacity
       // style={{ ...viewStyle }}
       ref={ref}
-      onMouseOver={() => (enableMouseOver ? _setMouseOver(true) : null)}
+      onMouseOver={() => {
+        handleMouseOver();
+        enableMouseOver ? _setMouseOver(true) : null;
+      }}
       onMouseLeave={() => {
+        handleMouseExit();
         _setMouseOver(false);
       }}
       // on={() => log("here")}

@@ -89,6 +89,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowCustomerInfoModal, _setShowCustomerInfoModal] =
     React.useState(false);
   const [sInfoTextFocus, _setInfoTextFocus] = React.useState(null);
+  const [sInputMouseOver, _setInputMouseOver] = React.useState(null);
 
   const bikesRef = useRef();
   const ebikeRef = useRef();
@@ -190,19 +191,19 @@ export const ActiveWorkorderComponent = ({}) => {
           paddingBottom: 10,
           paddingTop: 5,
           paddingHorizontal: 5,
-          backgroundColor: APP_BASE_COLORS.backgroundListWhite,
-          borderRadius: 15,
-          shadowColor: APP_BASE_COLORS.green,
+          backgroundColor: APP_BASE_COLORS.lightred,
+          // borderRadius: 15,
+          // shadowColor: APP_BASE_COLORS.green,
           backgroundColor: APP_BASE_COLORS.backgroundWhite,
-          borderColor: APP_BASE_COLORS.buttonLightGreen,
-          borderWidth: 1,
           borderRadius: 15,
-          shadowOffset: {
-            width: 2,
-            height: 2,
-          },
-          shadowOpacity: 0.5,
-          shadowRadius: 15,
+          // borderColor: APP_BASE_COLORS.buttonLightGreen,
+
+          // shadowOffset: {
+          //   width: 2,
+          //   height: 2,
+          // },
+          // shadowOpacity: 0.5,
+          // shadowRadius: 15,
         }}
       >
         <View
@@ -349,14 +350,15 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 >
                   <DropdownMenu
+                    // openOnMouseOver=
                     dataArr={zSettingsObj.bikeBrands}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
                       wo.brand = item;
                       _zSetWorkorderObj(wo);
                     }}
-                    itemViewStyle={{ backgroundColor: "gray" }}
-                    itemTextStyle={{ fontSize: 18, color: "black" }}
+                    // itemViewStyle={{ backgroundColor: "gray" }}
+                    // itemTextStyle={{ fontSize: 18, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       backgroundColor: zWorkorderObj.brand
@@ -383,8 +385,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       wo.brand = item;
                       _zSetWorkorderObj(wo);
                     }}
-                    itemViewStyle={{ backgroundColor: "gray" }}
-                    itemTextStyle={{ fontSize: 14, color: "black" }}
+                    // itemViewStyle={{ backgroundColor: "gray" }}
+                    // itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       backgroundColor: zWorkorderObj.brand
@@ -440,8 +442,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                     }}
                     modalCoordinateVars={{ x: 30, y: 30 }}
-                    itemViewStyle={{ borderRadius: 0 }}
-                    itemTextStyle={{ fontSize: 14, color: "black" }}
+                    // itemViewStyle={{ borderRadius: 0 }}
+                    // itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{ ...dropdownButtonStyle }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={descriptionRef}
@@ -514,8 +516,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                       dbSetOpenWorkorderItem(wo);
                     }}
-                    itemViewStyle={{ borderRadius: 0 }}
-                    itemTextStyle={{ fontSize: 14 }}
+                    // itemViewStyle={{ borderRadius: 0 }}
+                    // itemTextStyle={{ fontSize: 14 }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       backgroundColor: zWorkorderObj.color1.label
@@ -539,11 +541,11 @@ export const ActiveWorkorderComponent = ({}) => {
                 >
                   <DropdownMenu
                     itemSeparatorStyle={{ height: 0 }}
-                    mouseOverOptions={{
-                      enable: true,
-                      opacity: 0.6,
-                      highlightColor: "white",
-                    }}
+                    // mouseOverOptions={{
+                    //   enable: true,
+                    //   opacity: 0.6,
+                    //   highlightColor: "white",
+                    // }}
                     dataArr={COLORS}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
@@ -551,8 +553,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                       dbSetOpenWorkorderItem(wo);
                     }}
-                    itemViewStyle={{ borderRadius: 0 }}
-                    itemTextStyle={{ fontSize: 14 }}
+                    // itemViewStyle={{ borderRadius: 0 }}
+                    // itemTextStyle={{ fontSize: 14 }}
                     buttonStyle={dropdownButtonStyle}
                     ref={color2Ref}
                     buttonText={"Color 2"}
@@ -599,8 +601,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                       dbSetOpenWorkorderItem(wo);
                     }}
-                    itemViewStyle={{ backgroundColor: "gray", width: null }}
-                    itemTextStyle={{ fontSize: 14, color: "black" }}
+                    // itemViewStyle={{ backgroundColor: "gray", width: null }}
+                    // itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       backgroundColor: zWorkorderObj.waitTime
@@ -622,7 +624,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 wo.status = val;
                 _zSetWorkorderObj(wo);
               }}
-              itemViewStyle={{ backgroundColor: "gray", width: null }}
+              // itemViewStyle={{ backgroundColor: "gray", width: null }}
               // itemTextStyle={{ color }}
               buttonStyle={{
                 width: "100%",
@@ -716,8 +718,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       wo.partSource = item;
                       _zSetWorkorderObj(wo);
                     }}
-                    itemViewStyle={{ backgroundColor: "gray" }}
-                    itemTextStyle={{ fontSize: 14, color: "black" }}
+                    // itemViewStyle={{ backgroundColor: "gray" }}
+                    // itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       paddingHorizontal: 40,

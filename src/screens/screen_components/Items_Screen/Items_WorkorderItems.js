@@ -306,13 +306,14 @@ export const Items_WorkorderItemsTab = ({}) => {
             alignSelf: "center",
           }}
         >
-          <Text style={{ fontSize: 16, color: "gray" }}>
-            {"Items: "}
+          <Text style={{ fontSize: 13, color: "gray" }}>
+            {"ITEMS: "}
             <Text
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
                 color: APP_BASE_COLORS.textMain,
+                fontSize: 15,
               }}
             >
               {sNumItems}
@@ -327,13 +328,14 @@ export const Items_WorkorderItemsTab = ({}) => {
           />
           {sTotalDiscount > 0 ? (
             <View>
-              <Text style={{ fontSize: 16, color: "gray" }}>
-                {"Discount: "}
+              <Text style={{ fontSize: 13, color: "gray" }}>
+                {"DISCOUNT: "}
                 <Text
                   style={{
                     marginRight: 10,
                     fontWeight: "bold",
                     color: APP_BASE_COLORS.textMain,
+                    fontSize: 15,
                   }}
                 >
                   {"$" + sTotalDiscount}
@@ -348,13 +350,14 @@ export const Items_WorkorderItemsTab = ({}) => {
               />
             </View>
           ) : null}
-          <Text style={{ fontSize: 16, color: "gray" }}>
-            {"Subtotal: "}
+          <Text style={{ fontSize: 13, color: "gray" }}>
+            {"SUBTOTAL: "}
             <Text
               style={{
                 marginRight: 10,
                 color: APP_BASE_COLORS.textMain,
                 fontWeight: "bold",
+                fontSize: 15,
               }}
             >
               {"$" + sTotalPrice}
@@ -367,13 +370,14 @@ export const Items_WorkorderItemsTab = ({}) => {
               backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
             }}
           />
-          <Text style={{ fontSize: 16, color: "gray" }}>
-            {"Tax: "}
+          <Text style={{ fontSize: 13, color: "gray" }}>
+            {"TAX: "}
             <Text
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
                 color: APP_BASE_COLORS.textMain,
+                fontSize: 15,
               }}
             >
               {"$" +
@@ -390,7 +394,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 
           <Text
             style={{
-              fontSize: 16,
+              fontSize: 13,
               borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
               borderRadius: 15,
               borderWidth: 1,
@@ -399,12 +403,13 @@ export const Items_WorkorderItemsTab = ({}) => {
               color: "gray",
             }}
           >
-            {"Total: "}
+            {"TOTAL: "}
             <Text
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
                 color: APP_BASE_COLORS.textMain,
+                fontSize: 15,
               }}
             >
               {"$" +
@@ -490,6 +495,7 @@ export const LineItemComponent = ({
             backgroundColor: APP_BASE_COLORS.backgroundListWhite,
             paddingVertical: 3,
             paddingRight: 5,
+            paddingLeft: 8,
             marginVertical: 3,
             marginHorizontal: 8,
             borderColor: "transparent",
@@ -557,6 +563,17 @@ export const LineItemComponent = ({
                 // marginRight: 5,
               }}
             >
+              <Button_
+                onPress={() => __deleteWorkorderLine(index)}
+                icon={ICONS.close1}
+                iconSize={17}
+                buttonStyle={{
+                  marginLeft: 5,
+                  marginRight: 5,
+                  // margin
+                  backgroundColor: "transparent",
+                }}
+              />
               <Button_
                 onPress={() =>
                   __modQtyPressed(inventoryItem, workorderLine, "up", index)
@@ -666,17 +683,6 @@ export const LineItemComponent = ({
                   )
                 }
                 buttonStyle={{
-                  backgroundColor: "transparent",
-                }}
-              />
-              <Button_
-                onPress={() => __deleteWorkorderLine(index)}
-                icon={ICONS.close1}
-                iconSize={17}
-                buttonStyle={{
-                  marginLeft: 5,
-                  marginRight: 5,
-                  // margin
                   backgroundColor: "transparent",
                 }}
               />

@@ -126,7 +126,9 @@ export function BaseScreen() {
         height: screenHeight,
         flexDirection: "row",
         justifyContent: "space-around",
-        padding: 8,
+        alignItems: "center",
+        // padding: 8,
+        // backgroundColor: "green",
         // paddingVertical: 8,
         // paddingHorizontal: 8,
       }}
@@ -150,30 +152,24 @@ export function BaseScreen() {
           width: "65%",
           backgroundColor: APP_BASE_COLORS.backgroundWhite,
           height: "100%",
+          paddingRight: 8,
+          justifyContent: "space-around",
+          // marginRight: 5,
         }}
       >
         <View
           style={{
             width: "100%",
-            height: "65%",
+            height: "64%",
             flexDirection: "row",
-            justifyContent: "flex-start",
+            justifyContent: "space-around",
+            // marginRight: 0,
           }}
         >
+          {/*Info Section */}
           <View
             style={{
               width: "33%",
-              paddingRight: 10,
-              paddingLeft: 3,
-              // height: "40%",
-              // backgro
-            }}
-          >
-            <Info_Section />
-          </View>
-          <View
-            style={{
-              width: "66%",
               height: "100%",
               backgroundColor: APP_BASE_COLORS.backgroundWhite,
               borderColor: APP_BASE_COLORS.buttonLightGreen,
@@ -189,15 +185,46 @@ export function BaseScreen() {
               shadowRadius: 15,
             }}
           >
+            <Info_Section />
+          </View>
+          <View
+            style={{
+              width: "65%",
+              height: "100%",
+              backgroundColor: APP_BASE_COLORS.backgroundWhite,
+              borderColor: APP_BASE_COLORS.buttonLightGreen,
+              borderWidth: 1,
+              borderRadius: 15,
+              // backgroundColor: "red",
+              shadowColor: APP_BASE_COLORS.green,
+              shadowOffset: {
+                width: 1,
+                height: 3,
+              },
+              shadowOpacity: 0.5,
+              shadowRadius: 15,
+            }}
+          >
             <Items_Section />
           </View>
         </View>
         <View
           style={{
-            width: "100%",
-            height: "35%",
-            paddingTop: 20,
-            paddingRight: 10,
+            marginLeft: 6,
+            width: "99%",
+            height: "33%",
+            backgroundColor: APP_BASE_COLORS.backgroundWhite,
+            borderColor: APP_BASE_COLORS.buttonLightGreen,
+            borderWidth: 1,
+            borderRadius: 15,
+            // backgroundColor: "red",
+            shadowColor: APP_BASE_COLORS.green,
+            shadowOffset: {
+              width: 1,
+              height: 3,
+            },
+            shadowOpacity: 0.5,
+            shadowRadius: 15,
           }}
         >
           <Notes_Section />
@@ -205,16 +232,17 @@ export function BaseScreen() {
       </View>
       <View
         style={{
-          width: "35%",
-          height: "100%",
+          marginRight: 13,
+          width: "34%",
+          height: "99%",
           backgroundColor: APP_BASE_COLORS.backgroundWhite,
-          borderColor: APP_BASE_COLORS.green,
-          borderWidth: 1,
+          // borderColor: APP_BASE_COLORS.green,
+          // borderWidth: 1,
           borderRadius: 15,
           shadowColor: APP_BASE_COLORS.green,
           shadowOffset: {
-            width: -2,
-            height: -2,
+            width: 0,
+            height: 0,
           },
           shadowOpacity: 0.5,
           shadowRadius: 15,

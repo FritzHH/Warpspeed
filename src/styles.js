@@ -89,8 +89,10 @@ export const ICONS = {
   ridingBike: require(ASSETS_PATH + "riding_bike.png"),
   menu1: require(ASSETS_PATH + "menu1.png"),
   menu2: require(ASSETS_PATH + "menu-button.png"),
-  CheckBox_: require(ASSETS_PATH + "checkbox.png"),
-  checkoxEmpty: require(ASSETS_PATH + "checkbox-empty.png")
+  checkbox: require(ASSETS_PATH + "checkbox.png"),
+  checkoxEmpty: require(ASSETS_PATH + "checkbox-empty.png"),
+  search: require(ASSETS_PATH + "search.png"),
+  logo: require(ASSETS_PATH + "logo_highres.png")
 };
 
 // rgb(64, 174, 113)

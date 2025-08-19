@@ -2457,7 +2457,7 @@ export const CheckBox_ = ({
 }) => {
   return (
     <Button_
-      icon={isChecked ? ICONS.CheckBox_ : ICONS.checkoxEmpty}
+      icon={isChecked ? ICONS.checkbox : ICONS.checkoxEmpty}
       iconSize={15}
       text={text}
       buttonStyle={buttonStyle}

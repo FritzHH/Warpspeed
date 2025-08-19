@@ -1,4 +1,6 @@
 import { Text, View } from "react-native-web";
+import { Image_ } from "../../../components";
+import { ICONS } from "../../../styles";
 
 export function EmptyItemsComponent() {
   return (
@@ -6,30 +8,15 @@ export function EmptyItemsComponent() {
       style={{
         width: "100%",
         height: "100%",
+        padding: 0,
         alignItems: "center",
-        justifyContent: "center",
+        justifyContent: "center"
       }}
     >
-      <Text
-        style={{
-          textAlign: "center",
-          width: "100%",
-          fontSize: 50,
-          color: "gray",
-        }}
-      >
-        {"WarpSpeed\n"}
-        <Text
-          style={{
-            textAlign: "center",
-            width: "100%",
-            fontSize: 20,
-            color: "gray",
-          }}
-        >
-          By Heliosoft
-        </Text>
-      </Text>
+      <Image_
+        icon={ICONS.logo}
+        style={{ opacity: 0.1, width: "90%", height: "90%" }}
+      />
     </View>
   );
 }

@@ -333,13 +333,36 @@ export function WorkordersComponent({}) {
                     style={{
                       marginVertical: 5,
                       flexDirection: "row",
-                      width: "65%"
+                      width: "65%",
+                      alignItems: "center"
                     }}
                   >
-                    <Text style={{ marginRight: 10 }}>
+                    <Text
+                      style={{
+                        fontWeight: 500,
+                        color: APP_BASE_COLORS.textMain
+                      }}
+                    >
                       {workorder.brand || "Brand"}
                     </Text>
-                    <Text>{workorder.description}</Text>
+                    {workorder.description ? (
+                      <View
+                        style={{
+                          width: 7,
+                          height: 2,
+                          marginHorizontal: 5,
+                          backgroundColor: "lightgray"
+                        }}
+                      />
+                    ) : null}
+                    <Text
+                      style={{
+                        color: APP_BASE_COLORS.textMain
+                        // fontStyle: "italic"
+                      }}
+                    >
+                      {workorder.description}
+                    </Text>
                   </View>
                   <View
                     style={{

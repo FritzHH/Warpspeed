@@ -279,19 +279,20 @@ export function NewWorkorderComponent({}) {
         style={{
           width: "100%",
           height: "100%",
-          justifyContent: "space-between",
-          alignItems: "center"
+          justifyContent: "flex-end",
+          alignItems: "center",
+          paddingBottom: 20
         }}
       >
-        <View
+        {/* <View
           style={{
             width: "100%",
             justifyContent: "flex-start",
             alignItems: "center"
             // backgroundColor: "green"
           }}
-        >
-          <View
+        > */}
+        {/* <View
             style={{
               flexDirection: "row",
               width: "100%",
@@ -299,8 +300,8 @@ export function NewWorkorderComponent({}) {
               alignItems: "center",
               paddingHorizontal: 5
             }}
-          >
-            <Button
+          > */}
+        {/* <Button
               buttonStyle={{
                 width: 110,
                 // height: 30,
@@ -335,83 +336,85 @@ export function NewWorkorderComponent({}) {
               onPress={() => {
                 handleStartStandaloneSalePress();
               }}
-            />
-          </View>
-          <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
-          <View style={{ alignItems: "center" }}>
+            /> */}
+        {/* </View> */}
+        <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+        <View style={{ alignItems: "center" }}>
+          <TextInput
+            style={{
+              // marginTop: 100,
+              borderBottomWidth: 1,
+              width: 200,
+              height: 40,
+              paddingHorizontal: 3,
+              outlineStyle: "none",
+              borderColor: "gray",
+              fontSize: 16,
+              color: sBox1Val.length < 0 ? "gray" : "dimgray"
+            }}
+            autoFocus={true}
+            placeholder={sSearchingByName ? "First Name" : "Phone number"}
+            placeholderTextColor={"gray"}
+            value={sBox1Val}
+            onChangeText={(val) => handleBox1TextChange(val)}
+          />
+          <View style={{ width: 10 }} />
+          {sSearchingByName && (
             <TextInput
+              placeholder={"Last name"}
+              placeholderTextColor={"gray"}
               style={{
-                marginTop: 100,
+                marginTop: 20,
+                padding: 3,
                 borderBottomWidth: 1,
+                fontSize: 16,
                 width: 200,
                 height: 40,
-                paddingHorizontal: 3,
                 outlineStyle: "none",
-                borderColor: "gray",
-                fontSize: 16,
-                color: sBox1Val.length < 0 ? "gray" : "dimgray"
+                borderColor: "gray"
               }}
-              autoFocus={true}
-              placeholder={sSearchingByName ? "First Name" : "Phone number"}
-              placeholderTextColor={"gray"}
-              value={sBox1Val}
-              onChangeText={(val) => handleBox1TextChange(val)}
+              value={sBox2Val}
+              onChangeText={(val) => handleBox2TextChange(val)}
             />
-            <View style={{ width: 10 }} />
-            {sSearchingByName && (
-              <TextInput
-                placeholder={"Last name"}
-                placeholderTextColor={"gray"}
-                style={{
-                  marginTop: 20,
-                  padding: 3,
-                  borderBottomWidth: 1,
-                  fontSize: 16,
-                  width: 200,
-                  height: 40,
-                  outlineStyle: "none",
-                  borderColor: "gray"
-                }}
-                value={sBox2Val}
-                onChangeText={(val) => handleBox2TextChange(val)}
-              />
-            )}
-            <Button_
-              text={sSearchingByName ? "Search By Phone" : "Search By Name"}
-              onPress={() => {
-                _setBox1Val("");
-                _setBox2Val("");
-                _setSearchingByName(!sSearchingByName);
-                _zSetSearchResults([]);
-                _setShowCreateCustomerBtn(false);
-              }}
-              icon={ICONS.cashRed}
-              iconSize={20}
-              colorGradientArr={COLOR_GRADIENTS.green}
-              buttonStyle={{
-                paddingHorizontal: 25,
-                paddingVertical: 5,
-                marginTop: 20,
-                width: 220
-              }}
-            />
-          </View>
-
-          {/** customer info modal */}
+          )}
+          <Button_
+            text={sSearchingByName ? "Search Phone" : "Search Name"}
+            onPress={() => {
+              _setBox1Val("");
+              _setBox2Val("");
+              _setSearchingByName(!sSearchingByName);
+              _zSetSearchResults([]);
+              _setShowCreateCustomerBtn(false);
+            }}
+            icon={ICONS.search}
+            iconSize={25}
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            buttonStyle={{
+              paddingHorizontal: 25,
+              paddingVertical: 5,
+              marginTop: 20,
+              width: 220
+            }}
+          />
         </View>
+        <View style={{ height: "45%" }} />
+        {/** customer info modal */}
+        {/* </View> */}
         <Button_
           text={"New Sale"}
           onPress={() => {
             handleStartStandaloneSalePress();
           }}
-          icon={ICONS.cashRed}
-          iconSize={20}
+          icon={ICONS.cashBag}
+          iconSize={35}
           colorGradientArr={COLOR_GRADIENTS.green}
           buttonStyle={{
             paddingHorizontal: 25,
             paddingVertical: 5,
-            width: 220
+            width: 220,
+            borderRadius: 20
           }}
+          textStyle={{ marginLeft: 15, fontSize: 20 }}
         />
         <ScreenModal
           showOuterModal={true}

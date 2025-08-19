@@ -18,7 +18,7 @@ import {
   useInterval,
 } from "../../../utils";
 import { TabMenuDivider as Divider, CheckBox } from "../../../components";
-import { Colors } from "../../../styles";
+import { APP_BASE_COLORS, Colors } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep, sortBy } from "lodash";
@@ -299,19 +299,7 @@ export function WorkordersComponent({}) {
         }}
         data={sortWorkorders(zOpenWorkordersArr)}
         keyExtractor={(item, index) => index}
-        ItemSeparatorComponent={() => (
-          <View style={{ height: 1, backgroundColor: "gray", width: "100%" }} />
-        )}
         renderItem={(item) => {
-          // if (!item.item.id) {
-          //   return (
-          //     <View style={{ width: "100%" }}>
-          //       <Text>{"Status"}</Text>
-          //       <Text>{"Status"}</Text>
-          //     </View>
-          //   );
-          // }
-
           let workorder = item.item;
           return (
             <View>
@@ -331,10 +319,21 @@ export function WorkordersComponent({}) {
               >
                 <View
                   style={{
+                    marginBottom: 4,
+                    borderRadius: 7,
+                    // borderWidth: 1,
+                    borderLeftWidth: 4,
+
+                    borderLeftColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                    borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                    backgroundColor: APP_BASE_COLORS.listItemWhite,
                     flexDirection: "row",
                     width: "100%",
-                    // backgroundColor: "green",
-                    marginTop: 4,
+                    justifyContent: "flex-start",
+                    alignItems: "center",
+                    paddingLeft: 5,
+                    paddingRight: 2,
+                    paddingVertical: 2,
                   }}
                 >
                   <View
@@ -355,23 +354,10 @@ export function WorkordersComponent({}) {
                       justifyContent: "flex-end",
                       alignItems: "center",
                       flexDirection: "row",
+                      height: "100%",
                       // backgroundColor: "green",
                     }}
                   >
-                    {/* <LinearGradient
-                      colors={["#4c669f", "#3b5998", "#192f6a"]}
-                      style={{
-                        width: 100,
-                        height: 50,
-                        borderRadius: 15,
-                        alignItems: "center",
-                      }}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                    >
-                      <Text style={{}}>Hello</Text>
-                    </LinearGradient> */}
-                    {/* <View style={{ alignItems: "flex-end", paddingRight: 20 }}> */}
                     <View
                       style={{
                         flexDirection: "column",
@@ -410,55 +396,67 @@ export function WorkordersComponent({}) {
                     </View>
                     <View
                       style={{
-                        flexDirection: "column",
+                        flexDirection: "row",
                         alignItems: "center",
-                        justifyContent: "space-between",
+                        justifyContent: "flex-start",
                         height: "100%",
-                        paddingRight: 8,
+                        paddingRight: 2,
+                        backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                        borderWidth: 1,
+                        borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                        borderRadius: 5,
+                        marginLeft: 5,
                       }}
                     >
-                      <Text
-                        style={{
-                          color: "dimgray",
-                          fontSize: 12,
-                          width: 100,
-                          textAlign: "right",
-                        }}
-                      >
-                        {"est: "}
+                      <View style={{ flexDirection: "" }}>
                         <Text
                           style={{
                             color: "dimgray",
-                            fontSize: 14,
-                            fontStyle: "italic",
+                            fontSize: 12,
+                            width: 100,
+                            textAlign: "right",
                           }}
                         >
-                          {workorder.waitTime.label}
+                          {"est: "}
+                          <Text
+                            style={{
+                              color: APP_BASE_COLORS.textMain,
+                              fontSize: 14,
+                              fontStyle: "italic",
+                            }}
+                          >
+                            {workorder.waitTime.label}
+                          </Text>
                         </Text>
-                      </Text>
-                      {sItemOptions[workorder.id]?.waitEndDay ? (
-                        <Text
-                          style={{
-                            paddingLeft: 10,
-                            color: "black",
-                            fontSize: 13,
-                          }}
-                        >
-                          {"Due: " +
-                            capitalizeFirstLetterOfString(
-                              sItemOptions[workorder.id].waitEndDay
-                            )}
-                        </Text>
-                      ) : null}
+                        {sItemOptions[workorder.id]?.waitEndDay ? (
+                          <Text
+                            style={{
+                              paddingLeft: 10,
+                              color: "gray",
+                              fontSize: 13,
+                              alignSelf: "flex-end",
+                            }}
+                          >
+                            {"due: "}{" "}
+                            <Text style={{ color: APP_BASE_COLORS.textMain }}>
+                              {capitalizeFirstLetterOfString(
+                                sItemOptions[workorder.id].waitEndDay
+                              )}
+                            </Text>
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View
+                        style={{
+                          backgroundColor: sItemOptions[workorder.id]?.color,
+                          width: 13,
+                          height: 13,
+                          borderRadius: 100,
+                          marginLeft: 7,
+                        }}
+                      />
                     </View>
-                    <View
-                      style={{
-                        backgroundColor: sItemOptions[workorder.id]?.color,
-                        width: 13,
-                        height: 13,
-                        borderRadius: 100,
-                      }}
-                    />
+
                     {/* </View> */}
                   </View>
                 </View>

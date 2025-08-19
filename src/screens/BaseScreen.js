@@ -178,11 +178,11 @@ export function BaseScreen() {
               // backgroundColor: "red",
               shadowColor: APP_BASE_COLORS.green,
               shadowOffset: {
-                width: 2,
-                height: 2,
+                width: 1,
+                height: 1,
               },
               shadowOpacity: 0.5,
-              shadowRadius: 15,
+              shadowRadius: 10,
             }}
           >
             <Info_Section />
@@ -199,10 +199,10 @@ export function BaseScreen() {
               shadowColor: APP_BASE_COLORS.green,
               shadowOffset: {
                 width: 1,
-                height: 3,
+                height: 1,
               },
               shadowOpacity: 0.5,
-              shadowRadius: 15,
+              shadowRadius: 10,
             }}
           >
             <Items_Section />
@@ -221,10 +221,10 @@ export function BaseScreen() {
             shadowColor: APP_BASE_COLORS.green,
             shadowOffset: {
               width: 1,
-              height: 3,
+              height: 1,
             },
             shadowOpacity: 0.5,
-            shadowRadius: 15,
+            shadowRadius: 10,
           }}
         >
           <Notes_Section />
@@ -242,10 +242,10 @@ export function BaseScreen() {
           shadowColor: APP_BASE_COLORS.green,
           shadowOffset: {
             width: 0,
-            height: 0,
+            height: 1,
           },
           shadowOpacity: 0.5,
-          shadowRadius: 15,
+          shadowRadius: 10,
         }}
       >
         <Options_Section />

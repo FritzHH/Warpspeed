@@ -215,6 +215,7 @@ export function QuickItemComponent({ __screenHeight }) {
       style={{
         // width: "100%",
         // backgroundColor: "blue",
+        paddingRight: 3,
         // height: __screenHeight,
         flex: 1,
       }}
@@ -227,6 +228,7 @@ export function QuickItemComponent({ __screenHeight }) {
           flexDirection: "row",
           paddingHorizontal: 4,
           alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
         <Button_
@@ -246,7 +248,7 @@ export function QuickItemComponent({ __screenHeight }) {
             fontSize: 20,
             color: Colors.darkTextOnMainBackground,
             outlineWidth: 0,
-            width: "100%",
+            width: "80%",
             marginLeft: 20,
             marginRight: 30,
           }}
@@ -330,15 +332,6 @@ export function QuickItemComponent({ __screenHeight }) {
               // backgroundColor: "green",
             }}
             data={[...sSearchResults]}
-            ItemSeparatorComponent={() => (
-              <View
-                style={{
-                  width: "100%",
-                  backgroundColor: "gray",
-                  height: 1,
-                }}
-              />
-            )}
             renderItem={(item) => {
               // if (!item.item) return null;
               let itemIndex = item.index;
@@ -347,7 +340,11 @@ export function QuickItemComponent({ __screenHeight }) {
               return (
                 <View
                   style={{
-                    // backgroundColor: "green",
+                    marginBottom: 2,
+                    borderRadius: 7,
+                    borderLeftWidth: 4,
+                    borderLeftColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                    backgroundColor: APP_BASE_COLORS.listItemWhite,
                     flexDirection: "row",
                     width: "100%",
                     // height: "100%",
@@ -355,15 +352,17 @@ export function QuickItemComponent({ __screenHeight }) {
                     alignItems: "center",
                   }}
                 >
-                  <Button
+                  <Button_
                     onPress={() => inventoryItemSelected(item)}
                     shadow={false}
                     // mouseOverOptions={{ opacity: 1 }}
                     buttonStyle={{
                       backgroundColor: "transparent",
-                      paddingLeft: 0,
-                      paddingRight: 4,
-                      // backgroundColor: "blue",
+                      width: "100%",
+                      height: "100%",
+                      // paddingLeft: 0,
+                      // paddingRight: 4,
+                      // backgroundColor: "green",
                     }}
                     viewStyle={{ width: "100%" }}
                     TextComponent={() => (
@@ -379,9 +378,10 @@ export function QuickItemComponent({ __screenHeight }) {
                       >
                         <Text
                           style={{
-                            width: "100%",
+                            width: "85%",
                             fontSize: 14,
                             paddingLeft: 7,
+                            paddingRight: 5,
                             // backgroundColor: "blue",
                             // textAlign: "left",
                           }}
@@ -412,23 +412,40 @@ export function QuickItemComponent({ __screenHeight }) {
                         <View
                           style={{
                             // borderLeftWidth: 1,
-                            // borderColor: "gray",
-                            paddingLeft: 0,
-                            width: "12%",
+                            borderWidth: 1,
+                            borderColor:
+                              APP_BASE_COLORS.buttonLightGreenOutline,
+                            paddingLeft: 4,
+                            paddingRight: 4,
+                            width: "15%",
+                            height: "100%",
                             alignItems: "flex-end",
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            borderRadius: 7,
+                            // backgroundColor: APP_BASE_COLORS.buttonLightGreen,
                           }}
                         >
                           <Text
                             style={{
+                              textAlign: "right",
                               fontSize: 10,
                               color: "dimgray",
-                              // width: "100%",
                             }}
                           >
                             {"$ "}
-                            <Text style={{ fontSize: 14, color: null }}>
-                              {item.price}
-                            </Text>
+                          </Text>
+
+                          <Text
+                            style={{
+                              paddingVertical: 5,
+
+                              fontSize: 14,
+                              color: null,
+                            }}
+                          >
+                            {item.price}
                           </Text>
                         </View>
                       </View>

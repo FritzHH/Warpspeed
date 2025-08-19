@@ -87,6 +87,8 @@ export const ICONS = {
   gears1: require(ASSETS_PATH + "gears1.png"),
   notes: require(ASSETS_PATH + "notes.png"),
   ridingBike: require(ASSETS_PATH + "riding_bike.png"),
+  menu1: require(ASSETS_PATH + "menu1.png"),
+  menu2: require(ASSETS_PATH + "menu-button.png"),
 };
 
 // rgb(64, 174, 113)

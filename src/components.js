@@ -18,8 +18,10 @@ import {
   clog,
   formatDecimal,
   generateRandomID,
+  ifNumIsOdd,
   insertOpacityIntoRGBString,
   LETTERS,
+  lightenRGBByPercent,
   log,
   NUMS,
   readAsBinaryString,
@@ -319,6 +321,7 @@ export const ScreenModal = ({
   buttonLabel = "Modal Button",
   buttonVisible = true,
   showOuterModal = false,
+  buttonIconSize,
   showShadow = true,
   buttonStyle = {},
   buttonTextStyle = {},
@@ -376,7 +379,8 @@ export const ScreenModal = ({
             handleMouseExit={handleMouseExit}
             handleMouseOver={handleMouseOver}
             icon={buttonIcon}
-            iconStyle={buttonIconStyle}
+            iconSize={buttonIconSize}
+            // iconStyle={buttonIconStyle}
             text={buttonLabel}
             onPress={() => {
               handleButtonPress();
@@ -435,16 +439,15 @@ export const ScreenModal = ({
 };
 
 export const DropdownMenu = ({
-  openOnMouseOver = true,
   dataArr = [],
   onSelect,
   buttonIcon,
-  currentSelectionIdx,
+  buttonIconSize,
   itemTextStyle = {},
   itemViewStyle = {},
   buttonStyle = {
-    backgroundColor: APP_BASE_COLORS.lightred,
-    borderRadius: 10,
+    // backgroundColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 50),
+    borderRadius: 25,
   },
   buttonTextStyle = {},
   buttonText,
@@ -456,7 +459,7 @@ export const DropdownMenu = ({
   mouseOverOptions = {
     enable: true,
     opacity: 1,
-    highlightColor: APP_BASE_COLORS.lightred,
+    highlightColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 10),
   },
   showButtonShadow,
   shadowStyle = { ...SHADOW_RADIUS_PROTO },
@@ -466,14 +469,24 @@ export const DropdownMenu = ({
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sModalVisible, _setModalVisible] = useState(false);
 
+  function getBackgroundColor(rgbString = "", index) {
+    // log(rgbString);
+    if (!rgbString) return null;
+    if (ifNumIsOdd(index) || !rgbString.includes("rgb")) {
+      return rgbString;
+    }
+    return lightenRGBByPercent(rgbString, 20);
+  }
+
   const DropdownComponent = () => {
     return (
       <View
         style={{
           backgroundColor: "transparent",
-          // borderWidth: 1,
-          borderColor: menuBorderColor || APP_BASE_COLORS.green,
-          // borderRadius: 25,
+          // borderWidth: 2,
+          borderColor:
+            menuBorderColor || APP_BASE_COLORS.buttonLightGreenOutline,
+          // borderRadius: 10,
           borderRadius: buttonStyle.borderRadius,
         }}
       >
@@ -483,9 +496,10 @@ export const DropdownMenu = ({
           ItemSeparatorComponent={() => (
             <View
               style={{
-                height: 1,
+                // height: 1,
                 backgroundColor: APP_BASE_COLORS.buttonLightGreen,
                 width: "100%",
+
                 ...itemSeparatorStyle,
               }}
             />
@@ -497,17 +511,18 @@ export const DropdownMenu = ({
             // log(item);
             return (
               <Button_
-                icon={buttonIcon}
                 mouseOverOptions={mouseOverOptions}
-                // enableMouseOver={enableMouseoverListItem}
                 buttonStyle={{
                   padding: 10,
                   height: 40,
-                  width: 130,
                   borderRadius: 0,
+                  width: 130,
                   backgroundColor:
-                    item.backgroundColor ||
-                    APP_BASE_COLORS.buttonLightGreenOutline,
+                    getBackgroundColor(item.backgroundColor, idx) ||
+                    getBackgroundColor(
+                      APP_BASE_COLORS.buttonLightGreenOutline,
+                      idx
+                    ),
                   borderTopLeftRadius:
                     idx == 0 ? buttonStyle.borderRadius : null,
                   borderTopRightRadius:
@@ -547,6 +562,7 @@ export const DropdownMenu = ({
       buttonLabel={buttonText}
       ref={ref}
       buttonIcon={buttonIcon}
+      buttonIconSize={buttonIconSize}
       modalCoordinateVars={modalCoordinateVars}
       showShadow={showButtonShadow}
       mouseOverOptions={mouseOverOptions}
@@ -2578,7 +2594,7 @@ export const Button_ = ({
   buttonStyle = {},
   textStyle = {},
   iconStyle = {},
-  // viewStyle = {},
+  viewStyle = {},
 }) => {
   const [sMouseOver, _setMouseOver] = React.useState(false);
   if (allCaps) text = text.toUpperCase();
@@ -2624,7 +2640,7 @@ export const Button_ = ({
 
   return (
     <TouchableOpacity
-      // style={{ ...viewStyle }}
+      style={{ ...viewStyle }}
       ref={ref}
       onMouseOver={() => {
         handleMouseOver();

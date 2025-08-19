@@ -467,6 +467,23 @@ export function insertOpacityIntoRGBString(rgbString, opacity) {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
+export function lightenRGBByPercent(rgb, percent) {
+  const match = rgb.match(/^rgb\s*\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)$/i);
+  if (!match) throw new Error("Invalid RGB format");
+  let [r, g, b] = match.slice(1, 4).map(Number);
+
+  // Calculate lightened values
+  r = Math.round(r + (255 - r) * (percent / 100));
+  g = Math.round(g + (255 - g) * (percent / 100));
+  b = Math.round(b + (255 - b) * (percent / 100));
+
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+export function ifNumIsOdd(num) {
+  return num % 2 !== 0;
+}
+
 export function getItemFromArr(value, arrKey, arr) {
   return arr.find((obj) => obj[arrKey] === value);
 }

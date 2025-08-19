@@ -167,7 +167,6 @@ export const ActiveWorkorderComponent = ({}) => {
     backgroundColor: APP_BASE_COLORS.buttonLightGreen,
     ...SHADOW_RADIUS_NOTHING,
     borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
-    // backgroundColor: "green",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
@@ -188,7 +187,7 @@ export const ActiveWorkorderComponent = ({}) => {
           flex: 1,
           justifyContent: "space-between",
           alignItems: "center",
-          paddingBottom: 10,
+          paddingBottom: 11,
           paddingTop: 5,
           paddingHorizontal: 5,
           backgroundColor: APP_BASE_COLORS.lightred,
@@ -220,7 +219,7 @@ export const ActiveWorkorderComponent = ({}) => {
               width: "100%",
               justifyContent: "center",
               alignItems: "center",
-              paddingVertical: 10,
+              paddingVertical: 11,
               backgroundColor: APP_BASE_COLORS.backgroundGreen,
               borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
               borderWidth: 1,
@@ -332,7 +331,7 @@ export const ActiveWorkorderComponent = ({}) => {
               {/* </View> */}
               <View
                 style={{
-                  // marginTop: 10,
+                  // marginTop: 11,
                   width: "50%",
                   flexDirection: "row",
                   paddingLeft: 5,
@@ -346,11 +345,13 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{
                     width: "48%",
                     height: "100%",
-                    // marginTop: 10,
+                    // marginTop: 11,
                   }}
                 >
                   <DropdownMenu
                     // openOnMouseOver=
+                    buttonIcon={ICONS.menu2}
+                    buttonIconSize={11}
                     dataArr={zSettingsObj.bikeBrands}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
@@ -379,14 +380,14 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 >
                   <DropdownMenu
+                    buttonIcon={ICONS.menu2}
+                    buttonIconSize={11}
                     dataArr={zSettingsObj.bikeOptionalBrands}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
                       wo.brand = item;
                       _zSetWorkorderObj(wo);
                     }}
-                    // itemViewStyle={{ backgroundColor: "gray" }}
-                    // itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       backgroundColor: zWorkorderObj.brand
@@ -407,7 +408,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 width: "100%",
                 alignItems: "center",
 
-                marginTop: 10,
+                marginTop: 11,
                 // backgroundColor: "blue",
               }}
             >
@@ -424,7 +425,7 @@ export const ActiveWorkorderComponent = ({}) => {
               />
               <View
                 style={{
-                  // marginTop: 10,
+                  // marginTop: 11,
                   width: "50%",
                   flexDirection: "row",
                   paddingLeft: 5,
@@ -435,6 +436,8 @@ export const ActiveWorkorderComponent = ({}) => {
               >
                 <View style={{ width: "100%" }}>
                   <DropdownMenu
+                    buttonIcon={ICONS.menu2}
+                    buttonIconSize={11}
                     dataArr={zSettingsObj.bikeDescriptions}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
@@ -460,7 +463,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
                 alignItems: "center",
                 width: "100%",
-                marginTop: 10,
+                marginTop: 11,
               }}
             >
               <TextInputOnMainBackground
@@ -491,7 +494,7 @@ export const ActiveWorkorderComponent = ({}) => {
               />
               <View
                 style={{
-                  // marginTop: 10,
+                  // marginTop: 11,
                   width: "50%",
                   flexDirection: "row",
                   paddingLeft: 5,
@@ -504,12 +507,15 @@ export const ActiveWorkorderComponent = ({}) => {
                     width: "48%",
                     height: "100%",
                     justifyContent: "center",
-                    // marginTop: 10,
+                    // marginTop: 11,
                   }}
                 >
                   <DropdownMenu
+                    buttonIcon={ICONS.menu2}
+                    buttonIconSize={11}
                     itemSeparatorStyle={{ height: 0 }}
                     dataArr={COLORS}
+                    menuBorderColor={"transparent"}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
                       wo.color1 = item;
@@ -536,16 +542,14 @@ export const ActiveWorkorderComponent = ({}) => {
                     width: "48%",
                     height: "100%",
                     justifyContent: "center",
-                    // marginTop: 10,
+                    // marginTop: 11,
                   }}
                 >
                   <DropdownMenu
+                    buttonIcon={ICONS.menu2}
+                    menuBorderColor={"transparent"}
+                    buttonIconSize={11}
                     itemSeparatorStyle={{ height: 0 }}
-                    // mouseOverOptions={{
-                    //   enable: true,
-                    //   opacity: 0.6,
-                    //   highlightColor: "white",
-                    // }}
                     dataArr={COLORS}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
@@ -553,8 +557,6 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                       dbSetOpenWorkorderItem(wo);
                     }}
-                    // itemViewStyle={{ borderRadius: 0 }}
-                    // itemTextStyle={{ fontSize: 14 }}
                     buttonStyle={dropdownButtonStyle}
                     ref={color2Ref}
                     buttonText={"Color 2"}
@@ -569,7 +571,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 justifyContent: "flex-start",
                 width: "100%",
                 alignItems: "center",
-                marginTop: 10,
+                marginTop: 11,
               }}
             >
               <TextInputOnMainBackground
@@ -580,7 +582,7 @@ export const ActiveWorkorderComponent = ({}) => {
               />
               <View
                 style={{
-                  // marginTop: 10,
+                  // marginTop: 11,
                   width: "50%",
                   flexDirection: "row",
                   paddingLeft: 5,
@@ -591,6 +593,8 @@ export const ActiveWorkorderComponent = ({}) => {
               >
                 <View style={{ width: "100%" }}>
                   <DropdownMenu
+                    buttonIcon={ICONS.menu2}
+                    buttonIconSize={11}
                     dataArr={zSettingsObj.waitTimes}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);
@@ -618,6 +622,8 @@ export const ActiveWorkorderComponent = ({}) => {
               </View>
             </View>
             <DropdownMenu
+              buttonIcon={ICONS.menu2}
+              buttonIconSize={11}
               dataArr={zSettingsObj.statuses}
               onSelect={(val) => {
                 let wo = cloneDeep(zWorkorderObj);
@@ -629,7 +635,7 @@ export const ActiveWorkorderComponent = ({}) => {
               buttonStyle={{
                 width: "100%",
                 backgroundColor: zWorkorderObj.status.backgroundColor,
-                marginTop: 10,
+                marginTop: 11,
               }}
               buttonTextStyle={{
                 ...dropdownButtonTextStyle,
@@ -683,7 +689,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   justifyContent: "flex-start",
                   alignItems: "center",
                   width: "100%",
-                  marginTop: 10,
+                  marginTop: 11,
                 }}
               >
                 <TextInputOnMainBackground
@@ -701,7 +707,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 />
                 <View
                   style={{
-                    // marginTop: 10,
+                    // marginTop: 11,
                     width: "50%",
                     flexDirection: "row",
                     paddingLeft: 5,
@@ -712,6 +718,8 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 >
                   <DropdownMenu
+                    buttonIcon={ICONS.menu2}
+                    buttonIconSize={11}
                     dataArr={zSettingsObj.partSources}
                     onSelect={(item, idx) => {
                       let wo = cloneDeep(zWorkorderObj);

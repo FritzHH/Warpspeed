@@ -6,6 +6,7 @@ import {
   calculateTaxes,
   clog,
   generateRandomID,
+  lightenRGBByPercent,
   log,
   trimToTwoDecimals,
 } from "../../../utils";
@@ -499,7 +500,7 @@ export const LineItemComponent = ({
             marginVertical: 3,
             marginHorizontal: 8,
             borderColor: "transparent",
-            borderLeftColor: APP_BASE_COLORS.green,
+            borderLeftColor: lightenRGBByPercent(APP_BASE_COLORS.green, 60),
             borderWidth: 2,
             borderRadius: 15,
           }}

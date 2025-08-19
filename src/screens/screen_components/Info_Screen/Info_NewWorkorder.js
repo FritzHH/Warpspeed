@@ -12,7 +12,7 @@ import {
   NUMS,
   removeDashesFromPhone,
   searchCustomerNames,
-  searchPhoneNum,
+  searchPhoneNum
 } from "../../../utils";
 import {
   ScreenModal,
@@ -21,12 +21,13 @@ import {
   SHADOW_RADIUS_PROTO,
   LoginScreenModalComponent,
   ColorSelectorModalComponent,
+  Button_
 } from "../../../components";
 import {
   CUSTOMER_PROTO,
   FOCUS_NAMES,
   TAB_NAMES,
-  WORKORDER_PROTO,
+  WORKORDER_PROTO
 } from "../../../data";
 import React, { useEffect, useState } from "react";
 import { cloneDeep } from "lodash";
@@ -38,13 +39,13 @@ import {
   useTabNamesStore,
   useOpenWorkordersStore,
   useCustMessagesStore,
-  useLoginStore,
+  useLoginStore
 } from "../../../stores";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
-import { Colors } from "../../../styles";
+import { COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
   dbSearchForName,
-  dbSearchForPhoneNumber,
+  dbSearchForPhoneNumber
 } from "../../../db_call_wrapper";
 export function NewWorkorderComponent({}) {
   // store setters ////////////////////////////////////////////////////////////////
@@ -278,17 +279,16 @@ export function NewWorkorderComponent({}) {
         style={{
           width: "100%",
           height: "100%",
-          backgroundColor: null,
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "center"
         }}
       >
         <View
           style={{
             width: "100%",
             justifyContent: "flex-start",
-            alignItems: "center",
-            // backgroundColor: "green",
+            alignItems: "center"
+            // backgroundColor: "green"
           }}
         >
           <View
@@ -297,7 +297,7 @@ export function NewWorkorderComponent({}) {
               width: "100%",
               justifyContent: "space-between",
               alignItems: "center",
-              paddingHorizontal: 5,
+              paddingHorizontal: 5
             }}
           >
             <Button
@@ -308,7 +308,7 @@ export function NewWorkorderComponent({}) {
                 marginTop: 10,
                 marginRight: 10,
                 // padding: 5,
-                paddingHorizontal: 0,
+                paddingHorizontal: 0
               }}
               textStyle={{ fontSize: 13, color: "white" }}
               onPress={() => {
@@ -328,84 +328,119 @@ export function NewWorkorderComponent({}) {
                 marginTop: 10,
                 marginRight: 10,
                 // padding: 5,
-                paddingHorizontal: 0,
+                paddingHorizontal: 0
               }}
-              text={"New Sale"}
               textStyle={{ fontSize: 13, color: "white" }}
+              text={"New Sale"}
               onPress={() => {
                 handleStartStandaloneSalePress();
               }}
             />
           </View>
           <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
-          <TextInput
-            style={{
-              marginTop: 100,
-              borderBottomWidth: 1,
-              width: 200,
-              height: 40,
-              paddingHorizontal: 3,
-              outlineStyle: "none",
-              borderColor: "gray",
-              fontSize: 16,
-              color: sBox1Val.length < 0 ? "gray" : "dimgray",
-            }}
-            autoFocus={true}
-            placeholder={sSearchingByName ? "First Name" : "Phone number"}
-            placeholderTextColor={"gray"}
-            value={sBox1Val}
-            onChangeText={(val) => handleBox1TextChange(val)}
-          />
-          <View style={{ width: 10 }} />
-          {sSearchingByName && (
+          <View style={{ alignItems: "center" }}>
             <TextInput
-              placeholder={"Last name"}
-              placeholderTextColor={"gray"}
               style={{
-                marginTop: 20,
-                padding: 3,
+                marginTop: 100,
                 borderBottomWidth: 1,
-                fontSize: 16,
                 width: 200,
                 height: 40,
+                paddingHorizontal: 3,
                 outlineStyle: "none",
                 borderColor: "gray",
+                fontSize: 16,
+                color: sBox1Val.length < 0 ? "gray" : "dimgray"
               }}
-              value={sBox2Val}
-              onChangeText={(val) => handleBox2TextChange(val)}
+              autoFocus={true}
+              placeholder={sSearchingByName ? "First Name" : "Phone number"}
+              placeholderTextColor={"gray"}
+              value={sBox1Val}
+              onChangeText={(val) => handleBox1TextChange(val)}
             />
-          )}
-
-          {/** customer info modal */}
-          <ScreenModal
-            showOuterModal={true}
-            outerModalStyle={{}}
-            buttonStyle={{
-              height: 50,
-              marginVertical: 10,
-              marginTop: 50,
-              width: null,
-            }}
-            buttonVisible={sShowCreateCustomerButton}
-            buttonTextStyle={{ color: "dimgray" }}
-            handleButtonPress={() => handleCreateCustomerBtnPressed()}
-            buttonLabel={"Create New Customer"}
-            modalVisible={sCustomerInfoObj}
-            canExitOnOuterClick={false}
-            Component={() => (
-              <CustomerInfoScreenModalComponent
-                ssCustomerInfoObj={sCustomerInfoObj}
-                __setCustomerInfoObj={_setCustomerInfoObj}
-                button1Text={"Create Customer"}
-                button2Text={"Cancel"}
-                ssInfoTextFocus={sInfoTextFocus}
-                __setInfoTextFocus={_setInfoTextFocus}
-                handleButton1Press={handleCreateNewCustomerPressed}
-                handleButton2Press={handleCancelCreateNewCustomerPress}
+            <View style={{ width: 10 }} />
+            {sSearchingByName && (
+              <TextInput
+                placeholder={"Last name"}
+                placeholderTextColor={"gray"}
+                style={{
+                  marginTop: 20,
+                  padding: 3,
+                  borderBottomWidth: 1,
+                  fontSize: 16,
+                  width: 200,
+                  height: 40,
+                  outlineStyle: "none",
+                  borderColor: "gray"
+                }}
+                value={sBox2Val}
+                onChangeText={(val) => handleBox2TextChange(val)}
               />
             )}
-          />
+            <Button_
+              text={sSearchingByName ? "Search By Phone" : "Search By Name"}
+              onPress={() => {
+                _setBox1Val("");
+                _setBox2Val("");
+                _setSearchingByName(!sSearchingByName);
+                _zSetSearchResults([]);
+                _setShowCreateCustomerBtn(false);
+              }}
+              icon={ICONS.cashRed}
+              iconSize={20}
+              colorGradientArr={COLOR_GRADIENTS.green}
+              buttonStyle={{
+                paddingHorizontal: 25,
+                paddingVertical: 5,
+                marginTop: 20,
+                width: 220
+              }}
+            />
+          </View>
+
+          {/** customer info modal */}
         </View>
+        <Button_
+          text={"New Sale"}
+          onPress={() => {
+            handleStartStandaloneSalePress();
+          }}
+          icon={ICONS.cashRed}
+          iconSize={20}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          buttonStyle={{
+            paddingHorizontal: 25,
+            paddingVertical: 5,
+            width: 220
+          }}
+        />
+        <ScreenModal
+          showOuterModal={true}
+          outerModalStyle={{}}
+          buttonStyle={{
+            height: 50,
+            marginVertical: 10,
+            marginTop: 50,
+            width: null
+          }}
+          buttonVisible={sShowCreateCustomerButton}
+          buttonTextStyle={{ color: "dimgray" }}
+          handleButtonPress={() => handleCreateCustomerBtnPressed()}
+          buttonLabel={"Create New Customer"}
+          modalVisible={sCustomerInfoObj}
+          canExitOnOuterClick={false}
+          Component={() => (
+            <CustomerInfoScreenModalComponent
+              ssCustomerInfoObj={sCustomerInfoObj}
+              __setCustomerInfoObj={_setCustomerInfoObj}
+              button1Text={"Create Customer"}
+              button2Text={"Cancel"}
+              ssInfoTextFocus={sInfoTextFocus}
+              __setInfoTextFocus={_setInfoTextFocus}
+              handleButton1Press={handleCreateNewCustomerPressed}
+              handleButton2Press={handleCancelCreateNewCustomerPress}
+            />
+          )}
+        />
       </View>
     );
   }

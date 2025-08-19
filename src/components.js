@@ -2455,28 +2455,6 @@ export const CheckBox_ = ({
 
   boxStyle = {}
 }) => {
-  // const [sMouseOver, _setMouseOver] = React.useState(false);
-  // const [isChecked, onCheck] = useState(false);
-  // const rgbText = "rgba(50,50,50,1)";
-  // if (roundButton) buttonStyle = { ...buttonStyle, borderRadius: 100 };
-
-  // if (sMouseOver) {
-  //   if (!isChecked && !isChecked) {
-  //     if (mouseOverOptions.enable) {
-  //       if (mouseOverOptions.highlightColor) {
-  //         backgroundColor = mouseOverOptions.highlightColor;
-  //       } else {
-  //         backgroundColor = "lightgray";
-  //       }
-  //     }
-  //   }
-  // } else {
-  //   backgroundColor =
-  //     isChecked || isChecked
-  //       ? checkedColor || Colors.tabMenuButton
-  //       : uncheckedColor || "lightgray";
-  // }
-
   return (
     <Button_
       icon={isChecked ? ICONS.CheckBox_ : ICONS.checkoxEmpty}
@@ -2485,70 +2463,9 @@ export const CheckBox_ = ({
       buttonStyle={buttonStyle}
       textStyle={textStyle}
       onPress={onCheck}
-      // mouseOverOptions={
-      // enable: false
-      // }
       enableMouseOver={false}
     />
   );
-
-  const Component = () => {
-    return (
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-around",
-          // width: 200,
-          width: "100%",
-          height: "100%"
-        }}
-      >
-        <Image_
-          icon={isChecked ? ICONS.CheckBox_ : ICONS.checkoxEmpty}
-          size={iconSize}
-        />
-        <Text>{text}</Text>
-      </View>
-    );
-  };
-
-  return <Button buttonStyle={buttonStyle} TextComponent={() => Component()} />;
-
-  // return (
-  // <TouchableOpacity
-  //   onPress={() => {
-  //     if (makeEntireViewCheckable) {
-  //       onCheck(!isChecked);
-  //       onCheck(item, !isChecked);
-  //     }
-  //   }}
-  //   style={{ padding: 1 }}
-  // >
-  //   <View
-  //     style={{
-  //       flexDirection: "row",
-  //       alignItems: "center",
-  //       // backgroundColor: "green",
-  //       ...viewStyle
-  //     }}
-  //   >
-  //     <RNCheckBox_
-  //       style={{
-  //         width: 17,
-  //         height: 17,
-  //         borderColor: "lightgray",
-  //         marginRight: 3,
-  //         ...boxStyle
-  //       }}
-  //       value={isChecked}
-  //       color={Colors.tabMenuButton}
-  //       onValueChange={onCheck}
-  //     />
-  //     <Text style={{ ...textStyle }}>{text}</Text>
-  //   </View>
-  // </TouchableOpacity>
-  // );
 };
 
 export const ColorSelectorModalComponent = ({ onSelect }) => {

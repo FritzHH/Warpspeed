@@ -223,11 +223,6 @@ export function WorkordersComponent({}) {
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
     _zSetPreviewObj(null);
-    // messagesSubscribe(
-    //   obj.customerID,
-    //   _zSetIncomingMessage,
-    //   _zSetOutgoingMessage
-    // );
   }
 
   function sortWorkorders(inputArr) {
@@ -260,7 +255,8 @@ export function WorkordersComponent({}) {
   return (
     <View
       style={{
-        flex: 1
+        flex: 1,
+        paddingHorizontal: 5
       }}
     >
       <View
@@ -292,8 +288,7 @@ export function WorkordersComponent({}) {
         style={{
           width: "100%",
           height: "96%",
-          backgroundColor: null,
-          paddingHorizontal: 5
+          backgroundColor: null
         }}
         data={sortWorkorders(zOpenWorkordersArr)}
         keyExtractor={(item, index) => index}

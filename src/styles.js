@@ -92,7 +92,11 @@ export const ICONS = {
   checkbox: require(ASSETS_PATH + "checkbox.png"),
   checkoxEmpty: require(ASSETS_PATH + "checkbox-empty.png"),
   search: require(ASSETS_PATH + "search.png"),
-  logo: require(ASSETS_PATH + "logo_highres.png")
+  logo: require(ASSETS_PATH + "logo_highres.png"),
+  info: require(ASSETS_PATH + "info.png"),
+  infoSquare: require(ASSETS_PATH + "info-square.png"),
+  settings: require(ASSETS_PATH + "settings.png"),
+  infoGear: require(ASSETS_PATH + "info-gear.png")
 };
 
 // rgb(64, 174, 113)

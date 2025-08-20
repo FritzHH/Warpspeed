@@ -6,20 +6,20 @@ import {
   INVENTORY_ITEM_PROTO,
   WORKORDER_PROTO,
   SETTINGS_OBJ,
-  TAB_NAMES,
+  TAB_NAMES
 } from "../../../data";
 import {
   APP_BASE_COLORS,
   COLOR_GRADIENTS,
   Colors,
-  ICONS,
+  ICONS
 } from "../../../styles";
 
 import {
   dim,
   generateRandomID,
   log,
-  randomWordGenerator,
+  randomWordGenerator
 } from "../../../utils";
 import {
   AlertBox,
@@ -29,7 +29,7 @@ import {
   ScreenModal,
   SHADOW_RADIUS_NOTHING,
   TabMenuButton,
-  TabMenuDivider,
+  TabMenuDivider
 } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
@@ -37,11 +37,11 @@ import {
   useOpenWorkordersStore,
   useInventoryStore,
   useLoginStore,
-  useTabNamesStore,
+  useTabNamesStore
 } from "../../../stores";
 import {
   dbSetOpenWorkorderItem,
-  dbSetSettings,
+  dbSetSettings
 } from "../../../db_call_wrapper";
 
 const SEARCH_STRING_TIMER = 45 * 1000;
@@ -217,7 +217,7 @@ export function QuickItemComponent({ __screenHeight }) {
         // backgroundColor: "blue",
         paddingRight: 3,
         // height: __screenHeight,
-        flex: 1,
+        flex: 1
       }}
     >
       <View
@@ -228,7 +228,7 @@ export function QuickItemComponent({ __screenHeight }) {
           flexDirection: "row",
           paddingHorizontal: 4,
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "space-between"
         }}
       >
         <Button_
@@ -250,7 +250,7 @@ export function QuickItemComponent({ __screenHeight }) {
             outlineWidth: 0,
             width: "80%",
             marginLeft: 20,
-            marginRight: 30,
+            marginRight: 30
           }}
           placeholder="Search inventory"
           placeholderTextColor={"darkgray"}
@@ -275,7 +275,7 @@ export function QuickItemComponent({ __screenHeight }) {
           flexDirection: "row",
           paddingTop: 10,
           justifyContent: "flex-start",
-          height: "95%",
+          height: "95%"
           // backgroundColor: "green",
         }}
       >
@@ -287,7 +287,7 @@ export function QuickItemComponent({ __screenHeight }) {
             width: "20%",
             // borderRightWidth: 1,
             // borderColor: "gray",
-            paddingHorizontal: 2,
+            paddingHorizontal: 2
             // marginBottom: 30,
             // paddingBottom: 20,
             // height: "50%",
@@ -304,7 +304,7 @@ export function QuickItemComponent({ __screenHeight }) {
                 borderRadius: 5,
                 borderColor: APP_BASE_COLORS.buttonLightGreen,
                 borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
-                marginBottom: 10,
+                marginBottom: 10
                 // paddingHorizontal: 3,
                 // height: 100,
                 // marginVertical: 30,
@@ -321,14 +321,14 @@ export function QuickItemComponent({ __screenHeight }) {
             width: "80%",
             paddingTop: 10,
             paddingLeft: 3,
-            paddingRight: 3,
+            paddingRight: 3
             // backgroundColor: "green",
           }}
         >
           <FlatList
             style={{
               width: "100%",
-              height: "100%",
+              height: "100%"
               // backgroundColor: "green",
             }}
             data={[...sSearchResults]}
@@ -349,7 +349,7 @@ export function QuickItemComponent({ __screenHeight }) {
                     width: "100%",
                     // height: "100%",
                     justifyContent: "flex-start",
-                    alignItems: "center",
+                    alignItems: "center"
                   }}
                 >
                   <Button_
@@ -360,6 +360,7 @@ export function QuickItemComponent({ __screenHeight }) {
                       backgroundColor: "transparent",
                       width: "100%",
                       height: "100%",
+                      borderRadius: 7
                       // paddingLeft: 0,
                       // paddingRight: 4,
                       // backgroundColor: "green",
@@ -372,7 +373,7 @@ export function QuickItemComponent({ __screenHeight }) {
                           flexDirection: "row",
                           // backgroundColor: "blue",
                           justifyContent: "space-between",
-                          alignItems: "center",
+                          alignItems: "center"
                           // justifyContent: "flex-start",
                         }}
                       >
@@ -381,7 +382,7 @@ export function QuickItemComponent({ __screenHeight }) {
                             width: "85%",
                             fontSize: 14,
                             paddingLeft: 7,
-                            paddingRight: 5,
+                            paddingRight: 5
                             // backgroundColor: "blue",
                             // textAlign: "left",
                           }}
@@ -393,16 +394,11 @@ export function QuickItemComponent({ __screenHeight }) {
                             </Text>
                           ) : null}
                         </Text>
-                        {!zWorkorderObj?.id ? (
-                          <Button
-                            mouseOverOptions={{ highlightColor: "red" }}
-                            buttonStyle={{
-                              backgroundColor: "transparent",
-                              // paddingLeft: 0,
-                              paddingHorizontal: 8,
-                              // width: "8%",
-                            }}
-                            text={"i"}
+                        {zWorkorderObj?.id ? (
+                          <Button_
+                            icon={ICONS.infoGear}
+                            iconSize={22}
+                            buttonStyle={{}}
                             onPress={() => {
                               _setLineItemBackgroundColor("transparent");
                               inventoryItemSelected(item, "info");
@@ -423,7 +419,7 @@ export function QuickItemComponent({ __screenHeight }) {
                             flexDirection: "row",
                             alignItems: "center",
                             justifyContent: "space-between",
-                            borderRadius: 7,
+                            borderRadius: 7
                             // backgroundColor: APP_BASE_COLORS.buttonLightGreen,
                           }}
                         >
@@ -431,7 +427,7 @@ export function QuickItemComponent({ __screenHeight }) {
                             style={{
                               textAlign: "right",
                               fontSize: 10,
-                              color: "dimgray",
+                              color: "dimgray"
                             }}
                           >
                             {"$ "}
@@ -442,7 +438,7 @@ export function QuickItemComponent({ __screenHeight }) {
                               paddingVertical: 5,
 
                               fontSize: 14,
-                              color: null,
+                              color: null
                             }}
                           >
                             {item.price}
@@ -467,7 +463,7 @@ export function QuickItemComponent({ __screenHeight }) {
           textStyle={{ fontSize: 14 }}
           showOuterModal={true}
           outerModalStyle={{
-            backgroundColor: "rgba(50,50,50,.5)",
+            backgroundColor: "rgba(50,50,50,.5)"
           }}
           Component={() => {
             return (

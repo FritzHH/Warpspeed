@@ -1,13 +1,20 @@
 /* eslint-disable */
 
 import { View } from "react-native-web";
-import { dim, generateRandomID, log, trimToTwoDecimals } from "../../utils";
+import {
+  checkInternetConnection,
+  dim,
+  generateRandomID,
+  log,
+  trimToTwoDecimals
+} from "../../utils";
 import {
   HorzSpacer,
   TabMenuButton,
   TabMenuDivider as Divider,
+  Image_
 } from "../../components";
-import { Colors } from "../../styles";
+import { Colors, ICONS } from "../../styles";
 import { WORKORDER_PROTO, TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import React, { useEffect, useRef, useState } from "react";
@@ -18,12 +25,7 @@ import { InventoryComponent } from "../screen_components/Options_Screen/Options_
 import { MessagesComponent } from "../screen_components/Options_Screen/Options_Messages";
 import { useTabNamesStore, useLoginStore } from "../../stores";
 
-export function Options_Section({
-  ssWorkorderObj = WORKORDER_PROTO,
-  ssInventoryArr,
-  ssAdjustableUserPreferences,
-  __setWorkorderObj,
-}) {
+export function Options_Section({}) {
   // store setters
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
@@ -35,39 +37,33 @@ export function Options_Section({
   );
 
   /////////////////////////////////////////////////////////////////////////////
-  const [sShowWorkorderModal, _setShowWorkorderModal] = React.useState(false);
-  const [sShowInventoryModal, _setShowInventoryModal] = React.useState(false);
+  const [sIsOnline, _setIsOnline] = useState(true);
 
-  const [screenWidth, _setScreenWidth] = useState(window.innerWidth);
-  const [screenHeight, _setScreenHeight] = useState(window.innerHeight);
-
-  const TAB_MENU_HEIGHT = Math.round(screenHeight * 0.03);
-  const SCREEN_HEIGHT = Math.round(screenHeight * 0.97);
-
+  // run constant checks to check if interent is connected
+  const INTERNET_CHECK_DELAY = 1000;
   useEffect(() => {
-    const handleResize = () => {
-      _setScreenWidth(window.innerWidth);
-      _setScreenHeight(window.innerHeight);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
+    // log("here");
+    async function tick() {
+      let isOnline = await checkInternetConnection();
+      // log(isOnline.toString());
+      _setIsOnline(isOnline);
+    }
+    let id = setInterval(tick, INTERNET_CHECK_DELAY);
+    return () => clearInterval(id);
   }, []);
 
-  // log("height", screenHeight);
-  function ScreenComponent(tabName) {
-    switch (tabName) {
+  //////////////////////////////////////////////////////////////////////////
+
+  function ScreenComponent() {
+    switch (zOptionsTabName) {
       case TAB_NAMES.optionsTab.inventory:
-        return <InventoryComponent __screenHeight={SCREEN_HEIGHT} />;
+        return <InventoryComponent />;
       case TAB_NAMES.optionsTab.messages:
-        return <MessagesComponent __screenHeight={SCREEN_HEIGHT} />;
+        return <MessagesComponent />;
       case TAB_NAMES.optionsTab.quickItems:
-        return <QuickItemComponent __screenHeight={SCREEN_HEIGHT} />;
+        return <QuickItemComponent />;
       case TAB_NAMES.optionsTab.workorders:
-        return <WorkordersComponent __screenHeight={SCREEN_HEIGHT} />;
+        return <WorkordersComponent />;
     }
     return null;
   }
@@ -77,9 +73,10 @@ export function Options_Section({
       <TabBar
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}
-        __tabMenuHeight={TAB_MENU_HEIGHT}
+        // __tabMenuHeight={}
+        __isOnline={sIsOnline}
       />
-      {ScreenComponent(zOptionsTabName)}
+      {ScreenComponent()}
     </View>
   );
 
@@ -88,73 +85,49 @@ export function Options_Section({
 }
 
 export const TabBar = ({
+  __isOnline,
   zOptionsTabName,
-  _zSetOptionsTabName,
-  __setShowWorkorderModal,
-  __setShowInventoryModal,
-  __tabMenuHeight,
+  _zSetOptionsTabName
 }) => (
   <View
     style={{
       flexDirection: "row",
+      width: "100%",
       // width: "100%",
-      // justifyContent: "space-between",
-      height: __tabMenuHeight,
+      justifyContent: "space-between",
+      paddingRight: 5
     }}
   >
-    <TabMenuButton
-      // height={height}
-      buttonStyle={{ borderTopLeftRadius: 15 }}
-      onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
-      text={TAB_NAMES.optionsTab.quickItems}
-      isSelected={
-        zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
-      }
-    />
-    {/* <Divider /> */}
-    <TabMenuButton
-      // height={height}
-      onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
-      text={TAB_NAMES.optionsTab.workorders}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
-      }
-    />
-    {/* <TabMenuButton
-      // height={height}
-      onPress={() => __setShowWorkorderModal(true)}
-      buttonStyle={{ width: 50 }}
-      text={`\u2610`}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
-      }
-    /> */}
-    {/* <Divider /> */}
-    {/* <TabMenuButton
-      // height={height}
-      onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory)}
-      text={TAB_NAMES.optionsTab.inventory}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
-      }
-    />
-    <TabMenuButton
-      // height={height}
-      onPress={() => __setShowInventoryModal(true)}
-      buttonStyle={{ width: 50 }}
-      text={`\u2610`}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
-      }
-    />
-    <Divider /> */}
-    <TabMenuButton
-      // height={height}
-      onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}
-      text={TAB_NAMES.optionsTab.messages}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
-      }
+    <View style={{ flexDirection: "row", justifyContent: "flex-start" }}>
+      <TabMenuButton
+        // height={height}
+        buttonStyle={{ borderTopLeftRadius: 15 }}
+        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
+        text={TAB_NAMES.optionsTab.quickItems}
+        isSelected={
+          zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
+        }
+      />
+      {/* <Divider /> */}
+      <TabMenuButton
+        // height={height}
+        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
+        text={TAB_NAMES.optionsTab.workorders}
+        isSelected={
+          zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
+        }
+      />
+      <TabMenuButton
+        // height={height}
+        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}
+        text={TAB_NAMES.optionsTab.messages}
+        isSelected={
+          zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
+        }
+      />
+    </View>
+    <Image_
+      icon={__isOnline ? ICONS.internetOnlineGIF : ICONS.internetOfflineGIF}
     />
   </View>
 );

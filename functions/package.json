@@ -14,6 +14,7 @@
   "main": "firebase-index.js",
   "dependencies": {
     "@vonage/server-sdk": "^3.21.0",
+    "basic-ftp": "^5.0.5",
     "dotenv": "^16.5.0",
     "firebase-admin": "^12.6.0",
     "firebase-functions": "^6.0.1",

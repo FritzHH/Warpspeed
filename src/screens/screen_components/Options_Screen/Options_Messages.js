@@ -78,24 +78,26 @@ export function MessagesComponent({}) {
     dbSendMessageToCustomer(msg);
   }
 
-  log("res", sCanRespond);
+  // log("res", sCanRespond);
   useEffect(() => {
-    let arr = combine2ArraysOrderByMillis(
-      zIncomingMessagesArr,
-      zOutgoingMessagesArr
-    );
+    try {
+      let arr = combine2ArraysOrderByMillis(
+        zIncomingMessagesArr,
+        zOutgoingMessagesArr
+      );
 
-    let lastMessage = arr[arr.length - 1];
-    console.log(lastMessage);
-    if (!lastMessage.senderUserObj || lastMessage.canRespond) {
-      _setCanRespond(true);
-    }
-    if (arr.length - 1 > 0) {
-      messageListRef.current?.scrollToIndex({
-        index: arr.length - 1,
-        animated: true
-      });
-    }
+      let lastMessage = arr[arr.length - 1];
+      console.log(lastMessage);
+      if (!lastMessage.senderUserObj || lastMessage.canRespond) {
+        _setCanRespond(true);
+      }
+      if (arr.length - 1 > 0) {
+        messageListRef.current?.scrollToIndex({
+          index: arr.length - 1,
+          animated: true
+        });
+      }
+    } catch (e) {}
   }, [zIncomingMessagesArr, zOutgoingMessagesArr]);
 
   ///////////////////////////////////////////////////////////////
@@ -103,7 +105,8 @@ export function MessagesComponent({}) {
   return (
     <View
       style={{
-        flex: 1
+        flex: 1,
+        padding: 5
       }}
     >
       <View
@@ -153,9 +156,7 @@ export function MessagesComponent({}) {
           numberOfLines={4}
           multiline={true}
           placeholderTextColor={"gray"}
-          placeholder={
-            "Type message to customer here ... \n\nCheck response box to right if they may respond..."
-          }
+          placeholder={"Message..."}
           style={{
             fontSize: 15,
             flexWrap: "wrap",

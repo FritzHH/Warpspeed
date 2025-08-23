@@ -39,16 +39,7 @@ import { getDatabase } from "firebase/database";
 import LinearGradient from "react-native-web-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 
-const MyIcon = ({ size = 24, color = "green" }) => {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-      <Path d="M16 6C17.1046 6 18 5.10457 18 4C18 2.89543 17.1046 2 16 2C14.8954 2 14 2.89543 14 4C14 5.10457 14.8954 6 16 6ZM13.2428 5.52993C13.5738 5.61279 13.8397 5.85869 13.9482 6.18222C14.13 6.72461 14.3843 7.20048 14.697 7.59998C15.5586 8.70094 16.9495 9.32795 18.8356 9.01361C19.3804 8.92281 19.8956 9.29083 19.9864 9.8356C20.0772 10.3804 19.7092 10.8956 19.1644 10.9864C17.0282 11.3424 15.1791 10.7992 13.8435 9.60462L11.1291 11.9869L12.7524 13.8413C12.912 14.0236 13 14.2577 13 14.5V19C13 19.5523 12.5523 20 12 20C11.4477 20 11 19.5523 11 19V14.8759L8.9689 12.5556L8.92455 12.5059C8.68548 12.2386 8.28531 11.7911 8.11145 11.2626C8.00463 10.9379 7.97131 10.5628 8.08578 10.1667C8.1967 9.78279 8.42374 9.45733 8.7058 9.18044L8.71971 9.16705L12.3134 5.77299C12.5614 5.53871 12.9118 5.44708 13.2428 5.52993ZM2 17C2 15.3431 3.34315 14 5 14C6.65685 14 8 15.3431 8 17C8 18.6569 6.65685 20 5 20C3.34315 20 2 18.6569 2 17ZM5 12C2.23858 12 0 14.2386 0 17C0 19.7614 2.23858 22 5 22C7.76142 22 10 19.7614 10 17C10 14.2386 7.76142 12 5 12ZM16 17C16 15.3431 17.3431 14 19 14C20.6569 14 22 15.3431 22 17C22 18.6569 20.6569 20 19 20C17.3431 20 16 18.6569 16 17ZM19 12C16.2386 12 14 14.2386 14 17C14 19.7614 16.2386 22 19 22C21.7614 22 24 19.7614 24 17C24 14.2386 21.7614 12 19 12Z" />
-    </Svg>
-  );
-};
-
-const numMillisInDay = 86400000; // millis in day
-const numMillisOneWeek = numMillisInDay * 7;
+const NUM_MILLIS_IN_DAY = 86400000; // millis in day
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
   const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
@@ -94,112 +85,114 @@ export function WorkordersComponent({}) {
   useEffect(() => {
     let hour = 3600000;
     const intervalId = setInterval(() => {
-      let colorsObj = cloneDeep(sItemOptions);
-      let nowMillis = Number(new Date().getTime());
-      let todayWord = getWordDayOfWeek();
-      let tomorrowWord = getWordDayOfWeek(nowMillis + numMillisInDay);
-      let nextDayWord = getWordDayOfWeek(nowMillis + numMillisInDay * 2);
+      try {
+        let colorsObj = cloneDeep(sItemOptions);
+        let nowMillis = Number(new Date().getTime());
+        let todayWord = getWordDayOfWeek();
+        let tomorrowWord = getWordDayOfWeek(nowMillis + NUM_MILLIS_IN_DAY);
+        let nextDayWord = getWordDayOfWeek(nowMillis + NUM_MILLIS_IN_DAY * 2);
 
-      /////////////////////////////////////////////////////
-      zOpenWorkordersArr.forEach((wo) => {
-        const startedOnMillis = Number(wo.startedOnMillis);
-        let maxWaitMillis = Number(
-          wo.waitTime?.maxWaitTimeDays * numMillisInDay
-        );
-        let endWaitMillis = startedOnMillis + maxWaitMillis;
+        /////////////////////////////////////////////////////
+        zOpenWorkordersArr.forEach((wo) => {
+          const startedOnMillis = Number(wo.startedOnMillis);
+          let maxWaitMillis = Number(
+            wo.waitTime?.maxWaitTimeDays * NUM_MILLIS_IN_DAY
+          );
+          let endWaitMillis = startedOnMillis + maxWaitMillis;
 
-        // check to see if any shop closed days exist in the quoted wait time
-        // first get all day names that the shop is closed
-        let closedDayNamesArr = [];
-        Object.keys(zSettingsObj?.storeHours).forEach((dayName) => {
-          if (!zSettingsObj.storeHours[dayName]?.isOpen)
-            closedDayNamesArr.push(dayName);
-        });
+          // check to see if any shop closed days exist in the quoted wait time
+          // first get all day names that the shop is closed
+          let closedDayNamesArr = [];
+          Object.keys(zSettingsObj?.storeHours).forEach((dayName) => {
+            if (!zSettingsObj.storeHours[dayName]?.isOpen)
+              closedDayNamesArr.push(dayName);
+          });
 
-        // next get list of all day names within the time range quoted
-        const dayNames = [
-          "Sunday",
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday"
-        ];
-        const result = [];
-        let current = new Date(wo.startedOnMillis);
+          // next get list of all day names within the time range quoted
+          const dayNames = [
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday"
+          ];
+          const result = [];
+          let current = new Date(wo.startedOnMillis);
 
-        // Normalize to the start of the day (midnight)
-        current.setHours(0, 0, 0, 0);
+          // Normalize to the start of the day (midnight)
+          current.setHours(0, 0, 0, 0);
 
-        const end = new Date(endWaitMillis);
-        end.setHours(0, 0, 0, 0);
+          const end = new Date(endWaitMillis);
+          end.setHours(0, 0, 0, 0);
 
-        while (current <= end) {
-          result.push(dayNames[current.getDay()]);
-          // Move to next day
-          current.setDate(current.getDate() + 1);
-        }
+          while (current <= end) {
+            result.push(dayNames[current.getDay()]);
+            // Move to next day
+            current.setDate(current.getDate() + 1);
+          }
 
-        // last check to see if any of the day names in the wait period coincide with days the shop is closed
-        let daysClosedMillis = closedDayNamesArr.length * numMillisInDay;
-        endWaitMillis = endWaitMillis + daysClosedMillis;
+          // last check to see if any of the day names in the wait period coincide with days the shop is closed
+          let daysClosedMillis = closedDayNamesArr.length * NUM_MILLIS_IN_DAY;
+          endWaitMillis = endWaitMillis + daysClosedMillis;
 
-        // const endDayMillis = startedOnMillis + maxWaitMillis;
-        const dayEndWord = getWordDayOfWeek(endWaitMillis);
+          // const endDayMillis = startedOnMillis + maxWaitMillis;
+          const dayEndWord = getWordDayOfWeek(endWaitMillis);
 
-        let waitEndMonthWord = getWordMonth(endWaitMillis);
-        let todayMonthWord = getWordMonth(nowMillis);
+          let waitEndMonthWord = getWordMonth(endWaitMillis);
+          let todayMonthWord = getWordMonth(nowMillis);
 
-        // check to see if the due day word is same week or upcoming weeks
-        let isDueWithin7Days = true;
-        if (
-          Math.ceil((endWaitMillis - nowMillis) / numMillisInDay) >= 7 ||
-          waitEndMonthWord != todayMonthWord
-        ) {
-          isDueWithin7Days = false;
-        }
+          // check to see if the due day word is same week or upcoming weeks
+          let isDueWithin7Days = true;
+          if (
+            Math.ceil((endWaitMillis - nowMillis) / NUM_MILLIS_IN_DAY) >= 7 ||
+            waitEndMonthWord != todayMonthWord
+          ) {
+            isDueWithin7Days = false;
+          }
 
-        // check to see if past due
-        let isPastDue = false;
-        if (endWaitMillis < nowMillis && todayWord != dayEndWord)
-          isPastDue = true;
+          // check to see if past due
+          let isPastDue = false;
+          if (endWaitMillis < nowMillis && todayWord != dayEndWord)
+            isPastDue = true;
 
-        let optionsObj = {
-          color: null,
-          waitEndDay: maxWaitMillis && isDueWithin7Days ? dayEndWord : ""
-        };
+          let optionsObj = {
+            color: null,
+            waitEndDay: maxWaitMillis && isDueWithin7Days ? dayEndWord : ""
+          };
 
-        //////////////////////////
-        if (wo.waitTime.label == "Waiting" || wo.waitTime.label == "Today") {
-          optionsObj.waitEndDay = "Today";
-          if (colorsObj[wo.id]?.color == "red") {
-            optionsObj.color = null;
-          } else {
+          //////////////////////////
+          if (wo.waitTime.label == "Waiting" || wo.waitTime.label == "Today") {
+            optionsObj.waitEndDay = "Today";
+            if (colorsObj[wo.id]?.color == "red") {
+              optionsObj.color = null;
+            } else {
+              optionsObj.color = "red";
+            }
+          } else if (isPastDue) {
+            if (colorsObj[wo.id]?.color == "pink") {
+              optionsObj.color = null;
+            } else {
+              optionsObj.color = "pink";
+            }
+            optionsObj.waitEndDay = "PAST DUE";
+          } else if (dayEndWord == todayWord && isDueWithin7Days) {
             optionsObj.color = "red";
+            optionsObj.waitEndDay = dayEndWord;
+          } else if (dayEndWord == tomorrowWord && isDueWithin7Days) {
+            optionsObj.waitEndDay = dayEndWord;
+            optionsObj.color = "yellow";
+          } else if (dayEndWord == nextDayWord && isDueWithin7Days) {
+            optionsObj.waitEndDay = dayEndWord;
+            optionsObj.color = "green";
           }
-        } else if (isPastDue) {
-          if (colorsObj[wo.id]?.color == "pink") {
-            optionsObj.color = null;
-          } else {
-            optionsObj.color = "pink";
-          }
-          optionsObj.waitEndDay = "PAST DUE";
-        } else if (dayEndWord == todayWord && isDueWithin7Days) {
-          optionsObj.color = "red";
-          optionsObj.waitEndDay = dayEndWord;
-        } else if (dayEndWord == tomorrowWord && isDueWithin7Days) {
-          optionsObj.waitEndDay = dayEndWord;
-          optionsObj.color = "yellow";
-        } else if (dayEndWord == nextDayWord && isDueWithin7Days) {
-          optionsObj.waitEndDay = dayEndWord;
-          optionsObj.color = "green";
-        }
-        colorsObj[wo.id] = optionsObj;
-      });
-      ////////////////////////////////////////////////////////
+          colorsObj[wo.id] = optionsObj;
+        });
+        ////////////////////////////////////////////////////////
 
-      _setItemOptions(colorsObj);
+        _setItemOptions(colorsObj);
+      } catch (e) {}
     }, 750);
 
     return () => {
@@ -233,7 +226,7 @@ export function WorkordersComponent({}) {
       inputArr.forEach((wo) => {
         const startedOnMillis = Number(wo.startedOnMillis);
         const maxWaitMillis = Number(
-          wo.waitTime?.maxWaitTimeDays * numMillisInDay
+          wo.waitTime?.maxWaitTimeDays * NUM_MILLIS_IN_DAY
         );
         if (wo.status.label == status.label) arr.push(wo);
       });
@@ -242,7 +235,7 @@ export function WorkordersComponent({}) {
       arr = sortBy(arr, (wo) => {
         let millisToCompletion =
           wo.startedOnMillis +
-          wo.waitTime?.maxWaitTimeDays * numMillisInDay -
+          wo.waitTime?.maxWaitTimeDays * NUM_MILLIS_IN_DAY -
           nowMillis;
         return millisToCompletion;
       });

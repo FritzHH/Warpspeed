@@ -46,7 +46,7 @@ import {
 
 const SEARCH_STRING_TIMER = 45 * 1000;
 
-export function QuickItemComponent({ __screenHeight }) {
+export function QuickItemComponent({}) {
   // store setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
@@ -204,12 +204,6 @@ export function QuickItemComponent({ __screenHeight }) {
 
   //////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////
-  // log("refs", randomWordGenerator());
-  // log("h", __screenHeight);
-  // log(Math.round(__screenHeight * 0.03) + Math.round(__screenHeight * 0.97));
-  let height1 = Math.round(__screenHeight * 0.03);
-  let height2 = Math.round(__screenHeight * 0.97);
-
   return (
     <View
       style={{
@@ -297,7 +291,7 @@ export function QuickItemComponent({ __screenHeight }) {
           {zSettingsObj?.quickItemButtonNames?.map((item) => (
             <Button_
               onPress={() => handleQuickButtonPress(item)}
-              colorGradientArr={COLOR_GRADIENTS.purple}
+              colorGradientArr={COLOR_GRADIENTS.blue}
               buttonStyle={{
                 ...SHADOW_RADIUS_NOTHING,
                 borderWidth: 1,

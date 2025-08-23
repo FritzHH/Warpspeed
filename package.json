@@ -26,6 +26,7 @@
     "events": "^3.3.0",
     "expo": "~51.0.0",
     "expo-linear-gradient": "~14.1.5",
+    "face-api.js": "^0.22.2",
     "firebase": "^11.6.1",
     "fs": "^0.0.1-security",
     "jspdf": "^3.0.1",

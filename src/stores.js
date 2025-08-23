@@ -6,7 +6,7 @@ import {
   INVENTORY_ITEM_PROTO,
   PRIVILEDGE_LEVELS,
   TAB_NAMES,
-  WORKORDER_PROTO,
+  WORKORDER_PROTO
 } from "./data";
 import { checkArr, clog, generateRandomID, log } from "./utils";
 import { cloneDeep } from "lodash";
@@ -23,7 +23,7 @@ export const useLoginStore = create((set, get) => ({
     permissions: "owner",
     phone: "2393369177",
     pin: "33",
-    alternatePin: "jj",
+    alternatePin: "jj"
   },
   modalVisible: false,
   lastActionMillis: 0,
@@ -90,7 +90,7 @@ export const useLoginStore = create((set, get) => ({
       postLoginFunctionCallback();
     }
   },
-  runPostLoginFunction: () => get().postLoginFunctionCallback(),
+  runPostLoginFunction: () => get().postLoginFunctionCallback()
 }));
 
 export const useInvModalStore = create((set, get) => ({
@@ -99,7 +99,7 @@ export const useInvModalStore = create((set, get) => ({
   setFocus: (focusName) => {
     // log("setting focus", focusName);
     set((state) => ({
-      currentFocusName: focusName,
+      currentFocusName: focusName
     }));
   },
   setItem: (item) => {
@@ -119,13 +119,13 @@ export const useInvModalStore = create((set, get) => ({
   reset: () => {
     set(() => ({
       currentFocusName: null,
-      item: INVENTORY_ITEM_PROTO,
+      item: INVENTORY_ITEM_PROTO
     }));
-  },
+  }
 }));
 
 export const useTabNamesStore = create((set, get) => ({
-  itemsTabName: TAB_NAMES.itemsTab.empty,
+  itemsTabName: TAB_NAMES.itemsTab.dashboard,
   optionsTabName: TAB_NAMES.optionsTab.workorders,
   infoTabName: TAB_NAMES.infoTab.customer,
 
@@ -141,7 +141,7 @@ export const useTabNamesStore = create((set, get) => ({
   },
   setOptionsTabName: (name) => {
     set((state) => ({ optionsTabName: name }));
-  },
+  }
 }));
 
 export const useCustomerSearchStore = create((set, get) => ({
@@ -151,7 +151,7 @@ export const useCustomerSearchStore = create((set, get) => ({
   getSelectedItem: () => get().selectedItem,
   setSelectedItem: (item) => {
     set((state) => ({
-      selectedItem: item,
+      selectedItem: item
     }));
   },
   setSearchResultsArr: (arr) => {
@@ -160,7 +160,7 @@ export const useCustomerSearchStore = create((set, get) => ({
   reset: () => {
     set((state) => ({ searchResultsArr: [] }));
     set((state) => ({ selectedItem: null }));
-  },
+  }
 }));
 
 export const useAppCurrentUserStore = create((set, get) => ({
@@ -171,10 +171,10 @@ export const useAppCurrentUserStore = create((set, get) => ({
     permissions: "owner",
     phone: "2393369177",
     pin: "33",
-    alternatePin: "jj",
+    alternatePin: "jj"
   },
   getCurrentUserObj: () => get().userObj,
-  setCurrentUserObj: (obj) => set((state) => ({ userObj: obj })),
+  setCurrentUserObj: (obj) => set((state) => ({ userObj: obj }))
 }));
 
 export const useCheckoutStore = create((set, get) => ({
@@ -214,9 +214,9 @@ export const useCheckoutStore = create((set, get) => ({
       splitPayment: false,
       paymentArr: [],
       isRefund: false,
-      totalAmount: 0,
+      totalAmount: 0
     }));
-  },
+  }
 }));
 
 // internal & database //////////////////////////////////////////////
@@ -233,13 +233,13 @@ export const useStripePaymentStore = create((set, get) => ({
 
   setReadersArr: (readersArr) => {
     set(() => ({
-      readersArr,
+      readersArr
     }));
   },
   setPaymentIntentID: (paymentIntentID) => {
     log("setting pi id in zustand", paymentIntentID);
     set(() => ({
-      paymentIntentID,
+      paymentIntentID
     }));
   },
   setPaymentAmount: (paymentAmount) => {
@@ -251,9 +251,9 @@ export const useStripePaymentStore = create((set, get) => ({
   reset: () => {
     set(() => ({
       paymentIntentID: null,
-      paymentAmount: 0,
+      paymentAmount: 0
     }));
-  },
+  }
 }));
 
 // database  //////////////////////////////////////////////////
@@ -271,7 +271,7 @@ export const usePunchClockStore = create((set, get) => ({
       loggedInUsers1.push(userObj);
       set((state) => ({ loggedInUsers: loggedInUsers1 }));
     }
-  },
+  }
 }));
 
 export const useCustomerPreviewStore = create((set, get) => ({
@@ -280,17 +280,17 @@ export const useCustomerPreviewStore = create((set, get) => ({
   modItem: (item, option) => {
     if (option === "change")
       return set((state) => ({
-        previewArr: changeItem(get().previewArr, item),
+        previewArr: changeItem(get().previewArr, item)
       }));
     if (option === "add")
       return set((state) => ({
-        previewArr: addItem(get().previewArr, item),
+        previewArr: addItem(get().previewArr, item)
       }));
     if (option === "remove")
       return set((state) => ({
-        previewArr: removeItem(get().previewArr, item),
+        previewArr: removeItem(get().previewArr, item)
       }));
-  },
+  }
 }));
 
 export const useCurrentCustomerStore = create((set, get) => ({
@@ -298,7 +298,7 @@ export const useCurrentCustomerStore = create((set, get) => ({
   getCustomerObj: () => get().customerObj,
   setCustomerObj: (obj) => {
     set((state) => ({ customerObj: obj }));
-  },
+  }
 }));
 
 export const useInventoryStore = create((set, get) => ({
@@ -307,17 +307,17 @@ export const useInventoryStore = create((set, get) => ({
   modItem: (item, option) => {
     if (option === "change")
       return set((state) => ({
-        inventoryArr: changeItem(get().inventoryArr, item),
+        inventoryArr: changeItem(get().inventoryArr, item)
       }));
     if (option === "add")
       return set((state) => ({
-        inventoryArr: addItem(get().inventoryArr, item),
+        inventoryArr: addItem(get().inventoryArr, item)
       }));
     if (option === "remove")
       return set((state) => ({
-        inventoryArr: removeItem(get().inventoryArr, item),
+        inventoryArr: removeItem(get().inventoryArr, item)
       }));
-  },
+  }
 }));
 
 export const useOpenWorkordersStore = create((set, get) => ({
@@ -352,7 +352,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
 
     set((state) => ({
       workorderArr,
-      openWorkorderObj: wo,
+      openWorkorderObj: wo
     }));
   },
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
@@ -362,17 +362,17 @@ export const useOpenWorkordersStore = create((set, get) => ({
     // log(item, option);
     if (option === "change")
       set((state) => ({
-        workorderArr: changeItem(get().workorderArr, item),
+        workorderArr: changeItem(get().workorderArr, item)
       }));
     if (option === "add")
       set((state) => ({
-        workorderArr: addItem(get().workorderArr, item),
+        workorderArr: addItem(get().workorderArr, item)
       }));
     if (option === "remove")
       set((state) => ({
-        workorderArr: removeItem(get().workorderArr, item),
+        workorderArr: removeItem(get().workorderArr, item)
       }));
-  },
+  }
 }));
 
 export const useCustMessagesStore = create((set, get) => ({
@@ -384,7 +384,7 @@ export const useCustMessagesStore = create((set, get) => ({
     let messages = get().incomingMessagesArr;
     if (checkArr(messages, obj)) return;
     set((state) => ({
-      incomingMessagesArr: [...state.incomingMessagesArr, obj],
+      incomingMessagesArr: [...state.incomingMessagesArr, obj]
     }));
   },
   setOutgoingMessage: (obj) => {
@@ -392,16 +392,16 @@ export const useCustMessagesStore = create((set, get) => ({
     if (checkArr(messages, obj)) return;
     // log("out", obj);
     set((state) => ({
-      outgoingMessagesArr: [...state.outgoingMessagesArr, obj],
+      outgoingMessagesArr: [...state.outgoingMessagesArr, obj]
     }));
-  },
+  }
 }));
 
 export const useWorkorderPreviewStore = create((set, get) => ({
   previewObj: null,
   getPreviewObj: () => get().previewObj,
   // setPreviewObj: (obj) => log("setting", obj),
-  setPreviewObj: (obj) => set((state) => ({ previewObj: obj })),
+  setPreviewObj: (obj) => set((state) => ({ previewObj: obj }))
 }));
 
 export const useSettingsStore = create((set, get) => ({
@@ -409,7 +409,7 @@ export const useSettingsStore = create((set, get) => ({
   getSettingsObj: () => get().settings,
   setSettingsObj: (obj) => set((state) => ({ settings: obj })),
   setSettingsItem: (key, val) =>
-    set((state) => ({ ...get().setttings, [key]: val })),
+    set((state) => ({ ...get().setttings, [key]: val }))
 }));
 
 export const useListenersStore = create((set, get) => ({
@@ -425,7 +425,7 @@ export const useListenersStore = create((set, get) => ({
   custPreviewAddSub: "",
   custPreviewRemoveSub: "",
   customerObjSub: "",
-  settingsSub: "",
+  settingsSub: ""
 }));
 
 /// internal functions ///////////////////////////////////////////

@@ -1,6 +1,8 @@
 /* eslint-disable */
 const { logger } = require("firebase-functions");
 const { onRequest } = require("firebase-functions/v2/https");
+const ftp = require("basic-ftp");
+const fs = require("fs");
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
 const { defineSecret } = require("firebase-functions/params");
@@ -14,7 +16,7 @@ var twilioClient;
 
 admin.initializeApp({
   credential: admin.credential.cert(creds),
-  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com/",
+  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com/"
 });
 const RDB = admin.database();
 const DB = getFirestore();
@@ -44,7 +46,7 @@ const SMS_PROTO = {
   message: "",
   customerID: "",
   read: false,
-  id: "",
+  id: ""
 };
 
 const CLOSED_THREAD_RESPONSE =
@@ -74,6 +76,47 @@ function log(one, two) {
   }
   logger.log(str);
 }
+
+// ftp reader
+exports.readFTPFile = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    log("Incoming FTP read request");
+    const client = new ftp.Client();
+    client.ftp.verbose = true; // Optional: for debug logging
+
+    //     Server                   : ftp.jbi.bike
+    // Login name         : 121080
+    // Password            : g3QX&bn5
+
+    try {
+      // Connect to FTP server
+      await client.access({
+        host: "ftp.jbi.bike",
+        user: "121080",
+        password: "g3QX&bn5",
+        secure: false // Set to true if using FTPS
+      });
+
+      // List files in the root directory
+      log("Directory listing for FTP host:");
+      const list = await client.list();
+      list.forEach((item) => console.log(item.name));
+
+      // Download a file (change 'file.txt' to your file name)
+      await client.downloadTo("local-file.txt", "file.txt");
+      log("File downloaded!");
+
+      // Read the downloaded file
+      const content = fs.readFileSync("local-file.txt", "utf8");
+      log("File content for FTP transfer:");
+      log(content);
+    } catch (err) {
+      console.error(err);
+    }
+    client.close();
+  }
+);
 
 // server driven Stripe payments
 exports.processServerDrivenStripePayment = onRequest(
@@ -111,7 +154,7 @@ exports.processServerDrivenStripePayment = onRequest(
           amount: Math.round(Number(req.body.amount) * 100),
           payment_method_types: ["card_present", "card", "link"],
           capture_method: req.body.captureMethod || "automatic",
-          currency: "usd",
+          currency: "usd"
         });
         paymentIntentID = paymentIntent.id;
         log(
@@ -132,7 +175,7 @@ exports.processServerDrivenStripePayment = onRequest(
           readerResult = await stripe.terminal.readers.processPaymentIntent(
             req.body.readerID,
             {
-              payment_intent: paymentIntentID,
+              payment_intent: paymentIntentID
             }
           );
           log("Stripe server-driven payment process complete!", readerResult);
@@ -142,7 +185,7 @@ exports.processServerDrivenStripePayment = onRequest(
           }
           return sendSuccessfulResult(res, {
             readerResult,
-            paymentIntentID,
+            paymentIntentID
           });
         } catch (error) {
           log("Stripe server-driven payment process ERROR ERROR ERROR!", error);
@@ -184,7 +227,7 @@ exports.refundStripePayment = onRequest(
     log("Incoming refund Stripe payment", req.body);
     const refund = await stripe.refunds.create({
       payment_intent: req.body.paymentIntentID,
-      amount: req.body.amount,
+      amount: req.body.amount
     });
     sendSuccessfulResult(res, readerResult);
   }
@@ -195,7 +238,7 @@ exports.getAvailableStripeReaders = onRequest(
   async (req, res) => {
     log("Incoming get available Stripe readers body", req.body);
     const readers = await stripe.terminal.readers.list({
-      limit: 3,
+      limit: 3
     });
     log("available Stripe readers", readers);
     sendSuccessfulResult(res, readers);
@@ -248,7 +291,7 @@ const sendTwilioMessage = (messageObj) => {
     .create({
       body: messageObj.message,
       to: "+1" + messageObj.phoneNumber,
-      from: "+12393171234",
+      from: "+12393171234"
     })
     .then((res) => {
       log("It appears that sending SMS is complete", res);
@@ -339,7 +382,7 @@ exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
     message: incomingMessage,
     customerID: customerObj.id,
     id: body.SmsSid,
-    type: "incoming",
+    type: "incoming"
   };
 
   let dbRef = RDB.ref("INCOMING_MESSAGES/" + customerObj.id);

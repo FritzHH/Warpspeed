@@ -1,4 +1,5 @@
-import { dim } from "./utils";
+import { dim, lightenRGBByPercent } from "./utils";
+// const { getDefaultConfig } = require("metro"); // Or require('metro-config') for bare React Native
 
 export const Colors = {
   // mainBackground: "white",
@@ -52,7 +53,7 @@ export const APP_BASE_COLORS = {
 export const COLOR_GRADIENTS = {
   green: ["rgb(71,185,119)", APP_BASE_COLORS.green],
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
-  blue: ["rgb(96, 152, 202)", APP_BASE_COLORS.blue]
+  blue: [lightenRGBByPercent(APP_BASE_COLORS.blue, 20), APP_BASE_COLORS.blue]
 };
 
 export const COLOR_GRADIENT_PROFILES = {
@@ -96,7 +97,12 @@ export const ICONS = {
   info: require(ASSETS_PATH + "info.png"),
   infoSquare: require(ASSETS_PATH + "info-square.png"),
   settings: require(ASSETS_PATH + "settings.png"),
-  infoGear: require(ASSETS_PATH + "info-gear.png")
+  infoGear: require(ASSETS_PATH + "info-gear.png"),
+  // internetOfflineGIF: require(ASSETS_PATH + "internetOfflineGIF.gif")
+  internetOnlineGIF: require(ASSETS_PATH + "internetOnlineGIF.gif"),
+  internetOfflineGIF: require(ASSETS_PATH + "internedDisconnectedGIF.gif")
+  // internetOfflineGIF: require(ASSETS_PATH+'internetOfflineGIF')"),
+  // internetOffline: require(ASSETS_PATH + "internetOffline")
 };
 
 // rgb(64, 174, 113)

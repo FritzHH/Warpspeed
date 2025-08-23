@@ -6,7 +6,7 @@ import {
   dim,
   generateRandomID,
   log,
-  trimToTwoDecimals,
+  trimToTwoDecimals
 } from "../../../utils";
 import {
   TabMenuDivider as Divider,
@@ -23,13 +23,13 @@ import {
   Button_,
   Icon_,
   Image_,
-  GradientView,
+  GradientView
 } from "../../../components";
 import {
   APP_BASE_COLORS,
   COLOR_GRADIENTS,
   Colors,
-  ICONS,
+  ICONS
 } from "../../../styles";
 import {
   SETTINGS_OBJ,
@@ -37,7 +37,7 @@ import {
   CUSTOMER_PROTO,
   TAB_NAMES,
   COLORS,
-  NONREMOVABLE_STATUSES,
+  NONREMOVABLE_STATUSES
 } from "../../../data";
 import React, { useRef } from "react";
 import { cloneDeep } from "lodash";
@@ -47,11 +47,11 @@ import {
   useOpenWorkordersStore,
   useLoginStore,
   useSettingsStore,
-  useTabNamesStore,
+  useTabNamesStore
 } from "../../../stores";
 import {
   dbSetCustomerObj,
-  dbSetOpenWorkorderItem,
+  dbSetOpenWorkorderItem
 } from "../../../db_call_wrapper";
 
 export const ActiveWorkorderComponent = ({}) => {
@@ -171,15 +171,16 @@ export const ActiveWorkorderComponent = ({}) => {
     alignItems: "center",
     borderWidth: 1,
     paddingVertical: 2,
-    borderRadius: 5,
+    borderRadius: 5
   };
 
   const dropdownButtonTextStyle = {
     fontSize: 14,
-    color: APP_BASE_COLORS.textMain,
+    color: APP_BASE_COLORS.textMain
     // width: "100%",
   };
 
+  const DROPDOWN_SELECTED_OPACITY = 0.3;
   function setComponent() {
     return (
       <View
@@ -194,7 +195,7 @@ export const ActiveWorkorderComponent = ({}) => {
           // borderRadius: 15,
           // shadowColor: APP_BASE_COLORS.green,
           backgroundColor: APP_BASE_COLORS.backgroundWhite,
-          borderRadius: 15,
+          borderRadius: 15
           // borderColor: APP_BASE_COLORS.buttonLightGreen,
 
           // shadowOffset: {
@@ -208,7 +209,7 @@ export const ActiveWorkorderComponent = ({}) => {
         <View
           style={{
             width: "100%",
-            alignItems: "center",
+            alignItems: "center"
             // backgroundColor: "blue",
             // paddingHorizontal: 5,
           }}
@@ -223,7 +224,7 @@ export const ActiveWorkorderComponent = ({}) => {
               backgroundColor: APP_BASE_COLORS.backgroundGreen,
               borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
               borderWidth: 1,
-              borderRadius: 15,
+              borderRadius: 15
             }}
           >
             <ScreenModal
@@ -241,12 +242,13 @@ export const ActiveWorkorderComponent = ({}) => {
                 paddingVertical: 5,
                 borderRadius: 5,
                 paddingHorizontal: 20,
+                backgroundColor: "transparent"
               }}
               mouseOverOptions={{ highlightColor: "transparent" }}
               handleButtonPress={() => _setShowCustomerInfoModal(true)}
               buttonTextStyle={{
                 fontSize: 25,
-                color: Colors.lightText,
+                color: Colors.lightText
               }}
               shadowProps={{ shadowColor: "transparent" }}
               handleOuterClick={() => _setShowCustomerInfoModal(false)}
@@ -270,7 +272,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 borderWidth: 1,
                 marginTop: 5,
                 padding: 5,
-                width: "95%",
+                width: "95%"
               }}
             >
               {zCustomerObj.cell.length > 0 ? (
@@ -313,7 +315,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 flexDirection: "row",
                 justifyContent: "flex-start",
                 alignItems: "center",
-                width: "100%",
+                width: "100%"
                 // backgroundColor: "blue",
               }}
             >
@@ -337,14 +339,14 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingLeft: 5,
                   justifyContent: "flex-start",
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  justifyContent: "space-between"
                   // backgroundColor: "green",
                 }}
               >
                 <View
                   style={{
                     width: "48%",
-                    height: "100%",
+                    height: "100%"
                     // marginTop: 11,
                   }}
                 >
@@ -362,9 +364,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     // itemTextStyle={{ fontSize: 18, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      backgroundColor: zWorkorderObj.brand
-                        ? dropdownButtonStyle.backgroundColor
-                        : APP_BASE_COLORS.lightred,
+                      opacity: zWorkorderObj.brand
+                        ? DROPDOWN_SELECTED_OPACITY
+                        : 1
                     }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={bikesRef}
@@ -376,7 +378,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{
                     width: "48%",
                     alignItems: null,
-                    justifyContent: "center",
+                    justifyContent: "center"
                   }}
                 >
                   <DropdownMenu
@@ -390,9 +392,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      backgroundColor: zWorkorderObj.brand
-                        ? dropdownButtonStyle.backgroundColor
-                        : "red",
+                      opacity: zWorkorderObj.brand
+                        ? DROPDOWN_SELECTED_OPACITY
+                        : 1
                     }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={ebikeRef}
@@ -408,7 +410,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 width: "100%",
                 alignItems: "center",
 
-                marginTop: 11,
+                marginTop: 11
                 // backgroundColor: "blue",
               }}
             >
@@ -430,7 +432,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   flexDirection: "row",
                   paddingLeft: 5,
                   justifyContent: "center",
-                  alignItems: "center",
+                  alignItems: "center"
                   // backgroundColor: "green",
                 }}
               >
@@ -447,7 +449,12 @@ export const ActiveWorkorderComponent = ({}) => {
                     modalCoordinateVars={{ x: 30, y: 30 }}
                     // itemViewStyle={{ borderRadius: 0 }}
                     // itemTextStyle={{ fontSize: 14, color: "black" }}
-                    buttonStyle={{ ...dropdownButtonStyle }}
+                    buttonStyle={{
+                      ...dropdownButtonStyle,
+                      opacity: zWorkorderObj.description
+                        ? DROPDOWN_SELECTED_OPACITY
+                        : 1
+                    }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={descriptionRef}
                     buttonText={"Descriptions"}
@@ -463,7 +470,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
                 alignItems: "center",
                 width: "100%",
-                marginTop: 11,
+                marginTop: 11
               }}
             >
               <TextInputOnMainBackground
@@ -472,7 +479,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{
                   width: "48%",
                   backgroundColor: zWorkorderObj.color1.backgroundColor,
-                  color: zWorkorderObj.color1.textColor,
+                  color: zWorkorderObj.color1.textColor
                   // borderRadius: 8,
                 }}
                 onTextChange={(val) => {
@@ -486,7 +493,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{
                   width: "48%",
                   backgroundColor: zWorkorderObj.color2.backgroundColor,
-                  color: zWorkorderObj.color2.textColor,
+                  color: zWorkorderObj.color2.textColor
                 }}
                 onTextChange={(val) => {
                   setBikeColor(val, "color2");
@@ -499,14 +506,14 @@ export const ActiveWorkorderComponent = ({}) => {
                   flexDirection: "row",
                   paddingLeft: 5,
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  justifyContent: "space-between"
                 }}
               >
                 <View
                   style={{
                     width: "48%",
                     height: "100%",
-                    justifyContent: "center",
+                    justifyContent: "center"
                     // marginTop: 11,
                   }}
                 >
@@ -526,9 +533,10 @@ export const ActiveWorkorderComponent = ({}) => {
                     // itemTextStyle={{ fontSize: 14 }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      backgroundColor: zWorkorderObj.color1.label
-                        ? dropdownButtonStyle.backgroundColor
-                        : APP_BASE_COLORS.lightred,
+                      opacity: zWorkorderObj.color1 ? 0.2 : 1
+                      // backgroundColor: zWorkorderObj.color1.label
+                      //   ? "lightgray"
+                      //   : dropdownButtonStyle.backgroundColor
                     }}
                     ref={color1Ref}
                     buttonText={"Color 1"}
@@ -541,7 +549,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{
                     width: "48%",
                     height: "100%",
-                    justifyContent: "center",
+                    justifyContent: "center"
                     // marginTop: 11,
                   }}
                 >
@@ -557,7 +565,15 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderObj(wo);
                       dbSetOpenWorkorderItem(wo);
                     }}
-                    buttonStyle={dropdownButtonStyle}
+                    buttonStyle={{
+                      ...dropdownButtonStyle,
+                      // backgroundColor: zWorkorderObj.color1.label
+                      //   ? "lightgray"
+                      //   : dropdownButtonStyle.backgroundColor,
+                      opacity: zWorkorderObj.color1
+                        ? DROPDOWN_SELECTED_OPACITY
+                        : 1
+                    }}
                     ref={color2Ref}
                     buttonText={"Color 2"}
                     buttonTextStyle={dropdownButtonTextStyle}
@@ -571,7 +587,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 justifyContent: "flex-start",
                 width: "100%",
                 alignItems: "center",
-                marginTop: 11,
+                marginTop: 11
               }}
             >
               <TextInputOnMainBackground
@@ -587,7 +603,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   flexDirection: "row",
                   paddingLeft: 5,
                   justifyContent: "flex-start",
-                  alignItems: "center",
+                  alignItems: "center"
                   // backgroundColor: "green",
                 }}
               >
@@ -609,9 +625,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     // itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      backgroundColor: zWorkorderObj.waitTime
-                        ? dropdownButtonStyle.backgroundColor
-                        : APP_BASE_COLORS.lightred,
+                      opacity: zWorkorderObj.waitTime.label
+                        ? DROPDOWN_SELECTED_OPACITY
+                        : 1
                     }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     modalCoordinateVars={{ x: 30, y: 50 }}
@@ -635,11 +651,11 @@ export const ActiveWorkorderComponent = ({}) => {
               buttonStyle={{
                 width: "100%",
                 backgroundColor: zWorkorderObj.status.backgroundColor,
-                marginTop: 11,
+                marginTop: 11
               }}
               buttonTextStyle={{
                 ...dropdownButtonTextStyle,
-                color: zWorkorderObj.status.textColor,
+                color: zWorkorderObj.status.textColor
               }}
               modalCoordinateVars={{ x: 50, y: 50 }}
               ref={statusRef}
@@ -654,7 +670,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 paddingHorizontal: 5,
                 paddingVertical: 5,
                 backgroundColor: APP_BASE_COLORS.buttonLightGreen,
-                width: "100%",
+                width: "100%"
               }}
             >
               <View
@@ -663,14 +679,14 @@ export const ActiveWorkorderComponent = ({}) => {
                   justifyContent: "flex-start",
                   alignItems: "center",
                   width: "100%",
-                  marginTop: 5,
+                  marginTop: 5
                 }}
               >
                 <TextInputOnMainBackground
                   placeholderText={"Part Ordered"}
                   style={{
                     width: "100%",
-                    backgroundColor: APP_BASE_COLORS.backgroundWhite,
+                    backgroundColor: APP_BASE_COLORS.backgroundWhite
                   }}
                   value={zWorkorderObj.partOrdered}
                   onTextChange={(val) => {
@@ -689,7 +705,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   justifyContent: "flex-start",
                   alignItems: "center",
                   width: "100%",
-                  marginTop: 11,
+                  marginTop: 11
                 }}
               >
                 <TextInputOnMainBackground
@@ -697,7 +713,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   placeholderText={"Part Source"}
                   style={{
                     width: "50%",
-                    backgroundColor: APP_BASE_COLORS.backgroundWhite,
+                    backgroundColor: APP_BASE_COLORS.backgroundWhite
                   }}
                   onTextChange={(val) => {
                     let wo = cloneDeep(zWorkorderObj);
@@ -713,7 +729,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     paddingLeft: 5,
                     justifyContent: "",
                     alignItems: "center",
-                    justifyContent: "center",
+                    justifyContent: "center"
                     // backgroundColor: "blue",
                   }}
                 >
@@ -730,7 +746,10 @@ export const ActiveWorkorderComponent = ({}) => {
                     // itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
-                      paddingHorizontal: 40,
+                      opacity: zWorkorderObj.brand
+                        ? DROPDOWN_SELECTED_OPACITY
+                        : 1,
+                      paddingHorizontal: 40
                     }}
                     buttonTextStyle={dropdownButtonTextStyle}
                     ref={partSourcesRef}
@@ -745,7 +764,7 @@ export const ActiveWorkorderComponent = ({}) => {
           style={{
             flexDirection: "row",
             justifyContent: "space-around",
-            width: "100%",
+            width: "100%"
           }}
         >
           <Button_
@@ -785,7 +804,7 @@ const TextInputOnMainBackground = ({
   onTextChange,
   style = {},
   placeholderText,
-  editable = true,
+  editable = true
 }) => {
   return (
     <TextInput
@@ -804,7 +823,7 @@ const TextInputOnMainBackground = ({
         outlineColor: APP_BASE_COLORS.green,
         borderRadius: 5,
         fontWeight: value ? "500" : null,
-        ...style,
+        ...style
       }}
       onChangeText={(val) => onTextChange(val)}
     />

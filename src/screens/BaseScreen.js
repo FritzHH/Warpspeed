@@ -5,7 +5,7 @@ import {
   View,
   Text,
   FlatList,
-  TouchableWithoutFeedback,
+  TouchableWithoutFeedback
 } from "react-native-web";
 import { Button } from "react-native-web";
 import { APP_BASE_COLORS, Colors, ViewStyles } from "../styles";
@@ -18,7 +18,7 @@ import {
   generateRandomID,
   log,
   searchPhoneNum,
-  useInterval,
+  useInterval
 } from "../utils";
 import { LoginScreenModalComponent, SHADOW_RADIUS_PROTO } from "../components";
 import { Info_Section } from "./screen_collections/Info_Section";
@@ -31,7 +31,7 @@ import {
   customerPreviewListSubscribe,
   inventorySubscribe,
   openWorkordersSubscribe,
-  settingsSubscribe,
+  settingsSubscribe
 } from "../db_subscription_wrapper";
 import {
   useCustomerPreviewStore,
@@ -40,7 +40,7 @@ import {
   useSettingsStore,
   useActionStore,
   useAppCurrentUserStore,
-  useLoginStore,
+  useLoginStore
 } from "../stores";
 import { dbSearchForPhoneNumber } from "../db_call_wrapper";
 
@@ -66,7 +66,7 @@ export function BaseScreen() {
   // local state ////////////////////////////////////////////////////////////////////////
   const [windowDimensions, setWindowDimensions] = useState({
     screenWidth: window.innerWidth,
-    screenHeight: window.innerHeight,
+    screenHeight: window.innerHeight
   });
   const [screenWidth, _setScreenWidth] = useState(window.innerWidth);
   const [screenHeight, _setScreenHeight] = useState(window.innerHeight);
@@ -126,7 +126,7 @@ export function BaseScreen() {
         height: screenHeight,
         flexDirection: "row",
         justifyContent: "space-around",
-        alignItems: "center",
+        alignItems: "center"
         // padding: 8,
         // backgroundColor: "green",
         // paddingVertical: 8,
@@ -153,7 +153,7 @@ export function BaseScreen() {
           backgroundColor: APP_BASE_COLORS.backgroundWhite,
           height: "100%",
           paddingRight: 8,
-          justifyContent: "space-around",
+          justifyContent: "space-around"
           // marginRight: 5,
         }}
       >
@@ -162,7 +162,7 @@ export function BaseScreen() {
             width: "100%",
             height: "64%",
             flexDirection: "row",
-            justifyContent: "space-around",
+            justifyContent: "space-around"
             // marginRight: 0,
           }}
         >
@@ -179,10 +179,10 @@ export function BaseScreen() {
               shadowColor: APP_BASE_COLORS.green,
               shadowOffset: {
                 width: 1,
-                height: 1,
+                height: 1
               },
               shadowOpacity: 0.5,
-              shadowRadius: 10,
+              shadowRadius: 10
             }}
           >
             <Info_Section />
@@ -199,10 +199,10 @@ export function BaseScreen() {
               shadowColor: APP_BASE_COLORS.green,
               shadowOffset: {
                 width: 1,
-                height: 1,
+                height: 1
               },
               shadowOpacity: 0.5,
-              shadowRadius: 10,
+              shadowRadius: 10
             }}
           >
             <Items_Section />
@@ -221,10 +221,10 @@ export function BaseScreen() {
             shadowColor: APP_BASE_COLORS.green,
             shadowOffset: {
               width: 1,
-              height: 1,
+              height: 1
             },
             shadowOpacity: 0.5,
-            shadowRadius: 10,
+            shadowRadius: 10
           }}
         >
           <Notes_Section />
@@ -233,6 +233,7 @@ export function BaseScreen() {
       <View
         style={{
           marginRight: 13,
+          // width: "100%",
           width: "34%",
           height: "99%",
           backgroundColor: APP_BASE_COLORS.backgroundWhite,
@@ -242,10 +243,10 @@ export function BaseScreen() {
           shadowColor: APP_BASE_COLORS.green,
           shadowOffset: {
             width: 0,
-            height: 1,
+            height: 1
           },
           shadowOpacity: 0.5,
-          shadowRadius: 10,
+          shadowRadius: 10
         }}
       >
         <Options_Section />

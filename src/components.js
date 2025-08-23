@@ -402,11 +402,13 @@ export const ScreenModal = ({
               width: !buttonVisible ? 0 : null,
               height: !buttonVisible ? 0 : null,
               ...shadowStyle,
-              ...buttonStyle,
-              backgroundColor: sMouseOver
-                ? mouseOverOptions.highlightColor
-                : buttonStyle.backgroundColor || "transparent",
-              opacity: sMouseOver ? mouseOverOptions.opacity : null
+              ...buttonStyle
+              // backgroundColor: sMouseOver
+              //   ? mouseOverOptions.highlightColor
+              //   : buttonStyle.backgroundColor || "transparent",
+              // opacity: sMouseOver
+              //   ? mouseOverOptions.opacity
+              //   : buttonStyle.opacity
             }}
           />
         ) : null}
@@ -447,10 +449,7 @@ export const DropdownMenu = ({
   buttonIconSize,
   itemTextStyle = {},
   itemViewStyle = {},
-  buttonStyle = {
-    // backgroundColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 50),
-    borderRadius: 25
-  },
+  buttonStyle = {},
   buttonTextStyle = {},
   buttonText,
   ref,
@@ -460,7 +459,7 @@ export const DropdownMenu = ({
   },
   mouseOverOptions = {
     enable: true,
-    opacity: 1,
+    // opacity: 1,
     highlightColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 10)
   },
   showButtonShadow,
@@ -484,12 +483,12 @@ export const DropdownMenu = ({
     return (
       <View
         style={{
-          backgroundColor: "transparent",
+          // backgroundColor: "transparent",
           // borderWidth: 2,
           borderColor:
             menuBorderColor || APP_BASE_COLORS.buttonLightGreenOutline,
           // borderRadius: 10,
-          borderRadius: buttonStyle.borderRadius
+          borderRadius: buttonStyle.borderRadius || 25
         }}
       >
         <FlatList
@@ -532,8 +531,10 @@ export const DropdownMenu = ({
                   borderBottomLeftRadius:
                     idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
                   borderBottomRightRadius:
-                    idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
-                  ...itemViewStyle
+                    idx == dataArr.length - 1 ? buttonStyle.borderRadius : null
+                  // backgroundColor: "blue"
+                  // opacity: 0.1
+                  // ...buttonStyle
                 }}
                 textStyle={{
                   ...itemTextStyle,
@@ -2334,8 +2335,9 @@ export const Button = ({
           paddingVertical: 5,
           ...shadowStyle,
           ...buttonStyle,
-          backgroundColor: getBackgroundColor(),
-          opacity: sMouseOver ? mouseOverOptions.opacity : buttonStyle.opacity
+          backgroundColor: getBackgroundColor()
+          // opacity: 0.1
+          // opacity:
         }}
       >
         {TextComponent ? (
@@ -2584,6 +2586,7 @@ export const Button_ = ({
     if (sMouseOver) {
       return mouseOverOptions.opacity;
     } else {
+      // log(text, buttonStyle.opacity);
       if (buttonStyle.opacity) return buttonStyle.opacity;
       return 1;
     }
@@ -2616,8 +2619,9 @@ export const Button_ = ({
           paddingVertical: 5,
           ...shadowStyle,
           ...buttonStyle,
-          backgroundColor: icon && !text ? null : getBackgroundColor(),
-          opacity: getOpacity()
+          backgroundColor: icon && !text ? null : getBackgroundColor()
+          // opacity: getOpacity()
+          // opacity: 0.1
         }}
         {...gradientViewProps}
       >

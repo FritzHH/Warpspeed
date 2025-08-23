@@ -8,7 +8,7 @@ import { cloneDeep } from "lodash";
 // const fs = require("node:fs");
 export const dim = {
   windowWidth: window.innerWidth,
-  windowHeight: window.innerHeight,
+  windowHeight: window.innerHeight
 };
 
 export const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
@@ -75,7 +75,7 @@ export function calculateRunningTotals(workorderObj, inventoryArr) {
   let obj = {
     runningTotal: trimToTwoDecimals(runningTotal),
     runningDiscount: trimToTwoDecimals(runningDiscount),
-    runningQty,
+    runningQty
   };
   // clog(obj);
   return obj;
@@ -140,14 +140,14 @@ export function formatDateTime(dateObj, millis) {
     date: formattedDate,
     time: formattedTime,
     topTicketDateTimeString,
-    dayOfWeek,
+    dayOfWeek
   };
 }
 
 export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
   let returnObj = {
     totalAmount: 0,
-    totalTax: 0,
+    totalTax: 0
   };
   if (workorderObj.taxFree) return returnObj;
   // log("total", totalAmount * zSettingsObj.salesTax);
@@ -155,7 +155,7 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
   let total = tax + Number(totalAmount);
   return {
     totalAmount: trimToTwoDecimals(total),
-    tax: trimToTwoDecimals(tax),
+    tax: trimToTwoDecimals(tax)
   };
 }
 
@@ -203,7 +203,7 @@ export const FileInputComponent = ({
   handleBinaryString,
   buttonStyle = {},
   textStyle = {},
-  text,
+  text
 }) => {
   const fileInputRef = useRef(null);
   const onDrop = useCallback((acceptedFiles) => {
@@ -239,7 +239,7 @@ export const FileInputComponent = ({
           alignItems: "center",
           justifyContent: "center",
           ...SHADOW_RADIUS_PROTO,
-          ...buttonStyle,
+          ...buttonStyle
         }}
       >
         <Text style={{ ...textStyle }}>{text || "Drag File / Click Here"}</Text>
@@ -260,7 +260,7 @@ export const FileInputComponent = ({
           width: 200,
           height: 30,
           backgroundColor: null,
-          ...buttonStyle,
+          ...buttonStyle
         }}
       >
         <input
@@ -321,6 +321,66 @@ export function searchCustomerNames(first, last, searchArr = [CUSTOMER_PROTO]) {
       res[customerObj.id] = customerObj;
   });
   return Object.values(res);
+}
+
+export function isChromiumBased() {
+  // Check for Chromium features and user agent
+  const ua = navigator.userAgent;
+  const isChromium =
+    // Chromium features
+    (!!window.chrome &&
+      // Not old Edge (EdgeHTML)
+      !window.StyleMedia &&
+      // Not Firefox
+      ua.indexOf("Firefox") === -1 &&
+      // Not Safari
+      ua.indexOf("Safari") === -1) ||
+    ua.indexOf("Chrome") !== -1;
+
+  return isChromium;
+}
+
+export function checkInternetConnection() {
+  // Attempt to fetch a lightweight, CORS-friendly resource (Google favicon)
+  const url = "https://www.google.com/favicon.ico?_=" + Date.now();
+
+  return fetch(url, { method: "HEAD", mode: "no-cors", cache: "no-cache" })
+    .then(() => true)
+    .catch(() => false);
+}
+
+export function getConnectionStrength() {
+  if ("connection" in navigator) {
+    const connection =
+      navigator.connection ||
+      navigator.mozConnection ||
+      navigator.webkitConnection;
+    const downlink = connection.downlink; // Mbps
+    const effectiveType = connection.effectiveType; // '4g', '3g', etc.
+
+    let strength;
+    if (downlink >= 10) {
+      strength = "Excellent";
+    } else if (downlink >= 5) {
+      strength = "Good";
+    } else if (downlink >= 2) {
+      strength = "Fair";
+    } else {
+      strength = "Poor";
+    }
+
+    return {
+      downlink,
+      effectiveType,
+      strength
+    };
+  } else {
+    return {
+      downlink: null,
+      effectiveType: "unknown",
+      strength: "Cannot determine (API not supported)"
+    };
+  }
 }
 
 export function getWordDayOfWeek(millies, abbreviated) {
@@ -456,7 +516,7 @@ export function applyDiscountToWorkorderItem(
     value: discountObj.value,
     newPrice: trimToTwoDecimals(newPrice),
     savings: trimToTwoDecimals(savings),
-    name: discountObj.name,
+    name: discountObj.name
   };
 }
 

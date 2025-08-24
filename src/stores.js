@@ -23,13 +23,18 @@ export const useLoginStore = create((set, get) => ({
     permissions: "owner",
     phone: "2393369177",
     pin: "33",
-    alternatePin: "jj"
+    alternatePin: "jj",
+    faceDescriptor: ""
   },
   modalVisible: false,
   lastActionMillis: 0,
   postLoginFunctionCallback: () => {},
   showLoginScreen: false,
 
+  // face login
+  runBackgroundRecognition: true,
+
+  getRunBackgroundRecognition: () => get().runBackgroundRecognition,
   getLoginFunctionCallback: () => get().loginFunctionCallback,
   getShowLoginScreen: () => get().showLoginScreen,
   getLastActionMillis: () => get().lastActionMillis,
@@ -37,6 +42,8 @@ export const useLoginStore = create((set, get) => ({
   getAdminPrivilege: () => get().adminPrivilege,
   getModalVisible: () => get().modalVisible,
 
+  setRunBackgroundRecognition: (runBackgroundRecognition) =>
+    set(() => ({ runBackgroundRecognition })),
   setModalVisible: (modalVisible) => set((state) => ({ modalVisible })),
   setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
   setCurrentUserObj: (currentUserObj) => {
@@ -125,7 +132,7 @@ export const useInvModalStore = create((set, get) => ({
 }));
 
 export const useTabNamesStore = create((set, get) => ({
-  itemsTabName: TAB_NAMES.itemsTab.dashboard,
+  itemsTabName: TAB_NAMES.itemsTab.empty,
   optionsTabName: TAB_NAMES.optionsTab.workorders,
   infoTabName: TAB_NAMES.infoTab.customer,
 
@@ -405,7 +412,7 @@ export const useWorkorderPreviewStore = create((set, get) => ({
 }));
 
 export const useSettingsStore = create((set, get) => ({
-  settings: {},
+  settings: null,
   getSettingsObj: () => get().settings,
   setSettingsObj: (obj) => set((state) => ({ settings: obj })),
   setSettingsItem: (key, val) =>

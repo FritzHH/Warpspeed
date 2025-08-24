@@ -43,6 +43,7 @@ import {
   useLoginStore
 } from "../stores";
 import { dbSearchForPhoneNumber } from "../db_call_wrapper";
+import { FaceDetectionComponent } from "../faceDetectionClient";
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
@@ -62,12 +63,11 @@ export function BaseScreen() {
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
   const zModalVisible = useLoginStore((state) => state.getModalVisible());
+  const zRunBackgroundRecognition = useLoginStore((state) =>
+    state.getRunBackgroundRecognition()
+  );
 
   // local state ////////////////////////////////////////////////////////////////////////
-  const [windowDimensions, setWindowDimensions] = useState({
-    screenWidth: window.innerWidth,
-    screenHeight: window.innerHeight
-  });
   const [screenWidth, _setScreenWidth] = useState(window.innerWidth);
   const [screenHeight, _setScreenHeight] = useState(window.innerHeight);
 
@@ -93,7 +93,10 @@ export function BaseScreen() {
     inventorySubscribe(_zModInventoryItem);
     settingsSubscribe(_zSetSettingsItem); // subscribe to changes only
     // have to do a one-off get due to only subscribing to changes in SETTINGS
-    getRealtimeNodeItem("SETTINGS").then((res) => _zSetSettingsObj(res));
+    getRealtimeNodeItem("SETTINGS").then((res) => {
+      // log(res);
+      _zSetSettingsObj(res);
+    });
   }, []);
 
   useEffect(() => {
@@ -121,19 +124,14 @@ export function BaseScreen() {
   return (
     <View
       style={{
-        // flex: 1,
         width: screenWidth,
         height: screenHeight,
         flexDirection: "row",
         justifyContent: "space-around",
         alignItems: "center"
-        // padding: 8,
-        // backgroundColor: "green",
-        // paddingVertical: 8,
-        // paddingHorizontal: 8,
       }}
     >
-      <div
+      {/* <div
         onKeyUp={() => {
           _zSetLastActionMillis();
         }}
@@ -141,7 +139,7 @@ export function BaseScreen() {
           _zSetLastActionMillis();
         }}
         style={{ width: "100%", height: 0 }}
-      />
+      /> */}
 
       <LoginScreenModalComponent
         modalVisible={zShowLoginScreen && !zModalVisible}
@@ -185,6 +183,9 @@ export function BaseScreen() {
               shadowRadius: 10
             }}
           >
+            {zRunBackgroundRecognition ? (
+              <FaceDetectionComponent runInBackground={false} />
+            ) : null}
             <Info_Section />
           </View>
           <View

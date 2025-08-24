@@ -1,35 +1,81 @@
 import React, { useRef, useEffect, useState } from "react";
 import { View, Button, Text } from "react-native";
 import * as faceapi from "face-api.js";
-import { log } from "./utils";
+import { clog, log } from "./utils";
+import { FACIAL_RECOGNITION_INTERVAL } from "./constants";
+import {
+  useLoginStore,
+  useOpenWorkordersStore,
+  useSettingsStore
+} from "./stores";
+import { SETTINGS_OBJ } from "./data";
+import { intersection } from "lodash";
+import { cloneDeep } from "lodash";
 // import {} from "./models";
 
 const MODEL_URL = "./models"; // Place models in public/models
 
-export default function FaceLogin() {
+export function FaceDetectionComponent({ runInBackground = true }) {
+  // store setters ////////////////////////////////////////////////////
+  const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
+
+  // store getters ///////////////////////////////////////////////////
+  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  //   const zRunBackgroundRecognition = useLoginStore((state) =>
+  //     state.getRunBackgroundRecognition()
+  //   );
+
+  /////////////////////////////////////////////////////////////////////////
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
   const [status, setStatus] = useState("Loading models...");
   const [enrolledDescriptor, setEnrolledDescriptor] = useState(null);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [backgroundStarted, _setBackgroundStarted] = useState(false);
+  const [setupComplete, setSetupComplete] = useState(false);
+
+  const SETUP_END_COUNT = 4;
+  useEffect(() => {
+    // log("running");
+    let setupCount = 0;
+    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL).then(() => {
+      setupCount++;
+      if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+      //   log("setup 1", setupCount);
+    });
+    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL).then(() => {
+      setupCount++;
+      if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+      //   log("setup 2", setupCount);
+    });
+    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL).then(() => {
+      setupCount++;
+      if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+      //   log("setup 3", setupCount);
+    });
+    startVideo().then(() => {
+      setupCount++;
+      if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+      //   log("setup 4", setupCount);
+    });
+  }, []);
 
   useEffect(() => {
-    (async () => {
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-      log("loaded models successfully");
-      setStatus("Loaded models");
-      await startVideo();
-    })();
+    if (!zSettingsObj || backgroundStarted) return;
+    if (runInBackground) startBackgroundRecognition(zSettingsObj);
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      log("closing interval");
+      //   if (intervalRef.current) clearInterval(intervalRef.current);
+      //   if (streamRef.current) {
+      // streamRef.current.getTracks().forEach((track) => track.stop());
+      //   }
     };
-  }, []);
+  }, [zSettingsObj]);
+
+  //////////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////////
 
   // Separate handler for metadata loaded event
   const handleLoadedMetadata = () => {
@@ -40,19 +86,53 @@ export default function FaceLogin() {
   };
 
   const startVideo = async () => {
+    if (videoRef?.current?.srcObject) return;
+    log("starting video stream");
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        log("video stream started");
         // DO NOT call play() here! Wait for onLoadedMetadata
       }
     }
   };
 
+  const startBackgroundRecognition = (settingsObj) => {
+    _setBackgroundStarted(true);
+    log("starting background recognition");
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(async () => {
+      const currentDesc = await getFaceDescriptor();
+      log("cur desc", currentDesc);
+      if (currentDesc) {
+        log("found descriptor");
+        let userObj = settingsObj.users.find((userObj) => {
+          const distance = faceapi.euclideanDistance(
+            userObj.faceDescriptor,
+            currentDesc
+          );
+          if (distance < 0.5) {
+            log("Face descriptor distance", distance);
+            // clog("Face Login!", userObj);
+            return true;
+          } else {
+            return false;
+          }
+        });
+        if (userObj) {
+          _zSetCurrentUserObj(userObj);
+          clog("Face Login!", userObj);
+        }
+      }
+    }, FACIAL_RECOGNITION_INTERVAL);
+  };
+
   const getFaceDescriptor = async () => {
     if (!videoRef.current) {
-      setStatus("no video ref");
+      log("No video ref in getFaceDescriptor()");
+      //   setStatus("No Video Playback Ref");
       return null;
     }
     const detection = await faceapi
@@ -62,7 +142,7 @@ export default function FaceLogin() {
     if (detection) {
       return detection.descriptor;
     } else {
-      setStatus("No detection");
+      log("No detection");
       return null;
     }
   };
@@ -71,6 +151,7 @@ export default function FaceLogin() {
     setStatus("Detecting face for enrollment...");
     const desc = await getFaceDescriptor();
     if (desc) {
+      log("desc", desc);
       setEnrolledDescriptor(desc);
       setStatus("Face enrolled! Now looking for you...");
       startBackgroundRecognition(desc);
@@ -79,60 +160,41 @@ export default function FaceLogin() {
     }
   };
 
-  const startBackgroundRecognition = (descriptor) => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(async () => {
-      if (loggedIn) return;
-      const currentDesc = await getFaceDescriptor();
-      if (currentDesc) {
-        const distance = faceapi.euclideanDistance(descriptor, currentDesc);
-        if (distance < 0.5) {
-          setStatus("Login successful!");
-          setLoggedIn(true);
-          clearInterval(intervalRef.current);
-        } else {
-          setStatus("Face detected, but does not match.");
-        }
-      } else {
-        setStatus("Looking for your face...");
-      }
-    }, 1000);
-  };
-
   return (
-    <View style={{ alignItems: "center", marginTop: 40 }}>
-      <Text style={{ margin: 12, fontSize: 18 }}>
-        Face Recognition Login (Web Demo)
-      </Text>
+    <View style={{}}>
       <video
         ref={videoRef}
-        width={320}
-        height={240}
+        width={runInBackground ? 0 : 320}
+        height={runInBackground ? 0 : 250}
         autoPlay
         muted
         onLoadedMetadata={handleLoadedMetadata}
-        style={{ borderWidth: 2, borderColor: "#888", margin: 8 }}
+        style={{}}
       />
-      <Button
-        title="Enroll Face"
-        onPress={handleEnroll}
-        disabled={!!enrolledDescriptor}
-      />
-      <Text style={{ margin: 12, color: "#007AFF", fontSize: 16 }}>
-        {status}
-      </Text>
-      {loggedIn && (
-        <Text
-          style={{
-            margin: 12,
-            color: "green",
-            fontSize: 20,
-            fontWeight: "bold"
-          }}
-        >
-          ✅ You are logged in!
-        </Text>
-      )}
+      {!runInBackground ? (
+        <View>
+          <Button
+            title="Enroll Face"
+            onPress={handleEnroll}
+            disabled={!!enrolledDescriptor}
+          />
+          <Text style={{ margin: 12, color: "#007AFF", fontSize: 16 }}>
+            {status}
+          </Text>
+          {loggedIn && (
+            <Text
+              style={{
+                margin: 12,
+                color: "green",
+                fontSize: 20,
+                fontWeight: "bold"
+              }}
+            >
+              ✅ You are logged in!
+            </Text>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }

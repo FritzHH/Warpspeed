@@ -1,1 +1,2 @@
 export const TAB_MENU_HEIGHT = 40;
+export const FACIAL_RECOGNITION_INTERVAL = 1000;

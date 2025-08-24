@@ -44,7 +44,10 @@ export function Options_Section({}) {
   useEffect(() => {
     // log("here");
     async function tick() {
-      let isOnline = await checkInternetConnection();
+      let isOnline = false;
+      try {
+        isOnline = await checkInternetConnection();
+      } catch (e) {}
       // log(isOnline.toString());
       _setIsOnline(isOnline);
     }

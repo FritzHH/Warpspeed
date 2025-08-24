@@ -8,11 +8,11 @@ import {
 } from "react-native-web";
 import { log } from "../../../utils";
 import { Button_, ScreenModal } from "../../../components";
-import { Items_Modal_DashboardAdmin } from "../Items_Screen/Items_Modal_DashboardAdmin";
+import { Items_Modal_DashboardAdmin } from "./dashboard_screen/Dashboard_Admin";
 import { useState } from "react";
 import { APP_USER, SETTINGS_OBJ } from "../../../data";
 import { useAppCurrentUserStore, useSettingsStore } from "../../../stores";
-import FaceLogin from "../../../faceDetectionClient";
+// import FaceLogin from "../../../faceDetectionClient";
 
 export function Items_Dashboard({}) {
   // setters
@@ -31,7 +31,7 @@ export function Items_Dashboard({}) {
   return (
     <View style={{ width: "100%", height: "100%", paddingTop: 40 }}>
       {/* <Button_ text={"Face Recog."} onPress={go} /> */}
-      <FaceLogin />
+      {/* <FaceLogin /> */}
     </View>
   );
 }

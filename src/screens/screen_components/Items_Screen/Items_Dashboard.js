@@ -4,14 +4,14 @@ import {
   Text,
   TextInput,
   FlatList,
-  TouchableOpacity
+  TouchableOpacity,
 } from "react-native-web";
 import { log } from "../../../utils";
 import { Button_, ScreenModal } from "../../../components";
 import { Items_Modal_DashboardAdmin } from "./dashboard_screen/Dashboard_Admin";
 import { useState } from "react";
 import { APP_USER, SETTINGS_OBJ } from "../../../data";
-import { useAppCurrentUserStore, useSettingsStore } from "../../../stores";
+import { useLoginStore, useSettingsStore } from "../../../stores";
 // import FaceLogin from "../../../faceDetectionClient";
 
 export function Items_Dashboard({}) {
@@ -21,7 +21,7 @@ export function Items_Dashboard({}) {
   let zSettingsObj = SETTINGS_OBJ;
   let zUserObj = APP_USER;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  zUserObj = useAppCurrentUserStore((state) => state.getCurrentUserObj());
+  zUserObj = useLoginStore((state) => state.getCurrentUserObj());
 
   //////////////////////////////////////////////////////////////
   const [sShowAdminModal, _setShowAdminModal] = useState(false);

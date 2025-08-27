@@ -12,7 +12,7 @@ import {
   NUMS,
   removeDashesFromPhone,
   searchCustomerNames,
-  searchPhoneNum
+  searchPhoneNum,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -21,31 +21,30 @@ import {
   SHADOW_RADIUS_PROTO,
   LoginScreenModalComponent,
   ColorSelectorModalComponent,
-  Button_
+  Button_,
 } from "../../../components";
 import {
   CUSTOMER_PROTO,
   FOCUS_NAMES,
   TAB_NAMES,
-  WORKORDER_PROTO
+  WORKORDER_PROTO,
 } from "../../../data";
 import React, { useEffect, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
-  useAppCurrentUserStore,
   useCustomerPreviewStore,
   useCustomerSearchStore,
   useTabNamesStore,
   useOpenWorkordersStore,
   useCustMessagesStore,
-  useLoginStore
+  useLoginStore,
 } from "../../../stores";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
   dbSearchForName,
-  dbSearchForPhoneNumber
+  dbSearchForPhoneNumber,
 } from "../../../db_call_wrapper";
 export function NewWorkorderComponent({}) {
   // store setters ////////////////////////////////////////////////////////////////
@@ -281,7 +280,7 @@ export function NewWorkorderComponent({}) {
           height: "100%",
           justifyContent: "flex-end",
           alignItems: "center",
-          paddingBottom: 20
+          paddingBottom: 20,
         }}
       >
         {/* <View
@@ -350,7 +349,7 @@ export function NewWorkorderComponent({}) {
               outlineStyle: "none",
               borderColor: "gray",
               fontSize: 16,
-              color: sBox1Val.length < 0 ? "gray" : "dimgray"
+              color: sBox1Val.length < 0 ? "gray" : "dimgray",
             }}
             autoFocus={true}
             placeholder={sSearchingByName ? "First Name" : "Phone number"}
@@ -371,7 +370,7 @@ export function NewWorkorderComponent({}) {
                 width: 200,
                 height: 40,
                 outlineStyle: "none",
-                borderColor: "gray"
+                borderColor: "gray",
               }}
               value={sBox2Val}
               onChangeText={(val) => handleBox2TextChange(val)}
@@ -393,28 +392,16 @@ export function NewWorkorderComponent({}) {
               paddingHorizontal: 25,
               paddingVertical: 5,
               marginTop: 20,
-              width: 220
+              width: 220,
             }}
           />
         </View>
         <View style={{ height: "45%" }} />
         {/** customer info modal */}
-        {/* </View> */}
         <Button_
-          text={"New Sale"}
-          onPress={() => {
-            handleStartStandaloneSalePress();
-          }}
-          icon={ICONS.cashBag}
-          iconSize={35}
-          colorGradientArr={COLOR_GRADIENTS.green}
-          buttonStyle={{
-            paddingHorizontal: 25,
-            paddingVertical: 5,
-            width: 220,
-            borderRadius: 20
-          }}
-          textStyle={{ marginLeft: 15, fontSize: 20 }}
+          onPress={handleStartStandaloneSalePress}
+          icon={ICONS.cashRegister}
+          iconSize={100}
         />
         <ScreenModal
           showOuterModal={true}
@@ -423,7 +410,7 @@ export function NewWorkorderComponent({}) {
             height: 50,
             marginVertical: 10,
             marginTop: 50,
-            width: null
+            width: null,
           }}
           buttonVisible={sShowCreateCustomerButton}
           buttonTextStyle={{ color: "dimgray" }}

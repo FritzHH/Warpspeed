@@ -27,7 +27,7 @@ export const Colors = {
   darkText: "rgb(20, 20, 20)",
   lightText: "rgb(60, 60, 60)",
   lightTextOnMainBackground: "rgb(170, 210, 200)",
-  darkTextOnMainBackground: "rgb(30, 30, 30)"
+  darkTextOnMainBackground: "rgb(30, 30, 30)",
 };
 
 export const APP_BASE_COLORS = {
@@ -47,27 +47,27 @@ export const APP_BASE_COLORS = {
   buttonLightGreenOutline: "rgb(200, 228, 220)",
 
   textMain: "rgb(45, 55, 72)",
-  textWhite: "rgb(255, 255, 255)"
+  textWhite: "rgb(255, 255, 255)",
 };
 
 export const COLOR_GRADIENTS = {
   green: ["rgb(71,185,119)", APP_BASE_COLORS.green],
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
-  blue: [lightenRGBByPercent(APP_BASE_COLORS.blue, 20), APP_BASE_COLORS.blue]
+  blue: [lightenRGBByPercent(APP_BASE_COLORS.blue, 20), APP_BASE_COLORS.blue],
 };
 
 export const COLOR_GRADIENT_PROFILES = {
   standard: {
     start: { x: 0, y: 0 },
-    end: { x: 1, y: 0 }
-  }
+    end: { x: 1, y: 0 },
+  },
 };
 
 export const BUTTON_VARS = {
   radius: {
     rounded: 15,
-    squared: 8
-  }
+    squared: 8,
+  },
 };
 
 const ASSETS_PATH = "./assets/";
@@ -76,6 +76,8 @@ export const ICONS = {
   upArrowOrange: require(ASSETS_PATH + "up_arrow_orange.png"),
   editPencil: require(ASSETS_PATH + "edit_pencil.png"),
   close1: require(ASSETS_PATH + "close1.png"),
+  check1: require(ASSETS_PATH + "check1.png"),
+  check: require(ASSETS_PATH + "check.png"),
   shoppingCart: require(ASSETS_PATH + "shopping_cart.png"),
   new: require(ASSETS_PATH + "new.png"),
   add: require(ASSETS_PATH + "add.png"),
@@ -98,11 +100,14 @@ export const ICONS = {
   infoSquare: require(ASSETS_PATH + "info-square.png"),
   settings: require(ASSETS_PATH + "settings.png"),
   infoGear: require(ASSETS_PATH + "info-gear.png"),
-  // internetOfflineGIF: require(ASSETS_PATH + "internetOfflineGIF.gif")
   internetOnlineGIF: require(ASSETS_PATH + "internetOnlineGIF.gif"),
-  internetOfflineGIF: require(ASSETS_PATH + "internedDisconnectedGIF.gif")
-  // internetOfflineGIF: require(ASSETS_PATH+'internetOfflineGIF')"),
-  // internetOffline: require(ASSETS_PATH + "internetOffline")
+  internetOfflineGIF: require(ASSETS_PATH + "internedDisconnectedGIF.gif"),
+  approvedButton: require(ASSETS_PATH + "approvedButton.png"),
+  acceptButton: require(ASSETS_PATH + "acceptButton.png"),
+  cancelButton: require(ASSETS_PATH + "cancelButton.png"),
+  moneySack: require(ASSETS_PATH + "moneySack.png"),
+  cashRegister: require(ASSETS_PATH + "cashRegister.png"),
+  camera: require(ASSETS_PATH + "camera.png"),
 };
 
 // rgb(64, 174, 113)
@@ -111,9 +116,9 @@ export const Fonts = {
   weight: {
     textRegular: "400",
     textHeavy: "600",
-    textSuperheavy: "800"
+    textSuperheavy: "800",
   },
-  style: {}
+  style: {},
 };
 
 export const ViewStyles = {
@@ -121,13 +126,13 @@ export const ViewStyles = {
     width: dim.windowWidth,
     height: dim.windowHeight * 1,
     backgroundColor: Colors.mainBackground,
-    padding: 5
-  }
+    padding: 5,
+  },
 };
 
 export const ButtonStyles = {
   darkSquare: {
     backgroundColor: Colors.buttonDarkBackground,
-    fontColor: Colors.buttonDarkFont
-  }
+    fontColor: Colors.buttonDarkFont,
+  },
 };

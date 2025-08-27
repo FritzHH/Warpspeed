@@ -7,7 +7,7 @@ import {
   Button,
   CustomerInfoScreenModalComponent,
   ScreenModal,
-  SHADOW_RADIUS_PROTO
+  SHADOW_RADIUS_PROTO,
 } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
@@ -16,16 +16,15 @@ import {
   SETTINGS_OBJ,
   TAB_NAMES,
   WORKORDER_PROTO,
-  WORKORDER_STATUS_NAMES
+  WORKORDER_STATUS_NAMES,
 } from "../../../data";
 import {
-  useAppCurrentUserStore,
   useCurrentCustomerStore,
   useCustMessagesStore,
   useCustomerSearchStore,
   useLoginStore,
   useOpenWorkordersStore,
-  useTabNamesStore
+  useTabNamesStore,
 } from "../../../stores";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { dbGetCustomerObj } from "../../../db_call_wrapper";
@@ -55,9 +54,7 @@ export function CustomerSearchListComponent({}) {
   const zSearchResultsArr = useCustomerSearchStore((state) =>
     state.getSearchResultsArr()
   );
-  const zCurrentUser = useAppCurrentUserStore((state) =>
-    state.getCurrentUserObj()
-  );
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUserObj());
 
   ////////////////////////////////////////////////////////////////////////////////////////
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
@@ -104,7 +101,7 @@ export function CustomerSearchListComponent({}) {
         justifyContent: "center",
         // height: "100%",
         // backgroundColor: "green",
-        justifySelf: "center"
+        justifySelf: "center",
       }}
     >
       <FlatList
@@ -128,7 +125,7 @@ export function CustomerSearchListComponent({}) {
                 alignItems: "center",
                 width: "100%",
                 justifyContent: "space-between",
-                paddingHorizontal: 10
+                paddingHorizontal: 10,
               }}
             >
               <TouchableOpacity
@@ -143,7 +140,7 @@ export function CustomerSearchListComponent({}) {
                 showOuterModal={true}
                 outerModalStyle={{}}
                 buttonStyle={{
-                  backgroundColor: "lightgray"
+                  backgroundColor: "lightgray",
                 }}
                 buttonVisible={true}
                 buttonTextStyle={{ fontSize: 13, color: "black" }}

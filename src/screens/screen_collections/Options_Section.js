@@ -1,20 +1,20 @@
 /* eslint-disable */
 
-import { View } from "react-native-web";
+import { Text, View } from "react-native-web";
 import {
   checkInternetConnection,
   dim,
   generateRandomID,
   log,
-  trimToTwoDecimals
+  trimToTwoDecimals,
 } from "../../utils";
 import {
   HorzSpacer,
   TabMenuButton,
   TabMenuDivider as Divider,
-  Image_
+  Image_,
 } from "../../components";
-import { Colors, ICONS } from "../../styles";
+import { APP_BASE_COLORS, Colors, ICONS } from "../../styles";
 import { WORKORDER_PROTO, TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import React, { useEffect, useRef, useState } from "react";
@@ -26,15 +26,17 @@ import { MessagesComponent } from "../screen_components/Options_Screen/Options_M
 import { useTabNamesStore, useLoginStore } from "../../stores";
 
 export function Options_Section({}) {
-  // store setters
+  // store setters ///////////////////////////////////////////////////////////
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
 
-  // store getters
+  // store getters ///////////////////////////////////////////////////////////////
   const zOptionsTabName = useTabNamesStore((state) =>
     state.getOptionsTabName()
   );
+  const zUserObj = useLoginStore((state) => state.getCurrentUserObj());
+  const zWebcamDetected = useLoginStore((state) => state.getWebcamDetected());
 
   /////////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
@@ -74,10 +76,12 @@ export function Options_Section({}) {
   return (
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
       <TabBar
+        userObj={zUserObj}
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}
         // __tabMenuHeight={}
         __isOnline={sIsOnline}
+        webcamDetected={zWebcamDetected}
       />
       {ScreenComponent()}
     </View>
@@ -88,9 +92,11 @@ export function Options_Section({}) {
 }
 
 export const TabBar = ({
+  userObj,
+  webcamDetected,
   __isOnline,
   zOptionsTabName,
-  _zSetOptionsTabName
+  _zSetOptionsTabName,
 }) => (
   <View
     style={{
@@ -98,7 +104,7 @@ export const TabBar = ({
       width: "100%",
       // width: "100%",
       justifyContent: "space-between",
-      paddingRight: 5
+      paddingRight: 5,
     }}
   >
     <View style={{ flexDirection: "row", justifyContent: "flex-start" }}>
@@ -129,8 +135,19 @@ export const TabBar = ({
         }
       />
     </View>
-    <Image_
-      icon={__isOnline ? ICONS.internetOnlineGIF : ICONS.internetOfflineGIF}
-    />
+    <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <Text style={{ color: APP_BASE_COLORS.textMain }}>
+        {userObj.first + " " + userObj.last[0] + "."}
+      </Text>
+      <View style={{ width: 8 }} />
+      <Image_
+        style={{ width: 23, height: 23 }}
+        icon={webcamDetected ? ICONS.camera : null}
+      />
+      <View style={{ width: 8 }} />
+      <Image_
+        icon={__isOnline ? ICONS.internetOnlineGIF : ICONS.internetOfflineGIF}
+      />{" "}
+    </View>
   </View>
 );

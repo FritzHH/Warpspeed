@@ -7,7 +7,7 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
   useStripePaymentStore,
-  useTabNamesStore
+  useTabNamesStore,
 } from "../../../stores";
 import * as XLSX from "xlsx";
 
@@ -21,7 +21,8 @@ import {
   LoadingIndicator,
   PaymentComponent,
   ScreenModal,
-  SHADOW_RADIUS_PROTO
+  SHADOW_RADIUS_PROTO,
+  Button_,
 } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
@@ -29,14 +30,14 @@ import {
   clog,
   generateRandomID,
   log,
-  trimToTwoDecimals
+  trimToTwoDecimals,
 } from "../../../utils";
 import { useEffect, useState } from "react";
-import { Colors } from "../../../styles";
+import { Colors, ICONS } from "../../../styles";
 import { sendFCMMessage } from "../../../db";
 import {
   dbProcessServerDrivenStripePayment,
-  dbRetrieveAvailableStripeReaders
+  dbRetrieveAvailableStripeReaders,
 } from "../../../db_call_wrapper";
 
 export const CheckoutComponent = ({}) => {
@@ -84,7 +85,7 @@ export const CheckoutComponent = ({}) => {
   const [sTotalsObj, _sSetTotalsObj] = useState({
     runningQty: "0.00",
     runningTotal: "0.00",
-    runningDiscount: "0.00"
+    runningDiscount: "0.00",
   });
   const [sTotalAmountCaptured, _setTotalAmountCaptured] = useState(0);
   const [sPaymentComplete, _setPaymentComplete] = useState(false);
@@ -98,7 +99,7 @@ export const CheckoutComponent = ({}) => {
     expMonth: "",
     expYear: "",
     issuer: "",
-    transactionNum: ""
+    transactionNum: "",
   });
   const [sRefundScan, _sSetRefundScan] = useState("");
 
@@ -234,7 +235,7 @@ export const CheckoutComponent = ({}) => {
           width: "100%",
           height: "100%",
           justifyContent: "flex-start",
-          alignItems: "center"
+          alignItems: "center",
           // backgroundColor: "green",
         }}
       >
@@ -280,7 +281,7 @@ export const CheckoutComponent = ({}) => {
             height: 50,
             alignItems: "center",
             marginTop: "1%",
-            paddingHorizontal: 8
+            paddingHorizontal: 8,
           }}
         >
           <View
@@ -288,7 +289,7 @@ export const CheckoutComponent = ({}) => {
               width: "70%",
               flexDirection: "row",
               justifyContent: "flex-start",
-              alignItems: "center"
+              alignItems: "center",
             }}
           >
             <CheckBox_
@@ -309,7 +310,7 @@ export const CheckoutComponent = ({}) => {
                   paddingHorizontal: 3,
                   height: 30,
                   marginLeft: 10,
-                  width: "70%"
+                  width: "70%",
                 }}
                 autoFocus={true}
                 placeholder="Scan or enter workorder #"
@@ -330,14 +331,14 @@ export const CheckoutComponent = ({}) => {
         </View>
         <View
           style={{
-            width: "100%"
+            width: "100%",
           }}
         >
           <View
             style={{
               width: "100%",
               flexDirection: "row",
-              justifyContent: "space-evenly"
+              justifyContent: "space-evenly",
             }}
           >
             <Button
@@ -346,7 +347,7 @@ export const CheckoutComponent = ({}) => {
                 width: 150,
                 height: 40,
                 backgroundColor: Colors.tabMenuButton,
-                borderRadius: 0
+                borderRadius: 0,
               }}
               visible={!sPaymentComplete}
               text={"Cash / Check"}
@@ -358,7 +359,7 @@ export const CheckoutComponent = ({}) => {
                 width: 150,
                 height: 40,
                 backgroundColor: Colors.tabMenuButton,
-                borderRadius: 0
+                borderRadius: 0,
               }}
               visible={!sPaymentComplete}
               text={"Card"}
@@ -369,7 +370,7 @@ export const CheckoutComponent = ({}) => {
         <View
           style={{
             marginTop: 10,
-            width: "100%"
+            width: "100%",
             // height: 20,
           }}
         >
@@ -377,7 +378,7 @@ export const CheckoutComponent = ({}) => {
             style={{
               flexDirection: "row",
               justifyContent: "space-around",
-              alignItems: "center"
+              alignItems: "center",
             }}
           >
             {sTotalAmountCaptured == zTotalAmount ? (
@@ -399,7 +400,7 @@ export const CheckoutComponent = ({}) => {
                   style={{
                     flexDirection: "row",
                     justifyContent: "center",
-                    marginVertical: 10
+                    marginVertical: 10,
                   }}
                 >
                   <Text style={{ fontSize: 20, fontWeight: 500 }}>
@@ -410,7 +411,7 @@ export const CheckoutComponent = ({}) => {
                       fontSize: 20,
                       marginLeft: 10,
                       color: "red",
-                      fontWeight: 500
+                      fontWeight: 500,
                     }}
                   >
                     {trimToTwoDecimals(zTotalAmount - sTotalAmountCaptured)}
@@ -426,7 +427,7 @@ export const CheckoutComponent = ({}) => {
                 flexDirection: "row",
                 width: "100%",
                 justifyContent: "space-around",
-                marginTop: 10
+                marginTop: 10,
               }}
             >
               <Button
@@ -435,7 +436,7 @@ export const CheckoutComponent = ({}) => {
                   width: 100,
                   height: 20,
                   backgroundColor: "gray",
-                  borderRadius: 0
+                  borderRadius: 0,
                 }}
                 shadow={true}
                 text={"Email"}
@@ -448,7 +449,7 @@ export const CheckoutComponent = ({}) => {
                   height: 20,
                   backgroundColor: "gray",
                   borderRadius: 0,
-                  padding: 5
+                  padding: 5,
                 }}
                 shadow={true}
                 text={"Print"}
@@ -460,7 +461,7 @@ export const CheckoutComponent = ({}) => {
                   width: 100,
                   height: 20,
                   backgroundColor: "gray",
-                  borderRadius: 0
+                  borderRadius: 0,
                 }}
                 text={"Text"}
                 onPress={() => {}}
@@ -473,7 +474,7 @@ export const CheckoutComponent = ({}) => {
                 width: "100%",
                 flexDirection: "row",
                 alignItems: "center",
-                justifyContent: "center"
+                justifyContent: "center",
               }}
             >
               <Text style={{ fontSize: 20, marginRight: 10, color: "" }}>
@@ -489,7 +490,7 @@ export const CheckoutComponent = ({}) => {
           style={{
             height: "80%",
             backgroundColor: null,
-            width: "100%"
+            width: "100%",
             // flexDirection: "row",
           }}
         >
@@ -502,7 +503,7 @@ export const CheckoutComponent = ({}) => {
                 <View
                   style={{
                     width: "100%",
-                    flexDirection: "row"
+                    flexDirection: "row",
                   }}
                 >
                   <View style={{ width: "95%" }}>
@@ -516,7 +517,7 @@ export const CheckoutComponent = ({}) => {
                       style={{
                         width: "90%",
                         flexDirection: "row",
-                        justifyContent: "space-between"
+                        justifyContent: "space-between",
                       }}
                     >
                       <Text style={{ marginRight: 10, fontWeight: "bold" }}>
@@ -538,7 +539,7 @@ export const CheckoutComponent = ({}) => {
                       width: "5%",
                       justifyContent: "center",
                       height: "100%",
-                      alignItems: "center"
+                      alignItems: "center",
                       // backgroundColor: "green",
                     }}
                   >
@@ -556,29 +557,14 @@ export const CheckoutComponent = ({}) => {
             style={{
               width: "100%",
               flexDirection: "row",
-              justifyContent: "space-around"
+              justifyContent: "space-around",
             }}
           >
-            <Button
-              textStyle={{ color: "white" }}
-              buttonStyle={{
-                backgroundColor: Colors.tabMenuButton,
-                height: 35,
-                width: 150
-              }}
-              text={"Exit Checkout"}
+            <Button_
+              icon={ICONS.close1}
+              iconSize={60}
               onPress={actionButtonPressed}
             />
-            {/* <Button
-          textStyle={{ color: "white" }}
-          buttonStyle={{
-            backgroundColor: Colors.tabMenuButton,
-            height: 35,
-            width: 150,
-          }}
-          text={!zWorkorderObj?.isStandaloneSale ? "New Sale" : "Cancel Sale"}
-          onPress={actionButtonPressed}
-        /> */}
           </View>
         </View>
         {/* ) : null} */}

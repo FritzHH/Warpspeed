@@ -16,8 +16,9 @@ var twilioClient;
 
 admin.initializeApp({
   credential: admin.credential.cert(creds),
-  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com/"
+  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com/",
 });
+
 const RDB = admin.database();
 const DB = getFirestore();
 const stripeSecretKey = defineSecret("stripeSecretKey");
@@ -46,7 +47,7 @@ const SMS_PROTO = {
   message: "",
   customerID: "",
   read: false,
-  id: ""
+  id: "",
 };
 
 const CLOSED_THREAD_RESPONSE =
@@ -95,7 +96,7 @@ exports.readFTPFile = onRequest(
         host: "ftp.jbi.bike",
         user: "121080",
         password: "g3QX&bn5",
-        secure: false // Set to true if using FTPS
+        secure: false, // Set to true if using FTPS
       });
 
       // List files in the root directory
@@ -154,7 +155,7 @@ exports.processServerDrivenStripePayment = onRequest(
           amount: Math.round(Number(req.body.amount) * 100),
           payment_method_types: ["card_present", "card", "link"],
           capture_method: req.body.captureMethod || "automatic",
-          currency: "usd"
+          currency: "usd",
         });
         paymentIntentID = paymentIntent.id;
         log(
@@ -175,7 +176,7 @@ exports.processServerDrivenStripePayment = onRequest(
           readerResult = await stripe.terminal.readers.processPaymentIntent(
             req.body.readerID,
             {
-              payment_intent: paymentIntentID
+              payment_intent: paymentIntentID,
             }
           );
           log("Stripe server-driven payment process complete!", readerResult);
@@ -185,7 +186,7 @@ exports.processServerDrivenStripePayment = onRequest(
           }
           return sendSuccessfulResult(res, {
             readerResult,
-            paymentIntentID
+            paymentIntentID,
           });
         } catch (error) {
           log("Stripe server-driven payment process ERROR ERROR ERROR!", error);
@@ -227,7 +228,7 @@ exports.refundStripePayment = onRequest(
     log("Incoming refund Stripe payment", req.body);
     const refund = await stripe.refunds.create({
       payment_intent: req.body.paymentIntentID,
-      amount: req.body.amount
+      amount: req.body.amount,
     });
     sendSuccessfulResult(res, readerResult);
   }
@@ -238,7 +239,7 @@ exports.getAvailableStripeReaders = onRequest(
   async (req, res) => {
     log("Incoming get available Stripe readers body", req.body);
     const readers = await stripe.terminal.readers.list({
-      limit: 3
+      limit: 3,
     });
     log("available Stripe readers", readers);
     sendSuccessfulResult(res, readers);
@@ -291,7 +292,7 @@ const sendTwilioMessage = (messageObj) => {
     .create({
       body: messageObj.message,
       to: "+1" + messageObj.phoneNumber,
-      from: "+12393171234"
+      from: "+12393171234",
     })
     .then((res) => {
       log("It appears that sending SMS is complete", res);
@@ -382,7 +383,7 @@ exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
     message: incomingMessage,
     customerID: customerObj.id,
     id: body.SmsSid,
-    type: "incoming"
+    type: "incoming",
   };
 
   let dbRef = RDB.ref("INCOMING_MESSAGES/" + customerObj.id);

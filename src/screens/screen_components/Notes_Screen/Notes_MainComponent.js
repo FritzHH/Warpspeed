@@ -3,10 +3,8 @@
 import {
   View,
   Text,
-  Pressable,
   TextInput,
   FlatList,
-  TouchableOpacity,
   TouchableWithoutFeedback,
 } from "react-native-web";
 import {
@@ -16,25 +14,11 @@ import {
   log,
   trimToTwoDecimals,
 } from "../../../utils";
-import {
-  HorzSpacer,
-  TabMenuButton,
-  TabMenuDivider as Divider,
-  ModalDropdown,
-  TextInputOnMainBackground,
-  TextInputLabelOnMainBackground,
-  Image_,
-  SHADOW_RADIUS_PROTO,
-} from "../../../components";
+import { Image_ } from "../../../components";
 import { APP_BASE_COLORS, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
-import {
-  useAppCurrentUserStore,
-  useOpenWorkordersStore,
-  useLoginStore,
-} from "../../../stores";
-import { WORKORDER_PROTO } from "../../../data";
+import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
 import { dbSetOpenWorkorderItem } from "../../../db_call_wrapper";
 
 /// Notes Tab Component

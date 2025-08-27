@@ -5,10 +5,10 @@ import {
   View,
   Text,
   FlatList,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
 } from "react-native-web";
 import { Button } from "react-native-web";
-import { APP_BASE_COLORS, Colors, ViewStyles } from "../styles";
+import { APP_BASE_COLORS, Colors, ICONS, ViewStyles } from "../styles";
 
 import {
   clog,
@@ -18,9 +18,13 @@ import {
   generateRandomID,
   log,
   searchPhoneNum,
-  useInterval
+  useInterval,
 } from "../utils";
-import { LoginScreenModalComponent, SHADOW_RADIUS_PROTO } from "../components";
+import {
+  AlertBox_,
+  LoginScreenModalComponent,
+  SHADOW_RADIUS_PROTO,
+} from "../components";
 import { Info_Section } from "./screen_collections/Info_Section";
 import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
@@ -31,7 +35,7 @@ import {
   customerPreviewListSubscribe,
   inventorySubscribe,
   openWorkordersSubscribe,
-  settingsSubscribe
+  settingsSubscribe,
 } from "../db_subscription_wrapper";
 import {
   useCustomerPreviewStore,
@@ -39,8 +43,7 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
   useActionStore,
-  useAppCurrentUserStore,
-  useLoginStore
+  useLoginStore,
 } from "../stores";
 import { dbSearchForPhoneNumber } from "../db_call_wrapper";
 import { FaceDetectionComponent } from "../faceDetectionClient";
@@ -128,10 +131,10 @@ export function BaseScreen() {
         height: screenHeight,
         flexDirection: "row",
         justifyContent: "space-around",
-        alignItems: "center"
+        alignItems: "center",
       }}
     >
-      {/* <div
+      <div
         onKeyUp={() => {
           _zSetLastActionMillis();
         }}
@@ -139,20 +142,18 @@ export function BaseScreen() {
           _zSetLastActionMillis();
         }}
         style={{ width: "100%", height: 0 }}
-      /> */}
+      />
 
       <LoginScreenModalComponent
         modalVisible={zShowLoginScreen && !zModalVisible}
       />
       <View
         style={{
-          // marginVertical: 8,
           width: "65%",
           backgroundColor: APP_BASE_COLORS.backgroundWhite,
           height: "100%",
           paddingRight: 8,
-          justifyContent: "space-around"
-          // marginRight: 5,
+          justifyContent: "space-around",
         }}
       >
         <View
@@ -160,8 +161,7 @@ export function BaseScreen() {
             width: "100%",
             height: "64%",
             flexDirection: "row",
-            justifyContent: "space-around"
-            // marginRight: 0,
+            justifyContent: "space-around",
           }}
         >
           {/*Info Section */}
@@ -173,19 +173,19 @@ export function BaseScreen() {
               borderColor: APP_BASE_COLORS.buttonLightGreen,
               borderWidth: 1,
               borderRadius: 15,
-              // backgroundColor: "red",
               shadowColor: APP_BASE_COLORS.green,
               shadowOffset: {
                 width: 1,
-                height: 1
+                height: 1,
               },
               shadowOpacity: 0.5,
-              shadowRadius: 10
+              shadowRadius: 10,
             }}
           >
             {zRunBackgroundRecognition ? (
-              <FaceDetectionComponent runInBackground={false} />
+              <FaceDetectionComponent runInBackground={true} />
             ) : null}
+            <AlertBox_ iconBtn1={ICONS.check1} iconBtn2={ICONS.close1} />
             <Info_Section />
           </View>
           <View
@@ -200,10 +200,10 @@ export function BaseScreen() {
               shadowColor: APP_BASE_COLORS.green,
               shadowOffset: {
                 width: 1,
-                height: 1
+                height: 1,
               },
               shadowOpacity: 0.5,
-              shadowRadius: 10
+              shadowRadius: 10,
             }}
           >
             <Items_Section />
@@ -222,10 +222,10 @@ export function BaseScreen() {
             shadowColor: APP_BASE_COLORS.green,
             shadowOffset: {
               width: 1,
-              height: 1
+              height: 1,
             },
             shadowOpacity: 0.5,
-            shadowRadius: 10
+            shadowRadius: 10,
           }}
         >
           <Notes_Section />
@@ -244,10 +244,10 @@ export function BaseScreen() {
           shadowColor: APP_BASE_COLORS.green,
           shadowOffset: {
             width: 0,
-            height: 1
+            height: 1,
           },
           shadowOpacity: 0.5,
-          shadowRadius: 10
+          shadowRadius: 10,
         }}
       >
         <Options_Section />

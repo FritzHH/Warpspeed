@@ -4,7 +4,7 @@
 export const SHADOW_RADIUS_NOTHING = {
   shadowOffset: { width: 0, height: 0 },
   shadowRadius: 0,
-  shadowColor: "transparent"
+  shadowColor: "transparent",
 };
 
 export const COLORS = [
@@ -12,31 +12,31 @@ export const COLORS = [
     textColor: "black",
     altTextColor: "dimgray",
     backgroundColor: "whitesmoke",
-    label: "White"
+    label: "White",
   },
   {
     textColor: "white",
     altTextColor: "gray",
     backgroundColor: "blue",
-    label: "Blue"
+    label: "Blue",
   },
   {
     textColor: "black",
     altTextColor: "gray",
     backgroundColor: "lightblue",
-    label: "Light-blue"
+    label: "Light-blue",
   },
   {
     textColor: "white",
     altTextColor: "gray",
     backgroundColor: "red",
-    label: "Red"
+    label: "Red",
   },
   {
     textColor: "white",
     altTextColor: "lightgray",
     backgroundColor: "green",
-    label: "Green"
+    label: "Green",
   },
 
   {
@@ -44,69 +44,69 @@ export const COLORS = [
     backgroundColor: "black",
     altTextColor: "lightgray",
 
-    label: "Black"
+    label: "Black",
   },
   {
     textColor: "black",
     altTextColor: "gray",
     backgroundColor: "yellow",
-    label: "Yellow"
+    label: "Yellow",
   },
   {
     textColor: "white",
     altTextColor: "dimgray",
     backgroundColor: "orange",
-    label: "Orange"
+    label: "Orange",
   },
   {
     textColor: "white",
     altTextColor: "lightgray",
     backgroundColor: "maroon",
-    label: "Maroon"
+    label: "Maroon",
   },
   {
     textColor: "white",
     altTextColor: "lightgray",
     backgroundColor: "rgb(139,69,19)",
-    label: "Brown"
+    label: "Brown",
   },
   {
     textColor: "black",
     altTextColor: "dimgray",
     backgroundColor: "rgb(192,192,192)",
-    label: "Silver"
+    label: "Silver",
   },
   {
     textColor: "black",
     altTextColor: "gray",
     backgroundColor: "tan",
-    label: "Tan"
+    label: "Tan",
   },
   {
     textColor: "black",
     altTextColor: "gray",
     backgroundColor: "beige",
-    label: "Beige"
+    label: "Beige",
   },
   {
     textColor: "white",
     altTextColor: "dimgray",
     backgroundColor: "darkgray",
-    label: "Gray"
+    label: "Gray",
   },
   {
     textColor: "black",
     altTextColor: "dimgray",
 
     backgroundColor: "lightgray",
-    label: "Light-gray"
+    label: "Light-gray",
   },
   {
     textColor: "black",
     altTextColor: "dimgray",
     backgroundColor: "pink",
-    label: "Pink"
-  }
+    label: "Pink",
+  },
 ];
 
 export const NONREMOVABLE_STATUSES = [
@@ -115,42 +115,42 @@ export const NONREMOVABLE_STATUSES = [
     textColor: "white",
     altTextColor: "black",
     backgroundColor: "red",
-    removable: false
+    removable: false,
   },
   {
     altTextColor: "dimgray",
     textColor: "black",
     backgroundColor: "rgb(192,192,192)",
     label: "Service",
-    removable: false
+    removable: false,
   },
   {
     altTextColor: "black",
     textColor: "white",
     backgroundColor: "green",
     label: "Finished",
-    removable: false
-  }
+    removable: false,
+  },
 ];
 
 export const WAIT_TIME_INCREMENTS = {
   day: "Days",
-  week: "Weeks"
+  week: "Weeks",
 };
 
 export const NONREMOVABLE_WAIT_TIMES = [
   {
     label: "Waiting",
-    maxWaitTimeDays: 0
+    maxWaitTimeDays: 0,
   },
   {
     label: "Today",
-    maxWaitTimeDays: 0
+    maxWaitTimeDays: 0,
   },
   {
     label: "Tomorrow",
-    maxWaitTimeDays: 1
-  }
+    maxWaitTimeDays: 1,
+  },
 ];
 
 ////////// names of stuff ////////////////////////////
@@ -159,19 +159,19 @@ export const INVENTORY_CATEGORY_NAMES = {
   labor: "Labor",
   bikes: "Bikes",
   accessories: "Accessories",
-  other: "Other"
+  other: "Other",
 };
 
 export const DISCOUNT_TYPES = {
   percent: "Percent",
-  dollar: "Dollar Amount"
+  dollar: "Dollar Amount",
 };
 
 export const TAB_NAMES = {
   infoTab: {
     customer: "Customer Entry",
     workorder: "Workorder View",
-    checkout: "Checkout Screen"
+    checkout: "Checkout Screen",
   },
   itemsTab: {
     workorderItems: "Workorder Items",
@@ -179,14 +179,14 @@ export const TAB_NAMES = {
     dashboard: "Dashboard",
     customerList: "Customer List",
     preview: "Preview",
-    empty: "Empty"
+    empty: "Empty",
   },
   optionsTab: {
     quickItems: "Quick Items",
     workorders: "Workorders",
     inventory: "Inventory",
-    messages: "Messages"
-  }
+    messages: "Messages",
+  },
 };
 
 export const FOCUS_NAMES = {
@@ -200,7 +200,7 @@ export const FOCUS_NAMES = {
   city: "city",
   state: "state",
   zip: "zip",
-  notes: "notes"
+  notes: "notes",
 };
 
 /////////// object prototypes ///////////////////////////////////////////////////
@@ -211,14 +211,14 @@ export const APP_USER = {
   permissions: "",
   phone: "",
   pin: "",
-  faceDescriptor: ""
+  faceDescriptor: "",
 };
 
 export const TIME_PUNCH_PROTO = {
   millis: "",
   userID: "",
   id: "",
-  punchType: ""
+  punchType: "",
 };
 
 export const ALERT_BOX_PROTO = {
@@ -231,7 +231,7 @@ export const ALERT_BOX_PROTO = {
   handleBtn3Press: () => {},
   showBox: false,
   onModalDismiss: () => {},
-  canExitOnOuterClick: true
+  canExitOnOuterClick: true,
 };
 
 export const SMS_PROTO = {
@@ -246,13 +246,13 @@ export const SMS_PROTO = {
   id: "",
   type: "",
   deliverySuccess: false,
-  senderUserObj: ""
+  senderUserObj: "",
 };
 
 export const DISCOUNT_OBJ_PROTO = {
   discountName: "",
   discountValue: "",
-  discountType: ""
+  discountType: "",
 };
 
 export const WORKORDER_PROTO = {
@@ -267,12 +267,12 @@ export const WORKORDER_PROTO = {
   color1: {
     textColor: "",
     backgroundColor: "",
-    label: ""
+    label: "",
   },
   color2: {
     textColor: "",
     backgroundColor: "",
-    label: ""
+    label: "",
   },
   waitTime: "",
   changeLog: [],
@@ -285,7 +285,7 @@ export const WORKORDER_PROTO = {
   internalNotes: [],
   customerNotes: [],
   status: "",
-  taxFree: false
+  taxFree: false,
 };
 
 export const WORKORDER_ITEM_PROTO = {
@@ -294,7 +294,7 @@ export const WORKORDER_ITEM_PROTO = {
   notes: "",
   invItemID: "",
   discountObj: { ...DISCOUNT_OBJ_PROTO },
-  id: ""
+  id: "",
   // priceOverride: "",
 };
 
@@ -315,7 +315,7 @@ export const CUSTOMER_PROTO = {
   interactionRating: "",
   workorders: [],
   payments: [],
-  dateCreated: ""
+  dateCreated: "",
 };
 
 export const CUSTOMER_PREVIEW_PROTO = {
@@ -323,7 +323,7 @@ export const CUSTOMER_PREVIEW_PROTO = {
   landline: "",
   first: "",
   last: "",
-  id: ""
+  id: "",
 };
 
 export const INVENTORY_ITEM_PROTO = {
@@ -335,20 +335,20 @@ export const INVENTORY_ITEM_PROTO = {
   // category: ,
   id: "",
   upc: "",
-  cost: ""
+  cost: "",
 };
 
 export const LABOR_ITEM_PROTO = {
   formalName: "",
   informalName: "",
   options: [],
-  price: ""
+  price: "",
 };
 
 export const MENU_BUTTON_PROTO = {
   type: "",
   name: "",
-  items: []
+  items: [],
 };
 
 // Objects with initial data /////////////////////////////////////////
@@ -360,29 +360,29 @@ export const SETTINGS_OBJ = {
       backgroundColor: "orange",
       altTextColor: "dimgray",
       label: "Order Part for Customer",
-      removable: true
+      removable: true,
     },
     {
       altTextColor: "dimgray",
       textColor: "white",
       backgroundColor: "orange",
       label: "Part Ordered",
-      removable: true
+      removable: true,
     },
     {
       textColor: "white",
       backgroundColor: "blue",
       altTextColor: "gray",
       label: "Messaging Customer",
-      removable: true
-    }
+      removable: true,
+    },
   ],
 
   quickItemButtonNames: [
     {
       name: "Tune-Up",
       type: "menu",
-      items: []
+      items: [],
     },
     {
       name: "Tube & Tire",
@@ -391,73 +391,73 @@ export const SETTINGS_OBJ = {
         {
           name: "Tube",
           type: "menu",
-          items: []
+          items: [],
         },
         {
           name: "Tire",
           type: "menu",
-          items: []
-        }
-      ]
+          items: [],
+        },
+      ],
     },
     {
       name: "Brakes",
       type: "submenu",
-      items: []
+      items: [],
     },
     {
       name: "Cable",
       type: "menu",
-      items: []
+      items: [],
     },
     {
       name: "Shifting",
       type: "menu",
-      items: []
+      items: [],
     },
     {
       name: "Drivetrain",
       type: "menu",
-      items: []
+      items: [],
     },
 
     {
       name: "Spoke",
       type: "menu",
-      items: []
+      items: [],
     },
     {
       name: "Cleaning",
       type: "menu",
-      items: []
+      items: [],
     },
     {
       name: "Scooter",
       type: "menu",
-      items: []
+      items: [],
     },
     {
       name: "Pickup/Delivery",
       type: "menu",
-      items: []
+      items: [],
     },
     {
       name: "Diagnostics",
       type: "menu",
-      items: []
+      items: [],
     },
     {
       name: "$Labor",
       type: "menu",
 
-      items: []
+      items: [],
     },
 
     {
       name: "$Part",
       type: "menu",
-      items: []
-    }
+      items: [],
+    },
   ],
   // colors:
   bikeBrands: ["Trek", "Specialized", "Sun", "Marin", "Cannondale", "Jamis"],
@@ -474,74 +474,87 @@ export const SETTINGS_OBJ = {
     {
       name: "2-bike purchase, $100 Off Each Bike",
       value: "100",
-      type: DISCOUNT_TYPES.dollar
+      type: DISCOUNT_TYPES.dollar,
     },
-    { name: "$10 Off", value: "10", type: DISCOUNT_TYPES.dollar }
+    { name: "$10 Off", value: "10", type: DISCOUNT_TYPES.dollar },
   ],
   waitTimes: [
     ...NONREMOVABLE_WAIT_TIMES,
     {
       label: "1-2 Days",
-      maxWaitTimeDays: 2
+      maxWaitTimeDays: 2,
     },
     {
       label: "2-3 Days",
-      maxWaitTimeDays: 3
+      maxWaitTimeDays: 3,
     },
     {
       label: "3-5 Days",
-      maxWaitTimeDays: 5
+      maxWaitTimeDays: 5,
     },
     {
       label: "1 Week",
-      maxWaitTimeDays: 7
+      maxWaitTimeDays: 7,
     },
     {
       label: "1-2 Weeks",
-      maxWaitTimeDays: 14
+      maxWaitTimeDays: 14,
     },
     {
-      label: "No Estimate"
-    }
+      label: "No Estimate",
+    },
   ],
   storeHours: {
-    Monday: {
-      open: "10:00 AM",
-      close: "6:00 PM",
-      isOpen: true
+    standard: {
+      Monday: {
+        open: "10:00 AM",
+        close: "6:00 PM",
+        isOpen: true,
+      },
+      Tuesday: {
+        open: "10:00 AM",
+        close: "6:00 PM",
+        isOpen: true,
+      },
+      Wednesday: {
+        open: "10:00 AM",
+        close: "6:00 PM",
+        isOpen: true,
+      },
+      Thursday: {
+        open: "10:00 AM",
+        close: "6:00 PM",
+        isOpen: true,
+      },
+      Friday: {
+        open: "10:00 AM",
+        close: "6:00 PM",
+        isOpen: true,
+      },
+      Saturday: {
+        open: "10:00 AM",
+        close: "6:00 PM",
+        isOpen: true,
+      },
+      Sunday: {
+        open: "10:00 AM",
+        close: "6:00 PM",
+        isOpen: true,
+      },
     },
-    Tuesday: {
-      open: "10:00 AM",
-      close: "6:00 PM",
-      isOpen: true
-    },
-    Wednesday: {
-      open: "10:00 AM",
-      close: "6:00 PM",
-      isOpen: true
-    },
-    Thursday: {
-      open: "10:00 AM",
-      close: "6:00 PM",
-      isOpen: true
-    },
-    Friday: {
-      open: "10:00 AM",
-      close: "6:00 PM",
-      isOpen: true
-    },
-    Saturday: {
-      open: "10:00 AM",
-      close: "6:00 PM",
-      isOpen: true
-    },
-    Sunday: {
-      open: "10:00 AM",
-      close: "6:00 PM",
-      isOpen: true
-    }
+    special: [{ name: "4th of July", dateMillies: 123434455544 }],
   },
-  specialStoreHours: [{ name: "4th of July", dateMillies: 123434455544 }],
+  storeInfo: {
+    displayName: "Bonita Bikes LLC",
+    address: {
+      street: "9102 Bonita Beach Rd SE",
+      unit: "",
+      city: "Bonita Springs",
+      state: "Florida",
+      zip: "34135",
+    },
+    phone: "2393369177",
+  },
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   loginTimeout: 15,
@@ -555,19 +568,19 @@ export const SETTINGS_OBJ = {
       permissions: "owner",
       phone: "2393369177",
       pin: "33",
-      alternatePin: "jj"
-    }
+      alternatePin: "jj",
+    },
   ],
   cardReaders: [
     { label: "Front Right Desk", id: "tmr_GFKNEgYkwcsIFF" },
-    { label: "Front Left Desk", id: "" }
+    { label: "Front Left Desk", id: "" },
   ],
   selectedCardReaderObj: {
     label: "Front Right Desk",
-    id: "tmr_GFKNEgYkwcsIFF"
+    id: "tmr_GFKNEgYkwcsIFF",
   },
   stripeBusinessLocationCode: "tml_GCsldAwakkr9vM",
-  autoConnectToCardReader: "true"
+  autoConnectToCardReader: "true",
 };
 
 // RECEIPT STUFF ////////////////////////////////////////////////////
@@ -576,7 +589,7 @@ export const RECEIPT_TYPES = {
   sales: "Sales",
   intake: "Intake",
   estimate: "Estimate",
-  register: "pop-register"
+  register: "pop-register",
 };
 
 export const PRINTER_NAMES = ["Left Printer", "Right Printer", "Back Printer"];
@@ -588,13 +601,13 @@ export const RECEIPT_LINE_ITEM_OBJ_PROTO = {
   discountSavings: "-$1.22",
   totalPrice: "$3.23",
   itemPrice: "1.24",
-  qty: "2"
+  qty: "2",
 };
 
 export const SALES_TRANSACTION_TYPES = {
   cash: "Cash",
   card: "Card",
-  check: "Check"
+  check: "Check",
 };
 
 export const RECEIPT_PROTO = {
@@ -638,7 +651,7 @@ export const RECEIPT_PROTO = {
     "www.bonitabikes.com",
   shopName: "Bonita Bikes LLC",
   thankYouBlurb:
-    "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again."
+    "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
 };
 // END RECEIPT STUFF /////////////////////////////////////////////
 
@@ -646,5 +659,5 @@ export const PRIVILEDGE_LEVELS = {
   admin: "Admin",
   superUser: "Editor",
   owner: "Owner",
-  user: "User"
+  user: "User",
 };

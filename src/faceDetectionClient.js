@@ -2,15 +2,19 @@ import React, { useRef, useEffect, useState } from "react";
 import { View, Button, Text } from "react-native";
 import * as faceapi from "face-api.js";
 import { clog, log } from "./utils";
-import { FACIAL_RECOGNITION_INTERVAL } from "./constants";
+import {
+  FACE_DESCRIPTOR_CONFIDENCE_DISTANCE,
+  FACIAL_RECOGNITION_INTERVAL,
+} from "./constants";
 import {
   useLoginStore,
   useOpenWorkordersStore,
-  useSettingsStore
+  useSettingsStore,
 } from "./stores";
 import { SETTINGS_OBJ } from "./data";
 import { intersection } from "lodash";
 import { cloneDeep } from "lodash";
+import { StaticRouter } from "react-router-dom";
 // import {} from "./models";
 
 const MODEL_URL = "./models"; // Place models in public/models
@@ -18,6 +22,7 @@ const MODEL_URL = "./models"; // Place models in public/models
 export function FaceDetectionComponent({ runInBackground = true }) {
   // store setters ////////////////////////////////////////////////////
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
+  const _zSetWebcamDetected = useLoginStore((state) => state.setWebcamDetected);
 
   // store getters ///////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
@@ -43,36 +48,42 @@ export function FaceDetectionComponent({ runInBackground = true }) {
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL).then(() => {
       setupCount++;
       if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
-      //   log("setup 1", setupCount);
     });
     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL).then(() => {
       setupCount++;
       if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
-      //   log("setup 2", setupCount);
     });
     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL).then(() => {
       setupCount++;
       if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
-      //   log("setup 3", setupCount);
     });
-    startVideo().then(() => {
-      setupCount++;
-      if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
-      //   log("setup 4", setupCount);
-    });
+    startVideo()
+      .then(() => {
+        setupCount++;
+        _zSetWebcamDetected(true);
+        if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+      })
+      .catch((e) => {
+        log("no webcam detected", e);
+        _zSetWebcamDetected(false);
+      });
   }, []);
 
   useEffect(() => {
     if (!zSettingsObj || backgroundStarted) return;
     if (runInBackground) startBackgroundRecognition(zSettingsObj);
+  }, [zSettingsObj, backgroundStarted, runInBackground]);
+
+  // cleanup state
+  useEffect(() => {
     return () => {
-      log("closing interval");
-      //   if (intervalRef.current) clearInterval(intervalRef.current);
-      //   if (streamRef.current) {
-      // streamRef.current.getTracks().forEach((track) => track.stop());
-      //   }
+      log("cleaning up faceDetectionClient state");
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
     };
-  }, [zSettingsObj]);
+  }, [intervalRef, streamRef]);
 
   //////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
@@ -94,27 +105,26 @@ export function FaceDetectionComponent({ runInBackground = true }) {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         log("video stream started");
-        // DO NOT call play() here! Wait for onLoadedMetadata
       }
     }
   };
 
   const startBackgroundRecognition = (settingsObj) => {
     _setBackgroundStarted(true);
-    log("starting background recognition");
+    log("starting background facial recognition");
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(async () => {
       const currentDesc = await getFaceDescriptor();
-      log("cur desc", currentDesc);
+      // log("cur desc", currentDesc);
       if (currentDesc) {
-        log("found descriptor");
+        // log("found descriptor");
         let userObj = settingsObj.users.find((userObj) => {
           const distance = faceapi.euclideanDistance(
             userObj.faceDescriptor,
             currentDesc
           );
-          if (distance < 0.5) {
-            log("Face descriptor distance", distance);
+          if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
+            // log("Face descriptor distance", distance);
             // clog("Face Login!", userObj);
             return true;
           } else {
@@ -123,7 +133,7 @@ export function FaceDetectionComponent({ runInBackground = true }) {
         });
         if (userObj) {
           _zSetCurrentUserObj(userObj);
-          clog("Face Login!", userObj);
+          // clog("Face Login!", userObj);
         }
       }
     }, FACIAL_RECOGNITION_INTERVAL);
@@ -187,7 +197,7 @@ export function FaceDetectionComponent({ runInBackground = true }) {
                 margin: 12,
                 color: "green",
                 fontSize: 20,
-                fontWeight: "bold"
+                fontWeight: "bold",
               }}
             >
               ✅ You are logged in!

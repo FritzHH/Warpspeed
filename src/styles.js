@@ -108,6 +108,7 @@ export const ICONS = {
   moneySack: require(ASSETS_PATH + "moneySack.png"),
   cashRegister: require(ASSETS_PATH + "cashRegister.png"),
   camera: require(ASSETS_PATH + "camera.png"),
+  wifi: require(ASSETS_PATH + "wifi.gif"),
 };
 
 // rgb(64, 174, 113)

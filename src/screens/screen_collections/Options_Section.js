@@ -136,18 +136,21 @@ export const TabBar = ({
       />
     </View>
     <View style={{ flexDirection: "row", alignItems: "center" }}>
-      <Text style={{ color: APP_BASE_COLORS.textMain }}>
-        {userObj.first + " " + userObj.last[0] + "."}
-      </Text>
+      {userObj ? (
+        <Text style={{ color: APP_BASE_COLORS.textMain }}>
+          {userObj.first + " " + userObj.last[0] + "."}
+        </Text>
+      ) : null}
       <View style={{ width: 8 }} />
       <Image_
-        style={{ width: 23, height: 23 }}
+        style={{ width: 19, height: 19 }}
         icon={webcamDetected ? ICONS.camera : null}
       />
-      <View style={{ width: 8 }} />
+      <View style={{ width: 5 }} />
       <Image_
-        icon={__isOnline ? ICONS.internetOnlineGIF : ICONS.internetOfflineGIF}
-      />{" "}
+        style={{ width: 28, height: 28 }}
+        icon={__isOnline ? ICONS.wifi : ICONS.internetOfflineGIF}
+      />
     </View>
   </View>
 );

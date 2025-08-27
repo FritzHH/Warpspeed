@@ -17,15 +17,17 @@ export const useLoginStore = create((set, get) => ({
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
-  currentUserObj: {
-    first: "Fritz",
-    last: "Hieb",
-    id: "1234",
-    permissions: "owner",
-    phone: "2393369177",
-    pin: "33",
-    faceDescriptor: "",
-  },
+  // currentUserObj: {
+  //   first: "Fritz",
+  //   last: "Hieb",
+  //   id: "1234",
+  //   permissions: "owner",
+  //   phone: "2393369177",
+  //   pin: "33",
+  //   faceDescriptor: "",
+  // },
+  currentUserObj: null,
+  clockedInUsers: [],
   modalVisible: false,
   lastActionMillis: 0,
   postLoginFunctionCallback: () => {},
@@ -34,6 +36,7 @@ export const useLoginStore = create((set, get) => ({
   // face login
   runBackgroundRecognition: true,
 
+  getClockedInUsers: () => get().clockedInUsers,
   getWebcamDetected: () => get().webcamDetected,
   getRunBackgroundRecognition: () => get().runBackgroundRecognition,
   getLoginFunctionCallback: () => get().loginFunctionCallback,
@@ -43,6 +46,19 @@ export const useLoginStore = create((set, get) => ({
   getAdminPrivilege: () => get().adminPrivilege,
   getModalVisible: () => get().modalVisible,
 
+  setClockedInUser: (userObj) =>
+    set(() => {
+      // log("userobj", userObj);
+      let userArr = cloneDeep(get().clockedInUsers);
+      if (userArr.find((o) => o.id == userObj.id)) {
+        userArr = userArr.filter((o) => o.id == userObj.id);
+      } else {
+        userArr.push(userObj);
+      }
+      return {
+        clockedInUsers: userArr,
+      };
+    }),
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
   setRunBackgroundRecognition: (runBackgroundRecognition) =>
     set(() => ({ runBackgroundRecognition })),
@@ -219,7 +235,7 @@ export const useAlertScreenStore = create((set, get) => ({
   btn2Icon: null,
   icon1Size: null,
   icon2Size: null,
-  handleBtn1Press: () => {},
+  handleBtn1Press: null,
   handleBtn2Press: null,
   canExitOnOuterClick: true,
 

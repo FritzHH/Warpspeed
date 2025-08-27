@@ -41,7 +41,12 @@ import {
   useLoginStore,
 } from "../../../stores";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
-import { COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
+import {
+  APP_BASE_COLORS,
+  COLOR_GRADIENTS,
+  Colors,
+  ICONS,
+} from "../../../styles";
 import {
   dbSearchForName,
   dbSearchForPhoneNumber,
@@ -399,9 +404,10 @@ export function NewWorkorderComponent({}) {
         <View style={{ height: "45%" }} />
         {/** customer info modal */}
         <Button_
+          buttonStyle={{}}
           onPress={handleStartStandaloneSalePress}
           icon={ICONS.cashRegister}
-          iconSize={100}
+          iconSize={80}
         />
         <ScreenModal
           showOuterModal={true}

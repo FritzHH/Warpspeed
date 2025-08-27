@@ -271,6 +271,7 @@ export const AlertBox_ = ({}) => {
               <Text
                 numberOfLines={3}
                 style={{
+                  fontWeight: "500",
                   marginTop: 25,
                   color: Colors.darkText,
                   fontSize: 25,
@@ -317,7 +318,7 @@ export const AlertBox_ = ({}) => {
               }}
             >
               <Button_
-                colorGradientArr={COLOR_GRADIENTS.purple}
+                colorGradientArr={zButton1Text ? COLOR_GRADIENTS.purple : []}
                 text={zButton1Text}
                 buttonStyle={zButton1Text ? {} : {}}
                 textStyle={
@@ -329,7 +330,7 @@ export const AlertBox_ = ({}) => {
               />
               {zButton2Handler ? (
                 <Button_
-                  colorGradientArr={COLOR_GRADIENTS.blue}
+                  colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
                   text={zButton2Text}
                   buttonStyle={zButton2Text ? {} : {}}
                   textStyle={
@@ -2649,7 +2650,7 @@ export const Button_ = ({
       onLongPress={visible ? onLongPress : () => {}}
     >
       <GradientView
-        colorArr={icon && !text ? [] : colorGradientArr}
+        colorArr={colorGradientArr}
         style={{
           alignItems: "center",
           justifyContent: "center",

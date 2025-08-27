@@ -182,10 +182,8 @@ export function BaseScreen() {
               shadowRadius: 10,
             }}
           >
-            {zRunBackgroundRecognition ? (
-              <FaceDetectionComponent runInBackground={true} />
-            ) : null}
-            <AlertBox_ iconBtn1={ICONS.check1} iconBtn2={ICONS.close1} />
+            {zRunBackgroundRecognition ? <FaceDetectionComponent /> : null}
+            <AlertBox_ />
             <Info_Section />
           </View>
           <View

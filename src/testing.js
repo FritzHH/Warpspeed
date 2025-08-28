@@ -21,7 +21,12 @@ import {
   log,
   randomWordGenerator,
 } from "./utils";
-import { dbSetCustomerObj, dbSetSettings } from "./db_call_wrapper";
+import {
+  dbSetCustomerObj,
+  dbSetSettings,
+  dbSetUserPunchAction,
+} from "./db_call_wrapper";
+import { MILLIS_IN_MINUTE } from "./constants";
 
 export function testPayment() {}
 
@@ -179,4 +184,21 @@ export function fillReceipt() {
 
 export function fillPrinterNames() {
   setRealtimeNodeItem("PRINTERS/printer_names", PRINTER_NAMES);
+}
+
+export function fillPunchHistory() {
+  let userID = "1234";
+  let ref = 1756328725524;
+  let option = true;
+  for (let i = 1; i <= 10; i++) {
+    let val = ref - i * 2 * Math.round((MILLIS_IN_MINUTE * 60 * 24) / 2.3);
+    // log(val);
+    let obj = {
+      userID,
+      millisIn: option ? val : null,
+      millisOut: option ? null : val,
+    };
+    dbSetUserPunchAction(obj);
+    option = !option;
+  }
 }

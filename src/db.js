@@ -61,6 +61,7 @@ const RDB = getDatabase();
 //////// Firestore calls ///////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
+// getters
 export function getNewCollectionRef(collectionName) {
   let ref = doc(collection(DB, collectionName));
   return ref;
@@ -76,6 +77,18 @@ export function getCollection(collectionName) {
   });
 }
 
+export function getCollectionItem(collectionName, itemID) {
+  let ref = doc(DB, collectionName, itemID);
+  return getDoc(ref).then((res) => {
+    if (res.exists()) {
+      return res.data();
+    } else {
+      return null;
+    }
+  });
+}
+
+// setters
 export function setFirestoreCollectionItem(
   collectionName,
   collectionId,
@@ -86,12 +99,16 @@ export function setFirestoreCollectionItem(
   if (stringify) item = { item: JSON.stringify(item) };
 
   let docRef = doc(DB, collectionName, collectionId);
+  // log(collectionName, collectionId);
+  // log(item);
   return setDoc(docRef, item)
-    .then(() => {})
-    .catch((err) => log("err", err));
+    .then(() => {
+      // log("finished setting firestore collection");
+    })
+    .catch((err) => log("error setting Firestore collection", err));
 }
 
-export async function setSubCollectionItem(
+export async function setFirestoreSubCollectionItem(
   collectionName,
   documentId,
   subCollectionName,
@@ -117,17 +134,21 @@ export async function setCustomer(customerObj) {
   setFirestoreCollectionItem("CUSTOMERS", customerObj);
 }
 
-export function getCollectionItem(collectionName, itemID) {
-  let ref = doc(DB, collectionName, itemID);
-  return getDoc(ref).then((res) => {
-    if (res.exists()) {
-      return res.data();
-    } else {
-      return null;
-    }
-  });
+// adders
+
+export function addToFirestoreCollectionItem(path, item, stringify) {
+  if (stringify) item = { item: JSON.stringify(item) };
+
+  let docRef = collection(DB, path);
+  // log(path);
+  return addDoc(docRef, item)
+    .then(() => {
+      log("finished adding firestore collection");
+    })
+    .catch((err) => log("error setting Firestore collection", err));
 }
 
+// subscribers
 export function subscribeToDocument(collectionName, documentID, callback) {
   let ref = doc(DB, collectionName, documentID);
   return onSnapshot(ref, (snap) => {
@@ -151,6 +172,7 @@ export function subscribeToCollectionNode(collectionName, callback) {
   });
 }
 
+// search and filters
 export async function searchCollection(collectionPath, fieldName, searchTerm) {
   let text = searchTerm.toString();
   // log("search term", text);
@@ -178,7 +200,7 @@ function createRealtimeRef(path) {
   return ref(RDB, path);
 }
 
-// getters
+// getters //////////////////////////////////////////////////////////
 function getNodeObject(dbRef) {
   try {
     return get(dbRef).then((snap) => {
@@ -251,7 +273,7 @@ export async function getInventory() {
   return getNodeObject(dbRef);
 }
 
-// setters
+// setters ///////////////////////////////////////////////////////////
 export function setPreferences(key, prefObj) {
   let dbRef = ref(RDB, "PREFERENCES/" + key);
   return set(dbRef, prefObj);
@@ -279,31 +301,6 @@ export function getRealtimeNodeItem(path) {
 export function setInventoryItem(inventoryObj = INVENTORY_ITEM_PROTO) {
   let dbRef = ref(RDB, "INVENTORY/" + inventoryObj.id);
   return set(dbRef, inventoryObj);
-}
-
-function concurrentDBSet(dbref1, obj1, dbref2, obj2) {
-  let ref1Complete = false;
-  let ref2Complete = false;
-  return new Promise((resolve, reject) => {
-    set(dbref1, obj1)
-      .then((res) => {
-        ref1Complete = true;
-        if (ref2Complete) resolve("first");
-      })
-      .catch((e) => {
-        log("ERROR IN CONCURRENT DBSET", e);
-        resolve(null);
-      });
-    set(dbref2, obj2)
-      .then((res) => {
-        ref2Complete = true;
-        if (ref1Complete) resolve("second");
-      })
-      .catch((e) => {
-        log("ERROR IN CONCURRENT DBSET", e);
-        resolve(null);
-      });
-  });
 }
 
 //////////////////////////////////////////////////////////////////////

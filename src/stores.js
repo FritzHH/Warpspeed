@@ -13,110 +13,6 @@ import { cloneDeep } from "lodash";
 import { dbSetOpenWorkorderItem } from "./db_call_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
-export const useLoginStore = create((set, get) => ({
-  webcamDetected: false,
-  adminPrivilege: "",
-  loginTimeout: 0,
-  // currentUserObj: {
-  //   first: "Fritz",
-  //   last: "Hieb",
-  //   id: "1234",
-  //   permissions: "owner",
-  //   phone: "2393369177",
-  //   pin: "33",
-  //   faceDescriptor: "",
-  // },
-  currentUserObj: null,
-  clockedInUsers: [],
-  modalVisible: false,
-  lastActionMillis: 0,
-  postLoginFunctionCallback: () => {},
-  showLoginScreen: false,
-
-  // face login
-  runBackgroundRecognition: true,
-
-  getClockedInUsers: () => get().clockedInUsers,
-  getWebcamDetected: () => get().webcamDetected,
-  getRunBackgroundRecognition: () => get().runBackgroundRecognition,
-  getLoginFunctionCallback: () => get().loginFunctionCallback,
-  getShowLoginScreen: () => get().showLoginScreen,
-  getLastActionMillis: () => get().lastActionMillis,
-  getCurrentUserObj: () => get().currentUserObj,
-  getAdminPrivilege: () => get().adminPrivilege,
-  getModalVisible: () => get().modalVisible,
-
-  setClockedInUser: (userObj) =>
-    set(() => {
-      // log("userobj", userObj);
-      let userArr = cloneDeep(get().clockedInUsers);
-      if (userArr.find((o) => o.id == userObj.id)) {
-        userArr = userArr.filter((o) => o.id == userObj.id);
-      } else {
-        userArr.push(userObj);
-      }
-      return {
-        clockedInUsers: userArr,
-      };
-    }),
-  setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
-  setRunBackgroundRecognition: (runBackgroundRecognition) =>
-    set(() => ({ runBackgroundRecognition })),
-  setModalVisible: (modalVisible) => set((state) => ({ modalVisible })),
-  setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
-  setCurrentUserObj: (currentUserObj) => {
-    // log("user", currentUserObj);
-    set((state) => ({ currentUserObj: currentUserObj }));
-  },
-  setLastActionMillis: () =>
-    set((state) => ({ lastActionMillis: new Date().getTime() })),
-  setShowLoginScreen: (showLoginScreen) => {
-    set((state) => ({ showLoginScreen }));
-  },
-
-  execute: (postLoginFunctionCallback, priviledgeLevel) => {
-    let lastMillis = get().lastActionMillis;
-    let cur = new Date().getTime();
-    let diff = (cur - lastMillis) / 1000;
-    let userObj = get().currentUserObj;
-    // log("diff", diff);
-    let hasAccess = true;
-    if (priviledgeLevel && userObj) {
-      hasAccess = false;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.owner &&
-        userObj.permissions == PRIVILEDGE_LEVELS.owner
-      ) {
-      }
-      hasAccess = true;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.admin &&
-        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
-          userObj.permissions == PRIVILEDGE_LEVELS.admin)
-      )
-        hasAccess = true;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.superUser &&
-        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
-          userObj.permissions == PRIVILEDGE_LEVELS.admin ||
-          userObj.permissions == PRIVILEDGE_LEVELS.superUser)
-      )
-        hasAccess = true;
-    }
-    // log("user in login store", userObj);
-    // log("diff", diff);
-    // log(get().loginTimeout);
-    if (diff > get().loginTimeout || !hasAccess || !userObj) {
-      set((state) => ({ postLoginFunctionCallback }));
-      set((state) => ({ showLoginScreen: true }));
-      set((state) => ({ adminPrivilege: priviledgeLevel }));
-      return;
-    } else if (hasAccess) {
-      postLoginFunctionCallback();
-    }
-  },
-  runPostLoginFunction: () => get().postLoginFunctionCallback(),
-}));
 
 export const useInvModalStore = create((set, get) => ({
   currentFocusName: null,
@@ -228,15 +124,20 @@ export const useAlertScreenStore = create((set, get) => ({
   showAlert: false,
   title: "Alert",
   message: "",
+  alertBoxStyle: {},
   subMessage: "",
   btn1Text: "",
   btn2Text: "",
+  btn3Text: "",
   btn1Icon: null,
   btn2Icon: null,
+  btn3Icon: null,
   icon1Size: null,
   icon2Size: null,
+  icon3Size: null,
   handleBtn1Press: null,
   handleBtn2Press: null,
+  handleBtn3Press: null,
   canExitOnOuterClick: true,
 
   getMessage: () => get().message,
@@ -246,13 +147,57 @@ export const useAlertScreenStore = create((set, get) => ({
   getShowAlert: () => get().showAlert,
   getButton1Text: () => get().btn1Text,
   getButton2Text: () => get().btn2Text,
+  getButton3Text: () => get().btn3Text,
   getButton1Handler: () => get().handleBtn1Press,
   getButton2Handler: () => get().handleBtn2Press,
+  getButton3Handler: () => get().handleBtn3Press,
   getButton1Icon: () => get().btn1Icon,
   getButton2Icon: () => get().btn2Icon,
+  getButton3Icon: () => get().btn3Icon,
   getIcon1Size: () => get().icon1Size,
   getIcon2Size: () => get().icon2Size,
+  getIcon3Size: () => get().icon3Size,
+  getAlertBoxStyle: () => get().alertBoxStyle,
 
+  setValues: ({
+    title,
+    message,
+    subMessage,
+    btn1Text,
+    btn2Text,
+    btn3Text,
+    btn1Icon,
+    btn2Icon,
+    btn3Icon,
+    icon1Size,
+    icon2Size,
+    icon3Size,
+    handleBtn1Press,
+    handleBtn2Press,
+    handleBtn3Press,
+    canExitOnOuterClick = true,
+    alertBoxStyle = {},
+  }) => {
+    set(() => ({
+      title,
+      message,
+      subMessage,
+      btn1Text,
+      btn2Text,
+      btn3Text,
+      btn1Icon,
+      btn2Icon,
+      btn3Icon,
+      icon1Size,
+      icon2Size,
+      icon3Size,
+      handleBtn1Press,
+      handleBtn2Press,
+      handleBtn3Press,
+      canExitOnOuterClick,
+      alertBoxStyle,
+    }));
+  },
   setMessage: (message) => {
     set(() => ({ message }));
   },
@@ -301,18 +246,24 @@ export const useAlertScreenStore = create((set, get) => ({
       subMessage: "",
       btn1Text: "",
       btn2Text: "",
+      btn3Text: "",
       btn1Icon: null,
       btn2Icon: null,
+      btn3Icon: null,
       icon1Size: null,
       icon2Size: null,
+      icon3Size: null,
       handleBtn1Press: null,
       handleBtn2Press: null,
+      handleBtn3Press: null,
       canExitOnOuterClick: true,
+      alertBoxStyle: {},
     }));
   },
 }));
 
-// internal & database //////////////////////////////////////////////
+// database  //////////////////////////////////////////////////
+
 export const useStripePaymentStore = create((set, get) => ({
   paymentIntentID: null,
   reader: null,
@@ -349,22 +300,109 @@ export const useStripePaymentStore = create((set, get) => ({
   },
 }));
 
-// database  //////////////////////////////////////////////////
-export const usePunchClockStore = create((set, get) => ({
-  loggedInUsers: [],
-  userClockArr: [],
-  getLoggedInUser: () => get().loggedInUsers,
-  getUserClockArr: () => get().userClockArr,
-  setUserClockArr: (userClockArr) => {
-    set((state) => ({ userClockArr }));
+export const useLoginStore = create((set, get) => ({
+  webcamDetected: false,
+  adminPrivilege: "",
+  loginTimeout: 0,
+  currentUserObj: { first: "Fritz", last: "Hieb", id: "1234" }, //testing
+  clockedInUsers: [],
+  modalVisible: false,
+  lastActionMillis: 0,
+  postLoginFunctionCallback: () => {},
+  showLoginScreen: false,
+
+  // face login
+  runBackgroundRecognition: true,
+
+  getClockedInUsers: () => get().clockedInUsers,
+  getWebcamDetected: () => get().webcamDetected,
+  getRunBackgroundRecognition: () => get().runBackgroundRecognition,
+  getLoginFunctionCallback: () => get().loginFunctionCallback,
+  getShowLoginScreen: () => get().showLoginScreen,
+  getLastActionMillis: () => get().lastActionMillis,
+  getCurrentUserObj: () => get().currentUserObj,
+  getAdminPrivilege: () => get().adminPrivilege,
+  getModalVisible: () => get().modalVisible,
+
+  // local app user
+  setCurrentUserObj: (currentUserObj) => {
+    // log("user", currentUserObj);
+    set((state) => ({ currentUserObj }));
   },
-  setLoggedInUser: (userObj) => {
-    let loggedInUsers1 = get().loggedInUsers;
-    if (!loggedInUsers1.find((o) => o.id === user.id)) {
-      loggedInUsers1.push(userObj);
-      set((state) => ({ loggedInUsers: loggedInUsers1 }));
+
+  setClockedInUser: (userID, millis, option) =>
+    set(() => {
+      let userArr = cloneDeep(get().clockedInUsers);
+      // log("clocked in user arr", userArr);
+      if (option === "out") {
+        // clock out
+        // log("clocking out");
+        userArr = userArr.filter((o) => o.id != userID);
+      } else {
+        // clock in
+        if (!userArr.find((o) => o.id === userID)) {
+          // log("clocking in " + userID);
+          userArr.push({ id: userID, millis });
+        }
+      }
+      return {
+        clockedInUsers: userArr,
+      };
+    }),
+  setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
+  setRunBackgroundRecognition: (runBackgroundRecognition) =>
+    set(() => ({ runBackgroundRecognition })),
+  setModalVisible: (modalVisible) => set((state) => ({ modalVisible })),
+  setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
+
+  setLastActionMillis: () =>
+    set((state) => ({ lastActionMillis: new Date().getTime() })),
+  setShowLoginScreen: (showLoginScreen) => {
+    set((state) => ({ showLoginScreen }));
+  },
+
+  execute: (postLoginFunctionCallback, priviledgeLevel) => {
+    let lastMillis = get().lastActionMillis;
+    let cur = new Date().getTime();
+    let diff = (cur - lastMillis) / 1000;
+    let userObj = get().currentUserObj;
+    // log("diff", diff);
+    let hasAccess = true;
+    if (priviledgeLevel && userObj) {
+      hasAccess = false;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.owner &&
+        userObj.permissions == PRIVILEDGE_LEVELS.owner
+      ) {
+      }
+      hasAccess = true;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.admin &&
+        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
+          userObj.permissions == PRIVILEDGE_LEVELS.admin)
+      )
+        hasAccess = true;
+      if (
+        priviledgeLevel == PRIVILEDGE_LEVELS.superUser &&
+        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
+          userObj.permissions == PRIVILEDGE_LEVELS.admin ||
+          userObj.permissions == PRIVILEDGE_LEVELS.superUser)
+      )
+        hasAccess = true;
+    }
+    // log("user in login store", userObj);
+    // log("diff", diff);
+    // log(get().loginTimeout);
+    if (diff > get().loginTimeout || !hasAccess || !userObj) {
+      set((state) => ({ postLoginFunctionCallback }));
+      set((state) => ({ showLoginScreen: true }));
+      set((state) => ({ adminPrivilege: priviledgeLevel }));
+      return;
+    } else if (hasAccess) {
+      postLoginFunctionCallback();
     }
   },
+  runPostLoginFunction: () => get().postLoginFunctionCallback(),
 }));
 
 export const useCustomerPreviewStore = create((set, get) => ({

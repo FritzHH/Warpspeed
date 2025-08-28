@@ -109,6 +109,12 @@ export const ICONS = {
   cashRegister: require(ASSETS_PATH + "cashRegister.png"),
   camera: require(ASSETS_PATH + "camera.png"),
   wifi: require(ASSETS_PATH + "wifi.gif"),
+  restricted: require(ASSETS_PATH + "restricted.png"),
+  redx: require(ASSETS_PATH + "redx.png"),
+  listGif: require(ASSETS_PATH + "list.gif"),
+  clockGif: require(ASSETS_PATH + "clock.gif"),
+  cancelGif: require(ASSETS_PATH + "cancel.gif"),
+  paperPlane: require(ASSETS_PATH + "paperPlane.png"),
 };
 
 // rgb(64, 174, 113)

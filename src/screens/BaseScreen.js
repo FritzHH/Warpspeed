@@ -30,11 +30,17 @@ import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
 import { getRealtimeNodeItem, searchCollection } from "../db";
-import { fillPreferences, fillPrinterNames, fillReceipt } from "../testing";
+import {
+  fillPreferences,
+  fillPrinterNames,
+  fillPunchHistory,
+  fillReceipt,
+} from "../testing";
 import {
   customerPreviewListSubscribe,
   inventorySubscribe,
   openWorkordersSubscribe,
+  punchClockSubscribe,
   settingsSubscribe,
 } from "../db_subscription_wrapper";
 import {
@@ -47,6 +53,7 @@ import {
 } from "../stores";
 import { dbSearchForPhoneNumber } from "../db_call_wrapper";
 import { FaceDetectionComponent } from "../faceDetectionClient";
+import { REALTIME_DATABASE_NODE_NAMES } from "../constants";
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
@@ -58,6 +65,7 @@ export function BaseScreen() {
     (state) => state.setLastActionMillis
   );
   const _zSetLoginTimeout = useLoginStore((state) => state.setLoginTimeout);
+  const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
 
   // testing
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
@@ -95,18 +103,26 @@ export function BaseScreen() {
     openWorkordersSubscribe(_zModWorkorderItem);
     inventorySubscribe(_zModInventoryItem);
     settingsSubscribe(_zSetSettingsItem); // subscribe to changes only
-    // have to do a one-off get due to only subscribing to changes in SETTINGS
-    getRealtimeNodeItem("SETTINGS").then((res) => {
-      // log(res);
+    punchClockSubscribe(_zSetClockedInUser);
+
+    // one-off reads due to only subscribing to changes in above
+    getRealtimeNodeItem(REALTIME_DATABASE_NODE_NAMES.settings).then((res) => {
       _zSetSettingsObj(res);
     });
+    // getRealtimeNodeItem(REALTIME_DATABASE_NODE_NAMES.punchClock).then((res) => {
+    //   // if (!res)
+    //   // log("FULL punch clock", res);
+    //   if (res) {
+    //     Object.keys(res).forEach((key) => {});
+    //   }
+    // });
   }, []);
 
   useEffect(() => {
     try {
       _zSetLoginTimeout(zSettingsObj?.loginTimeout);
       // testing take out this is your user obj
-      _zSetCurrentUserObj(zSettingsObj?.users[0]);
+      // _zSetCurrentUserObj(zSettingsObj?.users[0]);
     } catch (e) {}
   }, [zSettingsObj]);
 
@@ -122,6 +138,7 @@ export function BaseScreen() {
     // fillReceipt();
     // fillPrinterNames();
     // fillPreferences();
+    // fillPunchHistory();
   }, []);
 
   return (

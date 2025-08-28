@@ -16,6 +16,7 @@ import {
 } from "./db";
 import { arrayAddObjCheckForDupes, log } from "./utils";
 import { LocalPage } from "twilio/lib/rest/api/v2010/account/availablePhoneNumberCountry/local";
+import { REALTIME_DATABASE_NODE_NAMES } from "./constants";
 
 let inventoryChangeSub, inventoryAddSub, inventoryRemoveSub;
 let workorderChangeSub, workorderAddSub, workorderRemoveSub;
@@ -25,6 +26,7 @@ let customerObjSub;
 let settingsSub;
 let paymentIntentAddSub;
 let paymentIntentChangeSub;
+let punchClockChangeSub, punchClockAddSub, punchClockRemoveSub;
 
 // subscriptions /////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -83,6 +85,22 @@ export async function settingsSubscribe(_zSetSettingsItem) {
     // log("incoming", val);
     _zSetSettingsItem(key, val);
   });
+}
+
+// realtime database
+export async function punchClockSubscribe(_zSetClockedInUser) {
+  punchClockAddSub = await subscribeToNodeAddition(
+    REALTIME_DATABASE_NODE_NAMES.punchClock,
+    (type, key, val) => {
+      _zSetClockedInUser(key, val, "in");
+    }
+  );
+  punchClockRemoveSub = await subscribeToNodeRemoval(
+    REALTIME_DATABASE_NODE_NAMES.punchClock,
+    (type, key, val) => {
+      _zSetClockedInUser(key, null, "out");
+    }
+  );
 }
 
 // realtime database

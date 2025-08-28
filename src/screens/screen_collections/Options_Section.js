@@ -5,6 +5,7 @@ import {
   checkInternetConnection,
   dim,
   generateRandomID,
+  localStorageWrapper,
   log,
   trimToTwoDecimals,
 } from "../../utils";
@@ -13,6 +14,8 @@ import {
   TabMenuButton,
   TabMenuDivider as Divider,
   Image_,
+  Button_,
+  DateTimePicker,
 } from "../../components";
 import { APP_BASE_COLORS, Colors, ICONS } from "../../styles";
 import { WORKORDER_PROTO, TAB_NAMES } from "../../data";
@@ -23,23 +26,41 @@ import { WorkordersComponent } from "../screen_components/Options_Screen/Options
 import { QuickItemComponent } from "../screen_components/Options_Screen/Options_QuickItems";
 import { InventoryComponent } from "../screen_components/Options_Screen/Options_Inventory";
 import { MessagesComponent } from "../screen_components/Options_Screen/Options_Messages";
-import { useTabNamesStore, useLoginStore } from "../../stores";
+import {
+  useTabNamesStore,
+  useLoginStore,
+  useAlertScreenStore,
+} from "../../stores";
+import { dbSetUserPunchAction } from "../../db_call_wrapper";
+import { LOCAL_DB_KEYS } from "../../constants";
+import { UserClockHistoryModal } from "../screen_components/modal_screens/UserClockHistoryModalScreen";
 
 export function Options_Section({}) {
   // store setters ///////////////////////////////////////////////////////////
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
+  const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
+  const _zSetShowAlert = useAlertScreenStore((state) => state.setShowAlert);
+  const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
 
   // store getters ///////////////////////////////////////////////////////////////
   const zOptionsTabName = useTabNamesStore((state) =>
     state.getOptionsTabName()
   );
-  const zUserObj = useLoginStore((state) => state.getCurrentUserObj());
+  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
   const zWebcamDetected = useLoginStore((state) => state.getWebcamDetected());
+  const zClockedInUsersArr = useLoginStore((state) =>
+    state.getClockedInUsers()
+  );
 
-  /////////////////////////////////////////////////////////////////////////////
+  // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
+  const [sCurrentUserObj, _setCurrentUserObj] = useState({
+    first: "",
+    last: "",
+    isClockedIn: false,
+  });
 
   // run constant checks to check if interent is connected
   const INTERNET_CHECK_DELAY = 1000;
@@ -58,6 +79,54 @@ export function Options_Section({}) {
   }, []);
 
   //////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////
+
+  function handleUserPress(userObj) {
+    let millis = new Date().getTime();
+    let option = zClockedInUsersArr.find((o) => o.id === userObj.id)
+      ? "out"
+      : "in";
+    // log("clocked in arr", zClockedInUsersArr);
+    let clockinFun = () => {
+      _zSetClockedInUser(userObj.id, millis, option);
+      dbSetUserPunchAction({
+        userID: userObj.id,
+        millisIn: option === "in" ? millis : null,
+        millisOut: option === "out" ? millis : null,
+      });
+
+      if (option === "out") {
+        let clockPauseObj = localStorageWrapper.getItem(
+          LOCAL_DB_KEYS.userClockCheckPauseObj
+        );
+        if (!clockPauseObj) clockPauseObj = {};
+        clockPauseObj[userObj.id] = new Date().getTime();
+        localStorageWrapper.setItem(
+          LOCAL_DB_KEYS.userClockCheckPauseObj,
+          clockPauseObj
+        );
+      }
+    };
+
+    let viewHistoryFun = () => {
+      log("view history here");
+    };
+
+    _zSetShowAlert(true);
+    _zSetAlertValues({
+      title: "PUNCH CLOCK",
+      btn1Text: option == "in" ? "CLOCK IN" : "CLOCK OUT",
+      btn2Text: "VIEW HISTORY",
+      btn3Text: "CANCEL",
+      btn1Icon: ICONS.clockGif,
+      btn2Icon: ICONS.listGif,
+      btn3Icon: ICONS.cancelGif,
+      handleBtn1Press: clockinFun,
+      handleBtn2Press: viewHistoryFun,
+      handleBtn3Press: () => null,
+      alertBoxStyle: { width: 700 },
+    });
+  }
 
   function ScreenComponent() {
     switch (zOptionsTabName) {
@@ -75,13 +144,22 @@ export function Options_Section({}) {
 
   return (
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
+      {/* <UserClockHistoryModal
+        visible={zCurrentUserObj}
+        userObj={zCurrentUserObj}
+      /> */}
+
       <TabBar
-        userObj={zUserObj}
+        userObj={zCurrentUserObj}
+        isClockedIn={zClockedInUsersArr?.find(
+          (o) => o.id === zCurrentUserObj?.id
+        )}
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}
         // __tabMenuHeight={}
         __isOnline={sIsOnline}
         webcamDetected={zWebcamDetected}
+        handleUserPress={handleUserPress}
       />
       {ScreenComponent()}
     </View>
@@ -93,10 +171,12 @@ export function Options_Section({}) {
 
 export const TabBar = ({
   userObj,
+  isClockedIn,
   webcamDetected,
   __isOnline,
   zOptionsTabName,
   _zSetOptionsTabName,
+  handleUserPress,
 }) => (
   <View
     style={{
@@ -137,15 +217,27 @@ export const TabBar = ({
     </View>
     <View style={{ flexDirection: "row", alignItems: "center" }}>
       {userObj ? (
-        <Text style={{ color: APP_BASE_COLORS.textMain }}>
-          {userObj.first + " " + userObj.last[0] + "."}
-        </Text>
+        <Button_
+          onPress={() => handleUserPress(userObj)}
+          icon={isClockedIn ? ICONS.check : ICONS.redx}
+          text={userObj.first + " " + userObj.last[0] + "."}
+          textStyle={{ fontSize: 13 }}
+          iconSize={13}
+          buttonStyle={{
+            paddingHorizontal: 7,
+            paddingVertical: 2,
+            marginRight: 5,
+            borderWidth: 1,
+            borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+            backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+            borderRadius: 15,
+          }}
+        />
       ) : null}
-      <View style={{ width: 8 }} />
-      <Image_
-        style={{ width: 19, height: 19 }}
-        icon={webcamDetected ? ICONS.camera : null}
-      />
+
+      {webcamDetected ? (
+        <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
+      ) : null}
       <View style={{ width: 5 }} />
       <Image_
         style={{ width: 28, height: 28 }}

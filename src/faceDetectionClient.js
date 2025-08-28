@@ -1,10 +1,13 @@
 import React, { useRef, useEffect, useState } from "react";
 import { View, Button, Text } from "react-native";
 import * as faceapi from "face-api.js";
-import { clog, log } from "./utils";
+import { clog, localStorageWrapper, log } from "./utils";
 import {
   FACE_DESCRIPTOR_CONFIDENCE_DISTANCE,
-  FACIAL_RECOGNITION_INTERVAL,
+  FACIAL_RECOGNITION_INTERVAL_MILLIS,
+  LOCAL_DB_KEYS,
+  MILLIS_IN_MINUTE,
+  PAUSE_USER_CLOCK_IN_CHECK_MILLIS,
 } from "./constants";
 import {
   useAlertScreenStore,
@@ -16,11 +19,12 @@ import { SETTINGS_OBJ } from "./data";
 import { intersection } from "lodash";
 import { cloneDeep } from "lodash";
 import { StaticRouter } from "react-router-dom";
+import { dbSetUserPunchAction } from "./db_call_wrapper";
 // import {} from "./models";
 
 const MODEL_URL = "./models"; // Place models in public/models
 
-export function FaceDetectionComponent({ runInBackground = true }) {
+export function FaceDetectionComponent({}) {
   // store setters ////////////////////////////////////////////////////
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
   const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
@@ -34,11 +38,15 @@ export function FaceDetectionComponent({ runInBackground = true }) {
     (state) => state.setButton2Handler
   );
   const _zSetShowAlert = useAlertScreenStore((state) => state.setShowAlert);
+  const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
 
   // store getters ///////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zClockedInUsersArr = useLoginStore((state) =>
     state.getClockedInUsers()
+  );
+  const zRunBackgroundRecognition = useLoginStore((state) =>
+    state.getRunBackgroundRecognition()
   );
 
   /////////////////////////////////////////////////////////////////////////
@@ -49,49 +57,50 @@ export function FaceDetectionComponent({ runInBackground = true }) {
   const [enrolledDescriptor, setEnrolledDescriptor] = useState(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [backgroundStarted, _setBackgroundStarted] = useState(false);
-  const [setupComplete, setSetupComplete] = useState(false);
-  const [sLastCheckedUserObj, _setLastCheckedUserObj] = useState([]);
+  const [sBackgroundRecognitionRunning, _setBackgroundRecognitionRunning] =
+    useState(false);
+  const [sSetupComplete, _setSetupComplete] = useState(false);
   const [sPauseBackgroundRecognition, _setPauseBackgroundRecognition] =
     useState(false);
   const [sFacialRecognitionReady, _setFacialRecognitionReady] = useState(false);
 
   useEffect(() => {
+    // localStorageWrapper.clearLocalStorage(); // testing
     const SETUP_END_COUNT = 4;
     let setupCount = 0;
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL).then(() => {
       setupCount++;
-      if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+      if (setupCount === SETUP_END_COUNT) _setSetupComplete(true);
     });
     faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL).then(() => {
       setupCount++;
-      if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+      if (setupCount === SETUP_END_COUNT) _setSetupComplete(true);
     });
     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL).then(() => {
       setupCount++;
-      if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+      if (setupCount === SETUP_END_COUNT) _setSetupComplete(true);
     });
     startVideo()
       .then(() => {
         setupCount++;
         _zSetWebcamDetected(true);
-        if (setupCount === SETUP_END_COUNT) setSetupComplete(true);
+        if (setupCount === SETUP_END_COUNT) _setSetupComplete(true);
       })
       .catch((e) => {
         log("no webcam detected", e);
         _zSetWebcamDetected(false);
       });
-  }, []);
+  }, [_zSetWebcamDetected]);
 
+  // watch the
   useEffect(() => {
-    if (!zSettingsObj || backgroundStarted) return;
-    if (runInBackground) _setFacialRecognitionReady(true);
-  }, [zSettingsObj, backgroundStarted, runInBackground]);
+    if (!zSettingsObj || sBackgroundRecognitionRunning) return;
+    if (sSetupComplete) _setFacialRecognitionReady(true);
+  }, [zSettingsObj, sBackgroundRecognitionRunning, sSetupComplete]);
 
   // cleanup state
   useEffect(() => {
     return () => {
-      // log("cleaning up faceDetectionClient state");
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -100,16 +109,18 @@ export function FaceDetectionComponent({ runInBackground = true }) {
   }, [intervalRef, streamRef]);
 
   useEffect(() => {
-    if (!sFacialRecognitionReady) return;
+    if (!sFacialRecognitionReady || !zRunBackgroundRecognition || !zSettingsObj)
+      return;
+
     log("starting background facial recognition");
-    _setBackgroundStarted(true);
+    _setBackgroundRecognitionRunning(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(async () => {
       if (sPauseBackgroundRecognition) return;
       const currentDesc = await getFaceDescriptor();
       if (currentDesc) {
         // log("found descriptor");
-        let userObj = zSettingsObj.users.find((userObj) => {
+        let userObj = zSettingsObj?.users?.find((userObj) => {
           const distance = faceapi.euclideanDistance(
             userObj.faceDescriptor,
             currentDesc
@@ -123,30 +134,60 @@ export function FaceDetectionComponent({ runInBackground = true }) {
           }
         });
         if (userObj) {
-          // log("here");
-          _zSetCurrentUserObj(userObj);
-          // log(zClockedInUsersArr);
+          _zSetCurrentUserObj(userObj); // set app user on face recognition
+
+          // check to see if user asked to not clock in within period of time
           let clockedInUser = zClockedInUsersArr.find(
             (o) => o.id === userObj.id
           );
           if (!clockedInUser) {
+            let clockPauseObj = localStorageWrapper.getItem(
+              LOCAL_DB_KEYS.userClockCheckPauseObj
+            );
+            if (!clockPauseObj) clockPauseObj = {};
+            localStorageWrapper.setItem(
+              LOCAL_DB_KEYS.userClockCheckPauseObj,
+              clockPauseObj
+            );
+
+            let userKey = Object.keys(clockPauseObj).find(
+              (id) => id === userObj.id
+            );
+            if (userKey) {
+              let lastCheckMillis = clockPauseObj[userKey];
+              if (
+                new Date().getTime() - lastCheckMillis <
+                PAUSE_USER_CLOCK_IN_CHECK_MILLIS
+              )
+                return;
+            }
+
+            // ask the user if they want to clock in. pause for period of time if not, so they may use the computer without it asking all the time
+            let millis = new Date().getTime();
             _zSetShowAlert(true);
             _setPauseBackgroundRecognition(true);
-            _zSetAlertTitle("PUNCH CLOCK");
-            _zSetAlertMessage(
-              "Hi " +
+            _zSetAlertValues({
+              title: "PUNCH CLOCK",
+              message:
+                "Hi " +
                 userObj.first +
-                ", you are not clocked in. Would you like to punch in now?"
-            );
-            _zSetAlertBtn1Handle(() => {
-              _zSetClockedInUser(userObj);
-              _setPauseBackgroundRecognition(false);
-            });
-            _zSetAlertBtn2Handle(() => {
-              let lastCheckedUserObj = cloneDeep(sLastCheckedUserObj);
-              lastCheckedUserObj[userObj.id] = new Date().getTime();
-              _setLastCheckedUserObj(lastCheckedUserObj);
-              _setPauseBackgroundRecognition(false);
+                ", you are not clocked in. Would you like to punch in now?",
+              handleBtn1Press: () => {
+                _zSetClockedInUser(userObj.id, millis, "in");
+                dbSetUserPunchAction({
+                  userID: userObj.id,
+                  millisIn: millis,
+                });
+                _setPauseBackgroundRecognition(false);
+              },
+              handleBtn2Press: () => {
+                clockPauseObj[userObj.id] = new Date().getTime();
+                localStorageWrapper.setItem(
+                  LOCAL_DB_KEYS.userClockCheckPauseObj,
+                  clockPauseObj
+                );
+                _setPauseBackgroundRecognition(false);
+              },
             });
           }
         } else {
@@ -155,14 +196,14 @@ export function FaceDetectionComponent({ runInBackground = true }) {
       } else {
         _zSetCurrentUserObj(null);
       }
-    }, FACIAL_RECOGNITION_INTERVAL);
+    }, FACIAL_RECOGNITION_INTERVAL_MILLIS);
   }, [
     sFacialRecognitionReady,
-    sLastCheckedUserObj,
     zClockedInUsersArr,
     zSettingsObj,
     sPauseBackgroundRecognition,
     intervalRef,
+    _setPauseBackgroundRecognition,
   ]);
 
   //////////////////////////////////////////////////////////////////////////////
@@ -219,14 +260,14 @@ export function FaceDetectionComponent({ runInBackground = true }) {
     <View style={{}}>
       <video
         ref={videoRef}
-        width={runInBackground ? 0 : 320}
-        height={runInBackground ? 0 : 250}
+        width={zRunBackgroundRecognition ? 0 : 320}
+        height={zRunBackgroundRecognition ? 0 : 250}
         autoPlay
         muted
         onLoadedMetadata={handleLoadedMetadata}
         style={{}}
       />
-      {!runInBackground ? (
+      {!zRunBackgroundRecognition ? (
         <View>
           <Button
             title="Enroll Face"

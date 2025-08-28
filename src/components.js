@@ -18,6 +18,7 @@ import {
   clog,
   formatDecimal,
   generateRandomID,
+  getPreviousMondayDayJS,
   ifNumIsOdd,
   insertOpacityIntoRGBString,
   LETTERS,
@@ -79,6 +80,12 @@ import Dropzone from "react-dropzone";
 import { CheckBox_ as RNCheckBox_ } from "react-native-web";
 import LinearGradient from "react-native-web-linear-gradient";
 import { TextComponent } from "react-native";
+// import DateTimePicker from "@react-native-community/datetimepicker";
+import CalendarPicker, {
+  DateType,
+  useDefaultStyles,
+} from "react-native-ui-datepicker";
+import dayjs from "dayjs"; // Recommended for date manipulation
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -203,7 +210,7 @@ export const TextInputOnMainBackground = ({
 
 export const AlertBox_ = ({}) => {
   // store setters /////////////////////////////////////////////////////////////
-  const zResetAll = useAlertScreenStore((state) => state.resetAll);
+  const _zResetAll = useAlertScreenStore((state) => state.resetAll);
 
   // store getters //////////////////////////////////////////////////////////////
   const zCanExitOnOuterClick = useAlertScreenStore((state) =>
@@ -215,33 +222,47 @@ export const AlertBox_ = ({}) => {
   const zSubMessage = useAlertScreenStore((state) => state.getSubMessage());
   const zButton1Text = useAlertScreenStore((state) => state.getButton1Text());
   const zButton2Text = useAlertScreenStore((state) => state.getButton2Text());
+  const zButton3Text = useAlertScreenStore((state) => state.getButton3Text());
   const zButton1Handler = useAlertScreenStore((state) =>
     state.getButton1Handler()
   );
   const zButton2Handler = useAlertScreenStore((state) =>
     state.getButton2Handler()
   );
+  const zButton3Handler = useAlertScreenStore((state) =>
+    state.getButton3Handler()
+  );
   const zButton1Icon = useAlertScreenStore((state) => state.getButton1Icon());
   const zButton2Icon = useAlertScreenStore((state) => state.getButton2Icon());
+  const zButton3Icon = useAlertScreenStore((state) => state.getButton3Icon());
   const zIcon1Size = useAlertScreenStore((state) => state.getIcon1Size());
   const zIcon2Size = useAlertScreenStore((state) => state.getIcon2Size());
+  const zIcon3Size = useAlertScreenStore((state) => state.getIcon3Size());
+  const zAlertBoxStyle = useAlertScreenStore((state) =>
+    state.getAlertBoxStyle()
+  );
 
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
   function handleButton1Press() {
     zButton1Handler();
-    zResetAll();
+    _zResetAll();
   }
 
   function handleButton2Press() {
     zButton2Handler();
-    zResetAll();
+    _zResetAll();
+  }
+
+  function handleButton3Press() {
+    zButton3Handler();
+    _zResetAll();
   }
 
   return (
     <TouchableWithoutFeedback
-      onPress={() => (zCanExitOnOuterClick ? _setVisible(false) : null)}
+      onPress={() => (zCanExitOnOuterClick ? _zResetAll() : null)}
     >
       <Modal visible={zShowAlert} transparent>
         <View
@@ -263,8 +284,7 @@ export const AlertBox_ = ({}) => {
               justifyContent: "space-around",
               minWidth: "30%",
               minHeight: "20%",
-              maxWidth: "30%",
-              maxHeight: "50%",
+              ...zAlertBoxStyle,
             }}
           >
             {zTitle ? (
@@ -312,18 +332,16 @@ export const AlertBox_ = ({}) => {
               style={{
                 marginTop: 25,
                 flexDirection: "row",
-                justifyContent: "space-around",
+                justifyContent: "center",
                 marginBottom: 25,
-                width: "60%",
+                width: "100%",
               }}
             >
               <Button_
-                colorGradientArr={zButton1Text ? COLOR_GRADIENTS.purple : []}
+                colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
                 text={zButton1Text}
-                buttonStyle={zButton1Text ? {} : {}}
-                textStyle={
-                  zButton1Text ? { color: APP_BASE_COLORS.textWhite } : {}
-                }
+                buttonStyle={{ marginRight: 20 }}
+                textStyle={{ color: APP_BASE_COLORS.textWhite }}
                 onPress={handleButton1Press}
                 iconSize={zIcon1Size || 60}
                 icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
@@ -332,7 +350,7 @@ export const AlertBox_ = ({}) => {
                 <Button_
                   colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
                   text={zButton2Text}
-                  buttonStyle={zButton2Text ? {} : {}}
+                  buttonStyle={{ marginRight: 20 }}
                   textStyle={
                     zButton2Text ? { color: APP_BASE_COLORS.textWhite } : {}
                   }
@@ -341,11 +359,91 @@ export const AlertBox_ = ({}) => {
                   icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
                 />
               ) : null}
+              {zButton3Handler ? (
+                <Button_
+                  colorGradientArr={zButton3Text ? COLOR_GRADIENTS.purple : []}
+                  text={zButton3Text}
+                  buttonStyle={zButton3Text ? {} : {}}
+                  textStyle={
+                    zButton3Text ? { color: APP_BASE_COLORS.textWhite } : {}
+                  }
+                  onPress={handleButton3Press}
+                  iconSize={zIcon3Size || 60}
+                  icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
+                />
+              ) : null}
             </View>
           </View>
         </View>
       </Modal>
     </TouchableWithoutFeedback>
+  );
+};
+
+export const DateTimePicker = ({ range, handleDateRangeChange = () => {} }) => {
+  const defaultStyles = useDefaultStyles();
+  // const [range, setRange] = useState({
+  //   startDate, // Initialize with a default start date
+  //   endDate,
+  // });
+
+  function handleDateChange(obj) {
+    // setRange(obj);
+    handleDateRangeChange(obj);
+    // onStartDateChange(obj.startDate);
+    // onEndDateChange(obj.endDate);
+  }
+
+  return (
+    // <TouchableWithoutFeedback onPress={() => null}>
+    // <Modal visible={true} transparent>
+    <View
+      style={{
+        backgroundColor: "rgba(0, 0, 0, 0.75)",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: 15,
+      }}
+    >
+      <View
+        style={{
+          padding: 50,
+          // backgroundColor: "lightgray",
+          borderRadius: 15,
+          alignItems: "center",
+        }}
+      >
+        <CalendarPicker
+          styles={{
+            ...defaultStyles,
+            today: {
+              borderColor: APP_BASE_COLORS.lightred,
+              borderWidth: 2,
+              borderRadius: 100,
+            }, // Add a border to today's date
+            selected: {
+              borderRadius: 100,
+              backgroundColor: APP_BASE_COLORS.blue,
+            },
+            selected_label: { color: "white" },
+          }}
+          mode="range"
+          startDate={range.startDate}
+          endDate={range.endDate}
+          onChange={handleDateRangeChange}
+          // minDate={new Date()}
+        />
+        {/* <Button_
+          text={"SUBMIT"}
+          icon={ICONS.paperPlane}
+          colorGradientArr={COLOR_GRADIENTS.blue}
+          buttonStyle={{ width: 150 }}
+          onPress={handleSubmit}
+        /> */}
+      </View>
+    </View>
+    // </Modal>
+    // </TouchableWithoutFeedback>
   );
 };
 
@@ -2548,19 +2646,19 @@ export const GradientView = ({
 };
 
 export const Image_ = ({
-  size = 30,
-  style = { width: 30, height: 30 },
+  size,
+  style = {},
   resizeMode = "contain",
   icon = "",
 }) => {
-  let width, height;
-  if (style.width) {
-    width = style.width;
-    height = style.height;
-  } else {
-    (width = size), (height = size);
+  if (size) {
+    style.width = size;
+    style.height = size;
+  } else if (!style.width || !style.height) {
+    style.width ? null : (style.width = 30);
+    style.height ? null : (style.height = 30);
   }
-  return <Image source={icon} style={{ width, height, ...style }} />;
+  return <Image source={icon} style={{ ...style }} />;
 };
 
 export const Button_ = ({
@@ -2589,6 +2687,7 @@ export const Button_ = ({
   textStyle = {},
   iconStyle = {},
   viewStyle = {},
+  autoFocus,
 }) => {
   const [sMouseOver, _setMouseOver] = React.useState(false);
   if (allCaps) text = text.toUpperCase();

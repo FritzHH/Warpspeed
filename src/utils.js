@@ -4,11 +4,12 @@ import { getNewCollectionRef, setInventoryItem } from "./db";
 import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO } from "./data";
 import { generate } from "random-words";
 import { cloneDeep } from "lodash";
+import dayjs from "dayjs";
 
 // const fs = require("node:fs");
 export const dim = {
   windowWidth: window.innerWidth,
-  windowHeight: window.innerHeight
+  windowHeight: window.innerHeight,
 };
 
 export const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
@@ -75,7 +76,7 @@ export function calculateRunningTotals(workorderObj, inventoryArr) {
   let obj = {
     runningTotal: trimToTwoDecimals(runningTotal),
     runningDiscount: trimToTwoDecimals(runningDiscount),
-    runningQty
+    runningQty,
   };
   // clog(obj);
   return obj;
@@ -140,14 +141,14 @@ export function formatDateTime(dateObj, millis) {
     date: formattedDate,
     time: formattedTime,
     topTicketDateTimeString,
-    dayOfWeek
+    dayOfWeek,
   };
 }
 
 export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
   let returnObj = {
     totalAmount: 0,
-    totalTax: 0
+    totalTax: 0,
   };
   if (workorderObj.taxFree) return returnObj;
   // log("total", totalAmount * zSettingsObj.salesTax);
@@ -155,7 +156,7 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
   let total = tax + Number(totalAmount);
   return {
     totalAmount: trimToTwoDecimals(total),
-    tax: trimToTwoDecimals(tax)
+    tax: trimToTwoDecimals(tax),
   };
 }
 
@@ -203,7 +204,7 @@ export const FileInputComponent = ({
   handleBinaryString,
   buttonStyle = {},
   textStyle = {},
-  text
+  text,
 }) => {
   const fileInputRef = useRef(null);
   const onDrop = useCallback((acceptedFiles) => {
@@ -239,7 +240,7 @@ export const FileInputComponent = ({
           alignItems: "center",
           justifyContent: "center",
           ...SHADOW_RADIUS_PROTO,
-          ...buttonStyle
+          ...buttonStyle,
         }}
       >
         <Text style={{ ...textStyle }}>{text || "Drag File / Click Here"}</Text>
@@ -260,7 +261,7 @@ export const FileInputComponent = ({
           width: 200,
           height: 30,
           backgroundColor: null,
-          ...buttonStyle
+          ...buttonStyle,
         }}
       >
         <input
@@ -372,15 +373,21 @@ export function getConnectionStrength() {
     return {
       downlink,
       effectiveType,
-      strength
+      strength,
     };
   } else {
     return {
       downlink: null,
       effectiveType: "unknown",
-      strength: "Cannot determine (API not supported)"
+      strength: "Cannot determine (API not supported)",
     };
   }
+}
+
+// return date object
+export function getPreviousMondayDayJS(date = dayjs()) {
+  const dayOfWeek = date.day() === 0 ? 7 : date.day();
+  return date.subtract(dayOfWeek - 1, "day");
 }
 
 export function getWordDayOfWeek(millies, abbreviated) {
@@ -516,7 +523,7 @@ export function applyDiscountToWorkorderItem(
     value: discountObj.value,
     newPrice: trimToTwoDecimals(newPrice),
     savings: trimToTwoDecimals(savings),
-    name: discountObj.name
+    name: discountObj.name,
   };
 }
 
@@ -635,3 +642,18 @@ export function lightenRGB(r, g, b, amount) {
 
   return { r, g, b };
 }
+
+export const localStorageWrapper = {
+  setItem: (key, item) => {
+    localStorage.setItem(key, JSON.stringify(item));
+  },
+  getItem: (key) => {
+    return JSON.parse(localStorage.getItem(key));
+  },
+  removeItem: (key) => {
+    localStorage.removeItem(key);
+  },
+  clearLocalStorage: () => {
+    localStorage.clear();
+  },
+};

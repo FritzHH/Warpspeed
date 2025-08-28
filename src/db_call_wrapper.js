@@ -1,4 +1,12 @@
 import {
+  FIRESTORE_DATABASE_NODE_NAMES,
+  // FIRESTORE_DATABASE_NODE_NAMES,
+  MILLIS_IN_MINUTE,
+  REALTIME_DATABASE_NODE_NAMES,
+  // REALTIME_DATABASE_PATHS,
+} from "./constants";
+import {
+  addToFirestoreCollectionItem,
   cancelServerDrivenStripePayment,
   cancelStripeActivePaymentIntents,
   getCollectionItem,
@@ -12,9 +20,10 @@ import {
   searchCollection,
   sendSMS,
   setFirestoreCollectionItem,
+  setFirestoreSubCollectionItem,
   setRealtimeNodeItem,
 } from "./db";
-import { log } from "./utils";
+import { generateRandomID, log } from "./utils";
 
 // setters ///////////////////////////////////////////////////////
 export function dbSetCustomerObj(customerObj, removeOption = false) {
@@ -60,6 +69,27 @@ export function dbSetSaleItem(item, removeOption = false) {
   return setFirestoreCollectionItem("SALES", id, item);
 }
 
+export function dbSetUserPunchAction({ userID, millisIn, millisOut }) {
+  let id = generateRandomID();
+  let obj = {
+    millis: millisIn || millisOut,
+    option: millisIn ? "in" : "out",
+    id,
+    userID,
+  };
+  // log("obj", obj);
+  let punchClockPath =
+    "APP-USERS/" + userID + "/" + FIRESTORE_DATABASE_NODE_NAMES.punchClock;
+  let activeClockPath = REALTIME_DATABASE_NODE_NAMES.loggedInUsers + userID;
+  if (millisOut) {
+    setRealtimeNodeItem(activeClockPath, null);
+  } else {
+    setRealtimeNodeItem(activeClockPath, millisIn);
+  }
+  addToFirestoreCollectionItem(punchClockPath, obj);
+  // setRealtimeNodeItem(historyPath, obj);
+}
+
 // database getters ///////////////////////////////////////////////////////////
 export function dbGetClosedWorkorderItem(id) {
   return getCollectionItem("CLOSED-WORKORDERS", id);
@@ -75,6 +105,11 @@ export function dbGetSaleItem(id) {
 
 export function dbGetCustomerObj(id) {
   return getCollectionItem("CUSTOMERS", id);
+}
+
+// database filters //////////////////////////////////////////////////
+export function dbFindPunchHistoryByMillisRange(userID, start, end) {
+  // let path =
 }
 
 // database searchers /////////////////////////////////////////////////

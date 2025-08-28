@@ -1,3 +1,4 @@
+/*eslint-disable*/
 import React, { useRef, useEffect, useState } from "react";
 import { View, Button, Text } from "react-native";
 import * as faceapi from "face-api.js";
@@ -19,12 +20,14 @@ import { SETTINGS_OBJ } from "./data";
 import { intersection } from "lodash";
 import { cloneDeep } from "lodash";
 import { StaticRouter } from "react-router-dom";
-import { dbSetUserPunchAction } from "./db_call_wrapper";
+import { dbSetAppUserObj, dbSetUserPunchAction } from "./db_call_wrapper";
+import { Button_ } from "./components";
+import { APP_BASE_COLORS, COLOR_GRADIENTS } from "./styles";
 // import {} from "./models";
 
 const MODEL_URL = "./models"; // Place models in public/models
 
-export function FaceDetectionComponent({}) {
+export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
   // store setters ////////////////////////////////////////////////////
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
   const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
@@ -53,7 +56,7 @@ export function FaceDetectionComponent({}) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
-  const [status, setStatus] = useState("Loading models...");
+  const [status, setStatus] = useState("Loading models and finding webcam...");
   const [enrolledDescriptor, setEnrolledDescriptor] = useState(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
@@ -85,6 +88,7 @@ export function FaceDetectionComponent({}) {
         setupCount++;
         _zSetWebcamDetected(true);
         if (setupCount === SETUP_END_COUNT) _setSetupComplete(true);
+        setStatus("Setup ready, enroll face now");
       })
       .catch((e) => {
         log("no webcam detected", e);
@@ -95,7 +99,10 @@ export function FaceDetectionComponent({}) {
   // watch the
   useEffect(() => {
     if (!zSettingsObj || sBackgroundRecognitionRunning) return;
-    if (sSetupComplete) _setFacialRecognitionReady(true);
+    // if (sSetupComplete) getFaceDescriptor();
+    if (sSetupComplete) {
+      _setFacialRecognitionReady(true);
+    }
   }, [zSettingsObj, sBackgroundRecognitionRunning, sSetupComplete]);
 
   // cleanup state
@@ -108,6 +115,7 @@ export function FaceDetectionComponent({}) {
     };
   }, [intervalRef, streamRef]);
 
+  // background facial detection service
   useEffect(() => {
     if (!sFacialRecognitionReady || !zRunBackgroundRecognition || !zSettingsObj)
       return;
@@ -121,13 +129,16 @@ export function FaceDetectionComponent({}) {
       if (currentDesc) {
         // log("found descriptor");
         let userObj = zSettingsObj?.users?.find((userObj) => {
+          if (!userObj.faceDescriptor) {
+            return null;
+          }
           const distance = faceapi.euclideanDistance(
             userObj.faceDescriptor,
             currentDesc
           );
           if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
             // log("Face descriptor distance", distance);
-            // clog("Face Login!", userObj);
+            // log("Face Login!", userObj);
             return true;
           } else {
             return false;
@@ -233,13 +244,16 @@ export function FaceDetectionComponent({}) {
     if (!videoRef.current) {
       return null;
     }
+    // log("getting descriptor");
     const detection = await faceapi
       .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
       .withFaceDescriptor();
     if (detection) {
+      // log("descriptor", detection.descriptor);
       return detection.descriptor;
     } else {
+      log("no face descriptor detection");
       return null;
     }
   };
@@ -248,9 +262,11 @@ export function FaceDetectionComponent({}) {
     setStatus("Detecting face for enrollment...");
     const desc = await getFaceDescriptor();
     if (desc) {
-      // log("desc", desc);
-      setEnrolledDescriptor(desc);
-      // startBackgroundRecognition(desc);
+      setStatus("Found facial descriptor. You may exit now.");
+      log("Found Descriptor");
+      let userObj = null;
+      __handleEnrollDescriptor(desc);
+      // dbSetAppUserObj(userObj);
     } else {
       setStatus("No face detected. Try again.");
     }
@@ -260,35 +276,34 @@ export function FaceDetectionComponent({}) {
     <View style={{}}>
       <video
         ref={videoRef}
-        width={zRunBackgroundRecognition ? 0 : 320}
-        height={zRunBackgroundRecognition ? 0 : 250}
+        width={zRunBackgroundRecognition ? 0 : 500}
+        height={zRunBackgroundRecognition ? 0 : 500}
         autoPlay
         muted
         onLoadedMetadata={handleLoadedMetadata}
         style={{}}
       />
       {!zRunBackgroundRecognition ? (
-        <View>
-          <Button
-            title="Enroll Face"
-            onPress={handleEnroll}
-            disabled={!!enrolledDescriptor}
-          />
-          <Text style={{ margin: 12, color: "#007AFF", fontSize: 16 }}>
+        <View style={{ alignItems: "center" }}>
+          <Text
+            style={{
+              marginBottom: 20,
+              color: "#007AFF",
+              fontSize: 18,
+              fontWeight: 400,
+            }}
+          >
             {status}
           </Text>
-          {loggedIn && (
-            <Text
-              style={{
-                margin: 12,
-                color: "green",
-                fontSize: 20,
-                fontWeight: "bold",
-              }}
-            >
-              ✅ You are logged in!
-            </Text>
-          )}
+          {sSetupComplete ? (
+            <Button_
+              buttonStyle={{ marginBottom: 20 }}
+              colorGradientArr={COLOR_GRADIENTS.blue}
+              textStyle={{ color: APP_BASE_COLORS.textWhite }}
+              text="Enroll Face"
+              onPress={handleEnroll}
+            />
+          ) : null}
         </View>
       ) : null}
     </View>

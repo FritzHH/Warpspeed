@@ -9,6 +9,7 @@ import {
   addToFirestoreCollectionItem,
   cancelServerDrivenStripePayment,
   cancelStripeActivePaymentIntents,
+  filterFirestoreCollectionByNumber,
   getCollectionItem,
   getPaymentIntent,
   getRealtimeNodeItem,
@@ -79,7 +80,10 @@ export function dbSetUserPunchAction({ userID, millisIn, millisOut }) {
   };
   // log("obj", obj);
   let punchClockPath =
-    "APP-USERS/" + userID + "/" + FIRESTORE_DATABASE_NODE_NAMES.punchClock;
+    FIRESTORE_DATABASE_NODE_NAMES.appUsers +
+    userID +
+    "/" +
+    FIRESTORE_DATABASE_NODE_NAMES.punchClock;
   let activeClockPath = REALTIME_DATABASE_NODE_NAMES.loggedInUsers + userID;
   if (millisOut) {
     setRealtimeNodeItem(activeClockPath, null);
@@ -90,6 +94,11 @@ export function dbSetUserPunchAction({ userID, millisIn, millisOut }) {
   // setRealtimeNodeItem(historyPath, obj);
 }
 
+export function dbSetAppUserObj(userObj, remove = false) {
+  let path = "SETTINGS/" + userObj.id;
+  if (remove) userObj = null;
+  return setRealtimeNodeItem(path, userObj);
+}
 // database getters ///////////////////////////////////////////////////////////
 export function dbGetClosedWorkorderItem(id) {
   return getCollectionItem("CLOSED-WORKORDERS", id);
@@ -109,7 +118,13 @@ export function dbGetCustomerObj(id) {
 
 // database filters //////////////////////////////////////////////////
 export function dbFindPunchHistoryByMillisRange(userID, start, end) {
-  // let path =
+  let path =
+    FIRESTORE_DATABASE_NODE_NAMES.appUsers +
+    userID +
+    "/" +
+    FIRESTORE_DATABASE_NODE_NAMES.punchClock;
+  // log(path);
+  return filterFirestoreCollectionByNumber(path, "millis", start, end);
 }
 
 // database searchers /////////////////////////////////////////////////
@@ -191,3 +206,7 @@ export function dbCancelServerDrivenStripePayment(readerID, paymentIntentID) {
 export function dbRetrieveAvailableStripeReaders() {
   return retrieveAvailableStripeReaders();
 }
+
+// path builders
+
+function buildPath(one, two, three, four, five) {}

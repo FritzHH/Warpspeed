@@ -8,7 +8,7 @@ import {
 } from "react-native-web";
 import { log } from "../../../utils";
 import { Button_, ScreenModal } from "../../../components";
-import { Items_Modal_DashboardAdmin } from "./dashboard_screen/Dashboard_Admin";
+import { Dashboard_Admin } from "./dashboard_screen/Dashboard_Admin";
 import { useState } from "react";
 import { APP_USER, SETTINGS_OBJ } from "../../../data";
 import { useLoginStore, useSettingsStore } from "../../../stores";
@@ -26,12 +26,20 @@ export function Items_Dashboard({}) {
   //////////////////////////////////////////////////////////////
   const [sShowAdminModal, _setShowAdminModal] = useState(false);
 
-  function go() {}
+  function ScreenComponent() {
+    return <Dashboard_Admin />;
+  }
 
   return (
-    <View style={{ width: "100%", height: "100%", paddingTop: 40 }}>
-      {/* <Button_ text={"Face Recog."} onPress={go} /> */}
-      {/* <FaceLogin /> */}
+    <View
+      style={{
+        // width: "100%",
+        // height: "100%",
+        flex: 1,
+        // backgroundColor: "green",
+      }}
+    >
+      {ScreenComponent()}
     </View>
   );
 }

@@ -1,5 +1,7 @@
 /* eslint-disable */
 
+import { PERMISSION_LEVELS } from "./constants";
+
 ////////// hardcoded settings and options ///////
 export const SHADOW_RADIUS_NOTHING = {
   shadowOffset: { width: 0, height: 0 },
@@ -212,6 +214,7 @@ export const APP_USER = {
   phone: "",
   pin: "",
   faceDescriptor: "",
+  hourlyWage: "",
 };
 
 export const TIME_PUNCH_PROTO = {
@@ -565,10 +568,11 @@ export const SETTINGS_OBJ = {
       first: "Fritz",
       last: "Hieb",
       id: "1234",
-      permissions: "owner",
+      permissions: PERMISSION_LEVELS.owner,
       phone: "2393369177",
       pin: "33",
-      alternatePin: "jj",
+      hourlyWage: 25,
+      faceDescriptor: "",
     },
   ],
   cardReaders: [

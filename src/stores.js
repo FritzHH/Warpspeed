@@ -46,7 +46,7 @@ export const useInvModalStore = create((set, get) => ({
 }));
 
 export const useTabNamesStore = create((set, get) => ({
-  itemsTabName: TAB_NAMES.itemsTab.empty,
+  itemsTabName: TAB_NAMES.itemsTab.dashboard,
   optionsTabName: TAB_NAMES.optionsTab.workorders,
   infoTabName: TAB_NAMES.infoTab.customer,
 

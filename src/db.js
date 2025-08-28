@@ -173,8 +173,13 @@ export function subscribeToCollectionNode(collectionName, callback) {
 }
 
 // search and filters
-export async function searchCollection(collectionPath, fieldName, searchTerm) {
-  let text = searchTerm.toString();
+export async function searchCollection(
+  collectionPath,
+  fieldName,
+  searchTerm,
+  isText
+) {
+  let text = isText ? searchTerm.toString() : searchTerm;
   // log("search term", text);
   let q = query(
     collection(DB, collectionPath),
@@ -192,6 +197,30 @@ export async function searchCollection(collectionPath, fieldName, searchTerm) {
   return queryRes;
 }
 
+export async function filterFirestoreCollectionByNumber(
+  collectionPath,
+  fieldName,
+  startVal,
+  endVal
+) {
+  // log("search term", text);
+  log(startVal, endVal);
+  let q = query(
+    collection(DB, collectionPath),
+    where(fieldName, ">=", startVal),
+    where(fieldName, "<=", endVal)
+    // where(fieldName, "<=", end + "\uf8ff")
+  );
+
+  let queryRes = [];
+  let querySnapshot = await getDocs(q);
+  // log("snap empty", querySnapshot.empty.toString());
+  querySnapshot.forEach((doc) => {
+    // log("doc", doc.data());
+    queryRes.push(doc.data());
+  });
+  return queryRes;
+}
 ///////////////////////////////////////////////////////////////////////
 ////// Realtime Database calls ////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////

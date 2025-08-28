@@ -82,69 +82,6 @@ export function calculateRunningTotals(workorderObj, inventoryArr) {
   return obj;
 }
 
-export function formatDateTime(dateObj, millis) {
-  let now = dateObj;
-  if (!dateObj) {
-    now = new Date();
-    now.setTime(millis);
-  }
-
-  // log("now", now);
-  const dateOptions = { year: "numeric", month: "long", day: "numeric" };
-  const timeOptions = { hour: "2-digit", minute: "2-digit" };
-
-  let formattedDate = now.toLocaleDateString("en-US", dateOptions);
-  let formattedTime = now.toLocaleTimeString("en-US", timeOptions);
-
-  if (formattedTime.startsWith("0")) {
-    formattedTime = formattedTime.slice(1, formattedTime.length - 1);
-  }
-
-  let endSliced = formattedTime.slice(0, formattedTime.length - 2);
-  if (formattedTime.endsWith("P")) {
-    endSliced += " pm";
-    formattedTime = endSliced;
-  } else if (formattedTime.endsWith("A")) {
-    endSliced += " am";
-    formattedTime = endSliced;
-  }
-
-  let dayOfWeek = now.getDay();
-  switch (dayOfWeek) {
-    case 0:
-      dayOfWeek = "Sunday";
-      break;
-    case 1:
-      dayOfWeek = "Monday";
-      break;
-    case 2:
-      dayOfWeek = "Tuesday";
-      break;
-    case 3:
-      dayOfWeek = "Wednesday";
-      break;
-    case 4:
-      dayOfWeek = "Thursday";
-      break;
-    case 5:
-      dayOfWeek = "Friday";
-      break;
-    case 6:
-      dayOfWeek = "Saturday";
-  }
-  let topTicketDateTimeString = "";
-  topTicketDateTimeString += formattedDate;
-  topTicketDateTimeString += " --> ";
-  topTicketDateTimeString += formattedTime;
-
-  return {
-    date: formattedDate,
-    time: formattedTime,
-    topTicketDateTimeString,
-    dayOfWeek,
-  };
-}
-
 export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
   let returnObj = {
     totalAmount: 0,
@@ -276,7 +213,7 @@ export const FileInputComponent = ({
   );
 };
 
-// takes text input and inserts the decimal at the correct place as the user types numbers for correct currency display without having to press the decimal button
+// numbers
 export function formatDecimal(value) {
   // log("incoming", val);
   // Remove all non-digit characters
@@ -289,6 +226,10 @@ export function formatDecimal(value) {
   // Format to USD currency
   num = num.toLocaleString("en-US", { style: "currency", currency: "USD" });
   return num.slice(1);
+}
+
+export function numberIsEven(num) {
+  return num % 2 === 0;
 }
 
 export function searchPhoneNum(searchTerm, customerArrToSearch) {
@@ -384,66 +325,6 @@ export function getConnectionStrength() {
   }
 }
 
-// return date object
-export function getPreviousMondayDayJS(date = dayjs()) {
-  const dayOfWeek = date.day() === 0 ? 7 : date.day();
-  return date.subtract(dayOfWeek - 1, "day");
-}
-
-export function getWordDayOfWeek(millies, abbreviated) {
-  let date = new Date();
-  if (millies) date = new Date(millies);
-  let numDay = date.getDay();
-  switch (numDay) {
-    case 0:
-      if (abbreviated) return "Sun";
-      return "Sunday";
-    case 1:
-      if (abbreviated) return "Mon";
-      return "Monday";
-    case 2:
-      if (abbreviated) return "Tues";
-      return "Tuesday";
-    case 3:
-      if (abbreviated) return "Weds";
-      return "Wednesday";
-    case 4:
-      if (abbreviated) return "Thurs";
-      return "Thursday";
-    case 5:
-      if (abbreviated) return "Fri";
-      return "Friday";
-    case 6:
-      if (abbreviated) return "Sat";
-      return "Saturday";
-  }
-}
-
-export function getWordMonth(millis) {
-  let date = new Date(millis);
-  let val = date.toLocaleDateString("en-US", { month: "short" });
-  return val;
-}
-
-export function convert12to24Hour(time12h) {
-  const [time, modifier] = time12h.split(" ");
-  let [hours, minutes] = time.split(":");
-
-  if (hours === "12") {
-    hours = "00"; // Handle midnight (12 AM)
-  }
-
-  if (modifier === "PM") {
-    hours = parseInt(hours, 10) + 12; // Add 12 for PM hours (except 12 PM)
-  }
-
-  // Ensure hours and minutes are always two digits
-  hours = String(hours).padStart(2, "0");
-  minutes = String(minutes).padStart(2, "0");
-
-  return `${hours}:${minutes}`;
-}
-
 export function removeDashesFromPhone(num = "") {
   let split = num.split("-");
   let newVal = "";
@@ -465,6 +346,7 @@ export function addDashesToPhone(num) {
   )} ${digits.slice(10)}`;
 }
 
+// text formatting
 export function capitalizeFirstLetterOfString(str) {
   if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
@@ -617,7 +499,8 @@ export function combine2ArraysOrderByMillis(arr1, arr2) {
   return newArr;
 }
 
-export function getDisplayFormatDateTime(millis, includeYear) {
+// date & time
+export function getDisplayFormattedDate(millis, includeYear) {
   let wordDayOfWeek = getWordDayOfWeek(millis, true);
   let dateObj = new Date(millis);
   let dayOfMonth = dateObj.getDate();
@@ -631,18 +514,162 @@ export function getDisplayFormatDateTime(millis, includeYear) {
   return str;
 }
 
-export function lightenRGB(r, g, b, amount) {
-  // Ensure amount is within a reasonable range (e.g., 0-100)
-  amount = Math.max(0, Math.min(100, amount));
+export function getDisplayFormattedDateWithTime(millis, includeYear) {
+  let dateObj = new Date(millis);
+  let dateStr = getDisplayFormattedDate(millis);
+  let split = dateStr.split(" ");
 
-  // Increase each color component, capping at 255
-  r = Math.min(255, r + amount);
-  g = Math.min(255, g + amount);
-  b = Math.min(255, b + amount);
-
-  return { r, g, b };
+  let minutes = dateObj.getMinutes();
+  let hour = dateObj.getHours();
+  let amPM = "AM";
+  if (hour >= 12) amPM = "PM";
+  hour = hour % 12 || 12;
+  if (minutes < 10) minutes = "0" + minutes;
+  // log(dateStr + " , " + hour, minutes + " " + amPM);
+  let dateTime = dateStr + ", " + hour + ":" + minutes + " " + amPM;
+  return {
+    date: dateStr,
+    time: hour + ":" + minutes + " " + amPM,
+    dateTime,
+    dayOfWeek: split[0].split(",")[0],
+    month: split[1],
+    dayOfMonth: split[2],
+    hour,
+    minutes,
+    amPM,
+  };
 }
 
+export function getPreviousMondayDayJS(date = dayjs()) {
+  const dayOfWeek = date.day() === 0 ? 7 : date.day();
+  return date.subtract(dayOfWeek - 1, "day");
+}
+
+export function getWordDayOfWeek(millies, abbreviated) {
+  let date = new Date();
+  if (millies) date = new Date(millies);
+  let numDay = date.getDay();
+  switch (numDay) {
+    case 0:
+      if (abbreviated) return "Sun";
+      return "Sunday";
+    case 1:
+      if (abbreviated) return "Mon";
+      return "Monday";
+    case 2:
+      if (abbreviated) return "Tues";
+      return "Tuesday";
+    case 3:
+      if (abbreviated) return "Weds";
+      return "Wednesday";
+    case 4:
+      if (abbreviated) return "Thurs";
+      return "Thursday";
+    case 5:
+      if (abbreviated) return "Fri";
+      return "Friday";
+    case 6:
+      if (abbreviated) return "Sat";
+      return "Saturday";
+  }
+}
+
+export function getWordMonth(millis) {
+  let date = new Date(millis);
+  let val = date.toLocaleDateString("en-US", { month: "short" });
+  return val;
+}
+
+export function convert12to24Hour(time12h) {
+  const [time, modifier] = time12h.split(" ");
+  let [hours, minutes] = time.split(":");
+
+  if (hours === "12") {
+    hours = "00"; // Handle midnight (12 AM)
+  }
+
+  if (modifier === "PM") {
+    hours = parseInt(hours, 10) + 12; // Add 12 for PM hours (except 12 PM)
+  }
+
+  // Ensure hours and minutes are always two digits
+  hours = String(hours).padStart(2, "0");
+  minutes = String(minutes).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
+}
+
+export function formatDateTimeForReceipt(dateObj, millis) {
+  let now = dateObj;
+  if (!dateObj) {
+    now = new Date();
+    now.setTime(millis);
+  }
+
+  // log("now", now);
+  const dateOptions = { year: "numeric", month: "long", day: "numeric" };
+  const timeOptions = { hour: "2-digit", minute: "2-digit" };
+
+  let formattedDate = now.toLocaleDateString("en-US", dateOptions);
+  let formattedTime = now.toLocaleTimeString("en-US", timeOptions);
+
+  if (formattedTime.startsWith("0")) {
+    formattedTime = formattedTime.slice(1, formattedTime.length - 1);
+  }
+
+  let endSliced = formattedTime.slice(0, formattedTime.length - 2);
+  if (formattedTime.endsWith("P")) {
+    endSliced += " pm";
+    formattedTime = endSliced;
+  } else if (formattedTime.endsWith("A")) {
+    endSliced += " am";
+    formattedTime = endSliced;
+  }
+
+  let dayOfWeek = now.getDay();
+  switch (dayOfWeek) {
+    case 0:
+      dayOfWeek = "Sunday";
+      break;
+    case 1:
+      dayOfWeek = "Monday";
+      break;
+    case 2:
+      dayOfWeek = "Tuesday";
+      break;
+    case 3:
+      dayOfWeek = "Wednesday";
+      break;
+    case 4:
+      dayOfWeek = "Thursday";
+      break;
+    case 5:
+      dayOfWeek = "Friday";
+      break;
+    case 6:
+      dayOfWeek = "Saturday";
+  }
+  let topTicketDateTimeString = "";
+  topTicketDateTimeString += formattedDate;
+  topTicketDateTimeString += " --> ";
+  topTicketDateTimeString += formattedTime;
+
+  return {
+    date: formattedDate,
+    time: formattedTime,
+    topTicketDateTimeString,
+    dayOfWeek,
+  };
+}
+
+export function convertMillisToHoursMins(millis) {
+  const totalMinutes = Math.floor(millis / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return { hours, minutes };
+}
+
+// utils
 export const localStorageWrapper = {
   setItem: (key, item) => {
     localStorage.setItem(key, JSON.stringify(item));
@@ -657,3 +684,15 @@ export const localStorageWrapper = {
     localStorage.clear();
   },
 };
+
+export function lightenRGB(r, g, b, amount) {
+  // Ensure amount is within a reasonable range (e.g., 0-100)
+  amount = Math.max(0, Math.min(100, amount));
+
+  // Increase each color component, capping at 255
+  r = Math.min(255, r + amount);
+  g = Math.min(255, g + amount);
+  b = Math.min(255, b + amount);
+
+  return { r, g, b };
+}

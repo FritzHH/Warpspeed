@@ -15,7 +15,7 @@ import {
 } from "./data";
 import { setInventoryItem, setOpenWorkorder, setRealtimeNodeItem } from "./db";
 import {
-  formatDateTime,
+  formatDateTimeForReceipt,
   generateBarcode,
   generateRandomID,
   log,
@@ -188,10 +188,10 @@ export function fillPrinterNames() {
 
 export function fillPunchHistory() {
   let userID = "1234";
-  let ref = 1756328725524;
+  let ref = new Date().getTime();
   let option = true;
   for (let i = 1; i <= 10; i++) {
-    let val = ref - i * 2 * Math.round((MILLIS_IN_MINUTE * 60 * 24) / 2.3);
+    let val = ref - i * 3 * Math.round(MILLIS_IN_MINUTE);
     // log(val);
     let obj = {
       userID,

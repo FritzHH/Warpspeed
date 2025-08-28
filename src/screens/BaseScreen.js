@@ -13,7 +13,7 @@ import { APP_BASE_COLORS, Colors, ICONS, ViewStyles } from "../styles";
 import {
   clog,
   dim,
-  formatDateTime,
+  formatDateTimeForReceipt,
   generateBarcode,
   generateRandomID,
   log,
@@ -137,7 +137,7 @@ export function BaseScreen() {
   useEffect(() => {
     // fillReceipt();
     // fillPrinterNames();
-    // fillPreferences();
+    fillPreferences();
     // fillPunchHistory();
   }, []);
 
@@ -164,6 +164,8 @@ export function BaseScreen() {
       <LoginScreenModalComponent
         modalVisible={zShowLoginScreen && !zModalVisible}
       />
+      {zRunBackgroundRecognition ? <FaceDetectionComponent /> : null}
+      <AlertBox_ />
       <View
         style={{
           width: "65%",
@@ -199,8 +201,6 @@ export function BaseScreen() {
               shadowRadius: 10,
             }}
           >
-            {zRunBackgroundRecognition ? <FaceDetectionComponent /> : null}
-            <AlertBox_ />
             <Info_Section />
           </View>
           <View

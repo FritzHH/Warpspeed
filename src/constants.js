@@ -4,7 +4,7 @@ export const MILLIS_IN_MINUTE = 60000;
 
 // timing and interval
 export const FACIAL_RECOGNITION_INTERVAL_MILLIS = 500;
-export const PAUSE_USER_CLOCK_IN_CHECK_MILLIS = MILLIS_IN_MINUTE * 1;
+export const PAUSE_USER_CLOCK_IN_CHECK_MILLIS = MILLIS_IN_MINUTE * 10;
 
 // keys
 export const LOCAL_DB_KEYS = {
@@ -22,6 +22,7 @@ export const REALTIME_DATABASE_NODE_NAMES = {
 
 export const FIRESTORE_DATABASE_NODE_NAMES = {
   punchClock: "PUNCH-CLOCK/",
+  appUsers: "APP-USERS/",
 };
 
 // dimensions
@@ -30,21 +31,21 @@ export const TAB_MENU_HEIGHT = 40;
 // words
 
 // objects & functions
-export const PERMISSION_LEVELS = [
-  {
+export const PERMISSION_LEVELS = {
+  owner: {
     name: "Owner",
     level: 4,
   },
-  {
+  admin: {
     name: "Admin",
     level: 3,
   },
-  {
+  editor: {
     name: "Editor",
     level: 2,
   },
-  {
+  user: {
     name: "User",
     level: 1,
   },
-];
+};

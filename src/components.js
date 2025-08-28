@@ -382,21 +382,13 @@ export const AlertBox_ = ({}) => {
 
 export const DateTimePicker = ({ range, handleDateRangeChange = () => {} }) => {
   const defaultStyles = useDefaultStyles();
-  // const [range, setRange] = useState({
-  //   startDate, // Initialize with a default start date
-  //   endDate,
-  // });
 
-  function handleDateChange(obj) {
-    // setRange(obj);
+  function handleDateChange_(obj) {
+    if (!obj.endDate) obj.endDate = obj.startDate;
     handleDateRangeChange(obj);
-    // onStartDateChange(obj.startDate);
-    // onEndDateChange(obj.endDate);
   }
 
   return (
-    // <TouchableWithoutFeedback onPress={() => null}>
-    // <Modal visible={true} transparent>
     <View
       style={{
         backgroundColor: "rgba(0, 0, 0, 0.75)",
@@ -430,20 +422,11 @@ export const DateTimePicker = ({ range, handleDateRangeChange = () => {} }) => {
           mode="range"
           startDate={range.startDate}
           endDate={range.endDate}
-          onChange={handleDateRangeChange}
+          onChange={handleDateChange_}
           // minDate={new Date()}
         />
-        {/* <Button_
-          text={"SUBMIT"}
-          icon={ICONS.paperPlane}
-          colorGradientArr={COLOR_GRADIENTS.blue}
-          buttonStyle={{ width: 150 }}
-          onPress={handleSubmit}
-        /> */}
       </View>
     </View>
-    // </Modal>
-    // </TouchableWithoutFeedback>
   );
 };
 

@@ -570,6 +570,7 @@ export const DropdownMenu = ({
   itemTextStyle = {},
   itemStyle = {},
   buttonStyle = {},
+  menuButtonStyle = {},
   buttonTextStyle = {},
   buttonText,
   ref,
@@ -586,6 +587,8 @@ export const DropdownMenu = ({
   shadowStyle = {},
   itemSeparatorStyle = {},
   menuBorderColor,
+  selectedIdx = 0,
+  useSelectedAsButtonTitle = false,
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sModalVisible, _setModalVisible] = useState(false);
@@ -597,6 +600,12 @@ export const DropdownMenu = ({
       return rgbString;
     }
     return lightenRGBByPercent(rgbString, 20);
+  }
+
+  // log("ss", selectedIdx);
+  if (useSelectedAsButtonTitle) {
+    // log(selectedIdx);
+    buttonText = dataArr[Number(selectedIdx)]?.label;
   }
 
   const DropdownComponent = () => {
@@ -645,13 +654,17 @@ export const DropdownMenu = ({
                       idx
                     ),
                   borderTopLeftRadius:
-                    idx == 0 ? buttonStyle.borderRadius : null,
+                    idx == 0 ? menuButtonStyle.borderRadius : null,
                   borderTopRightRadius:
-                    idx == 0 ? buttonStyle.borderRadius : null,
+                    idx == 0 ? menuButtonStyle.borderRadius : null,
                   borderBottomLeftRadius:
-                    idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
+                    idx == dataArr.length - 1
+                      ? menuButtonStyle.borderRadius
+                      : null,
                   borderBottomRightRadius:
-                    idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
+                    idx == dataArr.length - 1
+                      ? menuButtonStyle.borderRadius
+                      : null,
                   ...itemStyle,
                 }}
                 textStyle={{

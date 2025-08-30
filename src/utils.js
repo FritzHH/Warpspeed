@@ -137,6 +137,8 @@ export function trimToTwoDecimals(num) {
   return res;
 }
 
+export function formatDecimalToCommas(val) {}
+
 export const FileInputComponent = ({
   handleBinaryString,
   buttonStyle = {},
@@ -666,7 +668,8 @@ export function convertMillisToHoursMins(millis) {
   const totalMinutes = Math.floor(millis / 60000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return { hours, minutes, totalMinutes };
+  const formattedHoursMin = hours + ":" + minutes;
+  return { hours, minutes, totalMinutes, formattedHoursMin };
 }
 
 // utils

@@ -49,6 +49,7 @@ export function Options_Section({}) {
     state.getOptionsTabName()
   );
   const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
+
   const zWebcamDetected = useLoginStore((state) => state.getWebcamDetected());
   const zClockedInUsersArr = useLoginStore((state) =>
     state.getClockedInUsers()
@@ -144,11 +145,6 @@ export function Options_Section({}) {
 
   return (
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
-      {/* <UserClockHistoryModal
-        visible={zCurrentUserObj}
-        userObj={zCurrentUserObj}
-      /> */}
-
       <TabBar
         userObj={zCurrentUserObj}
         isClockedIn={zClockedInUsersArr?.find(
@@ -220,7 +216,12 @@ export const TabBar = ({
         <Button_
           onPress={() => handleUserPress(userObj)}
           icon={isClockedIn ? ICONS.check : ICONS.redx}
-          text={userObj.first + " " + userObj.last[0] + "."}
+          text={
+            userObj.first +
+            " " +
+            (userObj?.last?.length >= 0 ? userObj.last[0] : "") +
+            "."
+          }
           textStyle={{ fontSize: 13 }}
           iconSize={13}
           buttonStyle={{

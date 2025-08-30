@@ -83,6 +83,7 @@ export function WorkordersComponent({}) {
   const [sItemOptions, _setItemOptions] = useState({});
 
   useEffect(() => {
+    // log(zSettingsObj);
     let hour = 3600000;
     const intervalId = setInterval(() => {
       try {

@@ -563,12 +563,16 @@ export const SETTINGS_OBJ = {
   loginTimeout: 15,
   salesTax: 0.065,
   acceptChecks: true,
+  userPinStrength: 2,
   users: [
     {
       first: "Fritz",
       last: "Hieb",
       id: "1234",
-      permissions: PERMISSION_LEVELS.owner,
+      permissions: {
+        name: "Owner",
+        level: 4,
+      },
       phone: "2393369177",
       pin: "33",
       hourlyWage: 25,

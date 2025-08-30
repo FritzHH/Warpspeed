@@ -27,19 +27,11 @@ import { APP_BASE_COLORS, COLOR_GRADIENTS } from "./styles";
 
 const MODEL_URL = "./models"; // Place models in public/models
 
-export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
+export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // store setters ////////////////////////////////////////////////////
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
   const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
   const _zSetWebcamDetected = useLoginStore((state) => state.setWebcamDetected);
-  const _zSetAlertTitle = useAlertScreenStore((state) => state.setTitle);
-  const _zSetAlertMessage = useAlertScreenStore((state) => state.setMessage);
-  const _zSetAlertBtn1Handle = useAlertScreenStore(
-    (state) => state.setButton1Handler
-  );
-  const _zSetAlertBtn2Handle = useAlertScreenStore(
-    (state) => state.setButton2Handler
-  );
   const _zSetShowAlert = useAlertScreenStore((state) => state.setShowAlert);
   const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
 
@@ -57,15 +49,12 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
   const [status, setStatus] = useState("Loading models and finding webcam...");
-  const [enrolledDescriptor, setEnrolledDescriptor] = useState(null);
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
   const [sBackgroundRecognitionRunning, _setBackgroundRecognitionRunning] =
     useState(false);
   const [sSetupComplete, _setSetupComplete] = useState(false);
   const [sPauseBackgroundRecognition, _setPauseBackgroundRecognition] =
     useState(false);
-  const [sFacialRecognitionReady, _setFacialRecognitionReady] = useState(false);
+  // const [sFacialRecognitionReady, _setFacialRecognitionReady] = useState(false);
 
   useEffect(() => {
     // localStorageWrapper.clearLocalStorage(); // testing
@@ -87,8 +76,10 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
       .then(() => {
         setupCount++;
         _zSetWebcamDetected(true);
-        if (setupCount === SETUP_END_COUNT) _setSetupComplete(true);
-        setStatus("Setup ready, enroll face now");
+        if (setupCount === SETUP_END_COUNT) {
+          log("Face detection setup complete! Webcam found, models loaded.");
+          _setSetupComplete(true);
+        }
       })
       .catch((e) => {
         log("no webcam detected", e);
@@ -96,18 +87,10 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
       });
   }, [_zSetWebcamDetected]);
 
-  // watch the
-  useEffect(() => {
-    if (!zSettingsObj || sBackgroundRecognitionRunning) return;
-    // if (sSetupComplete) getFaceDescriptor();
-    if (sSetupComplete) {
-      _setFacialRecognitionReady(true);
-    }
-  }, [zSettingsObj, sBackgroundRecognitionRunning, sSetupComplete]);
-
   // cleanup state
   useEffect(() => {
     return () => {
+      log("Cleaning up Face Detection Client; still active?");
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -117,17 +100,21 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
 
   // background facial detection service
   useEffect(() => {
-    if (!sFacialRecognitionReady || !zRunBackgroundRecognition || !zSettingsObj)
-      return;
-
-    log("starting background facial recognition");
+    // log("setup", sSetupComplete);
+    setStatus("Setup ready, enroll face now");
+    // log("starting background facial recognition");
     _setBackgroundRecognitionRunning(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(async () => {
-      if (sPauseBackgroundRecognition) return;
+      // if (
+      //   !zRunBackgroundRecognition ||
+      //   sPauseBackgroundRecognition ||
+      //   !sSetupComplete
+      // )
+      //   return;
       const currentDesc = await getFaceDescriptor();
       if (currentDesc) {
-        // log("found descriptor");
+        // log("cur desc", currentDesc);
         let userObj = zSettingsObj?.users?.find((userObj) => {
           if (!userObj.faceDescriptor) {
             return null;
@@ -136,14 +123,15 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
             userObj.faceDescriptor,
             currentDesc
           );
+          // log("dist", distance);
           if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
-            // log("Face descriptor distance", distance);
-            // log("Face Login!", userObj);
             return true;
           } else {
-            return false;
+            return null;
           }
         });
+
+        // log(userObj);
         if (userObj) {
           _zSetCurrentUserObj(userObj); // set app user on face recognition
 
@@ -175,8 +163,11 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
 
             // ask the user if they want to clock in. pause for period of time if not, so they may use the computer without it asking all the time
             let millis = new Date().getTime();
-            _zSetShowAlert(true);
-            _setPauseBackgroundRecognition(true);
+
+            // paused for dev
+
+            // _zSetShowAlert(true);
+            // _setPauseBackgroundRecognition(true);
             _zSetAlertValues({
               title: "PUNCH CLOCK",
               message:
@@ -209,12 +200,11 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
       }
     }, FACIAL_RECOGNITION_INTERVAL_MILLIS);
   }, [
-    sFacialRecognitionReady,
-    zClockedInUsersArr,
+    sSetupComplete,
+    intervalRef,
     zSettingsObj,
     sPauseBackgroundRecognition,
-    intervalRef,
-    _setPauseBackgroundRecognition,
+    zClockedInUsersArr,
   ]);
 
   //////////////////////////////////////////////////////////////////////////////
@@ -222,7 +212,9 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
 
   // Separate handler for metadata loaded event
   const handleLoadedMetadata = () => {
+    // log("Metadata loaded");
     if (videoRef.current) {
+      // log("playing");
       videoRef.current.play();
     }
   };
@@ -232,6 +224,7 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
     // log("starting video stream");
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // log("found");
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -244,7 +237,6 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
     if (!videoRef.current) {
       return null;
     }
-    // log("getting descriptor");
     const detection = await faceapi
       .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
@@ -263,10 +255,8 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
     const desc = await getFaceDescriptor();
     if (desc) {
       setStatus("Found facial descriptor. You may exit now.");
-      log("Found Descriptor");
-      let userObj = null;
+      // log("Found Descriptor");
       __handleEnrollDescriptor(desc);
-      // dbSetAppUserObj(userObj);
     } else {
       setStatus("No face detected. Try again.");
     }
@@ -278,7 +268,7 @@ export function FaceDetectionComponent({ __handleEnrollDescriptor }) {
         ref={videoRef}
         width={zRunBackgroundRecognition ? 0 : 500}
         height={zRunBackgroundRecognition ? 0 : 500}
-        autoPlay
+        autoPlay={true}
         muted
         onLoadedMetadata={handleLoadedMetadata}
         style={{}}

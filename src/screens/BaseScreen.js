@@ -52,7 +52,7 @@ import {
   useLoginStore,
 } from "../stores";
 import { dbSearchForPhoneNumber } from "../db_call_wrapper";
-import { FaceDetectionComponent } from "../faceDetectionClient";
+import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { REALTIME_DATABASE_NODE_NAMES } from "../constants";
 
 export function BaseScreen() {
@@ -68,7 +68,7 @@ export function BaseScreen() {
   const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
 
   // testing
-  const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
+  // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
   // store getters /////////////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
@@ -126,21 +126,14 @@ export function BaseScreen() {
     } catch (e) {}
   }, [zSettingsObj]);
 
-  // timer
-  useEffect(() => {
-    function tick() {}
-    let id = setInterval(tick, 200);
-    return () => clearInterval(id);
-  }, []);
-
   // testing, build db items
   useEffect(() => {
     // fillReceipt();
     // fillPrinterNames();
-    fillPreferences();
+    // fillPreferences();
     // fillPunchHistory();
   }, []);
-
+  // log(zSettingsObj);
   return (
     <View
       style={{
@@ -164,7 +157,7 @@ export function BaseScreen() {
       <LoginScreenModalComponent
         modalVisible={zShowLoginScreen && !zModalVisible}
       />
-      {zRunBackgroundRecognition ? <FaceDetectionComponent /> : null}
+      {zRunBackgroundRecognition ? <FaceDetectionClientComponent /> : null}
       <AlertBox_ />
       <View
         style={{

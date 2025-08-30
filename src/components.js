@@ -431,6 +431,7 @@ export const DateTimePicker = ({ range, handleDateRangeChange = () => {} }) => {
 };
 
 export const ScreenModal = ({
+  enabled,
   ref,
   modalCoordinateVars = {
     // x: -30,
@@ -482,7 +483,7 @@ export const ScreenModal = ({
       let rect = el.getBoundingClientRect();
       _setModalCoordinates({ x: rect.x, y: rect.y });
     }
-  }, []);
+  }, [ref]);
 
   if (!showShadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   if (!showOuterModal)
@@ -502,11 +503,11 @@ export const ScreenModal = ({
       <View style={{}}>
         {buttonVisible ? (
           <Button_
+            enabled={enabled}
             handleMouseExit={handleMouseExit}
             handleMouseOver={handleMouseOver}
             icon={buttonIcon}
             iconSize={buttonIconSize}
-            // iconStyle={buttonIconStyle}
             text={buttonLabel}
             onPress={() => {
               handleButtonPress();
@@ -527,12 +528,6 @@ export const ScreenModal = ({
               height: !buttonVisible ? 0 : null,
               ...shadowStyle,
               ...buttonStyle,
-              // backgroundColor: sMouseOver
-              //   ? mouseOverOptions.highlightColor
-              //   : buttonStyle.backgroundColor || "transparent",
-              // opacity: sMouseOver
-              //   ? mouseOverOptions.opacity
-              //   : buttonStyle.opacity
             }}
           />
         ) : null}
@@ -567,12 +562,13 @@ export const ScreenModal = ({
 };
 
 export const DropdownMenu = ({
+  enabled,
   dataArr = [],
   onSelect,
   buttonIcon,
   buttonIconSize,
   itemTextStyle = {},
-  itemViewStyle = {},
+  itemStyle = {},
   buttonStyle = {},
   buttonTextStyle = {},
   buttonText,
@@ -587,7 +583,7 @@ export const DropdownMenu = ({
     highlightColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 10),
   },
   showButtonShadow,
-  shadowStyle = { ...SHADOW_RADIUS_PROTO },
+  shadowStyle = {},
   itemSeparatorStyle = {},
   menuBorderColor,
 }) => {
@@ -612,7 +608,7 @@ export const DropdownMenu = ({
           borderColor:
             menuBorderColor || APP_BASE_COLORS.buttonLightGreenOutline,
           // borderRadius: 10,
-          borderRadius: buttonStyle.borderRadius || 25,
+          borderRadius: 25,
         }}
       >
         <FlatList
@@ -656,9 +652,7 @@ export const DropdownMenu = ({
                     idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
                   borderBottomRightRadius:
                     idx == dataArr.length - 1 ? buttonStyle.borderRadius : null,
-                  // backgroundColor: "blue"
-                  // opacity: 0.1
-                  // ...buttonStyle
+                  ...itemStyle,
                 }}
                 textStyle={{
                   ...itemTextStyle,
@@ -682,8 +676,6 @@ export const DropdownMenu = ({
       Component={() => <DropdownComponent />}
       modalVisible={sModalVisible}
       handleButtonPress={() => _setModalVisible(!sModalVisible)}
-      // handleMouseOver={() => (openOnMouseOver ? _setModalVisible(true) : null)}
-      // handleMouseExit={() => (openOnMouseOver ? handleMouseExit() : null)}
       buttonStyle={buttonStyle}
       buttonTextStyle={buttonTextStyle}
       buttonLabel={buttonText}
@@ -695,6 +687,7 @@ export const DropdownMenu = ({
       mouseOverOptions={mouseOverOptions}
       shadowStyle={shadowStyle}
       handleOuterClick={() => _setModalVisible(false)}
+      enabled={enabled}
     />
   );
 };
@@ -2670,6 +2663,7 @@ export const Button_ = ({
   textStyle = {},
   iconStyle = {},
   viewStyle = {},
+  enabled = true,
   autoFocus,
 }) => {
   const [sMouseOver, _setMouseOver] = React.useState(false);
@@ -2697,7 +2691,7 @@ export const Button_ = ({
   }
 
   function getBackgroundColor() {
-    if (sMouseOver) {
+    if (sMouseOver && enabled) {
       return mouseOverOptions.highlightColor;
     } else {
       if (buttonStyle.backgroundColor) return buttonStyle.backgroundColor;
@@ -2706,7 +2700,7 @@ export const Button_ = ({
   }
 
   function getOpacity() {
-    if (sMouseOver) {
+    if (sMouseOver && enabled) {
       return mouseOverOptions.opacity;
     } else {
       // log(text, buttonStyle.opacity);
@@ -2732,7 +2726,7 @@ export const Button_ = ({
       onLongPress={visible ? onLongPress : () => {}}
     >
       <GradientView
-        colorArr={colorGradientArr}
+        colorArr={enabled ? colorGradientArr : []}
         style={{
           alignItems: "center",
           justifyContent: "center",
@@ -2744,6 +2738,7 @@ export const Button_ = ({
           ...shadowStyle,
           ...buttonStyle,
           backgroundColor: icon && !text ? null : getBackgroundColor(),
+          opacity: enabled ? null : 0.3,
         }}
         {...gradientViewProps}
       >

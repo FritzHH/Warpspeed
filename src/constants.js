@@ -31,21 +31,21 @@ export const TAB_MENU_HEIGHT = 40;
 // words
 
 // objects & functions
-export const PERMISSION_LEVELS = {
-  owner: {
+export const PERMISSION_LEVELS = [
+  {
     name: "Owner",
     level: 4,
   },
-  admin: {
+  {
     name: "Admin",
     level: 3,
   },
-  editor: {
+  {
     name: "Editor",
     level: 2,
   },
-  user: {
+  {
     name: "User",
     level: 1,
   },
-};
+];

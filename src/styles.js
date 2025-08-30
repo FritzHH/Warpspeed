@@ -115,6 +115,7 @@ export const ICONS = {
   clockGif: require(ASSETS_PATH + "clock.gif"),
   cancelGif: require(ASSETS_PATH + "cancel.gif"),
   paperPlane: require(ASSETS_PATH + "paperPlane.png"),
+  eyeballs: require(ASSETS_PATH + "eyeballs.png"),
 };
 
 // rgb(64, 174, 113)

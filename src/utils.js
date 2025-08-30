@@ -346,6 +346,10 @@ export function addDashesToPhone(num) {
   )} ${digits.slice(10)}`;
 }
 
+export function makeGrey(opacity) {
+  return "rgba(0,0,0," + opacity + ")";
+}
+
 // text formatting
 export function capitalizeFirstLetterOfString(str) {
   if (!str) return "";
@@ -500,7 +504,12 @@ export function combine2ArraysOrderByMillis(arr1, arr2) {
 }
 
 // date & time
-export function getDisplayFormattedDate(millis, includeYear) {
+export function getDisplayFormattedDate(
+  millis,
+  includeYear,
+  returnAsObject,
+  abbreviateYear
+) {
   let wordDayOfWeek = getWordDayOfWeek(millis, true);
   let dateObj = new Date(millis);
   let dayOfMonth = dateObj.getDate();
@@ -510,34 +519,25 @@ export function getDisplayFormattedDate(millis, includeYear) {
   let str = wordDayOfWeek + ", " + wordDayOfMonth + " " + dayOfMonth;
   if (!includeYear) return str;
 
-  str = str + ` '` + year.substring(2, 4);
-  return str;
-}
-
-export function getDisplayFormattedDateWithTime(millis, includeYear) {
-  let dateObj = new Date(millis);
-  let dateStr = getDisplayFormattedDate(millis);
-  let split = dateStr.split(" ");
-
-  let minutes = dateObj.getMinutes();
   let hour = dateObj.getHours();
   let amPM = "AM";
   if (hour >= 12) amPM = "PM";
   hour = hour % 12 || 12;
-  if (minutes < 10) minutes = "0" + minutes;
-  // log(dateStr + " , " + hour, minutes + " " + amPM);
-  let dateTime = dateStr + ", " + hour + ":" + minutes + " " + amPM;
-  return {
-    date: dateStr,
-    time: hour + ":" + minutes + " " + amPM,
-    dateTime,
-    dayOfWeek: split[0].split(",")[0],
-    month: split[1],
-    dayOfMonth: split[2],
-    hour,
-    minutes,
-    amPM,
-  };
+
+  if (returnAsObject) {
+    return {
+      wordDayOfWeek: wordDayOfWeek,
+      dayOfMonth: dayOfMonth,
+      wordDayOfMonth: wordDayOfMonth,
+      year: abbreviateYear ? year.substring(2, 4) : year,
+      minutes: dateObj.getMinutes(),
+      hour: hour,
+      amPM: amPM,
+    };
+  }
+
+  str = str + ` '` + year.substring(2, 4);
+  return str;
 }
 
 export function getPreviousMondayDayJS(date = dayjs()) {
@@ -666,7 +666,7 @@ export function convertMillisToHoursMins(millis) {
   const totalMinutes = Math.floor(millis / 60000);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return { hours, minutes };
+  return { hours, minutes, totalMinutes };
 }
 
 // utils

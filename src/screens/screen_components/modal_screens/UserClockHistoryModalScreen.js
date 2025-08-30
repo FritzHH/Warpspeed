@@ -1,23 +1,30 @@
-import { FlatList, Text, View } from "react-native-web";
+import {
+  FlatList,
+  Text,
+  TextInput,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native-web";
 import { DateTimePicker, ScreenModal } from "../../../components";
 import { APP_BASE_COLORS } from "../../../styles";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   clog,
   convertMillisToHoursMins,
   getDisplayFormattedDate,
-  getDisplayFormattedDateWithTime,
   getPreviousMondayDayJS,
   getWordDayOfWeek,
   log,
+  makeGrey,
   numberIsEven,
 } from "../../../utils";
 import dayjs from "dayjs";
 import { dbFindPunchHistoryByMillisRange } from "../../../db_call_wrapper";
 import sr from "dayjs/locale/sr";
-import { sortBy } from "lodash";
+import { range, sortBy } from "lodash";
+import { loadBundle } from "firebase/firestore";
 
-export const UserClockHistoryModal = ({ userObj }) => {
+export const UserClockHistoryModal = React.memo(({ userObj, handleExit }) => {
   const [sRange, _setRange] = useState({
     startDate: getPreviousMondayDayJS(),
     endDate: dayjs(),
@@ -45,18 +52,18 @@ export const UserClockHistoryModal = ({ userObj }) => {
         resArr = sortBy(resArr, "millis");
         let arr = [];
         resArr.forEach((o) => {
-          let dateObj = getDisplayFormattedDateWithTime(o.millis);
-          arr.push({ ...o, dateObj });
+          arr.push(o);
+          // let dateObj = getDisplayFormattedDateWithTime(o.millis);
+          // arr.push({ ...o, dateObj });
         });
         _setFilteredArr(arr);
       })
       .catch((e) => log("error", e));
-  }, [sRange, sHistoryDisplay, _setHistoryDisplay, userObj, _setFilteredArr]);
+  }, [sRange, userObj, _setFilteredArr]);
 
   useEffect(() => {
     let resArr = [];
 
-    let prevPunch;
     let counter = 0;
     let resObj = {};
     sFilteredArr.forEach((obj) => {
@@ -75,55 +82,238 @@ export const UserClockHistoryModal = ({ userObj }) => {
     let arr = [];
     resArr.forEach((obj) => {
       if (obj.in && obj.out) {
+        obj.in = {
+          ...obj.in,
+          ...getDisplayFormattedDate(obj.in.millis, true, true),
+        };
+        obj.out = {
+          ...obj.out,
+          ...getDisplayFormattedDate(obj.out.millis, true, true),
+        };
+        // clog(obj.in);
         let diff = obj.out.millis - obj.in.millis;
         let total = convertMillisToHoursMins(diff);
-        obj.hours = total.hours;
-        obj.minutes = total.minutes;
+        obj.hoursDiff = total.hours;
+        obj.minutesDiff = total.minutes;
+        obj.totalMinutes = total.totalMinutes;
+        // clog(obj);
+        if (Number(obj.minutesDiff) < 10) {
+          // log(obj.minutes);
+          obj.minutesDiff = "0" + obj.minutesDiff.toString();
+        }
+      } else if (obj.in) {
+        obj.in = {
+          ...obj.in,
+          ...getDisplayFormattedDate(obj.in.millis, true, true),
+        };
+        // log("clock in only");
+      } else if (obj.out) {
+        obj.out = {
+          ...obj.out,
+          ...getDisplayFormattedDate(obj.out.millies, true, true),
+        };
+        // log("clock out only");
+      } else {
+        return;
       }
+      // log(obj);
       arr.push(obj);
+      _setHistoryDisplay(arr);
     });
 
-    clog(arr);
-  }, [sFilteredArr, _setHistoryDisplay]);
+    // clog(arr);
+  }, [_setHistoryDisplay, sFilteredArr]);
+  // log("rendering");
 
-  let Component = () => (
-    <View
-      style={{
-        width: "80%",
-        height: "80%",
-        backgroundColor: APP_BASE_COLORS.backgroundWhite,
-        flexDirection: "row",
-        alignItems: "flex-start",
-        padding: 30,
-        borderRadius: 15,
-      }}
-    >
-      <View style={{ width: "40%" }}>
-        <DateTimePicker range={sRange} handleDateRangeChange={_setRange} />
+  let Component = React.useCallback(
+    () => (
+      <TouchableWithoutFeedback>
         <View
           style={{
-            marginTop: 20,
+            width: "60%",
+            height: "85%",
+            backgroundColor: APP_BASE_COLORS.backgroundWhite,
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "flex-start",
+            justifyContent: "space-evenly",
+            padding: 30,
+            borderRadius: 15,
           }}
         >
-          <Text>Total Selected Hours: </Text>
-          <Text>{sTotalHours}</Text>
-        </View>
-      </View>
-      <View style={{}}>
-        <FlatList
-          data={sHistoryDisplay}
-          renderItem={(obj) => {
-            let idx = obj.index;
-            let item = obj.item;
+          <View style={{ width: "45%" }}>
+            <DateTimePicker range={sRange} handleDateRangeChange={_setRange} />
+            <View
+              style={{
+                marginTop: 20,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "flex-start",
+              }}
+            >
+              <Text>Total Selected Hours: </Text>
+              <Text>{sTotalHours}</Text>
+            </View>
+          </View>
+          <View
+            style={{
+              width: "45%",
+              height: "95%",
+              backgroundColor: APP_BASE_COLORS.backgroundListWhite,
+              borderRadius: 15,
+            }}
+          >
+            <FlatList
+              // style={{ width: "100%" }}
+              data={sHistoryDisplay}
+              ItemSeparatorComponent={() => (
+                <View
+                  style={{
+                    height: 1,
+                    backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                  }}
+                />
+              )}
+              renderItem={(obj) => {
+                let idx = obj.index;
+                let item = obj.item;
+                // log("item", item);
+                return (
+                  <View
+                    style={{
+                      width: "95%",
+                      // alignItems: "space-around",
+                      marginVertical: 5,
+                      borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                      // borderWidth: 1,
+                      borderRadius: 1,
+                      padding: 5,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        width: "100%",
+                        // backgroundColor: APP_BASE_COLORS.listItemWhite,
+                        // backgroundColor: "green",
+                        // marginRight: 40,
+                      }}
+                    >
+                      {item.in ? (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            width: "40%",
+                            alignItems: "flex-end",
 
-            return <View style={{}}></View>;
-          }}
-        />
-      </View>
-    </View>
+                            // justifyContent: "space-between",
+                            // backgroundColor: "green",
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: makeGrey(0.5) }}>
+                            IN:{" "}
+                          </Text>
+                          <Text
+                            style={{
+                              color:
+                                Number(item.in?.dayOfMonth) !==
+                                  Number(item.out?.dayOfMonth) &&
+                                (!item.out || !item.in)
+                                  ? "red"
+                                  : APP_BASE_COLORS.textMain,
+                              fontSize: 13,
+                              marginRight: 10,
+                            }}
+                          >
+                            {item.in.wordDayOfWeek +
+                              ", " +
+                              item.in.wordDayOfMonth +
+                              " " +
+                              item.in.dayOfMonth}
+                          </Text>
+
+                          <TextInput
+                            style={{ width: 10, textAlign: "right" }}
+                            value={item.in.hour}
+                          />
+                          <Text>:</Text>
+                          <TextInput
+                            style={{ width: 20 }}
+                            value={item.in.minutes}
+                          />
+                          <TextInput
+                            style={{ width: 20 }}
+                            value={item.in.amPM}
+                          />
+                        </View>
+                      ) : null}
+                      {item.out ? (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            width: "50%",
+                            alignItems: "flex-end",
+                            borderLeftWidth: 1,
+                            borderColor:
+                              APP_BASE_COLORS.buttonLightGreenOutline,
+                            paddingLeft: 5,
+                            height: "100%",
+                            // justifyContent: "space-between",
+                            // backgroundColor: "green",
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: makeGrey(0.5) }}>
+                            OUT:{" "}
+                          </Text>
+                          <Text
+                            style={{
+                              color:
+                                item.in?.dayOfMonth === item.out?.dayOfMonth &&
+                                (item.in || item.out)
+                                  ? APP_BASE_COLORS.textMain
+                                  : "red",
+                              fontSize: 13,
+                              marginRight: 10,
+                            }}
+                          >
+                            {item.in.wordDayOfWeek +
+                              ", " +
+                              item.in.wordDayOfMonth +
+                              " " +
+                              item.in.dayOfMonth}
+                          </Text>
+
+                          <TextInput
+                            style={{ width: 10, textAlign: "right" }}
+                            value={item.out.hour}
+                          />
+                          <Text>:</Text>
+                          <TextInput
+                            style={{ width: 20 }}
+                            value={item.out.minutes}
+                          />
+                          <TextInput
+                            style={{ width: 20 }}
+                            value={item.out.amPM}
+                          />
+                        </View>
+                      ) : null}
+                      {/* {item.hoursDiff || item.minutesDiff ? (
+                    <Text style={{ textAlign: "right", width: "20%" }}>
+                      {(item.hoursDiff ? item.hoursDiff : "") +
+                        ":" +
+                        item.minutesDiff}
+                    </Text>
+                  ) : null} */}
+                    </View>
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    ),
+    [sTotalHours, sHistoryDisplay, sRange]
   );
 
   return (
@@ -132,6 +322,8 @@ export const UserClockHistoryModal = ({ userObj }) => {
       Component={Component}
       modalVisible={true}
       showOuterModal={true}
+      handleOuterClick={handleExit}
+      outerModalStyle={{}}
     />
   );
-};
+});

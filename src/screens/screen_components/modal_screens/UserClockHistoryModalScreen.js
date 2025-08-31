@@ -59,7 +59,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   const [sSelectedUserIdx, _setSelectedUserIdx] = useState();
   const [sTotalMinutesWorked, _setTotalMinutesWorked] = useState();
   const [sRunningTotalWages, _setRunningTotalWages] = useState();
-  const [sEditableRowIdx, _setEditableRowIdx] = useState(5);
+  const [sEditableRowIdx, _setEditableRowIdx] = useState();
 
   const userDropdownRef = useRef();
   const amPMOUtDropdownRef = useRef([]);
@@ -365,7 +365,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                         flexDirection: "row",
                         alignItems: "center",
                         width: "100%",
-                        opacity: sEditableRowIdx && editable ? null : 0.65,
+                        opacity: editable ? 1 : !sEditableRowIdx ? 1 : 0.15,
                         backgroundColor: isEven(idx)
                           ? APP_BASE_COLORS.listItemWhite
                           : makeGrey(0.075),
@@ -455,10 +455,8 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             ) : null}
                             <Text
                               style={{
-                                width: 20,
+                                width: iconSize,
                                 textAlign: editable ? "center" : "right",
-                                // width: 20,
-                                // textAlign: "right",
                                 outlineColor: APP_BASE_COLORS.green,
                                 paddingRight: 1,
                                 // backgroundColor: "blue",
@@ -628,7 +626,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 textAlign: editable ? "center" : "left",
                                 outlineColor: APP_BASE_COLORS.green,
                                 // borderWidth: 1,
-                                paddingHorizontal: 1,
+                                paddingHorizontal: 0,
                                 borderColor:
                                   APP_BASE_COLORS.buttonLightGreenOutline,
                               }}
@@ -690,9 +688,13 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                         </View>
                       ) : null}
                       <Button_
-                        onPress={() =>
-                          _setEditableRowIdx(sEditableRowIdx ? null : idx)
-                        }
+                        onPress={() => {
+                          if (sEditableRowIdx === idx) {
+                            _setEditableRowIdx(null);
+                          } else {
+                            _setEditableRowIdx(idx);
+                          }
+                        }}
                         iconSize={20}
                         icon={ICONS.editPencil}
                       />
@@ -727,6 +729,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     sRange,
     sTotalHours,
     sHistoryDisplay,
+    sEditableRowIdx,
   ]);
 
   return (

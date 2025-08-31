@@ -604,7 +604,7 @@ export const DropdownMenu = ({
 
   // log("ss", selectedIdx);
   if (useSelectedAsButtonTitle) {
-    // log(selectedIdx);
+    // log("idx", selectedIdx);
     buttonText = dataArr[Number(selectedIdx)]?.label;
   }
 

@@ -116,6 +116,12 @@ export const ICONS = {
   cancelGif: require(ASSETS_PATH + "cancel.gif"),
   paperPlane: require(ASSETS_PATH + "paperPlane.png"),
   eyeballs: require(ASSETS_PATH + "eyeballs.png"),
+  in: require(ASSETS_PATH + "in.png"),
+  out: require(ASSETS_PATH + "out.png"),
+  forwardGreen: require(ASSETS_PATH + "forwardGreen.png"),
+  backRed: require(ASSETS_PATH + "backRed.png"),
+  upChevron: require(ASSETS_PATH + "up-chevron.png"),
+  downChevron: require(ASSETS_PATH + "down-chevron.png"),
 };
 
 // rgb(64, 174, 113)

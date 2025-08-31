@@ -1,3 +1,4 @@
+/*eslint-disable*/
 import {
   FlatList,
   Text,
@@ -5,8 +6,14 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native-web";
-import { DateTimePicker, DropdownMenu, ScreenModal } from "../../../components";
-import { APP_BASE_COLORS } from "../../../styles";
+import {
+  Button_,
+  DateTimePicker,
+  DropdownMenu,
+  Image_,
+  ScreenModal,
+} from "../../../components";
+import { APP_BASE_COLORS, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   clog,
@@ -52,8 +59,11 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   const [sSelectedUserIdx, _setSelectedUserIdx] = useState();
   const [sTotalMinutesWorked, _setTotalMinutesWorked] = useState();
   const [sRunningTotalWages, _setRunningTotalWages] = useState();
+  const [sEditableRowIdx, _setEditableRowIdx] = useState(5);
 
   const userDropdownRef = useRef();
+  const amPMOUtDropdownRef = useRef([]);
+  const amPMINDropdownRef = useRef([]);
   /////////////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////////////
 
@@ -99,8 +109,6 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         let arr = [];
         resArr.forEach((o) => {
           arr.push(o);
-          // let dateObj = getDisplayFormattedDateWithTime(o.millis);
-          // arr.push({ ...o, dateObj });
         });
         _setFilteredArr(arr);
       })
@@ -160,6 +168,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
           ...obj.in,
           ...getDisplayFormattedDate(obj.in.millis, true, true),
         };
+
         // log("clock in only");
       } else if (obj.out) {
         obj.out = {
@@ -170,6 +179,19 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       } else {
         return;
       }
+      let dateObj = {};
+      if (obj.in) {
+        dateObj.wordDayOfMonth = obj.in.wordDayOfMonth;
+        dateObj.dayOfMonth = obj.in.dayOfMonth;
+        dateObj.year = obj.in.year;
+        dateObj.wordDayOfWeek = obj.in.wordDayOfWeek;
+      } else if (obj.out) {
+        dateObj.wordDayOfMonth = obj.out.wordDayOfMonth;
+        dateObj.dayOfMonth = obj.out.dayOfMonth;
+        dateObj.year = obj.out.year;
+        dateObj.wordDayOfWeek = obj.out.wordDayOfWeek;
+      }
+      obj = { ...obj, ...dateObj };
       // log(obj);
       arr.push(obj);
     });
@@ -182,7 +204,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     // clog(arr);
   }, [_setHistoryDisplay, sFilteredArr]);
 
-  log(sRunningTotalWages);
+  // log(sRunningTotalWages);
   let Component = useCallback(() => {
     function handleUserSelect(item, idx) {
       // log("item", item);
@@ -190,6 +212,38 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       // log(user);
       _setUserObj(user);
     }
+
+    function handleTimeEdit(obj, option) {
+      log("option", option);
+      switch (option) {
+        case "date-up":
+          break;
+        case "date-down":
+          break;
+        case "in-hour-up":
+          break;
+        case "in-hour-down":
+          break;
+        case "in-minutes-up":
+          break;
+        case "in-minutes-down":
+          break;
+        case "out-hour-up":
+          break;
+        case "out-hour-down":
+          break;
+        case "out-minutes-up":
+          break;
+        case "out-minutes-down":
+          break;
+        case "in-am-pm":
+          break;
+        case "out-am-pm":
+          break;
+      }
+    }
+
+    const iconSize = 30;
     return (
       <TouchableWithoutFeedback>
         <View
@@ -282,8 +336,8 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
           <View
             style={{
               marginLeft: 20,
-              width: "60%",
-              height: "95%",
+              width: "55%",
+              height: "97%",
               // alignItems: "center",
               backgroundColor: APP_BASE_COLORS.backgroundListWhite,
               borderRadius: 15,
@@ -304,119 +358,344 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                 renderItem={(obj) => {
                   let idx = obj.index;
                   let item = obj.item;
+                  let editable = idx === sEditableRowIdx;
                   return (
                     <View
                       style={{
+                        flexDirection: "row",
+                        alignItems: "center",
                         width: "100%",
-                        borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
-                        borderRadius: 1,
+                        opacity: sEditableRowIdx && editable ? null : 0.65,
+                        backgroundColor: isEven(idx)
+                          ? APP_BASE_COLORS.listItemWhite
+                          : makeGrey(0.075),
+                        paddingVertical: 8,
+                        paddingHorizontal: 5,
                       }}
                     >
                       <View
                         style={{
                           flexDirection: "row",
-                          width: "100%",
-                          backgroundColor: isEven(idx)
-                            ? APP_BASE_COLORS.listItemWhite
-                            : makeGrey(0.1),
-                          paddingVertical: 8,
-                          paddingHorizontal: 5,
+                          alignItems: "center",
+                          // marginRight: 3,
+                          width: "25%",
                         }}
                       >
-                        {item.in ? (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              width: "30%",
-                              alignItems: "flex-end",
-                            }}
-                          >
-                            <Text
-                              style={{ fontSize: 12, color: makeGrey(0.5) }}
-                            >
-                              IN:{"  "}
-                            </Text>
-                            <Text
-                              style={{
-                                color: APP_BASE_COLORS.textMain,
-                                fontSize: 13,
-                                marginRight: 10,
+                        <Text style={{ color: makeGrey(0.4), marginRight: 5 }}>
+                          {item.year}
+                        </Text>
+                        <Text
+                          style={{
+                            color: APP_BASE_COLORS.textMain,
+                            marginRight: 1,
+                          }}
+                        >
+                          {item.wordDayOfWeek + ", "}
+                        </Text>
+                        <Text style={{ color: APP_BASE_COLORS.textMain }}>
+                          {item.wordDayOfMonth}
+                        </Text>
+                        <View style={{ alignItems: "center", marginLeft: 3 }}>
+                          {editable ? (
+                            <Button_
+                              icon={ICONS.upChevron}
+                              iconSize={iconSize}
+                              onPress={() => handleTimeEdit(item, "date-up")}
+                              buttonStyle={{
+                                paddingVertical: 0,
+                                paddingHorizontal: 0,
                               }}
-                            >
-                              {item.in.wordDayOfWeek +
-                                ", " +
-                                item.in.wordDayOfMonth +
-                                " " +
-                                item.in.dayOfMonth}
-                            </Text>
-
-                            <TextInput
-                              style={{ width: 10, textAlign: "right" }}
-                              value={item.in.hour}
                             />
-                            <Text>:</Text>
-                            <TextInput
-                              style={{ width: 20 }}
-                              value={item.in.minutes}
-                            />
-                            <TextInput
-                              style={{ width: 20 }}
-                              value={item.in.amPM}
-                            />
-                          </View>
-                        ) : null}
-                        {item.out ? (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              width: "30%",
-                              alignItems: "flex-end",
-                              // justifyContent: "space-between",
-                              // backgroundColor: "green",
-                            }}
-                          >
-                            <Text
-                              style={{ fontSize: 12, color: makeGrey(0.5) }}
-                            >
-                              OUT:{"  "}
-                            </Text>
-                            <Text
-                              style={{
-                                color: APP_BASE_COLORS.textMain,
-                                fontSize: 13,
-                                marginRight: 10,
+                          ) : null}
+                          <Text style={{ width: 20, textAlign: "center" }}>
+                            {item.dayOfMonth}
+                          </Text>
+                          {editable ? (
+                            <Button_
+                              buttonStyle={{
+                                paddingVertical: 0,
+                                paddingHorizontal: 0,
                               }}
-                            >
-                              {item.out.wordDayOfWeek +
-                                ", " +
-                                item.out.wordDayOfMonth +
-                                " " +
-                                item.out.dayOfMonth}
-                            </Text>
-
-                            <TextInput
-                              style={{ width: 10, textAlign: "right" }}
-                              value={item.out.hour}
+                              icon={ICONS.downChevron}
+                              iconSize={iconSize}
+                              onPress={() => handleTimeEdit(item, "date-down")}
                             />
-                            <Text>:</Text>
-                            <TextInput
-                              style={{ width: 20 }}
-                              value={item.out.minutes}
-                            />
-                            <TextInput
-                              style={{ width: 20 }}
-                              value={item.out.amPM}
-                            />
-                          </View>
-                        ) : null}
-                        {/* {item.hoursDiff || item.minutesDiff ? (
-                    <Text style={{ textAlign: "right", width: "20%" }}>
-                      {(item.hoursDiff ? item.hoursDiff : "") +
-                        ":" +
-                        item.minutesDiff}
-                    </Text>
-                  ) : null} */}
+                          ) : null}
+                        </View>
                       </View>
+                      {item.in ? (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            width: "20%",
+                            alignItems: "center",
+                            justifyContent: "flex-start",
+                            // marginRight: 0,
+                            // backgroundColor: "blue",
+                            // paddin
+                          }}
+                        >
+                          {editable ? <View></View> : null}
+                          {editable ? null : (
+                            <Image_ icon={ICONS.forwardGreen} size={14} />
+                          )}
+                          <View style={{ alignItems: "center" }}>
+                            {editable ? (
+                              <Button_
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                                icon={ICONS.upChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "in-hour-up")
+                                }
+                              />
+                            ) : null}
+                            <Text
+                              style={{
+                                width: 20,
+                                textAlign: editable ? "center" : "right",
+                                // width: 20,
+                                // textAlign: "right",
+                                outlineColor: APP_BASE_COLORS.green,
+                                paddingRight: 1,
+                                // backgroundColor: "blue",
+                                // borderWidth: 1,
+                                outlineColor: APP_BASE_COLORS.green,
+                                borderColor:
+                                  APP_BASE_COLORS.buttonLightGreenOutline,
+                              }}
+                            >
+                              {item.in.hour}
+                            </Text>
+                            {editable ? (
+                              <Button_
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                                icon={ICONS.downChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "in-hour-down")
+                                }
+                              />
+                            ) : null}
+                          </View>
+                          <Text style={{ paddingHorizontal: 1 }}>:</Text>
+                          <View style={{ alignItems: "center" }}>
+                            {editable ? (
+                              <Button_
+                                icon={ICONS.upChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "in-minutes-up")
+                                }
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                              />
+                            ) : null}
+                            <Text
+                              style={{
+                                width: iconSize,
+                                textAlign: editable ? "center" : "left",
+                                // textAlign: editable ? center : ,
+                                outlineColor: APP_BASE_COLORS.green,
+                                outlineColor: APP_BASE_COLORS.green,
+                                borderColor:
+                                  APP_BASE_COLORS.buttonLightGreenOutline,
+                              }}
+                            >
+                              {item.in.minutes}
+                            </Text>
+                            {editable ? (
+                              <Button_
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                                icon={ICONS.downChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "in-minutes-down")
+                                }
+                              />
+                            ) : null}
+                          </View>
+                          <View
+                            ref={(el) => (amPMINDropdownRef.current[idx] = el)}
+                          >
+                            <DropdownMenu
+                              ref={amPMINDropdownRef.current[idx]}
+                              dataArr={[{ label: "AM" }, { label: "PM" }]}
+                              useSelectedAsButtonTitle={true}
+                              selectedIdx={item.in.amPM === "AM" ? 0 : 1}
+                              buttonStyle={{
+                                // width: 20,
+                                backgroundColor: "transparent",
+                                paddingHorizontal: 4,
+                                borderRadius: 5,
+                              }}
+                              buttonTextStyle={{
+                                color: makeGrey(0.6),
+                                fontSize: 14,
+                                // paddingHorizontal: 0,
+                              }}
+                              onSelect={(val) => {
+                                handleTimeEdit(item, val, "in-am-pm");
+                              }}
+                            />
+                          </View>
+                        </View>
+                      ) : null}
+                      {item.out ? (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            width: "25%",
+                            alignItems: "center",
+                          }}
+                        >
+                          {editable ? null : (
+                            <Image_ icon={ICONS.backRed} size={13} />
+                          )}
+
+                          <View>
+                            {editable ? (
+                              <Button_
+                                icon={ICONS.upChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "out-hour-up")
+                                }
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                              />
+                            ) : null}
+                            <Text
+                              style={{
+                                // marginLeft: 10,
+                                width: iconSize,
+                                textAlign: editable ? "center" : "right",
+                                outlineColor: APP_BASE_COLORS.green,
+                                // borderWidth: 1,
+                                paddingRight: 1,
+                                borderColor:
+                                  APP_BASE_COLORS.buttonLightGreenOutline,
+                              }}
+                            >
+                              {item.out.hour}
+                            </Text>
+
+                            {editable ? (
+                              <Button_
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                                icon={ICONS.downChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "out-hour-down")
+                                }
+                              />
+                            ) : null}
+                          </View>
+                          <Text style={{ paddingHorizontal: 1 }}>:</Text>
+                          <View>
+                            {editable ? (
+                              <Button_
+                                icon={ICONS.upChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "out-minutes-up")
+                                }
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                              />
+                            ) : null}
+                            <Text
+                              style={{
+                                width: iconSize,
+                                textAlign: editable ? "center" : "left",
+                                outlineColor: APP_BASE_COLORS.green,
+                                // borderWidth: 1,
+                                paddingHorizontal: 1,
+                                borderColor:
+                                  APP_BASE_COLORS.buttonLightGreenOutline,
+                              }}
+                            >
+                              {item.out.minutes}
+                            </Text>
+                            {editable ? (
+                              <Button_
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                                icon={ICONS.downChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "out-minutes-down")
+                                }
+                              />
+                            ) : null}
+                          </View>
+                          <View
+                            ref={(el) => (amPMOUtDropdownRef.current[idx] = el)}
+                          >
+                            <DropdownMenu
+                              ref={amPMOUtDropdownRef.current[idx]}
+                              dataArr={[{ label: "AM" }, { label: "PM" }]}
+                              useSelectedAsButtonTitle={true}
+                              selectedIdx={item.out.amPM === "AM" ? 0 : 1}
+                              buttonStyle={{
+                                // width: 20,
+                                backgroundColor: "transparent",
+                                paddingHorizontal: 4,
+                                borderRadius: 5,
+                              }}
+                              buttonTextStyle={{
+                                color: makeGrey(0.6),
+                                fontSize: 14,
+                                // paddingHorizontal: 0,
+                              }}
+                              onSelect={(val) => {
+                                handleTimeEdit(item, val, "out-am-pm");
+                              }}
+                            />
+                          </View>
+                        </View>
+                      ) : null}
+                      {item.hoursDiff || item.minutesDiff ? (
+                        <View style={{ flexDirection: "row", marginRight: 30 }}>
+                          <Text
+                            style={{ color: makeGrey(0.6), marginRight: 5 }}
+                          >
+                            Total:
+                          </Text>
+                          <Text style={{ textAlign: "right", width: 50 }}>
+                            {(item.hoursDiff ? item.hoursDiff : "") +
+                              " : " +
+                              item.minutesDiff}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <Button_
+                        onPress={() =>
+                          _setEditableRowIdx(sEditableRowIdx ? null : idx)
+                        }
+                        iconSize={20}
+                        icon={ICONS.editPencil}
+                      />
                     </View>
                   );
                 }}

@@ -131,7 +131,6 @@ export function BaseScreen() {
     // fillSettings();
     // fillReceipt();
     // fillPrinterNames();
-    // fillPunchHistory();
   }, []);
   // log(zSettingsObj);
   return (

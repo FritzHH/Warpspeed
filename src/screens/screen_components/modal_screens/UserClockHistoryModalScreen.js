@@ -239,23 +239,24 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       }
 
       let userID = obj.in ? obj.in.userID : obj.out.userID;
+      log(option);
       switch (option) {
         case "in-date-up":
-          if (!obj.in) {
-            // is punch-in only
-            obj.out.millis = obj.out.millis + MILLIS_IN_DAY;
-            setDBItem(build_db_path.punchClock(obj.out.userID), obj.out);
-          } else if (!obj.out) {
-            // is punch-out only
-            obj.in.millis = obj.in.millis + MILLIS_IN_DAY;
-          } else {
-            // has both punch-in and punch-out
-            obj.in.millis = obj.in.millis + MILLIS_IN_DAY;
-            obj.out.millis = obj.out.millis + MILLIS_IN_DAY;
-          }
+          // if (!obj.in) {
+          //   // is punch-in only
+          //   obj.out.millis = obj.out.millis + MILLIS_IN_DAY;
+          //   setDBItem(build_db_path.punchClock(obj.out.userID), obj.out);
+          // } else if (!obj.out) {
+          //   // is punch-out only
+          //   obj.in.millis = obj.in.millis + MILLIS_IN_DAY;
+          // } else {
+          //   // has both punch-in and punch-out
+          //   obj.in.millis = obj.in.millis + MILLIS_IN_DAY;
+          //   obj.out.millis = obj.out.millis + MILLIS_IN_DAY;
+          // }
           break;
         case "in-date-down":
-          obj.in.millis = oldMillis - MILLIS_IN_DAY;
+          // obj.in.millis = oldMillis - MILLIS_IN_DAY;
           break;
         case "out-date-up":
           break;
@@ -479,7 +480,9 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               <Button_
                                 icon={ICONS.upChevron}
                                 iconSize={iconSize}
-                                onPress={() => handleTimeEdit(item, "date-up")}
+                                onPress={() =>
+                                  handleTimeEdit(item, "in-date-up")
+                                }
                                 buttonStyle={{
                                   paddingVertical: 0,
                                   paddingHorizontal: 0,
@@ -503,7 +506,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 icon={ICONS.downChevron}
                                 iconSize={iconSize}
                                 onPress={() =>
-                                  handleTimeEdit(item, "date-down")
+                                  handleTimeEdit(item, "in-date-down")
                                 }
                               />
                             ) : null}
@@ -664,7 +667,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                   icon={ICONS.upChevron}
                                   iconSize={iconSize}
                                   onPress={() =>
-                                    handleTimeEdit(item, "date-up")
+                                    handleTimeEdit(item, "out-date-up")
                                   }
                                   buttonStyle={{
                                     paddingVertical: 0,
@@ -684,7 +687,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                   icon={ICONS.downChevron}
                                   iconSize={iconSize}
                                   onPress={() =>
-                                    handleTimeEdit(item, "date-down")
+                                    handleTimeEdit(item, "out-date-down")
                                   }
                                 />
                               ) : null}
@@ -852,6 +855,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           {editable ? (
                             <Button_
                               onPress={() => {
+                                log("delete punch clock item function needed");
                                 if (sEditableRowIdx === idx) {
                                   _setEditableRowIdx(null);
                                 } else {

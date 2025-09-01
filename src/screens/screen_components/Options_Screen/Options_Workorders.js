@@ -10,7 +10,7 @@ import {
   capitalizeFirstLetterOfString,
   clog,
   dim,
-  getDisplayFormattedDate,
+  formatMillisForDisplay,
   getWordDayOfWeek,
   getWordMonth,
   log,
@@ -18,7 +18,7 @@ import {
   useInterval,
 } from "../../../utils";
 import { TabMenuDivider as Divider, CheckBox_ } from "../../../components";
-import { APP_BASE_COLORS, Colors } from "../../../styles";
+import { C, Colors } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep, sortBy } from "lodash";
@@ -274,7 +274,7 @@ export function WorkordersComponent({}) {
             backgroundColor: "transparent",
           }}
           outerButtonStyle={{}}
-          textStyle={{ color: APP_BASE_COLORS.textMain, fontSize: 13 }}
+          textStyle={{ color: C.textMain, fontSize: 13 }}
         />
       </View>
 
@@ -311,9 +311,9 @@ export function WorkordersComponent({}) {
                     // borderWidth: 1,
                     borderLeftWidth: 4,
 
-                    borderLeftColor: APP_BASE_COLORS.buttonLightGreenOutline,
-                    borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
-                    backgroundColor: APP_BASE_COLORS.listItemWhite,
+                    borderLeftColor: C.buttonLightGreenOutline,
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.listItemWhite,
                     flexDirection: "row",
                     width: "100%",
                     justifyContent: "flex-start",
@@ -334,7 +334,7 @@ export function WorkordersComponent({}) {
                     <Text
                       style={{
                         fontWeight: 500,
-                        color: APP_BASE_COLORS.textMain,
+                        color: C.textMain,
                       }}
                     >
                       {workorder.brand || "Brand"}
@@ -351,7 +351,7 @@ export function WorkordersComponent({}) {
                     ) : null}
                     <Text
                       style={{
-                        color: APP_BASE_COLORS.textMain,
+                        color: C.textMain,
                         // fontStyle: "italic"
                       }}
                     >
@@ -401,7 +401,7 @@ export function WorkordersComponent({}) {
                       </View>
                       <View style={{ width: 8 }} />
                       <Text style={{ color: "dimgray", fontSize: 13 }}>
-                        {getDisplayFormattedDate(workorder.startedOnMillis)}
+                        {formatMillisForDisplay(workorder.startedOnMillis)}
                       </Text>
                     </View>
                     <View
@@ -411,9 +411,9 @@ export function WorkordersComponent({}) {
                         justifyContent: "flex-start",
                         height: "100%",
                         paddingRight: 2,
-                        backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                        backgroundColor: C.buttonLightGreen,
                         borderWidth: 1,
-                        borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                        borderColor: C.buttonLightGreenOutline,
                         borderRadius: 5,
                         marginLeft: 5,
                       }}
@@ -430,7 +430,7 @@ export function WorkordersComponent({}) {
                           {"est: "}
                           <Text
                             style={{
-                              color: APP_BASE_COLORS.textMain,
+                              color: C.textMain,
                               fontSize: 14,
                               fontStyle: "italic",
                             }}
@@ -448,7 +448,7 @@ export function WorkordersComponent({}) {
                             }}
                           >
                             {"due: "}{" "}
-                            <Text style={{ color: APP_BASE_COLORS.textMain }}>
+                            <Text style={{ color: C.textMain }}>
                               {capitalizeFirstLetterOfString(
                                 sItemOptions[workorder.id].waitEndDay
                               )}

@@ -41,12 +41,7 @@ import {
   useLoginStore,
 } from "../../../stores";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
-import {
-  APP_BASE_COLORS,
-  COLOR_GRADIENTS,
-  Colors,
-  ICONS,
-} from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
   dbSearchForName,
   dbSearchForPhoneNumber,

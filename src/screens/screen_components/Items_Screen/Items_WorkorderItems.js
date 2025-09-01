@@ -19,7 +19,7 @@ import {
   Button_,
 } from "../../../components";
 import {
-  APP_BASE_COLORS,
+  C,
   BUTTON_VARS,
   COLOR_GRADIENTS,
   Colors,
@@ -296,12 +296,12 @@ export const Items_WorkorderItemsTab = ({}) => {
             justifyContent: "space-around",
             alignItems: "center",
             width: "99%",
-            backgroundColor: APP_BASE_COLORS.backgroundGreen,
+            backgroundColor: C.backgroundGreen,
             opacity: sNumItems > 0 ? 1 : 0.2,
             marginVertical: 5,
             marginHorizontal: 5,
             borderRadius: 15,
-            borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+            borderColor: C.buttonLightGreenOutline,
             borderWidth: 1,
             padding: 10,
             alignSelf: "center",
@@ -313,7 +313,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
-                color: APP_BASE_COLORS.textMain,
+                color: C.textMain,
                 fontSize: 15,
               }}
             >
@@ -324,7 +324,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             style={{
               width: 1,
               height: "100%",
-              backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+              backgroundColor: C.buttonLightGreenOutline,
             }}
           />
           {sTotalDiscount > 0 ? (
@@ -335,7 +335,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                   style={{
                     marginRight: 10,
                     fontWeight: "bold",
-                    color: APP_BASE_COLORS.textMain,
+                    color: C.textMain,
                     fontSize: 15,
                   }}
                 >
@@ -346,7 +346,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                 style={{
                   width: 1,
                   height: "100%",
-                  backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                  backgroundColor: C.buttonLightGreenOutline,
                 }}
               />
             </View>
@@ -356,7 +356,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             <Text
               style={{
                 marginRight: 10,
-                color: APP_BASE_COLORS.textMain,
+                color: C.textMain,
                 fontWeight: "bold",
                 fontSize: 15,
               }}
@@ -368,7 +368,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             style={{
               width: 1,
               height: "100%",
-              backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+              backgroundColor: C.buttonLightGreenOutline,
             }}
           />
           <Text style={{ fontSize: 13, color: "gray" }}>
@@ -377,7 +377,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
-                color: APP_BASE_COLORS.textMain,
+                color: C.textMain,
                 fontSize: 15,
               }}
             >
@@ -389,14 +389,14 @@ export const Items_WorkorderItemsTab = ({}) => {
             style={{
               width: 1,
               height: "100%",
-              backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+              backgroundColor: C.buttonLightGreenOutline,
             }}
           />
 
           <Text
             style={{
               fontSize: 13,
-              borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+              borderColor: C.buttonLightGreenOutline,
               borderRadius: 15,
               borderWidth: 1,
               paddingHorizontal: 15,
@@ -409,7 +409,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
-                color: APP_BASE_COLORS.textMain,
+                color: C.textMain,
                 fontSize: 15,
               }}
             >
@@ -493,14 +493,14 @@ export const LineItemComponent = ({
             flexDirection: "row",
             width: "100%",
             alignItems: "center",
-            backgroundColor: APP_BASE_COLORS.backgroundListWhite,
+            backgroundColor: C.backgroundListWhite,
             paddingVertical: 3,
             paddingRight: 5,
             paddingLeft: 8,
             marginVertical: 3,
             marginHorizontal: 8,
             borderColor: "transparent",
-            borderLeftColor: lightenRGBByPercent(APP_BASE_COLORS.green, 60),
+            borderLeftColor: lightenRGBByPercent(C.green, 60),
             borderWidth: 2,
             borderRadius: 15,
           }}
@@ -602,7 +602,7 @@ export const LineItemComponent = ({
                     fontSize: 18,
                     fontWeight: 700,
                     textAlign: "center",
-                    color: APP_BASE_COLORS.textWhite,
+                    color: C.textWhite,
                     outlineWidth: 0,
                     width: "100%",
                   }}

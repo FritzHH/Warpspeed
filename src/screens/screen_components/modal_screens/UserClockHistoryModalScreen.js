@@ -12,28 +12,38 @@ import {
   DropdownMenu,
   Image_,
   ScreenModal,
+  SHADOW_RADIUS_PROTO,
 } from "../../../components";
-import { APP_BASE_COLORS, ICONS } from "../../../styles";
+import { C, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   clog,
   convertMillisToHoursMins,
-  getDisplayFormattedDate,
+  decrementNumByFive,
+  formatMillisForDisplay,
   getPreviousMondayDayJS,
   getWordDayOfWeek,
+  incrementNumByFive,
   log,
   makeGrey,
   numberIsEven,
   trimToTwoDecimals,
 } from "../../../utils";
 import dayjs from "dayjs";
-import { dbFindPunchHistoryByMillisRange } from "../../../db_call_wrapper";
+import {
+  build_db_path,
+  dbFindPunchHistoryByMillisRange,
+  dbUpdateUserPunchAction,
+  setDBItem,
+} from "../../../db_call_wrapper";
 import sr from "dayjs/locale/sr";
-import { range, sortBy } from "lodash";
+import { cloneDeep, range, sortBy } from "lodash";
 import { loadBundle } from "firebase/firestore";
 import { isEven } from "face-api.js/build/commonjs/utils";
 import { useLoginStore, useSettingsStore } from "../../../stores";
-import { MILLIS_IN_MINUTE } from "../../../constants";
+import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "../../../constants";
+import { ToolContextImpl } from "twilio/lib/rest/assistants/v1/tool";
+import { ItemAssignmentContextImpl } from "twilio/lib/rest/numbers/v2/regulatoryCompliance/bundle/itemAssignment";
 
 // eslint-disable-next-line no-lone-blocks
 {
@@ -59,7 +69,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   const [sSelectedUserIdx, _setSelectedUserIdx] = useState();
   const [sTotalMinutesWorked, _setTotalMinutesWorked] = useState();
   const [sRunningTotalWages, _setRunningTotalWages] = useState();
-  const [sEditableRowIdx, _setEditableRowIdx] = useState();
+  const [sEditableRowIdx, _setEditableRowIdx] = useState(1);
 
   const userDropdownRef = useRef();
   const amPMOUtDropdownRef = useRef([]);
@@ -104,61 +114,84 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
 
     dbFindPunchHistoryByMillisRange(sUserObj.id, dayBegin, dayEnd)
       .then((resArr) => {
-        // log(resArr);
+        // clog("res arr", resArr);
         resArr = sortBy(resArr, "millis");
-        let arr = [];
-        resArr.forEach((o) => {
-          arr.push(o);
-        });
-        _setFilteredArr(arr);
+        _setFilteredArr(resArr);
       })
       .catch((e) => log("error", e));
   }, [sRange, sUserObj, _setFilteredArr]);
 
   useEffect(() => {
-    // log("filtered", sFilteredArr);
-
     let resArr = [];
     let counter = 0;
     let resObj = {};
+    let pairs = [];
+    // clog(sFilteredArr);
+    let filteredArr = sortBy(sFilteredArr, "millis");
     sFilteredArr.forEach((obj) => {
-      if (obj.option === "in") {
-        resObj = { in: obj };
-      } else {
+      obj = cloneDeep(obj);
+      // clog(obj);
+      if (counter === 0 && obj.option === "out") {
+        // log("edge 1");
+        // edge case, they either worked overnight or forgot to clock out the day before
         resObj.out = obj;
+        resArr.push(resObj);
+        resObj = {};
+        counter++;
+        return;
       }
 
-      if (obj.option == "out" || counter === sFilteredArr.length - 1) {
+      if (counter === sFilteredArr.length - 1 && obj.option === "in") {
+        // edge case, they either are going to work overnight or forgot to clock out on this date
+        // log("edge 2");
+        resObj.in = obj;
         resArr.push(resObj);
+        return;
+      }
+
+      if (obj.option === "in") {
+        // log("in" + counter);
+        resObj.in = obj;
+      } else if (obj.option === "out") {
+        // log("out" + counter);
+        resObj.out = obj;
+        resArr.push(resObj);
+        resObj = {};
       }
       counter++;
     });
+    // clog(resArr);
 
     let arr = [];
     let runningTotalMinutes = 0;
     let runningTotalWages = 0;
+    // clog(resArr);
     resArr.forEach((obj) => {
-      if (obj.in && obj.out) {
+      obj = cloneDeep(obj);
+      // log(obj);
+      // clog(obj);
+      if (obj.in) {
         obj.in = {
           ...obj.in,
-          ...getDisplayFormattedDate(obj.in.millis, true, true),
+          ...formatMillisForDisplay(obj.in.millis, true, true),
         };
+      }
+
+      if (obj.out) {
         obj.out = {
           ...obj.out,
-          ...getDisplayFormattedDate(obj.out.millis, true, true),
+          ...formatMillisForDisplay(obj.out.millis, true, true),
         };
+      }
 
-        if (obj.in.dayOfMonth !== obj.out.dayOfMonth) {
-          obj.sameDayPunchout = false;
-        }
-        // clog(obj.in);
-        let diff = obj.out.millis - obj.in.millis;
-        let total = convertMillisToHoursMins(diff);
+      let total;
+      if (obj.in && obj.out) {
+        total = convertMillisToHoursMins(obj.out.millis - obj.in.millis);
+        // log("total", total);
         obj.hoursDiff = total.hours;
         obj.minutesDiff = total.minutes;
         obj.totalMinutes = total.totalMinutes;
         runningTotalMinutes += total.totalMinutes;
-        // clog(obj);
         if (Number(obj.minutesDiff) < 10) {
           // log(obj.minutes);
           obj.minutesDiff = "0" + obj.minutesDiff.toString();
@@ -166,33 +199,16 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       } else if (obj.in) {
         obj.in = {
           ...obj.in,
-          ...getDisplayFormattedDate(obj.in.millis, true, true),
+          ...formatMillisForDisplay(obj.in.millis, true, true),
         };
-
-        // log("clock in only");
-      } else if (obj.out) {
+      } else {
         obj.out = {
           ...obj.out,
-          ...getDisplayFormattedDate(obj.out.millies, true, true),
+          ...formatMillisForDisplay(obj.out.millis, true, true),
         };
-        // log("clock out only");
-      } else {
-        return;
       }
-      let dateObj = {};
-      if (obj.in) {
-        dateObj.wordDayOfMonth = obj.in.wordDayOfMonth;
-        dateObj.dayOfMonth = obj.in.dayOfMonth;
-        dateObj.year = obj.in.year;
-        dateObj.wordDayOfWeek = obj.in.wordDayOfWeek;
-      } else if (obj.out) {
-        dateObj.wordDayOfMonth = obj.out.wordDayOfMonth;
-        dateObj.dayOfMonth = obj.out.dayOfMonth;
-        dateObj.year = obj.out.year;
-        dateObj.wordDayOfWeek = obj.out.wordDayOfWeek;
-      }
-      obj = { ...obj, ...dateObj };
-      // log(obj);
+
+      // clog(obj);
       arr.push(obj);
     });
     _setRunningTotalWages(
@@ -201,45 +217,79 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     _setTotalMinutesWorked(runningTotalMinutes);
     _setHistoryDisplay(arr);
 
-    // clog(arr);
+    clog(arr);
   }, [_setHistoryDisplay, sFilteredArr]);
 
   // log(sRunningTotalWages);
   let Component = useCallback(() => {
     function handleUserSelect(item, idx) {
-      // log("item", item);
       let user = zSettingsObj.users.find((o) => o.id === item.id);
-      // log(user);
       _setUserObj(user);
     }
 
     function handleTimeEdit(obj, option) {
-      log("option", option);
+      obj = cloneDeep(obj);
+      let oldMillis;
+      if (option.includes("in")) {
+        oldMillis = obj.in.millis;
+      } else if (option.includes("out")) {
+        oldMillis = obj.out.millis;
+      } else {
+        oldMillis = obj.in.millis || obj.out.millis;
+      }
+
+      let userID = obj.in ? obj.in.userID : obj.out.userID;
       switch (option) {
-        case "date-up":
+        case "in-date-up":
+          if (!obj.in) {
+            // is punch-in only
+            obj.out.millis = obj.out.millis + MILLIS_IN_DAY;
+            setDBItem(build_db_path.punchClock(obj.out.userID), obj.out);
+          } else if (!obj.out) {
+            // is punch-out only
+            obj.in.millis = obj.in.millis + MILLIS_IN_DAY;
+          } else {
+            // has both punch-in and punch-out
+            obj.in.millis = obj.in.millis + MILLIS_IN_DAY;
+            obj.out.millis = obj.out.millis + MILLIS_IN_DAY;
+          }
           break;
-        case "date-down":
+        case "in-date-down":
+          obj.in.millis = oldMillis - MILLIS_IN_DAY;
           break;
+        case "out-date-up":
+          break;
+        case "out-date-down":
+          break;
+
         case "in-hour-up":
           break;
         case "in-hour-down":
-          break;
-        case "in-minutes-up":
-          break;
-        case "in-minutes-down":
           break;
         case "out-hour-up":
           break;
         case "out-hour-down":
           break;
+
+        case "in-minutes-up":
+          break;
+        case "in-minutes-down":
+          break;
         case "out-minutes-up":
           break;
         case "out-minutes-down":
           break;
+
         case "in-am-pm":
           break;
         case "out-am-pm":
           break;
+      }
+
+      if (obj.out && obj.in) {
+        dbUpdateUserPunchAction(userID, obj.out);
+        dbUpdateUserPunchAction(userID, obj.in);
+      } else {
       }
     }
 
@@ -248,9 +298,9 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       <TouchableWithoutFeedback>
         <View
           style={{
-            width: "75%",
+            width: "80%",
             height: "85%",
-            backgroundColor: APP_BASE_COLORS.backgroundWhite,
+            backgroundColor: C.backgroundWhite,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-evenly",
@@ -265,7 +315,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                   buttonStyle={{
                     width: 150,
                     borderWidth: 1,
-                    borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                    borderColor: C.buttonLightGreenOutline,
                     alignSelf: "center",
                     borderRadius: 5,
                   }}
@@ -336,13 +386,18 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
           <View
             style={{
               marginLeft: 20,
-              width: "55%",
-              height: "97%",
-              // alignItems: "center",
-              backgroundColor: APP_BASE_COLORS.backgroundListWhite,
-              borderRadius: 15,
+              width: "65%",
+              maxHeight: "97%",
+              // minHeight: "20%",
+              backgroundColor: C.backgroundListWhite,
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+              ...SHADOW_RADIUS_PROTO,
+              // shadowColor: C.green,
             }}
           >
+            {/* "Flat list component" ////////////////////////////////////////*/}
+            {/* "Flat list component" ////////////////////////////////////////*/}
             {sHistoryDisplay.length > 0 ? (
               <FlatList
                 // style={{ width: "100%" }}
@@ -351,7 +406,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                   <View
                     style={{
                       height: 0,
-                      backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                      backgroundColor: C.buttonLightGreen,
                     }}
                   />
                 )}
@@ -365,9 +420,9 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                         flexDirection: "row",
                         alignItems: "center",
                         width: "100%",
-                        opacity: editable ? 1 : !sEditableRowIdx ? 1 : 0.15,
+                        opacity: editable ? 1 : !sEditableRowIdx ? 1 : 0.55,
                         backgroundColor: isEven(idx)
-                          ? APP_BASE_COLORS.listItemWhite
+                          ? C.listItemWhite
                           : makeGrey(0.075),
                         paddingVertical: 8,
                         paddingHorizontal: 5,
@@ -378,56 +433,18 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           flexDirection: "row",
                           alignItems: "center",
                           // marginRight: 3,
-                          width: "25%",
+                          width: "8%",
                         }}
                       >
                         <Text style={{ color: makeGrey(0.4), marginRight: 5 }}>
-                          {item.year}
+                          {item.in?.year || item.out?.year}
                         </Text>
-                        <Text
-                          style={{
-                            color: APP_BASE_COLORS.textMain,
-                            marginRight: 1,
-                          }}
-                        >
-                          {item.wordDayOfWeek + ", "}
-                        </Text>
-                        <Text style={{ color: APP_BASE_COLORS.textMain }}>
-                          {item.wordDayOfMonth}
-                        </Text>
-                        <View style={{ alignItems: "center", marginLeft: 3 }}>
-                          {editable ? (
-                            <Button_
-                              icon={ICONS.upChevron}
-                              iconSize={iconSize}
-                              onPress={() => handleTimeEdit(item, "date-up")}
-                              buttonStyle={{
-                                paddingVertical: 0,
-                                paddingHorizontal: 0,
-                              }}
-                            />
-                          ) : null}
-                          <Text style={{ width: 20, textAlign: "center" }}>
-                            {item.dayOfMonth}
-                          </Text>
-                          {editable ? (
-                            <Button_
-                              buttonStyle={{
-                                paddingVertical: 0,
-                                paddingHorizontal: 0,
-                              }}
-                              icon={ICONS.downChevron}
-                              iconSize={iconSize}
-                              onPress={() => handleTimeEdit(item, "date-down")}
-                            />
-                          ) : null}
-                        </View>
                       </View>
                       {item.in ? (
                         <View
                           style={{
                             flexDirection: "row",
-                            width: "20%",
+                            width: "32%",
                             alignItems: "center",
                             justifyContent: "flex-start",
                             // marginRight: 0,
@@ -436,9 +453,61 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           }}
                         >
                           {editable ? <View></View> : null}
-                          {editable ? null : (
-                            <Image_ icon={ICONS.forwardGreen} size={14} />
-                          )}
+                          <Image_
+                            icon={ICONS.forwardGreen}
+                            size={17}
+                            style={{ marginRight: 15 }}
+                          />
+                          <Text
+                            style={{
+                              color: C.textMain,
+                              marginRight: 1,
+                            }}
+                          >
+                            {item.in?.wordDayOfWeek
+                              ? item.in?.wordDayOfWeek + ", "
+                              : item.out?.wordDayOfWeek + ", "}
+                          </Text>
+                          <Text style={{ color: C.textMain }}>
+                            {item.in?.wordDayOfMonth ||
+                              item.out?.wordDayOfMonth}
+                          </Text>
+                          <View
+                            style={{ alignItems: "center", marginRight: 20 }}
+                          >
+                            {editable ? (
+                              <Button_
+                                icon={ICONS.upChevron}
+                                iconSize={iconSize}
+                                onPress={() => handleTimeEdit(item, "date-up")}
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                              />
+                            ) : null}
+                            <Text
+                              style={{
+                                width: 20,
+                                textAlign: "center",
+                              }}
+                            >
+                              {item.in?.dayOfMonth || item.out?.dayOfMonth}
+                            </Text>
+                            {editable ? (
+                              <Button_
+                                buttonStyle={{
+                                  paddingVertical: 0,
+                                  paddingHorizontal: 0,
+                                }}
+                                icon={ICONS.downChevron}
+                                iconSize={iconSize}
+                                onPress={() =>
+                                  handleTimeEdit(item, "date-down")
+                                }
+                              />
+                            ) : null}
+                          </View>
                           <View style={{ alignItems: "center" }}>
                             {editable ? (
                               <Button_
@@ -457,13 +526,12 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               style={{
                                 width: iconSize,
                                 textAlign: editable ? "center" : "right",
-                                outlineColor: APP_BASE_COLORS.green,
+                                outlineColor: C.green,
                                 paddingRight: 1,
                                 // backgroundColor: "blue",
                                 // borderWidth: 1,
-                                outlineColor: APP_BASE_COLORS.green,
-                                borderColor:
-                                  APP_BASE_COLORS.buttonLightGreenOutline,
+                                outlineColor: C.green,
+                                borderColor: C.buttonLightGreenOutline,
                               }}
                             >
                               {item.in.hour}
@@ -502,10 +570,9 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 width: iconSize,
                                 textAlign: editable ? "center" : "left",
                                 // textAlign: editable ? center : ,
-                                outlineColor: APP_BASE_COLORS.green,
-                                outlineColor: APP_BASE_COLORS.green,
-                                borderColor:
-                                  APP_BASE_COLORS.buttonLightGreenOutline,
+                                outlineColor: C.green,
+                                outlineColor: C.green,
+                                borderColor: C.buttonLightGreenOutline,
                               }}
                             >
                               {item.in.minutes}
@@ -549,18 +616,80 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             />
                           </View>
                         </View>
-                      ) : null}
+                      ) : (
+                        <View style={{ width: "32%" }} />
+                      )}
                       {item.out ? (
                         <View
                           style={{
                             flexDirection: "row",
-                            width: "25%",
+                            width: "35%",
                             alignItems: "center",
                           }}
                         >
-                          {editable ? null : (
-                            <Image_ icon={ICONS.backRed} size={13} />
-                          )}
+                          <Image_
+                            icon={ICONS.backRed}
+                            size={15}
+                            style={{ marginRight: 15 }}
+                          />
+
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              marginRight: 20,
+                              // marginRight: 3,
+                              // width: "45%",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: C.textMain,
+                                marginRight: 1,
+                              }}
+                            >
+                              {item.in?.wordDayOfWeek
+                                ? item.in?.wordDayOfWeek + ", "
+                                : item.out?.wordDayOfWeek + ", "}
+                            </Text>
+                            <Text style={{ color: C.textMain }}>
+                              {item.in?.wordDayOfMonth ||
+                                item.out?.wordDayOfMonth}
+                            </Text>
+                            <View
+                              style={{ alignItems: "center", marginLeft: 3 }}
+                            >
+                              {editable ? (
+                                <Button_
+                                  icon={ICONS.upChevron}
+                                  iconSize={iconSize}
+                                  onPress={() =>
+                                    handleTimeEdit(item, "date-up")
+                                  }
+                                  buttonStyle={{
+                                    paddingVertical: 0,
+                                    paddingHorizontal: 0,
+                                  }}
+                                />
+                              ) : null}
+                              <Text style={{ width: 20, textAlign: "center" }}>
+                                {item.in?.dayOfMonth || item.out?.dayOfMonth}
+                              </Text>
+                              {editable ? (
+                                <Button_
+                                  buttonStyle={{
+                                    paddingVertical: 0,
+                                    paddingHorizontal: 0,
+                                  }}
+                                  icon={ICONS.downChevron}
+                                  iconSize={iconSize}
+                                  onPress={() =>
+                                    handleTimeEdit(item, "date-down")
+                                  }
+                                />
+                              ) : null}
+                            </View>
+                          </View>
 
                           <View>
                             {editable ? (
@@ -581,11 +710,10 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 // marginLeft: 10,
                                 width: iconSize,
                                 textAlign: editable ? "center" : "right",
-                                outlineColor: APP_BASE_COLORS.green,
+                                outlineColor: C.green,
                                 // borderWidth: 1,
                                 paddingRight: 1,
-                                borderColor:
-                                  APP_BASE_COLORS.buttonLightGreenOutline,
+                                borderColor: C.buttonLightGreenOutline,
                               }}
                             >
                               {item.out.hour}
@@ -624,11 +752,10 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               style={{
                                 width: iconSize,
                                 textAlign: editable ? "center" : "left",
-                                outlineColor: APP_BASE_COLORS.green,
+                                outlineColor: C.green,
                                 // borderWidth: 1,
                                 paddingHorizontal: 0,
-                                borderColor:
-                                  APP_BASE_COLORS.buttonLightGreenOutline,
+                                borderColor: C.buttonLightGreenOutline,
                               }}
                             >
                               {item.out.minutes}
@@ -672,32 +799,71 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             />
                           </View>
                         </View>
-                      ) : null}
-                      {item.hoursDiff || item.minutesDiff ? (
-                        <View style={{ flexDirection: "row", marginRight: 30 }}>
-                          <Text
-                            style={{ color: makeGrey(0.6), marginRight: 5 }}
-                          >
-                            Total:
-                          </Text>
-                          <Text style={{ textAlign: "right", width: 50 }}>
-                            {(item.hoursDiff ? item.hoursDiff : "") +
-                              " : " +
-                              item.minutesDiff}
-                          </Text>
-                        </View>
-                      ) : null}
-                      <Button_
-                        onPress={() => {
-                          if (sEditableRowIdx === idx) {
-                            _setEditableRowIdx(null);
-                          } else {
-                            _setEditableRowIdx(idx);
-                          }
+                      ) : (
+                        <View style={{ width: "35%" }} />
+                      )}
+                      <View
+                        style={{
+                          width: "25%",
+                          // backgroundColor: "green",
+                          flexDirection: "row",
+                          alignItems: "center",
                         }}
-                        iconSize={20}
-                        icon={ICONS.editPencil}
-                      />
+                      >
+                        {item.hoursDiff || item.minutesDiff ? (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              width: "35%",
+                              justifyContent: "space-between",
+                              paddingRight: 12,
+                              // backgroundColor: "blue",
+                            }}
+                          >
+                            <Text style={{ color: makeGrey(0.6) }}>Total:</Text>
+                            <Text style={{ textAlign: "right", width: 50 }}>
+                              {(item.hoursDiff ? item.hoursDiff : "") +
+                                " : " +
+                                item.minutesDiff}
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={{ width: "35%" }} />
+                        )}
+
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            width: "60%",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Button_
+                            onPress={() => {
+                              if (sEditableRowIdx === idx) {
+                                _setEditableRowIdx(null);
+                              } else {
+                                _setEditableRowIdx(idx);
+                              }
+                            }}
+                            iconSize={20}
+                            icon={ICONS.editPencil}
+                          />
+                          {editable ? (
+                            <Button_
+                              onPress={() => {
+                                if (sEditableRowIdx === idx) {
+                                  _setEditableRowIdx(null);
+                                } else {
+                                  _setEditableRowIdx(idx);
+                                }
+                              }}
+                              iconSize={16}
+                              icon={ICONS.close1}
+                            />
+                          ) : null}
+                        </View>
+                      </View>
                     </View>
                   );
                 }}
@@ -711,7 +877,13 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                   alignItems: "center",
                 }}
               >
-                <Text style={{ color: makeGrey(0.4), fontSize: 17 }}>
+                <Text
+                  style={{
+                    color: makeGrey(0.4),
+                    fontSize: 17,
+                    paddingVertical: 10,
+                  }}
+                >
                   No punches for this date range
                 </Text>
               </View>

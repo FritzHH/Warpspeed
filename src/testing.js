@@ -15,18 +15,23 @@ import {
 } from "./data";
 import { setInventoryItem, setOpenWorkorder, setRealtimeNodeItem } from "./db";
 import {
+  convertMillisToHoursMins,
   formatDateTimeForReceipt,
   generateBarcode,
   generateRandomID,
+  generateRandomNumber,
+  formatMillisForDisplay,
   log,
   randomWordGenerator,
 } from "./utils";
 import {
   dbSetCustomerObj,
   dbSetSettings,
-  dbSetUserPunchAction,
+  dbCreateUserPunchAction,
+  setDBItem,
+  build_db_path,
 } from "./db_call_wrapper";
-import { MILLIS_IN_MINUTE } from "./constants";
+import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "./constants";
 
 export function testPayment() {}
 
@@ -109,7 +114,7 @@ export function fillCustomers() {
   }
 }
 
-export function fillPreferences() {
+export function fillSettings() {
   // log(SETTINGS_PROTO);
   dbSetSettings(SETTINGS_OBJ);
   // getRealtimeNodeItem("SETTINGS").then((res) => log("res", res));
@@ -187,18 +192,35 @@ export function fillPrinterNames() {
 }
 
 export function fillPunchHistory() {
+  // log("here");
   let userID = "1234";
-  let ref = new Date().getTime();
   let option = true;
-  for (let i = 1; i <= 10; i++) {
-    let val = ref - i * 3 * Math.round(MILLIS_IN_MINUTE);
+  let ref = new Date().getTime();
+  let running = ref;
+  for (let i = 2; i <= 5; i++) {
+    if (i === 2) {
+      let obj = {
+        userID,
+        millis: running,
+        id: generateRandomID(),
+        option: "out",
+      };
+      setDBItem(build_db_path.punchClock(userID), obj);
+      continue;
+    }
+
+    let num = Math.round(MILLIS_IN_MINUTE * i * 10);
+    running += num;
+    // log(formatMillisForDisplay(val, true, true));
     // log(val);
     let obj = {
       userID,
-      millisIn: option ? val : null,
-      millisOut: option ? null : val,
+      millis: running,
+      id: generateRandomID(),
+      option: option ? "in" : "out",
     };
-    dbSetUserPunchAction(obj);
+    // log(formatMillisForDisplay(obj.millis));
+    setDBItem(build_db_path.punchClock(userID), obj);
     option = !option;
   }
 }

@@ -20,9 +20,9 @@ import { SETTINGS_OBJ } from "./data";
 import { intersection } from "lodash";
 import { cloneDeep } from "lodash";
 import { StaticRouter } from "react-router-dom";
-import { dbSetAppUserObj, dbSetUserPunchAction } from "./db_call_wrapper";
+import { dbSetAppUserObj, dbCreateUserPunchAction } from "./db_call_wrapper";
 import { Button_ } from "./components";
-import { APP_BASE_COLORS, COLOR_GRADIENTS } from "./styles";
+import { C, COLOR_GRADIENTS } from "./styles";
 // import {} from "./models";
 
 const MODEL_URL = "./models"; // Place models in public/models
@@ -176,7 +176,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
                 ", you are not clocked in. Would you like to punch in now?",
               handleBtn1Press: () => {
                 _zSetClockedInUser(userObj.id, millis, "in");
-                dbSetUserPunchAction({
+                dbCreateUserPunchAction({
                   userID: userObj.id,
                   millisIn: millis,
                 });
@@ -289,7 +289,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
             <Button_
               buttonStyle={{ marginBottom: 20 }}
               colorGradientArr={COLOR_GRADIENTS.blue}
-              textStyle={{ color: APP_BASE_COLORS.textWhite }}
+              textStyle={{ color: C.textWhite }}
               text="Enroll Face"
               onPress={handleEnroll}
             />

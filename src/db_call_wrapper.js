@@ -1,3 +1,4 @@
+/*eslint-disable*/
 import {
   FIRESTORE_DATABASE_NODE_NAMES,
   // FIRESTORE_DATABASE_NODE_NAMES,
@@ -10,7 +11,8 @@ import {
   cancelServerDrivenStripePayment,
   cancelStripeActivePaymentIntents,
   filterFirestoreCollectionByNumber,
-  getCollectionItem,
+  getCollection,
+  getDocument,
   getPaymentIntent,
   getRealtimeNodeItem,
   getStripeActivePaymentIntents,
@@ -20,6 +22,7 @@ import {
   retrieveAvailableStripeReaders,
   searchCollection,
   sendSMS,
+  SET_FIRESTORE_ITEM,
   setFirestoreCollectionItem,
   setFirestoreSubCollectionItem,
   setRealtimeNodeItem,
@@ -27,6 +30,28 @@ import {
 import { generateRandomID, log } from "./utils";
 
 // setters ///////////////////////////////////////////////////////
+
+function checkDBPath(path) {
+  if (
+    Object.values(FIRESTORE_DATABASE_NODE_NAMES).find((str) =>
+      path.includes(str)
+    )
+  ) {
+    return "firestore";
+  } else {
+    return "realtime";
+  }
+}
+
+export function setDBItem(path, item) {
+  if (checkDBPath(path) === "firestore") {
+    return SET_FIRESTORE_ITEM(path, item);
+  } else if (checkDBPath(path) === "realtime") {
+  }
+}
+
+//////////////////////////////////////////////////////////////
+
 export function dbSetCustomerObj(customerObj, removeOption = false) {
   let id = customerObj.id;
   let previewObj = {};
@@ -70,7 +95,18 @@ export function dbSetSaleItem(item, removeOption = false) {
   return setFirestoreCollectionItem("SALES", id, item);
 }
 
-export function dbSetUserPunchAction({ userID, millisIn, millisOut }) {
+export function dbSetFirestoreItem(path, obj) {}
+
+export function dbUpdateUserPunchAction(userID, punchObj) {
+  let punchClockPath =
+    FIRESTORE_DATABASE_NODE_NAMES.appUsers +
+    userID +
+    "/" +
+    FIRESTORE_DATABASE_NODE_NAMES.punchClock;
+  addToFirestoreCollectionItem(punchClockPath, punchObj);
+}
+
+export function dbCreateUserPunchAction({ userID, millisIn, millisOut }) {
   let id = generateRandomID();
   let obj = {
     millis: millisIn || millisOut,
@@ -78,20 +114,23 @@ export function dbSetUserPunchAction({ userID, millisIn, millisOut }) {
     id,
     userID,
   };
-  // log("obj", obj);
+
   let punchClockPath =
     FIRESTORE_DATABASE_NODE_NAMES.appUsers +
     userID +
     "/" +
     FIRESTORE_DATABASE_NODE_NAMES.punchClock;
   let activeClockPath = REALTIME_DATABASE_NODE_NAMES.loggedInUsers + userID;
+
+  // add the user to the currently clocked-in node of Realtime Database
   if (millisOut) {
     setRealtimeNodeItem(activeClockPath, null);
   } else {
     setRealtimeNodeItem(activeClockPath, millisIn);
   }
+
+  // add the new punch object to the Firestore database for record keeping
   addToFirestoreCollectionItem(punchClockPath, obj);
-  // setRealtimeNodeItem(historyPath, obj);
 }
 
 export function dbSetAppUserObj(userObj, remove = false) {
@@ -99,9 +138,10 @@ export function dbSetAppUserObj(userObj, remove = false) {
   if (remove) userObj = null;
   return setRealtimeNodeItem(path, userObj);
 }
+
 // database getters ///////////////////////////////////////////////////////////
 export function dbGetClosedWorkorderItem(id) {
-  return getCollectionItem("CLOSED-WORKORDERS", id);
+  return getDocument("CLOSED-WORKORDERS", id);
 }
 
 export function dbGetOpenWorkorderItem(id) {
@@ -109,21 +149,18 @@ export function dbGetOpenWorkorderItem(id) {
 }
 
 export function dbGetSaleItem(id) {
-  return getCollectionItem("SALES", id);
+  return getDocument("SALES", id);
 }
 
 export function dbGetCustomerObj(id) {
-  return getCollectionItem("CUSTOMERS", id);
+  return getDocument("CUSTOMERS", id);
 }
 
 // database filters //////////////////////////////////////////////////
 export function dbFindPunchHistoryByMillisRange(userID, start, end) {
-  let path =
-    FIRESTORE_DATABASE_NODE_NAMES.appUsers +
-    userID +
-    "/" +
-    FIRESTORE_DATABASE_NODE_NAMES.punchClock;
+  let path = build_db_path.punchClock(userID);
   // log(path);
+  return getCollection(path);
   return filterFirestoreCollectionByNumber(path, "millis", start, end);
 }
 
@@ -207,6 +244,11 @@ export function dbRetrieveAvailableStripeReaders() {
   return retrieveAvailableStripeReaders();
 }
 
-// path builders
-
-function buildPath(one, two, three, four, five) {}
+// database path builder /////////////////////////////////////////////////
+export const build_db_path = {
+  punchClock: (userID, nodeID) =>
+    FIRESTORE_DATABASE_NODE_NAMES.appUsers +
+    userID +
+    "/" +
+    FIRESTORE_DATABASE_NODE_NAMES.punchClock,
+};

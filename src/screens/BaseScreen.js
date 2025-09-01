@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import { Button } from "react-native-web";
-import { APP_BASE_COLORS, Colors, ICONS, ViewStyles } from "../styles";
+import { C, Colors, ICONS, ViewStyles } from "../styles";
 
 import {
   clog,
@@ -31,7 +31,7 @@ import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
 import { getRealtimeNodeItem, searchCollection } from "../db";
 import {
-  fillPreferences,
+  fillSettings,
   fillPrinterNames,
   fillPunchHistory,
   fillReceipt,
@@ -128,9 +128,9 @@ export function BaseScreen() {
 
   // testing, build db items
   useEffect(() => {
+    // fillSettings();
     // fillReceipt();
     // fillPrinterNames();
-    // fillPreferences();
     // fillPunchHistory();
   }, []);
   // log(zSettingsObj);
@@ -162,7 +162,7 @@ export function BaseScreen() {
       <View
         style={{
           width: "65%",
-          backgroundColor: APP_BASE_COLORS.backgroundWhite,
+          backgroundColor: C.backgroundWhite,
           height: "100%",
           paddingRight: 8,
           justifyContent: "space-around",
@@ -181,11 +181,11 @@ export function BaseScreen() {
             style={{
               width: "33%",
               height: "100%",
-              backgroundColor: APP_BASE_COLORS.backgroundWhite,
-              borderColor: APP_BASE_COLORS.buttonLightGreen,
+              backgroundColor: C.backgroundWhite,
+              borderColor: C.buttonLightGreen,
               borderWidth: 1,
               borderRadius: 15,
-              shadowColor: APP_BASE_COLORS.green,
+              shadowColor: C.green,
               shadowOffset: {
                 width: 1,
                 height: 1,
@@ -200,12 +200,12 @@ export function BaseScreen() {
             style={{
               width: "65%",
               height: "100%",
-              backgroundColor: APP_BASE_COLORS.backgroundWhite,
-              borderColor: APP_BASE_COLORS.buttonLightGreen,
+              backgroundColor: C.backgroundWhite,
+              borderColor: C.buttonLightGreen,
               borderWidth: 1,
               borderRadius: 15,
               // backgroundColor: "red",
-              shadowColor: APP_BASE_COLORS.green,
+              shadowColor: C.green,
               shadowOffset: {
                 width: 1,
                 height: 1,
@@ -222,12 +222,12 @@ export function BaseScreen() {
             marginLeft: 6,
             width: "99%",
             height: "33%",
-            backgroundColor: APP_BASE_COLORS.backgroundWhite,
-            borderColor: APP_BASE_COLORS.buttonLightGreen,
+            backgroundColor: C.backgroundWhite,
+            borderColor: C.buttonLightGreen,
             borderWidth: 1,
             borderRadius: 15,
             // backgroundColor: "red",
-            shadowColor: APP_BASE_COLORS.green,
+            shadowColor: C.green,
             shadowOffset: {
               width: 1,
               height: 1,
@@ -245,11 +245,11 @@ export function BaseScreen() {
           // width: "100%",
           width: "34%",
           height: "99%",
-          backgroundColor: APP_BASE_COLORS.backgroundWhite,
+          backgroundColor: C.backgroundWhite,
           // borderColor: APP_BASE_COLORS.green,
           // borderWidth: 1,
           borderRadius: 15,
-          shadowColor: APP_BASE_COLORS.green,
+          shadowColor: C.green,
           shadowOffset: {
             width: 0,
             height: 1,

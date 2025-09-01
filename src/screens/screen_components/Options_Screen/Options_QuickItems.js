@@ -8,12 +8,7 @@ import {
   SETTINGS_OBJ,
   TAB_NAMES,
 } from "../../../data";
-import {
-  APP_BASE_COLORS,
-  COLOR_GRADIENTS,
-  Colors,
-  ICONS,
-} from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
 import {
   dim,
@@ -295,8 +290,8 @@ export function QuickItemComponent({}) {
                 ...SHADOW_RADIUS_NOTHING,
                 borderWidth: 1,
                 borderRadius: 5,
-                borderColor: APP_BASE_COLORS.buttonLightGreen,
-                borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                borderColor: C.buttonLightGreen,
+                borderColor: C.buttonLightGreenOutline,
                 marginBottom: 10,
                 // paddingHorizontal: 3,
                 // height: 100,
@@ -336,8 +331,8 @@ export function QuickItemComponent({}) {
                     marginBottom: 2,
                     borderRadius: 7,
                     borderLeftWidth: 4,
-                    borderLeftColor: APP_BASE_COLORS.buttonLightGreenOutline,
-                    backgroundColor: APP_BASE_COLORS.listItemWhite,
+                    borderLeftColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.listItemWhite,
                     flexDirection: "row",
                     width: "100%",
                     // height: "100%",
@@ -402,8 +397,7 @@ export function QuickItemComponent({}) {
                           style={{
                             // borderLeftWidth: 1,
                             borderWidth: 1,
-                            borderColor:
-                              APP_BASE_COLORS.buttonLightGreenOutline,
+                            borderColor: C.buttonLightGreenOutline,
                             paddingLeft: 4,
                             paddingRight: 4,
                             width: "15%",

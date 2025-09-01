@@ -20,10 +20,11 @@ import { cloneDeep, set } from "lodash";
 import { dbSetSettings } from "../../../../db_call_wrapper";
 import { useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
-import { APP_BASE_COLORS, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import { PERMISSION_LEVELS } from "../../../../constants";
 import { APP_USER } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
+import { fillPunchHistory } from "../../../../testing";
 
 export function Dashboard_Admin({}) {
   // store setters ///////////////////////////////////////////////////////////
@@ -132,19 +133,35 @@ export function Dashboard_Admin({}) {
           }}
         >
           <Button_
+            onPress={fillPunchHistory}
+            text={"Fill History"}
+            buttonStyle={{
+              borderRadius: 5,
+              padding: 0,
+              height: 20,
+              backgroundColor: C.buttonLightGreen,
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+            }}
+            textStyle={{
+              fontSize: 14,
+              fontColor: C.textMain,
+            }}
+          />
+          <Button_
             onPress={handleNewUserPress}
             text={"New User"}
             buttonStyle={{
               borderRadius: 5,
               padding: 0,
               height: 20,
-              backgroundColor: APP_BASE_COLORS.buttonLightGreen,
-              borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+              backgroundColor: C.buttonLightGreen,
+              borderColor: C.buttonLightGreenOutline,
               borderWidth: 1,
             }}
             textStyle={{
               fontSize: 14,
-              fontColor: APP_BASE_COLORS.textMain,
+              fontColor: C.textMain,
             }}
           />
         </View>
@@ -178,9 +195,9 @@ export function Dashboard_Admin({}) {
                 style={{
                   flexDirection: "row",
                   paddingVertical: 2,
-                  backgroundColor: APP_BASE_COLORS.listItemWhite,
+                  backgroundColor: C.listItemWhite,
                   borderWidth: 1,
-                  borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                  borderColor: C.buttonLightGreenOutline,
                   borderRadius: 5,
                   padding: 3,
                   marginRight: 5,
@@ -204,19 +221,17 @@ export function Dashboard_Admin({}) {
                     }}
                     buttonStyle={{
                       borderWidth: 1,
-                      borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                      borderColor: C.buttonLightGreenOutline,
                       backgroundColor: editable
-                        ? APP_BASE_COLORS.lightred
-                        : APP_BASE_COLORS.buttonLightGreen,
+                        ? C.lightred
+                        : C.buttonLightGreen,
                       borderRadius: 5,
                       paddingHorizontal: 0,
                       paddingVertical: 2,
                       width: 50,
                     }}
                     textStyle={{
-                      color: editable
-                        ? APP_BASE_COLORS.textWhite
-                        : APP_BASE_COLORS.textMain,
+                      color: editable ? C.textWhite : C.textMain,
                       fontSize: 12,
                     }}
                   />
@@ -228,8 +243,8 @@ export function Dashboard_Admin({}) {
                     enabled={editable}
                     buttonStyle={{
                       borderWidth: 1,
-                      borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
-                      backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                      borderColor: C.buttonLightGreenOutline,
+                      backgroundColor: C.buttonLightGreen,
                       width: 50,
                       paddingVertical: 2,
 
@@ -253,8 +268,8 @@ export function Dashboard_Admin({}) {
                       borderWidth: 1,
                       paddingVertical: 2,
 
-                      borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
-                      backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                      borderColor: C.buttonLightGreenOutline,
+                      backgroundColor: C.buttonLightGreen,
                       borderRadius: 5,
                       paddingHorizontal: 0,
                       width: 50,
@@ -278,7 +293,7 @@ export function Dashboard_Admin({}) {
                         paddingHorizontal: 5,
                         padding: 1,
                         borderColor: editable
-                          ? APP_BASE_COLORS.buttonLightGreenOutline
+                          ? C.buttonLightGreenOutline
                           : "transparent",
                         outlineWidth: 0,
                         width: 100,
@@ -304,7 +319,7 @@ export function Dashboard_Admin({}) {
                         paddingHorizontal: 5,
                         // paddingHorizontal: 2,
                         borderColor: editable
-                          ? APP_BASE_COLORS.buttonLightGreenOutline
+                          ? C.buttonLightGreenOutline
                           : "transparent",
                         outlineWidth: 0,
                         width: 100,
@@ -335,7 +350,7 @@ export function Dashboard_Admin({}) {
                         marginTop: 5,
                         padding: 1,
                         borderColor: editable
-                          ? APP_BASE_COLORS.buttonLightGreenOutline
+                          ? C.buttonLightGreenOutline
                           : "transparent",
                         outlineWidth: 0,
                         width: 100,
@@ -362,7 +377,7 @@ export function Dashboard_Admin({}) {
                         paddingHorizontal: 5,
                         marginTop: 5,
                         padding: 1,
-                        borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                        borderColor: C.buttonLightGreenOutline,
                         outlineWidth: 0,
                         borderRadius: 5,
                         width: 100,
@@ -371,7 +386,7 @@ export function Dashboard_Admin({}) {
                         backgroundColor: "transparent",
                         alignItems: "flex-start",
                         backgroundColor: editable
-                          ? APP_BASE_COLORS.buttonLightGreen
+                          ? C.buttonLightGreen
                           : "transparent",
                         paddingVertical: 2,
                       }}
@@ -391,7 +406,7 @@ export function Dashboard_Admin({}) {
                       style={{
                         flexDirection: "row",
                         borderColor: editable
-                          ? APP_BASE_COLORS.buttonLightGreenOutline
+                          ? C.buttonLightGreenOutline
                           : "transparent",
                         width: 100,
                         marginRight: 10,
@@ -435,7 +450,7 @@ export function Dashboard_Admin({}) {
                       style={{
                         flexDirection: "row",
                         borderColor: editable
-                          ? APP_BASE_COLORS.buttonLightGreenOutline
+                          ? C.buttonLightGreenOutline
                           : "transparent",
                         width: 100,
                         marginRight: 10,

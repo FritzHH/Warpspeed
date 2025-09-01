@@ -29,7 +29,7 @@ import {
   set,
 } from "firebase/database";
 import { initializeApp } from "firebase/app";
-import { clog, log } from "./utils";
+import { clog, formatMillisForDisplay, log } from "./utils";
 import {
   CUSTOMER_PREVIEW_PROTO,
   CUSTOMER_PROTO,
@@ -77,7 +77,7 @@ export function getCollection(collectionName) {
   });
 }
 
-export function getCollectionItem(collectionName, itemID) {
+export function getDocument(collectionName, itemID) {
   let ref = doc(DB, collectionName, itemID);
   return getDoc(ref).then((res) => {
     if (res.exists()) {
@@ -89,6 +89,17 @@ export function getCollectionItem(collectionName, itemID) {
 }
 
 // setters
+
+export async function SET_FIRESTORE_ITEM(path, item, nodeID) {
+  let docRef = doc(DB, path, nodeID || item.id);
+  return await setDoc(docRef, item);
+}
+
+export async function ADD_FIRESTORE_ITEM(path, item) {
+  let docRef = doc(path);
+  return await addDoc(docRef, item);
+}
+
 export function setFirestoreCollectionItem(
   collectionName,
   collectionId,
@@ -148,6 +159,18 @@ export function addToFirestoreCollectionItem(path, item, stringify) {
     .catch((err) => log("error setting Firestore collection", err));
 }
 
+// export function setFirestoreCollectionItem(path, item, stringify) {
+//   if (stringify) item = { item: JSON.stringify(item) };
+
+//   let docRef = collection(DB, path);
+//   // log(path);
+//   return addDoc(docRef, item)
+//     .then(() => {
+//       log("finished adding firestore collection");
+//     })
+//     .catch((err) => log("error setting Firestore collection", err));
+// }
+
 // subscribers
 export function subscribeToDocument(collectionName, documentID, callback) {
   let ref = doc(DB, collectionName, documentID);
@@ -203,13 +226,12 @@ export async function filterFirestoreCollectionByNumber(
   startVal,
   endVal
 ) {
-  // log("search term", text);
-  log(startVal, endVal);
+  // log(formatMillisForDisplay(startVal), formatMillisForDisplay(endVal));
+  // log(collectionPath);
   let q = query(
     collection(DB, collectionPath),
     where(fieldName, ">=", startVal),
     where(fieldName, "<=", endVal)
-    // where(fieldName, "<=", end + "\uf8ff")
   );
 
   let queryRes = [];
@@ -221,6 +243,7 @@ export async function filterFirestoreCollectionByNumber(
   });
   return queryRes;
 }
+
 ///////////////////////////////////////////////////////////////////////
 ////// Realtime Database calls ////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////

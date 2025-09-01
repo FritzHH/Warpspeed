@@ -30,7 +30,7 @@ export const Colors = {
   darkTextOnMainBackground: "rgb(30, 30, 30)",
 };
 
-export const APP_BASE_COLORS = {
+export const C = {
   green: "rgb(33, 148, 86)",
   purple: "",
   orange: "",
@@ -51,23 +51,9 @@ export const APP_BASE_COLORS = {
 };
 
 export const COLOR_GRADIENTS = {
-  green: ["rgb(71,185,119)", APP_BASE_COLORS.green],
+  green: ["rgb(71,185,119)", C.green],
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
-  blue: [lightenRGBByPercent(APP_BASE_COLORS.blue, 20), APP_BASE_COLORS.blue],
-};
-
-export const COLOR_GRADIENT_PROFILES = {
-  standard: {
-    start: { x: 0, y: 0 },
-    end: { x: 1, y: 0 },
-  },
-};
-
-export const BUTTON_VARS = {
-  radius: {
-    rounded: 15,
-    squared: 8,
-  },
+  blue: [lightenRGBByPercent(C.blue, 20), C.blue],
 };
 
 const ASSETS_PATH = "./assets/";

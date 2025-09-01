@@ -15,7 +15,7 @@ import {
   trimToTwoDecimals,
 } from "../../../utils";
 import { Image_ } from "../../../components";
-import { APP_BASE_COLORS, Colors, ICONS } from "../../../styles";
+import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
 import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
@@ -201,7 +201,7 @@ export function Notes_MainComponent() {
                   height: 40,
                   justifyContent: "flex-start",
                   alignItems: "center",
-                  borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                  borderColor: C.buttonLightGreenOutline,
                   borderWidth: 1,
                   borderRadius: 15,
                   marginBottom: 5,
@@ -211,7 +211,7 @@ export function Notes_MainComponent() {
                 <Text
                   style={{
                     fontSize: 15,
-                    color: APP_BASE_COLORS.textMain,
+                    color: C.textMain,
                     fontWeight: "bold",
                     // marginBottom: 5,
                     marginLeft: 10,
@@ -246,7 +246,7 @@ export function Notes_MainComponent() {
                           flexDirection: "row",
                           alignItems: "center",
                           borderRadius: 5,
-                          backgroundColor: APP_BASE_COLORS.backgroundWhite,
+                          backgroundColor: C.backgroundWhite,
                         }}
                       >
                         <Text
@@ -302,7 +302,7 @@ export function Notes_MainComponent() {
                 height: 40,
                 justifyContent: "flex-start",
                 alignItems: "center",
-                borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                borderColor: C.buttonLightGreenOutline,
                 borderWidth: 1,
                 borderRadius: 15,
                 marginBottom: 5,
@@ -314,7 +314,7 @@ export function Notes_MainComponent() {
                 style={{
                   marginLeft: 10,
                   fontSize: 15,
-                  color: APP_BASE_COLORS.textMain,
+                  color: C.textMain,
                   fontWeight: "bold",
                 }}
               >
@@ -349,7 +349,7 @@ export function Notes_MainComponent() {
                           // paddingVertical: 3,
                           flexDirection: "row",
                           alignItems: "center",
-                          backgroundColor: APP_BASE_COLORS.backgroundWhite,
+                          backgroundColor: C.backgroundWhite,
                         }}
                       >
                         <Text

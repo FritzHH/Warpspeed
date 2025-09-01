@@ -29,14 +29,7 @@ import {
   removeDashesFromPhone,
   trimToTwoDecimals,
 } from "./utils";
-import {
-  APP_BASE_COLORS,
-  COLOR_GRADIENT_PROFILES,
-  COLOR_GRADIENTS,
-  Colors,
-  Fonts,
-  ICONS,
-} from "./styles";
+import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
 import { useState } from "react";
 import {
   FOCUS_NAMES,
@@ -278,7 +271,7 @@ export const AlertBox_ = ({}) => {
         >
           <View
             style={{
-              backgroundColor: APP_BASE_COLORS.backgroundWhite,
+              backgroundColor: C.backgroundWhite,
               borderRadius: 15,
               alignItems: "center",
               justifyContent: "space-around",
@@ -341,7 +334,7 @@ export const AlertBox_ = ({}) => {
                 colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
                 text={zButton1Text}
                 buttonStyle={{ marginRight: 20 }}
-                textStyle={{ color: APP_BASE_COLORS.textWhite }}
+                textStyle={{ color: C.textWhite }}
                 onPress={handleButton1Press}
                 iconSize={zIcon1Size || 60}
                 icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
@@ -351,9 +344,7 @@ export const AlertBox_ = ({}) => {
                   colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
                   text={zButton2Text}
                   buttonStyle={{ marginRight: 20 }}
-                  textStyle={
-                    zButton2Text ? { color: APP_BASE_COLORS.textWhite } : {}
-                  }
+                  textStyle={zButton2Text ? { color: C.textWhite } : {}}
                   onPress={handleButton2Press}
                   iconSize={zIcon2Size || 60}
                   icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
@@ -364,9 +355,7 @@ export const AlertBox_ = ({}) => {
                   colorGradientArr={zButton3Text ? COLOR_GRADIENTS.purple : []}
                   text={zButton3Text}
                   buttonStyle={zButton3Text ? {} : {}}
-                  textStyle={
-                    zButton3Text ? { color: APP_BASE_COLORS.textWhite } : {}
-                  }
+                  textStyle={zButton3Text ? { color: C.textWhite } : {}}
                   onPress={handleButton3Press}
                   iconSize={zIcon3Size || 60}
                   icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
@@ -409,13 +398,13 @@ export const DateTimePicker = ({ range, handleDateRangeChange = () => {} }) => {
           styles={{
             ...defaultStyles,
             today: {
-              borderColor: APP_BASE_COLORS.lightred,
+              borderColor: C.lightred,
               borderWidth: 2,
               borderRadius: 100,
             }, // Add a border to today's date
             selected: {
               borderRadius: 100,
-              backgroundColor: APP_BASE_COLORS.blue,
+              backgroundColor: C.blue,
             },
             selected_label: { color: "white" },
           }}
@@ -581,7 +570,7 @@ export const DropdownMenu = ({
   mouseOverOptions = {
     enable: true,
     // opacity: 1,
-    highlightColor: lightenRGBByPercent(APP_BASE_COLORS.lightred, 10),
+    highlightColor: lightenRGBByPercent(C.lightred, 10),
   },
   showButtonShadow,
   shadowStyle = {},
@@ -614,8 +603,7 @@ export const DropdownMenu = ({
         style={{
           // backgroundColor: "transparent",
           // borderWidth: 2,
-          borderColor:
-            menuBorderColor || APP_BASE_COLORS.buttonLightGreenOutline,
+          borderColor: menuBorderColor || C.buttonLightGreenOutline,
           // borderRadius: 10,
           borderRadius: 25,
         }}
@@ -627,7 +615,7 @@ export const DropdownMenu = ({
             <View
               style={{
                 // height: 1,
-                backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                backgroundColor: C.buttonLightGreen,
                 width: "100%",
 
                 ...itemSeparatorStyle,
@@ -649,10 +637,7 @@ export const DropdownMenu = ({
                   width: 130,
                   backgroundColor:
                     getBackgroundColor(item.backgroundColor, idx) ||
-                    getBackgroundColor(
-                      APP_BASE_COLORS.buttonLightGreenOutline,
-                      idx
-                    ),
+                    getBackgroundColor(C.buttonLightGreenOutline, idx),
                   borderTopLeftRadius:
                     idx == 0 ? menuButtonStyle.borderRadius : null,
                   borderTopRightRadius:
@@ -669,7 +654,7 @@ export const DropdownMenu = ({
                 }}
                 textStyle={{
                   ...itemTextStyle,
-                  color: item.textColor || APP_BASE_COLORS.textMain,
+                  color: item.textColor || C.textMain,
                 }}
                 text={item.label || item}
                 onPress={() => {
@@ -2509,7 +2494,7 @@ export const TabMenuButton = ({
       text={text}
       textStyle={{
         // textColor: Colors.tabMenuButtonText,
-        color: APP_BASE_COLORS.textWhite,
+        color: C.textWhite,
         fontSize: 15,
         ...textStyle,
       }}
@@ -2615,7 +2600,6 @@ export const ColorSelectorModalComponent = ({ onSelect }) => {
 };
 
 export const GradientView = ({
-  gradientProfile = COLOR_GRADIENT_PROFILES.standard,
   colorArr = COLOR_GRADIENTS.blue,
   children,
   style,
@@ -2624,8 +2608,8 @@ export const GradientView = ({
   return (
     <LinearGradient
       colors={[...colorArr]}
-      start={gradientProfile.start}
-      end={gradientProfile.end}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
       style={{ justifyContent: "center", alignItems: "center", ...style }}
       {...props}
     >
@@ -2708,7 +2692,7 @@ export const Button_ = ({
       return mouseOverOptions.highlightColor;
     } else {
       if (buttonStyle.backgroundColor) return buttonStyle.backgroundColor;
-      return APP_BASE_COLORS.buttonLightGreen;
+      return C.buttonLightGreen;
     }
   }
 
@@ -2778,7 +2762,7 @@ export const Button_ = ({
               textAlign: "center",
               textAlignVertical: "center",
               fontSize: 17,
-              color: APP_BASE_COLORS.textMain,
+              color: C.textMain,
               ...textStyle,
             }}
           >

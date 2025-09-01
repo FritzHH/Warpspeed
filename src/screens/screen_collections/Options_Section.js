@@ -17,7 +17,7 @@ import {
   Button_,
   DateTimePicker,
 } from "../../components";
-import { APP_BASE_COLORS, Colors, ICONS } from "../../styles";
+import { C, Colors, ICONS } from "../../styles";
 import { WORKORDER_PROTO, TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import React, { useEffect, useRef, useState } from "react";
@@ -31,7 +31,7 @@ import {
   useLoginStore,
   useAlertScreenStore,
 } from "../../stores";
-import { dbSetUserPunchAction } from "../../db_call_wrapper";
+import { dbCreateUserPunchAction } from "../../db_call_wrapper";
 import { LOCAL_DB_KEYS } from "../../constants";
 import { UserClockHistoryModal } from "../screen_components/modal_screens/UserClockHistoryModalScreen";
 
@@ -90,7 +90,7 @@ export function Options_Section({}) {
     // log("clocked in arr", zClockedInUsersArr);
     let clockinFun = () => {
       _zSetClockedInUser(userObj.id, millis, option);
-      dbSetUserPunchAction({
+      dbCreateUserPunchAction({
         userID: userObj.id,
         millisIn: option === "in" ? millis : null,
         millisOut: option === "out" ? millis : null,
@@ -229,8 +229,8 @@ export const TabBar = ({
             paddingVertical: 2,
             marginRight: 5,
             borderWidth: 1,
-            borderColor: APP_BASE_COLORS.buttonLightGreenOutline,
-            backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+            borderColor: C.buttonLightGreenOutline,
+            backgroundColor: C.buttonLightGreen,
             borderRadius: 15,
           }}
         />

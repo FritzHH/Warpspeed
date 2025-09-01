@@ -234,6 +234,45 @@ export function numberIsEven(num) {
   return num % 2 === 0;
 }
 
+export function generateRandomNumber({ min, max }) {
+  if (!min) {
+    min = 1;
+    max = 10;
+  }
+
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  // The maximum and minimum are inclusive
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+export function incrementNumByFive(input) {
+  let currentValue = parseInt(input, 10) || 0;
+  if (currentValue % 5 !== 0) {
+    // Find the next highest multiple of 5
+    currentValue = currentValue + (5 - (currentValue % 5));
+  } else {
+    currentValue += 5;
+  }
+  return currentValue;
+}
+
+export function decrementNumByFive(input) {
+  let currentValue = parseInt(input, 10) || 0;
+  if (currentValue % 5 !== 0) {
+    // Go to the next lowest multiple of 5
+    currentValue = currentValue - (currentValue % 5);
+  } else {
+    currentValue -= 5;
+  }
+
+  if (currentValue <= 0) {
+    currentValue = 0;
+  }
+  return currentValue;
+}
+
+// searching and filters ////////////////////////////////////////
 export function searchPhoneNum(searchTerm, customerArrToSearch) {
   let resObj = {};
   for (let i = 0; i <= customerArrToSearch.length - 1; i++) {
@@ -506,7 +545,7 @@ export function combine2ArraysOrderByMillis(arr1, arr2) {
 }
 
 // date & time
-export function getDisplayFormattedDate(
+export function formatMillisForDisplay(
   millis,
   includeYear,
   returnAsObject,

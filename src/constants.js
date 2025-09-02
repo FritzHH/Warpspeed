@@ -52,3 +52,10 @@ export const PERMISSION_LEVELS = [
     level: 1,
   },
 ];
+
+export const ROLES = {
+  owner: "Owner",
+  admin: "Admin",
+  editor: "Editor",
+  user: "User",
+};

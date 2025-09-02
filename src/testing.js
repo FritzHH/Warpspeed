@@ -197,19 +197,20 @@ export function fillPunchHistory() {
   let option = true;
   let ref = new Date().getTime();
   let running = ref;
-  for (let i = 2; i <= 5; i++) {
-    if (i === 2) {
-      let obj = {
-        userID,
-        millis: running,
-        id: generateRandomID(),
-        option: "out",
-      };
-      setDBItem(build_db_path.punchClock(userID), obj);
-      continue;
-    }
+  // running = running - MILLIS_IN_DAY * 1;
+  for (let i = 2; i <= 60; i++) {
+    // if (i === 2) {
+    //   let obj = {
+    //     userID,
+    //     millis: running,
+    //     id: generateRandomID(),
+    //     option: "out",
+    //   };
+    //   setDBItem(build_db_path.punchClock(userID), obj);
+    //   continue;
+    // }
 
-    let num = Math.round(MILLIS_IN_MINUTE * i * 10);
+    let num = Math.round(MILLIS_IN_MINUTE * i * 120);
     running += num;
     // log(formatMillisForDisplay(val, true, true));
     // log(val);

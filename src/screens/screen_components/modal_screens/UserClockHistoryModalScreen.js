@@ -14,13 +14,14 @@ import {
   ScreenModal,
   SHADOW_RADIUS_PROTO,
 } from "../../../components";
-import { C, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   clog,
   convertMillisToHoursMins,
   decrementNumByFive,
   formatMillisForDisplay,
+  generateRandomID,
   getPreviousMondayDayJS,
   getWordDayOfWeek,
   incrementNumByFive,
@@ -32,18 +33,24 @@ import {
 import dayjs from "dayjs";
 import {
   build_db_path,
-  dbFindPunchHistoryByMillisRange,
+  _dbFindPunchHistoryByMillisRange,
   dbUpdateUserPunchAction,
   setDBItem,
+  dbDeleteUserPunchAction,
 } from "../../../db_call_wrapper";
 import sr from "dayjs/locale/sr";
 import { cloneDeep, range, sortBy } from "lodash";
 import { loadBundle } from "firebase/firestore";
 import { isEven } from "face-api.js/build/commonjs/utils";
 import { useLoginStore, useSettingsStore } from "../../../stores";
-import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "../../../constants";
+import {
+  MILLIS_IN_DAY,
+  MILLIS_IN_HOUR,
+  MILLIS_IN_MINUTE,
+} from "../../../constants";
 import { ToolContextImpl } from "twilio/lib/rest/assistants/v1/tool";
 import { ItemAssignmentContextImpl } from "twilio/lib/rest/numbers/v2/regulatoryCompliance/bundle/itemAssignment";
+import { TIME_PUNCH_PROTO } from "../../../data";
 
 // eslint-disable-next-line no-lone-blocks
 {
@@ -54,14 +61,22 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   // store getters //////////////////////////////////////////////////////
   const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zUserHasAdminRole = useLoginStore((state) =>
+    state.getUserHasAdminRole()
+  );
 
   // local state ////////////////////////////////////////////////////////
   const [sUserObj, _setUserObj] = useState(userObj);
   const [sUserDropdownDataArr, _setUserDropdownDataArr] = useState([]);
 
+  // testing ////////////////////////
+  let date = dayjs();
+  date = date.add(9, "days");
   const [sRange, _setRange] = useState({
-    startDate: getPreviousMondayDayJS(),
-    endDate: dayjs(),
+    // startDate: getPreviousMondayDayJS(),
+    // endDate: dayjs(),
+    startDate: dayjs(), //test
+    endDate: getPreviousMondayDayJS(date), //test
   });
   const [sHistoryDisplay, _setHistoryDisplay] = useState([]);
   const [sTotalHours, _setTotalHours] = useState("");
@@ -81,7 +96,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   useEffect(() => {
     let selectedUserIdx;
     let idx = 0;
-    let dataArr = zSettingsObj.users.map((user_obj) => {
+    let dataArr = zSettingsObj?.users.map((user_obj) => {
       if (user_obj.id === sUserObj.id) selectedUserIdx = idx;
       // log(user_obj);
       idx++;
@@ -112,8 +127,9 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     dayBegin = dayBegin.getTime();
     dayEnd = dayEnd.getTime();
 
-    dbFindPunchHistoryByMillisRange(sUserObj.id, dayBegin, dayEnd)
+    _dbFindPunchHistoryByMillisRange(sUserObj.id, dayBegin, dayEnd)
       .then((resArr) => {
+        // log(formatMillisForDisplay(dayBegin), formatMillisForDisplay(dayEnd));
         // clog("res arr", resArr);
         resArr = sortBy(resArr, "millis");
         _setFilteredArr(resArr);
@@ -127,7 +143,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     let resObj = {};
     let pairs = [];
     // clog(sFilteredArr);
-    let filteredArr = sortBy(sFilteredArr, "millis");
+    let lastOneWasClockIn = false;
     sFilteredArr.forEach((obj) => {
       obj = cloneDeep(obj);
       // clog(obj);
@@ -138,6 +154,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         resArr.push(resObj);
         resObj = {};
         counter++;
+        lastOneWasClockIn = false;
         return;
       }
 
@@ -146,13 +163,25 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         // log("edge 2");
         resObj.in = obj;
         resArr.push(resObj);
+        lastOneWasClockIn = true;
+        counter++;
+        return;
+      }
+
+      if (obj.option === "in" && lastOneWasClockIn) {
+        resObj.in = obj;
+        resArr.push(resObj);
+        counter++;
+        // lastOneWasClockIn = true
         return;
       }
 
       if (obj.option === "in") {
+        lastOneWasClockIn = true;
         // log("in" + counter);
         resObj.in = obj;
       } else if (obj.option === "out") {
+        lastOneWasClockIn = false;
         // log("out" + counter);
         resObj.out = obj;
         resArr.push(resObj);
@@ -160,6 +189,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       }
       counter++;
     });
+    // log(counter);
     // clog(resArr);
 
     let arr = [];
@@ -217,11 +247,48 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     _setTotalMinutesWorked(runningTotalMinutes);
     _setHistoryDisplay(arr);
 
-    clog(arr);
+    // clog(arr);
   }, [_setHistoryDisplay, sFilteredArr]);
 
   // log(sRunningTotalWages);
   let Component = useCallback(() => {
+    function handleNewPunchPress() {
+      let usePrevious = false;
+      let prevPunchObj = sFilteredArr[sFilteredArr.length - 1];
+      if (!prevPunchObj.out) usePrevious = true;
+
+      let punchObj = cloneDeep(TIME_PUNCH_PROTO);
+      punchObj.userID = sUserObj.id;
+      punchObj.id = generateRandomID();
+      punchObj.millis = usePrevious
+        ? prevPunchObj.millis + MILLIS_IN_HOUR
+        : new Date().getTime();
+      punchObj.option = usePrevious ? "out" : "in";
+
+      let filteredArr = cloneDeep(sFilteredArr);
+      // update local state
+      filteredArr.push(punchObj);
+      _setFilteredArr(filteredArr);
+      dbUpdateUserPunchAction(punchObj.userID, punchObj);
+
+      // log(formatMillisForDisplay(prevPunchObj.millis));
+      // log(formatMillisForDisplay(punchObj.millis));
+    }
+
+    function handleDeletePunchPress(inID, outID) {
+      // log(sUserObj);
+      if (inID) {
+        dbDeleteUserPunchAction(sUserObj.id, inID);
+        let arr = cloneDeep(sFilteredArr).filter((o) => o.id != inID);
+        _setFilteredArr(arr);
+      }
+      if (outID) {
+        dbDeleteUserPunchAction(sUserObj.id, outID);
+        let arr = cloneDeep(sFilteredArr).filter((o) => o.id != outID);
+        _setFilteredArr(arr);
+      }
+    }
+
     function handleUserSelect(item, idx) {
       let user = zSettingsObj.users.find((o) => o.id === item.id);
       _setUserObj(user);
@@ -229,72 +296,90 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
 
     function handleTimeEdit(obj, option) {
       obj = cloneDeep(obj);
-      let oldMillis;
-      if (option.includes("in")) {
-        oldMillis = obj.in.millis;
-      } else if (option.includes("out")) {
-        oldMillis = obj.out.millis;
-      } else {
-        oldMillis = obj.in.millis || obj.out.millis;
-      }
 
       let userID = obj.in ? obj.in.userID : obj.out.userID;
-      log(option);
+      let millis;
+
       switch (option) {
         case "in-date-up":
-          // if (!obj.in) {
-          //   // is punch-in only
-          //   obj.out.millis = obj.out.millis + MILLIS_IN_DAY;
-          //   setDBItem(build_db_path.punchClock(obj.out.userID), obj.out);
-          // } else if (!obj.out) {
-          //   // is punch-out only
-          //   obj.in.millis = obj.in.millis + MILLIS_IN_DAY;
-          // } else {
-          //   // has both punch-in and punch-out
-          //   obj.in.millis = obj.in.millis + MILLIS_IN_DAY;
-          //   obj.out.millis = obj.out.millis + MILLIS_IN_DAY;
-          // }
+          millis = obj.in.millis + MILLIS_IN_DAY;
           break;
         case "in-date-down":
-          // obj.in.millis = oldMillis - MILLIS_IN_DAY;
+          millis = obj.in.millis - MILLIS_IN_DAY;
           break;
         case "out-date-up":
+          millis = obj.out.millis + MILLIS_IN_DAY;
           break;
         case "out-date-down":
+          millis = obj.out.millis - MILLIS_IN_DAY;
           break;
-
         case "in-hour-up":
+          millis = obj.in.millis + MILLIS_IN_HOUR;
           break;
         case "in-hour-down":
+          millis = obj.in.millis - MILLIS_IN_HOUR;
           break;
         case "out-hour-up":
+          millis = obj.out.millis + MILLIS_IN_HOUR;
           break;
         case "out-hour-down":
+          millis = obj.out.millis - MILLIS_IN_HOUR;
           break;
-
         case "in-minutes-up":
+          millis = obj.in.millis + MILLIS_IN_MINUTE;
           break;
         case "in-minutes-down":
+          millis = obj.in.millis - MILLIS_IN_MINUTE;
           break;
         case "out-minutes-up":
+          millis = obj.out.millis + MILLIS_IN_MINUTE;
           break;
         case "out-minutes-down":
+          millis = obj.out.millis - MILLIS_IN_MINUTE;
           break;
-
         case "in-am-pm":
+          let val = 12 * MILLIS_IN_HOUR;
+          if (obj.in.amPM === "PM") val = val * -1;
+          millis = obj.in.millis + val;
           break;
         case "out-am-pm":
+          let val1 = 12 * MILLIS_IN_HOUR;
+          if (obj.out.amPM === "PM") val1 = val1 * -1;
+          millis = obj.out.millis + val1;
           break;
       }
 
-      if (obj.out && obj.in) {
-        dbUpdateUserPunchAction(userID, obj.out);
-        dbUpdateUserPunchAction(userID, obj.in);
+      let punchObj;
+      let idx;
+      if (option.includes("in-")) {
+        idx = sFilteredArr.findIndex((o) => o.id === obj.in.id);
+        punchObj = sFilteredArr[idx];
       } else {
+        idx = sFilteredArr.findIndex((o) => o.id === obj.out.id);
+        punchObj = sFilteredArr[idx];
       }
+
+      // make sure the new in time isn't more than the out time
+      if (option.includes("in-") && obj.in && obj.out) {
+        if (millis >= obj.out.millis) return;
+      }
+
+      if (option.includes("out-") && obj.in && obj.out) {
+        if (millis <= obj.in.millis) return;
+      }
+
+      // log("idx", idx);
+      let filteredArr = cloneDeep(sFilteredArr);
+      punchObj.millis = millis;
+      // update local state
+      filteredArr[idx] = punchObj;
+      _setFilteredArr(filteredArr);
+      // add to database
+      dbUpdateUserPunchAction(obj.in?.userID || obj.out?.userID, punchObj);
     }
 
     const iconSize = 30;
+    // log(zCurrentUserObj);
     return (
       <TouchableWithoutFeedback>
         <View
@@ -311,7 +396,13 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         >
           <View style={{ width: "35%" }}>
             {zCurrentUserObj?.permissions?.level >= 3 ? (
-              <View style={{ marginBottom: 30 }}>
+              <View
+                style={{
+                  marginBottom: 30,
+                  flexDirection: "row",
+                  justifyContent: "space-around",
+                }}
+              >
                 <DropdownMenu
                   buttonStyle={{
                     width: 150,
@@ -326,6 +417,16 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                   useSelectedAsButtonTitle={true}
                   dataArr={sUserDropdownDataArr}
                   onSelect={handleUserSelect}
+                />
+                <Button_
+                  text={"Add Punch"}
+                  onPress={handleNewPunchPress}
+                  colorGradientArr={COLOR_GRADIENTS.blue}
+                  icon={ICONS.tools1}
+                  buttonStyle={{
+                    alignSelf: "center",
+                    borderRadius: 5,
+                  }}
                 />
               </View>
             ) : null}
@@ -465,13 +566,10 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               marginRight: 1,
                             }}
                           >
-                            {item.in?.wordDayOfWeek
-                              ? item.in?.wordDayOfWeek + ", "
-                              : item.out?.wordDayOfWeek + ", "}
+                            {item.in?.wordDayOfWeek + ", "}
                           </Text>
                           <Text style={{ color: C.textMain }}>
-                            {item.in?.wordDayOfMonth ||
-                              item.out?.wordDayOfMonth}
+                            {item.in.wordDayOfMonth}
                           </Text>
                           <View
                             style={{ alignItems: "center", marginRight: 20 }}
@@ -495,7 +593,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 textAlign: "center",
                               }}
                             >
-                              {item.in?.dayOfMonth || item.out?.dayOfMonth}
+                              {item.in.dayOfMonth}
                             </Text>
                             {editable ? (
                               <Button_
@@ -614,7 +712,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 // paddingHorizontal: 0,
                               }}
                               onSelect={(val) => {
-                                handleTimeEdit(item, val, "in-am-pm");
+                                handleTimeEdit(item, "in-am-pm");
                               }}
                             />
                           </View>
@@ -651,13 +749,10 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 marginRight: 1,
                               }}
                             >
-                              {item.in?.wordDayOfWeek
-                                ? item.in?.wordDayOfWeek + ", "
-                                : item.out?.wordDayOfWeek + ", "}
+                              {item.out?.wordDayOfWeek + ", "}
                             </Text>
                             <Text style={{ color: C.textMain }}>
-                              {item.in?.wordDayOfMonth ||
-                                item.out?.wordDayOfMonth}
+                              {item.out?.wordDayOfMonth}
                             </Text>
                             <View
                               style={{ alignItems: "center", marginLeft: 3 }}
@@ -676,7 +771,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 />
                               ) : null}
                               <Text style={{ width: 20, textAlign: "center" }}>
-                                {item.in?.dayOfMonth || item.out?.dayOfMonth}
+                                {item.out.dayOfMonth}
                               </Text>
                               {editable ? (
                                 <Button_
@@ -797,7 +892,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 // paddingHorizontal: 0,
                               }}
                               onSelect={(val) => {
-                                handleTimeEdit(item, val, "out-am-pm");
+                                handleTimeEdit(item, "out-am-pm");
                               }}
                             />
                           </View>
@@ -855,7 +950,10 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           {editable ? (
                             <Button_
                               onPress={() => {
-                                log("delete punch clock item function needed");
+                                handleDeletePunchPress(
+                                  item.in?.id,
+                                  item.out?.id
+                                );
                                 if (sEditableRowIdx === idx) {
                                   _setEditableRowIdx(null);
                                 } else {

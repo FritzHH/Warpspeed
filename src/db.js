@@ -15,6 +15,9 @@ import {
   query,
   arrayRemove,
   where,
+  updateDoc,
+  FieldValue,
+  deleteDoc,
 } from "firebase/firestore";
 
 import {
@@ -90,15 +93,27 @@ export function getDocument(collectionName, itemID) {
 
 // setters
 
-export async function SET_FIRESTORE_ITEM(path, item, nodeID) {
-  let docRef = doc(DB, path, nodeID || item.id);
+// NEW /////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+export async function SET_FIRESTORE_FIELD(path, item) {
+  let docRef = doc(DB, path, item.id);
   return await setDoc(docRef, item);
 }
 
-export async function ADD_FIRESTORE_ITEM(path, item) {
-  let docRef = doc(path);
+export async function ADD_FIRESTORE_FIELD(path, item) {
+  let docRef = doc(DB, path, item.id);
   return await addDoc(docRef, item);
 }
+
+export async function GET_FIRESTORE_FIELD(path, id) {}
+
+export async function DELETE_FIRESTORE_FIELD(path, id) {
+  let docRef = doc(DB, path, id);
+  return await deleteDoc(docRef);
+}
+
+/////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
 export function setFirestoreCollectionItem(
   collectionName,

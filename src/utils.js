@@ -581,7 +581,8 @@ export function formatMillisForDisplay(
   return str;
 }
 
-export function getPreviousMondayDayJS(date = dayjs()) {
+export function getPreviousMondayDayJS(date) {
+  if (!date) date = dayjs();
   const dayOfWeek = date.day() === 0 ? 7 : date.day();
   return date.subtract(dayOfWeek - 1, "day");
 }

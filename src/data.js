@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { PERMISSION_LEVELS } from "./constants";
+import { PERMISSION_LEVELS, ROLES } from "./constants";
 
 ////////// hardcoded settings and options ///////
 export const SHADOW_RADIUS_NOTHING = {
@@ -218,10 +218,10 @@ export const APP_USER = {
 };
 
 export const TIME_PUNCH_PROTO = {
-  millis: "",
-  userID: "",
   id: "",
-  punchType: "",
+  millis: null,
+  id: "",
+  option: "",
 };
 
 export const ALERT_BOX_PROTO = {
@@ -577,6 +577,7 @@ export const SETTINGS_OBJ = {
       pin: "33",
       hourlyWage: 25,
       faceDescriptor: "",
+      role: ROLES.owner,
     },
   ],
   cardReaders: [

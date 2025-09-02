@@ -304,7 +304,8 @@ export const useLoginStore = create((set, get) => ({
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
-  currentUserObj: { first: "Fritz", last: "Hieb", id: "1234" }, //testing
+  // currentUserObj: { first: "Fritz", last: "Hieb", id: "1234" }, //testing
+  currentUserObj: null,
   clockedInUsers: [],
   modalVisible: false,
   lastActionMillis: 0,
@@ -323,6 +324,12 @@ export const useLoginStore = create((set, get) => ({
   getCurrentUserObj: () => get().currentUserObj,
   getAdminPrivilege: () => get().adminPrivilege,
   getModalVisible: () => get().modalVisible,
+  getUserHasEditRole: () => {},
+  getUserHasAdminRole: () => {
+    let user = get().currentUserObj;
+    if (!user) return;
+  },
+  getUserHasOwnerRole: () => {},
 
   // local app user
   setCurrentUserObj: (currentUserObj) => {

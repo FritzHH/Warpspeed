@@ -521,7 +521,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                         flexDirection: "row",
                         alignItems: "center",
                         width: "100%",
-                        opacity: editable ? 1 : !sEditableRowIdx ? 1 : 0.55,
+                        opacity: editable ? 1 : !sEditableRowIdx ? 1 : 0.15,
                         backgroundColor: isEven(idx)
                           ? C.listItemWhite
                           : makeGrey(0.075),
@@ -553,60 +553,74 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             // paddin
                           }}
                         >
-                          {editable ? <View></View> : null}
                           <Image_
                             icon={ICONS.forwardGreen}
                             size={17}
                             style={{ marginRight: 15 }}
                           />
-                          <Text
+                          <View
                             style={{
-                              color: C.textMain,
-                              marginRight: 1,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              marginRight: 10,
+                              // backgroundColor: "green",
+                              width: "30%",
+                              justifyContent: "space-between",
                             }}
                           >
-                            {item.in?.wordDayOfWeek + ", "}
-                          </Text>
-                          <Text style={{ color: C.textMain }}>
-                            {item.in.wordDayOfMonth}
-                          </Text>
-                          <View
-                            style={{ alignItems: "center", marginRight: 20 }}
-                          >
-                            {editable ? (
-                              <Button_
-                                icon={ICONS.upChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "in-date-up")
-                                }
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
+                            <View style={{ flexDirection: "row" }}>
+                              <Text
+                                style={{
+                                  color: C.textMain,
+                                  marginRight: 1,
                                 }}
-                              />
-                            ) : null}
-                            <Text
+                              >
+                                {item.in?.wordDayOfWeek + ", "}
+                              </Text>
+                              <Text style={{ color: C.textMain }}>
+                                {item.in.wordDayOfMonth}
+                              </Text>
+                            </View>
+                            <View
                               style={{
-                                width: 20,
-                                textAlign: "center",
+                                alignItems: "center",
                               }}
                             >
-                              {item.in.dayOfMonth}
-                            </Text>
-                            {editable ? (
-                              <Button_
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
+                              {editable ? (
+                                <Button_
+                                  icon={ICONS.upChevron}
+                                  iconSize={iconSize}
+                                  onPress={() =>
+                                    handleTimeEdit(item, "in-date-up")
+                                  }
+                                  buttonStyle={{
+                                    paddingVertical: 0,
+                                    paddingHorizontal: 0,
+                                  }}
+                                />
+                              ) : null}
+                              <Text
+                                style={{
+                                  width: 20,
+                                  textAlign: "center",
                                 }}
-                                icon={ICONS.downChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "in-date-down")
-                                }
-                              />
-                            ) : null}
+                              >
+                                {item.in.dayOfMonth}
+                              </Text>
+                              {editable ? (
+                                <Button_
+                                  buttonStyle={{
+                                    paddingVertical: 0,
+                                    paddingHorizontal: 0,
+                                  }}
+                                  icon={ICONS.downChevron}
+                                  iconSize={iconSize}
+                                  onPress={() =>
+                                    handleTimeEdit(item, "in-date-down")
+                                  }
+                                />
+                              ) : null}
+                            </View>
                           </View>
                           <View style={{ alignItems: "center" }}>
                             {editable ? (
@@ -737,22 +751,35 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
-                              marginRight: 20,
-                              // marginRight: 3,
-                              // width: "45%",
+                              // marginRight: 10,
+                              // backgroundColor: "green",
+                              width: "28%",
+                              justifyContent: "space-between",
                             }}
                           >
-                            <Text
+                            <View
                               style={{
-                                color: C.textMain,
-                                marginRight: 1,
+                                flexDirection: "row",
+                                // alignItems: "center",
+                                // marginRight: 10,
+                                // backgroundColor: "green",
+                                // width: "40%",
+                                // justifyContent: "space-between",
                               }}
                             >
-                              {item.out?.wordDayOfWeek + ", "}
-                            </Text>
-                            <Text style={{ color: C.textMain }}>
-                              {item.out?.wordDayOfMonth}
-                            </Text>
+                              <Text
+                                style={{
+                                  color: C.textMain,
+                                  marginRight: 1,
+                                }}
+                              >
+                                {item.out?.wordDayOfWeek + ", "}
+                              </Text>
+                              <Text style={{ color: C.textMain }}>
+                                {item.out?.wordDayOfMonth}
+                              </Text>
+                            </View>
+
                             <View
                               style={{ alignItems: "center", marginLeft: 3 }}
                             >
@@ -788,88 +815,96 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             </View>
                           </View>
 
-                          <View>
-                            {editable ? (
-                              <Button_
-                                icon={ICONS.upChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "out-hour-up")
-                                }
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              width: "100",
+                            }}
+                          >
+                            <View>
+                              {editable ? (
+                                <Button_
+                                  icon={ICONS.upChevron}
+                                  iconSize={iconSize}
+                                  onPress={() =>
+                                    handleTimeEdit(item, "out-hour-up")
+                                  }
+                                  buttonStyle={{
+                                    paddingVertical: 0,
+                                    paddingHorizontal: 0,
+                                  }}
+                                />
+                              ) : null}
+                              <Text
+                                style={{
+                                  // marginLeft: 10,
+                                  width: iconSize,
+                                  textAlign: editable ? "center" : "right",
+                                  outlineColor: C.green,
+                                  // borderWidth: 1,
+                                  paddingRight: 1,
+                                  borderColor: C.buttonLightGreenOutline,
                                 }}
-                              />
-                            ) : null}
-                            <Text
-                              style={{
-                                // marginLeft: 10,
-                                width: iconSize,
-                                textAlign: editable ? "center" : "right",
-                                outlineColor: C.green,
-                                // borderWidth: 1,
-                                paddingRight: 1,
-                                borderColor: C.buttonLightGreenOutline,
-                              }}
-                            >
-                              {item.out.hour}
-                            </Text>
+                              >
+                                {item.out.hour}
+                              </Text>
 
-                            {editable ? (
-                              <Button_
-                                buttonStyle={{
-                                  paddingVertical: 0,
+                              {editable ? (
+                                <Button_
+                                  buttonStyle={{
+                                    paddingVertical: 0,
+                                    paddingHorizontal: 0,
+                                  }}
+                                  icon={ICONS.downChevron}
+                                  iconSize={iconSize}
+                                  onPress={() =>
+                                    handleTimeEdit(item, "out-hour-down")
+                                  }
+                                />
+                              ) : null}
+                            </View>
+                            <Text style={{ paddingHorizontal: 1 }}>:</Text>
+                            <View>
+                              {editable ? (
+                                <Button_
+                                  icon={ICONS.upChevron}
+                                  iconSize={iconSize}
+                                  onPress={() =>
+                                    handleTimeEdit(item, "out-minutes-up")
+                                  }
+                                  buttonStyle={{
+                                    paddingVertical: 0,
+                                    paddingHorizontal: 0,
+                                  }}
+                                />
+                              ) : null}
+                              <Text
+                                style={{
+                                  width: iconSize,
+                                  textAlign: editable ? "center" : "left",
+                                  outlineColor: C.green,
+                                  // borderWidth: 1,
                                   paddingHorizontal: 0,
+                                  borderColor: C.buttonLightGreenOutline,
                                 }}
-                                icon={ICONS.downChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "out-hour-down")
-                                }
-                              />
-                            ) : null}
-                          </View>
-                          <Text style={{ paddingHorizontal: 1 }}>:</Text>
-                          <View>
-                            {editable ? (
-                              <Button_
-                                icon={ICONS.upChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "out-minutes-up")
-                                }
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
-                                }}
-                              />
-                            ) : null}
-                            <Text
-                              style={{
-                                width: iconSize,
-                                textAlign: editable ? "center" : "left",
-                                outlineColor: C.green,
-                                // borderWidth: 1,
-                                paddingHorizontal: 0,
-                                borderColor: C.buttonLightGreenOutline,
-                              }}
-                            >
-                              {item.out.minutes}
-                            </Text>
-                            {editable ? (
-                              <Button_
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
-                                }}
-                                icon={ICONS.downChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "out-minutes-down")
-                                }
-                              />
-                            ) : null}
+                              >
+                                {item.out.minutes}
+                              </Text>
+                              {editable ? (
+                                <Button_
+                                  buttonStyle={{
+                                    paddingVertical: 0,
+                                    paddingHorizontal: 0,
+                                  }}
+                                  icon={ICONS.downChevron}
+                                  iconSize={iconSize}
+                                  onPress={() =>
+                                    handleTimeEdit(item, "out-minutes-down")
+                                  }
+                                />
+                              ) : null}
+                            </View>
                           </View>
                           <View
                             ref={(el) => (amPMOUtDropdownRef.current[idx] = el)}
@@ -911,7 +946,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           <View
                             style={{
                               flexDirection: "row",
-                              width: "35%",
+                              width: "45%",
                               justifyContent: "space-between",
                               paddingRight: 12,
                               // backgroundColor: "blue",
@@ -925,13 +960,13 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             </Text>
                           </View>
                         ) : (
-                          <View style={{ width: "35%" }} />
+                          <View style={{ width: "45%" }} />
                         )}
 
                         <View
                           style={{
                             flexDirection: "row",
-                            width: "60%",
+                            width: "50%",
                             justifyContent: "space-between",
                           }}
                         >

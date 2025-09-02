@@ -255,11 +255,13 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     function handleNewPunchPress() {
       let usePrevious = false;
       let prevPunchObj = sFilteredArr[sFilteredArr.length - 1];
-      if (!prevPunchObj.out) usePrevious = true;
+      // log(prevPunchObj);
+      if (prevPunchObj.option === "in") usePrevious = true;
 
       let punchObj = cloneDeep(TIME_PUNCH_PROTO);
       punchObj.userID = sUserObj.id;
       punchObj.id = generateRandomID();
+      // log("use previous", usePrevious);
       punchObj.millis = usePrevious
         ? prevPunchObj.millis + MILLIS_IN_HOUR
         : new Date().getTime();
@@ -270,9 +272,6 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       filteredArr.push(punchObj);
       _setFilteredArr(filteredArr);
       dbUpdateUserPunchAction(punchObj.userID, punchObj);
-
-      // log(formatMillisForDisplay(prevPunchObj.millis));
-      // log(formatMillisForDisplay(punchObj.millis));
     }
 
     function handleDeletePunchPress(inID, outID) {
@@ -448,7 +447,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                 style={{
                   fontWeight: 500,
                   fontSize: 16,
-                  width: 70,
+                  width: 100,
                   textAlign: "right",
                 }}
               >
@@ -469,14 +468,14 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                 alignItems: "center",
               }}
             >
-              <Text style={{ width: 300, textAlign: "right" }}>
+              <Text style={{ width: 400, textAlign: "right" }}>
                 {"Total Selected Wages: "}
               </Text>
               <Text
                 style={{
                   fontWeight: 500,
                   fontSize: 16,
-                  width: 70,
+                  width: 100,
                   textAlign: "right",
                 }}
               >

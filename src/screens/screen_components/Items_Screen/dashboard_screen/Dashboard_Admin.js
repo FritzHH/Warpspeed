@@ -22,6 +22,7 @@ import {
   CheckBox_,
   DropdownMenu,
   Image_,
+  NumberSpinner_,
 } from "../../../../components";
 import { cloneDeep, set } from "lodash";
 import { dbSetSettings } from "../../../../db_call_wrapper";
@@ -828,6 +829,7 @@ export function Dashboard_Admin({}) {
                 <Text>%</Text>
               </View>
             </BoxContainerInnerComponent>
+            <NumberSpinner_ />
           </BoxContainerOuterComponent>
         </View>
       </View>

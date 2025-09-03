@@ -8,6 +8,7 @@ import {
   FlatList,
   TextInput,
   TouchableWithoutFeedback,
+  ScrollView,
 } from "react-native-web";
 import React, { Component, useCallback, useEffect, useRef } from "react";
 import { Animated, Easing, Image } from "react-native-web";
@@ -2771,5 +2772,145 @@ export const Button_ = ({
         )}
       </GradientView>
     </TouchableOpacity>
+  );
+};
+
+const styles1 = {
+  item: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  text: {},
+};
+const ITEM_HEIGHT = 48;
+
+const pad = (n, len = 2) => n.toString().padStart(len, "0");
+export const NumberSpinner_ = ({
+  min = 0,
+  max = 100,
+  value = 46,
+  onChange = () => {},
+  width = 80,
+  style = {},
+  itemStyle = {},
+  visibleItems = 5,
+  padZero = false,
+}) => {
+  const scrollRef = useRef(null);
+  const [selected, setSelected] = useState(value);
+
+  // Generate number array
+  const numbers = [];
+  for (let i = min; i <= max; i++) {
+    numbers.push(padZero ? pad(i) : i);
+  }
+
+  // When component mounts or value prop changes, scroll to correct offset
+  React.useEffect(() => {
+    if (scrollRef.current) {
+      const idx = Math.max(0, numbers.indexOf(padZero ? pad(value) : value));
+      scrollRef.current.scrollTo({ y: idx * ITEM_HEIGHT, animated: false });
+      setSelected(numbers[idx]);
+    }
+  }, [value, min, max, padZero]);
+
+  // On scroll end, snap to nearest item
+  const onScrollEnd = (e) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const idx = Math.round(y / ITEM_HEIGHT);
+    const clampedIdx = Math.max(0, Math.min(numbers.length - 1, idx));
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        y: clampedIdx * ITEM_HEIGHT,
+        animated: true,
+      });
+    }
+    setSelected(numbers[clampedIdx]);
+    onChange(padZero ? parseInt(numbers[clampedIdx], 10) : numbers[clampedIdx]);
+  };
+
+  // Calculate padding items to center selected
+  const padCount = Math.floor(visibleItems / 2);
+
+  return (
+    <View
+      style={[
+        {
+          width,
+          height: ITEM_HEIGHT * visibleItems,
+          overflow: "hidden",
+          alignItems: "center",
+        },
+        style,
+      ]}
+    >
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_HEIGHT}
+        decelerationRate="fast"
+        onMomentumScrollEnd={onScrollEnd}
+        contentContainerStyle={{
+          paddingVertical: ITEM_HEIGHT * padCount,
+        }}
+      >
+        {numbers.map((num, idx) => (
+          <View
+            key={num + idx}
+            style={[
+              styles1.item,
+              {
+                height: ITEM_HEIGHT,
+                width: width,
+                opacity:
+                  num === selected
+                    ? 1
+                    : Math.abs(
+                        numbers.indexOf(num) - numbers.indexOf(selected)
+                      ) === 1
+                    ? 0.6
+                    : 0.3,
+              },
+              itemStyle,
+            ]}
+          >
+            <Text
+              style={[
+                styles1.text,
+                {
+                  fontWeight: num === selected ? "bold" : "normal",
+                  fontSize: num === selected ? 26 : 20,
+                  color: num === selected ? "#333" : "#999",
+                },
+              ]}
+            >
+              {num}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+      {/* Overlay center highlight */}
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <View
+          style={{
+            height: ITEM_HEIGHT,
+            width: width,
+            borderTopWidth: 2,
+            borderBottomWidth: 2,
+            borderColor: "#007AFF",
+            position: "absolute",
+          }}
+        />
+      </View>
+    </View>
   );
 };

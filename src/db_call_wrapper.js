@@ -12,12 +12,14 @@ import {
   cancelStripeActivePaymentIntents,
   DELETE_FIRESTORE_FIELD,
   filterFirestoreCollectionByNumber,
+  get_firestore_doc,
   getCollection,
   getDocument,
   getPaymentIntent,
   getRealtimeNodeItem,
   getStripeActivePaymentIntents,
   getStripeConnectionToken,
+  set_firestore_doc,
   processPaymentIntent,
   processServerDrivenStripePayment,
   retrieveAvailableStripeReaders,
@@ -28,10 +30,40 @@ import {
   setFirestoreSubCollectionItem,
   setRealtimeNodeItem,
 } from "./db";
-import { generateRandomID, log } from "./utils";
+import { useDatabaseBatchStore } from "./stores";
+import { clog, generateRandomID, log } from "./utils";
 
-// setters ///////////////////////////////////////////////////////
+// new shi+++++++++++++++++++++++++++++++++++++++++++++++++
 
+// write batching
+
+function clearDBBatch() {
+  localStorage.removeItem("batch");
+}
+
+function batchDBCall(fieldName, fieldValue) {
+  // localStorage.clear();
+  let batch = JSON.parse(localStorage.getItem("batch"));
+  if (!batch) batch = {};
+  batch[fieldName] = fieldValue;
+  // clog("batch", batch);
+  localStorage.setItem("batch", JSON.stringify(batch));
+}
+
+export function executeDBBatch() {
+  let batch = JSON.parse(localStorage.getItem("batch"));
+  // log("batch", batch);
+  if (!batch) return;
+  let pathNames = Object.keys(batch);
+  pathNames.forEach((path) => {
+    setDBItem(path, batch[path]);
+  });
+
+  useDatabaseBatchStore.getState().resetLastWriteMillis();
+  clearDBBatch();
+}
+
+// intermediate database path checker to determine which database to use
 function checkDBPath(path) {
   if (
     Object.values(FIRESTORE_DATABASE_NODE_NAMES).find((str) =>
@@ -44,20 +76,45 @@ function checkDBPath(path) {
   }
 }
 
-export function setDBItem(path, item) {
+// internal db read/write operations
+function setDBItem(path, item) {
   if (checkDBPath(path) === "firestore") {
-    return SET_FIRESTORE_FIELD(path, item);
+    return set_firestore_doc(path, item);
   } else if (checkDBPath(path) === "realtime") {
   }
 }
 
-export function deleteField(path, fieldID) {
+function deleteField(path, fieldID) {
   if (checkDBPath(path) === "firestore") {
     // log('field id', )
     return DELETE_FIRESTORE_FIELD(path, fieldID);
   } else if (checkDBPath(path) === "realtime") {
   }
 }
+
+// exposed setters ///////////////////////////////////////////////////////
+
+export function dbSetSettings({ settingsObj, fieldName, fieldVal, batch }) {
+  let path = build_db_path.settings();
+  if (batch) {
+    batchDBCall(path, settingsObj);
+    useDatabaseBatchStore.getState().setLastWriteMillis();
+  } else {
+    return setDBItem(path, settingsObj);
+  }
+}
+
+// exposed getters ///////////////////////////////////////////////////////
+export function dbGetSettings() {
+  let path = build_db_path.settings();
+  try {
+    return get_firestore_doc(path);
+  } catch (e) {
+    log(e);
+  }
+}
+
+// end new shit ++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 export function dbSetCustomerObj(customerObj, removeOption = false) {
   let id = customerObj.id;
@@ -73,11 +130,6 @@ export function dbSetCustomerObj(customerObj, removeOption = false) {
   }
   return setFirestoreCollectionItem("CUSTOMERS", id, customerObj);
 }
-
-export function dbSetSettings(settingsObj) {
-  return setRealtimeNodeItem("SETTINGS", settingsObj);
-}
-
 export function dbSetOpenWorkorderItem(item, removeOption = false) {
   let path = "OPEN-WORKORDERS/" + item.id;
   if (removeOption) item = null;
@@ -260,4 +312,9 @@ export const build_db_path = {
     userID +
     "/" +
     FIRESTORE_DATABASE_NODE_NAMES.punchClock,
+  settings: (fieldName) => {
+    let path = FIRESTORE_DATABASE_NODE_NAMES.settings + "settings/";
+    if (fieldName) path += fieldName + "/";
+    return path;
+  },
 };

@@ -18,6 +18,12 @@ import {
   updateDoc,
   FieldValue,
   deleteDoc,
+  initializeFirestore,
+  memoryLocalCache,
+  Firestore,
+  CACHE_SIZE_UNLIMITED,
+  disableNetwork,
+  persistentLocalCache,
 } from "firebase/firestore";
 
 import {
@@ -57,7 +63,12 @@ import {
 } from "./app_user_constants";
 
 // Initialize Firebase
-const DB = getFirestore(firebaseApp);
+// const FIRESTORE = getFirestore(firebaseApp);
+// const FIRESTORE = getFirestore(initializeApp(firebaseConfig));
+const FIRESTORE = initializeFirestore(initializeApp(firebaseConfig), {
+  localCache: persistentLocalCache(/*settings*/ {}),
+});
+// disableNetwork(FIRESTORE);
 const RDB = getDatabase();
 
 ////////////////////////////////////////////////////////////////////////
@@ -66,13 +77,13 @@ const RDB = getDatabase();
 
 // getters
 export function getNewCollectionRef(collectionName) {
-  let ref = doc(collection(DB, collectionName));
+  let ref = doc(collection(FIRESTORE, collectionName));
   return ref;
 }
 
 export function getCollection(collectionName) {
   let arr = [];
-  return getDocs(collection(DB, collectionName)).then((res) => {
+  return getDocs(collection(FIRESTORE, collectionName)).then((res) => {
     res.forEach((doc) => {
       arr.push(doc.data());
     });
@@ -81,7 +92,7 @@ export function getCollection(collectionName) {
 }
 
 export function getDocument(collectionName, itemID) {
-  let ref = doc(DB, collectionName, itemID);
+  let ref = doc(FIRESTORE, collectionName, itemID);
   return getDoc(ref).then((res) => {
     if (res.exists()) {
       return res.data();
@@ -95,25 +106,40 @@ export function getDocument(collectionName, itemID) {
 
 // NEW /////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
-export async function SET_FIRESTORE_FIELD(path, item) {
-  let docRef = doc(DB, path, item.id);
+export async function set_firestore_doc(path, item) {
+  // log(path, item);
+  let docRef = doc(FIRESTORE, path);
   return await setDoc(docRef, item);
 }
 
+export async function get_firestore_doc(path) {
+  let docRef = doc(FIRESTORE, path);
+  return (await getDoc(docRef)).data();
+}
+
+//// end new /////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+// sort of new???????????
+
+export async function SET_FIRESTORE_FIELD(path, item) {
+  if (item.id) {
+    // is document
+    let docRef = doc(FIRESTORE, path, item.id);
+    return await setDoc(docRef, item);
+  } else {
+  }
+}
+
 export async function ADD_FIRESTORE_FIELD(path, item) {
-  let docRef = doc(DB, path, item.id);
+  let docRef = doc(FIRESTORE, path, item.id);
   return await addDoc(docRef, item);
 }
 
-export async function GET_FIRESTORE_FIELD(path, id) {}
-
 export async function DELETE_FIRESTORE_FIELD(path, id) {
-  let docRef = doc(DB, path, id);
+  let docRef = doc(FIRESTORE, path, id);
   return await deleteDoc(docRef);
 }
-
-/////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
 
 export function setFirestoreCollectionItem(
   collectionName,
@@ -124,7 +150,7 @@ export function setFirestoreCollectionItem(
   // let id = item.id;
   if (stringify) item = { item: JSON.stringify(item) };
 
-  let docRef = doc(DB, collectionName, collectionId);
+  let docRef = doc(FIRESTORE, collectionName, collectionId);
   // log(collectionName, collectionId);
   // log(item);
   return setDoc(docRef, item)
@@ -144,7 +170,7 @@ export async function setFirestoreSubCollectionItem(
   // log(collectionName, documentId);
   try {
     const subCollectionRef = collection(
-      DB,
+      FIRESTORE,
       collectionName,
       documentId,
       subCollectionName
@@ -165,7 +191,7 @@ export async function setCustomer(customerObj) {
 export function addToFirestoreCollectionItem(path, item, stringify) {
   if (stringify) item = { item: JSON.stringify(item) };
 
-  let docRef = collection(DB, path);
+  let docRef = collection(FIRESTORE, path);
   // log(path);
   return addDoc(docRef, item)
     .then(() => {
@@ -188,14 +214,14 @@ export function addToFirestoreCollectionItem(path, item, stringify) {
 
 // subscribers
 export function subscribeToDocument(collectionName, documentID, callback) {
-  let ref = doc(DB, collectionName, documentID);
+  let ref = doc(FIRESTORE, collectionName, documentID);
   return onSnapshot(ref, (snap) => {
     callback(snap.data());
   });
 }
 
 export function subscribeToCollectionNode(collectionName, callback) {
-  let q = query(collection(DB, collectionName));
+  let q = query(collection(FIRESTORE, collectionName));
   return onSnapshot(q, (querySnapshot) => {
     let arr = [];
     querySnapshot.forEach((query) => {
@@ -220,7 +246,7 @@ export async function searchCollection(
   let text = isText ? searchTerm.toString() : searchTerm;
   // log("search term", text);
   let q = query(
-    collection(DB, collectionPath),
+    collection(FIRESTORE, collectionPath),
     where(fieldName, ">=", text),
     where(fieldName, "<=", text + "\uf8ff")
   );
@@ -244,7 +270,7 @@ export async function filterFirestoreCollectionByNumber(
   // log(formatMillisForDisplay(startVal), formatMillisForDisplay(endVal));
   // log(collectionPath);
   let q = query(
-    collection(DB, collectionPath),
+    collection(FIRESTORE, collectionPath),
     where(fieldName, ">=", startVal),
     where(fieldName, "<=", endVal)
   );

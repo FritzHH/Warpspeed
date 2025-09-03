@@ -15,7 +15,11 @@ import {
   makeGrey,
   removeDashesFromPhone,
 } from "../../../../utils";
-import { useLoginStore, useSettingsStore } from "../../../../stores";
+import {
+  // useDatabaseStore,
+  useLoginStore,
+  useSettingsStore,
+} from "../../../../stores";
 import {
   Button,
   Button_,
@@ -36,7 +40,9 @@ import { fillPunchHistory } from "../../../../testing";
 
 export function Dashboard_Admin({}) {
   // store setters ///////////////////////////////////////////////////////////
-  const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
+  // const _zSetSettingsObj = useDatabaseStore((state) => state.setSettings);
+  // const _zSetDatabaseItem = useDatabaseStore((state) => state.setSettings);
+  const _zSetSettingsField = useSettingsStore((state) => state.setField);
 
   // store getters ///////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
@@ -49,11 +55,18 @@ export function Dashboard_Admin({}) {
   const [sShowPinIndex, _setShowPinIndex] = useState();
   const [sShowWageIndex, _setShowWageIndex] = useState();
   const [sNewUserObj, _setNewUserObj] = useState();
+  const [sListExpandObj, _setListExpandObj] = useState({
+    userList: false,
+  });
+
   const userListItemRefs = useRef([]);
   const cardReaderListItemRefs = useRef([]);
   ///////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////
 
+  // user action handlers ///////////////////////////////////////////////////
+
+  // user component
   function commitUserInfoChange(userObj) {
     let settingsObj = cloneDeep(zSettingsObj);
     let userArr;
@@ -104,6 +117,15 @@ export function Dashboard_Admin({}) {
     dbSetSettings(settingsObj);
   }
 
+  // payment processing component ////////////////////////////////////////
+
+  function handleSettingsFieldChange(fieldName, fieldValue) {
+    // let settingsObj = cloneDeep(zSettingsObj);
+    // settingsObj[fieldName] = fieldValue;
+    _zSetSettingsField(fieldName, fieldValue);
+  }
+
+  // containers and reusable components ///////////////////////////////
   function BoxContainerOuterComponent({ style = {}, children }) {
     return (
       <View
@@ -154,24 +176,608 @@ export function Dashboard_Admin({}) {
     );
   }
 
-  function TextInputComponent({ label, value, onChangeText, style = {} }) {
+  // extruding each component because this page is humongous/ ////////////
+
+  const AppUserListComponent = ({}) => {
     return (
-      <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-        <Text style={{ minWidth: 10 }}>{label}</Text>
-        <TextInput
+      <View style={{ width: "100%" }}>
+        <BoxContainerLabelComponent text={"Users"} />
+
+        {/**Flatlist showing all app users, edit functions. sPunchClockUserObj */}
+        <View
           style={{
-            borderColor: C.buttonLightGreenOutline,
-            borderWidth: 1,
-            // borderRadius: 5,
-            paddingHorizontal: 5,
-            ...style,
+            borderRadius: 5,
+            backgroundColor: "rgba(0,0,0,.1)",
+            width: "100%",
+            padding: 5,
+            maxHeight: 550,
           }}
-          value={value}
-          onChangeText={onChangeText}
-        />
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 5,
+            }}
+          >
+            <Button_
+              icon={ICONS.maximize}
+              onPress={() =>
+                _setListExpandObj({
+                  ...sListExpandObj,
+                  userList: !sListExpandObj.userList,
+                })
+              }
+            />
+            {/* <Button_
+            onPress={fillPunchHistory}
+            text={"Fill History"}
+            buttonStyle={{
+              borderRadius: 5,
+              padding: 0,
+              height: 20,
+              backgroundColor: C.buttonLightGreen,
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+            }}
+            textStyle={{
+              fontSize: 14,
+              fontColor: C.textMain,
+            }}
+          /> */}
+            <Button_
+              enabled={sListExpandObj.userList}
+              icon={ICONS.add}
+              onPress={handleNewUserPress}
+              text={"User"}
+              buttonStyle={{
+                borderRadius: 5,
+                paddingVertical: 2,
+                marginRight: 6,
+                // height: 20,
+                backgroundColor: C.buttonLightGreen,
+                borderColor: C.buttonLightGreenOutline,
+                borderWidth: 1,
+              }}
+              textStyle={{
+                fontSize: 14,
+                fontColor: C.textMain,
+              }}
+            />
+          </View>
+          <FlatList
+            ItemSeparatorComponent={() => (
+              <View
+                style={{
+                  height: 5,
+                  // width: "100%",
+                  // backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
+                }}
+              />
+            )}
+            style={{ borderRadius: 5 }}
+            data={
+              sListExpandObj.userList
+                ? zSettingsObj
+                  ? sNewUserObj
+                    ? [sNewUserObj, ...zSettingsObj.users]
+                    : zSettingsObj.users
+                  : []
+                : []
+            }
+            renderItem={(obj) => {
+              obj = cloneDeep(obj);
+              let idx = obj.index;
+              let userObj = obj.item;
+              let editable = sEditUserIndex === idx;
+              // log("user", userObj);
+              return (
+                <View
+                  ref={(element) => (userListItemRefs.current[idx] = element)}
+                  style={{
+                    flexDirection: "row",
+                    paddingVertical: 2,
+                    backgroundColor: C.listItemWhite,
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderRadius: 5,
+                    padding: 3,
+                    marginRight: 5,
+                    opacity: !editable && sEditUserIndex ? 0.3 : 1,
+                  }}
+                >
+                  <View
+                    style={{
+                      // paddingTop: 3,
+                      paddingLeft: 0,
+                      marginRight: 5,
+                      justifyContent: "space-around",
+                    }}
+                  >
+                    <Button_
+                      text={"Edit"}
+                      onPress={() => {
+                        _setEditUserIndex(sEditUserIndex != null ? null : idx);
+                        _setShowPinIndex(null);
+                        _setShowWageIndex(null);
+                      }}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        backgroundColor: editable
+                          ? C.lightred
+                          : C.buttonLightGreen,
+                        borderRadius: 5,
+                        paddingHorizontal: 0,
+                        paddingVertical: 2,
+                        width: 50,
+                      }}
+                      textStyle={{
+                        color: editable ? C.textWhite : C.textMain,
+                        fontSize: 12,
+                      }}
+                    />
+                    <Button_
+                      text={"Enroll"}
+                      onPress={() => {
+                        _setFacialRecognitionModalUserObj(userObj);
+                      }}
+                      enabled={editable}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        backgroundColor: C.buttonLightGreen,
+                        width: 50,
+                        paddingVertical: 2,
+
+                        paddingHorizontal: 0,
+                        marginRight: 4,
+                        borderRadius: 5,
+                      }}
+                      textStyle={{ fontSize: 12 }}
+                    />
+                    <Button_
+                      text={sEditUserIndex === idx ? "Remove" : "Clock"}
+                      onPress={() => {
+                        if (sEditUserIndex === idx) {
+                          handleRemoveUserPress(userObj);
+                        } else if (sEditUserIndex) {
+                        } else {
+                          _setPunchClockUserObj(userObj);
+                        }
+                      }}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        paddingVertical: 2,
+
+                        borderColor: C.buttonLightGreenOutline,
+                        backgroundColor: C.buttonLightGreen,
+                        borderRadius: 5,
+                        paddingHorizontal: 0,
+                        width: 50,
+                      }}
+                      textStyle={{ fontSize: 12 }}
+                    />
+                  </View>
+                  <View style={{ justifyContent: "center" }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "flex-start",
+                      }}
+                    >
+                      <TextInput
+                        value={userObj.first}
+                        placeholder="First name"
+                        placeholderTextColor={"lightgray"}
+                        editable={editable}
+                        style={{
+                          paddingHorizontal: 5,
+                          padding: 1,
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          outlineWidth: 0,
+                          width: 100,
+                          marginRight: 10,
+                          borderWidth: 1,
+                          fontSize: 14,
+                        }}
+                        onChangeText={(value) => {
+                          userObj.first = value;
+                          commitUserInfoChange(userObj);
+                        }}
+                      />
+                      <TextInput
+                        value={userObj.last}
+                        onChangeText={(value) => {
+                          userObj.last = value;
+                          commitUserInfoChange(userObj);
+                        }}
+                        placeholder="Last name"
+                        placeholderTextColor={"lightgray"}
+                        editable={editable}
+                        style={{
+                          paddingHorizontal: 5,
+                          // paddingHorizontal: 2,
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          outlineWidth: 0,
+                          width: 100,
+                          marginRight: 10,
+                          borderWidth: 1,
+                          fontSize: 14,
+                        }}
+                      />
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "flex-start",
+                      }}
+                    >
+                      <TextInput
+                        value={addDashesToPhone(userObj.phone)}
+                        onChangeText={(value) => {
+                          let val = removeDashesFromPhone(value);
+                          userObj.phone = val;
+                          commitUserInfoChange(userObj);
+                        }}
+                        placeholder="Phone num."
+                        placeholderTextColor={"lightgray"}
+                        editable={editable}
+                        style={{
+                          paddingHorizontal: 5,
+                          marginTop: 5,
+                          padding: 1,
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          outlineWidth: 0,
+                          width: 100,
+                          marginRight: 10,
+                          borderWidth: 1,
+                          fontSize: 14,
+                        }}
+                      />
+                      <DropdownMenu
+                        enabled={editable}
+                        ref={userListItemRefs.current[idx]}
+                        dataArr={
+                          editable ? PERMISSION_LEVELS.map((o) => o.name) : []
+                        }
+                        onSelect={(item) => {
+                          if (!editable) return;
+                          let perm = PERMISSION_LEVELS.find(
+                            (o) => o.name == item
+                          );
+                          userObj.permissions = perm;
+                          commitUserInfoChange(userObj);
+                        }}
+                        buttonStyle={{
+                          paddingHorizontal: 5,
+                          marginTop: 5,
+                          padding: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          outlineWidth: 0,
+                          borderRadius: 5,
+                          width: 100,
+                          marginRight: 10,
+                          borderWidth: 1,
+                          backgroundColor: "transparent",
+                          alignItems: "flex-start",
+                          backgroundColor: editable
+                            ? C.buttonLightGreen
+                            : "transparent",
+                          paddingVertical: 2,
+                        }}
+                        buttonText={userObj.permissions.name}
+                        buttonTextStyle={{
+                          fontSize: 14,
+                        }}
+                      />
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "flex-start",
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          width: 100,
+                          marginRight: 10,
+                          borderWidth: 1,
+                          marginTop: 5,
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <TextInput
+                          // focusable={sShowPinIndex === idx ? true : false}
+                          caretHidden={sShowPinIndex != idx}
+                          focused={sShowPinIndex === idx}
+                          value={sShowPinIndex === idx ? userObj.pin : ""}
+                          onChangeText={(value) => {
+                            userObj.pin = value;
+                            commitUserInfoChange(userObj);
+                          }}
+                          placeholder={sShowPinIndex === idx ? "pin..." : "PIN"}
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            width: "70%",
+                            outlineWidth: 0,
+                            paddingHorizontal: 5,
+                            padding: 1,
+                            fontSize: 14,
+                          }}
+                        />
+                        {editable ? (
+                          <TouchableOpacity
+                            onPress={() =>
+                              _setShowPinIndex(
+                                sShowPinIndex != null ? null : idx
+                              )
+                            }
+                          >
+                            <Image_ icon={ICONS.editPencil} size={15} />
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          width: 100,
+                          marginRight: 10,
+                          borderWidth: 1,
+                          marginTop: 5,
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <TextInput
+                          caretHidden={sShowWageIndex != idx}
+                          value={
+                            sShowWageIndex === idx ? userObj.hourlyWage : ""
+                          }
+                          onChangeText={(value) => {
+                            userObj.hourlyWage = value;
+                            commitUserInfoChange(userObj);
+                          }}
+                          placeholder={
+                            sShowWageIndex === idx ? "wage..." : "Wage"
+                          }
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            width: "70%",
+                            outlineWidth: 0,
+                            paddingHorizontal: 5,
+                            padding: 1,
+                            fontSize: 14,
+                          }}
+                        />
+                        {editable ? (
+                          <TouchableOpacity
+                            onPress={() =>
+                              _setShowWageIndex(
+                                sShowWageIndex != null ? null : idx
+                              )
+                            }
+                          >
+                            <Image_ icon={ICONS.editPencil} size={15} />
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              );
+            }}
+          />
+        </View>
       </View>
     );
-  }
+  };
+
+  const PaymentProcessingComponent = ({}) => {
+    return (
+      <BoxContainerOuterComponent>
+        <BoxContainerLabelComponent
+          text={"payment processing"}
+          style={{ paddingRight: 5 }}
+        />
+        <BoxContainerInnerComponent>
+          <CheckBox_
+            isChecked={zSettingsObj?.acceptChecks}
+            textStyle={{ fontSize: 15 }}
+            buttonStyle={{
+              backgroundColor: "transparent",
+            }}
+            text={"Accepts checks"}
+            onCheck={() =>
+              handleSettingsFieldChange(
+                "acceptChecks",
+                !zSettingsObj?.acceptChecks
+              )
+            }
+          />
+          <CheckBox_
+            isChecked={true}
+            textStyle={{ fontSize: 15 }}
+            buttonStyle={{
+              backgroundColor: "transparent",
+            }}
+            text={"Auto connect to card reader"}
+            onCheck={() => {}}
+          />
+          {/**card reader flatlist */}
+          <View
+            style={{
+              width: "100%",
+              alignItems: "flex-end",
+              marginTop: 10,
+            }}
+          >
+            <BoxContainerLabelComponent
+              text={"stripe card readers"}
+              style={{ fontSize: 12 }}
+            />
+            <View
+              style={{
+                borderRadius: 5,
+                backgroundColor: "rgba(0,0,0,.1)",
+                padding: 5,
+                maxHeight: 550,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-start",
+                  marginBottom: 5,
+                }}
+              >
+                <Button_
+                  onPress={() => {
+                    log("need new card reader function");
+                  }}
+                  icon={ICONS.add}
+                  text={"Reader"}
+                  buttonStyle={{
+                    borderRadius: 5,
+                    padding: 0,
+                    height: 20,
+                    backgroundColor: C.buttonLightGreen,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                  }}
+                  textStyle={{
+                    fontSize: 14,
+                    fontColor: C.textMain,
+                  }}
+                />
+              </View>
+              {/**Flatlist showing the available card readers */}
+              <FlatList
+                ItemSeparatorComponent={() => (
+                  <View
+                    style={{
+                      height: 5,
+                    }}
+                  />
+                )}
+                style={{}}
+                data={zSettingsObj?.cardReaders || []}
+                renderItem={(obj) => {
+                  obj = cloneDeep(obj);
+                  let idx = obj.index;
+                  let item = obj.item;
+                  return (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "flex-end",
+                        alignItems: "center",
+                        // width: 500,
+                        // backgroundColor: "green",
+                      }}
+                    >
+                      <Text style={{ color: makeGrey(0.55), marginRight: 10 }}>
+                        ID:
+                      </Text>
+                      <TextInput
+                        style={{ outlineWidth: 0 }}
+                        editable={false}
+                        value={item.id}
+                      />
+                      <TextInput
+                        value={item.label}
+                        onChangeText={() => {}}
+                        style={{
+                          textAlign: "right",
+                          paddingRight: 2,
+                          // minWidth: 200,
+                          // width: "75%",
+                          justifyContent: "flex-end",
+                          paddingVertical: 4,
+                          backgroundColor: C.listItemWhite,
+                          borderWidth: 1,
+                          paddingRight: 2,
+                          borderColor: C.buttonLightGreenOutline,
+                          outlineWidth: 0,
+                        }}
+                      />
+                      <Button_
+                        buttonStyle={{ paddingHorizontal: 10 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                        onPress={() => {}}
+                      />
+                    </View>
+                    // </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              width: "95%",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              marginTop: 20,
+            }}
+          >
+            <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
+            <DropdownComponent
+              label={zSettingsObj?.selectedCardReaderObj.label}
+              data={zSettingsObj?.cardReaders || []}
+              onSelect={(obj) => log("selected", obj)}
+            />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              marginTop: 20,
+            }}
+          >
+            <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
+            <TextInput
+              style={{
+                outlineWidth: 0,
+                borderRadius: 5,
+                textAlign: "right",
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                paddingHorizontal: 5,
+                paddingVertical: 3,
+                marginRight: 3,
+                width: 75,
+              }}
+              value={zSettingsObj?.salesTax * 100}
+              onChangeText={() => log("change sales tax fun")}
+            />
+            <Text>%</Text>
+          </View>
+        </BoxContainerInnerComponent>
+      </BoxContainerOuterComponent>
+    );
+  };
 
   function DropdownComponent({
     ref,
@@ -204,20 +810,13 @@ export function Dashboard_Admin({}) {
     );
   }
 
-  const STYLES = {
-    dropdownButton: {},
-    dropdownText: {},
-    dropdownItem: {},
-  };
-
+  //////////////////////////////////////////////////////////////////////////
+  // Main component /////////////////////////////////////////////////////////
   return (
     <ScrollView
       style={{
-        // flex: 1,
         padding: 5,
         paddingTop: 20,
-        // flexDirection: "row",
-        // backgroundColor: "blue",
       }}
     >
       {/**Modals that will appear when user takes an action */}
@@ -243,594 +842,18 @@ export function Dashboard_Admin({}) {
           justifyContent: "flex-start",
         }}
       >
-        <View style={{ width: "35%", backgroundColor: "transparent" }}>
-          <BoxContainerLabelComponent text={"Users"} />
-
-          {/**Flatlist showing all app users, edit functions. sPunchClockUserObj */}
-          <View
-            style={{
-              borderRadius: 5,
-              backgroundColor: "rgba(0,0,0,.1)",
-              width: "100%",
-              padding: 5,
-              maxHeight: 550,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                alignItems: "center",
-                marginBottom: 5,
-              }}
-            >
-              {/* <Button_
-            onPress={fillPunchHistory}
-            text={"Fill History"}
-            buttonStyle={{
-              borderRadius: 5,
-              padding: 0,
-              height: 20,
-              backgroundColor: C.buttonLightGreen,
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-            }}
-            textStyle={{
-              fontSize: 14,
-              fontColor: C.textMain,
-            }}
-          /> */}
-              <Button_
-                onPress={handleNewUserPress}
-                text={"New User"}
-                buttonStyle={{
-                  borderRadius: 5,
-                  padding: 0,
-                  height: 20,
-                  backgroundColor: C.buttonLightGreen,
-                  borderColor: C.buttonLightGreenOutline,
-                  borderWidth: 1,
-                }}
-                textStyle={{
-                  fontSize: 14,
-                  fontColor: C.textMain,
-                }}
-              />
-            </View>
-            <FlatList
-              ItemSeparatorComponent={() => (
-                <View
-                  style={{
-                    height: 5,
-                    // width: "100%",
-                    // backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
-                  }}
-                />
-              )}
-              style={{ borderRadius: 5 }}
-              data={
-                zSettingsObj
-                  ? sNewUserObj
-                    ? [sNewUserObj, ...zSettingsObj.users]
-                    : zSettingsObj.users
-                  : []
-              }
-              renderItem={(obj) => {
-                obj = cloneDeep(obj);
-                let idx = obj.index;
-                let userObj = obj.item;
-                let editable = sEditUserIndex === idx;
-                // log("user", userObj);
-                return (
-                  <View
-                    ref={(element) => (userListItemRefs.current[idx] = element)}
-                    style={{
-                      flexDirection: "row",
-                      paddingVertical: 2,
-                      backgroundColor: C.listItemWhite,
-                      borderWidth: 1,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderRadius: 5,
-                      padding: 3,
-                      marginRight: 5,
-                      opacity: !editable && sEditUserIndex ? 0.3 : 1,
-                    }}
-                  >
-                    <View
-                      style={{
-                        // paddingTop: 3,
-                        paddingLeft: 0,
-                        marginRight: 5,
-                        justifyContent: "space-around",
-                      }}
-                    >
-                      <Button_
-                        text={"Edit"}
-                        onPress={() => {
-                          _setEditUserIndex(
-                            sEditUserIndex != null ? null : idx
-                          );
-                          _setShowPinIndex(null);
-                          _setShowWageIndex(null);
-                        }}
-                        buttonStyle={{
-                          borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          backgroundColor: editable
-                            ? C.lightred
-                            : C.buttonLightGreen,
-                          borderRadius: 5,
-                          paddingHorizontal: 0,
-                          paddingVertical: 2,
-                          width: 50,
-                        }}
-                        textStyle={{
-                          color: editable ? C.textWhite : C.textMain,
-                          fontSize: 12,
-                        }}
-                      />
-                      <Button_
-                        text={"Enroll"}
-                        onPress={() => {
-                          _setFacialRecognitionModalUserObj(userObj);
-                        }}
-                        enabled={editable}
-                        buttonStyle={{
-                          borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          backgroundColor: C.buttonLightGreen,
-                          width: 50,
-                          paddingVertical: 2,
-
-                          paddingHorizontal: 0,
-                          marginRight: 4,
-                          borderRadius: 5,
-                        }}
-                        textStyle={{ fontSize: 12 }}
-                      />
-                      <Button_
-                        text={sEditUserIndex === idx ? "Remove" : "Clock"}
-                        onPress={() => {
-                          if (sEditUserIndex === idx) {
-                            handleRemoveUserPress(userObj);
-                          } else if (sEditUserIndex) {
-                          } else {
-                            _setPunchClockUserObj(userObj);
-                          }
-                        }}
-                        buttonStyle={{
-                          borderWidth: 1,
-                          paddingVertical: 2,
-
-                          borderColor: C.buttonLightGreenOutline,
-                          backgroundColor: C.buttonLightGreen,
-                          borderRadius: 5,
-                          paddingHorizontal: 0,
-                          width: 50,
-                        }}
-                        textStyle={{ fontSize: 12 }}
-                      />
-                    </View>
-                    <View style={{ justifyContent: "center" }}>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "flex-start",
-                        }}
-                      >
-                        <TextInput
-                          value={userObj.first}
-                          placeholder="First name"
-                          placeholderTextColor={"lightgray"}
-                          editable={editable}
-                          style={{
-                            paddingHorizontal: 5,
-                            padding: 1,
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            outlineWidth: 0,
-                            width: 100,
-                            marginRight: 10,
-                            borderWidth: 1,
-                            fontSize: 14,
-                          }}
-                          onChangeText={(value) => {
-                            userObj.first = value;
-                            commitUserInfoChange(userObj);
-                          }}
-                        />
-                        <TextInput
-                          value={userObj.last}
-                          onChangeText={(value) => {
-                            userObj.last = value;
-                            commitUserInfoChange(userObj);
-                          }}
-                          placeholder="Last name"
-                          placeholderTextColor={"lightgray"}
-                          editable={editable}
-                          style={{
-                            paddingHorizontal: 5,
-                            // paddingHorizontal: 2,
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            outlineWidth: 0,
-                            width: 100,
-                            marginRight: 10,
-                            borderWidth: 1,
-                            fontSize: 14,
-                          }}
-                        />
-                      </View>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "flex-start",
-                        }}
-                      >
-                        <TextInput
-                          value={addDashesToPhone(userObj.phone)}
-                          onChangeText={(value) => {
-                            let val = removeDashesFromPhone(value);
-                            userObj.phone = val;
-                            commitUserInfoChange(userObj);
-                          }}
-                          placeholder="Phone num."
-                          placeholderTextColor={"lightgray"}
-                          editable={editable}
-                          style={{
-                            paddingHorizontal: 5,
-                            marginTop: 5,
-                            padding: 1,
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            outlineWidth: 0,
-                            width: 100,
-                            marginRight: 10,
-                            borderWidth: 1,
-                            fontSize: 14,
-                          }}
-                        />
-                        <DropdownMenu
-                          enabled={editable}
-                          ref={userListItemRefs.current[idx]}
-                          dataArr={
-                            editable ? PERMISSION_LEVELS.map((o) => o.name) : []
-                          }
-                          onSelect={(item) => {
-                            if (!editable) return;
-                            let perm = PERMISSION_LEVELS.find(
-                              (o) => o.name == item
-                            );
-                            userObj.permissions = perm;
-                            commitUserInfoChange(userObj);
-                          }}
-                          buttonStyle={{
-                            paddingHorizontal: 5,
-                            marginTop: 5,
-                            padding: 1,
-                            borderColor: C.buttonLightGreenOutline,
-                            outlineWidth: 0,
-                            borderRadius: 5,
-                            width: 100,
-                            marginRight: 10,
-                            borderWidth: 1,
-                            backgroundColor: "transparent",
-                            alignItems: "flex-start",
-                            backgroundColor: editable
-                              ? C.buttonLightGreen
-                              : "transparent",
-                            paddingVertical: 2,
-                          }}
-                          buttonText={userObj.permissions.name}
-                          buttonTextStyle={{
-                            fontSize: 14,
-                          }}
-                        />
-                      </View>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "flex-start",
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            width: 100,
-                            marginRight: 10,
-                            borderWidth: 1,
-                            marginTop: 5,
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <TextInput
-                            // focusable={sShowPinIndex === idx ? true : false}
-                            caretHidden={sShowPinIndex != idx}
-                            focused={sShowPinIndex === idx}
-                            value={sShowPinIndex === idx ? userObj.pin : ""}
-                            onChangeText={(value) => {
-                              userObj.pin = value;
-                              commitUserInfoChange(userObj);
-                            }}
-                            placeholder={
-                              sShowPinIndex === idx ? "pin..." : "PIN"
-                            }
-                            placeholderTextColor={"lightgray"}
-                            editable={editable}
-                            style={{
-                              width: "70%",
-                              outlineWidth: 0,
-                              paddingHorizontal: 5,
-                              padding: 1,
-                              fontSize: 14,
-                            }}
-                          />
-                          {editable ? (
-                            <TouchableOpacity
-                              onPress={() =>
-                                _setShowPinIndex(
-                                  sShowPinIndex != null ? null : idx
-                                )
-                              }
-                            >
-                              <Image_ icon={ICONS.editPencil} size={15} />
-                            </TouchableOpacity>
-                          ) : null}
-                        </View>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            width: 100,
-                            marginRight: 10,
-                            borderWidth: 1,
-                            marginTop: 5,
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <TextInput
-                            caretHidden={sShowWageIndex != idx}
-                            value={
-                              sShowWageIndex === idx ? userObj.hourlyWage : ""
-                            }
-                            onChangeText={(value) => {
-                              userObj.hourlyWage = value;
-                              commitUserInfoChange(userObj);
-                            }}
-                            placeholder={
-                              sShowWageIndex === idx ? "wage..." : "Wage"
-                            }
-                            placeholderTextColor={"lightgray"}
-                            editable={editable}
-                            style={{
-                              width: "70%",
-                              outlineWidth: 0,
-                              paddingHorizontal: 5,
-                              padding: 1,
-                              fontSize: 14,
-                            }}
-                          />
-                          {editable ? (
-                            <TouchableOpacity
-                              onPress={() =>
-                                _setShowWageIndex(
-                                  sShowWageIndex != null ? null : idx
-                                )
-                              }
-                            >
-                              <Image_ icon={ICONS.editPencil} size={15} />
-                            </TouchableOpacity>
-                          ) : null}
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                );
-              }}
-            />
-          </View>
+        <View style={{ width: "40%" }}>
+          <AppUserListComponent />
         </View>
         {/**right-side column container */}
         <View
           style={{
-            width: "65%",
+            width: "60%",
             alignItems: "flex-end",
             paddingHorizontal: 10,
-            // backgroundColor: "blue",
           }}
         >
-          {/**PAYMENT PROCESSING BOX   */}
-          <BoxContainerOuterComponent>
-            <BoxContainerLabelComponent
-              text={"payment processing"}
-              style={{ paddingRight: 5 }}
-            />
-            <BoxContainerInnerComponent>
-              <CheckBox_
-                isChecked={true}
-                textStyle={{ fontSize: 15 }}
-                buttonStyle={{
-                  backgroundColor: "transparent",
-                }}
-                text={"Accepts checks"}
-                onCheck={() => {}}
-              />
-              <CheckBox_
-                isChecked={true}
-                textStyle={{ fontSize: 15 }}
-                buttonStyle={{
-                  backgroundColor: "transparent",
-                }}
-                text={"Auto connect to card reader"}
-                onCheck={() => {}}
-              />
-              {/**card reader flatlist */}
-              <View
-                style={{
-                  width: "100%",
-                  alignItems: "flex-end",
-                  marginTop: 10,
-                  // backgroundColor: "green",
-                }}
-              >
-                <BoxContainerLabelComponent
-                  text={"stripe card readers"}
-                  style={{ fontSize: 12 }}
-                />
-                <View
-                  style={{
-                    borderRadius: 5,
-                    backgroundColor: "rgba(0,0,0,.1)",
-                    padding: 5,
-                    maxHeight: 550,
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "flex-start",
-                      marginBottom: 5,
-                    }}
-                  >
-                    <Button_
-                      onPress={() => {
-                        log("need new card reader function");
-                      }}
-                      text={"New Reader"}
-                      buttonStyle={{
-                        borderRadius: 5,
-                        padding: 0,
-                        height: 20,
-                        backgroundColor: C.buttonLightGreen,
-                        borderColor: C.buttonLightGreenOutline,
-                        borderWidth: 1,
-                      }}
-                      textStyle={{
-                        fontSize: 14,
-                        fontColor: C.textMain,
-                      }}
-                    />
-                  </View>
-                  {/**Flatlist showing the available card readers */}
-                  <FlatList
-                    ItemSeparatorComponent={() => (
-                      <View
-                        style={{
-                          height: 5,
-                        }}
-                      />
-                    )}
-                    style={{}}
-                    data={zSettingsObj?.cardReaders || []}
-                    renderItem={(obj) => {
-                      obj = cloneDeep(obj);
-                      let idx = obj.index;
-                      let item = obj.item;
-                      return (
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            justifyContent: "flex-end",
-                            alignItems: "center",
-                            // width: 500,
-                            // backgroundColor: "green",
-                          }}
-                        >
-                          <Text
-                            style={{ color: makeGrey(0.55), marginRight: 10 }}
-                          >
-                            ID:
-                          </Text>
-                          <TextInput
-                            style={{ outlineWidth: 0 }}
-                            editable={false}
-                            value={item.id}
-                          />
-                          <TextInput
-                            value={item.label}
-                            onChangeText={() => {}}
-                            style={{
-                              textAlign: "right",
-                              paddingRight: 2,
-                              // minWidth: 200,
-                              // width: "75%",
-                              justifyContent: "flex-end",
-                              paddingVertical: 4,
-                              backgroundColor: C.listItemWhite,
-                              borderWidth: 1,
-                              paddingRight: 2,
-                              borderColor: C.buttonLightGreenOutline,
-                              outlineWidth: 0,
-                            }}
-                          />
-                          <Button_
-                            buttonStyle={{ paddingHorizontal: 10 }}
-                            iconSize={15}
-                            icon={ICONS.close1}
-                            onPress={() => {}}
-                          />
-                        </View>
-                        // </View>
-                      );
-                    }}
-                  />
-                </View>
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  width: "95%",
-                  justifyContent: "flex-end",
-                  alignItems: "center",
-                  marginTop: 20,
-                }}
-              >
-                <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
-                <DropdownComponent
-                  label={zSettingsObj?.selectedCardReaderObj.label}
-                  data={zSettingsObj?.cardReaders || []}
-                  onSelect={(obj) => log("selected", obj)}
-                />
-              </View>
-              <View
-                style={{
-                  width: "100%",
-                  flexDirection: "row",
-                  justifyContent: "flex-end",
-                  alignItems: "center",
-                  marginTop: 20,
-                }}
-              >
-                <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
-                <TextInput
-                  style={{
-                    outlineWidth: 0,
-                    borderRadius: 5,
-                    textAlign: "right",
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    paddingHorizontal: 5,
-                    paddingVertical: 3,
-                    marginRight: 3,
-                  }}
-                  value={zSettingsObj?.salesTax * 100}
-                  onChangeText={() => log("change sales tax fun")}
-                />
-                <Text>%</Text>
-              </View>
-            </BoxContainerInnerComponent>
-            <NumberSpinner_ />
-          </BoxContainerOuterComponent>
+          <PaymentProcessingComponent />
         </View>
       </View>
     </ScrollView>

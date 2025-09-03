@@ -1,5 +1,6 @@
 // numbers
 export const FACE_DESCRIPTOR_CONFIDENCE_DISTANCE = 0.55;
+export const DB_BATCH_INTERVAL_MILLIS = 3000;
 
 // timing and interval
 export const MILLIS_IN_MINUTE = 60000;
@@ -26,6 +27,7 @@ export const REALTIME_DATABASE_NODE_NAMES = {
 export const FIRESTORE_DATABASE_NODE_NAMES = {
   punchClock: "PUNCH-CLOCK/",
   appUsers: "APP-USERS/",
+  settings: "SETTINGS/",
 };
 
 // dimensions
@@ -36,7 +38,7 @@ export const TAB_MENU_HEIGHT = 40;
 // objects & functions
 export const PERMISSION_LEVELS = [
   {
-    name: "Owner",
+    name: "Super-User",
     level: 4,
   },
   {

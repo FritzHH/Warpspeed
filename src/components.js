@@ -2710,8 +2710,10 @@ export const Button_ = ({
   return (
     <TouchableOpacity
       style={{ ...viewStyle }}
+      activeOpacity={enabled ? null : 1}
       ref={ref}
       onMouseOver={() => {
+        if (!enabled) return;
         handleMouseOver();
         enableMouseOver ? _setMouseOver(true) : null;
       }}
@@ -2720,7 +2722,7 @@ export const Button_ = ({
         _setMouseOver(false);
       }}
       // on={() => log("here")}
-      onPress={handleButtonPress}
+      onPress={() => (enabled ? handleButtonPress() : null)}
       onLongPress={visible ? onLongPress : () => {}}
     >
       <GradientView

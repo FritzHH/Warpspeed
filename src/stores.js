@@ -10,7 +10,11 @@ import {
 } from "./data";
 import { checkArr, clog, generateRandomID, log } from "./utils";
 import { cloneDeep } from "lodash";
-import { dbSetOpenWorkorderItem } from "./db_call_wrapper";
+import {
+  batchDBCall,
+  dbSetOpenWorkorderItem,
+  dbSetSettings,
+} from "./db_call_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
 
@@ -262,7 +266,22 @@ export const useAlertScreenStore = create((set, get) => ({
   },
 }));
 
-// database  //////////////////////////////////////////////////
+export const useDatabaseBatchStore = create((set, get) => ({
+  lastBatchMillis: 9999999999999999999999999,
+  lastWriteMillis: 9999999999999999999999999,
+
+  getLastWriteMillis: () => get().lastWriteMillis,
+  getLastBatchMillis: () => get().lastBatchMillis,
+
+  setLastBatchMillis: (lastBatchMillis) => set({ lastBatchMillis }),
+  setLastWriteMillis: (lastWriteMillis) => set({ lastWriteMillis }),
+  setLastWriteMillis: () => {
+    let lastWriteMillis = new Date().getTime();
+    set({ lastWriteMillis });
+  },
+  resetLastWriteMillis: () =>
+    set({ lastWriteMillis: 9999999999999999999999999 }),
+}));
 
 export const useStripePaymentStore = create((set, get) => ({
   paymentIntentID: null,
@@ -543,11 +562,22 @@ export const useWorkorderPreviewStore = create((set, get) => ({
 }));
 
 export const useSettingsStore = create((set, get) => ({
-  settings: null,
-  getSettingsObj: () => get().settings,
-  setSettingsObj: (obj) => set((state) => ({ settings: obj })),
-  setSettingsItem: (key, val) =>
-    set((state) => ({ ...get().setttings, [key]: val })),
+  settingsObj: null,
+  getSettingsObj: () => get().settingsObj,
+  setSettingsObj: ({ settingsObj, batch = true, sendToDB = true }) => {
+    // clog(settingsObj);
+    set({ settingsObj });
+    if (sendToDB) {
+      dbSetSettings({ settingsObj, batch });
+    }
+  },
+
+  setField: (fieldName, fieldVal, batch = true) => {
+    let settingsObj = cloneDeep(get().settingsObj);
+    settingsObj[fieldName] = fieldVal;
+    set({ settingsObj });
+    dbSetSettings({ settingsObj, batch });
+  },
 }));
 
 export const useListenersStore = create((set, get) => ({

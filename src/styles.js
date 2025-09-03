@@ -71,6 +71,7 @@ export const ICONS = {
   cashHand: require(ASSETS_PATH + "cashHand.png"),
   cashRed: require(ASSETS_PATH + "cashRed.png"),
   cellPhone: require(ASSETS_PATH + "cell.png"),
+  maximize: require(ASSETS_PATH + "maximize.png"),
   home: require(ASSETS_PATH + "home.png"),
   reset1: require(ASSETS_PATH + "reset.png"),
   gears1: require(ASSETS_PATH + "gears1.png"),

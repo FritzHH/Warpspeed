@@ -221,7 +221,7 @@ export function fillPunchHistory() {
       option: option ? "in" : "out",
     };
     // log(formatMillisForDisplay(obj.millis));
-    setDBItem(build_db_path.punchClock(userID), obj);
+    // setDBItem(build_db_path.punchClock(userID), obj);
     option = !option;
   }
 }

@@ -50,10 +50,18 @@ import {
   useSettingsStore,
   useActionStore,
   useLoginStore,
+  useDatabaseBatchStore,
 } from "../stores";
-import { dbSearchForPhoneNumber } from "../db_call_wrapper";
+import {
+  dbGetSettings,
+  dbSearchForPhoneNumber,
+  executeDBBatch,
+} from "../db_call_wrapper";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
-import { REALTIME_DATABASE_NODE_NAMES } from "../constants";
+import {
+  DB_BATCH_INTERVAL_MILLIS,
+  REALTIME_DATABASE_NODE_NAMES,
+} from "../constants";
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
@@ -66,11 +74,22 @@ export function BaseScreen() {
   );
   const _zSetLoginTimeout = useLoginStore((state) => state.setLoginTimeout);
   const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
-
+  const _zSetLastDatabaseBatchMillis = useDatabaseBatchStore(
+    (state) => state.setLastBatchMillis
+  );
+  const _zSetLastDatabaseWriteMillis = useDatabaseBatchStore(
+    (state) => state.setLastWriteMillis
+  );
   // testing
   // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
   // store getters /////////////////////////////////////////////////////////////////
+  const zLastDatabaseBatchMillis = useDatabaseBatchStore((state) =>
+    state.getLastBatchMillis()
+  );
+  const zLastDatabaseWriteMillis = useDatabaseBatchStore((state) =>
+    state.getLastWriteMillis()
+  );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
   const zModalVisible = useLoginStore((state) => state.getModalVisible());
@@ -106,16 +125,13 @@ export function BaseScreen() {
     punchClockSubscribe(_zSetClockedInUser);
 
     // one-off reads due to only subscribing to changes in above
-    getRealtimeNodeItem(REALTIME_DATABASE_NODE_NAMES.settings).then((res) => {
-      _zSetSettingsObj(res);
-    });
-    // getRealtimeNodeItem(REALTIME_DATABASE_NODE_NAMES.punchClock).then((res) => {
-    //   // if (!res)
-    //   // log("FULL punch clock", res);
-    //   if (res) {
-    //     Object.keys(res).forEach((key) => {});
-    //   }
+    // getRealtimeNodeItem(REALTIME_DATABASE_NODE_NAMES.settings).then((res) => {
+    //   _zSetSettingsObj(res);
     // });
+    dbGetSettings().then((settingsObj) => {
+      _zSetSettingsObj({ settingsObj, sendToDB: false });
+      // log("res", res);
+    });
   }, []);
 
   useEffect(() => {
@@ -125,6 +141,22 @@ export function BaseScreen() {
       // _zSetCurrentUserObj(zSettingsObj?.users[0]);
     } catch (e) {}
   }, [zSettingsObj]);
+
+  // database batching
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      let curMillis = new Date().getTime();
+      let diff = curMillis - zLastDatabaseWriteMillis;
+      // let batchDiff = curMillis - batchDiff
+      // log("diff", diff);
+      if (diff > DB_BATCH_INTERVAL_MILLIS) executeDBBatch();
+    }, 100);
+
+    // Cleanup function to clear the interval
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [zLastDatabaseBatchMillis, zLastDatabaseWriteMillis]);
 
   // testing, build db items
   useEffect(() => {

@@ -33,10 +33,7 @@ export function Items_Dashboard({}) {
   return (
     <View
       style={{
-        // width: "100%",
-        // height: "100%",
         flex: 1,
-        // backgroundColor: "green",
       }}
     >
       {ScreenComponent()}

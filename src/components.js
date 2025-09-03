@@ -2563,22 +2563,21 @@ export const CheckBox_ = ({
   onCheck,
   item,
   iconSize = 25,
-  // makeEntireViewCheckable = true,
+  mouseOverOptions,
+  makeEntireViewCheckable = true,
   // roundButton = false,
   isChecked,
   buttonStyle = {},
   textStyle = {},
-  viewStyle = {},
-
-  boxStyle = {},
 }) => {
   return (
     <Button_
+      mouseOverOptions={mouseOverOptions}
       icon={isChecked ? ICONS.checkbox : ICONS.checkoxEmpty}
       iconSize={15}
       text={text}
       buttonStyle={buttonStyle}
-      textStyle={textStyle}
+      textStyle={{ ...textStyle }}
       onPress={onCheck}
       enableMouseOver={false}
     />

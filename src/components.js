@@ -562,10 +562,10 @@ export const DropdownMenu = ({
   menuButtonStyle = {},
   buttonTextStyle = {},
   buttonText,
-  ref,
+  // ref,
   modalCoordinateVars = {
-    x: -15,
-    y: 50,
+    x: -10,
+    y: 40,
   },
   mouseOverOptions = {
     enable: true,
@@ -581,6 +581,7 @@ export const DropdownMenu = ({
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sModalVisible, _setModalVisible] = useState(false);
+  const ref = useRef();
 
   function getBackgroundColor(rgbString = "", index) {
     // log(rgbString);

@@ -143,6 +143,8 @@ export function Dashboard_Admin({}) {
           alignItems: "flex-end",
           paddingLeft: 15,
           paddingRight: 7,
+          paddingTop: 10,
+          paddingBottom: 10,
           ...style,
         }}
       >
@@ -181,14 +183,21 @@ export function Dashboard_Admin({}) {
     label,
   }) {
     return (
-      <DropdownComponent
-        label={label}
-        textStyle={{ ...textStyle }}
-        buttonStyle={{ ...buttonStyle }}
+      <DropdownMenu
+        buttonText={label}
+        buttonTextStyle={{ fontSize: 14, ...textStyle }}
+        buttonStyle={{
+          borderRadius: 5,
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+          paddingHorizontal: 7,
+          paddingVertical: 3,
+          ...buttonStyle,
+        }}
         itemTextStyle={{ ...itemTextStyle }}
         itemStyle={{ ...itemStyle }}
         onSelect={onSelect}
-        data={data}
+        dataArr={data}
         ref={ref}
       />
     );
@@ -636,6 +645,7 @@ export function Dashboard_Admin({}) {
             width: "65%",
             alignItems: "flex-end",
             paddingHorizontal: 10,
+            // backgroundColor: "blue",
           }}
         >
           {/**PAYMENT PROCESSING BOX   */}
@@ -665,26 +675,29 @@ export function Dashboard_Admin({}) {
               />
               {/**card reader flatlist */}
               <View
-                style={{ width: "100%", alignItems: "flex-end", marginTop: 5 }}
+                style={{
+                  width: "100%",
+                  alignItems: "flex-end",
+                  marginTop: 10,
+                  // backgroundColor: "green",
+                }}
               >
                 <BoxContainerLabelComponent
-                  text={"Card Readers"}
+                  text={"stripe card readers"}
                   style={{ fontSize: 12 }}
                 />
                 <View
                   style={{
                     borderRadius: 5,
                     backgroundColor: "rgba(0,0,0,.1)",
-                    // width: "50%",
                     padding: 5,
                     maxHeight: 550,
-                    width: "98%",
                   }}
                 >
                   <View
                     style={{
                       flexDirection: "row",
-                      justifyContent: "flex-end",
+                      justifyContent: "flex-start",
                       marginBottom: 5,
                     }}
                   >
@@ -723,34 +736,97 @@ export function Dashboard_Admin({}) {
                       let idx = obj.index;
                       let item = obj.item;
                       return (
-                        <TextInput
-                          value={item.label}
-                          onChangeText={() => {}}
+                        <View
                           style={{
-                            textAlign: "right",
-                            paddingRight: 2,
-                            minWidth: 200,
-                            // width: "75%",
+                            flexDirection: "row",
                             justifyContent: "flex-end",
-                            paddingVertical: 4,
-                            backgroundColor: C.listItemWhite,
-                            borderWidth: 1,
-                            paddingRight: 2,
-                            borderColor: C.buttonLightGreenOutline,
-                            outlineWidth: 0,
+                            alignItems: "center",
+                            // width: 500,
+                            // backgroundColor: "green",
                           }}
-                        />
+                        >
+                          <Text
+                            style={{ color: makeGrey(0.55), marginRight: 10 }}
+                          >
+                            ID:
+                          </Text>
+                          <TextInput
+                            style={{ outlineWidth: 0 }}
+                            editable={false}
+                            value={item.id}
+                          />
+                          <TextInput
+                            value={item.label}
+                            onChangeText={() => {}}
+                            style={{
+                              textAlign: "right",
+                              paddingRight: 2,
+                              // minWidth: 200,
+                              // width: "75%",
+                              justifyContent: "flex-end",
+                              paddingVertical: 4,
+                              backgroundColor: C.listItemWhite,
+                              borderWidth: 1,
+                              paddingRight: 2,
+                              borderColor: C.buttonLightGreenOutline,
+                              outlineWidth: 0,
+                            }}
+                          />
+                          <Button_
+                            buttonStyle={{ paddingHorizontal: 10 }}
+                            iconSize={15}
+                            icon={ICONS.close1}
+                            onPress={() => {}}
+                          />
+                        </View>
                         // </View>
                       );
                     }}
                   />
                 </View>
               </View>
-              <DropdownComponent
-                label={"Card Readers"}
-                data={zSettingsObj?.cardReaders || []}
-                onSelect={(obj) => log("selected", obj)}
-              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  width: "95%",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  marginTop: 20,
+                }}
+              >
+                <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
+                <DropdownComponent
+                  label={zSettingsObj?.selectedCardReaderObj.label}
+                  data={zSettingsObj?.cardReaders || []}
+                  onSelect={(obj) => log("selected", obj)}
+                />
+              </View>
+              <View
+                style={{
+                  width: "100%",
+                  flexDirection: "row",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  marginTop: 20,
+                }}
+              >
+                <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
+                <TextInput
+                  style={{
+                    outlineWidth: 0,
+                    borderRadius: 5,
+                    textAlign: "right",
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    paddingHorizontal: 5,
+                    paddingVertical: 3,
+                    marginRight: 3,
+                  }}
+                  value={zSettingsObj?.salesTax * 100}
+                  onChangeText={() => log("change sales tax fun")}
+                />
+                <Text>%</Text>
+              </View>
             </BoxContainerInnerComponent>
           </BoxContainerOuterComponent>
         </View>

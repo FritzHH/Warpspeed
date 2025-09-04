@@ -114,20 +114,26 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       //   return;
       const currentDesc = await getFaceDescriptor();
       if (currentDesc) {
-        // log("cur desc", currentDesc);
+        // log("cur desc", currentDesc.length);
         let userObj = zSettingsObj?.users?.find((userObj) => {
           if (!userObj.faceDescriptor) {
             return null;
           }
-          const distance = faceapi.euclideanDistance(
-            userObj.faceDescriptor,
-            currentDesc
-          );
-          // log("dist", distance);
-          if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
-            return true;
-          } else {
-            return null;
+          try {
+            const distance = faceapi.euclideanDistance(
+              // Object.values(userObj.faceDescriptor),
+              userObj.faceDescriptor,
+              currentDesc
+            );
+            // log("dist", distance);
+            if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
+              return true;
+            } else {
+              return null;
+            }
+          } catch (e) {
+            log(userObj);
+            log(e);
           }
         });
 
@@ -256,6 +262,9 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     if (desc) {
       setStatus("Found facial descriptor. You may exit now.");
       // log("Found Descriptor");
+      // clog(desc);
+      // return;
+      // must copy this array as Firestore convert
       __handleEnrollDescriptor(desc);
     } else {
       setStatus("No face detected. Try again.");

@@ -16,6 +16,7 @@ export const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
 export const NUMS = "1234567890-";
 
 export function log(one, two) {
+  // console.log("hdfkjdkjfak");
   let str = "";
 
   if (typeof one === "object") {
@@ -97,48 +98,6 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
   };
 }
 
-export function trimToTwoDecimals(num) {
-  // log("incoming num to trim to 2 decimals", num);
-
-  let strNum = num.toString();
-  let res;
-  if (strNum.includes(".")) {
-    let split = strNum.split(".");
-    // log("split", split);
-    let countOnRight = split[1].length;
-    if (countOnRight == 2) {
-      // have decimal with 2 on right
-      // log("one");
-      if (split[0] == "") {
-        // no leading 0, add
-        strNum = "0" + strNum;
-      }
-      res = strNum;
-    } else if (countOnRight == 1) {
-      // 1 character on right, add another
-      // log("two");
-      res = strNum + "0";
-      if (split[0] == "") {
-        res = "0" + res;
-      }
-    } else if (countOnRight == 0 && split[1] != "") {
-      // log("three");
-      res = strNum + "00";
-    } else {
-      // log("four");
-      let last2 = split[1].slice(0, 2);
-      res = split[0] + "." + last2;
-    }
-  } else {
-    // log("five");
-    res = strNum + ".00";
-  }
-  // log("trim 2 decimals val", res);
-  return res;
-}
-
-export function formatDecimalToCommas(val) {}
-
 export const FileInputComponent = ({
   handleBinaryString,
   buttonStyle = {},
@@ -216,6 +175,19 @@ export const FileInputComponent = ({
 };
 
 // numbers
+export function checkInputForNumbersOnly(valString, includeDecimal = true) {
+  let isGood = true;
+  let nums = NUMS;
+  if (includeDecimal) nums += ".";
+  valString
+    .toString()
+    .split("")
+    .forEach((val) => {
+      if (!nums.includes(val)) isGood = false;
+    });
+  return isGood;
+}
+
 export function formatDecimal(value) {
   // log("incoming", val);
   // Remove all non-digit characters
@@ -228,6 +200,50 @@ export function formatDecimal(value) {
   // Format to USD currency
   num = num.toLocaleString("en-US", { style: "currency", currency: "USD" });
   return num.slice(1);
+}
+
+export function trimToTwoDecimals(num) {
+  // log("incoming num to trim to 2 decimals", num);
+
+  let strNum = num.toString();
+  let res;
+  if (strNum.includes(".")) {
+    let split = strNum.split(".");
+    // log("split", split);
+    let countOnRight = split[1].length;
+    if (countOnRight == 2) {
+      // have decimal with 2 on right
+      // log("one");
+      if (split[0] == "") {
+        // no leading 0, add
+        strNum = "0" + strNum;
+      }
+      res = strNum;
+    } else if (countOnRight == 1) {
+      // 1 character on right, add another
+      // log("two");
+      res = strNum + "0";
+      if (split[0] == "") {
+        res = "0" + res;
+      }
+    } else if (countOnRight == 0 && split[1] != "") {
+      // log("three");
+      res = strNum + "00";
+    } else {
+      // log("four");
+      let last2 = split[1].slice(0, 2);
+      res = split[0] + "." + last2;
+    }
+  } else {
+    // log("five");
+    res = strNum + ".00";
+  }
+  // log("trim 2 decimals val", res);
+  return res;
+}
+
+export function ifNumIsOdd(num) {
+  return num % 2 !== 0;
 }
 
 export function numberIsEven(num) {
@@ -472,10 +488,6 @@ export function lightenRGBByPercent(rgb, percent) {
   b = Math.round(b + (255 - b) * (percent / 100));
 
   return `rgb(${r}, ${g}, ${b})`;
-}
-
-export function ifNumIsOdd(num) {
-  return num % 2 !== 0;
 }
 
 export function getItemFromArr(value, arrKey, arr) {

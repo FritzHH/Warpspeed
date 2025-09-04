@@ -63,11 +63,11 @@ import {
 } from "./app_user_constants";
 
 // Initialize Firebase
-// const FIRESTORE = getFirestore(firebaseApp);
+const FIRESTORE = getFirestore(firebaseApp);
 // const FIRESTORE = getFirestore(initializeApp(firebaseConfig));
-const FIRESTORE = initializeFirestore(initializeApp(firebaseConfig), {
-  localCache: persistentLocalCache(/*settings*/ {}),
-});
+// const FIRESTORE = initializeFirestore(initializeApp(firebaseConfig), {
+//   localCache: persistentLocalCache(/*settings*/ {}),
+// });
 // disableNetwork(FIRESTORE);
 const RDB = getDatabase();
 
@@ -109,7 +109,7 @@ export function getDocument(collectionName, itemID) {
 export async function set_firestore_doc(path, item) {
   // log(path, item);
   let docRef = doc(FIRESTORE, path);
-  return await setDoc(docRef, item);
+  return await setDoc(docRef, { ...item });
 }
 
 export async function get_firestore_doc(path) {

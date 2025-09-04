@@ -557,7 +557,6 @@ export const useCustMessagesStore = create((set, get) => ({
 export const useWorkorderPreviewStore = create((set, get) => ({
   previewObj: null,
   getPreviewObj: () => get().previewObj,
-  // setPreviewObj: (obj) => log("setting", obj),
   setPreviewObj: (obj) => set((state) => ({ previewObj: obj })),
 }));
 
@@ -566,7 +565,7 @@ export const useSettingsStore = create((set, get) => ({
   getSettingsObj: () => get().settingsObj,
   setSettingsObj: ({ settingsObj, batch = true, sendToDB = true }) => {
     // clog(settingsObj);
-    set({ settingsObj });
+    set((state) => ({ settingsObj }));
     if (sendToDB) {
       dbSetSettings({ settingsObj, batch });
     }
@@ -576,7 +575,7 @@ export const useSettingsStore = create((set, get) => ({
     let settingsObj = cloneDeep(get().settingsObj);
     settingsObj[fieldName] = fieldVal;
     set({ settingsObj });
-    dbSetSettings({ settingsObj, batch });
+    dbSetSettings(settingsObj, batch);
   },
 }));
 

@@ -94,16 +94,6 @@ function deleteField(path, fieldID) {
 
 // exposed setters ///////////////////////////////////////////////////////
 
-export function dbSetSettings({ settingsObj, fieldName, fieldVal, batch }) {
-  let path = build_db_path.settings();
-  if (batch) {
-    batchDBCall(path, settingsObj);
-    useDatabaseBatchStore.getState().setLastWriteMillis();
-  } else {
-    return setDBItem(path, settingsObj);
-  }
-}
-
 // exposed getters ///////////////////////////////////////////////////////
 export function dbGetSettings() {
   let path = build_db_path.settings();
@@ -115,6 +105,16 @@ export function dbGetSettings() {
 }
 
 // end new shit ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+export function dbSetSettings(settingsObj, batch, fieldName, fieldVal) {
+  let path = build_db_path.settings();
+  if (batch) {
+    batchDBCall(path, settingsObj);
+    useDatabaseBatchStore.getState().setLastWriteMillis();
+  } else {
+    return setDBItem(path, settingsObj);
+  }
+}
 
 export function dbSetCustomerObj(customerObj, removeOption = false) {
   let id = customerObj.id;

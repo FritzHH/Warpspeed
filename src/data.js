@@ -113,6 +113,7 @@ export const COLORS = [
 
 export const NONREMOVABLE_STATUSES = [
   {
+    id: "34kttekj",
     label: "Newly Created",
     textColor: "white",
     altTextColor: "black",
@@ -120,6 +121,7 @@ export const NONREMOVABLE_STATUSES = [
     removable: false,
   },
   {
+    id: "383rne3kj",
     altTextColor: "dimgray",
     textColor: "black",
     backgroundColor: "rgb(192,192,192)",
@@ -127,6 +129,7 @@ export const NONREMOVABLE_STATUSES = [
     removable: false,
   },
   {
+    id: "33knktg",
     altTextColor: "black",
     textColor: "white",
     backgroundColor: "green",
@@ -359,6 +362,7 @@ export const SETTINGS_OBJ = {
   statuses: [
     ...NONREMOVABLE_STATUSES,
     {
+      id: "1334453",
       textColor: "white",
       backgroundColor: "orange",
       altTextColor: "dimgray",
@@ -366,6 +370,7 @@ export const SETTINGS_OBJ = {
       removable: true,
     },
     {
+      id: "kerj3krj",
       altTextColor: "dimgray",
       textColor: "white",
       backgroundColor: "orange",
@@ -373,6 +378,7 @@ export const SETTINGS_OBJ = {
       removable: true,
     },
     {
+      id: "ek3rkeng",
       textColor: "white",
       backgroundColor: "blue",
       altTextColor: "gray",
@@ -561,7 +567,7 @@ export const SETTINGS_OBJ = {
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   loginTimeout: 15,
-  salesTax: 0.065,
+  salesTax: 6.5,
   acceptChecks: true,
   userPinStrength: 2,
   users: [
@@ -590,6 +596,107 @@ export const SETTINGS_OBJ = {
   },
   stripeBusinessLocationCode: "tml_GCsldAwakkr9vM",
   autoConnectToCardReader: "true",
+  // statusColors: [
+  //   {
+  //     textColor: "black",
+  //     altTextColor: "dimgray",
+  //     backgroundColor: "whitesmoke",
+  //     label: "White",
+  //   },
+  //   {
+  //     textColor: "white",
+  //     altTextColor: "gray",
+  //     backgroundColor: "blue",
+  //     label: "Blue",
+  //   },
+  //   {
+  //     textColor: "black",
+  //     altTextColor: "gray",
+  //     backgroundColor: "lightblue",
+  //     label: "Light-blue",
+  //   },
+  //   {
+  //     textColor: "white",
+  //     altTextColor: "gray",
+  //     backgroundColor: "red",
+  //     label: "Red",
+  //   },
+  //   {
+  //     textColor: "white",
+  //     altTextColor: "lightgray",
+  //     backgroundColor: "green",
+  //     label: "Green",
+  //   },
+
+  //   {
+  //     textColor: "whitesmoke",
+  //     backgroundColor: "black",
+  //     altTextColor: "lightgray",
+
+  //     label: "Black",
+  //   },
+  //   {
+  //     textColor: "black",
+  //     altTextColor: "gray",
+  //     backgroundColor: "yellow",
+  //     label: "Yellow",
+  //   },
+  //   {
+  //     textColor: "white",
+  //     altTextColor: "dimgray",
+  //     backgroundColor: "orange",
+  //     label: "Orange",
+  //   },
+  //   {
+  //     textColor: "white",
+  //     altTextColor: "lightgray",
+  //     backgroundColor: "maroon",
+  //     label: "Maroon",
+  //   },
+  //   {
+  //     textColor: "white",
+  //     altTextColor: "lightgray",
+  //     backgroundColor: "rgb(139,69,19)",
+  //     label: "Brown",
+  //   },
+  //   {
+  //     textColor: "black",
+  //     altTextColor: "dimgray",
+  //     backgroundColor: "rgb(192,192,192)",
+  //     label: "Silver",
+  //   },
+  //   {
+  //     textColor: "black",
+  //     altTextColor: "gray",
+  //     backgroundColor: "tan",
+  //     label: "Tan",
+  //   },
+  //   {
+  //     textColor: "black",
+  //     altTextColor: "gray",
+  //     backgroundColor: "beige",
+  //     label: "Beige",
+  //   },
+  //   {
+  //     textColor: "white",
+  //     altTextColor: "dimgray",
+  //     backgroundColor: "darkgray",
+  //     label: "Gray",
+  //   },
+  //   {
+  //     textColor: "black",
+  //     altTextColor: "dimgray",
+
+  //     backgroundColor: "lightgray",
+  //     label: "Light-gray",
+  //   },
+  //   {
+  //     textColor: "black",
+  //     altTextColor: "dimgray",
+  //     backgroundColor: "pink",
+  //     label: "Pink",
+  //   },
+  // ],
 };
 
 // RECEIPT STUFF ////////////////////////////////////////////////////

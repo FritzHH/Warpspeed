@@ -2586,20 +2586,6 @@ export const CheckBox_ = ({
   );
 };
 
-export const ColorSelectorModalComponent = ({ onSelect }) => {
-  return (
-    <View
-      style={{
-        width: 200,
-        height: "90%",
-        // alignSelf: "center",
-        // justifySelf: "center",
-        backgroundColor: "green",
-      }}
-    ></View>
-  );
-};
-
 export const GradientView = ({
   colorArr = COLOR_GRADIENTS.blue,
   children,

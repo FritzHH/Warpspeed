@@ -13,7 +13,12 @@ import {
   SMS_PROTO,
   WORKORDER_PROTO,
 } from "./data";
-import { setInventoryItem, setOpenWorkorder, setRealtimeNodeItem } from "./db";
+import {
+  set_firestore_doc,
+  setInventoryItem,
+  setOpenWorkorder,
+  setRealtimeNodeItem,
+} from "./db";
 import {
   convertMillisToHoursMins,
   formatDateTimeForReceipt,
@@ -116,8 +121,7 @@ export function fillCustomers() {
 
 export function fillSettings() {
   // log(SETTINGS_PROTO);
-  dbSetSettings(SETTINGS_OBJ);
-  // getRealtimeNodeItem("SETTINGS").then((res) => log("res", res));
+  dbSetSettings({ ...SETTINGS_OBJ }, false);
 }
 
 export function fillReceipt() {

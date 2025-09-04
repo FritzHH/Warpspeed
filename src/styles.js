@@ -58,6 +58,7 @@ export const COLOR_GRADIENTS = {
 
 const ASSETS_PATH = "./assets/";
 export const ICONS = {
+  blocked: require(ASSETS_PATH + "blocked.png"),
   letterT: require(ASSETS_PATH + "t-letter.png"),
   colorWheel: require(ASSETS_PATH + "colorWheel.png"),
   tools1: require(ASSETS_PATH + "tools1.png"),

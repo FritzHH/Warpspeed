@@ -11,11 +11,13 @@ import {
 } from "react-native-web";
 import {
   addDashesToPhone,
+  bestForegroundHex,
   checkInputForNumbersOnly,
   clog,
   generateRandomID,
   log,
   makeGrey,
+  moveItemInArr,
   NUMS,
   removeDashesFromPhone,
 } from "../../../../utils";
@@ -989,10 +991,15 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   const [sExpand, _setExpand] = useState(true);
   const [sBackgroundColorWheelItem, _setBackgroundColorWheelItem] = useState();
   const [sTextColorWheelItem, _setTextColorWheelItem] = useState();
+  const [sEditableInputIdx, _setEditableInputIdx] = useState(null);
+  const [sNewItem, _setNewItem] = useState();
 
   return (
-    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
+    <BoxContainerOuterComponent
+      style={{ marginTop: 20, width: "100%", backgroundColor: "transparent" }}
+    >
       <BoxContainerLabelComponent
+        // style={{ width: "100%" }}
         handleExpandPress={() => _setExpand(!sExpand)}
         icon={ICONS.maximize}
         text={"workorder statuses"}
@@ -1004,125 +1011,254 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             backgroundColor: "transparent",
             borderWidth: 0,
             alignItems: "flex-end",
-            // backgroundColor: "green",
             paddingHorizontal: 0,
             paddingVertical: 0,
+            width: "100%",
           }}
         >
-          <BoxButton1 />
-
-          <FlatList
-            data={zSettingsObj?.statuses || []}
-            style={{
-              marginTop: 20,
-            }}
-            renderItem={(obj) => {
-              let idx = obj.index;
-              let item = obj.item;
-              // log(item);
-              return (
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <BoxButton1
-                    style={{ paddingHorizontal: 3 }}
-                    iconSize={22}
-                    icon={ICONS.upChevron}
-                  />
-                  <BoxButton1
-                    style={{ paddingHorizontal: 3 }}
-                    iconSize={22}
-                    icon={ICONS.downChevron}
-                  />
-
-                  <BoxButton1
-                    style={{ paddingHorizontal: 3 }}
-                    iconSize={22}
-                    icon={ICONS.editPencil}
-                  />
-                  <View
-                    style={{
-                      backgroundColor: item.backgroundColor,
-                      alignItems: "center",
-                      width: 250,
-                      paddingHorizontal: 20,
-                      paddingVertical: 10,
-                      borderTopLeftRadius: idx === 0 ? 5 : 0,
-                      borderTopRightRadius: idx === 0 ? 5 : 0,
-                      borderBottomLeftRadius:
-                        idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
-                      borderBottomRightRadius:
-                        idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
-                    }}
-                  >
-                    <Text style={{ color: item.textColor }}>{item.label}</Text>
-                  </View>
-                  <BoxButton1
-                    style={{ paddingHorizontal: 3 }}
-                    iconSize={23}
-                    icon={ICONS.colorWheel}
-                    onPress={() => {
-                      if (sBackgroundColorWheelItem) {
-                        _setBackgroundColorWheelItem();
-                        _setTextColorWheelItem();
-                      } else {
-                        _setBackgroundColorWheelItem(item);
-                        _setTextColorWheelItem();
-                      }
-                    }}
-                  />
-                  <BoxButton1
-                    onPress={() => {
-                      if (sTextColorWheelItem) {
-                        _setBackgroundColorWheelItem();
-                        _setTextColorWheelItem();
-                      } else {
-                        _setBackgroundColorWheelItem();
-                        _setTextColorWheelItem(item);
-                      }
-                    }}
-                    style={{ paddingHorizontal: 3 }}
-                    iconSize={22}
-                    icon={ICONS.letterT}
-                  />
-                  {sBackgroundColorWheelItem?.id === item.id ? (
-                    <ColorWheel
-                      thing={"thing"}
-                      onColorChange={(val) => {
-                        let back = val.hex;
-                        let text = bestForegroundHex(val.hex);
-                        let statuses = zSettingsObj.statuses.map((o) => {
-                          if (o.id === item.id)
-                            return {
-                              ...o,
-                              backgroundColor: back,
-                              textColor: text,
-                            };
-                          return o;
-                        });
-                        handleSettingsFieldChange("statuses", statuses);
-                      }}
-                    />
-                  ) : null}
-                  {sTextColorWheelItem?.id === item.id ? (
-                    <ColorWheel
-                      onColorChange={(val) => {
-                        // let back = val.hex;
-                        // let text = bestForegroundHex(val.hex);
-                        let statuses = zSettingsObj.statuses.map((o) => {
-                          if (o.id === item.id)
-                            return {
-                              ...o,
-                              textColor: val.hex,
-                            };
-                          return o;
-                        });
-                        handleSettingsFieldChange("statuses", statuses);
-                      }}
-                    />
-                  ) : null}
-                </View>
-              );
+          <BoxButton1
+            style={{ marginTop: 10 }}
+            onPress={() => {
+              let proto = {};
+              Object.keys(zSettingsObj.statuses[0]).forEach((key) => {
+                proto[key] = "";
+              });
+              proto.label = "New Status";
+              proto.id = generateRandomID();
+              proto.backgroundColor = makeGrey(0.3);
+              proto.textColor = C.textMain;
+              proto.removable = true;
+              let statuses = [proto, ...zSettingsObj.statuses];
+              handleSettingsFieldChange("statuses", statuses);
             }}
           />
+
+          <View
+            style={{
+              width: "100%",
+              alignItems: "flex-end",
+            }}
+          >
+            <FlatList
+              data={zSettingsObj?.statuses || []}
+              style={{
+                marginTop: 7,
+                width: "100%",
+              }}
+              renderItem={(obj) => {
+                let idx = obj.index;
+                let item = obj.item;
+                // log(item);
+                return (
+                  <View
+                    style={{
+                      flexDirection: "column",
+                      alignItems: "center",
+                      width: "100%",
+                      justifyContent: "flex-end",
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        width: "100%",
+                        justifyContent: "flex-end",
+                      }}
+                    >
+                      <BoxButton1
+                        style={{ paddingHorizontal: 3 }}
+                        iconSize={22}
+                        icon={ICONS.upChevron}
+                        onPress={() => {
+                          let arr = moveItemInArr(
+                            zSettingsObj.statuses,
+                            idx,
+                            "up"
+                          );
+                          handleSettingsFieldChange("statuses", arr);
+                        }}
+                      />
+                      <BoxButton1
+                        style={{ paddingHorizontal: 3 }}
+                        iconSize={22}
+                        icon={ICONS.downChevron}
+                        onPress={() => {
+                          let arr = moveItemInArr(
+                            zSettingsObj.statuses,
+                            idx,
+                            "down"
+                          );
+                          handleSettingsFieldChange("statuses", arr);
+                        }}
+                      />
+
+                      <BoxButton1
+                        style={{ paddingHorizontal: 3 }}
+                        iconSize={22}
+                        icon={ICONS.editPencil}
+                        onPress={() =>
+                          _setEditableInputIdx(
+                            sEditableInputIdx === null ||
+                              (sEditableInputIdx && sEditableInputIdx != idx)
+                              ? idx
+                              : null
+                          )
+                        }
+                      />
+                      <BoxButton1
+                        style={{ paddingHorizontal: 3, paddingRight: 5 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                        onPress={() => {
+                          let statuses = zSettingsObj.statuses.filter(
+                            (o) => o.id != item.id
+                          );
+                          handleSettingsFieldChange("statuses", statuses);
+                        }}
+                      />
+                      <View
+                        style={{
+                          backgroundColor: item.backgroundColor,
+                          alignItems: "center",
+                          // justifyContent: ''
+                          flexDirection: "row",
+                          width: "50%",
+                          height: 35,
+                          // paddingHorizontal: 20,
+                          // paddingVertical: 5,
+                          borderTopLeftRadius: idx === 0 ? 5 : 0,
+                          borderTopRightRadius: idx === 0 ? 5 : 0,
+                          borderBottomLeftRadius:
+                            idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
+                          borderBottomRightRadius:
+                            idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
+                        }}
+                      >
+                        {!item.removable ? (
+                          <View
+                            style={{
+                              width: "10%",
+                            }}
+                          />
+                        ) : null}
+                        <TextInput
+                          style={{
+                            width: "100%",
+                            textAlign: "center",
+                            color: item.textColor,
+                            outlineWidth: 0,
+                            paddingVertical: 4,
+                            fontSize: 13,
+                            borderWidth: 1,
+                            borderColor:
+                              sEditableInputIdx === idx && item.removable
+                                ? makeGrey(0.4)
+                                : "transparent",
+                          }}
+                          onChangeText={(val) => {
+                            let statuses = zSettingsObj.statuses.map((o) => {
+                              if (o.id === item.id) return { ...o, label: val };
+                              return o;
+                            });
+                            handleSettingsFieldChange("statuses", statuses);
+                          }}
+                          editable={sEditableInputIdx === idx && item.removable}
+                          autoFocus={sEditableInputIdx === idx}
+                          value={item.label}
+                        />
+                        {!item.removable ? (
+                          <View
+                            style={{
+                              width: "10%",
+                              height: "100%",
+                              alignItems: "flex-end",
+                              justifyContent: "flex-start",
+                              padding: 3,
+                            }}
+                          >
+                            <Image_ icon={ICONS.blocked} size={15} />
+                          </View>
+                        ) : null}
+                      </View>
+                      <BoxButton1
+                        style={{ paddingHorizontal: 3 }}
+                        iconSize={23}
+                        icon={ICONS.colorWheel}
+                        onPress={() => {
+                          if (sBackgroundColorWheelItem) {
+                            _setBackgroundColorWheelItem();
+                            _setTextColorWheelItem();
+                          } else {
+                            _setBackgroundColorWheelItem(item);
+                            _setTextColorWheelItem();
+                          }
+                        }}
+                      />
+                      <BoxButton1
+                        onPress={() => {
+                          if (sTextColorWheelItem) {
+                            _setBackgroundColorWheelItem();
+                            _setTextColorWheelItem();
+                          } else {
+                            _setBackgroundColorWheelItem();
+                            _setTextColorWheelItem(item);
+                          }
+                        }}
+                        style={{ paddingHorizontal: 3 }}
+                        iconSize={22}
+                        icon={ICONS.letterT}
+                      />
+                    </View>
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        width: "100%",
+                        justifyContent: "flex-end",
+                        paddingRight: "10%",
+                      }}
+                    >
+                      {sBackgroundColorWheelItem?.id === item.id ? (
+                        <ColorWheel
+                          style={{ marginVertical: 7 }}
+                          onColorChange={(val) => {
+                            let back = val.hex;
+                            let text = bestForegroundHex(val.hex);
+                            let statuses = zSettingsObj.statuses.map((o) => {
+                              if (o.id === item.id)
+                                return {
+                                  ...o,
+                                  backgroundColor: back,
+                                  textColor: text,
+                                };
+                              return o;
+                            });
+                            handleSettingsFieldChange("statuses", statuses);
+                          }}
+                        />
+                      ) : null}
+                      {sTextColorWheelItem?.id === item.id ? (
+                        <ColorWheel
+                          style={{ marginVertical: 7 }}
+                          onColorChange={(val) => {
+                            let statuses = zSettingsObj.statuses.map((o) => {
+                              if (o.id === item.id)
+                                return {
+                                  ...o,
+                                  textColor: val.hex,
+                                };
+                              return o;
+                            });
+                            handleSettingsFieldChange("statuses", statuses);
+                          }}
+                        />
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              }}
+            />
+          </View>
         </BoxContainerInnerComponent>
       ) : null}
     </BoxContainerOuterComponent>
@@ -1158,50 +1294,4 @@ function DropdownComponent({
       ref={ref}
     />
   );
-}
-
-// Parse hex (#RRGGBB or #RGB) → {r,g,b}
-function hexToRgb(hex) {
-  let h = hex.replace("#", "").trim();
-  if (h.length === 3) {
-    h = h
-      .split("")
-      .map((c) => c + c)
-      .join("");
-  }
-  const int = parseInt(h, 16);
-  return {
-    r: (int >> 16) & 255,
-    g: (int >> 8) & 255,
-    b: int & 255,
-  };
-}
-
-// Relative luminance (WCAG)
-function luminance(r, g, b) {
-  const srgb = [r, g, b].map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
-}
-
-// Contrast ratio
-function contrastRatio(l1, l2) {
-  const L1 = Math.max(l1, l2);
-  const L2 = Math.min(l1, l2);
-  return (L1 + 0.05) / (L2 + 0.05);
-}
-
-// Main: pick black or white for best contrast
-function bestForegroundHex(bgHex) {
-  const { r, g, b } = hexToRgb(bgHex);
-  const bgLum = luminance(r, g, b);
-
-  const whiteLum = 1.0;
-  const blackLum = 0.0;
-  const contrastWithWhite = contrastRatio(bgLum, whiteLum);
-  const contrastWithBlack = contrastRatio(bgLum, blackLum);
-
-  return contrastWithWhite >= contrastWithBlack ? C.textWhite : makeGrey(0.85);
 }

@@ -5,6 +5,7 @@ import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO } from "./data";
 import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
+import { C } from "./styles";
 
 // const fs = require("node:fs");
 export const dim = {
@@ -173,6 +174,19 @@ export const FileInputComponent = ({
     </TouchableOpacity>
   );
 };
+
+// array ops
+export function moveItemInArr(arr, index, direction) {
+  const newArr = cloneDeep(arr); // copy so original isn’t mutated
+
+  if (direction === "up" && index > 0) {
+    [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
+  } else if (direction === "down" && index < arr.length - 1) {
+    [newArr[index + 1], newArr[index]] = [newArr[index], newArr[index + 1]];
+  }
+
+  return newArr;
+}
 
 // numbers
 export function checkInputForNumbersOnly(valString, includeDecimal = true) {
@@ -724,6 +738,51 @@ export function convertMillisToHoursMins(millis) {
   return { hours, minutes, totalMinutes, formattedHoursMin };
 }
 
+// colors
+function hexToRgb(hex) {
+  let h = hex.replace("#", "").trim();
+  if (h.length === 3) {
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  const int = parseInt(h, 16);
+  return {
+    r: (int >> 16) & 255,
+    g: (int >> 8) & 255,
+    b: int & 255,
+  };
+}
+
+// Relative luminance (WCAG)
+function luminance(r, g, b) {
+  const srgb = [r, g, b].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+}
+
+// Contrast ratio
+function contrastRatio(l1, l2) {
+  const L1 = Math.max(l1, l2);
+  const L2 = Math.min(l1, l2);
+  return (L1 + 0.05) / (L2 + 0.05);
+}
+
+// Main: pick black or white for best contrast
+export function bestForegroundHex(bgHex) {
+  const { r, g, b } = hexToRgb(bgHex);
+  const bgLum = luminance(r, g, b);
+
+  const whiteLum = 1.0;
+  const blackLum = 0.0;
+  const contrastWithWhite = contrastRatio(bgLum, whiteLum);
+  const contrastWithBlack = contrastRatio(bgLum, blackLum);
+
+  return contrastWithWhite >= contrastWithBlack ? C.textWhite : makeGrey(0.85);
+}
 // utils
 export const localStorageWrapper = {
   setItem: (key, item) => {

@@ -565,7 +565,7 @@ export const useSettingsStore = create((set, get) => ({
   getSettingsObj: () => get().settingsObj,
   setSettingsObj: ({ settingsObj, batch = true, sendToDB = true }) => {
     // clog(settingsObj);
-    set((state) => ({ settingsObj }));
+    set({ settingsObj });
     if (sendToDB) {
       dbSetSettings({ settingsObj, batch });
     }

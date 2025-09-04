@@ -58,15 +58,8 @@ export function Dashboard_Admin({}) {
   // local state ///////////////////////////////////////////////////////////
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
     useState(false);
-  const [sPunchClockUserObj, _setPunchClockUserObj] = useState();
-  // const [sEditUserIndex, _setEditUserIndex] = useState();
-  // const [sShowPinIndex, _setShowPinIndex] = useState();
-  // const [sShowWageIndex, _setShowWageIndex] = useState();
-  // const [sNewUserObj, _setNewUserObj] = useState();
-
-  const [sFocus, _setFocus] = useState({ name: "", start: "", end: "" });
-
-  const cardReaderListItemRefs = useRef([]);
+  const [sPunchClockUserObj, _setPunchClockUserObj] = useState(null);
+  const [sExpand, _setExpand] = useState("");
 
   ///////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////
@@ -75,29 +68,33 @@ export function Dashboard_Admin({}) {
 
   // user component
   function commitUserInfoChange(userObj, sNewUserObj) {
-    let settingsObj = cloneDeep(zSettingsObj);
+    // let settingsObj = cloneDeep(zSettingsObj);
+    // let users = zSettingsObj.users.map(user => {
+    //   if (user.id === userObj.id) {
+    //     return userObj
+    //     return user
+    //   }
+    // })
     let userArr;
     if (sNewUserObj) {
-      userArr = [userObj, ...settingsObj.users];
-      _setNewUserObj();
+      userArr = [userObj, ...zSettingsObj.users];
+      // _setNewUserObj();
     } else {
-      userArr = settingsObj.users.map((o) => {
+      userArr = zSettingsObj.users.map((o) => {
         if (o.id === userObj.id) return userObj;
         return o;
       });
     }
 
-    settingsObj.users = userArr;
-    _zSetSettingsObj({ settingsObj });
+    _zSetSettingsField("users", userArr);
+    // settingsObj.users = userArr;
+    // _zSetSettingsObj({ settingsObj });
     // dbSetSettings(settingsObj);
   }
 
   function handleRemoveUserPress(userObj) {
-    let settingsObj = cloneDeep(zSettingsObj);
-    let userArr = settingsObj.users.filter((o) => o.id != userObj.id);
-    settingsObj.users = userArr;
-    _zSetSettingsObj(settingsObj);
-    dbSetSettings(settingsObj);
+    let userArr = zSettingsObj.users.filter((o) => o.id != userObj.id);
+    _zSetSettingsField("users", userArr);
   }
 
   function handleDescriptorCapture(userObj, desc) {
@@ -118,67 +115,12 @@ export function Dashboard_Admin({}) {
     _zSetSettingsField(fieldName, fieldValue);
   }
 
-  // containers and reusable components ///////////////////////////////
-  function BoxContainerOuterComponent({ style = {}, children }) {
-    return (
-      <View
-        style={{
-          ...style,
-        }}
-      >
-        {children}
-      </View>
-    );
-  }
-  function BoxContainerLabelComponent({ text, style = {} }) {
-    return (
-      <Text
-        style={{
-          fontSize: 14,
-          color: makeGrey(0.5),
-          alignSelf: "flex-end",
-          ...style,
-        }}
-      >
-        {text.toUpperCase()}
-      </Text>
-    );
-  }
-
-  function BoxContainerInnerComponent({ style = {}, children }) {
-    return (
-      <View
-        style={{
-          // width: "100%",
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          backgroundColor: C.listItemWhite,
-          borderRadius: 5,
-          paddingVertical: 5,
-          paddingHorizontal: 4,
-          alignItems: "flex-end",
-          paddingLeft: 15,
-          paddingRight: 7,
-          paddingTop: 10,
-          paddingBottom: 10,
-          ...style,
-        }}
-      >
-        {children}
-      </View>
-    );
-  }
-
-  // extruding each component because this page is humongous/ ////////////
-
-  // log("focus", sFocus);
-
   //////////////////////////////////////////////////////////////////////////
   // Main component /////////////////////////////////////////////////////////
   return (
     <ScrollView
       style={{
-        padding: 5,
+        padding: 0,
         paddingTop: 20,
       }}
     >
@@ -196,37 +138,119 @@ export function Dashboard_Admin({}) {
           userObj={sPunchClockUserObj}
         />
       ) : null}
+
       {/**left-side column container */}
       <View
         style={{
-          flex: 1,
-          backgroundColor: "transparent",
+          // backgroundColor: "blue",
           flexDirection: "row",
-          justifyContent: "flex-start",
+          justifyContent: "space-between",
+          paddingHorizontal: 5,
         }}
       >
-        <View style={{ width: "40%", alignItems: "flex-end" }}>
+        <View
+          style={{
+            width: "30%",
+            alignItems: "flex-start",
+            borderRadius: 5,
+            paddingRight: 10,
+            paddingLeft: 5,
+            backgroundColor: C.listItemWhite,
+            borderColor: C.buttonLightGreenOutline,
+            height: 200,
+            borderWidth: 1,
+          }}
+        >
+          <VerticalSpacer />
+          <SettingsLabelListComponent
+            // style={{ width: "100%" }}
+            handleExpandPress={() =>
+              _setExpand(sExpand === "User Accounts" ? null : "User Accounts")
+            }
+            text={"app user control"}
+            style={{
+              color: sExpand === "User Accounts" ? C.lightred : makeGrey(0.6),
+            }}
+          />
+          <VerticalSpacer />
+          <SettingsLabelListComponent
+            // style={{ width: "100%" }}
+            handleExpandPress={() =>
+              _setExpand(
+                sExpand === "Payment Processing" ? null : "Payment Processing"
+              )
+            }
+            text={"payment processing"}
+            style={{
+              color:
+                sExpand === "Payment Processing" ? C.lightred : makeGrey(0.6),
+            }}
+          />
+          <VerticalSpacer />
+
+          <SettingsLabelListComponent
+            // style={{ width: "100%" }}
+            handleExpandPress={() =>
+              _setExpand(
+                sExpand === "Workorder Statuses" ? null : "Workorder Statuses"
+              )
+            }
+            text={"workorder statuses"}
+            style={{
+              color:
+                sExpand === "Workorder Statuses" ? C.lightred : makeGrey(0.6),
+            }}
+          />
+          <VerticalSpacer />
+
+          <SettingsLabelListComponent
+            // style={{ width: "100%" }}
+            handleExpandPress={() =>
+              _setExpand(sExpand === "Bike Options" ? null : "Bike Options")
+            }
+            style={{
+              color: sExpand === "Bike Options" ? C.lightred : makeGrey(0.6),
+            }}
+            icon={ICONS.maximize}
+            text={"Bike Options"}
+          />
+        </View>
+
+        {/**right-side column container */}
+        <View
+          style={{
+            width: "70%",
+            alignItems: "center",
+            // flex: 1,
+            // paddingHorizontal: 10,
+          }}
+        >
+          <Text
+            style={{ color: makeGrey(0.6), marginBottom: 10, fontSize: 17 }}
+          >
+            {sExpand?.toUpperCase()}
+          </Text>
+          <PaymentProcessingComponent
+            zSettingsObj={zSettingsObj}
+            handleSettingsFieldChange={handleSettingsFieldChange}
+            sExpand={sExpand === "Payment Processing"}
+          />
           <AppUserListComponent
+            handleRemoveUserPress={handleRemoveUserPress}
             zSettingsObj={zSettingsObj}
             commitUserInfoChange={commitUserInfoChange}
             _setFacialRecognitionModalUserObj={
               _setFacialRecognitionModalUserObj
             }
+            sExpand={sExpand === "User Accounts"}
           />
-        </View>
-        {/**right-side column container */}
-        <View
-          style={{
-            width: "60%",
-            alignItems: "flex-end",
-            paddingHorizontal: 10,
-          }}
-        >
-          {/* <PaymentProcessingComponent
+          <StatusesComponent
+            sExpand={sExpand === "Workorder Statuses"}
             zSettingsObj={zSettingsObj}
             handleSettingsFieldChange={handleSettingsFieldChange}
-          /> */}
-          <StatusesComponent
+          />
+          <BikeBrandsComponent
+            sExpand={sExpand === "Bike Options"}
             zSettingsObj={zSettingsObj}
             handleSettingsFieldChange={handleSettingsFieldChange}
           />
@@ -239,11 +263,17 @@ export function Dashboard_Admin({}) {
 ///////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
+function VerticalSpacer({ height }) {
+  return <View style={{ height: 17 }} />;
+}
+
 function BoxContainerOuterComponent({ style = {}, children }) {
   return (
     <View
       style={{
-        // width: "100%",
+        width: "97%",
+        alignItems: "center",
+
         ...style,
       }}
     >
@@ -251,12 +281,12 @@ function BoxContainerOuterComponent({ style = {}, children }) {
     </View>
   );
 }
-function BoxContainerLabelComponent({
+
+function SettingsLabelListComponent({
   text,
   style = {},
   icon,
   handleExpandPress,
-  expanded,
 }) {
   let ICON_SIZE = 18;
   return (
@@ -264,9 +294,9 @@ function BoxContainerLabelComponent({
       style={{
         flexDirection: "row",
         width: "100%",
-        justifyContent: "flex-end",
+        justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 2,
+        marginBottom: 4,
         // backgroundColor: expanded ? "transparent" : makeGrey(0.4),
         // paddingHorizontal:
         // backgroundColor: "blue",
@@ -276,7 +306,7 @@ function BoxContainerLabelComponent({
         style={{
           fontSize: 16,
           color: makeGrey(0.5),
-          alignSelf: "flex-end",
+          // alignSelf: "flex-end",
           ...style,
         }}
       >
@@ -285,12 +315,12 @@ function BoxContainerLabelComponent({
       <Button_
         visible={icon}
         buttonStyle={{
-          marginLeft: 10,
           paddingHorizontal: 0,
           paddingVertical: 0,
+          marginLeft: 10,
         }}
         iconSize={ICON_SIZE}
-        icon={icon}
+        icon={icon || ICONS.maximize}
         onPress={handleExpandPress}
       />
     </View>
@@ -306,13 +336,8 @@ function BoxContainerInnerComponent({ style = {}, children }) {
         borderColor: C.buttonLightGreenOutline,
         backgroundColor: C.listItemWhite,
         borderRadius: 5,
-        paddingVertical: 10,
-        paddingHorizontal: 10,
         alignItems: "flex-end",
-        // paddingLeft: 15,
-        // paddingRight: 7,
-        // paddingTop: 10,
-        // paddingBottom: 10,
+        padding: 10,
         ...style,
       }}
     >
@@ -347,14 +372,14 @@ const AppUserListComponent = ({
   zSettingsObj,
   commitUserInfoChange,
   _setFacialRecognitionModalUserObj,
+  sExpand,
+  handleRemoveUserPress,
 }) => {
-  const [sEditUserIndex, _setEditUserIndex] = useState();
-  const [sShowPinIndex, _setShowPinIndex] = useState();
-  const [sShowWageIndex, _setShowWageIndex] = useState();
-  const [sNewUserObj, _setNewUserObj] = useState();
-  const [sListExpandObj, _setListExpandObj] = useState({
-    userList: false,
-  });
+  const [sEditUserIndex, _setEditUserIndex] = useState(null);
+  const [sShowPinIndex, _setShowPinIndex] = useState(false);
+  const [sShowWageIndex, _setShowWageIndex] = useState(false);
+  const [sNewUserObj, _setNewUserObj] = useState(null);
+  // const [sExpand, _setExpand] = useState(false);
 
   const userListItemRefs = useRef([]);
 
@@ -363,41 +388,32 @@ const AppUserListComponent = ({
     userObj.id = generateRandomID();
     let role = PERMISSION_LEVELS.find((o) => (o.name = "User"));
     userObj.permissions = role;
-    _setNewUserObj(userObj);
+    commitUserInfoChange(userObj, true);
+    // _setNewUserObj(userObj);
     _setEditUserIndex(0);
   }
-  return (
-    <View style={{ width: "100%" }}>
-      <BoxContainerLabelComponent text={"Users"} />
 
+  return (
+    <BoxContainerOuterComponent
+      style={{ width: "100%", backgroundColor: "transparent" }}
+    >
       {/**Flatlist showing all app users, edit functions. sPunchClockUserObj */}
-      <View
-        style={{
-          borderRadius: 5,
-          backgroundColor: "rgba(0,0,0,.1)",
-          width: "100%",
-          padding: 5,
-          maxHeight: 550,
-        }}
-      >
-        <View
+      {sExpand ? (
+        <BoxContainerInnerComponent
           style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 5,
+            backgroundColor: makeGrey(0.1),
+            width: "80%",
           }}
         >
-          <Button_
-            icon={ICONS.maximize}
-            onPress={() =>
-              _setListExpandObj({
-                ...sListExpandObj,
-                userList: !sListExpandObj.userList,
-              })
-            }
-          />
-          {/* <Button_
+          <View
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              justifyContent: "flex-end",
+              alignItems: "center",
+            }}
+          >
+            {/* <Button_
             onPress={fillPunchHistory}
             text={"Fill History"}
             buttonStyle={{
@@ -413,582 +429,904 @@ const AppUserListComponent = ({
               fontColor: C.textMain,
             }}
           /> */}
-          <Button_
-            enabled={sListExpandObj.userList}
-            icon={ICONS.add}
-            onPress={handleNewUserPress}
-            text={"User"}
-            buttonStyle={{
-              borderRadius: 5,
-              paddingVertical: 2,
-              marginRight: 6,
-              // height: 20,
-              backgroundColor: C.buttonLightGreen,
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-            }}
-            textStyle={{
-              fontSize: 14,
-              fontColor: C.textMain,
-            }}
-          />
-        </View>
-        <FlatList
-          ItemSeparatorComponent={() => (
-            <View
-              style={{
-                height: 5,
-                // width: "100%",
-                // backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
-              }}
+            <BoxButton1
+              icon={ICONS.add}
+              onPress={handleNewUserPress}
+              style={
+                {
+                  // borderRadius: 5,
+                  // paddingTop: 3,
+                  // paddingHorizontal: 0,
+                  // paddingV
+                }
+              }
             />
-          )}
-          style={{ borderRadius: 5 }}
-          data={
-            sListExpandObj.userList
-              ? zSettingsObj
-                ? sNewUserObj
-                  ? [sNewUserObj, ...zSettingsObj.users]
-                  : zSettingsObj.users
-                : []
-              : []
-          }
-          renderItem={(obj) => {
-            obj = cloneDeep(obj);
-            let idx = obj.index;
-            let userObj = obj.item;
-            let editable = sEditUserIndex === idx;
-            // log("user", userObj);
-            return (
-              <View
-                ref={(element) => (userListItemRefs.current[idx] = element)}
-                style={{
-                  flexDirection: "row",
-                  paddingVertical: 2,
-                  backgroundColor: C.listItemWhite,
-                  borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
-                  borderRadius: 5,
-                  padding: 3,
-                  marginRight: 5,
-                  opacity: !editable && sEditUserIndex ? 0.3 : 1,
-                }}
-              >
-                <View
-                  style={{
-                    // paddingTop: 3,
-                    paddingLeft: 0,
-                    marginRight: 5,
-                    justifyContent: "space-around",
-                  }}
-                >
-                  <Button_
-                    text={"Edit"}
-                    onPress={() => {
-                      _setEditUserIndex(sEditUserIndex != null ? null : idx);
-                      _setShowPinIndex(null);
-                      _setShowWageIndex(null);
-                    }}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      borderColor: C.buttonLightGreenOutline,
-                      backgroundColor: editable
-                        ? C.lightred
-                        : C.buttonLightGreen,
-                      borderRadius: 5,
-                      paddingHorizontal: 0,
-                      paddingVertical: 2,
-                      width: 50,
-                    }}
-                    textStyle={{
-                      color: editable ? C.textWhite : C.textMain,
-                      fontSize: 12,
-                    }}
-                  />
-                  <Button_
-                    text={"Enroll"}
-                    onPress={() => {
-                      _setFacialRecognitionModalUserObj(userObj);
-                    }}
-                    enabled={editable}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      borderColor: C.buttonLightGreenOutline,
-                      backgroundColor: C.buttonLightGreen,
-                      width: 50,
-                      paddingVertical: 2,
-
-                      paddingHorizontal: 0,
-                      marginRight: 4,
-                      borderRadius: 5,
-                    }}
-                    textStyle={{ fontSize: 12 }}
-                  />
-                  <Button_
-                    text={sEditUserIndex === idx ? "Remove" : "Clock"}
-                    onPress={() => {
-                      if (sEditUserIndex === idx) {
-                        handleRemoveUserPress(userObj);
-                      } else if (sEditUserIndex) {
-                      } else {
-                        _setPunchClockUserObj(userObj);
-                      }
-                    }}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      paddingVertical: 2,
-
-                      borderColor: C.buttonLightGreenOutline,
-                      backgroundColor: C.buttonLightGreen,
-                      borderRadius: 5,
-                      paddingHorizontal: 0,
-                      width: 50,
-                    }}
-                    textStyle={{ fontSize: 12 }}
-                  />
-                </View>
-                <View style={{ justifyContent: "center" }}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "flex-start",
-                    }}
-                  >
-                    <TextInput
-                      value={userObj.first}
-                      placeholder="First name"
-                      placeholderTextColor={"lightgray"}
-                      editable={editable}
-                      style={{
-                        paddingHorizontal: 5,
-                        padding: 1,
-                        borderColor: editable
-                          ? C.buttonLightGreenOutline
-                          : "transparent",
-                        outlineWidth: 0,
-                        width: 100,
-                        marginRight: 10,
-                        borderWidth: 1,
-                        fontSize: 14,
-                      }}
-                      onChangeText={(value) => {
-                        userObj.first = value;
-                        commitUserInfoChange(userObj, sNewUserObj);
-                      }}
-                    />
-                    <TextInput
-                      value={userObj.last}
-                      onChangeText={(value) => {
-                        userObj.last = value;
-                        commitUserInfoChange(userObj);
-                      }}
-                      placeholder="Last name"
-                      placeholderTextColor={"lightgray"}
-                      editable={editable}
-                      style={{
-                        paddingHorizontal: 5,
-                        // paddingHorizontal: 2,
-                        borderColor: editable
-                          ? C.buttonLightGreenOutline
-                          : "transparent",
-                        outlineWidth: 0,
-                        width: 100,
-                        marginRight: 10,
-                        borderWidth: 1,
-                        fontSize: 14,
-                      }}
-                    />
-                  </View>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "flex-start",
-                    }}
-                  >
-                    <TextInput
-                      value={addDashesToPhone(userObj.phone)}
-                      onChangeText={(value) => {
-                        let val = removeDashesFromPhone(value);
-                        userObj.phone = val;
-                        commitUserInfoChange(userObj);
-                      }}
-                      placeholder="Phone num."
-                      placeholderTextColor={"lightgray"}
-                      editable={editable}
-                      style={{
-                        paddingHorizontal: 5,
-                        marginTop: 5,
-                        padding: 1,
-                        borderColor: editable
-                          ? C.buttonLightGreenOutline
-                          : "transparent",
-                        outlineWidth: 0,
-                        width: 100,
-                        marginRight: 10,
-                        borderWidth: 1,
-                        fontSize: 14,
-                      }}
-                    />
-                    <DropdownMenu
-                      enabled={editable}
-                      ref={userListItemRefs.current[idx]}
-                      dataArr={
-                        editable ? PERMISSION_LEVELS.map((o) => o.name) : []
-                      }
-                      onSelect={(item) => {
-                        if (!editable) return;
-                        let perm = PERMISSION_LEVELS.find(
-                          (o) => o.name == item
-                        );
-                        userObj.permissions = perm;
-                        commitUserInfoChange(userObj);
-                      }}
-                      buttonStyle={{
-                        paddingHorizontal: 5,
-                        marginTop: 5,
-                        padding: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        outlineWidth: 0,
-                        borderRadius: 5,
-                        width: 100,
-                        marginRight: 10,
-                        borderWidth: 1,
-                        backgroundColor: "transparent",
-                        alignItems: "flex-start",
-                        backgroundColor: editable
-                          ? C.buttonLightGreen
-                          : "transparent",
-                        paddingVertical: 2,
-                      }}
-                      buttonText={userObj.permissions.name}
-                      buttonTextStyle={{
-                        fontSize: 14,
-                      }}
-                    />
-                  </View>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "flex-start",
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        borderColor: editable
-                          ? C.buttonLightGreenOutline
-                          : "transparent",
-                        width: 100,
-                        marginRight: 10,
-                        borderWidth: 1,
-                        marginTop: 5,
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <TextInput
-                        // focusable={sShowPinIndex === idx ? true : false}
-                        caretHidden={sShowPinIndex != idx}
-                        focused={sShowPinIndex === idx}
-                        value={sShowPinIndex === idx ? userObj.pin : ""}
-                        onChangeText={(value) => {
-                          userObj.pin = value;
-                          commitUserInfoChange(userObj);
-                        }}
-                        placeholder={sShowPinIndex === idx ? "pin..." : "PIN"}
-                        placeholderTextColor={"lightgray"}
-                        editable={editable}
-                        style={{
-                          width: "70%",
-                          outlineWidth: 0,
-                          paddingHorizontal: 5,
-                          padding: 1,
-                          fontSize: 14,
-                        }}
-                      />
-                      {editable ? (
-                        <TouchableOpacity
-                          onPress={() =>
-                            _setShowPinIndex(sShowPinIndex != null ? null : idx)
-                          }
-                        >
-                          <Image_ icon={ICONS.editPencil} size={15} />
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        borderColor: editable
-                          ? C.buttonLightGreenOutline
-                          : "transparent",
-                        width: 100,
-                        marginRight: 10,
-                        borderWidth: 1,
-                        marginTop: 5,
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <TextInput
-                        caretHidden={sShowWageIndex != idx}
-                        value={sShowWageIndex === idx ? userObj.hourlyWage : ""}
-                        onChangeText={(value) => {
-                          userObj.hourlyWage = value;
-                          commitUserInfoChange(userObj);
-                        }}
-                        placeholder={
-                          sShowWageIndex === idx ? "wage..." : "Wage"
-                        }
-                        placeholderTextColor={"lightgray"}
-                        editable={editable}
-                        style={{
-                          width: "70%",
-                          outlineWidth: 0,
-                          paddingHorizontal: 5,
-                          padding: 1,
-                          fontSize: 14,
-                        }}
-                      />
-                      {editable ? (
-                        <TouchableOpacity
-                          onPress={() =>
-                            _setShowWageIndex(
-                              sShowWageIndex != null ? null : idx
-                            )
-                          }
-                        >
-                          <Image_ icon={ICONS.editPencil} size={15} />
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                  </View>
-                </View>
-              </View>
-            );
-          }}
-        />
-      </View>
-    </View>
-  );
-};
-
-//////////////////////////////////////////////////////////////////////////////////
-
-const PaymentProcessingComponent = ({
-  zSettingsObj,
-  handleSettingsFieldChange,
-}) => {
-  return (
-    <BoxContainerOuterComponent>
-      <BoxContainerLabelComponent
-        text={"payment processing"}
-        style={{ paddingRight: 5 }}
-      />
-      <BoxContainerInnerComponent>
-        <CheckBox_
-          isChecked={zSettingsObj?.acceptChecks}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{
-            backgroundColor: "transparent",
-          }}
-          text={"Accepts checks"}
-          onCheck={() =>
-            handleSettingsFieldChange(
-              "acceptChecks",
-              !zSettingsObj?.acceptChecks
-            )
-          }
-        />
-        <CheckBox_
-          isChecked={zSettingsObj?.autoConnectToCardReader}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{
-            backgroundColor: "transparent",
-          }}
-          text={"Auto connect to card reader"}
-          onCheck={() =>
-            handleSettingsFieldChange(
-              "autoConnectToCardReader",
-              !zSettingsObj?.autoConnectToCardReader
-            )
-          }
-        />
-        {/**card reader flatlist */}
-        <View
-          style={{
-            width: "100%",
-            alignItems: "flex-end",
-            marginTop: 10,
-          }}
-        >
-          <BoxContainerLabelComponent
-            text={"stripe card readers"}
-            style={{ fontSize: 12 }}
-          />
-          <View
-            style={{
-              borderRadius: 5,
-              backgroundColor: "rgba(0,0,0,.1)",
-              padding: 5,
-              maxHeight: 550,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-start",
-                marginBottom: 5,
-              }}
-            >
-              <Button_
-                onPress={() => {
-                  log("need new card reader function");
-                }}
-                icon={ICONS.add}
-                text={"Reader"}
-                buttonStyle={{
-                  borderRadius: 5,
-                  padding: 0,
-                  height: 20,
-                  backgroundColor: C.buttonLightGreen,
-                  borderColor: C.buttonLightGreenOutline,
-                  borderWidth: 1,
-                }}
-                textStyle={{
-                  fontSize: 14,
-                  fontColor: C.textMain,
-                }}
-              />
-            </View>
-            {/**Flatlist showing the available card readers */}
+          </View>
+          <View style={{ width: "100%" }}>
             <FlatList
               ItemSeparatorComponent={() => (
                 <View
                   style={{
                     height: 5,
+                    // width: "100%",
+                    // backgroundColor: APP_BASE_COLORS.buttonLightGreenOutline,
                   }}
                 />
               )}
-              style={{}}
-              data={zSettingsObj?.cardReaders || []}
+              style={{ borderRadius: 5 }}
+              data={
+                sExpand
+                  ? zSettingsObj
+                    ? sNewUserObj
+                      ? [sNewUserObj, ...zSettingsObj.users]
+                      : zSettingsObj.users
+                    : []
+                  : []
+              }
               renderItem={(obj) => {
                 obj = cloneDeep(obj);
                 let idx = obj.index;
-                let item = obj.item;
+                let userObj = obj.item;
+                let editable = sEditUserIndex === idx;
+                // log("user", userObj);
+                // log(userObj);
                 return (
                   <View
+                    ref={(element) => (userListItemRefs.current[idx] = element)}
                     style={{
                       flexDirection: "row",
-                      justifyContent: "flex-end",
-                      alignItems: "center",
+                      // paddingRight: 20,
+                      backgroundColor: C.listItemWhite,
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 5,
+                      padding: 3,
+                      paddingRight: 10,
+                      opacity: !editable && sEditUserIndex ? 0.3 : 1,
                     }}
                   >
-                    <Text style={{ color: makeGrey(0.55), marginRight: 10 }}>
-                      ID:
-                    </Text>
-                    <TextInput
-                      style={{ outlineWidth: 0 }}
-                      editable={true}
-                      value={item.id}
-                    />
-                    <TextInput
-                      value={item.label}
-                      onChangeText={(val) => {
-                        let cardReaderArr = zSettingsObj.cardReaders?.map(
-                          (o) => {
-                            if (o.id === item.id) return { ...o, label: val };
-                            return o;
-                          }
-                        );
-                        handleSettingsFieldChange(
-                          "cardReaders",
-                          cloneDeep(cardReaderArr)
-                        );
-                      }}
+                    <View
                       style={{
-                        textAlign: "right",
-                        paddingRight: 2,
-                        justifyContent: "flex-end",
-                        paddingVertical: 4,
-                        backgroundColor: C.listItemWhite,
-                        borderWidth: 1,
-                        paddingRight: 2,
-                        borderColor: C.buttonLightGreenOutline,
-                        outlineWidth: 0,
+                        // paddingTop: 3,
+                        paddingLeft: 0,
+                        marginRight: 5,
+                        justifyContent: "space-around",
+                        width: "20%",
                       }}
-                    />
-                    <Button_
-                      buttonStyle={{ paddingHorizontal: 10 }}
-                      iconSize={15}
-                      icon={ICONS.close1}
-                      onPress={() => {}}
-                    />
+                    >
+                      <Button_
+                        text={"Edit"}
+                        onPress={() => {
+                          _setEditUserIndex(
+                            sEditUserIndex != null ? null : idx
+                          );
+                          _setShowPinIndex(null);
+                          _setShowWageIndex(null);
+                        }}
+                        buttonStyle={{
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          backgroundColor: editable
+                            ? C.lightred
+                            : C.buttonLightGreen,
+                          borderRadius: 5,
+                          paddingHorizontal: 0,
+                          paddingVertical: 2,
+                          width: 80,
+                        }}
+                        textStyle={{
+                          color: editable ? C.textWhite : C.textMain,
+                          fontSize: 12,
+                        }}
+                      />
+                      <Button_
+                        text={"Enroll"}
+                        onPress={() => {
+                          _setFacialRecognitionModalUserObj(userObj);
+                        }}
+                        enabled={editable}
+                        buttonStyle={{
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          backgroundColor: C.buttonLightGreen,
+                          width: 80,
+                          paddingVertical: 2,
+
+                          paddingHorizontal: 0,
+                          marginRight: 4,
+                          borderRadius: 5,
+                        }}
+                        textStyle={{ fontSize: 12 }}
+                      />
+                      <Button_
+                        text={sEditUserIndex === idx ? "Remove" : "Clock"}
+                        onPress={() => {
+                          if (sEditUserIndex === idx) {
+                            handleRemoveUserPress(userObj);
+                          } else {
+                            _setPunchClockUserObj(userObj);
+                          }
+                        }}
+                        buttonStyle={{
+                          borderWidth: 1,
+                          paddingVertical: 2,
+
+                          borderColor: C.buttonLightGreenOutline,
+                          backgroundColor: C.buttonLightGreen,
+                          borderRadius: 5,
+                          paddingHorizontal: 0,
+                          width: 80,
+                        }}
+                        textStyle={{ fontSize: 12 }}
+                      />
+                    </View>
+                    <View
+                      style={{
+                        justifyContent: "center",
+                        // backgroundColor: "red",
+                        marginTop: 2,
+                        width: "80%",
+                        // paddingRight: 5,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          // width: "100%",
+                          // backgroundColor: "red",
+                        }}
+                      >
+                        <TextInput
+                          value={userObj.first}
+                          placeholder="First name"
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            paddingHorizontal: 5,
+                            padding: 1,
+                            borderColor: editable
+                              ? C.buttonLightGreenOutline
+                              : "transparent",
+                            outlineWidth: 0,
+                            width: "49%",
+                            // marginRight: 10,
+                            borderWidth: 1,
+                            fontSize: 14,
+                            height: 25,
+                          }}
+                          onChangeText={(value) => {
+                            userObj.first = value;
+                            commitUserInfoChange(userObj);
+                          }}
+                        />
+                        <TextInput
+                          value={userObj.last}
+                          onChangeText={(value) => {
+                            userObj.last = value;
+                            commitUserInfoChange(userObj);
+                          }}
+                          placeholder="Last name"
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            paddingHorizontal: 5,
+                            // paddingHorizontal: 2,
+                            borderColor: editable
+                              ? C.buttonLightGreenOutline
+                              : "transparent",
+                            outlineWidth: 0,
+                            width: "49%",
+                            // marginRight: 10,
+                            borderWidth: 1,
+                            fontSize: 14,
+                            height: 25,
+                          }}
+                        />
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          width: "100%",
+                          alignItems: "center",
+                          marginTop: 7,
+                        }}
+                      >
+                        <TextInput
+                          value={addDashesToPhone(userObj.phone)}
+                          onChangeText={(value) => {
+                            let val = removeDashesFromPhone(value);
+                            userObj.phone = val;
+                            commitUserInfoChange(userObj);
+                          }}
+                          placeholder="Phone num."
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            paddingHorizontal: 5,
+                            // marginTop: 5,
+                            padding: 1,
+                            borderColor: editable
+                              ? C.buttonLightGreenOutline
+                              : "transparent",
+                            outlineWidth: 0,
+                            width: "49%",
+                            // marginRight: 10,
+                            borderWidth: 1,
+                            height: 25,
+
+                            fontSize: 14,
+                          }}
+                        />
+                        <View style={{ width: "49%", alignItems: "center" }}>
+                          <DropdownMenu
+                            enabled={editable}
+                            ref={userListItemRefs.current[idx]}
+                            dataArr={
+                              editable
+                                ? PERMISSION_LEVELS.map((o) => o.name)
+                                : []
+                            }
+                            onSelect={(item) => {
+                              if (!editable) return;
+                              let perm = PERMISSION_LEVELS.find(
+                                (o) => o.name == item
+                              );
+                              userObj.permissions = perm;
+                              commitUserInfoChange(userObj);
+                            }}
+                            buttonStyle={{
+                              paddingHorizontal: 5,
+                              // marginTop: 5,
+                              padding: 1,
+                              borderColor: C.buttonLightGreenOutline,
+                              outlineWidth: 0,
+                              borderRadius: 5,
+                              minWidth: 120,
+                              height: 25,
+                              // marginRight: 10,
+                              borderWidth: 1,
+                              backgroundColor: "transparent",
+                              alignItems: "flex-start",
+                              backgroundColor: editable
+                                ? C.buttonLightGreen
+                                : "transparent",
+                              paddingVertical: 2,
+                            }}
+                            buttonText={userObj.permissions.name}
+                            buttonTextStyle={{
+                              color: C.textMain,
+                              fontSize: 14,
+                            }}
+                          />
+                        </View>
+                      </View>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          width: "100%",
+                          // backgroundColor: "red",
+                          marginTop: 7,
+                          alignItems: "center",
+                          // height: 25,
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            borderColor: editable
+                              ? C.buttonLightGreenOutline
+                              : "transparent",
+                            width: "49%",
+                            // marginRight: 10,
+                            borderWidth: 1,
+                            // marginTop: 5,
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            height: 25,
+                          }}
+                        >
+                          <TextInput
+                            // focusable={sShowPinIndex === idx ? true : false}
+                            caretHidden={sShowPinIndex != idx}
+                            focused={sShowPinIndex === idx}
+                            value={sShowPinIndex === idx ? userObj.pin : ""}
+                            onChangeText={(value) => {
+                              userObj.pin = value;
+                              commitUserInfoChange(userObj);
+                            }}
+                            placeholder={
+                              sShowPinIndex === idx ? "pin..." : "PIN"
+                            }
+                            placeholderTextColor={"lightgray"}
+                            editable={editable}
+                            style={{
+                              outlineWidth: 0,
+                              paddingHorizontal: 5,
+                              padding: 1,
+                              fontSize: 14,
+                              width: "90%",
+                            }}
+                          />
+                          {editable ? (
+                            <TouchableOpacity
+                              onPress={() =>
+                                _setShowPinIndex(
+                                  sShowPinIndex != null ? null : idx
+                                )
+                              }
+                            >
+                              <Image_ icon={ICONS.editPencil} size={15} />
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={{ width: 15 }} />
+                          )}
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            borderColor: editable
+                              ? C.buttonLightGreenOutline
+                              : "transparent",
+                            width: "49%",
+                            borderWidth: 1,
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            height: 25,
+                          }}
+                        >
+                          <TextInput
+                            caretHidden={sShowWageIndex != idx}
+                            value={
+                              sShowWageIndex === idx ? userObj.hourlyWage : ""
+                            }
+                            onChangeText={(value) => {
+                              userObj.hourlyWage = value;
+                              commitUserInfoChange(userObj);
+                            }}
+                            placeholder={
+                              sShowWageIndex === idx ? "wage..." : "Wage"
+                            }
+                            placeholderTextColor={"lightgray"}
+                            editable={editable}
+                            style={{
+                              outlineWidth: 0,
+                              paddingHorizontal: 5,
+                              padding: 1,
+                              fontSize: 14,
+                              width: "90%",
+                            }}
+                          />
+                          {editable ? (
+                            <TouchableOpacity
+                              onPress={() =>
+                                _setShowWageIndex(
+                                  sShowWageIndex != null ? null : idx
+                                )
+                              }
+                            >
+                              <Image_ icon={ICONS.editPencil} size={15} />
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={{ width: 15 }} />
+                          )}
+                        </View>
+                      </View>
+                    </View>
                   </View>
-                  // </View>
                 );
               }}
             />
           </View>
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            width: "95%",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            marginTop: 20,
-          }}
-        >
-          <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
-          <DropdownComponent
-            label={zSettingsObj?.selectedCardReaderObj?.label || ""}
-            data={zSettingsObj?.cardReaders || []}
-            onSelect={(obj) =>
-              handleSettingsFieldChange("selectedCardReaderObj", obj)
-            }
-          />
-        </View>
-        <View
-          style={{
-            width: "100%",
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            marginTop: 20,
-          }}
-        >
-          <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
-          <TextInput
-            style={{
-              outlineWidth: 0,
-              borderRadius: 5,
-              textAlign: "right",
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              paddingHorizontal: 5,
-              paddingVertical: 3,
-              marginRight: 3,
-              width: 75,
-            }}
-            value={zSettingsObj?.salesTax || ""}
-            onChangeText={(val) => {
-              const regex = new RegExp(".", "g");
-              let containsDecimalAlready = val.split(".").length > 2;
-              if (checkInputForNumbersOnly(val) && !containsDecimalAlready) {
-                handleSettingsFieldChange("salesTax", val);
-              }
-            }}
-          />
-          <Text>%</Text>
-        </View>
-      </BoxContainerInnerComponent>
+        </BoxContainerInnerComponent>
+      ) : null}
     </BoxContainerOuterComponent>
   );
 };
 
-const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
-  const [sExpand, _setExpand] = useState(true);
+const BikeBrandsComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+  sExpand,
+}) => {
+  // const [sExpand, _setExpand] = useState();
+
+  return (
+    <BoxContainerOuterComponent style={{ marginBottom: 20 }}>
+      {sExpand ? (
+        <BoxContainerInnerComponent
+          style={{ width: "70%", alignItems: "center" }}
+        >
+          {/**Bike brands */}
+          <View style={{ width: "100%", alignItems: "center" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                backgroundColor: C.buttonLightGreen,
+                borderRadius: 5,
+                paddingHorizontal: 5,
+                paddingVertical: 5,
+                width: "95%",
+              }}
+            >
+              <Text style={{ color: C.textMain }}>Category Name:</Text>
+              <TextInput
+                style={{
+                  width: "50%",
+                  marginLeft: 10,
+                  padding: 5,
+                  borderWidth: 2,
+                  borderRadius: 5,
+                  borderColor: C.buttonLightGreenOutline,
+                  outlineWidth: 0,
+                  color: C.textMain,
+                  marginRight: 10,
+                }}
+                value={zSettingsObj?.bikeBrandsName}
+                onChangeText={(val) => {
+                  handleSettingsFieldChange("bikeBrandsName", val);
+                }}
+              />
+              <BoxButton1
+                onPress={() => {
+                  let brandsArr = zSettingsObj?.bikeBrands;
+                  brandsArr.push("New Bike Brand...");
+                  handleSettingsFieldChange("bikeBrands", brandsArr);
+                }}
+              />
+            </View>
+            <View style={{ marginTop: 10, width: "100%" }}>
+              <FlatList
+                data={zSettingsObj?.bikeBrands || []}
+                renderItem={(obj) => {
+                  let idx = obj.index;
+                  let brandName = obj.item;
+                  return (
+                    <View
+                      style={{
+                        alignItems: "center",
+                        width: "100%",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {" "}
+                      <TextInput
+                        onChangeText={(val) => {
+                          let brandsArr = zSettingsObj.bikeBrands;
+                          brandsArr[idx] = val;
+                          handleSettingsFieldChange("bikeBrands", brandsArr);
+                        }}
+                        style={{
+                          marginBottom: 5,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "80%",
+                          textAlign: "center",
+                          color: C.textMain,
+                          outlineWidth: 0,
+                        }}
+                        value={brandName}
+                      />
+                      <BoxButton1
+                        onPress={() => {
+                          let arr = zSettingsObj.bikeBrands.filter(
+                            (name) => name !== brandName
+                          );
+                          handleSettingsFieldChange("bikeBrands", arr);
+                        }}
+                        style={{ marginLeft: 15 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                      />
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+
+          {/**Optional bike brands */}
+          <View style={{ width: "100%", alignItems: "center" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                backgroundColor: C.buttonLightGreen,
+                borderRadius: 5,
+                paddingHorizontal: 5,
+                paddingVertical: 5,
+                marginTop: 20,
+                marginBottom: 10,
+                width: "95%",
+              }}
+            >
+              <Text style={{ color: C.textMain }}>Category Name:</Text>
+              <TextInput
+                style={{
+                  width: "50%",
+                  marginLeft: 10,
+                  padding: 5,
+                  borderWidth: 2,
+                  borderRadius: 5,
+                  borderColor: C.buttonLightGreenOutline,
+                  outlineWidth: 0,
+                  color: C.textMain,
+                  marginRight: 10,
+                }}
+                value={zSettingsObj?.bikeOptionalBrandsName}
+                onChangeText={(val) => {
+                  handleSettingsFieldChange("bikeOptionalBrandsName", val);
+                }}
+              />
+              <BoxButton1
+                onPress={() => {
+                  let brandsArr = zSettingsObj?.bikeOptionalBrands;
+                  brandsArr.push("New Bike Brand...");
+                  handleSettingsFieldChange("bikeOptionalBrands", brandsArr);
+                }}
+              />
+            </View>
+            <View style={{ marginTop: 10, width: "100%" }}>
+              <FlatList
+                data={zSettingsObj?.bikeOptionalBrands || []}
+                renderItem={(obj) => {
+                  let idx = obj.index;
+                  let brandName = obj.item;
+                  return (
+                    <View
+                      style={{
+                        alignItems: "center",
+                        width: "100%",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {" "}
+                      <TextInput
+                        onChangeText={(val) => {
+                          let brandsArr = zSettingsObj.bikeOptionalBrands;
+                          brandsArr[idx] = val;
+                          handleSettingsFieldChange(
+                            "bikeOptionalBrands",
+                            brandsArr
+                          );
+                        }}
+                        style={{
+                          marginBottom: 5,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "80%",
+                          textAlign: "center",
+                          color: C.textMain,
+                          outlineWidth: 0,
+                        }}
+                        value={brandName}
+                      />
+                      <BoxButton1
+                        onPress={() => {
+                          let arr = zSettingsObj.bikeOptionalBrands.filter(
+                            (name) => name !== brandName
+                          );
+                          handleSettingsFieldChange("bikeOptionalBrands", arr);
+                        }}
+                        style={{ marginLeft: 15 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                      />
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+
+          {/**Bike Descriptions*/}
+          <View style={{ width: "100%", alignItems: "center" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: C.buttonLightGreen,
+                borderRadius: 5,
+                paddingHorizontal: 20,
+                paddingVertical: 5,
+                marginTop: 20,
+                marginBottom: 10,
+                width: "95%",
+              }}
+            >
+              <Text style={{ color: C.textMain, marginRight: 20 }}>
+                Bike Descriptions
+              </Text>
+              <BoxButton1
+                onPress={() => {
+                  let brandsArr = zSettingsObj?.bikeDescriptions;
+                  brandsArr.push("New Bike Description...");
+                  handleSettingsFieldChange("bikeDescriptions", brandsArr);
+                }}
+              />
+            </View>
+            <View style={{ marginTop: 10, width: "100%" }}>
+              <FlatList
+                data={zSettingsObj?.bikeDescriptions || []}
+                renderItem={(obj) => {
+                  let idx = obj.index;
+                  let brandName = obj.item;
+                  return (
+                    <View
+                      style={{
+                        alignItems: "center",
+                        width: "100%",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <TextInput
+                        onChangeText={(val) => {
+                          let descriptionsArr = zSettingsObj.bikeDescriptions;
+                          descriptionsArr[idx] = val;
+                          handleSettingsFieldChange(
+                            "bikeDescriptions",
+                            descriptionsArr
+                          );
+                        }}
+                        style={{
+                          marginBottom: 5,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "80%",
+                          textAlign: "center",
+                          color: C.textMain,
+                          outlineWidth: 0,
+                        }}
+                        value={brandName}
+                      />
+                      <BoxButton1
+                        onPress={() => {
+                          let arr = zSettingsObj.bikeDescriptions.filter(
+                            (name) => name !== brandName
+                          );
+                          handleSettingsFieldChange("bikeDescriptions", arr);
+                        }}
+                        style={{ marginLeft: 15 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                      />
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+        </BoxContainerInnerComponent>
+      ) : null}
+    </BoxContainerOuterComponent>
+  );
+};
+
+const PaymentProcessingComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+  sExpand,
+}) => {
+  // const [sExpand, _setExpand] = useState();
+
+  return (
+    <BoxContainerOuterComponent>
+      {sExpand ? (
+        <BoxContainerInnerComponent>
+          <CheckBox_
+            isChecked={zSettingsObj?.acceptChecks}
+            textStyle={{ fontSize: 15 }}
+            buttonStyle={{
+              backgroundColor: "transparent",
+            }}
+            text={"Accepts checks"}
+            onCheck={() =>
+              handleSettingsFieldChange(
+                "acceptChecks",
+                !zSettingsObj?.acceptChecks
+              )
+            }
+          />
+          <CheckBox_
+            isChecked={zSettingsObj?.autoConnectToCardReader}
+            textStyle={{ fontSize: 15 }}
+            buttonStyle={{
+              backgroundColor: "transparent",
+            }}
+            text={"Auto connect to card reader"}
+            onCheck={() =>
+              handleSettingsFieldChange(
+                "autoConnectToCardReader",
+                !zSettingsObj?.autoConnectToCardReader
+              )
+            }
+          />
+          {/**card reader flatlist */}
+          <View
+            style={{
+              width: "100%",
+              alignItems: "flex-end",
+              marginTop: 10,
+            }}
+          >
+            <View
+              style={{
+                borderRadius: 5,
+                backgroundColor: "rgba(0,0,0,.1)",
+                padding: 10,
+                alignItems: "flex-end",
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    marginBottom: 10,
+                    alignItems: "center",
+                    // backgroundColor: "red",
+                  }}
+                >
+                  <BoxButton1
+                    onPress={() => {
+                      log("need new card reader function");
+                    }}
+                    icon={ICONS.add}
+                    style={{ marginRight: 10 }}
+                  />
+                  <Text style={{ fontSize: 12, color: makeGrey(0.6) }}>
+                    {"STRIPE CARD READERS"}
+                  </Text>
+                </View>
+              </View>
+              {/**Flatlist showing the available card readers */}
+              <FlatList
+                ItemSeparatorComponent={() => (
+                  <View
+                    style={{
+                      height: 5,
+                    }}
+                  />
+                )}
+                style={{}}
+                data={zSettingsObj?.cardReaders || []}
+                renderItem={(obj) => {
+                  obj = cloneDeep(obj);
+                  let idx = obj.index;
+                  let item = obj.item;
+                  return (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "flex-end",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ color: makeGrey(0.55), marginRight: 10 }}>
+                        ID:
+                      </Text>
+                      <TextInput
+                        style={{ outlineWidth: 0 }}
+                        editable={true}
+                        value={item.id}
+                      />
+                      <TextInput
+                        value={item.label}
+                        onChangeText={(val) => {
+                          let cardReaderArr = zSettingsObj.cardReaders?.map(
+                            (o) => {
+                              if (o.id === item.id) return { ...o, label: val };
+                              return o;
+                            }
+                          );
+                          handleSettingsFieldChange(
+                            "cardReaders",
+                            cloneDeep(cardReaderArr)
+                          );
+                        }}
+                        style={{
+                          textAlign: "right",
+                          paddingRight: 2,
+                          justifyContent: "flex-end",
+                          paddingVertical: 4,
+                          backgroundColor: C.listItemWhite,
+                          borderWidth: 1,
+                          paddingRight: 2,
+                          borderColor: C.buttonLightGreenOutline,
+                          outlineWidth: 0,
+                        }}
+                      />
+                      <Button_
+                        buttonStyle={{ paddingHorizontal: 10 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                        onPress={() => {}}
+                      />
+                    </View>
+                    // </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              width: "95%",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              marginTop: 20,
+            }}
+          >
+            <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
+            <DropdownComponent
+              label={zSettingsObj?.selectedCardReaderObj?.label || ""}
+              data={zSettingsObj?.cardReaders || []}
+              onSelect={(obj) =>
+                handleSettingsFieldChange("selectedCardReaderObj", obj)
+              }
+            />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              marginTop: 20,
+            }}
+          >
+            <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
+            <TextInput
+              style={{
+                outlineWidth: 0,
+                borderRadius: 5,
+                textAlign: "right",
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                paddingHorizontal: 5,
+                paddingVertical: 3,
+                marginRight: 3,
+                width: 75,
+              }}
+              value={zSettingsObj?.salesTax || ""}
+              onChangeText={(val) => {
+                const regex = new RegExp(".", "g");
+                let containsDecimalAlready = val.split(".").length > 2;
+                if (checkInputForNumbersOnly(val) && !containsDecimalAlready) {
+                  handleSettingsFieldChange("salesTax", val);
+                }
+              }}
+            />
+            <Text>%</Text>
+          </View>
+        </BoxContainerInnerComponent>
+      ) : null}
+    </BoxContainerOuterComponent>
+  );
+};
+
+const StatusesComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+  sExpand,
+}) => {
+  // const [sExpand, _setExpand] = useState(true);
   const [sBackgroundColorWheelItem, _setBackgroundColorWheelItem] = useState();
   const [sTextColorWheelItem, _setTextColorWheelItem] = useState();
   const [sEditableInputIdx, _setEditableInputIdx] = useState(null);
@@ -996,28 +1334,29 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
 
   return (
     <BoxContainerOuterComponent
-      style={{ marginTop: 20, width: "100%", backgroundColor: "transparent" }}
+      style={{ backgroundColor: "transparent", borderWidth: 0 }}
     >
-      <BoxContainerLabelComponent
-        // style={{ width: "100%" }}
-        handleExpandPress={() => _setExpand(!sExpand)}
-        icon={ICONS.maximize}
-        text={"workorder statuses"}
-        expanded={sExpand}
-      />
       {sExpand ? (
         <BoxContainerInnerComponent
           style={{
             backgroundColor: "transparent",
             borderWidth: 0,
-            alignItems: "flex-end",
+            alignItems: "center",
             paddingHorizontal: 0,
             paddingVertical: 0,
             width: "100%",
+            // borderWidth: 1,
           }}
         >
           <BoxButton1
-            style={{ marginTop: 10 }}
+            style={{
+              marginTop: 10,
+              width: 130,
+              paddingVertical: 0,
+              marginBottom: 20,
+              backgroundColor: makeGrey(0.15),
+            }}
+            label={"New Status"}
             onPress={() => {
               let proto = {};
               Object.keys(zSettingsObj.statuses[0]).forEach((key) => {
@@ -1036,14 +1375,18 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <View
             style={{
               width: "100%",
-              alignItems: "flex-end",
+              alignItems: "center",
             }}
           >
             <FlatList
               data={zSettingsObj?.statuses || []}
               style={{
                 marginTop: 7,
-                width: "100%",
+                borderWidth: 1,
+                padding: 20,
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 5,
+                // width: "100%",
               }}
               renderItem={(obj) => {
                 let idx = obj.index;
@@ -1056,17 +1399,19 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       alignItems: "center",
                       width: "100%",
                       justifyContent: "flex-end",
+                      // backgroundColor: "red",
                     }}
                   >
                     <View
                       style={{
                         flexDirection: "row",
                         width: "100%",
-                        justifyContent: "flex-end",
+                        alignItems: "center",
+                        // justifyContent: "flex-end",
                       }}
                     >
                       <BoxButton1
-                        style={{ paddingHorizontal: 3 }}
+                        style={{ paddingHorizontal: 5 }}
                         iconSize={22}
                         icon={ICONS.upChevron}
                         onPress={() => {
@@ -1079,7 +1424,7 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                         }}
                       />
                       <BoxButton1
-                        style={{ paddingHorizontal: 3 }}
+                        style={{ paddingHorizontal: 5 }}
                         iconSize={22}
                         icon={ICONS.downChevron}
                         onPress={() => {
@@ -1093,7 +1438,7 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       />
 
                       <BoxButton1
-                        style={{ paddingHorizontal: 3 }}
+                        style={{ paddingHorizontal: 5 }}
                         iconSize={22}
                         icon={ICONS.editPencil}
                         onPress={() =>
@@ -1106,7 +1451,7 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                         }
                       />
                       <BoxButton1
-                        style={{ paddingHorizontal: 3, paddingRight: 5 }}
+                        style={{ paddingHorizontal: 5, paddingRight: 5 }}
                         iconSize={15}
                         icon={ICONS.close1}
                         onPress={() => {
@@ -1181,7 +1526,7 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                         ) : null}
                       </View>
                       <BoxButton1
-                        style={{ paddingHorizontal: 3 }}
+                        style={{ paddingHorizontal: 7 }}
                         iconSize={23}
                         icon={ICONS.colorWheel}
                         onPress={() => {
@@ -1204,7 +1549,7 @@ const StatusesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                             _setTextColorWheelItem(item);
                           }
                         }}
-                        style={{ paddingHorizontal: 3 }}
+                        style={{ paddingHorizontal: 7 }}
                         iconSize={22}
                         icon={ICONS.letterT}
                       />

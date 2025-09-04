@@ -129,6 +129,7 @@ export function BaseScreen() {
     //   _zSetSettingsObj(res);
     // });
     dbGetSettings().then((settingsObj) => {
+      // log("s", settingsObj);
       _zSetSettingsObj({ settingsObj, sendToDB: false });
       // log("res", res);
     });

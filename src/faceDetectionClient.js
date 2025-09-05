@@ -114,15 +114,17 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       //   return;
       const currentDesc = await getFaceDescriptor();
       if (currentDesc) {
-        // log("cur desc", currentDesc.length);
+        // log("cur desc", currentDesc);
         let userObj = zSettingsObj?.users?.find((userObj) => {
           if (!userObj.faceDescriptor) {
+            // log("here");
             return null;
           }
           try {
+            // log(userObj.faceDescriptor);
             const distance = faceapi.euclideanDistance(
-              // Object.values(userObj.faceDescriptor),
-              userObj.faceDescriptor,
+              // userObj.faceDescriptor,
+              Object.values(userObj.faceDescriptor),
               currentDesc
             );
             // log("dist", distance);
@@ -132,8 +134,14 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
               return null;
             }
           } catch (e) {
-            log(userObj);
-            log(e);
+            log(
+              "user: ",
+              userObj.first +
+                " " +
+                userObj.last +
+                "  error face recognition" +
+                e.toString()
+            );
           }
         });
 

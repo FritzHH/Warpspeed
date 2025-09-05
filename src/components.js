@@ -10,7 +10,13 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
 } from "react-native-web";
-import React, { Component, useCallback, useEffect, useRef } from "react";
+import React, {
+  Component,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { Animated, Easing, Image } from "react-native-web";
 import {
   addDashesToPhone,
@@ -2578,8 +2584,13 @@ export const CheckBox_ = ({
       icon={isChecked ? ICONS.checkbox : ICONS.checkoxEmpty}
       iconSize={15}
       text={text}
-      buttonStyle={buttonStyle}
-      textStyle={{ ...textStyle }}
+      buttonStyle={{
+        backgroundColor: "transparent",
+        paddingHorizontal: 0,
+        paddingVertical: 0,
+        ...buttonStyle,
+      }}
+      textStyle={{ color: C.textMain, fontSize: 15, ...textStyle }}
       onPress={onCheck}
       enableMouseOver={false}
     />
@@ -2902,3 +2913,114 @@ export const NumberSpinner_ = ({
     </View>
   );
 };
+
+// Generate time slots from 12:00 AM → 12:00 PM in 30 min increments
+function generateTimes() {
+  const times = [];
+  for (let m = 0; m <= 12 * 60; m += 30) {
+    let hours24 = Math.floor(m / 60);
+    let minutes = m % 60;
+
+    let period = hours24 < 12 ? "AM" : "PM";
+    let hours12 = hours24 % 12;
+    if (hours12 === 0) hours12 = 12;
+
+    const label = `${hours12}:${minutes.toString().padStart(2, "0")} ${period}`;
+    times.push({ label, minutes: m });
+  }
+  return times;
+}
+
+export function TimeSpinner({
+  onChange = () => {},
+  initialMinutes = 0,
+  itemHeight = 20,
+  style,
+}) {
+  const times = useMemo(() => generateTimes(), []);
+  const [selected, setSelected] = useState(initialMinutes);
+
+  const listRef = useRef(null);
+
+  // Find index of initial selection
+  const initialIndex = times.findIndex((t) => t.minutes === initialMinutes);
+
+  const handleSelect = (item) => {
+    setSelected(item.minutes);
+    onChange(item);
+  };
+  const styles = {
+    container: {
+      width: 120,
+      overflow: "hidden",
+      alignSelf: "center",
+    },
+    item: {
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    text: {
+      fontSize: 18,
+      color: "#555",
+    },
+    selectedText: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: "#000",
+    },
+    selector: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: "#aaa",
+    },
+  };
+
+  return (
+    <View style={[styles.container, { height: itemHeight * 5 }, style]}>
+      <FlatList
+        ref={listRef}
+        data={times}
+        keyExtractor={(item) => item.minutes.toString()}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={itemHeight}
+        decelerationRate="fast"
+        getItemLayout={(_, index) => ({
+          length: itemHeight,
+          offset: itemHeight * index,
+          index,
+        })}
+        initialScrollIndex={initialIndex > -1 ? initialIndex : 0}
+        renderItem={({ item }) => {
+          const isSelected = item.minutes === selected;
+          return (
+            <TouchableOpacity
+              style={[styles.item, { height: itemHeight }]}
+              onPress={() => handleSelect(item)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.text, isSelected && styles.selectedText]}>
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
+        onMomentumScrollEnd={(e) => {
+          const offsetY = e.nativeEvent.contentOffset.y;
+          const index = Math.round(offsetY / itemHeight);
+          if (times[index]) handleSelect(times[index]);
+        }}
+      />
+      {/* Selection indicator (overlay) */}
+      <View
+        style={[
+          styles.selector,
+          { top: (itemHeight * 5) / 2 - itemHeight / 2, height: itemHeight },
+        ]}
+        pointerEvents="none"
+      />
+    </View>
+  );
+}

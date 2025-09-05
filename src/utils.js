@@ -302,6 +302,30 @@ export function decrementNumByFive(input) {
   return currentValue;
 }
 
+export function generateTimesForListDisplay() {
+  const times = [];
+  const startMinutes = 0; // 12:00 AM → 0 minutes
+  const endMinutes = 12 * 60; // 12:00 PM → 720 minutes
+  const step = 30; // step size in minutes (adjust as needed)
+
+  for (let m = startMinutes; m <= endMinutes; m += step) {
+    let hours24 = Math.floor(m / 60);
+    let minutes = m % 60;
+
+    // Convert 24h → 12h format
+    let period = hours24 < 12 ? "AM" : "PM";
+    let hours12 = hours24 % 12;
+    if (hours12 === 0) hours12 = 12;
+
+    // Format as hh:mm
+    const label = `${hours12}:${minutes.toString().padStart(2, "0")} ${period}`;
+
+    times.push({ label, minutes: m });
+  }
+
+  return times;
+}
+
 // searching and filters ////////////////////////////////////////
 export function searchPhoneNum(searchTerm, customerArrToSearch) {
   let resObj = {};

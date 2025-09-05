@@ -2,6 +2,11 @@
 export const FACE_DESCRIPTOR_CONFIDENCE_DISTANCE = 0.55;
 export const DB_BATCH_INTERVAL_MILLIS = 500;
 
+export const DISCOUNT_TYPES = {
+  percent: "%",
+  dollar: "$",
+};
+
 // timing and interval
 export const MILLIS_IN_MINUTE = 60000;
 export const MILLIS_IN_HOUR = MILLIS_IN_MINUTE * 60;

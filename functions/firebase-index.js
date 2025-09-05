@@ -1,7 +1,7 @@
 /* eslint-disable */
 const { logger } = require("firebase-functions");
 const { onRequest } = require("firebase-functions/v2/https");
-const ftp = require("basic-ftp");
+// const ftp = require("basic-ftp");
 const fs = require("fs");
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
@@ -79,45 +79,45 @@ function log(one, two) {
 }
 
 // ftp reader
-exports.readFTPFile = onRequest(
-  { cors: true, secrets: [stripeSecretKey] },
-  async (req, res) => {
-    log("Incoming FTP read request");
-    const client = new ftp.Client();
-    client.ftp.verbose = true; // Optional: for debug logging
+// exports.readFTPFile = onRequest(
+//   { cors: true, secrets: [stripeSecretKey] },
+//   async (req, res) => {
+//     log("Incoming FTP read request");
+//     const client = new ftp.Client();
+//     client.ftp.verbose = true; // Optional: for debug logging
 
-    //     Server                   : ftp.jbi.bike
-    // Login name         : 121080
-    // Password            : g3QX&bn5
+//     //     Server                   : ftp.jbi.bike
+//     // Login name         : 121080
+//     // Password            : g3QX&bn5
 
-    try {
-      // Connect to FTP server
-      await client.access({
-        host: "ftp.jbi.bike",
-        user: "121080",
-        password: "g3QX&bn5",
-        secure: false, // Set to true if using FTPS
-      });
+//     try {
+//       // Connect to FTP server
+//       await client.access({
+//         host: "ftp.jbi.bike",
+//         user: "121080",
+//         password: "g3QX&bn5",
+//         secure: false, // Set to true if using FTPS
+//       });
 
-      // List files in the root directory
-      log("Directory listing for FTP host:");
-      const list = await client.list();
-      list.forEach((item) => console.log(item.name));
+//       // List files in the root directory
+//       log("Directory listing for FTP host:");
+//       const list = await client.list();
+//       list.forEach((item) => console.log(item.name));
 
-      // Download a file (change 'file.txt' to your file name)
-      await client.downloadTo("local-file.txt", "file.txt");
-      log("File downloaded!");
+//       // Download a file (change 'file.txt' to your file name)
+//       await client.downloadTo("local-file.txt", "file.txt");
+//       log("File downloaded!");
 
-      // Read the downloaded file
-      const content = fs.readFileSync("local-file.txt", "utf8");
-      log("File content for FTP transfer:");
-      log(content);
-    } catch (err) {
-      console.error(err);
-    }
-    client.close();
-  }
-);
+//       // Read the downloaded file
+//       const content = fs.readFileSync("local-file.txt", "utf8");
+//       log("File content for FTP transfer:");
+//       log(content);
+//     } catch (err) {
+//       console.error(err);
+//     }
+//     client.close();
+//   }
+// );
 
 // server driven Stripe payments
 exports.processServerDrivenStripePayment = onRequest(

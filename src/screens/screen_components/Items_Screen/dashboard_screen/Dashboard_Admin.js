@@ -15,6 +15,7 @@ import {
   checkInputForNumbersOnly,
   clog,
   generateRandomID,
+  generateTimesForListDisplay,
   log,
   makeGrey,
   moveItemInArr,
@@ -34,13 +35,14 @@ import {
   Image_,
   NumberSpinner_,
   ScreenModal,
+  TimeSpinner,
 } from "../../../../components";
 import { cloneDeep, set } from "lodash";
 import { dbSetSettings } from "../../../../db_call_wrapper";
 import { Children, useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
-import { PERMISSION_LEVELS } from "../../../../constants";
+import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
 import { APP_USER } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
@@ -59,14 +61,10 @@ export function Dashboard_Admin({}) {
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
     useState(false);
   const [sPunchClockUserObj, _setPunchClockUserObj] = useState(null);
-  const [sExpand, _setExpand] = useState("");
+  const [sExpand, _setExpand] = useState("Store Info");
 
   ///////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////
 
-  // user action handlers ///////////////////////////////////////////////////
-
-  // user component
   function commitUserInfoChange(userObj, sNewUserObj) {
     // let settingsObj = cloneDeep(zSettingsObj);
     // let users = zSettingsObj.users.map(user => {
@@ -101,15 +99,13 @@ export function Dashboard_Admin({}) {
     // let settingsObj = cloneDeep(zSettingsObj);
     let userArr = zSettingsObj.users.map((o) => {
       if (o.id === userObj.id) {
-        o.faceDescriptor = desc;
-        return o;
+        // o.faceDescriptor = [...desc];
+        return { ...o, faceDescriptor: desc };
       }
       return o;
     });
     _zSetSettingsField("users", userArr);
   }
-
-  // payment processing component ////////////////////////////////////////
 
   function handleSettingsFieldChange(fieldName, fieldValue) {
     _zSetSettingsField(fieldName, fieldValue);
@@ -155,26 +151,29 @@ export function Dashboard_Admin({}) {
             borderRadius: 5,
             paddingRight: 10,
             paddingLeft: 5,
-            backgroundColor: C.listItemWhite,
+            backgroundColor: C.backgroundListWhite,
             borderColor: C.buttonLightGreenOutline,
-            height: 200,
+            height: 300,
             borderWidth: 1,
+            paddingTop: 13,
           }}
         >
-          <VerticalSpacer />
           <SettingsLabelListComponent
             // style={{ width: "100%" }}
+            selected={sExpand === "User Accounts"}
             handleExpandPress={() =>
               _setExpand(sExpand === "User Accounts" ? null : "User Accounts")
             }
             text={"app user control"}
             style={{
+              fontWeight: sExpand === "User Accounts" ? 500 : null,
               color: sExpand === "User Accounts" ? C.lightred : makeGrey(0.6),
             }}
           />
           <VerticalSpacer />
           <SettingsLabelListComponent
             // style={{ width: "100%" }}
+            selected={sExpand === "Payment Processing"}
             handleExpandPress={() =>
               _setExpand(
                 sExpand === "Payment Processing" ? null : "Payment Processing"
@@ -182,6 +181,8 @@ export function Dashboard_Admin({}) {
             }
             text={"payment processing"}
             style={{
+              fontWeight: sExpand === "Payment Processing" ? 500 : null,
+
               color:
                 sExpand === "Payment Processing" ? C.lightred : makeGrey(0.6),
             }}
@@ -190,6 +191,7 @@ export function Dashboard_Admin({}) {
 
           <SettingsLabelListComponent
             // style={{ width: "100%" }}
+            selected={sExpand === "Workorder Statuses"}
             handleExpandPress={() =>
               _setExpand(
                 sExpand === "Workorder Statuses" ? null : "Workorder Statuses"
@@ -197,6 +199,8 @@ export function Dashboard_Admin({}) {
             }
             text={"workorder statuses"}
             style={{
+              fontWeight: sExpand === "Workorder Statuses" ? 500 : null,
+
               color:
                 sExpand === "Workorder Statuses" ? C.lightred : makeGrey(0.6),
             }}
@@ -205,15 +209,61 @@ export function Dashboard_Admin({}) {
 
           <SettingsLabelListComponent
             // style={{ width: "100%" }}
+            selected={sExpand === "Bike Options"}
             handleExpandPress={() =>
               _setExpand(sExpand === "Bike Options" ? null : "Bike Options")
             }
             style={{
+              fontWeight: sExpand === "Bike Options" ? 500 : null,
+
               color: sExpand === "Bike Options" ? C.lightred : makeGrey(0.6),
             }}
-            icon={ICONS.maximize}
             text={"Bike Options"}
           />
+          <VerticalSpacer />
+
+          <SettingsLabelListComponent
+            // style={{ width: "100%" }}
+            selected={sExpand === "Discounts"}
+            handleExpandPress={() =>
+              _setExpand(sExpand === "Discounts" ? null : "Discounts")
+            }
+            style={{
+              fontWeight: sExpand === "Discounts" ? 500 : null,
+
+              color: sExpand === "Discounts" ? C.lightred : makeGrey(0.6),
+            }}
+            text={"Discounts"}
+          />
+          <VerticalSpacer />
+          <SettingsLabelListComponent
+            // style={{ width: "100%" }}
+            selected={sExpand === "Wait Times"}
+            handleExpandPress={() =>
+              _setExpand(sExpand === "Wait Times" ? null : "Wait Times")
+            }
+            style={{
+              fontWeight: sExpand === "Wait Times" ? 500 : null,
+
+              color: sExpand === "Wait Times" ? C.lightred : makeGrey(0.6),
+            }}
+            text={"Wait Times"}
+          />
+          <VerticalSpacer />
+          <SettingsLabelListComponent
+            // style={{ width: "100%" }}
+            selected={sExpand === "Store Info"}
+            handleExpandPress={() =>
+              _setExpand(sExpand === "Store Info" ? null : "Store Info")
+            }
+            style={{
+              fontWeight: sExpand === "Store Info" ? 500 : null,
+
+              color: sExpand === "Store Info" ? C.lightred : makeGrey(0.6),
+            }}
+            text={"Store Info"}
+          />
+          <VerticalSpacer />
         </View>
 
         {/**right-side column container */}
@@ -226,7 +276,17 @@ export function Dashboard_Admin({}) {
           }}
         >
           <Text
-            style={{ color: makeGrey(0.6), marginBottom: 10, fontSize: 17 }}
+            style={{
+              // backgroundColor: C.backgroundListWhite,
+              // borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              color: makeGrey(0.6),
+              marginBottom: 10,
+              fontSize: 17,
+              fontWeight: 500,
+              // paddingHorizontal: 20,
+              // paddingVertical: 10,
+            }}
           >
             {sExpand?.toUpperCase()}
           </Text>
@@ -243,6 +303,7 @@ export function Dashboard_Admin({}) {
               _setFacialRecognitionModalUserObj
             }
             sExpand={sExpand === "User Accounts"}
+            handleSettingsFieldChange={handleSettingsFieldChange}
           />
           <StatusesComponent
             sExpand={sExpand === "Workorder Statuses"}
@@ -254,17 +315,40 @@ export function Dashboard_Admin({}) {
             zSettingsObj={zSettingsObj}
             handleSettingsFieldChange={handleSettingsFieldChange}
           />
+          <DiscountsComponent
+            sExpand={sExpand === "Discounts"}
+            zSettingsObj={zSettingsObj}
+            handleSettingsFieldChange={handleSettingsFieldChange}
+          />
+          <WaitTimesComponent
+            sExpand={sExpand === "Wait Times"}
+            zSettingsObj={zSettingsObj}
+            handleSettingsFieldChange={handleSettingsFieldChange}
+          />
+          <StoreInfoComponent
+            sExpand={sExpand === "Store Info"}
+            zSettingsObj={zSettingsObj}
+            handleSettingsFieldChange={handleSettingsFieldChange}
+          />
         </View>
       </View>
     </ScrollView>
   );
 }
 
-///////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 function VerticalSpacer({ height }) {
-  return <View style={{ height: 17 }} />;
+  return (
+    <View
+      style={{
+        height: 1,
+        marginVertical: 7,
+        width: "100%",
+        backgroundColor: makeGrey(0.1),
+      }}
+    />
+  );
 }
 
 function BoxContainerOuterComponent({ style = {}, children }) {
@@ -287,16 +371,23 @@ function SettingsLabelListComponent({
   style = {},
   icon,
   handleExpandPress,
+  selected,
 }) {
   let ICON_SIZE = 18;
+  const [sOpacity, _setOpacity] = useState(1);
+  selected ? (icon = ICONS.check) : null;
   return (
-    <View
+    <TouchableOpacity
+      onMouseEnter={() => _setOpacity(0.6)}
+      onMouseLeave={() => _setOpacity(1)}
+      onPress={handleExpandPress}
       style={{
         flexDirection: "row",
         width: "100%",
         justifyContent: "space-between",
         alignItems: "center",
         marginBottom: 4,
+        opacity: sOpacity,
         // backgroundColor: expanded ? "transparent" : makeGrey(0.4),
         // paddingHorizontal:
         // backgroundColor: "blue",
@@ -312,18 +403,8 @@ function SettingsLabelListComponent({
       >
         {text.toUpperCase()}
       </Text>
-      <Button_
-        visible={icon}
-        buttonStyle={{
-          paddingHorizontal: 0,
-          paddingVertical: 0,
-          marginLeft: 10,
-        }}
-        iconSize={ICON_SIZE}
-        icon={icon || ICONS.maximize}
-        onPress={handleExpandPress}
-      />
-    </View>
+      <Image_ size={ICON_SIZE} icon={icon || ICONS.expandGreen} />
+    </TouchableOpacity>
   );
 }
 
@@ -334,7 +415,7 @@ function BoxContainerInnerComponent({ style = {}, children }) {
         // width: null,
         borderWidth: 1,
         borderColor: C.buttonLightGreenOutline,
-        backgroundColor: C.listItemWhite,
+        backgroundColor: C.backgroundListWhite,
         borderRadius: 5,
         alignItems: "flex-end",
         padding: 10,
@@ -366,6 +447,37 @@ function BoxButton1({ label, style = {}, icon, iconSize, textStyle, onPress }) {
   );
 }
 
+function DropdownComponent({
+  ref,
+  data,
+  onSelect,
+  textStyle = {},
+  buttonStyle = {},
+  itemStyle = {},
+  itemTextStyle = {},
+  label,
+}) {
+  return (
+    <DropdownMenu
+      buttonText={label}
+      buttonTextStyle={{ fontSize: 14, ...textStyle }}
+      buttonStyle={{
+        borderRadius: 5,
+        borderWidth: 1,
+        borderColor: C.buttonLightGreenOutline,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        ...buttonStyle,
+      }}
+      itemTextStyle={{ ...itemTextStyle }}
+      itemStyle={{ ...itemStyle }}
+      onSelect={onSelect}
+      dataArr={data}
+      ref={ref}
+    />
+  );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////
 
 const AppUserListComponent = ({
@@ -374,6 +486,7 @@ const AppUserListComponent = ({
   _setFacialRecognitionModalUserObj,
   sExpand,
   handleRemoveUserPress,
+  handleSettingsFieldChange,
 }) => {
   const [sEditUserIndex, _setEditUserIndex] = useState(null);
   const [sShowPinIndex, _setShowPinIndex] = useState(false);
@@ -401,10 +514,112 @@ const AppUserListComponent = ({
       {sExpand ? (
         <BoxContainerInnerComponent
           style={{
-            backgroundColor: makeGrey(0.1),
+            backgroundColor: makeGrey(0.045),
             width: "80%",
+            // justifyContent: "flex-end",
           }}
         >
+          <View style={{ width: "100%", justifyContent: "flex-end" }}>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  width: "40%",
+                  color: C.textMain,
+                }}
+              >
+                {"Seconds to log user out: "}
+              </Text>
+              <TextInput
+                onChangeText={(val) => {
+                  handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
+                }}
+                style={{
+                  width: 50,
+                  marginLeft: 10,
+                  borderColor: C.green,
+                  borderWidth: 1,
+                  borderRadius: 5,
+                  paddingLeft: 3,
+                  outlineWidth: 0,
+                  color: C.textMain,
+                }}
+                value={zSettingsObj?.activeLoginTimeoutSeconds}
+              />
+            </View>
+          </View>
+          <View
+            style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
+          >
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  width: "40%",
+                  color: C.textMain,
+                }}
+              >
+                {"Hours to lock app: "}
+              </Text>
+              <TextInput
+                onChangeText={(val) => {
+                  handleSettingsFieldChange("idleLoginTimeoutHours", val);
+                }}
+                style={{
+                  width: 50,
+                  marginLeft: 10,
+                  borderColor: C.green,
+                  borderWidth: 1,
+                  borderRadius: 5,
+                  paddingLeft: 3,
+                  color: C.textMain,
+                  outlineWidth: 0,
+                }}
+                value={Math.round(zSettingsObj?.idleLoginTimeoutHours)}
+              />
+            </View>
+            <View style={{ width: "100%", justifyContent: "flex-end" }}>
+              <View style={{ flexDirection: "row", marginTop: 10 }}>
+                <Text
+                  style={{
+                    width: "40%",
+                    color: C.textMain,
+                  }}
+                >
+                  {"User login PIN length: "}
+                </Text>
+                <TextInput
+                  onChangeText={(val) => {
+                    handleSettingsFieldChange("userPinStrength", val);
+                  }}
+                  style={{
+                    width: 50,
+                    marginLeft: 10,
+                    borderColor: C.green,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    paddingLeft: 3,
+                    outlineWidth: 0,
+                    color: C.textMain,
+                  }}
+                  value={zSettingsObj?.userPinStrength}
+                />
+              </View>
+            </View>
+          </View>
+          <View
+            style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
+          >
+            <CheckBox_
+              buttonStyle={{ justifyContent: "flex-start" }}
+              isChecked={zSettingsObj?.lockScreenWhenUserLogsOut}
+              text={"Lock screen when user logs out"}
+              onCheck={() => {
+                handleSettingsFieldChange(
+                  "lockScreenWhenUserLogsOut",
+                  !zSettingsObj.lockScreenWhenUserLogsOut
+                );
+              }}
+            />
+          </View>
           <View
             style={{
               flexDirection: "row",
@@ -894,7 +1109,6 @@ const BikeBrandsComponent = ({
                         justifyContent: "center",
                       }}
                     >
-                      {" "}
                       <TextInput
                         onChangeText={(val) => {
                           let brandsArr = zSettingsObj.bikeBrands;
@@ -989,7 +1203,6 @@ const BikeBrandsComponent = ({
                         justifyContent: "center",
                       }}
                     >
-                      {" "}
                       <TextInput
                         onChangeText={(val) => {
                           let brandsArr = zSettingsObj.bikeOptionalBrands;
@@ -1117,6 +1330,672 @@ const BikeBrandsComponent = ({
   );
 };
 
+const DiscountsComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+  sExpand,
+}) => {
+  // const [sExpand, _setExpand] = useState();
+
+  return (
+    <BoxContainerOuterComponent style={{}}>
+      {sExpand ? (
+        <BoxContainerInnerComponent
+          style={{ width: "80%", alignItems: "center" }}
+        >
+          <View style={{ width: "100%", alignItems: "center" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                borderRadius: 5,
+                paddingHorizontal: 5,
+                width: "100%",
+              }}
+            >
+              <BoxButton1
+                onPress={() => {
+                  let discountsArr = zSettingsObj.discounts;
+                  let discount = {};
+                  discount.name = "";
+                  discount.type = "Percent";
+                  discount.value = "20";
+                  discount.id = generateRandomID();
+                  discountsArr.push(discount);
+                  discountsArr.push(discount);
+                  handleSettingsFieldChange("discounts", discountsArr);
+                }}
+              />
+            </View>
+            <View style={{ marginTop: 10, width: "100%" }}>
+              <FlatList
+                data={zSettingsObj?.discounts || []}
+                renderItem={(obj) => {
+                  let idx = obj.index;
+                  let item = obj.item;
+                  return (
+                    <View
+                      style={{
+                        alignItems: "center",
+                        width: "100%",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        marginBottom: 10,
+                        // backgroundColor: "blue",
+                      }}
+                    >
+                      <TextInput
+                        onChangeText={(val) => {
+                          let discountsArr = zSettingsObj.discounts.map((o) => {
+                            if (o.id === item.id) return { ...o, name: val };
+                            return o;
+                          });
+                          handleSettingsFieldChange("discounts", discountsArr);
+                        }}
+                        placeholder={"Discount Name"}
+                        placeholderTextColor={makeGrey(0.15)}
+                        style={{
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "80%",
+                          textAlign: "center",
+                          color: C.textMain,
+                          outlineWidth: 0,
+                          fontSize: 13,
+                          marginRight: 20,
+                          backgroundColor: C.listItemWhite,
+                        }}
+                        value={item.name}
+                      />
+                      <View
+                        style={{
+                          width: "20%",
+                          flexDirection: "row",
+                          alignItems: "center",
+                        }}
+                      >
+                        <DropdownComponent
+                          onSelect={(val) => {
+                            let discountsArr = zSettingsObj.discounts.map(
+                              (o) => {
+                                if (o.id === item.id)
+                                  return { ...o, type: val };
+                                return o;
+                              }
+                            );
+                            handleSettingsFieldChange(
+                              "discounts",
+                              discountsArr
+                            );
+                          }}
+                          textStyle={{ fontSize: 13 }}
+                          buttonStyle={{ width: 40 }}
+                          label={item.type}
+                          data={[DISCOUNT_TYPES.percent, DISCOUNT_TYPES.dollar]}
+                        />
+                        <BoxButton1
+                          onPress={() => {
+                            let arr = zSettingsObj.discounts.filter(
+                              (o) => o.id !== item.id
+                            );
+                            handleSettingsFieldChange("discounts", arr);
+                          }}
+                          style={{ marginLeft: 15 }}
+                          iconSize={15}
+                          icon={ICONS.close1}
+                        />
+                      </View>
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+        </BoxContainerInnerComponent>
+      ) : null}
+    </BoxContainerOuterComponent>
+  );
+};
+
+const WaitTimesComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+  sExpand,
+}) => {
+  // const [sExpand, _setExpand] = useState();
+
+  return (
+    <BoxContainerOuterComponent style={{}}>
+      {sExpand ? (
+        <BoxContainerInnerComponent
+          style={{ width: "80%", alignItems: "center" }}
+        >
+          <View style={{ width: "100%", alignItems: "center" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                borderRadius: 5,
+                paddingHorizontal: 5,
+                width: "100%",
+              }}
+            >
+              <BoxButton1
+                onPress={() => {
+                  let waitTimesArr = zSettingsObj.waitTimes;
+                  let waitTime = {};
+                  waitTime.label = "New wait time...";
+                  waitTime.maxWaitTimeDays = 0;
+                  waitTime.id = generateRandomID();
+                  waitTimesArr.push(waitTime);
+                  handleSettingsFieldChange("waitTimes", waitTimesArr);
+                }}
+              />
+            </View>
+            <View
+              style={{
+                width: "100%",
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              <View
+                style={{
+                  width: "66%",
+                  fontSize: 12,
+                  backgroundColor: "transparent",
+                }}
+              >
+                <Text style={{ fontColor: C.textMain }}>Label</Text>
+              </View>
+              <View
+                style={{
+                  width: "20%",
+                  alignItems: "center",
+                  // backgroundColor: "green",
+                }}
+              >
+                <Text
+                  style={{
+                    // width: "100%",
+                    fontColor: C.textMain,
+                    textAlign: "center",
+                    fontSize: 12,
+                  }}
+                >
+                  Max Wait Days
+                </Text>
+              </View>
+              <View style={{ width: "10%" }}></View>
+            </View>
+            <View style={{ marginTop: 10, width: "100%" }}>
+              <FlatList
+                data={zSettingsObj?.waitTimes || []}
+                style={{ width: "100%" }}
+                renderItem={(obj) => {
+                  let idx = obj.index;
+                  let item = obj.item;
+                  return (
+                    <View
+                      style={{
+                        alignItems: "center",
+                        width: "100%",
+                        flexDirection: "row",
+                        // justifyContent: "space-between",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <TextInput
+                        onChangeText={(val) => {
+                          let arr = zSettingsObj.waitTimes.map((o) => {
+                            if (o.id === item.id) return { ...o, label: val };
+                            return o;
+                          });
+                          handleSettingsFieldChange("waitTimes", arr);
+                        }}
+                        placeholder={"Wait time label"}
+                        placeholderTextColor={makeGrey(0.15)}
+                        style={{
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "70%",
+                          textAlign: "center",
+                          color: C.textMain,
+                          outlineWidth: 0,
+                          fontSize: 13,
+                          marginRight: 20,
+                          backgroundColor: C.listItemWhite,
+                        }}
+                        value={item.label}
+                      />
+                      <TextInput
+                        onChangeText={(val) => {
+                          let arr = zSettingsObj.waitTimes.map((o) => {
+                            if (o.id === item.id)
+                              return { ...o, maxVaitTimeDays: val };
+                            return o;
+                          });
+                          handleSettingsFieldChange("waitTimes", arr);
+                        }}
+                        placeholder={"Days"}
+                        placeholderTextColor={makeGrey(0.15)}
+                        style={{
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "20%",
+                          textAlign: "center",
+                          color: C.textMain,
+                          outlineWidth: 0,
+                          fontSize: 13,
+                          marginRight: 20,
+                          backgroundColor: C.listItemWhite,
+                        }}
+                        value={item.maxWaitTimeDays}
+                      />
+                      <View
+                        style={{
+                          width: "10%",
+                          flexDirection: "row",
+                          alignItems: "center",
+                        }}
+                      >
+                        <BoxButton1
+                          onPress={() => {
+                            let arr = zSettingsObj.waitTimes.filter(
+                              (o) => o.id !== item.id
+                            );
+                            handleSettingsFieldChange("waitTimes", arr);
+                          }}
+                          style={{ marginLeft: 15 }}
+                          iconSize={15}
+                          icon={ICONS.close1}
+                        />
+                      </View>
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+        </BoxContainerInnerComponent>
+      ) : null}
+    </BoxContainerOuterComponent>
+  );
+};
+
+const StoreInfoComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+  sExpand,
+}) => {
+  // const [sExpand, _setExpand] = useState();
+  if (!zSettingsObj) return null;
+  return (
+    <BoxContainerOuterComponent style={{}}>
+      {sExpand ? (
+        <BoxContainerInnerComponent
+          style={{ width: "80%", alignItems: "center" }}
+        >
+          <View
+            style={{
+              width: "100%",
+              justifyContent: "flex-end",
+              flexDirection: "row",
+              alignItems: "center",
+              // backgroundColor: "green",
+            }}
+          >
+            <Text
+              style={{
+                textAlign: "right",
+                fontColor: C.textMain,
+                width: "30%",
+              }}
+            >
+              Display Name:
+            </Text>
+            <TextInput
+              style={{
+                width: "70%",
+                marginLeft: 10,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                padding: 3,
+                paddingRight: 7,
+                textAlign: "right",
+                outlineWidth: 0,
+              }}
+              value={zSettingsObj.storeInfo.displayName}
+              onChangeText={() => {}}
+            />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              justifyContent: "flex-end",
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 10,
+
+              // backgroundColor: "green",
+            }}
+          >
+            <Text
+              style={{
+                textAlign: "right",
+                fontColor: C.textMain,
+                width: "30%",
+              }}
+            >
+              Phone Number:
+            </Text>
+            <TextInput
+              style={{
+                width: "70%",
+                marginLeft: 10,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                padding: 3,
+                paddingRight: 7,
+                textAlign: "right",
+                outlineWidth: 0,
+              }}
+              value={addDashesToPhone(zSettingsObj.storeInfo.phone)}
+              onChangeText={() => {}}
+            />
+          </View>
+
+          <View
+            style={{
+              width: "100%",
+              justifyContent: "flex-end",
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 10,
+
+              // backgroundColor: "green",
+            }}
+          >
+            <Text
+              style={{
+                textAlign: "right",
+                fontColor: C.textMain,
+                width: "30%",
+              }}
+            >
+              Street:
+            </Text>
+            <TextInput
+              style={{
+                width: "70%",
+                marginLeft: 10,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                padding: 3,
+                paddingRight: 7,
+                textAlign: "right",
+                outlineWidth: 0,
+              }}
+              value={zSettingsObj.storeInfo.address.street}
+              onChangeText={(street) => {
+                handleSettingsFieldChange("storeInfo", {
+                  ...zSettingsObj.storeInfo,
+                  address: {
+                    ...zSettingsObj.storeInfo.address,
+                    street,
+                  },
+                });
+              }}
+            />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              justifyContent: "flex-end",
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 10,
+
+              // backgroundColor: "green",
+            }}
+          >
+            <Text
+              style={{
+                textAlign: "right",
+                fontColor: C.textMain,
+                width: "30%",
+              }}
+            >
+              Unit:
+            </Text>
+            <TextInput
+              style={{
+                width: "70%",
+                marginLeft: 10,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                padding: 3,
+                paddingRight: 7,
+                textAlign: "right",
+                outlineWidth: 0,
+              }}
+              value={zSettingsObj.storeInfo.address.unit}
+              onChangeText={(unit) => {
+                handleSettingsFieldChange("storeInfo", {
+                  ...zSettingsObj.storeInfo,
+                  address: {
+                    ...zSettingsObj.storeInfo.address,
+                    unit,
+                  },
+                });
+              }}
+            />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              justifyContent: "flex-end",
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 10,
+
+              // backgroundColor: "green",
+            }}
+          >
+            <Text
+              style={{
+                textAlign: "right",
+                fontColor: C.textMain,
+                width: "30%",
+              }}
+            >
+              City:
+            </Text>
+            <TextInput
+              style={{
+                width: "70%",
+                marginLeft: 10,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                padding: 3,
+                paddingRight: 7,
+                textAlign: "right",
+                outlineWidth: 0,
+              }}
+              value={zSettingsObj.storeInfo.address.city}
+              onChangeText={(city) => {
+                handleSettingsFieldChange("storeInfo", {
+                  ...zSettingsObj.storeInfo,
+                  address: {
+                    ...zSettingsObj.storeInfo.address,
+                    city,
+                  },
+                });
+              }}
+            />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              justifyContent: "flex-end",
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 10,
+
+              // backgroundColor: "green",
+            }}
+          >
+            <Text
+              style={{
+                textAlign: "right",
+                fontColor: C.textMain,
+                width: "30%",
+              }}
+            >
+              State or Abbrev.
+            </Text>
+            <TextInput
+              style={{
+                width: "70%",
+                marginLeft: 10,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                padding: 3,
+                paddingRight: 7,
+                textAlign: "right",
+                outlineWidth: 0,
+              }}
+              value={zSettingsObj.storeInfo.address.state}
+              onChangeText={(state) => {
+                handleSettingsFieldChange("storeInfo", {
+                  ...zSettingsObj.storeInfo,
+                  address: {
+                    ...zSettingsObj.storeInfo.address,
+                    state,
+                  },
+                });
+              }}
+            />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              justifyContent: "flex-end",
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 10,
+
+              // backgroundColor: "green",
+            }}
+          >
+            <Text
+              style={{
+                textAlign: "right",
+                fontColor: C.textMain,
+                width: "30%",
+              }}
+            >
+              Zip Code:
+            </Text>
+            <TextInput
+              style={{
+                width: "70%",
+                marginLeft: 10,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                padding: 3,
+                paddingRight: 7,
+                textAlign: "right",
+                outlineWidth: 0,
+              }}
+              value={zSettingsObj.storeInfo.address.zip}
+              onChangeText={(zip) => {
+                handleSettingsFieldChange("storeInfo", {
+                  ...zSettingsObj.storeInfo,
+                  address: {
+                    ...zSettingsObj.storeInfo.address,
+                    zip,
+                  },
+                });
+              }}
+            />
+          </View>
+          {Object.values(zSettingsObj?.storeHours.standard).map((item, idx) => (
+            <View
+              style={{
+                width: "100%",
+                flexDirection: "row",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  // width: "50%",
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                  // backgroundColor: "red",
+                }}
+              >
+                <Text style={{ width: 50 }}>Open:</Text>
+                <TextInput
+                  style={{
+                    textAlign: "right",
+                    paddingRight: 2,
+                    backgroundColor: "transparent",
+                    width: 30,
+                    fontSize: 15,
+                    marginVertical: 3,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    marginRight: 2,
+                    outlineColor: "transparent",
+                  }}
+                  value={item.open.split(":")[0]}
+                />
+                <Text>:</Text>
+                <TextInput
+                  style={{
+                    textAlign: "left",
+                    paddingLeft: 2,
+                    backgroundColor: "transparent",
+                    width: 30,
+                    fontSize: 15,
+                    marginVertical: 3,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    marginLeft: 2,
+                    outlineColor: "transparent",
+                    backgroundColor: "transparent",
+                    width: 30,
+                  }}
+                  value={item.open.split(":")[1].split(" ")[0]}
+                />
+              </View>
+              <CheckBox_
+                buttonStyle={{ marginLeft: 20 }}
+                text={"Open"}
+                isChecked={item.isOpen}
+              />
+            </View>
+          ))}
+        </BoxContainerInnerComponent>
+      ) : null}
+    </BoxContainerOuterComponent>
+  );
+};
+
 const PaymentProcessingComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
@@ -1174,6 +2053,9 @@ const PaymentProcessingComponent = ({
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <View
+                  style={{ width: "100%", justifyContent: "flex-end" }}
+                ></View>
+                <View
                   style={{
                     flexDirection: "row",
                     justifyContent: "flex-end",
@@ -1194,6 +2076,7 @@ const PaymentProcessingComponent = ({
                   </Text>
                 </View>
               </View>
+
               {/**Flatlist showing the available card readers */}
               <FlatList
                 ItemSeparatorComponent={() => (
@@ -1609,34 +2492,3 @@ const StatusesComponent = ({
     </BoxContainerOuterComponent>
   );
 };
-
-function DropdownComponent({
-  ref,
-  data,
-  onSelect,
-  textStyle = {},
-  buttonStyle = {},
-  itemStyle = {},
-  itemTextStyle = {},
-  label,
-}) {
-  return (
-    <DropdownMenu
-      buttonText={label}
-      buttonTextStyle={{ fontSize: 14, ...textStyle }}
-      buttonStyle={{
-        borderRadius: 5,
-        borderWidth: 1,
-        borderColor: C.buttonLightGreenOutline,
-        paddingHorizontal: 7,
-        paddingVertical: 3,
-        ...buttonStyle,
-      }}
-      itemTextStyle={{ ...itemTextStyle }}
-      itemStyle={{ ...itemStyle }}
-      onSelect={onSelect}
-      dataArr={data}
-      ref={ref}
-    />
-  );
-}

@@ -1664,7 +1664,7 @@ const StoreInfoComponent = ({
             </Text>
             <TextInput
               style={{
-                width: "70%",
+                width: "50%",
                 marginLeft: 10,
                 borderWidth: 1,
                 borderColor: C.buttonLightGreenOutline,
@@ -1673,8 +1673,22 @@ const StoreInfoComponent = ({
                 textAlign: "right",
                 outlineWidth: 0,
               }}
-              value={zSettingsObj.storeInfo.displayName}
-              onChangeText={() => {}}
+              value={zSettingsObj?.storeInfo.displayName}
+              onChangeText={(unit) => {
+                handleSettingsFieldChange("displayName", {
+                  ...zSettingsObj?.displayName,
+                  unit,
+                });
+              }}
+            />
+            <CheckBox_
+              onCheck={() => {}}
+              buttonStyle={{ marginLeft: 7 }}
+              text={"Receipt"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+                (o) => o === "displayName"
+              )}
             />
           </View>
           <View
@@ -1699,7 +1713,7 @@ const StoreInfoComponent = ({
             </Text>
             <TextInput
               style={{
-                width: "70%",
+                width: "50%",
                 marginLeft: 10,
                 borderWidth: 1,
                 borderColor: C.buttonLightGreenOutline,
@@ -1708,8 +1722,21 @@ const StoreInfoComponent = ({
                 textAlign: "right",
                 outlineWidth: 0,
               }}
-              value={addDashesToPhone(zSettingsObj.storeInfo.phone)}
-              onChangeText={() => {}}
+              value={addDashesToPhone(zSettingsObj?.storeInfo.phone)}
+              onChangeText={(unit) => {
+                handleSettingsFieldChange("phone", {
+                  ...zSettingsObj?.phone,
+                  unit,
+                });
+              }}
+            />
+            <CheckBox_
+              buttonStyle={{ marginLeft: 7 }}
+              text={"Receipt"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+                (o) => o === "phone"
+              )}
             />
           </View>
 
@@ -1735,7 +1762,7 @@ const StoreInfoComponent = ({
             </Text>
             <TextInput
               style={{
-                width: "70%",
+                width: "50%",
                 marginLeft: 10,
                 borderWidth: 1,
                 borderColor: C.buttonLightGreenOutline,
@@ -1744,16 +1771,21 @@ const StoreInfoComponent = ({
                 textAlign: "right",
                 outlineWidth: 0,
               }}
-              value={zSettingsObj.storeInfo.address.street}
+              value={zSettingsObj?.storeInfo.street}
               onChangeText={(street) => {
                 handleSettingsFieldChange("storeInfo", {
                   ...zSettingsObj.storeInfo,
-                  address: {
-                    ...zSettingsObj.storeInfo.address,
-                    street,
-                  },
+                  street,
                 });
               }}
+            />
+            <CheckBox_
+              buttonStyle={{ marginLeft: 7 }}
+              text={"Receipt"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+                (o) => o === "street"
+              )}
             />
           </View>
           <View
@@ -1778,7 +1810,7 @@ const StoreInfoComponent = ({
             </Text>
             <TextInput
               style={{
-                width: "70%",
+                width: "50%",
                 marginLeft: 10,
                 borderWidth: 1,
                 borderColor: C.buttonLightGreenOutline,
@@ -1787,16 +1819,21 @@ const StoreInfoComponent = ({
                 textAlign: "right",
                 outlineWidth: 0,
               }}
-              value={zSettingsObj.storeInfo.address.unit}
+              value={zSettingsObj?.storeInfo.unit}
               onChangeText={(unit) => {
                 handleSettingsFieldChange("storeInfo", {
-                  ...zSettingsObj.storeInfo,
-                  address: {
-                    ...zSettingsObj.storeInfo.address,
-                    unit,
-                  },
+                  ...zSettingsObj?.storeInfo,
+                  unit,
                 });
               }}
+            />
+            <CheckBox_
+              buttonStyle={{ marginLeft: 7 }}
+              text={"Receipt"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+                (o) => o === "unit"
+              )}
             />
           </View>
           <View
@@ -1821,7 +1858,7 @@ const StoreInfoComponent = ({
             </Text>
             <TextInput
               style={{
-                width: "70%",
+                width: "50%",
                 marginLeft: 10,
                 borderWidth: 1,
                 borderColor: C.buttonLightGreenOutline,
@@ -1830,16 +1867,21 @@ const StoreInfoComponent = ({
                 textAlign: "right",
                 outlineWidth: 0,
               }}
-              value={zSettingsObj.storeInfo.address.city}
+              value={zSettingsObj?.storeInfo.city}
               onChangeText={(city) => {
                 handleSettingsFieldChange("storeInfo", {
-                  ...zSettingsObj.storeInfo,
-                  address: {
-                    ...zSettingsObj.storeInfo.address,
-                    city,
-                  },
+                  ...zSettingsObj?.storeInfo,
+                  city,
                 });
               }}
+            />
+            <CheckBox_
+              buttonStyle={{ marginLeft: 7 }}
+              text={"Receipt"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+                (o) => o === "city"
+              )}
             />
           </View>
           <View
@@ -1864,7 +1906,7 @@ const StoreInfoComponent = ({
             </Text>
             <TextInput
               style={{
-                width: "70%",
+                width: "50%",
                 marginLeft: 10,
                 borderWidth: 1,
                 borderColor: C.buttonLightGreenOutline,
@@ -1873,16 +1915,21 @@ const StoreInfoComponent = ({
                 textAlign: "right",
                 outlineWidth: 0,
               }}
-              value={zSettingsObj.storeInfo.address.state}
+              value={zSettingsObj?.storeInfo.state}
               onChangeText={(state) => {
                 handleSettingsFieldChange("storeInfo", {
-                  ...zSettingsObj.storeInfo,
-                  address: {
-                    ...zSettingsObj.storeInfo.address,
-                    state,
-                  },
+                  ...zSettingsObj?.storeInfo,
+                  state,
                 });
               }}
+            />
+            <CheckBox_
+              buttonStyle={{ marginLeft: 7 }}
+              text={"Receipt"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+                (o) => o === "state"
+              )}
             />
           </View>
           <View
@@ -1907,7 +1954,7 @@ const StoreInfoComponent = ({
             </Text>
             <TextInput
               style={{
-                width: "70%",
+                width: "50%",
                 marginLeft: 10,
                 borderWidth: 1,
                 borderColor: C.buttonLightGreenOutline,
@@ -1916,16 +1963,21 @@ const StoreInfoComponent = ({
                 textAlign: "right",
                 outlineWidth: 0,
               }}
-              value={zSettingsObj.storeInfo.address.zip}
+              value={zSettingsObj?.storeInfo.zip}
               onChangeText={(zip) => {
                 handleSettingsFieldChange("storeInfo", {
                   ...zSettingsObj.storeInfo,
-                  address: {
-                    ...zSettingsObj.storeInfo.address,
-                    zip,
-                  },
+                  zip,
                 });
               }}
+            />
+            <CheckBox_
+              buttonStyle={{ marginLeft: 7 }}
+              text={"Receipt"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+                (o) => o === "zip"
+              )}
             />
           </View>
           {Object.values(zSettingsObj?.storeHours.standard).map((item, idx) => (
@@ -1940,10 +1992,8 @@ const StoreInfoComponent = ({
               <View
                 style={{
                   flexDirection: "row",
-                  // width: "50%",
                   justifyContent: "flex-start",
                   alignItems: "center",
-                  // backgroundColor: "red",
                 }}
               >
                 <Text style={{ width: 50 }}>Open:</Text>

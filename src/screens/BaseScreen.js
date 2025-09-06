@@ -161,7 +161,7 @@ export function BaseScreen() {
 
   // testing, build db items
   useEffect(() => {
-    // fillSettings();
+    fillSettings();
     // fillReceipt();
     // fillPrinterNames();
     // fillPunchHistory()

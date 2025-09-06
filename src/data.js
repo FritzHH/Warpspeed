@@ -596,14 +596,15 @@ export const SETTINGS_OBJ = {
   },
   storeInfo: {
     displayName: "Bonita Bikes LLC",
-    address: {
-      street: "9102 Bonita Beach Rd SE",
-      unit: "",
-      city: "Bonita Springs",
-      state: "Florida",
-      zip: "34135",
-    },
+    street: "9102 Bonita Beach Rd SE",
+    unit: "",
+    city: "Bonita Springs",
+    state: "Florida",
+    zip: "34135",
     phone: "2393369177",
+  },
+  receiptSetup: {
+    includeFieldsInReceipt: ["displayName", "street", "city", "state", "phone"],
   },
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
@@ -764,107 +765,6 @@ export const SETTINGS_OBJ = {
     id: "tmr_GFKNEgYkwcsIFF",
   },
   autoConnectToCardReader: "true",
-  // statusColors: [
-  //   {
-  //     textColor: "black",
-  //     altTextColor: "dimgray",
-  //     backgroundColor: "whitesmoke",
-  //     label: "White",
-  //   },
-  //   {
-  //     textColor: "white",
-  //     altTextColor: "gray",
-  //     backgroundColor: "blue",
-  //     label: "Blue",
-  //   },
-  //   {
-  //     textColor: "black",
-  //     altTextColor: "gray",
-  //     backgroundColor: "lightblue",
-  //     label: "Light-blue",
-  //   },
-  //   {
-  //     textColor: "white",
-  //     altTextColor: "gray",
-  //     backgroundColor: "red",
-  //     label: "Red",
-  //   },
-  //   {
-  //     textColor: "white",
-  //     altTextColor: "lightgray",
-  //     backgroundColor: "green",
-  //     label: "Green",
-  //   },
-
-  //   {
-  //     textColor: "whitesmoke",
-  //     backgroundColor: "black",
-  //     altTextColor: "lightgray",
-
-  //     label: "Black",
-  //   },
-  //   {
-  //     textColor: "black",
-  //     altTextColor: "gray",
-  //     backgroundColor: "yellow",
-  //     label: "Yellow",
-  //   },
-  //   {
-  //     textColor: "white",
-  //     altTextColor: "dimgray",
-  //     backgroundColor: "orange",
-  //     label: "Orange",
-  //   },
-  //   {
-  //     textColor: "white",
-  //     altTextColor: "lightgray",
-  //     backgroundColor: "maroon",
-  //     label: "Maroon",
-  //   },
-  //   {
-  //     textColor: "white",
-  //     altTextColor: "lightgray",
-  //     backgroundColor: "rgb(139,69,19)",
-  //     label: "Brown",
-  //   },
-  //   {
-  //     textColor: "black",
-  //     altTextColor: "dimgray",
-  //     backgroundColor: "rgb(192,192,192)",
-  //     label: "Silver",
-  //   },
-  //   {
-  //     textColor: "black",
-  //     altTextColor: "gray",
-  //     backgroundColor: "tan",
-  //     label: "Tan",
-  //   },
-  //   {
-  //     textColor: "black",
-  //     altTextColor: "gray",
-  //     backgroundColor: "beige",
-  //     label: "Beige",
-  //   },
-  //   {
-  //     textColor: "white",
-  //     altTextColor: "dimgray",
-  //     backgroundColor: "darkgray",
-  //     label: "Gray",
-  //   },
-  //   {
-  //     textColor: "black",
-  //     altTextColor: "dimgray",
-
-  //     backgroundColor: "lightgray",
-  //     label: "Light-gray",
-  //   },
-  //   {
-  //     textColor: "black",
-  //     altTextColor: "dimgray",
-  //     backgroundColor: "pink",
-  //     label: "Pink",
-  //   },
-  // ],
 };
 
 // RECEIPT STUFF ////////////////////////////////////////////////////

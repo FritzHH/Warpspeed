@@ -555,44 +555,67 @@ export const SETTINGS_OBJ = {
     },
   ],
   storeHours: {
-    standard: {
-      Monday: {
+    standard: [
+      {
+        name: "Monday",
+        id: "dkfjdkfn",
         open: "10:00 AM",
         close: "6:00 PM",
         isOpen: true,
       },
-      Tuesday: {
+      {
+        name: "Tuesday",
+        id: "dkfjdkf3r3n",
         open: "10:00 AM",
         close: "6:00 PM",
         isOpen: true,
       },
-      Wednesday: {
+      {
+        name: "Wednesday",
+        id: "dkfjdkfdkfjdkn",
         open: "10:00 AM",
         close: "6:00 PM",
         isOpen: true,
       },
-      Thursday: {
+      {
+        name: "Thursday",
+        id: "dkfjdkf34rjk3n",
         open: "10:00 AM",
         close: "6:00 PM",
         isOpen: true,
       },
-      Friday: {
+      {
+        name: "Friday",
+        id: "dkfjdkfkenjrken",
         open: "10:00 AM",
         close: "6:00 PM",
         isOpen: true,
       },
-      Saturday: {
+      {
+        name: "Saturday",
+        id: "dkfjdk3krjfn",
         open: "10:00 AM",
         close: "6:00 PM",
         isOpen: true,
       },
-      Sunday: {
+      {
+        name: "Sunday",
+        id: "dkfjdkf3nrkejn",
         open: "10:00 AM",
         close: "6:00 PM",
         isOpen: true,
       },
-    },
-    special: [{ name: "4th of July", dateMillies: 123434455544 }],
+    ],
+    special: [
+      {
+        name: "4th of July",
+        dateMillies: 123434455544,
+        id: "dkfjdkf3nrk333ejn",
+        open: "10:00 AM",
+        close: "6:00 PM",
+        isOpen: false,
+      },
+    ],
   },
   storeInfo: {
     displayName: "Bonita Bikes LLC",

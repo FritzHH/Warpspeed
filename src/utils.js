@@ -595,6 +595,33 @@ export function combine2ArraysOrderByMillis(arr1, arr2) {
 }
 
 // date & time
+export function getDayOfWeekFrom0To7Input(n, startSunday = false) {
+  const daysSundayStart = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday", // allow 7 → Sunday
+  ];
+
+  const daysMondayStart = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+    "Monday", // allow 7 → Monday
+  ];
+
+  if (n < 0 || n > 7) return null;
+  return startSunday ? daysSundayStart[n] : daysMondayStart[n];
+}
+
 export function formatMillisForDisplay(
   millis,
   includeYear,

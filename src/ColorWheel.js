@@ -14,80 +14,6 @@ import Svg, {
 import { log } from "./utils";
 
 // ---------- Color utils ----------
-function clamp(v, min = 0, max = 1) {
-  return Math.min(max, Math.max(min, v));
-}
-
-function hsvToRgb(h, s, v) {
-  // h in [0, 360), s,v in [0,1]
-  const c = v * s;
-  const hp = (h % 360) / 60;
-  const x = c * (1 - Math.abs((hp % 2) - 1));
-  let r1 = 0,
-    g1 = 0,
-    b1 = 0;
-  if (0 <= hp && hp < 1) [r1, g1, b1] = [c, x, 0];
-  else if (1 <= hp && hp < 2) [r1, g1, b1] = [x, c, 0];
-  else if (2 <= hp && hp < 3) [r1, g1, b1] = [0, c, x];
-  else if (3 <= hp && hp < 4) [r1, g1, b1] = [0, x, c];
-  else if (4 <= hp && hp < 5) [r1, g1, b1] = [x, 0, c];
-  else if (5 <= hp && hp < 6) [r1, g1, b1] = [c, 0, x];
-  const m = v - c;
-  const r = Math.round((r1 + m) * 255);
-  const g = Math.round((g1 + m) * 255);
-  const b = Math.round((b1 + m) * 255);
-  return { r, g, b };
-}
-
-function rgbToHsv(r, g, b) {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-  const max = Math.max(r, g, b),
-    min = Math.min(r, g, b);
-  const d = max - min;
-  let h = 0;
-  if (d !== 0) {
-    switch (max) {
-      case r:
-        h = 60 * (((g - b) / d) % 6);
-        break;
-      case g:
-        h = 60 * ((b - r) / d + 2);
-        break;
-      case b:
-        h = 60 * ((r - g) / d + 4);
-        break;
-      default:
-        break;
-    }
-  }
-  if (h < 0) h += 360;
-  const s = max === 0 ? 0 : d / max;
-  const v = max;
-  return { h, s, v };
-}
-
-function rgbToHex({ r, g, b }) {
-  const toHex = (n) => n.toString(16).padStart(2, "0");
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
-}
-
-function hexToRgb(hex) {
-  let h = hex.replace("#", "").trim();
-  if (h.length === 3) {
-    h = h
-      .split("")
-      .map((c) => c + c)
-      .join("");
-  }
-  const int = parseInt(h, 16);
-  return {
-    r: (int >> 16) & 255,
-    g: (int >> 8) & 255,
-    b: int & 255,
-  };
-}
 
 // ---------- Component ----------
 /**
@@ -111,7 +37,80 @@ export function ColorWheel({
   const ringOuter = radius;
   const ringInner = radius - strokeWidth;
   const svRadius = ringInner - 8; // small gap inside ring
+  function clamp(v, min = 0, max = 1) {
+    return Math.min(max, Math.max(min, v));
+  }
 
+  function hsvToRgb(h, s, v) {
+    // h in [0, 360), s,v in [0,1]
+    const c = v * s;
+    const hp = (h % 360) / 60;
+    const x = c * (1 - Math.abs((hp % 2) - 1));
+    let r1 = 0,
+      g1 = 0,
+      b1 = 0;
+    if (0 <= hp && hp < 1) [r1, g1, b1] = [c, x, 0];
+    else if (1 <= hp && hp < 2) [r1, g1, b1] = [x, c, 0];
+    else if (2 <= hp && hp < 3) [r1, g1, b1] = [0, c, x];
+    else if (3 <= hp && hp < 4) [r1, g1, b1] = [0, x, c];
+    else if (4 <= hp && hp < 5) [r1, g1, b1] = [x, 0, c];
+    else if (5 <= hp && hp < 6) [r1, g1, b1] = [c, 0, x];
+    const m = v - c;
+    const r = Math.round((r1 + m) * 255);
+    const g = Math.round((g1 + m) * 255);
+    const b = Math.round((b1 + m) * 255);
+    return { r, g, b };
+  }
+
+  function rgbToHsv(r, g, b) {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const max = Math.max(r, g, b),
+      min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if (d !== 0) {
+      switch (max) {
+        case r:
+          h = 60 * (((g - b) / d) % 6);
+          break;
+        case g:
+          h = 60 * ((b - r) / d + 2);
+          break;
+        case b:
+          h = 60 * ((r - g) / d + 4);
+          break;
+        default:
+          break;
+      }
+    }
+    if (h < 0) h += 360;
+    const s = max === 0 ? 0 : d / max;
+    const v = max;
+    return { h, s, v };
+  }
+
+  function rgbToHex({ r, g, b }) {
+    const toHex = (n) => n.toString(16).padStart(2, "0");
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+  }
+
+  function hexToRgb(hex) {
+    let h = hex.replace("#", "").trim();
+    if (h.length === 3) {
+      h = h
+        .split("")
+        .map((c) => c + c)
+        .join("");
+    }
+    const int = parseInt(h, 16);
+    return {
+      r: (int >> 16) & 255,
+      g: (int >> 8) & 255,
+      b: int & 255,
+    };
+  }
   // state
   const initialHsv = useMemo(() => {
     const { r, g, b } = hexToRgb(initialColor);

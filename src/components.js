@@ -31,6 +31,7 @@ import {
   LETTERS,
   lightenRGBByPercent,
   log,
+  makeGrey,
   NUMS,
   readAsBinaryString,
   removeDashesFromPhone,
@@ -86,6 +87,16 @@ import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
 import dayjs from "dayjs"; // Recommended for date manipulation
+import { PanResponder } from "react-native";
+import Svg, {
+  Circle,
+  ClipPath,
+  Defs,
+  G,
+  Path,
+  Rect,
+  Stop,
+} from "react-native-svg";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -2644,11 +2655,12 @@ export const Button_ = ({
   numLines = 1,
   text,
   enableMouseOver = true,
+  opacity,
   TextComponent,
   mouseOverOptions = {
-    opacity: 0.6,
-    highlightColor: "lightgray",
-    textColor: "white",
+    opacity: 0.82,
+    highlightColor: "",
+    textColor: "",
   },
   shadow = false,
   allCaps = false,
@@ -2687,26 +2699,28 @@ export const Button_ = ({
 
   function getBackgroundColor() {
     if (sMouseOver && enabled) {
-      return mouseOverOptions.highlightColor;
+      return mouseOverOptions.highlightColor || buttonStyle.backgroundColor;
     } else {
       if (buttonStyle.backgroundColor) return buttonStyle.backgroundColor;
       return C.buttonLightGreen;
     }
   }
-
   function getOpacity() {
     if (sMouseOver && enabled) {
       return mouseOverOptions.opacity;
+    } else if (!enabled) {
+      return 0.4;
     } else {
-      // log(text, buttonStyle.opacity);
-      if (buttonStyle.opacity) return buttonStyle.opacity;
       return 1;
     }
   }
 
   return (
     <TouchableOpacity
-      style={{ ...viewStyle }}
+      style={{
+        opacity: getOpacity(),
+        ...viewStyle,
+      }}
       activeOpacity={enabled ? null : 1}
       ref={ref}
       onMouseOver={() => {
@@ -2735,7 +2749,6 @@ export const Button_ = ({
           ...shadowStyle,
           ...buttonStyle,
           backgroundColor: icon && !text ? null : getBackgroundColor(),
-          opacity: enabled ? null : 0.3,
         }}
         {...gradientViewProps}
       >
@@ -2774,15 +2787,6 @@ export const Button_ = ({
   );
 };
 
-const styles1 = {
-  item: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  text: {},
-};
-const ITEM_HEIGHT = 48;
-
 const pad = (n, len = 2) => n.toString().padStart(len, "0");
 export const NumberSpinner_ = ({
   min = 0,
@@ -2797,7 +2801,14 @@ export const NumberSpinner_ = ({
 }) => {
   const scrollRef = useRef(null);
   const [selected, setSelected] = useState(value);
-
+  const styles1 = {
+    item: {
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    text: {},
+  };
+  const ITEM_HEIGHT = 48;
   // Generate number array
   const numbers = [];
   for (let i = min; i <= max; i++) {

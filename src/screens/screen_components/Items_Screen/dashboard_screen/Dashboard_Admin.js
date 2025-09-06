@@ -50,12 +50,13 @@ import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 
 const CAT_NAMES = {
-  users: "App User Control",
+  users: "User Control",
   payments: "Payment Processing",
   statuses: "Workorder Statuses",
-  lists: "Lists",
+  lists: "Lists & Options",
   waitTimes: "Wait Times",
   storeInfo: "Store Info",
+  quickItems: "Quick Item Buttons",
 };
 
 export function Dashboard_Admin({}) {
@@ -155,6 +156,21 @@ export function Dashboard_Admin({}) {
           }}
         >
           <SettingsLabelListComponent
+            selected={sExpand === CAT_NAMES.quickItems}
+            handleExpandPress={() =>
+              _setExpand(
+                sExpand === CAT_NAMES.quickItems ? null : CAT_NAMES.quickItems
+              )
+            }
+            text={CAT_NAMES.quickItems}
+            style={{
+              fontWeight: sExpand === CAT_NAMES.quickItems ? 500 : null,
+              color:
+                sExpand === CAT_NAMES.quickItems ? C.lightred : makeGrey(0.6),
+            }}
+          />
+          <VerticalSpacer />
+          <SettingsLabelListComponent
             selected={sExpand === CAT_NAMES.users}
             handleExpandPress={() =>
               _setExpand(sExpand === CAT_NAMES.users ? null : CAT_NAMES.users)
@@ -182,7 +198,6 @@ export function Dashboard_Admin({}) {
             }}
           />
           <VerticalSpacer />
-
           <SettingsLabelListComponent
             selected={sExpand === CAT_NAMES.statuses}
             handleExpandPress={() =>
@@ -199,7 +214,6 @@ export function Dashboard_Admin({}) {
             }}
           />
           <VerticalSpacer />
-
           <SettingsLabelListComponent
             selected={sExpand === CAT_NAMES.lists}
             handleExpandPress={() =>
@@ -213,7 +227,6 @@ export function Dashboard_Admin({}) {
             text={CAT_NAMES.lists}
           />
           <VerticalSpacer />
-
           <SettingsLabelListComponent
             selected={sExpand === CAT_NAMES.storeInfo}
             handleExpandPress={() =>
@@ -251,36 +264,47 @@ export function Dashboard_Admin({}) {
           >
             {sExpand?.toUpperCase()}
           </Text>
-          <PaymentProcessingComponent
-            zSettingsObj={zSettingsObj}
-            handleSettingsFieldChange={handleSettingsFieldChange}
-            sExpand={sExpand === CAT_NAMES.payments}
-          />
-          <AppUserListComponent
-            handleRemoveUserPress={handleRemoveUserPress}
-            zSettingsObj={zSettingsObj}
-            commitUserInfoChange={commitUserInfoChange}
-            _setFacialRecognitionModalUserObj={
-              _setFacialRecognitionModalUserObj
-            }
-            sExpand={sExpand === CAT_NAMES.users}
-            handleSettingsFieldChange={handleSettingsFieldChange}
-          />
-          <WorkorderStatusesComponent
-            sExpand={sExpand === CAT_NAMES.statuses}
-            zSettingsObj={zSettingsObj}
-            handleSettingsFieldChange={handleSettingsFieldChange}
-          />
-          <ListOptionsComponent
-            sExpand={sExpand === CAT_NAMES.lists}
-            zSettingsObj={zSettingsObj}
-            handleSettingsFieldChange={handleSettingsFieldChange}
-          />
-          <StoreInfoComponent
-            sExpand={sExpand === CAT_NAMES.storeInfo}
-            zSettingsObj={zSettingsObj}
-            handleSettingsFieldChange={handleSettingsFieldChange}
-          />
+          {sExpand === CAT_NAMES.payments ? (
+            <PaymentProcessingComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          ) : null}
+          {sExpand === CAT_NAMES.users ? (
+            <AppUserListComponent
+              handleRemoveUserPress={handleRemoveUserPress}
+              zSettingsObj={zSettingsObj}
+              commitUserInfoChange={commitUserInfoChange}
+              _setFacialRecognitionModalUserObj={
+                _setFacialRecognitionModalUserObj
+              }
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          ) : null}
+          {sExpand === CAT_NAMES.statuses ? (
+            <WorkorderStatusesComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          ) : null}
+          {sExpand === CAT_NAMES.lists ? (
+            <ListOptionsComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          ) : null}
+          {sExpand === CAT_NAMES.storeInfo ? (
+            <StoreInfoComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          ) : null}
+          {sExpand === CAT_NAMES.quickItems ? (
+            <QuickItemButtonsComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          ) : null}
         </View>
       </View>
     </ScrollView>
@@ -309,6 +333,7 @@ function BoxContainerOuterComponent({ style = {}, children }) {
         width: "97%",
         alignItems: "center",
 
+        // marginHorizontal: 0,
         ...style,
       }}
     >
@@ -366,8 +391,9 @@ function BoxContainerInnerComponent({ style = {}, children }) {
         backgroundColor: C.listItemWhite,
         borderRadius: 10,
         alignItems: "flex-end",
-        padding: 10,
+        padding: 15,
         borderColore: C.buttonLightGreenOutline,
+        width: "100%",
         ...style,
       }}
     >
@@ -442,7 +468,6 @@ const AppUserListComponent = ({
   zSettingsObj,
   commitUserInfoChange,
   _setFacialRecognitionModalUserObj,
-  sExpand,
   handleRemoveUserPress,
   handleSettingsFieldChange,
 }) => {
@@ -450,7 +475,7 @@ const AppUserListComponent = ({
   const [sShowPinIndex, _setShowPinIndex] = useState(false);
   const [sShowWageIndex, _setShowWageIndex] = useState(false);
   const [sNewUserObj, _setNewUserObj] = useState(null);
-  // const [sExpand, _setExpand] = useState(false);
+  const [sExpand, _setExpand] = useState(false);
 
   const userListItemRefs = useRef([]);
 
@@ -466,59 +491,85 @@ const AppUserListComponent = ({
   return (
     <BoxContainerOuterComponent>
       {/**Flatlist showing all app users, edit functions. sPunchClockUserObj */}
-      {sExpand ? (
-        <BoxContainerInnerComponent
-          style={{
-            backgroundColor: C.backgroundListWhite,
-            width: "100%",
-          }}
-        >
-          <View style={{ width: "100%", justifyContent: "flex-end" }}>
-            <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-              <Text
-                style={{
-                  color: C.textMain,
-                }}
-              >
-                {"Seconds to log user out: "}
-              </Text>
-              <TextInput
-                onChangeText={(val) => {
-                  handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
-                }}
-                style={{
-                  width: 50,
-                  marginLeft: 10,
-                  borderColor: C.green,
-                  borderWidth: 1,
-                  borderRadius: 5,
-                  paddingLeft: 3,
-                  outlineWidth: 0,
-                  color: C.textMain,
-                }}
-                value={zSettingsObj?.activeLoginTimeoutSeconds}
-              />
-            </View>
-          </View>
-          <View style={{ justifyContent: "flex-end" }}>
-            <View
+      <BoxContainerInnerComponent
+        style={{
+          backgroundColor: C.backgroundListWhite,
+          // width: "100%",
+        }}
+      >
+        <View style={{ width: "100%", justifyContent: "flex-end" }}>
+          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+            <Text
               style={{
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                marginTop: 10,
+                color: C.textMain,
               }}
             >
+              {"Seconds to log user out: "}
+            </Text>
+            <TextInput
+              onChangeText={(val) => {
+                handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
+              }}
+              style={{
+                width: 50,
+                marginLeft: 10,
+                borderColor: C.green,
+                borderWidth: 1,
+                borderRadius: 5,
+                paddingLeft: 3,
+                outlineWidth: 0,
+                color: C.textMain,
+              }}
+              value={zSettingsObj?.activeLoginTimeoutSeconds}
+            />
+          </View>
+        </View>
+        <View style={{ justifyContent: "flex-end" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              marginTop: 10,
+            }}
+          >
+            <Text
+              style={{
+                // width: "40%",
+                color: C.textMain,
+              }}
+            >
+              {"Hours to lock app: "}
+            </Text>
+            <TextInput
+              onChangeText={(val) => {
+                handleSettingsFieldChange("idleLoginTimeoutHours", val);
+              }}
+              style={{
+                width: 50,
+                marginLeft: 10,
+                borderColor: C.green,
+                borderWidth: 1,
+                borderRadius: 5,
+                paddingLeft: 3,
+                color: C.textMain,
+                outlineWidth: 0,
+              }}
+              value={Math.round(zSettingsObj?.idleLoginTimeoutHours)}
+            />
+          </View>
+          <View style={{ width: "100%", justifyContent: "flex-end" }}>
+            <View style={{ flexDirection: "row", marginTop: 10 }}>
               <Text
                 style={{
                   // width: "40%",
                   color: C.textMain,
                 }}
               >
-                {"Hours to lock app: "}
+                {"User login PIN length: "}
               </Text>
               <TextInput
                 onChangeText={(val) => {
-                  handleSettingsFieldChange("idleLoginTimeoutHours", val);
+                  handleSettingsFieldChange("userPinStrength", val);
                 }}
                 style={{
                   width: 50,
@@ -527,57 +578,30 @@ const AppUserListComponent = ({
                   borderWidth: 1,
                   borderRadius: 5,
                   paddingLeft: 3,
-                  color: C.textMain,
                   outlineWidth: 0,
+                  color: C.textMain,
                 }}
-                value={Math.round(zSettingsObj?.idleLoginTimeoutHours)}
+                value={zSettingsObj?.userPinStrength}
               />
             </View>
-            <View style={{ width: "100%", justifyContent: "flex-end" }}>
-              <View style={{ flexDirection: "row", marginTop: 10 }}>
-                <Text
-                  style={{
-                    // width: "40%",
-                    color: C.textMain,
-                  }}
-                >
-                  {"User login PIN length: "}
-                </Text>
-                <TextInput
-                  onChangeText={(val) => {
-                    handleSettingsFieldChange("userPinStrength", val);
-                  }}
-                  style={{
-                    width: 50,
-                    marginLeft: 10,
-                    borderColor: C.green,
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    paddingLeft: 3,
-                    outlineWidth: 0,
-                    color: C.textMain,
-                  }}
-                  value={zSettingsObj?.userPinStrength}
-                />
-              </View>
-            </View>
           </View>
-          <View
-            style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
-          >
-            <CheckBox_
-              buttonStyle={{ justifyContent: "flex-end" }}
-              isChecked={zSettingsObj?.lockScreenWhenUserLogsOut}
-              text={"Lock screen when user logs out"}
-              onCheck={() => {
-                handleSettingsFieldChange(
-                  "lockScreenWhenUserLogsOut",
-                  !zSettingsObj.lockScreenWhenUserLogsOut
-                );
-              }}
-            />
-          </View>
-          {/* <View
+        </View>
+        <View
+          style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
+        >
+          <CheckBox_
+            buttonStyle={{ justifyContent: "flex-end" }}
+            isChecked={zSettingsObj?.lockScreenWhenUserLogsOut}
+            text={"Lock screen when user logs out"}
+            onCheck={() => {
+              handleSettingsFieldChange(
+                "lockScreenWhenUserLogsOut",
+                !zSettingsObj.lockScreenWhenUserLogsOut
+              );
+            }}
+          />
+        </View>
+        {/* <View
             style={{
               flexDirection: "row",
               width: "100%",
@@ -585,7 +609,7 @@ const AppUserListComponent = ({
               alignItems: "center",
             }}
           > */}
-          {/* <Button_
+        {/* <Button_
             onPress={fillPunchHistory}
             text={"Fill History"}
             buttonStyle={{
@@ -602,436 +626,424 @@ const AppUserListComponent = ({
             }}
           /> */}
 
-          {/* </View> */}
-          <View
-            style={{
-              width: "100%",
-              alignItems: "flex-start",
-            }}
-          >
-            <BoxButton1
-              iconSize={35}
-              icon={ICONS.add}
-              onPress={handleNewUserPress}
-              style={{}}
-            />
-          </View>
-          <View style={{ width: "100%" }}>
-            <FlatList
-              ItemSeparatorComponent={() => (
+        {/* </View> */}
+        <View
+          style={{
+            width: "100%",
+            alignItems: "flex-start",
+          }}
+        >
+          <BoxButton1
+            iconSize={35}
+            icon={ICONS.add}
+            onPress={handleNewUserPress}
+            style={{}}
+          />
+        </View>
+        <View style={{ width: "100%" }}>
+          <FlatList
+            ItemSeparatorComponent={() => (
+              <View
+                style={{
+                  height: 5,
+                }}
+              />
+            )}
+            style={{ borderRadius: 5 }}
+            data={
+              zSettingsObj
+                ? sNewUserObj
+                  ? [sNewUserObj, ...zSettingsObj.users]
+                  : zSettingsObj.users
+                : []
+            }
+            renderItem={(obj) => {
+              obj = cloneDeep(obj);
+              let idx = obj.index;
+              let userObj = obj.item;
+              let editable = sEditUserIndex === idx;
+              return (
                 <View
+                  ref={(element) => (userListItemRefs.current[idx] = element)}
                   style={{
-                    height: 5,
+                    flexDirection: "row",
+                    backgroundColor: C.listItemWhite,
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderRadius: 5,
+                    padding: 3,
+                    paddingRight: 10,
+                    opacity: !editable && sEditUserIndex ? 0.3 : 1,
                   }}
-                />
-              )}
-              style={{ borderRadius: 5 }}
-              data={
-                sExpand
-                  ? zSettingsObj
-                    ? sNewUserObj
-                      ? [sNewUserObj, ...zSettingsObj.users]
-                      : zSettingsObj.users
-                    : []
-                  : []
-              }
-              renderItem={(obj) => {
-                obj = cloneDeep(obj);
-                let idx = obj.index;
-                let userObj = obj.item;
-                let editable = sEditUserIndex === idx;
-                return (
+                >
                   <View
-                    ref={(element) => (userListItemRefs.current[idx] = element)}
                     style={{
-                      flexDirection: "row",
-                      backgroundColor: C.listItemWhite,
-                      borderWidth: 1,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderRadius: 5,
-                      padding: 3,
-                      paddingRight: 10,
-                      opacity: !editable && sEditUserIndex ? 0.3 : 1,
+                      paddingLeft: 0,
+                      marginRight: 5,
+                      justifyContent: "space-around",
+                      width: "22%",
+                    }}
+                  >
+                    <Button_
+                      text={sEditUserIndex === idx ? "Close Edit" : "Edit User"}
+                      onPress={() => {
+                        _setEditUserIndex(sEditUserIndex != null ? null : idx);
+                        _setShowPinIndex(null);
+                        _setShowWageIndex(null);
+                      }}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        backgroundColor: editable
+                          ? C.lightred
+                          : C.buttonLightGreen,
+                        borderRadius: 5,
+                        paddingHorizontal: 0,
+                        paddingVertical: 2,
+                        width: "100%",
+                      }}
+                      mouseOverOptions={{ opacity: 0.7 }}
+                      textStyle={{
+                        color: editable ? C.textWhite : C.textMain,
+                        fontSize: 12,
+                      }}
+                    />
+                    <Button_
+                      text={"Face Enroll"}
+                      onPress={() => {
+                        _setFacialRecognitionModalUserObj(userObj);
+                      }}
+                      enabled={editable}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        backgroundColor: C.buttonLightGreen,
+                        paddingVertical: 2,
+
+                        paddingHorizontal: 0,
+                        marginRight: 4,
+                        width: "100%",
+
+                        borderRadius: 5,
+                      }}
+                      mouseOverOptions={{ opacity: 0.7 }}
+                      textStyle={{ fontSize: 12 }}
+                    />
+                    <Button_
+                      text={
+                        sEditUserIndex === idx ? "Delete User" : "Punch Clock"
+                      }
+                      onPress={() => {
+                        if (sEditUserIndex === idx) {
+                          handleRemoveUserPress(userObj);
+                        } else {
+                          _setPunchClockUserObj(userObj);
+                        }
+                      }}
+                      mouseOverOptions={{ opacity: 0.7 }}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        paddingVertical: 2,
+
+                        borderColor: C.buttonLightGreenOutline,
+                        backgroundColor: C.buttonLightGreen,
+                        borderRadius: 5,
+                        paddingHorizontal: 0,
+                        width: "100%",
+                      }}
+                      textStyle={{ fontSize: 12 }}
+                    />
+                  </View>
+                  <View
+                    style={{
+                      justifyContent: "center",
+                      // backgroundColor: "red",
+                      marginTop: 2,
+                      width: "78%",
+                      // paddingRight: 5,
                     }}
                   >
                     <View
                       style={{
-                        paddingLeft: 0,
-                        marginRight: 5,
-                        justifyContent: "space-around",
-                        width: "22%",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        // width: "100%",
+                        // backgroundColor: "red",
                       }}
                     >
-                      <Button_
-                        text={
-                          sEditUserIndex === idx ? "Close Edit" : "Edit User"
-                        }
-                        onPress={() => {
-                          _setEditUserIndex(
-                            sEditUserIndex != null ? null : idx
-                          );
-                          _setShowPinIndex(null);
-                          _setShowWageIndex(null);
-                        }}
-                        buttonStyle={{
+                      <TextInput
+                        value={userObj.first}
+                        placeholder="First name"
+                        placeholderTextColor={"lightgray"}
+                        editable={editable}
+                        style={{
+                          paddingHorizontal: 5,
+                          padding: 1,
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          outlineWidth: 0,
+                          width: "49%",
+                          // marginRight: 10,
                           borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          backgroundColor: editable
-                            ? C.lightred
-                            : C.buttonLightGreen,
-                          borderRadius: 5,
-                          paddingHorizontal: 0,
-                          paddingVertical: 2,
-                          width: "100%",
+                          fontSize: 14,
+                          height: 25,
                         }}
-                        mouseOverOptions={{ opacity: 0.7 }}
-                        textStyle={{
-                          color: editable ? C.textWhite : C.textMain,
-                          fontSize: 12,
+                        onChangeText={(value) => {
+                          userObj.first = value;
+                          commitUserInfoChange(userObj);
                         }}
                       />
-                      <Button_
-                        text={"Face Enroll"}
-                        onPress={() => {
-                          _setFacialRecognitionModalUserObj(userObj);
+                      <TextInput
+                        value={userObj.last}
+                        onChangeText={(value) => {
+                          userObj.last = value;
+                          commitUserInfoChange(userObj);
                         }}
-                        enabled={editable}
-                        buttonStyle={{
+                        placeholder="Last name"
+                        placeholderTextColor={"lightgray"}
+                        editable={editable}
+                        style={{
+                          paddingHorizontal: 5,
+                          // paddingHorizontal: 2,
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          outlineWidth: 0,
+                          width: "49%",
+                          // marginRight: 10,
                           borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          backgroundColor: C.buttonLightGreen,
-                          paddingVertical: 2,
-
-                          paddingHorizontal: 0,
-                          marginRight: 4,
-                          width: "100%",
-
-                          borderRadius: 5,
+                          fontSize: 14,
+                          height: 25,
                         }}
-                        mouseOverOptions={{ opacity: 0.7 }}
-                        textStyle={{ fontSize: 12 }}
-                      />
-                      <Button_
-                        text={
-                          sEditUserIndex === idx ? "Delete User" : "Punch Clock"
-                        }
-                        onPress={() => {
-                          if (sEditUserIndex === idx) {
-                            handleRemoveUserPress(userObj);
-                          } else {
-                            _setPunchClockUserObj(userObj);
-                          }
-                        }}
-                        mouseOverOptions={{ opacity: 0.7 }}
-                        buttonStyle={{
-                          borderWidth: 1,
-                          paddingVertical: 2,
-
-                          borderColor: C.buttonLightGreenOutline,
-                          backgroundColor: C.buttonLightGreen,
-                          borderRadius: 5,
-                          paddingHorizontal: 0,
-                          width: "100%",
-                        }}
-                        textStyle={{ fontSize: 12 }}
                       />
                     </View>
                     <View
                       style={{
-                        justifyContent: "center",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        alignItems: "center",
+                        marginTop: 7,
+                      }}
+                    >
+                      <TextInput
+                        value={addDashesToPhone(userObj.phone)}
+                        onChangeText={(value) => {
+                          let val = removeDashesFromPhone(value);
+                          userObj.phone = val;
+                          commitUserInfoChange(userObj);
+                        }}
+                        placeholder="Phone num."
+                        placeholderTextColor={"lightgray"}
+                        editable={editable}
+                        style={{
+                          paddingHorizontal: 5,
+                          // marginTop: 5,
+                          padding: 1,
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          outlineWidth: 0,
+                          width: "49%",
+                          // marginRight: 10,
+                          borderWidth: 1,
+                          height: 25,
+
+                          fontSize: 14,
+                        }}
+                      />
+                      <View style={{ width: "49%", alignItems: "center" }}>
+                        <DropdownMenu
+                          enabled={editable}
+                          ref={userListItemRefs.current[idx]}
+                          dataArr={
+                            editable ? PERMISSION_LEVELS.map((o) => o.name) : []
+                          }
+                          onSelect={(item) => {
+                            if (!editable) return;
+                            let perm = PERMISSION_LEVELS.find(
+                              (o) => o.name == item
+                            );
+                            userObj.permissions = perm;
+                            commitUserInfoChange(userObj);
+                          }}
+                          buttonStyle={{
+                            paddingHorizontal: 5,
+                            // marginTop: 5,
+                            padding: 1,
+                            borderColor: C.buttonLightGreenOutline,
+                            outlineWidth: 0,
+                            borderRadius: 5,
+                            minWidth: 120,
+                            height: 25,
+                            // marginRight: 10,
+                            borderWidth: 1,
+                            backgroundColor: "transparent",
+                            alignItems: "flex-start",
+                            backgroundColor: editable
+                              ? C.buttonLightGreen
+                              : "transparent",
+                            paddingVertical: 2,
+                          }}
+                          buttonText={userObj.permissions.name}
+                          buttonTextStyle={{
+                            color: C.textMain,
+                            fontSize: 14,
+                          }}
+                        />
+                      </View>
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        width: "100%",
                         // backgroundColor: "red",
-                        marginTop: 2,
-                        width: "78%",
-                        // paddingRight: 5,
+                        marginTop: 7,
+                        alignItems: "center",
+                        // height: 25,
                       }}
                     >
                       <View
                         style={{
                           flexDirection: "row",
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          width: "49%",
+                          // marginRight: 10,
+                          borderWidth: 1,
+                          // marginTop: 5,
                           justifyContent: "space-between",
-                          // width: "100%",
-                          // backgroundColor: "red",
+                          alignItems: "center",
+                          height: 25,
                         }}
                       >
                         <TextInput
-                          value={userObj.first}
-                          placeholder="First name"
+                          // focusable={sShowPinIndex === idx ? true : false}
+                          caretHidden={sShowPinIndex != idx}
+                          focused={sShowPinIndex === idx}
+                          value={sShowPinIndex === idx ? userObj.pin : ""}
+                          onChangeText={(value) => {
+                            userObj.pin = value;
+                            commitUserInfoChange(userObj);
+                          }}
+                          placeholder={sShowPinIndex === idx ? "pin..." : "PIN"}
                           placeholderTextColor={"lightgray"}
                           editable={editable}
                           style={{
+                            outlineWidth: 0,
                             paddingHorizontal: 5,
                             padding: 1,
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            outlineWidth: 0,
-                            width: "49%",
-                            // marginRight: 10,
-                            borderWidth: 1,
                             fontSize: 14,
-                            height: 25,
-                          }}
-                          onChangeText={(value) => {
-                            userObj.first = value;
-                            commitUserInfoChange(userObj);
+                            width: "90%",
                           }}
                         />
-                        <TextInput
-                          value={userObj.last}
-                          onChangeText={(value) => {
-                            userObj.last = value;
-                            commitUserInfoChange(userObj);
-                          }}
-                          placeholder="Last name"
-                          placeholderTextColor={"lightgray"}
-                          editable={editable}
-                          style={{
-                            paddingHorizontal: 5,
-                            // paddingHorizontal: 2,
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            outlineWidth: 0,
-                            width: "49%",
-                            // marginRight: 10,
-                            borderWidth: 1,
-                            fontSize: 14,
-                            height: 25,
-                          }}
-                        />
+                        {editable ? (
+                          <TouchableOpacity
+                            onPress={() =>
+                              _setShowPinIndex(
+                                sShowPinIndex != null ? null : idx
+                              )
+                            }
+                          >
+                            <Image_ icon={ICONS.editPencil} size={15} />
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={{ width: 15 }} />
+                        )}
                       </View>
                       <View
                         style={{
                           flexDirection: "row",
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          width: "49%",
+                          borderWidth: 1,
                           justifyContent: "space-between",
-                          width: "100%",
                           alignItems: "center",
-                          marginTop: 7,
+                          height: 25,
                         }}
                       >
                         <TextInput
-                          value={addDashesToPhone(userObj.phone)}
+                          caretHidden={sShowWageIndex != idx}
+                          value={
+                            sShowWageIndex === idx ? userObj.hourlyWage : ""
+                          }
                           onChangeText={(value) => {
-                            let val = removeDashesFromPhone(value);
-                            userObj.phone = val;
+                            userObj.hourlyWage = value;
                             commitUserInfoChange(userObj);
                           }}
-                          placeholder="Phone num."
+                          placeholder={
+                            sShowWageIndex === idx ? "wage..." : "Wage"
+                          }
                           placeholderTextColor={"lightgray"}
                           editable={editable}
                           style={{
-                            paddingHorizontal: 5,
-                            // marginTop: 5,
-                            padding: 1,
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
                             outlineWidth: 0,
-                            width: "49%",
-                            // marginRight: 10,
-                            borderWidth: 1,
-                            height: 25,
-
+                            paddingHorizontal: 5,
+                            padding: 1,
                             fontSize: 14,
+                            width: "90%",
                           }}
                         />
-                        <View style={{ width: "49%", alignItems: "center" }}>
-                          <DropdownMenu
-                            enabled={editable}
-                            ref={userListItemRefs.current[idx]}
-                            dataArr={
-                              editable
-                                ? PERMISSION_LEVELS.map((o) => o.name)
-                                : []
+                        {editable ? (
+                          <TouchableOpacity
+                            onPress={() =>
+                              _setShowWageIndex(
+                                sShowWageIndex != null ? null : idx
+                              )
                             }
-                            onSelect={(item) => {
-                              if (!editable) return;
-                              let perm = PERMISSION_LEVELS.find(
-                                (o) => o.name == item
-                              );
-                              userObj.permissions = perm;
-                              commitUserInfoChange(userObj);
-                            }}
-                            buttonStyle={{
-                              paddingHorizontal: 5,
-                              // marginTop: 5,
-                              padding: 1,
-                              borderColor: C.buttonLightGreenOutline,
-                              outlineWidth: 0,
-                              borderRadius: 5,
-                              minWidth: 120,
-                              height: 25,
-                              // marginRight: 10,
-                              borderWidth: 1,
-                              backgroundColor: "transparent",
-                              alignItems: "flex-start",
-                              backgroundColor: editable
-                                ? C.buttonLightGreen
-                                : "transparent",
-                              paddingVertical: 2,
-                            }}
-                            buttonText={userObj.permissions.name}
-                            buttonTextStyle={{
-                              color: C.textMain,
-                              fontSize: 14,
-                            }}
-                          />
-                        </View>
-                      </View>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          width: "100%",
-                          // backgroundColor: "red",
-                          marginTop: 7,
-                          alignItems: "center",
-                          // height: 25,
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            width: "49%",
-                            // marginRight: 10,
-                            borderWidth: 1,
-                            // marginTop: 5,
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            height: 25,
-                          }}
-                        >
-                          <TextInput
-                            // focusable={sShowPinIndex === idx ? true : false}
-                            caretHidden={sShowPinIndex != idx}
-                            focused={sShowPinIndex === idx}
-                            value={sShowPinIndex === idx ? userObj.pin : ""}
-                            onChangeText={(value) => {
-                              userObj.pin = value;
-                              commitUserInfoChange(userObj);
-                            }}
-                            placeholder={
-                              sShowPinIndex === idx ? "pin..." : "PIN"
-                            }
-                            placeholderTextColor={"lightgray"}
-                            editable={editable}
-                            style={{
-                              outlineWidth: 0,
-                              paddingHorizontal: 5,
-                              padding: 1,
-                              fontSize: 14,
-                              width: "90%",
-                            }}
-                          />
-                          {editable ? (
-                            <TouchableOpacity
-                              onPress={() =>
-                                _setShowPinIndex(
-                                  sShowPinIndex != null ? null : idx
-                                )
-                              }
-                            >
-                              <Image_ icon={ICONS.editPencil} size={15} />
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={{ width: 15 }} />
-                          )}
-                        </View>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            borderColor: editable
-                              ? C.buttonLightGreenOutline
-                              : "transparent",
-                            width: "49%",
-                            borderWidth: 1,
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            height: 25,
-                          }}
-                        >
-                          <TextInput
-                            caretHidden={sShowWageIndex != idx}
-                            value={
-                              sShowWageIndex === idx ? userObj.hourlyWage : ""
-                            }
-                            onChangeText={(value) => {
-                              userObj.hourlyWage = value;
-                              commitUserInfoChange(userObj);
-                            }}
-                            placeholder={
-                              sShowWageIndex === idx ? "wage..." : "Wage"
-                            }
-                            placeholderTextColor={"lightgray"}
-                            editable={editable}
-                            style={{
-                              outlineWidth: 0,
-                              paddingHorizontal: 5,
-                              padding: 1,
-                              fontSize: 14,
-                              width: "90%",
-                            }}
-                          />
-                          {editable ? (
-                            <TouchableOpacity
-                              onPress={() =>
-                                _setShowWageIndex(
-                                  sShowWageIndex != null ? null : idx
-                                )
-                              }
-                            >
-                              <Image_ icon={ICONS.editPencil} size={15} />
-                            </TouchableOpacity>
-                          ) : (
-                            <View style={{ width: 15 }} />
-                          )}
-                        </View>
+                          >
+                            <Image_ icon={ICONS.editPencil} size={15} />
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={{ width: 15 }} />
+                        )}
                       </View>
                     </View>
                   </View>
-                );
-              }}
-            />
-          </View>
-        </BoxContainerInnerComponent>
-      ) : null}
+                </View>
+              );
+            }}
+          />
+        </View>
+      </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
 };
 
 // the next components are compiled into the ListOptionsComponent  //////////
-const ListOptionsComponent = ({
-  zSettingsObj,
-  handleSettingsFieldChange,
-  sExpand,
-}) => {
-  if (!sExpand) return null;
+const ListOptionsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   return (
-    <BoxContainerInnerComponent style={{ width: "90%", alignItems: "center" }}>
-      <BikeBrandsComponent
-        zSettingsObj={zSettingsObj}
-        handleSettingsFieldChange={handleSettingsFieldChange}
-      />
-      <DiscountsComponent
-        zSettingsObj={zSettingsObj}
-        handleSettingsFieldChange={handleSettingsFieldChange}
-      />
-      <WaitTimesComponent
-        zSettingsObj={zSettingsObj}
-        handleSettingsFieldChange={handleSettingsFieldChange}
-      />
-    </BoxContainerInnerComponent>
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent
+        style={{ width: "100%", alignItems: "center" }}
+      >
+        <BikeBrandsComponent
+          zSettingsObj={zSettingsObj}
+          handleSettingsFieldChange={handleSettingsFieldChange}
+        />
+        <DiscountsComponent
+          zSettingsObj={zSettingsObj}
+          handleSettingsFieldChange={handleSettingsFieldChange}
+        />
+        <WaitTimesComponent
+          zSettingsObj={zSettingsObj}
+          handleSettingsFieldChange={handleSettingsFieldChange}
+        />
+        <PartSourcesComponent
+          zSettingsObj={zSettingsObj}
+          handleSettingsFieldChange={handleSettingsFieldChange}
+        />
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
   );
 };
 
-const BikeBrandsComponent = ({
-  zSettingsObj,
-  handleSettingsFieldChange,
-  sExpand,
-}) => {
+const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   // const [sExpand, _setExpand] = useState();
 
   return (
@@ -1635,578 +1647,656 @@ const WaitTimesComponent = ({
   );
 };
 
+const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  return (
+    <BoxContainerInnerComponent
+      style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+    >
+      {/**Bike brands */}
+      <View style={{ width: "100%", alignItems: "center" }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: C.buttonLightGreen,
+            borderRadius: 5,
+            paddingVertical: 5,
+            width: "95%",
+          }}
+        >
+          <Text style={{ color: C.textMain, marginRight: 20 }}>
+            Part Sources
+          </Text>
+          <BoxButton1
+            onPress={() => {
+              let partSourcesArr = zSettingsObj?.partSources;
+              partSourcesArr.push("New part source...");
+              handleSettingsFieldChange("partSources", partSourcesArr);
+            }}
+          />
+        </View>
+        <View style={{ marginTop: 10, width: "100%" }}>
+          <FlatList
+            data={zSettingsObj?.partSources || []}
+            renderItem={(obj) => {
+              let idx = obj.index;
+              let partSourceName = obj.item;
+              return (
+                <View
+                  style={{
+                    alignItems: "center",
+                    width: "100%",
+                    flexDirection: "row",
+                    justifyContent: "center",
+                  }}
+                >
+                  <TextInput
+                    onChangeText={(val) => {
+                      let partSourcesArr = zSettingsObj.partSources;
+                      partSourcesArr[idx] = val;
+                      handleSettingsFieldChange("partSources", partSourcesArr);
+                    }}
+                    style={{
+                      marginBottom: 5,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      padding: 5,
+                      width: "80%",
+                      textAlign: "center",
+                      color: C.textMain,
+                      outlineWidth: 0,
+                    }}
+                    value={partSourceName}
+                  />
+                  <BoxButton1
+                    onPress={() => {
+                      let arr = zSettingsObj.partSources.filter(
+                        (name) => name !== partSourceName
+                      );
+                      handleSettingsFieldChange("partSources", arr);
+                    }}
+                    style={{ marginLeft: 15 }}
+                    iconSize={15}
+                    icon={ICONS.close1}
+                  />
+                </View>
+              );
+            }}
+          />
+        </View>
+      </View>
+    </BoxContainerInnerComponent>
+  );
+};
+
 // end compile into ListOptionsComponent /////////////////////////////////////////
 
-const StoreInfoComponent = ({
-  zSettingsObj,
-  handleSettingsFieldChange,
-  sExpand,
-}) => {
+const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   if (!zSettingsObj) return null;
   return (
     <BoxContainerOuterComponent style={{ marginBottom: 20 }}>
-      {sExpand ? (
-        <BoxContainerInnerComponent
-          style={{ width: "90%", alignItems: "center", paddingVertical: 20 }}
+      <BoxContainerInnerComponent
+        style={{ width: "100%", alignItems: "center", paddingVertical: 20 }}
+      >
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+
+            // backgroundColor: "green",
+          }}
         >
-          <View
+          <Text
             style={{
-              width: "100%",
-              justifyContent: "flex-end",
-              flexDirection: "row",
-              alignItems: "center",
-
-              // backgroundColor: "green",
+              textAlign: "right",
+              fontColor: C.textMain,
+              width: "30%",
             }}
           >
-            <Text
-              style={{
-                textAlign: "right",
-                fontColor: C.textMain,
-                width: "30%",
-              }}
-            >
-              Display Name:
-            </Text>
-            <TextInput
-              style={{
-                width: "50%",
-                marginLeft: 10,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                padding: 3,
-                paddingRight: 7,
-                textAlign: "right",
-                outlineWidth: 0,
-              }}
-              value={zSettingsObj?.storeInfo.displayName}
-              onChangeText={(unit) => {
-                handleSettingsFieldChange("displayName", {
-                  ...zSettingsObj?.displayName,
-                  unit,
-                });
-              }}
-            />
-            <CheckBox_
-              onCheck={() => {}}
-              buttonStyle={{ marginLeft: 7 }}
-              text={"Receipt"}
-              textStyle={{ fontSize: 12 }}
-              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
-                (o) => o === "displayName"
-              )}
-            />
-          </View>
-          <View
+            Display Name:
+          </Text>
+          <TextInput
             style={{
-              width: "100%",
-              justifyContent: "flex-end",
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 10,
-
-              // backgroundColor: "green",
-            }}
-          >
-            <Text
-              style={{
-                textAlign: "right",
-                fontColor: C.textMain,
-                width: "30%",
-              }}
-            >
-              Phone Number:
-            </Text>
-            <TextInput
-              style={{
-                width: "50%",
-                marginLeft: 10,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                padding: 3,
-                paddingRight: 7,
-                textAlign: "right",
-                outlineWidth: 0,
-              }}
-              value={addDashesToPhone(zSettingsObj?.storeInfo.phone)}
-              onChangeText={(unit) => {
-                handleSettingsFieldChange("phone", {
-                  ...zSettingsObj?.phone,
-                  unit,
-                });
-              }}
-            />
-            <CheckBox_
-              buttonStyle={{ marginLeft: 7 }}
-              text={"Receipt"}
-              textStyle={{ fontSize: 12 }}
-              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
-                (o) => o === "phone"
-              )}
-            />
-          </View>
-
-          <View
-            style={{
-              width: "100%",
-              justifyContent: "flex-end",
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 10,
-
-              // backgroundColor: "green",
-            }}
-          >
-            <Text
-              style={{
-                textAlign: "right",
-                fontColor: C.textMain,
-                width: "30%",
-              }}
-            >
-              Street:
-            </Text>
-            <TextInput
-              style={{
-                width: "50%",
-                marginLeft: 10,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                padding: 3,
-                paddingRight: 7,
-                textAlign: "right",
-                outlineWidth: 0,
-              }}
-              value={zSettingsObj?.storeInfo.street}
-              onChangeText={(street) => {
-                handleSettingsFieldChange("storeInfo", {
-                  ...zSettingsObj.storeInfo,
-                  street,
-                });
-              }}
-            />
-            <CheckBox_
-              buttonStyle={{ marginLeft: 7 }}
-              text={"Receipt"}
-              textStyle={{ fontSize: 12 }}
-              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
-                (o) => o === "street"
-              )}
-            />
-          </View>
-          <View
-            style={{
-              width: "100%",
-              justifyContent: "flex-end",
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 10,
-
-              // backgroundColor: "green",
-            }}
-          >
-            <Text
-              style={{
-                textAlign: "right",
-                fontColor: C.textMain,
-                width: "30%",
-              }}
-            >
-              Unit:
-            </Text>
-            <TextInput
-              style={{
-                width: "50%",
-                marginLeft: 10,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                padding: 3,
-                paddingRight: 7,
-                textAlign: "right",
-                outlineWidth: 0,
-              }}
-              value={zSettingsObj?.storeInfo.unit}
-              onChangeText={(unit) => {
-                handleSettingsFieldChange("storeInfo", {
-                  ...zSettingsObj?.storeInfo,
-                  unit,
-                });
-              }}
-            />
-            <CheckBox_
-              buttonStyle={{ marginLeft: 7 }}
-              text={"Receipt"}
-              textStyle={{ fontSize: 12 }}
-              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
-                (o) => o === "unit"
-              )}
-            />
-          </View>
-          <View
-            style={{
-              width: "100%",
-              justifyContent: "flex-end",
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 10,
-
-              // backgroundColor: "green",
-            }}
-          >
-            <Text
-              style={{
-                textAlign: "right",
-                fontColor: C.textMain,
-                width: "30%",
-              }}
-            >
-              City:
-            </Text>
-            <TextInput
-              style={{
-                width: "50%",
-                marginLeft: 10,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                padding: 3,
-                paddingRight: 7,
-                textAlign: "right",
-                outlineWidth: 0,
-              }}
-              value={zSettingsObj?.storeInfo.city}
-              onChangeText={(city) => {
-                handleSettingsFieldChange("storeInfo", {
-                  ...zSettingsObj?.storeInfo,
-                  city,
-                });
-              }}
-            />
-            <CheckBox_
-              buttonStyle={{ marginLeft: 7 }}
-              text={"Receipt"}
-              textStyle={{ fontSize: 12 }}
-              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
-                (o) => o === "city"
-              )}
-            />
-          </View>
-          <View
-            style={{
-              width: "100%",
-              justifyContent: "flex-end",
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 10,
-
-              // backgroundColor: "green",
-            }}
-          >
-            <Text
-              style={{
-                textAlign: "right",
-                fontColor: C.textMain,
-                width: "30%",
-              }}
-            >
-              State or Abbrev.
-            </Text>
-            <TextInput
-              style={{
-                width: "50%",
-                marginLeft: 10,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                padding: 3,
-                paddingRight: 7,
-                textAlign: "right",
-                outlineWidth: 0,
-              }}
-              value={zSettingsObj?.storeInfo.state}
-              onChangeText={(state) => {
-                handleSettingsFieldChange("storeInfo", {
-                  ...zSettingsObj?.storeInfo,
-                  state,
-                });
-              }}
-            />
-            <CheckBox_
-              buttonStyle={{ marginLeft: 7 }}
-              text={"Receipt"}
-              textStyle={{ fontSize: 12 }}
-              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
-                (o) => o === "state"
-              )}
-            />
-          </View>
-          <View
-            style={{
-              width: "100%",
-              justifyContent: "flex-end",
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 10,
-
-              // backgroundColor: "green",
-            }}
-          >
-            <Text
-              style={{
-                textAlign: "right",
-                fontColor: C.textMain,
-                width: "30%",
-              }}
-            >
-              Zip Code:
-            </Text>
-            <TextInput
-              style={{
-                width: "50%",
-                marginLeft: 10,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                padding: 3,
-                paddingRight: 7,
-                textAlign: "right",
-                outlineWidth: 0,
-              }}
-              value={zSettingsObj?.storeInfo.zip}
-              onChangeText={(zip) => {
-                handleSettingsFieldChange("storeInfo", {
-                  ...zSettingsObj.storeInfo,
-                  zip,
-                });
-              }}
-            />
-            <CheckBox_
-              buttonStyle={{ marginLeft: 7 }}
-              text={"Receipt"}
-              textStyle={{ fontSize: 12 }}
-              isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
-                (o) => o === "zip"
-              )}
-            />
-          </View>
-          {/***************** open and closing hours **************************/}
-          <View
-            style={{
-              marginTop: 20,
+              width: "50%",
+              marginLeft: 10,
               borderWidth: 1,
               borderColor: C.buttonLightGreenOutline,
-              borderRadius: 5,
-              padding: 4,
-              width: "100%",
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={zSettingsObj?.storeInfo.displayName}
+            onChangeText={(unit) => {
+              handleSettingsFieldChange("displayName", {
+                ...zSettingsObj?.displayName,
+                unit,
+              });
+            }}
+          />
+          <CheckBox_
+            onCheck={() => {}}
+            buttonStyle={{ marginLeft: 7 }}
+            text={"Receipt"}
+            textStyle={{ fontSize: 12 }}
+            isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+              (o) => o === "displayName"
+            )}
+          />
+        </View>
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
+
+            // backgroundColor: "green",
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.textMain,
+              width: "30%",
             }}
           >
-            {zSettingsObj?.storeHours.standard.map((item, idx) => (
+            Phone Number:
+          </Text>
+          <TextInput
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={addDashesToPhone(zSettingsObj?.storeInfo.phone)}
+            onChangeText={(unit) => {
+              handleSettingsFieldChange("phone", {
+                ...zSettingsObj?.phone,
+                unit,
+              });
+            }}
+          />
+          <CheckBox_
+            buttonStyle={{ marginLeft: 7 }}
+            text={"Receipt"}
+            textStyle={{ fontSize: 12 }}
+            isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+              (o) => o === "phone"
+            )}
+          />
+        </View>
+
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
+
+            // backgroundColor: "green",
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.textMain,
+              width: "30%",
+            }}
+          >
+            Street:
+          </Text>
+          <TextInput
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={zSettingsObj?.storeInfo.street}
+            onChangeText={(street) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj.storeInfo,
+                street,
+              });
+            }}
+          />
+          <CheckBox_
+            buttonStyle={{ marginLeft: 7 }}
+            text={"Receipt"}
+            textStyle={{ fontSize: 12 }}
+            isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+              (o) => o === "street"
+            )}
+          />
+        </View>
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
+
+            // backgroundColor: "green",
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.textMain,
+              width: "30%",
+            }}
+          >
+            Unit:
+          </Text>
+          <TextInput
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={zSettingsObj?.storeInfo.unit}
+            onChangeText={(unit) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj?.storeInfo,
+                unit,
+              });
+            }}
+          />
+          <CheckBox_
+            buttonStyle={{ marginLeft: 7 }}
+            text={"Receipt"}
+            textStyle={{ fontSize: 12 }}
+            isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+              (o) => o === "unit"
+            )}
+          />
+        </View>
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
+
+            // backgroundColor: "green",
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.textMain,
+              width: "30%",
+            }}
+          >
+            City:
+          </Text>
+          <TextInput
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={zSettingsObj?.storeInfo.city}
+            onChangeText={(city) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj?.storeInfo,
+                city,
+              });
+            }}
+          />
+          <CheckBox_
+            buttonStyle={{ marginLeft: 7 }}
+            text={"Receipt"}
+            textStyle={{ fontSize: 12 }}
+            isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+              (o) => o === "city"
+            )}
+          />
+        </View>
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
+
+            // backgroundColor: "green",
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.textMain,
+              width: "30%",
+            }}
+          >
+            State or Abbrev.
+          </Text>
+          <TextInput
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={zSettingsObj?.storeInfo.state}
+            onChangeText={(state) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj?.storeInfo,
+                state,
+              });
+            }}
+          />
+          <CheckBox_
+            buttonStyle={{ marginLeft: 7 }}
+            text={"Receipt"}
+            textStyle={{ fontSize: 12 }}
+            isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+              (o) => o === "state"
+            )}
+          />
+        </View>
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
+
+            // backgroundColor: "green",
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.textMain,
+              width: "30%",
+            }}
+          >
+            Zip Code:
+          </Text>
+          <TextInput
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={zSettingsObj?.storeInfo.zip}
+            onChangeText={(zip) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj.storeInfo,
+                zip,
+              });
+            }}
+          />
+          <CheckBox_
+            buttonStyle={{ marginLeft: 7 }}
+            text={"Receipt"}
+            textStyle={{ fontSize: 12 }}
+            isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+              (o) => o === "zip"
+            )}
+          />
+        </View>
+        {/***************** open and closing hours **************************/}
+        <View
+          style={{
+            marginTop: 20,
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 5,
+            padding: 4,
+            width: "100%",
+          }}
+        >
+          {zSettingsObj?.storeHours.standard.map((item, idx) => (
+            <View
+              style={{
+                width: "100%",
+                flexDirection: "row",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  alignItems: "center",
+                  width: "25%",
+                  textAlign: "right",
+                  paddingRight: 20,
+                }}
+              >
+                {getDayOfWeekFrom0To7Input(idx)}
+              </Text>
               <View
                 style={{
-                  width: "100%",
+                  width: "45%",
                   flexDirection: "row",
-                  justifyContent: "center",
                   alignItems: "center",
                 }}
               >
-                <Text
+                <TextInput
+                  onChangeText={(val) => {
+                    let standardStoreHours =
+                      zSettingsObj.storeHours.standard.map((o) => {
+                        if (o.id === item.id) {
+                          let amPMSplit = o.open.split(" ");
+                          let amPM = amPMSplit[1];
+                          let hourMinSplit = amPMSplit[0].split(":");
+                          hourMinSplit[0] = val;
+                          if (val >= 12) amPM = "PM";
+                          return {
+                            ...o,
+                            open: val + ":" + hourMinSplit[1] + " " + amPM,
+                          };
+                        }
+                        return o;
+                      });
+
+                    handleSettingsFieldChange("storeHours", {
+                      standard: standardStoreHours,
+                      special: zSettingsObj.storeHours.special,
+                    });
+                  }}
                   style={{
-                    alignItems: "center",
-                    width: "25%",
                     textAlign: "right",
-                    paddingRight: 20,
+                    paddingRight: 2,
+                    backgroundColor: "transparent",
+                    width: 30,
+                    fontSize: 15,
+                    marginVertical: 3,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    marginRight: 2,
+                    outlineColor: "transparent",
                   }}
-                >
-                  {getDayOfWeekFrom0To7Input(idx)}
-                </Text>
-                <View
+                  value={item.open.split(":")[0]}
+                />
+                <Text>:</Text>
+                <TextInput
                   style={{
-                    width: "45%",
-                    flexDirection: "row",
-                    alignItems: "center",
+                    textAlign: "left",
+                    paddingLeft: 2,
+                    backgroundColor: "transparent",
+                    width: 30,
+                    fontSize: 15,
+                    marginVertical: 3,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    marginLeft: 2,
+                    outlineColor: makeGrey(0.5),
+                    backgroundColor: "transparent",
+                    width: 30,
                   }}
-                >
-                  <TextInput
-                    onChangeText={(val) => {
-                      let standardStoreHours =
-                        zSettingsObj.storeHours.standard.map((o) => {
-                          if (o.id === item.id) {
-                            let amPMSplit = o.open.split(" ");
-                            let amPM = amPMSplit[1];
-                            let hourMinSplit = amPMSplit[0].split(":");
-                            hourMinSplit[0] = val;
-                            if (val >= 12) amPM = "PM";
-                            return {
-                              ...o,
-                              open: val + ":" + hourMinSplit[1] + " " + amPM,
-                            };
-                          }
-                          return o;
-                        });
+                  onChangeText={(val) => {
+                    let standardStoreHours =
+                      zSettingsObj.storeHours.standard.map((o) => {
+                        // if (val > 60 || val < 0) return;
 
-                      handleSettingsFieldChange("storeHours", {
-                        standard: standardStoreHours,
-                        special: zSettingsObj.storeHours.special,
+                        if (o.id === item.id) {
+                          let amPMSplit = o.open.split(" ");
+                          let amPM = amPMSplit[1];
+                          let hourMinSplit = amPMSplit[0].split(":");
+                          // if (val === "0") val = "00";
+                          return {
+                            ...o,
+                            open: hourMinSplit[0] + ":" + val + " " + amPM,
+                          };
+                        }
+                        return o;
                       });
-                    }}
-                    style={{
-                      textAlign: "right",
-                      paddingRight: 2,
-                      backgroundColor: "transparent",
-                      width: 30,
-                      fontSize: 15,
-                      marginVertical: 3,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      marginRight: 2,
-                      outlineColor: "transparent",
-                    }}
-                    value={item.open.split(":")[0]}
-                  />
-                  <Text>:</Text>
-                  <TextInput
-                    style={{
-                      textAlign: "left",
-                      paddingLeft: 2,
-                      backgroundColor: "transparent",
-                      width: 30,
-                      fontSize: 15,
-                      marginVertical: 3,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      marginLeft: 2,
-                      outlineColor: makeGrey(0.5),
-                      backgroundColor: "transparent",
-                      width: 30,
-                    }}
-                    onChangeText={(val) => {
-                      let standardStoreHours =
-                        zSettingsObj.storeHours.standard.map((o) => {
-                          // if (val > 60 || val < 0) return;
 
-                          if (o.id === item.id) {
-                            let amPMSplit = o.open.split(" ");
-                            let amPM = amPMSplit[1];
-                            let hourMinSplit = amPMSplit[0].split(":");
-                            // if (val === "0") val = "00";
-                            return {
-                              ...o,
-                              open: hourMinSplit[0] + ":" + val + " " + amPM,
-                            };
-                          }
-                          return o;
-                        });
-
-                      handleSettingsFieldChange("storeHours", {
-                        standard: standardStoreHours,
-                        special: zSettingsObj.storeHours.special,
-                      });
-                    }}
-                    value={item.open.split(":")[1].split(" ")[0]}
-                  />
-                  <Image_
-                    style={{ width: 22, height: 12, marginHorizontal: 10 }}
-                    // size={13}
-                    icon={ICONS.rightArrowBlue}
-                  />
-                  <TextInput
-                    style={{
-                      textAlign: "right",
-                      paddingRight: 2,
-                      backgroundColor: "transparent",
-                      width: 30,
-                      fontSize: 15,
-                      marginVertical: 3,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      marginRight: 2,
-                      outlineColor: "transparent",
-                    }}
-                    onChangeText={(val) => {
-                      let standardStoreHours =
-                        zSettingsObj.storeHours.standard.map((o) => {
-                          if (o.id === item.id) {
-                            let amPMSplit = o.close.split(" ");
-                            let amPM = amPMSplit[1];
-                            let hourMinSplit = amPMSplit[0].split(":");
-                            hourMinSplit[0] = val;
-                            if (val >= 12) amPM = "PM";
-                            return {
-                              ...o,
-                              close: val + ":" + hourMinSplit[1] + " " + amPM,
-                            };
-                          }
-                          return o;
-                        });
-
-                      handleSettingsFieldChange("storeHours", {
-                        standard: standardStoreHours,
-                        special: zSettingsObj.storeHours.special,
-                      });
-                    }}
-                    value={item.close.split(":")[0]}
-                  />
-                  <Text>:</Text>
-                  <TextInput
-                    style={{
-                      textAlign: "left",
-                      paddingLeft: 2,
-                      backgroundColor: "transparent",
-                      width: 30,
-                      fontSize: 15,
-                      marginVertical: 3,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      marginLeft: 2,
-                      outlineColor: "transparent",
-                      backgroundColor: "transparent",
-                      width: 30,
-                    }}
-                    onChangeText={(val) => {
-                      let standardStoreHours =
-                        zSettingsObj.storeHours.standard.map((o) => {
-                          // if (val > 60 || val < 0) return;
-
-                          if (o.id === item.id) {
-                            let amPMSplit = o.close.split(" ");
-                            let amPM = amPMSplit[1];
-                            let hourMinSplit = amPMSplit[0].split(":");
-                            // if (val === "0") val = "00";
-                            return {
-                              ...o,
-                              close: hourMinSplit[0] + ":" + val + " " + amPM,
-                            };
-                          }
-                          return o;
-                        });
-
-                      handleSettingsFieldChange("storeHours", {
-                        standard: standardStoreHours,
-                        special: zSettingsObj.storeHours.special,
-                      });
-                    }}
-                    value={item.close.split(":")[1].split(" ")[0]}
-                  />
-                </View>
-                <View
+                    handleSettingsFieldChange("storeHours", {
+                      standard: standardStoreHours,
+                      special: zSettingsObj.storeHours.special,
+                    });
+                  }}
+                  value={item.open.split(":")[1].split(" ")[0]}
+                />
+                <Image_
+                  style={{ width: 22, height: 12, marginHorizontal: 10 }}
+                  // size={13}
+                  icon={ICONS.rightArrowBlue}
+                />
+                <TextInput
                   style={{
-                    width: "20%",
-                    // backgroundColor: "green",
-                    alignItems: "flex-end",
+                    textAlign: "right",
+                    paddingRight: 2,
+                    backgroundColor: "transparent",
+                    width: 30,
+                    fontSize: 15,
+                    marginVertical: 3,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    marginRight: 2,
+                    outlineColor: "transparent",
                   }}
-                >
-                  <CheckBox_
-                    buttonStyle={{ marginLeft: 20 }}
-                    text={"Open"}
-                    isChecked={item.isOpen}
-                  />
-                </View>
+                  onChangeText={(val) => {
+                    let standardStoreHours =
+                      zSettingsObj.storeHours.standard.map((o) => {
+                        if (o.id === item.id) {
+                          let amPMSplit = o.close.split(" ");
+                          let amPM = amPMSplit[1];
+                          let hourMinSplit = amPMSplit[0].split(":");
+                          hourMinSplit[0] = val;
+                          if (val >= 12) amPM = "PM";
+                          return {
+                            ...o,
+                            close: val + ":" + hourMinSplit[1] + " " + amPM,
+                          };
+                        }
+                        return o;
+                      });
+
+                    handleSettingsFieldChange("storeHours", {
+                      standard: standardStoreHours,
+                      special: zSettingsObj.storeHours.special,
+                    });
+                  }}
+                  value={item.close.split(":")[0]}
+                />
+                <Text>:</Text>
+                <TextInput
+                  style={{
+                    textAlign: "left",
+                    paddingLeft: 2,
+                    backgroundColor: "transparent",
+                    width: 30,
+                    fontSize: 15,
+                    marginVertical: 3,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    marginLeft: 2,
+                    outlineColor: "transparent",
+                    backgroundColor: "transparent",
+                    width: 30,
+                  }}
+                  onChangeText={(val) => {
+                    let standardStoreHours =
+                      zSettingsObj.storeHours.standard.map((o) => {
+                        // if (val > 60 || val < 0) return;
+
+                        if (o.id === item.id) {
+                          let amPMSplit = o.close.split(" ");
+                          let amPM = amPMSplit[1];
+                          let hourMinSplit = amPMSplit[0].split(":");
+                          // if (val === "0") val = "00";
+                          return {
+                            ...o,
+                            close: hourMinSplit[0] + ":" + val + " " + amPM,
+                          };
+                        }
+                        return o;
+                      });
+
+                    handleSettingsFieldChange("storeHours", {
+                      standard: standardStoreHours,
+                      special: zSettingsObj.storeHours.special,
+                    });
+                  }}
+                  value={item.close.split(":")[1].split(" ")[0]}
+                />
               </View>
-            ))}
-          </View>
-        </BoxContainerInnerComponent>
-      ) : null}
+              <View
+                style={{
+                  width: "20%",
+                  // backgroundColor: "green",
+                  alignItems: "flex-end",
+                }}
+              >
+                <CheckBox_
+                  buttonStyle={{ marginLeft: 20 }}
+                  text={"Open"}
+                  isChecked={item.isOpen}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
+      </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
 };
@@ -2214,211 +2304,231 @@ const StoreInfoComponent = ({
 const PaymentProcessingComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
-  sExpand,
 }) => {
   // const [sExpand, _setExpand] = useState();
 
   return (
     <BoxContainerOuterComponent>
-      {sExpand ? (
-        <BoxContainerInnerComponent>
-          <CheckBox_
-            isChecked={zSettingsObj?.acceptChecks}
-            textStyle={{ fontSize: 15 }}
-            buttonStyle={{
-              backgroundColor: "transparent",
-            }}
-            text={"Accepts checks"}
-            onCheck={() =>
-              handleSettingsFieldChange(
-                "acceptChecks",
-                !zSettingsObj?.acceptChecks
-              )
-            }
-          />
-          <CheckBox_
-            isChecked={zSettingsObj?.autoConnectToCardReader}
-            textStyle={{ fontSize: 15 }}
-            buttonStyle={{
-              marginVertical: 10,
-              backgroundColor: "transparent",
-            }}
-            text={"Auto connect to card reader"}
-            onCheck={() =>
-              handleSettingsFieldChange(
-                "autoConnectToCardReader",
-                !zSettingsObj?.autoConnectToCardReader
-              )
-            }
-          />
-          {/**card reader flatlist */}
+      <BoxContainerInnerComponent>
+        <CheckBox_
+          isChecked={zSettingsObj?.acceptChecks}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{
+            backgroundColor: "transparent",
+          }}
+          text={"Accepts checks"}
+          onCheck={() =>
+            handleSettingsFieldChange(
+              "acceptChecks",
+              !zSettingsObj?.acceptChecks
+            )
+          }
+        />
+        <CheckBox_
+          isChecked={zSettingsObj?.autoConnectToCardReader}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{
+            marginVertical: 10,
+            backgroundColor: "transparent",
+          }}
+          text={"Auto connect to card reader"}
+          onCheck={() =>
+            handleSettingsFieldChange(
+              "autoConnectToCardReader",
+              !zSettingsObj?.autoConnectToCardReader
+            )
+          }
+        />
+        {/**card reader flatlist */}
+        <View
+          style={{
+            marginTop: 7,
+            width: "100%",
+            alignItems: "flex-end",
+          }}
+        >
           <View
             style={{
-              marginTop: 7,
-              width: "100%",
-              alignItems: "flex-end",
+              borderRadius: 8,
+              backgroundColor: C.backgroundListWhite,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 10,
             }}
           >
-            <View
-              style={{
-                borderRadius: 8,
-                backgroundColor: C.backgroundListWhite,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                padding: 10,
-              }}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "flex-start",
-                    marginBottom: 10,
-                    alignItems: "center",
-                    width: "100%",
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "flex-start",
+                  marginBottom: 10,
+                  alignItems: "center",
+                  width: "100%",
+                }}
+              >
+                <BoxButton1
+                  onPress={() => {
+                    handleSettingsFieldChange("cardReaders", [
+                      ...zSettingsObj.cardReaders,
+                      { id: "", label: "" },
+                    ]);
                   }}
-                >
-                  <BoxButton1
-                    onPress={() => {
-                      log("need new card reader function");
-                    }}
-                    icon={ICONS.add}
-                    style={{ marginRight: 10, paddingLeft: 0 }}
-                  />
-                  <Text style={{ fontSize: 12, color: makeGrey(0.6) }}>
-                    {"STRIPE CARD READERS"}
-                  </Text>
-                </View>
-              </View>
-
-              {/**Flatlist showing the available card readers */}
-              <View style={{ width: "100%" }}>
-                <FlatList
-                  ItemSeparatorComponent={() => (
-                    <View
-                      style={{
-                        height: 5,
-                      }}
-                    />
-                  )}
-                  style={{}}
-                  data={zSettingsObj?.cardReaders || []}
-                  renderItem={(obj) => {
-                    obj = cloneDeep(obj);
-                    let idx = obj.index;
-                    let item = obj.item;
-                    return (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "flex-end",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Text
-                          style={{ color: makeGrey(0.55), marginRight: 10 }}
-                        >
-                          ID:
-                        </Text>
-                        <TextInput
-                          style={{ outlineWidth: 0 }}
-                          editable={true}
-                          value={item.id}
-                        />
-                        <TextInput
-                          value={item.label}
-                          onChangeText={(val) => {
-                            let cardReaderArr = zSettingsObj.cardReaders?.map(
-                              (o) => {
-                                if (o.id === item.id)
-                                  return { ...o, label: val };
-                                return o;
-                              }
-                            );
-                            handleSettingsFieldChange(
-                              "cardReaders",
-                              cloneDeep(cardReaderArr)
-                            );
-                          }}
-                          style={{
-                            textAlign: "right",
-                            paddingRight: 2,
-                            justifyContent: "flex-end",
-                            paddingVertical: 4,
-                            backgroundColor: C.listItemWhite,
-                            borderWidth: 1,
-                            paddingRight: 2,
-                            borderColor: C.buttonLightGreenOutline,
-                            outlineWidth: 0,
-                          }}
-                        />
-                        <Button_
-                          buttonStyle={{ paddingHorizontal: 10 }}
-                          iconSize={15}
-                          icon={ICONS.close1}
-                          onPress={() => {}}
-                        />
-                      </View>
-                      // </View>
-                    );
-                  }}
+                  icon={ICONS.add}
+                  style={{ marginRight: 10, paddingLeft: 0 }}
                 />
+                <Text style={{ fontSize: 12, color: makeGrey(0.6) }}>
+                  {"STRIPE CARD READERS"}
+                </Text>
               </View>
             </View>
+
+            {/**Flatlist showing the available card readers */}
+            <View style={{ width: "100%" }}>
+              <FlatList
+                ItemSeparatorComponent={() => (
+                  <View
+                    style={{
+                      height: 5,
+                    }}
+                  />
+                )}
+                style={{}}
+                data={zSettingsObj?.cardReaders || []}
+                renderItem={(obj) => {
+                  obj = cloneDeep(obj);
+                  let idx = obj.index;
+                  let item = obj.item;
+                  return (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "flex-end",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ color: makeGrey(0.55), marginRight: 10 }}>
+                        ID:
+                      </Text>
+                      <TextInput
+                        style={{ outlineWidth: 0 }}
+                        editable={true}
+                        value={item.id}
+                        placeholder="Assign reader name..."
+                        placeholderTextColor={makeGrey(0.4)}
+                        onChangeText={(val) => {
+                          let cardReaderArr = zSettingsObj.cardReaders?.map(
+                            (o) => {
+                              if (o.id === item.id) return { ...o, id: val };
+                              return o;
+                            }
+                          );
+                          handleSettingsFieldChange(
+                            "cardReaders",
+                            cloneDeep(cardReaderArr)
+                          );
+                        }}
+                      />
+                      <TextInput
+                        value={item.label}
+                        onChangeText={(val) => {
+                          let cardReaderArr = zSettingsObj.cardReaders?.map(
+                            (o) => {
+                              if (o.id === item.id) return { ...o, label: val };
+                              return o;
+                            }
+                          );
+                          handleSettingsFieldChange(
+                            "cardReaders",
+                            cloneDeep(cardReaderArr)
+                          );
+                        }}
+                        placeholder="Assign reader name..."
+                        placeholderTextColor={makeGrey(0.4)}
+                        style={{
+                          textAlign: "right",
+                          paddingRight: 2,
+                          justifyContent: "flex-end",
+                          paddingVertical: 4,
+                          backgroundColor: C.listItemWhite,
+                          borderWidth: 1,
+                          paddingRight: 2,
+                          borderColor: C.buttonLightGreenOutline,
+                          outlineWidth: 0,
+                        }}
+                      />
+                      <Button_
+                        buttonStyle={{ paddingHorizontal: 10 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                        onPress={() => {
+                          handleSettingsFieldChange(
+                            "cardReaders",
+                            zSettingsObj.cardReaders.filter(
+                              (obj) => obj.label != item.label
+                            )
+                          );
+                        }}
+                      />
+                    </View>
+                    // </View>
+                  );
+                }}
+              />
+            </View>
           </View>
-          <View
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            width: "95%",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            marginTop: 20,
+          }}
+        >
+          <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
+          <DropdownComponent
+            label={zSettingsObj?.selectedCardReaderObj?.label || ""}
+            data={zSettingsObj?.cardReaders || []}
+            onSelect={(obj) =>
+              handleSettingsFieldChange("selectedCardReaderObj", obj)
+            }
+          />
+        </View>
+        <View
+          style={{
+            width: "100%",
+            flexDirection: "row",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            marginTop: 20,
+          }}
+        >
+          <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
+          <TextInput
             style={{
-              flexDirection: "row",
-              width: "95%",
-              justifyContent: "flex-end",
-              alignItems: "center",
-              marginTop: 20,
+              outlineWidth: 0,
+              borderRadius: 5,
+              textAlign: "right",
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              paddingHorizontal: 5,
+              paddingVertical: 3,
+              marginRight: 3,
+              width: 75,
             }}
-          >
-            <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
-            <DropdownComponent
-              label={zSettingsObj?.selectedCardReaderObj?.label || ""}
-              data={zSettingsObj?.cardReaders || []}
-              onSelect={(obj) =>
-                handleSettingsFieldChange("selectedCardReaderObj", obj)
+            value={zSettingsObj?.salesTax || ""}
+            onChangeText={(val) => {
+              const regex = new RegExp(".", "g");
+              let containsDecimalAlready = val.split(".").length > 2;
+              if (checkInputForNumbersOnly(val) && !containsDecimalAlready) {
+                handleSettingsFieldChange("salesTax", val);
               }
-            />
-          </View>
-          <View
-            style={{
-              width: "100%",
-              flexDirection: "row",
-              justifyContent: "flex-end",
-              alignItems: "center",
-              marginTop: 20,
             }}
-          >
-            <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
-            <TextInput
-              style={{
-                outlineWidth: 0,
-                borderRadius: 5,
-                textAlign: "right",
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                paddingHorizontal: 5,
-                paddingVertical: 3,
-                marginRight: 3,
-                width: 75,
-              }}
-              value={zSettingsObj?.salesTax || ""}
-              onChangeText={(val) => {
-                const regex = new RegExp(".", "g");
-                let containsDecimalAlready = val.split(".").length > 2;
-                if (checkInputForNumbersOnly(val) && !containsDecimalAlready) {
-                  handleSettingsFieldChange("salesTax", val);
-                }
-              }}
-            />
-            <Text>%</Text>
-          </View>
-        </BoxContainerInnerComponent>
-      ) : null}
+          />
+          <Text>%</Text>
+        </View>
+      </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
 };
@@ -2426,7 +2536,6 @@ const PaymentProcessingComponent = ({
 const WorkorderStatusesComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
-  sExpand,
 }) => {
   // const [sExpand, _setExpand] = useState(true);
   const [sBackgroundColorWheelItem, _setBackgroundColorWheelItem] = useState();
@@ -2436,294 +2545,425 @@ const WorkorderStatusesComponent = ({
 
   return (
     <BoxContainerOuterComponent style={{}}>
-      {sExpand ? (
-        <BoxContainerInnerComponent
+      <BoxContainerInnerComponent
+        style={{
+          backgroundColor: "transparent",
+          borderWidth: 0,
+          alignItems: "center",
+          paddingHorizontal: 0,
+          paddingVertical: 0,
+          width: "100%",
+        }}
+      >
+        <View
           style={{
-            backgroundColor: "transparent",
-            borderWidth: 0,
-            alignItems: "center",
-            paddingHorizontal: 0,
-            paddingVertical: 0,
             width: "100%",
-            // borderWidth: 1,
+            alignItems: "center",
+            borderWidth: 1,
+            paddingBottom: 30,
+            paddingTop: 13,
+            paddingHorizontal: 10,
+            borderColor: C.buttonLightGreenOutline,
+            backgroundColor: C.backgroundListWhite,
+            borderRadius: 10,
           }}
         >
-          <BoxButton1
-            style={{
-              marginTop: 10,
-              width: 130,
-              paddingVertical: 0,
-              marginBottom: 20,
-              backgroundColor: makeGrey(0.15),
-              borderRadius: 15,
-            }}
-            colorGradientArr={COLOR_GRADIENTS.green}
-            label={"New Status"}
-            onPress={() => {
-              let proto = {};
-              Object.keys(zSettingsObj.statuses[0]).forEach((key) => {
-                proto[key] = "";
-              });
-              proto.label = "New Status";
-              proto.id = generateRandomID();
-              proto.backgroundColor = makeGrey(0.3);
-              proto.textColor = C.textMain;
-              proto.removable = true;
-              let statuses = [proto, ...zSettingsObj.statuses];
-              handleSettingsFieldChange("statuses", statuses);
-            }}
-          />
-
-          <View
+          <View style={{ width: "100%", alignItems: "flex-start" }}>
+            <BoxButton1
+              style={{
+                marginBottom: 10,
+                alignSelf: "flex-start",
+              }}
+              onPress={() => {
+                let proto = {};
+                Object.keys(zSettingsObj.statuses[0]).forEach((key) => {
+                  proto[key] = "";
+                });
+                proto.label = "New Status";
+                proto.id = generateRandomID();
+                proto.backgroundColor = makeGrey(0.3);
+                proto.textColor = C.textMain;
+                proto.removable = true;
+                let statuses = [proto, ...zSettingsObj.statuses];
+                handleSettingsFieldChange("statuses", statuses);
+              }}
+            />
+          </View>
+          <FlatList
+            data={zSettingsObj?.statuses || []}
             style={{
               width: "100%",
-              alignItems: "center",
             }}
-          >
-            <FlatList
-              data={zSettingsObj?.statuses || []}
-              style={{
-                marginTop: 7,
-                borderWidth: 1,
-                paddingVertical: 30,
-                paddingHorizontal: 10,
-                borderColor: C.buttonLightGreenOutline,
-                backgroundColor: C.backgroundListWhite,
-                borderRadius: 10,
-                width: "100%",
-              }}
-              renderItem={(obj) => {
-                let idx = obj.index;
-                let item = obj.item;
-                // log(item);
-                return (
+            renderItem={(obj) => {
+              let idx = obj.index;
+              let item = obj.item;
+              // log(item);
+              return (
+                <View
+                  style={{
+                    flexDirection: "column",
+                    alignItems: "center",
+                    width: "100%",
+                    justifyContent: "flex-end",
+                    // backgroundColor: "red",
+                  }}
+                >
                   <View
                     style={{
-                      flexDirection: "column",
-                      alignItems: "center",
+                      flexDirection: "row",
                       width: "100%",
-                      justifyContent: "flex-end",
-                      // backgroundColor: "red",
+                      alignItems: "center",
+                      // justifyContent: "flex-end",
                     }}
                   >
+                    <BoxButton1
+                      style={{ paddingHorizontal: 5 }}
+                      iconSize={22}
+                      icon={ICONS.upChevron}
+                      onPress={() => {
+                        let arr = moveItemInArr(
+                          zSettingsObj.statuses,
+                          idx,
+                          "up"
+                        );
+                        handleSettingsFieldChange("statuses", arr);
+                      }}
+                    />
+                    <BoxButton1
+                      style={{ paddingHorizontal: 5 }}
+                      iconSize={22}
+                      icon={ICONS.downChevron}
+                      onPress={() => {
+                        let arr = moveItemInArr(
+                          zSettingsObj.statuses,
+                          idx,
+                          "down"
+                        );
+                        handleSettingsFieldChange("statuses", arr);
+                      }}
+                    />
+
+                    <BoxButton1
+                      style={{ paddingHorizontal: 5 }}
+                      iconSize={22}
+                      icon={ICONS.editPencil}
+                      onPress={() =>
+                        _setEditableInputIdx(
+                          sEditableInputIdx === null ||
+                            (sEditableInputIdx && sEditableInputIdx != idx)
+                            ? idx
+                            : null
+                        )
+                      }
+                    />
+                    <BoxButton1
+                      style={{
+                        paddingHorizontal: 5,
+                        paddingRight: 5,
+                        marginRight: 20,
+                      }}
+                      iconSize={15}
+                      icon={ICONS.close1}
+                      onPress={() => {
+                        let statuses = zSettingsObj.statuses.filter(
+                          (o) => o.id != item.id
+                        );
+                        handleSettingsFieldChange("statuses", statuses);
+                      }}
+                    />
+                    <View
+                      style={{
+                        backgroundColor: item.backgroundColor,
+                        alignItems: "center",
+                        // justifyContent: ''
+                        flexDirection: "row",
+                        width: "50%",
+                        height: 35,
+                        // paddingHorizontal: 20,
+                        // paddingVertical: 5,
+                        borderTopLeftRadius: idx === 0 ? 5 : 0,
+                        borderTopRightRadius: idx === 0 ? 5 : 0,
+                        borderBottomLeftRadius:
+                          idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
+                        borderBottomRightRadius:
+                          idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
+                      }}
+                    >
+                      {!item.removable ? (
+                        <View
+                          style={{
+                            width: "10%",
+                          }}
+                        />
+                      ) : null}
+                      <TextInput
+                        style={{
+                          width: "100%",
+                          textAlign: "center",
+                          color: item.textColor,
+                          outlineWidth: 0,
+                          paddingVertical: 4,
+                          fontSize: 13,
+                          borderWidth: 1,
+                          borderColor:
+                            sEditableInputIdx === idx && item.removable
+                              ? makeGrey(0.4)
+                              : "transparent",
+                        }}
+                        onChangeText={(val) => {
+                          let statuses = zSettingsObj.statuses.map((o) => {
+                            if (o.id === item.id) return { ...o, label: val };
+                            return o;
+                          });
+                          handleSettingsFieldChange("statuses", statuses);
+                        }}
+                        editable={sEditableInputIdx === idx && item.removable}
+                        autoFocus={sEditableInputIdx === idx}
+                        value={item.label}
+                      />
+                      {!item.removable ? (
+                        <View
+                          style={{
+                            width: "10%",
+                            height: "100%",
+                            alignItems: "flex-end",
+                            justifyContent: "flex-start",
+                            padding: 3,
+                          }}
+                        >
+                          <Image_ icon={ICONS.blocked} size={15} />
+                        </View>
+                      ) : null}
+                    </View>
                     <View
                       style={{
                         flexDirection: "row",
-                        width: "100%",
-                        alignItems: "center",
-                        // justifyContent: "flex-end",
+                        width: "15%",
+                        justifyContent: "space-between",
+                        // backgroundColor: "blue",
+                        paddingLeft: 20,
                       }}
                     >
                       <BoxButton1
-                        style={{ paddingHorizontal: 5 }}
-                        iconSize={22}
-                        icon={ICONS.upChevron}
+                        style={{ paddingHorizontal: 7 }}
+                        iconSize={23}
+                        icon={ICONS.colorWheel}
                         onPress={() => {
-                          let arr = moveItemInArr(
-                            zSettingsObj.statuses,
-                            idx,
-                            "up"
-                          );
-                          handleSettingsFieldChange("statuses", arr);
+                          if (sBackgroundColorWheelItem) {
+                            _setBackgroundColorWheelItem();
+                            _setTextColorWheelItem();
+                          } else {
+                            _setBackgroundColorWheelItem(item);
+                            _setTextColorWheelItem();
+                          }
                         }}
                       />
                       <BoxButton1
-                        style={{ paddingHorizontal: 5 }}
-                        iconSize={22}
-                        icon={ICONS.downChevron}
                         onPress={() => {
-                          let arr = moveItemInArr(
-                            zSettingsObj.statuses,
-                            idx,
-                            "down"
-                          );
-                          handleSettingsFieldChange("statuses", arr);
+                          if (sTextColorWheelItem) {
+                            _setBackgroundColorWheelItem();
+                            _setTextColorWheelItem();
+                          } else {
+                            _setBackgroundColorWheelItem();
+                            _setTextColorWheelItem(item);
+                          }
                         }}
+                        style={{ paddingHorizontal: 7 }}
+                        iconSize={22}
+                        icon={ICONS.letterT}
                       />
+                    </View>
+                  </View>
 
-                      <BoxButton1
-                        style={{ paddingHorizontal: 5 }}
-                        iconSize={22}
-                        icon={ICONS.editPencil}
-                        onPress={() =>
-                          _setEditableInputIdx(
-                            sEditableInputIdx === null ||
-                              (sEditableInputIdx && sEditableInputIdx != idx)
-                              ? idx
-                              : null
-                          )
-                        }
-                      />
-                      <BoxButton1
-                        style={{
-                          paddingHorizontal: 5,
-                          paddingRight: 5,
-                          marginRight: 20,
-                        }}
-                        iconSize={15}
-                        icon={ICONS.close1}
-                        onPress={() => {
-                          let statuses = zSettingsObj.statuses.filter(
-                            (o) => o.id != item.id
-                          );
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      width: "100%",
+                      justifyContent: "flex-end",
+                      paddingRight: "21%",
+                    }}
+                  >
+                    {sBackgroundColorWheelItem?.id === item.id ? (
+                      <ColorWheel
+                        style={{ marginVertical: 7 }}
+                        onColorChange={(val) => {
+                          let back = val.hex;
+                          let text = bestForegroundHex(val.hex);
+                          let statuses = zSettingsObj.statuses.map((o) => {
+                            if (o.id === item.id)
+                              return {
+                                ...o,
+                                backgroundColor: back,
+                                textColor: text,
+                              };
+                            return o;
+                          });
                           handleSettingsFieldChange("statuses", statuses);
                         }}
                       />
-                      <View
-                        style={{
-                          backgroundColor: item.backgroundColor,
-                          alignItems: "center",
-                          // justifyContent: ''
-                          flexDirection: "row",
-                          width: "50%",
-                          height: 35,
-                          // paddingHorizontal: 20,
-                          // paddingVertical: 5,
-                          borderTopLeftRadius: idx === 0 ? 5 : 0,
-                          borderTopRightRadius: idx === 0 ? 5 : 0,
-                          borderBottomLeftRadius:
-                            idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
-                          borderBottomRightRadius:
-                            idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
+                    ) : null}
+                    {sTextColorWheelItem?.id === item.id ? (
+                      <ColorWheel
+                        style={{ marginVertical: 7 }}
+                        onColorChange={(val) => {
+                          let statuses = zSettingsObj.statuses.map((o) => {
+                            if (o.id === item.id)
+                              return {
+                                ...o,
+                                textColor: val.hex,
+                              };
+                            return o;
+                          });
+                          handleSettingsFieldChange("statuses", statuses);
                         }}
-                      >
-                        {!item.removable ? (
-                          <View
-                            style={{
-                              width: "10%",
-                            }}
-                          />
-                        ) : null}
-                        <TextInput
-                          style={{
-                            width: "100%",
-                            textAlign: "center",
-                            color: item.textColor,
-                            outlineWidth: 0,
-                            paddingVertical: 4,
-                            fontSize: 13,
-                            borderWidth: 1,
-                            borderColor:
-                              sEditableInputIdx === idx && item.removable
-                                ? makeGrey(0.4)
-                                : "transparent",
-                          }}
-                          onChangeText={(val) => {
-                            let statuses = zSettingsObj.statuses.map((o) => {
-                              if (o.id === item.id) return { ...o, label: val };
-                              return o;
-                            });
-                            handleSettingsFieldChange("statuses", statuses);
-                          }}
-                          editable={sEditableInputIdx === idx && item.removable}
-                          autoFocus={sEditableInputIdx === idx}
-                          value={item.label}
-                        />
-                        {!item.removable ? (
-                          <View
-                            style={{
-                              width: "10%",
-                              height: "100%",
-                              alignItems: "flex-end",
-                              justifyContent: "flex-start",
-                              padding: 3,
-                            }}
-                          >
-                            <Image_ icon={ICONS.blocked} size={15} />
-                          </View>
-                        ) : null}
-                      </View>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          width: "15%",
-                          justifyContent: "space-between",
-                          // backgroundColor: "blue",
-                          paddingLeft: 20,
-                        }}
-                      >
-                        <BoxButton1
-                          style={{ paddingHorizontal: 7 }}
-                          iconSize={23}
-                          icon={ICONS.colorWheel}
-                          onPress={() => {
-                            if (sBackgroundColorWheelItem) {
-                              _setBackgroundColorWheelItem();
-                              _setTextColorWheelItem();
-                            } else {
-                              _setBackgroundColorWheelItem(item);
-                              _setTextColorWheelItem();
-                            }
-                          }}
-                        />
-                        <BoxButton1
-                          onPress={() => {
-                            if (sTextColorWheelItem) {
-                              _setBackgroundColorWheelItem();
-                              _setTextColorWheelItem();
-                            } else {
-                              _setBackgroundColorWheelItem();
-                              _setTextColorWheelItem(item);
-                            }
-                          }}
-                          style={{ paddingHorizontal: 7 }}
-                          iconSize={22}
-                          icon={ICONS.letterT}
-                        />
-                      </View>
-                    </View>
+                      />
+                    ) : null}
+                  </View>
+                </View>
+              );
+            }}
+          />
+        </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
 
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        width: "100%",
-                        justifyContent: "flex-end",
-                        paddingRight: "21%",
+const QuickItemButtonsComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+}) => {
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent
+        style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+      >
+        <View style={{ width: "100%", alignItems: "flex-start" }}>
+          <BoxButton1
+            onPress={() => {
+              let quickButtonsArr = zSettingsObj?.quickItemButtons;
+              quickButtonsArr = [
+                {
+                  id: generateRandomID(),
+                  name: "",
+                  type: "Menu",
+                },
+                ...quickButtonsArr,
+              ];
+              handleSettingsFieldChange("quickItemButtons", quickButtonsArr);
+            }}
+          />
+          <View style={{ marginTop: 10, width: "100%" }}>
+            <FlatList
+              data={zSettingsObj?.quickItemButtons || []}
+              renderItem={(obj) => {
+                let idx = obj.index;
+                let quickItemButtonObj = obj.item;
+                return (
+                  <View
+                    style={{
+                      alignItems: "center",
+                      width: "100%",
+                      flexDirection: "row",
+                      justifyContent: "center",
+                      marginBottom: 5,
+                    }}
+                  >
+                    <BoxButton1
+                      style={{ paddingHorizontal: 5, marginRight: 10 }}
+                      iconSize={22}
+                      icon={ICONS.upChevron}
+                      onPress={() => {
+                        let arr = moveItemInArr(
+                          zSettingsObj.quickItemButtons,
+                          idx,
+                          "up"
+                        );
+                        handleSettingsFieldChange("quickItemButtons", arr);
                       }}
-                    >
-                      {sBackgroundColorWheelItem?.id === item.id ? (
-                        <ColorWheel
-                          style={{ marginVertical: 7 }}
-                          onColorChange={(val) => {
-                            let back = val.hex;
-                            let text = bestForegroundHex(val.hex);
-                            let statuses = zSettingsObj.statuses.map((o) => {
-                              if (o.id === item.id)
-                                return {
-                                  ...o,
-                                  backgroundColor: back,
-                                  textColor: text,
-                                };
-                              return o;
-                            });
-                            handleSettingsFieldChange("statuses", statuses);
-                          }}
-                        />
-                      ) : null}
-                      {sTextColorWheelItem?.id === item.id ? (
-                        <ColorWheel
-                          style={{ marginVertical: 7 }}
-                          onColorChange={(val) => {
-                            let statuses = zSettingsObj.statuses.map((o) => {
-                              if (o.id === item.id)
-                                return {
-                                  ...o,
-                                  textColor: val.hex,
-                                };
-                              return o;
-                            });
-                            handleSettingsFieldChange("statuses", statuses);
-                          }}
-                        />
-                      ) : null}
-                    </View>
+                    />
+                    <BoxButton1
+                      style={{ paddingHorizontal: 5 }}
+                      iconSize={22}
+                      icon={ICONS.downChevron}
+                      onPress={() => {
+                        let arr = moveItemInArr(
+                          zSettingsObj.quickItemButtons,
+                          idx,
+                          "down"
+                        );
+                        handleSettingsFieldChange("quickItemButtons", arr);
+                      }}
+                    />
+                    <TextInput
+                      onChangeText={(val) => {
+                        let quickButtonsArr = zSettingsObj.quickItemButtons;
+                        quickButtonsArr[idx] = {
+                          ...quickButtonsArr,
+                          name: val,
+                        };
+                        handleSettingsFieldChange(
+                          "partSources",
+                          quickButtonsArr
+                        );
+                      }}
+                      placeholder="Quick item button name..."
+                      placeholderTextColor={makeGrey(0.3)}
+                      style={{
+                        marginLeft: 20,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderWidth: 1,
+                        borderRadius: 5,
+                        padding: 5,
+                        width: "35%",
+                        textAlign: "center",
+                        color: C.textMain,
+                        outlineWidth: 0,
+                      }}
+                      value={quickItemButtonObj.name}
+                    />
+                    <DropdownComponent
+                      buttonStyle={{ width: 90, marginLeft: 20 }}
+                      data={["Menu", "Sub-menu"]}
+                      label={quickItemButtonObj.type}
+                      onSelect={(val) =>
+                        handleSettingsFieldChange(
+                          "quickItemButtons",
+                          zSettingsObj.quickItemButtons.map((obj) =>
+                            obj.id === quickItemButtonObj.id
+                              ? { ...quickItemButtonObj, type: val }
+                              : obj
+                          )
+                        )
+                      }
+                    />
+                    <BoxButton1
+                      onPress={() => {
+                        let idx = zSettingsObj.quickItemButtons.findIndex(
+                          (obj) => obj.id === quickItemButtonObj.id
+                        );
+                        if (zSettingsObj.quickItemButtons[idx].id === "labor")
+                          return;
+                        if (zSettingsObj.quickItemButtons[idx].id === "part")
+                          return;
+                        handleSettingsFieldChange(
+                          "quickItemButtons",
+                          zSettingsObj.quickItemButtons.filter(
+                            (o) => o.id !== quickItemButtonObj.id
+                          )
+                        );
+                      }}
+                      style={{ marginLeft: 20 }}
+                      iconSize={15}
+                      icon={ICONS.close1}
+                    />
                   </View>
                 );
               }}
             />
           </View>
-        </BoxContainerInnerComponent>
-      ) : null}
+        </View>
+      </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
 };

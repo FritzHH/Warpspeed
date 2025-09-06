@@ -374,86 +374,29 @@ export const SETTINGS_OBJ = {
     },
   ],
 
-  quickItemButtonNames: [
+  quickItemButtons: [
     {
+      id: "38trrneg",
       name: "Tune-Up",
-      type: "menu",
+      type: "Menu",
       items: [],
     },
-    {
-      name: "Tube & Tire",
-      type: "supermenu",
-      items: [
-        {
-          name: "Tube",
-          type: "menu",
-          items: [],
-        },
-        {
-          name: "Tire",
-          type: "menu",
-          items: [],
-        },
-      ],
-    },
-    {
-      name: "Brakes",
-      type: "submenu",
-      items: [],
-    },
-    {
-      name: "Cable",
-      type: "menu",
-      items: [],
-    },
-    {
-      name: "Shifting",
-      type: "menu",
-      items: [],
-    },
-    {
-      name: "Drivetrain",
-      type: "menu",
-      items: [],
-    },
+    { id: "38trrdfdneg", name: "Tube", type: "Sub-menu", items: [] },
+    { id: "38trrsdfneg", name: "Tire", type: "Sub-menu", items: [] },
+    { id: "38trdfdrneg", name: "Tube & Tire", type: "Menu", items: [] },
+    { id: "38trdfadrneg", name: "Brakes", type: "Menu", items: [] },
+    { id: "38tradfdrneg", name: "Cable", type: "Menu", items: [] },
+    { id: "38trrnebfdgdg", name: "Shifting", type: "Menu", items: [] },
+    { id: "38trrnadfvceg", name: "Drivetrain", type: "Menu", items: [] },
 
-    {
-      name: "Spoke",
-      type: "menu",
-      items: [],
-    },
-    {
-      name: "Cleaning",
-      type: "menu",
-      items: [],
-    },
-    {
-      name: "Scooter",
-      type: "menu",
-      items: [],
-    },
-    {
-      name: "Pickup/Delivery",
-      type: "menu",
-      items: [],
-    },
-    {
-      name: "Diagnostics",
-      type: "menu",
-      items: [],
-    },
-    {
-      name: "$Labor",
-      type: "menu",
+    { id: "38trsadgdvdrneg", name: "Spoke", type: "Menu", items: [] },
+    { id: "38trerfedgbdrneg", name: "Cleaning", type: "Menu", items: [] },
+    { id: "38trrfrdggdneg", name: "Scooter", type: "Menu", items: [] },
+    { id: "bnfdeqw", name: "Pickup/Delivery", type: "Menu", items: [] },
+    { id: "34trhrg", name: "Diagnostics", type: "Menu", items: [] },
+    { id: "labor", name: "$Labor", type: "Menu", items: [] },
 
-      items: [],
-    },
-
-    {
-      name: "$Part",
-      type: "menu",
-      items: [],
-    },
+    { id: "part", name: "$Part", type: "Menu", items: [] },
   ],
   // colors:
   bikeBrands: ["Trek", "Specialized", "Sun", "Marin", "Cannondale", "Jamis"],

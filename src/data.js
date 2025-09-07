@@ -208,7 +208,7 @@ export const APP_USER = {
 };
 
 export const TIME_PUNCH_PROTO = {
-  id: "",
+  userID: "",
   millis: null,
   id: "",
   option: "",

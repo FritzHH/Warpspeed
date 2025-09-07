@@ -20,7 +20,7 @@ import { SETTINGS_OBJ } from "./data";
 import { intersection } from "lodash";
 import { cloneDeep } from "lodash";
 import { StaticRouter } from "react-router-dom";
-import { dbSetAppUserObj, dbCreateUserPunchAction } from "./db_call_wrapper";
+// import { dbSetAppUserObj, dbCreateUserPunchAction } from "./db_call_wrapper";
 import { Button_ } from "./components";
 import { C, COLOR_GRADIENTS } from "./styles";
 // import {} from "./models";
@@ -30,7 +30,9 @@ const MODEL_URL = "./models"; // Place models in public/models
 export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // store setters ////////////////////////////////////////////////////
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
-  const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
+  const _zCreateUserClockPunch = useLoginStore(
+    (state) => state.setCreateUserClockObj
+  );
   const _zSetWebcamDetected = useLoginStore((state) => state.setWebcamDetected);
   const _zSetShowAlert = useAlertScreenStore((state) => state.setShowAlert);
   const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
@@ -57,7 +59,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // const [sFacialRecognitionReady, _setFacialRecognitionReady] = useState(false);
 
   useEffect(() => {
-    // localStorageWrapper.clearLocalStorage(); // testing
+    localStorageWrapper.clearLocalStorage(); // testing
     const SETUP_END_COUNT = 4;
     let setupCount = 0;
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL).then(() => {
@@ -106,12 +108,6 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     _setBackgroundRecognitionRunning(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(async () => {
-      // if (
-      //   !zRunBackgroundRecognition ||
-      //   sPauseBackgroundRecognition ||
-      //   !sSetupComplete
-      // )
-      //   return;
       const currentDesc = await getFaceDescriptor();
       if (currentDesc) {
         // log("cur desc", currentDesc);
@@ -180,8 +176,8 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
             // paused for dev
 
-            // _zSetShowAlert(true);
-            // _setPauseBackgroundRecognition(true);
+            _zSetShowAlert(true);
+            _setPauseBackgroundRecognition(true);
             _zSetAlertValues({
               title: "PUNCH CLOCK",
               message:
@@ -189,11 +185,11 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
                 userObj.first +
                 ", you are not clocked in. Would you like to punch in now?",
               handleBtn1Press: () => {
-                _zSetClockedInUser(userObj.id, millis, "in");
-                dbCreateUserPunchAction({
-                  userID: userObj.id,
-                  millisIn: millis,
-                });
+                _zCreateUserClockPunch(userObj.id, millis, "in");
+                // dbCreateUserPunchAction({
+                //   userID: userObj.id,
+                //   millisIn: millis,
+                // });
                 _setPauseBackgroundRecognition(false);
               },
               handleBtn2Press: () => {

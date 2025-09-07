@@ -224,10 +224,6 @@ export function QuickItemComponent({}) {
           iconSize={30}
           onPress={() => clearSearch()}
           useColorGradient={false}
-          // colorGradientArr={null}
-          // text={"reset"}
-          // textStyle={{ color: "darkgray", fontSize: 14 }}
-          // buttonStyle={{ height: 30 }}
         />
         <TextInput
           style={{
@@ -282,7 +278,7 @@ export function QuickItemComponent({}) {
             // maxHeight: "100%",
           }}
         >
-          {zSettingsObj?.quickItemButtonNames?.map((item) => (
+          {zSettingsObj?.quickItemButtons?.map((item) => (
             <Button_
               onPress={() => handleQuickButtonPress(item)}
               colorGradientArr={COLOR_GRADIENTS.blue}
@@ -293,9 +289,6 @@ export function QuickItemComponent({}) {
                 borderColor: C.buttonLightGreen,
                 borderColor: C.buttonLightGreenOutline,
                 marginBottom: 10,
-                // paddingHorizontal: 3,
-                // height: 100,
-                // marginVertical: 30,
               }}
               textStyle={{ fontSize: 14, fontWeight: 400 }}
               text={item.name.toUpperCase()}
@@ -465,68 +458,3 @@ export function QuickItemComponent({}) {
     </View>
   );
 }
-
-// <View
-//   style={{
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     borderBottomWidth: 1,
-//     borderColor: Colors.opacityBackgoundDark,
-//   }}
-// >
-//   <View style={{ width: "75%" }}>
-//     <Button
-//       onPress={() =>
-//         _zExecute(
-//           () => handleSearchItemSelected(item),
-//           _zSetLoginFunctionCallback,
-//           _zSetShowLoginScreen
-//         )
-//       }
-//       numLines={2}
-//       text={item.informalName || item.formalName}
-//       shadow={false}
-//       textStyle={{
-//         width: "100%",
-//         fontSize: 15,
-//       }}
-//       buttonStyle={{ width: "100%" }}
-//     />
-//   </View>
-
-//   <View
-//     style={{
-//       flexDirection: "row",
-//       justifyContent: "space-between",
-//       alignItems: "center",
-//       width: "15%",
-//     }}
-//   >
-//     {/**Information full screen inventory modal */}
-//     <ScreenModal
-//       buttonLabel={"i"}
-//       handleButtonPress={() => {
-//         _setModalInventoryObjIdx(
-//           zInventoryArr.findIndex((o) => o.id == item.id)
-//         );
-//         _setModalInventoryObj(item);
-//       }}
-//       modalStyle={{ width: "40%", alignSelf: "flex-end" }}
-//       buttonStyle={{}}
-//       showShadow={false}
-//       textStyle={{ fontSize: 14 }}
-//       showOuterModal={true}
-//       modalVisible={sModalInventoryObj === item}
-//       outerModalStyle={{
-//         backgroundColor: "rgba(50,50,50,.5)",
-//       }}
-//       handleOuterClick={() => _setModalInventoryObj(null)}
-//       Component={() => (
-//         <InventoryItemScreeenModalComponent
-//           handleClosePress={() => _setModalInventoryObj(null)}
-//           itemIdx={sModalInventoryObjIdx}
-//         />
-//       )}
-//     />
-//   </View>
-// </View>

@@ -89,18 +89,18 @@ export async function settingsSubscribe(_zSetSettingsItem) {
 
 // realtime database
 export async function punchClockSubscribe(_zSetClockedInUser) {
-  punchClockAddSub = await subscribeToNodeAddition(
-    REALTIME_DATABASE_NODE_NAMES.punchClock,
-    (type, key, val) => {
-      _zSetClockedInUser(key, val, "in");
-    }
-  );
-  punchClockRemoveSub = await subscribeToNodeRemoval(
-    REALTIME_DATABASE_NODE_NAMES.punchClock,
-    (type, key, val) => {
-      _zSetClockedInUser(key, null, "out");
-    }
-  );
+  // punchClockAddSub = await subscribeToNodeAddition(
+  //   REALTIME_DATABASE_NODE_NAMES.punchClock,
+  //   (type, key, val) => {
+  //     _zSetClockedInUser(key, val, "in");
+  //   }
+  // );
+  // punchClockRemoveSub = await subscribeToNodeRemoval(
+  //   REALTIME_DATABASE_NODE_NAMES.punchClock,
+  //   (type, key, val) => {
+  //     _zSetClockedInUser(key, null, "out");
+  //   }
+  // );
 }
 
 // realtime database

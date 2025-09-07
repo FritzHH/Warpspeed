@@ -10,16 +10,16 @@ import {
   addToFirestoreCollectionItem,
   cancelServerDrivenStripePayment,
   cancelStripeActivePaymentIntents,
-  DELETE_FIRESTORE_FIELD,
+  remove_firestore_field,
   filterFirestoreCollectionByNumber,
-  get_firestore_doc,
+  get_firestore_field,
   getCollection,
   getDocument,
   getPaymentIntent,
   getRealtimeNodeItem,
   getStripeActivePaymentIntents,
   getStripeConnectionToken,
-  set_firestore_doc,
+  set_firestore_field,
   processPaymentIntent,
   processServerDrivenStripePayment,
   retrieveAvailableStripeReaders,
@@ -56,7 +56,7 @@ export function executeDBBatch() {
   if (!batch) return;
   let pathNames = Object.keys(batch);
   pathNames.forEach((path) => {
-    setDBItem(path, batch[path]);
+    setDBField(path, batch[path]);
   });
 
   useDatabaseBatchStore.getState().resetLastWriteMillis();
@@ -77,34 +77,25 @@ function checkDBPath(path) {
 }
 
 // internal db read/write operations
-function setDBItem(path, item) {
+function setDBField(path, item, remove) {
   if (checkDBPath(path) === "firestore") {
-    return set_firestore_doc(path, item);
+    if (remove) return remove_firestore_field(path, item.id);
+    return set_firestore_field(path, item);
   } else if (checkDBPath(path) === "realtime") {
   }
 }
 
-function deleteField(path, fieldID) {
-  if (checkDBPath(path) === "firestore") {
-    // log('field id', )
-    return DELETE_FIRESTORE_FIELD(path, fieldID);
-  } else if (checkDBPath(path) === "realtime") {
-  }
-}
+////////////////////////////////////////////////////////////////////////////////
+// setters /////////////////////////////////////////////////////////////////////
 
-// exposed setters ///////////////////////////////////////////////////////
-
-// exposed getters ///////////////////////////////////////////////////////
 export function dbGetSettings() {
   let path = build_db_path.settings();
   try {
-    return get_firestore_doc(path);
+    return get_firestore_field(path);
   } catch (e) {
     log(e);
   }
 }
-
-// end new shit ++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 export function dbSetSettings(settingsObj, batch, fieldName, fieldVal) {
   let path = build_db_path.settings();
@@ -112,7 +103,7 @@ export function dbSetSettings(settingsObj, batch, fieldName, fieldVal) {
     batchDBCall(path, settingsObj);
     useDatabaseBatchStore.getState().setLastWriteMillis();
   } else {
-    return setDBItem(path, settingsObj);
+    return setDBField(path, settingsObj);
   }
 }
 
@@ -130,6 +121,7 @@ export function dbSetCustomerObj(customerObj, removeOption = false) {
   }
   return setFirestoreCollectionItem("CUSTOMERS", id, customerObj);
 }
+
 export function dbSetOpenWorkorderItem(item, removeOption = false) {
   let path = "OPEN-WORKORDERS/" + item.id;
   if (removeOption) item = null;
@@ -154,42 +146,14 @@ export function dbSetSaleItem(item, removeOption = false) {
   return setFirestoreCollectionItem("SALES", id, item);
 }
 
-export function dbUpdateUserPunchAction(userID, punchObj) {
-  let punchClockPath = build_db_path.punchClock(userID);
-  setDBItem(punchClockPath, punchObj);
+export function dbSetOrUpdateUserPunchObj(punchObj, remove = false) {
+  let punchClockPath = build_db_path.punchClock(punchObj.id);
+  setDBField(punchClockPath, punchObj, remove);
 }
 
-export function dbCreateUserPunchAction({ userID, millisIn, millisOut }) {
-  let id = generateRandomID();
-  let obj = {
-    millis: millisIn || millisOut,
-    option: millisIn ? "in" : "out",
-    id,
-    userID,
-  };
-
-  let punchClockPath =
-    FIRESTORE_DATABASE_NODE_NAMES.appUsers +
-    userID +
-    "/" +
-    FIRESTORE_DATABASE_NODE_NAMES.punchClock;
-  let activeClockPath = REALTIME_DATABASE_NODE_NAMES.loggedInUsers + userID;
-
-  // add the user to the currently clocked-in node of Realtime Database
-  if (millisOut) {
-    setRealtimeNodeItem(activeClockPath, null);
-  } else {
-    setRealtimeNodeItem(activeClockPath, millisIn);
-  }
-
-  // add the new punch object to the Firestore database for record keeping
-  addToFirestoreCollectionItem(punchClockPath, obj);
-}
-
-export function dbDeleteUserPunchAction(userID, punchID) {
-  let punchClockPath = build_db_path.punchClock(userID);
-  // log(punchClockPath);
-  deleteField(punchClockPath, punchID);
+export function dbSetActiveClockUserArr(arr) {
+  let clockArrPath = build_db_path.activePunchClock();
+  setDBField(clockArrPath, arr);
 }
 
 export function dbSetAppUserObj(userObj, remove = false) {
@@ -307,14 +271,16 @@ export function dbRetrieveAvailableStripeReaders() {
 
 // database path builder /////////////////////////////////////////////////
 export const build_db_path = {
-  punchClock: (userID) =>
-    FIRESTORE_DATABASE_NODE_NAMES.appUsers +
-    userID +
-    "/" +
-    FIRESTORE_DATABASE_NODE_NAMES.punchClock,
+  punchClock: (punchID) =>
+    // FIRESTORE_DATABASE_NODE_NAMES.appUsers +
+    // userID +
+    // "/" +
+    FIRESTORE_DATABASE_NODE_NAMES.punchClock + punchID + "/",
   settings: (fieldName) => {
     let path = FIRESTORE_DATABASE_NODE_NAMES.settings + "settings/";
     if (fieldName) path += fieldName + "/";
     return path;
   },
+  activePunchClock: () =>
+    FIRESTORE_DATABASE_NODE_NAMES.clockedInUsers + "clock-array/",
 };

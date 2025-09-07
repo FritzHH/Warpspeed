@@ -271,6 +271,7 @@ export const AlertBox_ = ({}) => {
     _zResetAll();
   }
 
+  // log(zButton1Text, zButton2Text);
   return (
     <TouchableWithoutFeedback
       onPress={() => (zCanExitOnOuterClick ? _zResetAll() : null)}

@@ -33,6 +33,7 @@ export const FIRESTORE_DATABASE_NODE_NAMES = {
   punchClock: "PUNCH-CLOCK/",
   appUsers: "APP-USERS/",
   settings: "SETTINGS/",
+  clockedInUsers: "CLOCKED-IN-USERS/",
 };
 
 // dimensions

@@ -40,7 +40,9 @@ export function Options_Section({}) {
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
-  const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
+  const _zCreateUserClockPunch = useLoginStore(
+    (state) => state.setCreateUserClockObj
+  );
   const _zSetShowAlert = useAlertScreenStore((state) => state.setShowAlert);
   const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
 
@@ -82,20 +84,18 @@ export function Options_Section({}) {
   //////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
 
-  function handleUserPress(userObj) {
+  function handleUserClockPress(userObj) {
     let millis = new Date().getTime();
     let option = zClockedInUsersArr.find((o) => o.id === userObj.id)
       ? "out"
       : "in";
+
     // log("clocked in arr", zClockedInUsersArr);
     let clockinFun = () => {
-      _zSetClockedInUser(userObj.id, millis, option);
-      dbCreateUserPunchAction({
-        userID: userObj.id,
-        millisIn: option === "in" ? millis : null,
-        millisOut: option === "out" ? millis : null,
-      });
+      _zCreateUserClockPunch(userObj.id, millis, option);
 
+      // will pause the app asking if the user wants to clock in if they say "no". this is to let them use the app even if they aren't clocked in.
+      // TODO administrator can set this to not allow the user to use the app if not clocked in, let it keep bugging them as a way to stop them from using it
       if (option === "out") {
         let clockPauseObj = localStorageWrapper.getItem(
           LOCAL_DB_KEYS.userClockCheckPauseObj
@@ -155,7 +155,7 @@ export function Options_Section({}) {
         // __tabMenuHeight={}
         __isOnline={sIsOnline}
         webcamDetected={zWebcamDetected}
-        handleUserPress={handleUserPress}
+        handleUserPress={handleUserClockPress}
       />
       {ScreenComponent()}
     </View>

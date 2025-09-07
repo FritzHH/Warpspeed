@@ -34,7 +34,7 @@ import dayjs from "dayjs";
 import {
   build_db_path,
   _dbFindPunchHistoryByMillisRange,
-  dbUpdateUserPunchAction,
+  dbSetOrUpdateUserPunchObj,
   setDBItem,
   dbDeleteUserPunchAction,
 } from "../../../db_call_wrapper";
@@ -258,34 +258,28 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       // log(prevPunchObj);
       if (prevPunchObj.option === "in") usePrevious = true;
 
-      let punchObj = cloneDeep(TIME_PUNCH_PROTO);
+      let punchObj = { ...TIME_PUNCH_PROTO };
       punchObj.userID = sUserObj.id;
       punchObj.id = generateRandomID();
-      // log("use previous", usePrevious);
       punchObj.millis = usePrevious
         ? prevPunchObj.millis + MILLIS_IN_HOUR
         : new Date().getTime();
       punchObj.option = usePrevious ? "out" : "in";
 
+      // update local punch array
       let filteredArr = cloneDeep(sFilteredArr);
-      // update local state
       filteredArr.push(punchObj);
       _setFilteredArr(filteredArr);
-      dbUpdateUserPunchAction(punchObj.userID, punchObj);
+
+      // send to db
+      dbSetOrUpdateUserPunchObj(punchObj);
     }
 
-    function handleDeletePunchPress(inID, outID) {
+    function handleDeletePunchPress(punchObj) {
       // log(sUserObj);
-      if (inID) {
-        dbDeleteUserPunchAction(sUserObj.id, inID);
-        let arr = cloneDeep(sFilteredArr).filter((o) => o.id != inID);
-        _setFilteredArr(arr);
-      }
-      if (outID) {
-        dbDeleteUserPunchAction(sUserObj.id, outID);
-        let arr = cloneDeep(sFilteredArr).filter((o) => o.id != outID);
-        _setFilteredArr(arr);
-      }
+      dbSetOrUpdateUserPunchObj(punchObj, true);
+      let arr = cloneDeep(sFilteredArr).filter((o) => o.id != punchObj.id);
+      _setFilteredArr(arr);
     }
 
     function handleUserSelect(item, idx) {
@@ -374,7 +368,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       filteredArr[idx] = punchObj;
       _setFilteredArr(filteredArr);
       // add to database
-      dbUpdateUserPunchAction(obj.in?.userID || obj.out?.userID, punchObj);
+      dbSetOrUpdateUserPunchObj(punchObj);
     }
 
     const iconSize = 30;
@@ -984,10 +978,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           {editable ? (
                             <Button_
                               onPress={() => {
-                                handleDeletePunchPress(
-                                  item.in?.id,
-                                  item.out?.id
-                                );
+                                handleDeletePunchPress(item.in || item.out);
                                 if (sEditableRowIdx === idx) {
                                   _setEditableRowIdx(null);
                                 } else {

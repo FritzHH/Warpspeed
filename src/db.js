@@ -106,15 +106,20 @@ export function getDocument(collectionName, itemID) {
 
 // NEW /////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
-export async function set_firestore_doc(path, item) {
+export async function set_firestore_field(path, obj, remove) {
   // log(path, item);
   let docRef = doc(FIRESTORE, path);
-  return await setDoc(docRef, { ...item });
+  return await setDoc(docRef, { ...obj });
 }
 
-export async function get_firestore_doc(path) {
+export async function get_firestore_field(path) {
   let docRef = doc(FIRESTORE, path);
   return (await getDoc(docRef)).data();
+}
+
+export async function remove_firestore_field(path, fieldID) {
+  let docRef = doc(FIRESTORE, path, fieldID);
+  return await deleteDoc(docRef);
 }
 
 //// end new /////////////////////////////////////////////////////////
@@ -134,11 +139,6 @@ export async function SET_FIRESTORE_FIELD(path, item) {
 export async function ADD_FIRESTORE_FIELD(path, item) {
   let docRef = doc(FIRESTORE, path, item.id);
   return await addDoc(docRef, item);
-}
-
-export async function DELETE_FIRESTORE_FIELD(path, id) {
-  let docRef = doc(FIRESTORE, path, id);
-  return await deleteDoc(docRef);
 }
 
 export function setFirestoreCollectionItem(

@@ -80,7 +80,7 @@ export function Dashboard_Admin({}) {
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
     useState(false);
   const [sPunchClockUserObj, _setPunchClockUserObj] = useState(null);
-  const [sShowSalesReportModal, _setShowSalesReportModal] = useState(true);
+  const [sShowSalesReportModal, _setShowSalesReportModal] = useState(false);
   const [sExpand, _setExpand] = useState();
   const [sOrderingMenuSelectionName, _setOrderingMenuSelectionName] = useState(
     DROPDOWN_ORDERING_SELECTION_NAMES.importOrder
@@ -156,7 +156,6 @@ export function Dashboard_Admin({}) {
         }}
       >
         {/*********************left-side column container *****************/}
-
         <View style={{ width: "30%" }}>
           <View
             style={{
@@ -172,6 +171,7 @@ export function Dashboard_Admin({}) {
               paddingTop: 13,
             }}
           >
+            {/************************* settings list names ****************** */}
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.quickItems}
               handleExpandPress={() =>
@@ -244,7 +244,11 @@ export function Dashboard_Admin({}) {
             <VerticalSpacer />
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.storeInfo}
-              handleExpandPress={() => _setShowSalesReportModal(true)}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.storeInfo ? null : TAB_NAMES.storeInfo
+                )
+              }
               style={{
                 fontWeight: sExpand === TAB_NAMES.storeInfo ? 500 : null,
                 color:
@@ -253,7 +257,8 @@ export function Dashboard_Admin({}) {
               text={TAB_NAMES.storeInfo}
             />
           </View>
-          {/* <View style={{ height: 50 }} /> */}
+
+          {/****************** sales report modal *****************************/}
           <View
             style={{
               width: "100%",
@@ -281,6 +286,8 @@ export function Dashboard_Admin({}) {
               iconSize={25}
             />
           </View>
+
+          {/****************** ordering tab***********************************/}
           <View
             style={{
               width: "100%",
@@ -343,6 +350,7 @@ export function Dashboard_Admin({}) {
               _setFacialRecognitionModalUserObj={
                 _setFacialRecognitionModalUserObj
               }
+              _setPunchClockUserObj={_setPunchClockUserObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
           ) : null}
@@ -441,8 +449,6 @@ function MenuListLabelComponent({
             fontSize: 16,
             color: makeGrey(0.5),
             fontWeight: "500",
-            // alignSelf: "flex-end",
-            // ...style,
           }}
         >
           {text.toUpperCase()}
@@ -561,6 +567,7 @@ const AppUserListComponent = ({
   zSettingsObj,
   commitUserInfoChange,
   _setFacialRecognitionModalUserObj,
+  _setPunchClockUserObj,
   handleRemoveUserPress,
   handleSettingsFieldChange,
 }) => {

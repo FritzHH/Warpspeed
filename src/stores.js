@@ -6,13 +6,16 @@ import {
   INVENTORY_ITEM_PROTO,
   PRIVILEDGE_LEVELS,
   TAB_NAMES,
+  TIME_PUNCH_PROTO,
   WORKORDER_PROTO,
 } from "./data";
 import { checkArr, clog, generateRandomID, log } from "./utils";
 import { cloneDeep } from "lodash";
 import {
   batchDBCall,
+  dbSetActiveClockUserArr,
   dbSetOpenWorkorderItem,
+  dbSetOrUpdateUserPunchObj,
   dbSetSettings,
 } from "./db_call_wrapper";
 
@@ -352,25 +355,28 @@ export const useLoginStore = create((set, get) => ({
 
   // local app user
   setCurrentUserObj: (currentUserObj) => {
-    // log("user", currentUserObj);
-    set((state) => ({ currentUserObj }));
+    set({ currentUserObj });
   },
 
-  setClockedInUser: (userID, millis, option) =>
+  // create new punch obj, log user in locally and send punch obj to DB
+  setCreateUserClockObj: (userID, millis, option) =>
     set(() => {
+      let punchObj = { ...TIME_PUNCH_PROTO };
+      punchObj.id = generateRandomID();
+      punchObj.userID = userID;
+      punchObj.option = option;
+      punchObj.millis = millis;
+      dbSetOrUpdateUserPunchObj(punchObj);
+
       let userArr = cloneDeep(get().clockedInUsers);
-      // log("clocked in user arr", userArr);
       if (option === "out") {
-        // clock out
-        // log("clocking out");
         userArr = userArr.filter((o) => o.id != userID);
       } else {
-        // clock in
         if (!userArr.find((o) => o.id === userID)) {
-          // log("clocking in " + userID);
           userArr.push({ id: userID, millis });
         }
       }
+      dbSetActiveClockUserArr(userArr);
       return {
         clockedInUsers: userArr,
       };

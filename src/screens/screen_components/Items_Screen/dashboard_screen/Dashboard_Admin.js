@@ -34,6 +34,7 @@ import {
   CheckBox_,
   DropdownMenu,
   Image_,
+  ModalDropdown,
   NumberSpinner_,
   ScreenModal,
   TimeSpinner,
@@ -48,8 +49,9 @@ import { APP_USER } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
+import { SalesReportsModal } from "../../modal_screens/SalesReports";
 
-const CAT_NAMES = {
+const TAB_NAMES = {
   users: "User Control",
   payments: "Payment Processing",
   statuses: "Workorder Statuses",
@@ -57,6 +59,13 @@ const CAT_NAMES = {
   waitTimes: "Wait Times",
   storeInfo: "Store Info",
   quickItems: "Quick Item Buttons",
+  sales: "Sales Reports",
+  ordering: "Ordering",
+};
+
+const DROPDOWN_ORDERING_SELECTION_NAMES = {
+  importOrder: "Import Order",
+  viewPreviousOrders: "View Previous Orders",
 };
 
 export function Dashboard_Admin({}) {
@@ -71,7 +80,11 @@ export function Dashboard_Admin({}) {
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
     useState(false);
   const [sPunchClockUserObj, _setPunchClockUserObj] = useState(null);
+  const [sShowSalesReportModal, _setShowSalesReportModal] = useState(true);
   const [sExpand, _setExpand] = useState();
+  const [sOrderingMenuSelectionName, _setOrderingMenuSelectionName] = useState(
+    DROPDOWN_ORDERING_SELECTION_NAMES.importOrder
+  );
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -131,8 +144,9 @@ export function Dashboard_Admin({}) {
           userObj={sPunchClockUserObj}
         />
       ) : null}
-
-      {/*********************left-side column container *****************/}
+      {sShowSalesReportModal ? (
+        <SalesReportsModal handleExit={() => _setShowSalesReportModal(false)} />
+      ) : null}
 
       <View
         style={{
@@ -141,108 +155,159 @@ export function Dashboard_Admin({}) {
           paddingHorizontal: 5,
         }}
       >
-        <View
-          style={{
-            width: "30%",
-            alignItems: "flex-start",
-            borderRadius: 5,
-            paddingRight: 10,
-            paddingLeft: 5,
-            backgroundColor: C.backgroundListWhite,
-            borderColor: C.buttonLightGreenOutline,
-            height: 300,
-            borderWidth: 1,
-            paddingTop: 13,
-          }}
-        >
-          <SettingsLabelListComponent
-            selected={sExpand === CAT_NAMES.quickItems}
-            handleExpandPress={() =>
-              _setExpand(
-                sExpand === CAT_NAMES.quickItems ? null : CAT_NAMES.quickItems
-              )
-            }
-            text={CAT_NAMES.quickItems}
-            style={{
-              fontWeight: sExpand === CAT_NAMES.quickItems ? 500 : null,
-              color:
-                sExpand === CAT_NAMES.quickItems ? C.lightred : makeGrey(0.6),
-            }}
-          />
-          <VerticalSpacer />
-          <SettingsLabelListComponent
-            selected={sExpand === CAT_NAMES.users}
-            handleExpandPress={() =>
-              _setExpand(sExpand === CAT_NAMES.users ? null : CAT_NAMES.users)
-            }
-            text={CAT_NAMES.users}
-            style={{
-              fontWeight: sExpand === CAT_NAMES.users ? 500 : null,
-              color: sExpand === CAT_NAMES.users ? C.lightred : makeGrey(0.6),
-            }}
-          />
-          <VerticalSpacer />
-          <SettingsLabelListComponent
-            selected={sExpand === CAT_NAMES.payments}
-            handleExpandPress={() =>
-              _setExpand(
-                sExpand === CAT_NAMES.payments ? null : CAT_NAMES.payments
-              )
-            }
-            text={CAT_NAMES.payments}
-            style={{
-              fontWeight: sExpand === CAT_NAMES.payments ? 500 : null,
+        {/*********************left-side column container *****************/}
 
-              color:
-                sExpand === CAT_NAMES.payments ? C.lightred : makeGrey(0.6),
-            }}
-          />
-          <VerticalSpacer />
-          <SettingsLabelListComponent
-            selected={sExpand === CAT_NAMES.statuses}
-            handleExpandPress={() =>
-              _setExpand(
-                sExpand === CAT_NAMES.statuses ? null : CAT_NAMES.statuses
-              )
-            }
-            text={CAT_NAMES.statuses}
+        <View style={{ width: "30%" }}>
+          <View
             style={{
-              fontWeight: sExpand === CAT_NAMES.statuses ? 500 : null,
-
-              color:
-                sExpand === CAT_NAMES.statuses ? C.lightred : makeGrey(0.6),
+              width: "100%",
+              alignItems: "flex-start",
+              borderRadius: 5,
+              paddingRight: 10,
+              paddingLeft: 5,
+              backgroundColor: C.backgroundListWhite,
+              borderColor: C.buttonLightGreenOutline,
+              height: 250,
+              borderWidth: 1,
+              paddingTop: 13,
             }}
-          />
-          <VerticalSpacer />
-          <SettingsLabelListComponent
-            selected={sExpand === CAT_NAMES.lists}
-            handleExpandPress={() =>
-              _setExpand(sExpand === CAT_NAMES.lists ? null : CAT_NAMES.lists)
-            }
+          >
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.quickItems}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.quickItems ? null : TAB_NAMES.quickItems
+                )
+              }
+              text={TAB_NAMES.quickItems}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.quickItems ? 500 : null,
+                color:
+                  sExpand === TAB_NAMES.quickItems ? C.green : makeGrey(0.6),
+              }}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.users}
+              handleExpandPress={() =>
+                _setExpand(sExpand === TAB_NAMES.users ? null : TAB_NAMES.users)
+              }
+              text={TAB_NAMES.users}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.users ? 500 : null,
+                color: sExpand === TAB_NAMES.users ? C.green : makeGrey(0.6),
+              }}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.payments}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.payments ? null : TAB_NAMES.payments
+                )
+              }
+              text={TAB_NAMES.payments}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.payments ? 500 : null,
+
+                color: sExpand === TAB_NAMES.payments ? C.green : makeGrey(0.6),
+              }}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.statuses}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.statuses ? null : TAB_NAMES.statuses
+                )
+              }
+              text={TAB_NAMES.statuses}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.statuses ? 500 : null,
+
+                color: sExpand === TAB_NAMES.statuses ? C.green : makeGrey(0.6),
+              }}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.lists}
+              handleExpandPress={() =>
+                _setExpand(sExpand === TAB_NAMES.lists ? null : TAB_NAMES.lists)
+              }
+              style={{
+                fontWeight: sExpand === TAB_NAMES.lists ? 500 : null,
+
+                color: sExpand === TAB_NAMES.lists ? C.green : makeGrey(0.6),
+              }}
+              text={TAB_NAMES.lists}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.storeInfo}
+              handleExpandPress={() => _setShowSalesReportModal(true)}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.storeInfo ? 500 : null,
+                color:
+                  sExpand === TAB_NAMES.storeInfo ? C.green : makeGrey(0.6),
+              }}
+              text={TAB_NAMES.storeInfo}
+            />
+          </View>
+          {/* <View style={{ height: 50 }} /> */}
+          <View
             style={{
-              fontWeight: sExpand === CAT_NAMES.lists ? 500 : null,
-
-              color: sExpand === CAT_NAMES.lists ? C.lightred : makeGrey(0.6),
+              width: "100%",
+              alignItems: "flex-start",
+              borderRadius: 5,
+              paddingRight: 10,
+              paddingLeft: 5,
+              backgroundColor: C.backgroundListWhite,
+              borderColor: C.buttonLightGreenOutline,
+              height: 50,
+              borderWidth: 1,
+              paddingTop: 13,
+              marginTop: 50,
             }}
-            text={CAT_NAMES.lists}
-          />
-          <VerticalSpacer />
-          <SettingsLabelListComponent
-            selected={sExpand === CAT_NAMES.storeInfo}
-            handleExpandPress={() =>
-              _setExpand(
-                sExpand === CAT_NAMES.storeInfo ? null : CAT_NAMES.storeInfo
-              )
-            }
+          >
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.sales}
+              handleExpandPress={() => _setShowSalesReportModal(true)}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.sales ? 500 : null,
+                color: sExpand === TAB_NAMES.sales ? C.green : makeGrey(0.6),
+              }}
+              text={TAB_NAMES.sales}
+              icon={ICONS.dollarYellow}
+              iconSize={25}
+            />
+          </View>
+          <View
             style={{
-              fontWeight: sExpand === CAT_NAMES.storeInfo ? 500 : null,
-
-              color:
-                sExpand === CAT_NAMES.storeInfo ? C.lightred : makeGrey(0.6),
+              width: "100%",
+              alignItems: "flex-start",
+              borderRadius: 5,
+              paddingRight: 10,
+              paddingLeft: 5,
+              backgroundColor: C.backgroundListWhite,
+              borderColor: C.buttonLightGreenOutline,
+              height: 50,
+              borderWidth: 1,
+              paddingTop: 13,
+              marginTop: 50,
             }}
-            text={CAT_NAMES.storeInfo}
-          />
-          <VerticalSpacer />
+          >
+            <MenuListLabelComponent
+              dropdownDataArr={Object.values(DROPDOWN_ORDERING_SELECTION_NAMES)}
+              selected={sExpand === TAB_NAMES.ordering}
+              handleExpandPress={() => {}}
+              style={{
+                color: sExpand === TAB_NAMES.ordering ? C.green : makeGrey(0.6),
+              }}
+              dropdownLabel={"ORDERING"}
+              text={TAB_NAMES.ordering}
+              icon={ICONS.menu2}
+            />
+          </View>
         </View>
 
         {/*********************right-side column container****************** */}
@@ -264,13 +329,13 @@ export function Dashboard_Admin({}) {
           >
             {sExpand?.toUpperCase()}
           </Text>
-          {sExpand === CAT_NAMES.payments ? (
+          {sExpand === TAB_NAMES.payments ? (
             <PaymentProcessingComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
           ) : null}
-          {sExpand === CAT_NAMES.users ? (
+          {sExpand === TAB_NAMES.users ? (
             <AppUserListComponent
               handleRemoveUserPress={handleRemoveUserPress}
               zSettingsObj={zSettingsObj}
@@ -281,25 +346,25 @@ export function Dashboard_Admin({}) {
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
           ) : null}
-          {sExpand === CAT_NAMES.statuses ? (
+          {sExpand === TAB_NAMES.statuses ? (
             <WorkorderStatusesComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
           ) : null}
-          {sExpand === CAT_NAMES.lists ? (
+          {sExpand === TAB_NAMES.lists ? (
             <ListOptionsComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
           ) : null}
-          {sExpand === CAT_NAMES.storeInfo ? (
+          {sExpand === TAB_NAMES.storeInfo ? (
             <StoreInfoComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
           ) : null}
-          {sExpand === CAT_NAMES.quickItems ? (
+          {sExpand === TAB_NAMES.quickItems ? (
             <QuickItemButtonsComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
@@ -342,12 +407,16 @@ function BoxContainerOuterComponent({ style = {}, children }) {
   );
 }
 
-function SettingsLabelListComponent({
+function MenuListLabelComponent({
   text,
   style = {},
   icon,
+  iconSize,
+  dropdownLabel,
   handleExpandPress,
   selected,
+  dropdownDataArr,
+  onDropdownSelect,
 }) {
   let ICON_SIZE = 18;
   const [sOpacity, _setOpacity] = useState(1);
@@ -366,17 +435,41 @@ function SettingsLabelListComponent({
         opacity: sOpacity,
       }}
     >
-      <Text
-        style={{
-          fontSize: 16,
-          color: makeGrey(0.5),
-          // alignSelf: "flex-end",
-          ...style,
-        }}
-      >
-        {text.toUpperCase()}
-      </Text>
-      <Image_ size={ICON_SIZE} icon={icon || ICONS.expandGreen} />
+      {!dropdownDataArr ? (
+        <Text
+          style={{
+            fontSize: 16,
+            color: makeGrey(0.5),
+            fontWeight: "500",
+            // alignSelf: "flex-end",
+            // ...style,
+          }}
+        >
+          {text.toUpperCase()}
+        </Text>
+      ) : null}
+      {dropdownDataArr ? (
+        <DropdownMenu
+          buttonStyle={{
+            backgroundColor: "transparent",
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+          }}
+          itemStyle={{
+            width: null,
+          }}
+          buttonText={dropdownLabel}
+          dataArr={dropdownDataArr}
+          onSelect={onDropdownSelect}
+          buttonTextStyle={{
+            fontSize: 15,
+            color: makeGrey(0.5),
+            textAlign: "left",
+            fontWeight: "500",
+          }}
+        />
+      ) : null}
+      <Image_ size={iconSize || ICON_SIZE} icon={icon || ICONS.expandGreen} />
     </TouchableOpacity>
   );
 }
@@ -2785,6 +2878,7 @@ const WorkorderStatusesComponent = ({
                   >
                     {sBackgroundColorWheelItem?.id === item.id ? (
                       <ColorWheel
+                        initialColor={item.backgroundColor}
                         style={{ marginVertical: 7 }}
                         onColorChange={(val) => {
                           let back = val.hex;
@@ -2804,6 +2898,7 @@ const WorkorderStatusesComponent = ({
                     ) : null}
                     {sTextColorWheelItem?.id === item.id ? (
                       <ColorWheel
+                        initialColor={item.textColor}
                         style={{ marginVertical: 7 }}
                         onColorChange={(val) => {
                           let statuses = zSettingsObj.statuses.map((o) => {

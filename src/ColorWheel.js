@@ -12,6 +12,7 @@ import Svg, {
   ClipPath,
 } from "react-native-svg";
 import { log } from "./utils";
+import { processColor } from "react-native";
 
 // ---------- Color utils ----------
 
@@ -31,6 +32,12 @@ export function ColorWheel({
   style,
   thing,
 }) {
+  // log("iniital", initialColor);
+  if (!initialColor.includes("#")) {
+    let intColor = processColor(initialColor);
+    initialColor = (intColor >>> 0).toString(16).padStart(8, "0").toUpperCase();
+  }
+  // if (!initialColor.includes("#")) initialColor = rgbToHex(initialRGB);
   // log("thin", thing);
   // geometry
   const radius = size / 2;

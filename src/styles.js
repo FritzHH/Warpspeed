@@ -58,6 +58,7 @@ export const COLOR_GRADIENTS = {
 
 const ASSETS_PATH = "./assets/";
 export const ICONS = {
+  dollarYellow: require(ASSETS_PATH + "dollar.png"),
   rightArrowBlue: require(ASSETS_PATH + "right-arrow.png"),
   expandGreen: require(ASSETS_PATH + "expandGreen.png"),
   expandYellow: require(ASSETS_PATH + "expandYellow.png"),

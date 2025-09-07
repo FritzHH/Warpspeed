@@ -588,7 +588,8 @@ export const DropdownMenu = ({
   mouseOverOptions = {
     enable: true,
     // opacity: 1,
-    highlightColor: lightenRGBByPercent(C.lightred, 10),
+    // highlightColor: lightenRGBByPercent(C.lightred, 10),
+    opacity: 0.6,
   },
   showButtonShadow,
   shadowStyle = {},
@@ -610,9 +611,7 @@ export const DropdownMenu = ({
     return lightenRGBByPercent(rgbString, 20);
   }
 
-  // log("ss", selectedIdx);
   if (useSelectedAsButtonTitle) {
-    // log("idx", selectedIdx);
     buttonText = dataArr[Number(selectedIdx)]?.label;
   }
 
@@ -620,32 +619,23 @@ export const DropdownMenu = ({
     return (
       <View
         style={{
-          // backgroundColor: "transparent",
-          // borderWidth: 2,
           borderColor: menuBorderColor || C.buttonLightGreenOutline,
-          // borderRadius: 10,
           borderRadius: 25,
         }}
       >
         <FlatList
-          // style={{ borderRadius: 15, backgroundColor: "transparent" }}
           data={dataArr}
           ItemSeparatorComponent={() => (
             <View
               style={{
-                // height: 1,
-                backgroundColor: C.buttonLightGreen,
                 width: "100%",
-
                 ...itemSeparatorStyle,
               }}
             />
           )}
           renderItem={(item) => {
             let idx = item.index;
-            // log(idx);
             item = item.item;
-            // log(item);
             return (
               <Button_
                 mouseOverOptions={mouseOverOptions}

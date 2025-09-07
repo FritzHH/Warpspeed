@@ -790,7 +790,7 @@ export function convertMillisToHoursMins(millis) {
 }
 
 // colors
-function hexToRgb(hex) {
+export function hexToRgb(hex) {
   let h = hex.replace("#", "").trim();
   if (h.length === 3) {
     h = h
@@ -804,6 +804,14 @@ function hexToRgb(hex) {
     g: (int >> 8) & 255,
     b: int & 255,
   };
+}
+
+export function rgbToHex(r, g, b) {
+  const toHex = (n) => {
+    const clamped = Math.max(0, Math.min(255, n)); // ensure in range
+    return clamped.toString(16).padStart(2, "0");
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
 }
 
 // Relative luminance (WCAG)

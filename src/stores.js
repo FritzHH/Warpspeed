@@ -371,15 +371,16 @@ export const useLoginStore = create((set, get) => ({
       let punchClockArr = cloneDeep(get().punchClockArr);
       if (option === "out") {
         punchClockArr = punchClockArr.filter((o) => o.userID != userID);
+        return dbSetOrUpdateUserPunchObj(punchObj, true);
       } else {
         if (!punchClockArr.find((o) => o.userID === userID)) {
           punchClockArr.push(punchObj);
+          return dbSetOrUpdateUserPunchObj(punchObj);
         }
       }
-      return dbSetPunchClockArr(punchClockArr);
     }),
 
-  setSinglePunchObjInPunchArr: (punchObj, option) => {
+  setSinglePunchObjInPunchArr: (punchObj, option, sendToDB = false) => {
     let punchClockArr = cloneDeep(get().punchClockArr);
     if (option === "add") {
       if (!punchClockArr.find((obj) => obj.id === punchObj.id))
@@ -394,6 +395,7 @@ export const useLoginStore = create((set, get) => ({
     }
     // clog(punchClockArr);
     set({ punchClockArr });
+    // if (sendToDB)
   },
   setPunchClockArr: (punchClockArr) => set({ punchClockArr }),
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),

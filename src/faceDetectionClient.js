@@ -116,7 +116,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
           }
           try {
             // log(userObj.faceDescriptor);
-            clog(userObj);
+            // clog(userObj);
             const distance = faceapi.euclideanDistance(
               // userObj.faceDescriptor,
               userObj.faceDescriptor,

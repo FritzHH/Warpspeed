@@ -143,9 +143,9 @@ export function BaseScreen() {
       addCallback: (key, val) => {
         _zSetPunchClockItem(val, "add");
       },
-      changeCallback: (key, val) => {
-        _zSetPunchClockItem(val, "change");
-      },
+      // changeCallback: (key, val) => {
+      //   _zSetPunchClockItem(val, "change");
+      // },
       removeCallback: (key, val) => {
         _zSetPunchClockItem(val, "remove");
       },

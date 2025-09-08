@@ -160,10 +160,15 @@ export function dbSetInventoryItem(item, batch = true, remove = false) {
   return newSetDatabaseField(path, item, remove);
 }
 
-export function dbSetSaleItem(item, removeOption = false) {
+export function dbSetSaleItem(item, batch = true, removeOption = false) {
   let id = item.id;
   if (removeOption) item = null;
   return setFirestoreCollectionItem("SALES", id, item);
+}
+
+export function dbSetPunchClockObj(obj, remove = false) {
+  let path = build_db_path.punchClock(obj.id);
+  return newSetDatabaseField(path, obj, remove);
 }
 
 export function dbSetOrUpdateUserPunchObj(punchObj, remove = false) {

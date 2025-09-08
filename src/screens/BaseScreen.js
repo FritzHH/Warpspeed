@@ -83,6 +83,9 @@ export function BaseScreen() {
   );
   const _zSetLoginTimeout = useLoginStore((state) => state.setLoginTimeout);
   const _zSetPunchClockArr = useLoginStore((state) => state.setPunchClockArr);
+  const _zSetPunchClockItem = useLoginStore(
+    (state) => state.setSinglePunchObjInPunchArr
+  );
   const _zSetLastDatabaseBatchMillis = useDatabaseBatchStore(
     (state) => state.setLastBatchMillis
   );
@@ -129,25 +132,24 @@ export function BaseScreen() {
 
   // subscribe to database listeners
   useEffect(() => {
-    // subscribeToDBChanges("open workorders", _zTestIncoming);
     subscribeToDBNodeChanges({
       option: "settings",
-      ignoreObj: { remove: true },
-      callback: (key, val) => _zSetSettingsItem(key, val, false),
-      // clog(key, val);
-      // _zSetSettingsObj(val, false, false);
+      addCallback: (key, val) => _zSetSettingsItem(key, val, false),
+      changeCallback: (key, val) => _zSetSettingsItem(key, val, false),
     });
 
-    // subscribeToDBChanges("punch clock", (val) => {
-    //   _zSetPunchClockArr(val);
-    // });
-    // subscribeToDBChanges(
-    //   "inventory",
-    //   (item) => {
-    //     clog(item);
-    //   }
-    //   // _zSetInventoryItem({ item, sendToDB: false })
-    // );
+    subscribeToDBNodeChanges({
+      option: "punch clock",
+      addCallback: (key, val) => {
+        _zSetPunchClockItem(val, "add");
+      },
+      changeCallback: (key, val) => {
+        _zSetPunchClockItem(val, "change");
+      },
+      removeCallback: (key, val) => {
+        _zSetPunchClockItem(val, "remove");
+      },
+    });
   }, []);
 
   useEffect(() => {

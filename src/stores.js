@@ -378,6 +378,23 @@ export const useLoginStore = create((set, get) => ({
       }
       return dbSetPunchClockArr(punchClockArr);
     }),
+
+  setSinglePunchObjInPunchArr: (punchObj, option) => {
+    let punchClockArr = cloneDeep(get().punchClockArr);
+    if (option === "add") {
+      if (!punchClockArr.find((obj) => obj.id === punchObj.id))
+        punchClockArr.push(punchObj);
+    } else if (option === "change") {
+      punchClockArr = punchClockArr.map((obj) => {
+        if (obj.id === punchObj.id) return punchObj;
+        return obj;
+      });
+    } else {
+      punchClockArr = punchClockArr.filter((obj) => obj.id != punchObj.id);
+    }
+    // clog(punchClockArr);
+    set({ punchClockArr });
+  },
   setPunchClockArr: (punchClockArr) => set({ punchClockArr }),
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
   setRunBackgroundRecognition: (runBackgroundRecognition) =>
@@ -385,8 +402,7 @@ export const useLoginStore = create((set, get) => ({
   setModalVisible: (modalVisible) => set((state) => ({ modalVisible })),
   setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
 
-  setLastActionMillis: () =>
-    set((state) => ({ lastActionMillis: new Date().getTime() })),
+  setLastActionMillis: () => set({ lastActionMillis: new Date().getTime() }),
   setShowLoginScreen: (showLoginScreen) => {
     set((state) => ({ showLoginScreen }));
   },

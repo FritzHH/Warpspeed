@@ -49,23 +49,24 @@ export function removeDatabaseListeners(name) {
  */
 export async function subscribeToDBNodeChanges({
   option,
-  ignoreObj = {},
-  callback,
+  changeCallback,
+  removeCallback,
+  addCallback,
 }) {
   let subscribeToChanges = async (path) => {
-    let unsub = await subscribeToNodeChange(path, callback);
+    let unsub = await subscribeToNodeChange(path, changeCallback);
     listenerSubscriptions.push(unsub);
     return unsub;
   };
 
   let subscribeToAddition = async (path) => {
-    let unsub = await subscribeToNodeAddition(path, callback);
+    let unsub = await subscribeToNodeAddition(path, addCallback);
     listenerSubscriptions.push(unsub);
     return unsub;
   };
 
   let subscribeToRemoval = async (path) => {
-    let unsub = await subscribeToNodeRemoval(path, callback);
+    let unsub = await subscribeToNodeRemoval(path, removeCallback);
     listenerSubscriptions.push(unsub);
     return unsub;
   };
@@ -87,9 +88,9 @@ export async function subscribeToDBNodeChanges({
   }
   // log(path);
   // return subscribeToChanges(path);
-  if (!ignoreObj.add) subscribeToAddition(path);
-  if (!ignoreObj.remove) subscribeToRemoval(path);
-  if (!ignoreObj.change) subscribeToChanges(path);
+  if (addCallback) subscribeToAddition(path);
+  if (removeCallback) subscribeToRemoval(path);
+  if (changeCallback) subscribeToChanges(path);
 }
 
 // end new shit////////////////////////////////////////////////////////////

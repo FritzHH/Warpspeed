@@ -39,9 +39,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
   // store getters ///////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  const zClockedInUsersArr = useLoginStore((state) =>
-    state.getClockedInUsers()
-  );
+  const zPunchClockArr = useLoginStore((state) => state.getPunchClockArr());
   const zRunBackgroundRecognition = useLoginStore((state) =>
     state.getRunBackgroundRecognition()
   );
@@ -59,7 +57,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // const [sFacialRecognitionReady, _setFacialRecognitionReady] = useState(false);
 
   useEffect(() => {
-    localStorageWrapper.clearLocalStorage(); // testing
+    // localStorageWrapper.clearLocalStorage(); // testing
     const SETUP_END_COUNT = 4;
     let setupCount = 0;
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL).then(() => {
@@ -118,9 +116,10 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
           }
           try {
             // log(userObj.faceDescriptor);
+            clog(userObj);
             const distance = faceapi.euclideanDistance(
               // userObj.faceDescriptor,
-              Object.values(userObj.faceDescriptor),
+              userObj.faceDescriptor,
               currentDesc
             );
             // log("dist", distance);
@@ -130,14 +129,14 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
               return null;
             }
           } catch (e) {
-            log(
-              "user: ",
-              userObj.first +
-                " " +
-                userObj.last +
-                "  error face recognition" +
-                e.toString()
-            );
+            // log(
+            //   "user: ",
+            //   userObj.first +
+            //     " " +
+            //     userObj.last +
+            //     "  error face recognition" +
+            //     e.toString()
+            // );
           }
         });
 
@@ -146,8 +145,9 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
           _zSetCurrentUserObj(userObj); // set app user on face recognition
 
           // check to see if user asked to not clock in within period of time
-          let clockedInUser = zClockedInUsersArr.find(
-            (o) => o.id === userObj.id
+          // log("punch clock arr in facedetectionclient", zPunchClockArr);
+          let clockedInUser = zPunchClockArr.find(
+            (o) => o.userID === userObj.id
           );
           if (!clockedInUser) {
             let clockPauseObj = localStorageWrapper.getItem(
@@ -214,7 +214,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     intervalRef,
     zSettingsObj,
     sPauseBackgroundRecognition,
-    zClockedInUsersArr,
+    zPunchClockArr,
   ]);
 
   //////////////////////////////////////////////////////////////////////////////

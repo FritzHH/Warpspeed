@@ -1,6 +1,7 @@
 /*eslint-disable*/
 import {
-  FIRESTORE_DATABASE_NODE_NAMES,
+  build_db_path,
+  FIRESTORE_COLLECTION_NAMES,
   // FIRESTORE_DATABASE_NODE_NAMES,
   MILLIS_IN_MINUTE,
   REALTIME_DATABASE_NODE_NAMES,
@@ -29,6 +30,7 @@ import {
   setFirestoreCollectionItem,
   setFirestoreSubCollectionItem,
   setRealtimeNodeItem,
+  newSetDatabaseField,
 } from "./db";
 import { useDatabaseBatchStore } from "./stores";
 import { clog, generateRandomID, log } from "./utils";
@@ -41,19 +43,43 @@ function clearDBBatch() {
   localStorage.removeItem("batch");
 }
 
-function batchDBCall(fieldName, fieldValue) {
+function batchDBCallOLD(fieldName, fieldValue, remove) {
   // localStorage.clear();
   let batch = JSON.parse(localStorage.getItem("batch"));
   if (!batch) batch = {};
-  batch[fieldName] = fieldValue;
+  batch[fieldName] = { fieldName, fieldValue, remove };
   // clog("batch", batch);
   localStorage.setItem("batch", JSON.stringify(batch));
+  useDatabaseBatchStore.getState().setLastWriteMillis();
+}
+
+function batchDBCall(path, item, remove) {
+  // localStorage.clear();
+  let batch = JSON.parse(localStorage.getItem("batch"));
+  if (!batch) batch = [];
+  batch.push({ path, item, remove });
+  // clog("batch", batch);
+  localStorage.setItem("batch", JSON.stringify(batch));
+  useDatabaseBatchStore.getState().setLastWriteMillis();
 }
 
 export function executeDBBatch() {
   let batch = JSON.parse(localStorage.getItem("batch"));
   // log("batch", batch);
   if (!batch) return;
+  batch.forEach((batchItem) =>
+    newSetDatabaseField(batchItem.path, batchItem.item, batchItem.remove)
+  );
+  useDatabaseBatchStore.getState().resetLastWriteMillis();
+  clearDBBatch();
+}
+
+export function executeDBBatchOLD() {
+  let batch = JSON.parse(localStorage.getItem("batch"));
+  // log("batch", batch);
+  if (!batch) return;
+
+  Object.values(batch).forEach((o) => newSetDatabaseField(o));
   let pathNames = Object.keys(batch);
   pathNames.forEach((path) => {
     setDBField(path, batch[path]);
@@ -66,9 +92,7 @@ export function executeDBBatch() {
 // intermediate database path checker to determine which database to use
 function checkDBPath(path) {
   if (
-    Object.values(FIRESTORE_DATABASE_NODE_NAMES).find((str) =>
-      path.includes(str)
-    )
+    Object.values(FIRESTORE_COLLECTION_NAMES).find((str) => path.includes(str))
   ) {
     return "firestore";
   } else {
@@ -78,11 +102,11 @@ function checkDBPath(path) {
 
 // internal db read/write operations
 function setDBField(path, item, remove) {
-  if (checkDBPath(path) === "firestore") {
-    if (remove) return remove_firestore_field(path, item.id);
-    return set_firestore_field(path, item);
-  } else if (checkDBPath(path) === "realtime") {
-  }
+  // if (checkDBPath(path) === "firestore") {
+  //   if (remove) return remove_firestore_field(path, item.id);
+  //   return set_firestore_field(path, item);
+  // } else if (checkDBPath(path) === "realtime") {
+  // }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,14 +121,10 @@ export function dbGetSettings() {
   }
 }
 
-export function dbSetSettings(settingsObj, batch, fieldName, fieldVal) {
+export function dbSetSettings(settingsObj, batch) {
   let path = build_db_path.settings();
-  if (batch) {
-    batchDBCall(path, settingsObj);
-    useDatabaseBatchStore.getState().setLastWriteMillis();
-  } else {
-    return setDBField(path, settingsObj);
-  }
+  if (batch) return batchDBCall(path, settingsObj);
+  return newSetDatabaseField(path, settingsObj);
 }
 
 export function dbSetCustomerObj(customerObj, removeOption = false) {
@@ -134,10 +154,10 @@ export function dbSetClosedWorkorderItem(item, removeOption = false) {
   return setFirestoreCollectionItem("CLOSED-WORKORDERS", id, item);
 }
 
-export function dbSetInventoryItem(item, remove = false) {
-  let path = "INVENTORY/" + item.id;
-  if (remove) item = null;
-  return setRealtimeNodeItem(path, item);
+export function dbSetInventoryItem(item, batch = true, remove = false) {
+  let path = build_db_path.inventory(item.id);
+  if (batch) return batchDBCall(path, item, remove);
+  return newSetDatabaseField(path, item, remove);
 }
 
 export function dbSetSaleItem(item, removeOption = false) {
@@ -147,13 +167,14 @@ export function dbSetSaleItem(item, removeOption = false) {
 }
 
 export function dbSetOrUpdateUserPunchObj(punchObj, remove = false) {
-  let punchClockPath = build_db_path.punchClock(punchObj.id);
+  let punchClockPath = build_db_path.punchHistory(punchObj.id);
   setDBField(punchClockPath, punchObj, remove);
 }
 
-export function dbSetActiveClockUserArr(arr) {
-  let clockArrPath = build_db_path.activePunchClock();
-  setDBField(clockArrPath, arr);
+export function dbSetPunchClockArr(arr) {
+  let clockArrPath = build_db_path.punchClock();
+  // log("setting arr", arr);
+  newSetDatabaseField(clockArrPath, arr);
 }
 
 export function dbSetAppUserObj(userObj, remove = false) {
@@ -181,7 +202,7 @@ export function dbGetCustomerObj(id) {
 
 // database filters //////////////////////////////////////////////////
 export function _dbFindPunchHistoryByMillisRange(userID, start, end) {
-  let path = build_db_path.punchClock(userID);
+  let path = build_db_path.punchHistory(userID);
   // log(path);
   // return getCollection(path);
   return filterFirestoreCollectionByNumber(path, "millis", start, end);
@@ -268,19 +289,3 @@ export function dbCancelServerDrivenStripePayment(readerID, paymentIntentID) {
 export function dbRetrieveAvailableStripeReaders() {
   return retrieveAvailableStripeReaders();
 }
-
-// database path builder /////////////////////////////////////////////////
-export const build_db_path = {
-  punchClock: (punchID) =>
-    // FIRESTORE_DATABASE_NODE_NAMES.appUsers +
-    // userID +
-    // "/" +
-    FIRESTORE_DATABASE_NODE_NAMES.punchClock + punchID + "/",
-  settings: (fieldName) => {
-    let path = FIRESTORE_DATABASE_NODE_NAMES.settings + "settings/";
-    if (fieldName) path += fieldName + "/";
-    return path;
-  },
-  activePunchClock: () =>
-    FIRESTORE_DATABASE_NODE_NAMES.clockedInUsers + "clock-array/",
-};

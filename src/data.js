@@ -1,11 +1,6 @@
 /* eslint-disable */
 
-import {
-  DISCOUNT_TYPES,
-  MILLIS_IN_HOUR,
-  PERMISSION_LEVELS,
-  ROLES,
-} from "./constants";
+import { DISCOUNT_TYPES, MILLIS_IN_HOUR, PERMISSION_LEVELS } from "./constants";
 
 ////////// hardcoded settings and options ///////
 export const SHADOW_RADIUS_NOTHING = {
@@ -154,9 +149,6 @@ export const NONREMOVABLE_WAIT_TIMES = [];
 export const INVENTORY_CATEGORY_NAMES = {
   parts: "Parts",
   labor: "Labor",
-  bikes: "Bikes",
-  accessories: "Accessories",
-  other: "Other",
 };
 
 export const TAB_NAMES = {
@@ -722,7 +714,18 @@ export const SETTINGS_OBJ = {
         126: 0.09107036888599396,
         127: 0.048106178641319275,
       },
-      role: ROLES.owner,
+      // role: PERMISSION_LEVELS.superUser,
+    },
+    {
+      first: "Jennifer ",
+      last: "Udebrock",
+      id: "12345",
+      permissions: PERMISSION_LEVELS.user,
+      phone: "2489370426",
+      pin: "22",
+      hourlyWage: 20,
+      faceDescriptor: {},
+      // role: PERMISSION_LEVELS.user,
     },
   ],
   cardReaders: [{ label: "Front Right Desk", id: "tmr_GFKNEgYkwcsIFF" }],

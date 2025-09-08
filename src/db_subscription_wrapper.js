@@ -8,15 +8,17 @@ import {
   getNodeObject,
   subscribeToCollectionNode,
   subscribeToDocument,
+  subscribeToFirestorePath,
   subscribeToInventory,
   subscribeToNode,
   subscribeToNodeAddition,
   subscribeToNodeChange,
   subscribeToNodeRemoval,
 } from "./db";
-import { arrayAddObjCheckForDupes, log } from "./utils";
+import { arrayAddObjCheckForDupes, clog, log } from "./utils";
 import { LocalPage } from "twilio/lib/rest/api/v2010/account/availablePhoneNumberCountry/local";
-import { REALTIME_DATABASE_NODE_NAMES } from "./constants";
+import { build_db_path, REALTIME_DATABASE_NODE_NAMES } from "./constants";
+import { useOpenWorkordersStore } from "./stores";
 
 let inventoryChangeSub, inventoryAddSub, inventoryRemoveSub;
 let workorderChangeSub, workorderAddSub, workorderRemoveSub;
@@ -27,6 +29,71 @@ let settingsSub;
 let paymentIntentAddSub;
 let paymentIntentChangeSub;
 let punchClockChangeSub, punchClockAddSub, punchClockRemoveSub;
+
+let listenerSubscriptions = [];
+
+// new shit////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
+export function removeDatabaseListeners(name) {
+  if (!name) {
+    listenerSubscriptions.forEach((unsub) => unsub());
+  } else {
+  }
+}
+
+/**
+ * stores and returns a subscription cancel function. The callback is the Zustand store setter
+ * @param {string} option - option: "punch clock", "open workorders", "inventory", "
+ * settings"
+ * @param {function zustandCallback(val) {}} - zustandCallback - zustand store setter.
+ */
+export async function subscribeToDBNodeChanges({
+  option,
+  ignoreObj = {},
+  callback,
+}) {
+  let subscribeToChanges = async (path) => {
+    let unsub = await subscribeToNodeChange(path, callback);
+    listenerSubscriptions.push(unsub);
+    return unsub;
+  };
+
+  let subscribeToAddition = async (path) => {
+    let unsub = await subscribeToNodeAddition(path, callback);
+    listenerSubscriptions.push(unsub);
+    return unsub;
+  };
+
+  let subscribeToRemoval = async (path) => {
+    let unsub = await subscribeToNodeRemoval(path, callback);
+    listenerSubscriptions.push(unsub);
+    return unsub;
+  };
+
+  let path;
+  switch (option) {
+    case "punch clock":
+      path = build_db_path.punchClock();
+      break;
+    case "open workorders":
+      path = build_db_path.openWorkorders();
+      break;
+    case "inventory":
+      path = build_db_path.inventory();
+      break;
+    case "settings":
+      path = build_db_path.settings();
+      break;
+  }
+  // log(path);
+  // return subscribeToChanges(path);
+  if (!ignoreObj.add) subscribeToAddition(path);
+  if (!ignoreObj.remove) subscribeToRemoval(path);
+  if (!ignoreObj.change) subscribeToChanges(path);
+}
+
+// end new shit////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 
 // subscriptions /////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -88,19 +155,13 @@ export async function settingsSubscribe(_zSetSettingsItem) {
 }
 
 // realtime database
-export async function punchClockSubscribe(_zSetClockedInUser) {
-  // punchClockAddSub = await subscribeToNodeAddition(
-  //   REALTIME_DATABASE_NODE_NAMES.punchClock,
-  //   (type, key, val) => {
-  //     _zSetClockedInUser(key, val, "in");
-  //   }
-  // );
-  // punchClockRemoveSub = await subscribeToNodeRemoval(
-  //   REALTIME_DATABASE_NODE_NAMES.punchClock,
-  //   (type, key, val) => {
-  //     _zSetClockedInUser(key, null, "out");
-  //   }
-  // );
+export async function punchClockSubscribe(_zSetClockedInUserArr) {
+  let path = build_db_path.punchClock();
+  punchClockAddSub = await subscribeToFirestorePath(path, (val) => {
+    log("incoming from punch clock sub", val);
+    if (!val) val = [];
+    _zSetClockedInUserArr(val);
+  });
 }
 
 // realtime database

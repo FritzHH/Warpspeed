@@ -38,7 +38,7 @@ import {
   set,
 } from "firebase/database";
 import { initializeApp } from "firebase/app";
-import { clog, formatMillisForDisplay, log } from "./utils";
+import { clog, formatMillisForDisplay, log, numberIsEven } from "./utils";
 import {
   CUSTOMER_PREVIEW_PROTO,
   CUSTOMER_PROTO,
@@ -61,6 +61,7 @@ import {
   STRIPE_SERVER_DRIVEN_INITIATE_PAYMENT_INTENT_URL,
   STRIPE_SERVER_DRIVEN_GET_AVAIALABLE_STRIPE_READERS_URL,
 } from "./app_user_constants";
+import { FIRESTORE_COLLECTION_NAMES } from "./constants";
 
 // Initialize Firebase
 const FIRESTORE = getFirestore(firebaseApp);
@@ -71,8 +72,93 @@ const FIRESTORE = getFirestore(firebaseApp);
 // disableNetwork(FIRESTORE);
 const RDB = getDatabase();
 
+///**************************************************************
+// NEW *////////////////////////////////////////////////////////////
+
+// internal ////////////////////////////
+function createRealtimeRef(path) {
+  return ref(RDB, path);
+}
+
+function checkDBPath(path) {
+  if (
+    Object.values(FIRESTORE_COLLECTION_NAMES).find((str) => path.includes(str))
+  ) {
+    return "firestore";
+  } else {
+    return "realtime";
+  }
+}
+
+async function remove_firestore_field(path, fieldID) {
+  let docRef = doc(FIRESTORE, path, fieldID);
+  return await deleteDoc(docRef);
+}
+
+async function set_firestore_field(path, obj, remove) {
+  // log(path, item);
+  let docRef = doc(FIRESTORE, path);
+  // return await setDoc(docRef, { ...obj });
+  updateDoc(docRef, obj);
+}
+
+export function setRealtimeNodeItem(path, item) {
+  return set(createRealtimeRef(path), item);
+}
+
+export function getRealtimeNodeItem(path) {
+  let dbRef = ref(RDB, path);
+  return getNodeObject(dbRef);
+}
+
+// subscriptions ////////////////////////////////////////
+export function subscribeToNodeChange(path, callback) {
+  let dbRef = ref(RDB, path);
+  return onChildChanged(dbRef, (snap) => {
+    // log(snap);
+    if (snap.val()) {
+      // log("subscription change", snap.val());
+      callback(snap.key, snap.val());
+    }
+  });
+}
+
+export function subscribeToNodeRemoval(nodePath, callback) {
+  let dbRef = ref(RDB, nodePath);
+  return onChildRemoved(dbRef, (snap) => {
+    if (snap.val()) {
+      callback(snap.key, snap.val());
+    }
+  });
+}
+
+export function subscribeToNodeAddition(path, callback) {
+  let dbRef = ref(RDB, path);
+  return onChildAdded(dbRef, (snap) => {
+    if (snap.val()) {
+      // clog("added", snap.val());
+      callback(snap.key, snap.val());
+    }
+  });
+}
+
+// exposed //////////////////////////////f
+
+export function newSetDatabaseField(path, item, remove) {
+  if (checkDBPath(path) === "firestore") {
+    // log(path, item);
+    if (remove) return remove_firestore_field(path, item.id);
+    return set_firestore_field(path, item);
+  }
+  // log(path, item);
+  if (remove) return setRealtimeNodeItem(path, null);
+  return setRealtimeNodeItem(path, item);
+}
+
+// END NEW **********************************************************
+
 ////////////////////////////////////////////////////////////////////////
-//////// Firestore calls ///////////////////////////////////////////////
+//////// //////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 
 // getters
@@ -102,24 +188,47 @@ export function getDocument(collectionName, itemID) {
   });
 }
 
-// setters
-
-// NEW /////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////
-export async function set_firestore_field(path, obj, remove) {
-  // log(path, item);
-  let docRef = doc(FIRESTORE, path);
-  return await setDoc(docRef, { ...obj });
-}
+// export async function set_firestore_field2(path, obj, remove) {
+//   // log(path, item);
+//   let docRef = doc(FIRESTORE, path);
+//   // return await setDoc(docRef, { ...obj });
+//   setDoc(docRef, { ...obj });
+// }
 
 export async function get_firestore_field(path) {
   let docRef = doc(FIRESTORE, path);
   return (await getDoc(docRef)).data();
 }
 
-export async function remove_firestore_field(path, fieldID) {
-  let docRef = doc(FIRESTORE, path, fieldID);
-  return await deleteDoc(docRef);
+// export async function get_firestore_field2(path) {
+//   let docRef = doc(FIRESTORE, path);
+//   return (await getDoc(docRef)).data();
+// }
+
+//////////////////////////////////////////////////////////////////////
+// subscriptions /////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+// new firestore calls ///////////////////
+
+function countSlashes(str) {
+  return (str.match(/\//g) || []).length;
+}
+
+export function subscribeToFirestorePath(path, callback) {
+  if (!numberIsEven(countSlashes(path)))
+    return onSnapshot(collection(FIRESTORE, path), (snapshot) => {
+      // log("incoming collection");
+      // log(doc.docs());
+      snapshot.forEach((item) => callback(item.data()));
+      // callback(snapshot.docs());
+    });
+
+  return onSnapshot(doc(FIRESTORE, path), (doc) => {
+    // log("incoming snapshot");
+    // log(doc.data());
+    callback(doc.data());
+  });
 }
 
 //// end new /////////////////////////////////////////////////////////
@@ -200,18 +309,6 @@ export function addToFirestoreCollectionItem(path, item, stringify) {
     .catch((err) => log("error setting Firestore collection", err));
 }
 
-// export function setFirestoreCollectionItem(path, item, stringify) {
-//   if (stringify) item = { item: JSON.stringify(item) };
-
-//   let docRef = collection(DB, path);
-//   // log(path);
-//   return addDoc(docRef, item)
-//     .then(() => {
-//       log("finished adding firestore collection");
-//     })
-//     .catch((err) => log("error setting Firestore collection", err));
-// }
-
 // subscribers
 export function subscribeToDocument(collectionName, documentID, callback) {
   let ref = doc(FIRESTORE, collectionName, documentID);
@@ -288,10 +385,6 @@ export async function filterFirestoreCollectionByNumber(
 ///////////////////////////////////////////////////////////////////////
 ////// Realtime Database calls ////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////
-
-function createRealtimeRef(path) {
-  return ref(RDB, path);
-}
 
 // getters //////////////////////////////////////////////////////////
 function getNodeObject(dbRef) {
@@ -382,66 +475,12 @@ export function setClosedWorkorder(workorder = WORKORDER_PROTO) {
   return set(dbRef, workorder);
 }
 
-export function setRealtimeNodeItem(path, item) {
-  return set(createRealtimeRef(path), item);
-}
-
-export function getRealtimeNodeItem(path) {
-  let dbRef = ref(RDB, path);
-  return getNodeObject(dbRef);
-}
-
 export function setInventoryItem(inventoryObj = INVENTORY_ITEM_PROTO) {
   let dbRef = ref(RDB, "INVENTORY/" + inventoryObj.id);
   return set(dbRef, inventoryObj);
 }
 
-//////////////////////////////////////////////////////////////////////
-// subscriptions /////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-export function subscribeToNodeChange(
-  nodePath,
-  callback,
-  targetData,
-  targetSetter
-) {
-  let dbRef = ref(RDB, nodePath);
-  return onChildChanged(dbRef, (snap) => {
-    if (snap.val()) {
-      // log("subscription change", snap.val());
-      callback("changed", snap.key, snap.val(), targetData, targetSetter);
-    }
-  });
-}
-
-export function subscribeToNodeRemoval(
-  nodePath,
-  callback,
-  targetData,
-  targetSetter
-) {
-  let dbRef = ref(RDB, nodePath);
-  return onChildRemoved(dbRef, (snap) => {
-    if (snap.val()) {
-      callback("removed", snap.key, snap.val(), targetData, targetSetter);
-    }
-  });
-}
-
-export function subscribeToNodeAddition(
-  nodePath,
-  callback
-  // targetData,
-  // targetSetter
-) {
-  let dbRef = ref(RDB, nodePath);
-  return onChildAdded(dbRef, (snap) => {
-    if (snap.val()) {
-      // clog("added", snap.val());
-      callback("subscription added", snap.key, snap.val());
-    }
-  });
-}
+// end new firestore calls /////////////
 
 export function subscriptionManualRemove(path) {
   let ref1 = ref(RDB, path);
@@ -453,7 +492,6 @@ export function subscriptionManualRemove(path) {
 //////////////////////////////////////////////////////////////////////
 ////// Firebase Function calls ///////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
-
 export function sendSMS(messageBody) {
   fetch(SMS_URL, {
     method: "POST",
@@ -481,8 +519,7 @@ export function sendSMS(messageBody) {
     });
 }
 
-/////////////////////////////////////////////////////////////////////////////////
-// server driven (new)
+// server driven Stripe payments ////////////////////////////////////////////////
 export function processServerDrivenStripePayment(
   saleAmount,
   readerID,

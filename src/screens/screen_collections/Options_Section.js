@@ -32,7 +32,7 @@ import {
   useAlertScreenStore,
 } from "../../stores";
 import { dbCreateUserPunchAction } from "../../db_call_wrapper";
-import { LOCAL_DB_KEYS } from "../../constants";
+import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
 import { UserClockHistoryModal } from "../screen_components/modal_screens/UserClockHistoryModalScreen";
 
 export function Options_Section({}) {
@@ -53,9 +53,7 @@ export function Options_Section({}) {
   const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
 
   const zWebcamDetected = useLoginStore((state) => state.getWebcamDetected());
-  const zClockedInUsersArr = useLoginStore((state) =>
-    state.getClockedInUsers()
-  );
+  const zPunchClockArr = useLoginStore((state) => state.getPunchClockArr());
 
   // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
@@ -66,7 +64,6 @@ export function Options_Section({}) {
   });
 
   // run constant checks to check if interent is connected
-  const INTERNET_CHECK_DELAY = 1000;
   useEffect(() => {
     // log("here");
     async function tick() {
@@ -86,7 +83,7 @@ export function Options_Section({}) {
 
   function handleUserClockPress(userObj) {
     let millis = new Date().getTime();
-    let option = zClockedInUsersArr.find((o) => o.id === userObj.id)
+    let option = zPunchClockArr.find((o) => o.userID === userObj.id)
       ? "out"
       : "in";
 
@@ -94,7 +91,8 @@ export function Options_Section({}) {
     let clockinFun = () => {
       _zCreateUserClockPunch(userObj.id, millis, option);
 
-      // will pause the app asking if the user wants to clock in if they say "no". this is to let them use the app even if they aren't clocked in.
+      // now we will pause the app asking if the user wants to clock in if they say "no". this is to let them use the app even if they aren't clocked in.
+
       // TODO administrator can set this to not allow the user to use the app if not clocked in, let it keep bugging them as a way to stop them from using it
       if (option === "out") {
         let clockPauseObj = localStorageWrapper.getItem(
@@ -147,8 +145,8 @@ export function Options_Section({}) {
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
       <TabBar
         userObj={zCurrentUserObj}
-        isClockedIn={zClockedInUsersArr?.find(
-          (o) => o.id === zCurrentUserObj?.id
+        isClockedIn={zPunchClockArr?.find(
+          (o) => o.userID === zCurrentUserObj?.id
         )}
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}

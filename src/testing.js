@@ -28,6 +28,7 @@ import {
   formatMillisForDisplay,
   log,
   randomWordGenerator,
+  clog,
 } from "./utils";
 import {
   dbSetCustomerObj,
@@ -35,8 +36,10 @@ import {
   // dbCreateUserPunchAction,
   setDBItem,
   build_db_path,
+  dbSetInventoryItem,
 } from "./db_call_wrapper";
 import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "./constants";
+import { LogBox } from "react-native";
 
 export function testPayment() {}
 
@@ -55,8 +58,7 @@ export function sendTestMessage() {
 }
 
 export async function fillInventory() {
-  let keys = Object.keys(INVENTORY_CATEGORY_NAMES);
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 2; i++) {
     let inv = { ...INVENTORY_ITEM_PROTO, id: generateRandomID() };
     inv.formalName =
       (await randomWordGenerator()) +
@@ -71,9 +73,11 @@ export async function fillInventory() {
       (await randomWordGenerator());
     inv.price = i * 4 + "." + i + i * 2;
     if (i === 1 || i === 3) inv.salePrice = i * 2 + "." + i + i * 2;
-    inv.category = INVENTORY_CATEGORY_NAMES[keys[i - 1]];
+    inv.category = INVENTORY_CATEGORY_NAMES.parts;
     inv.upc = generateBarcode();
-    setInventoryItem(inv);
+    // setInventoryItem(inv);
+    // clog(inv);
+    dbSetInventoryItem(inv, false);
   }
 }
 
@@ -121,7 +125,7 @@ export function fillCustomers() {
 
 export function fillSettings() {
   // log(SETTINGS_PROTO);
-  dbSetSettings({ ...SETTINGS_OBJ }, false);
+  dbSetSettings(SETTINGS_OBJ, false);
 }
 
 export function fillReceipt() {

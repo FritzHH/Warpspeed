@@ -582,7 +582,7 @@ const AppUserListComponent = ({
   function handleNewUserPress() {
     let userObj = cloneDeep(APP_USER);
     userObj.id = generateRandomID();
-    let role = PERMISSION_LEVELS.find((o) => (o.name = "User"));
+    let role = PERMISSION_LEVELS.user;
     userObj.permissions = role;
     commitUserInfoChange(userObj, true);
     _setEditUserIndex(0);

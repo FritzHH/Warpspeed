@@ -13,10 +13,11 @@ import { checkArr, clog, generateRandomID, log } from "./utils";
 import { cloneDeep } from "lodash";
 import {
   batchDBCall,
-  dbSetActiveClockUserArr,
+  dbSetPunchClockArr,
   dbSetOpenWorkorderItem,
   dbSetOrUpdateUserPunchObj,
   dbSetSettings,
+  dbSetInventoryItem,
 } from "./db_call_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
@@ -328,7 +329,7 @@ export const useLoginStore = create((set, get) => ({
   loginTimeout: 0,
   // currentUserObj: { first: "Fritz", last: "Hieb", id: "1234" }, //testing
   currentUserObj: null,
-  clockedInUsers: [],
+  punchClockArr: [],
   modalVisible: false,
   lastActionMillis: 0,
   postLoginFunctionCallback: () => {},
@@ -337,7 +338,7 @@ export const useLoginStore = create((set, get) => ({
   // face login
   runBackgroundRecognition: true,
 
-  getClockedInUsers: () => get().clockedInUsers,
+  getPunchClockArr: () => get().punchClockArr,
   getWebcamDetected: () => get().webcamDetected,
   getRunBackgroundRecognition: () => get().runBackgroundRecognition,
   getLoginFunctionCallback: () => get().loginFunctionCallback,
@@ -351,7 +352,6 @@ export const useLoginStore = create((set, get) => ({
     let user = get().currentUserObj;
     if (!user) return;
   },
-  getUserHasOwnerRole: () => {},
 
   // local app user
   setCurrentUserObj: (currentUserObj) => {
@@ -366,21 +366,19 @@ export const useLoginStore = create((set, get) => ({
       punchObj.userID = userID;
       punchObj.option = option;
       punchObj.millis = millis;
-      dbSetOrUpdateUserPunchObj(punchObj);
+      // dbSetOrUpdateUserPunchObj(punchObj);
 
-      let userArr = cloneDeep(get().clockedInUsers);
+      let punchClockArr = cloneDeep(get().punchClockArr);
       if (option === "out") {
-        userArr = userArr.filter((o) => o.id != userID);
+        punchClockArr = punchClockArr.filter((o) => o.userID != userID);
       } else {
-        if (!userArr.find((o) => o.id === userID)) {
-          userArr.push({ id: userID, millis });
+        if (!punchClockArr.find((o) => o.userID === userID)) {
+          punchClockArr.push(punchObj);
         }
       }
-      dbSetActiveClockUserArr(userArr);
-      return {
-        clockedInUsers: userArr,
-      };
+      return dbSetPunchClockArr(punchClockArr);
     }),
+  setPunchClockArr: (punchClockArr) => set({ punchClockArr }),
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
   setRunBackgroundRecognition: (runBackgroundRecognition) =>
     set(() => ({ runBackgroundRecognition })),
@@ -481,6 +479,21 @@ export const useInventoryStore = create((set, get) => ({
         inventoryArr: removeItem(get().inventoryArr, item),
       }));
   },
+
+  removeItem: (item, batch = true, sendToDB = true) => {},
+  setItem: ({ item, batch = true, sendToDB = true }) => {
+    // clog("item", item);
+    let inventoryArr = cloneDeep(get().inventoryArr);
+    let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
+    if (invItemIdx >= 0) {
+      inventoryArr[invItemIdx] = item;
+    } else {
+      inventoryArr.push(item);
+    }
+    set({ inventoryArr });
+    if (sendToDB) dbSetInventoryItem(item, batch);
+  },
+  // setEntireArr: ()
 }));
 
 export const useOpenWorkordersStore = create((set, get) => ({
@@ -520,6 +533,9 @@ export const useOpenWorkordersStore = create((set, get) => ({
   },
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
 
+  testIncoming: (val) => {
+    log("incoming open workorders zustand", val);
+  },
   // handles live DB subscription changes
   modItem: (item, option) => {
     // log(item, option);
@@ -568,20 +584,24 @@ export const useWorkorderPreviewStore = create((set, get) => ({
 
 export const useSettingsStore = create((set, get) => ({
   settingsObj: null,
+
   getSettingsObj: () => get().settingsObj,
-  setSettingsObj: ({ settingsObj, batch = true, sendToDB = true }) => {
+
+  setSettingsObj: (settingsObj, batch = true, sendToDB = true) => {
     // clog(settingsObj);
     set({ settingsObj });
     if (sendToDB) {
-      dbSetSettings({ settingsObj, batch });
+      dbSetSettings(settingsObj, batch);
     }
   },
 
-  setField: (fieldName, fieldVal, batch = true) => {
-    let settingsObj = cloneDeep(get().settingsObj);
+  setField: (fieldName, fieldVal, sendToDB = true, batch = true) => {
+    let settingsObj = get().settingsObj || {};
+    settingsObj = cloneDeep(settingsObj);
     settingsObj[fieldName] = fieldVal;
+    // log(fieldName, fieldVal);
     set({ settingsObj });
-    dbSetSettings(settingsObj, batch);
+    if (sendToDB) dbSetSettings(settingsObj, batch);
   },
 }));
 

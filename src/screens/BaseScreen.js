@@ -29,12 +29,21 @@ import { Info_Section } from "./screen_collections/Info_Section";
 import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
-import { getRealtimeNodeItem, searchCollection } from "../db";
+import {
+  get_firestore_field,
+  get_firestore_field2,
+  getRealtimeNodeItem,
+  searchCollection,
+  set_firestore_field,
+  set_firestore_field2,
+  subscribeToFirestorePath,
+} from "../db";
 import {
   fillSettings,
   fillPrinterNames,
   fillPunchHistory,
   fillReceipt,
+  fillInventory,
 } from "../testing";
 import {
   customerPreviewListSubscribe,
@@ -42,6 +51,7 @@ import {
   openWorkordersSubscribe,
   punchClockSubscribe,
   settingsSubscribe,
+  subscribeToDBNodeChanges,
 } from "../db_subscription_wrapper";
 import {
   useCustomerPreviewStore,
@@ -65,21 +75,21 @@ import {
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
-  const _zModWorkorderItem = useOpenWorkordersStore((state) => state.modItem);
-  const _zModInventoryItem = useInventoryStore((state) => state.modItem);
-  const _zSetSettingsItem = useSettingsStore((state) => state.setSettingsItem);
+  const _zSetInventoryItem = useInventoryStore((state) => state.setItem);
+  const _zSetSettingsItem = useSettingsStore((state) => state.setField);
   const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
   const _zSetLastActionMillis = useLoginStore(
     (state) => state.setLastActionMillis
   );
   const _zSetLoginTimeout = useLoginStore((state) => state.setLoginTimeout);
-  const _zSetClockedInUser = useLoginStore((state) => state.setClockedInUser);
+  const _zSetPunchClockArr = useLoginStore((state) => state.setPunchClockArr);
   const _zSetLastDatabaseBatchMillis = useDatabaseBatchStore(
     (state) => state.setLastBatchMillis
   );
   const _zSetLastDatabaseWriteMillis = useDatabaseBatchStore(
     (state) => state.setLastWriteMillis
   );
+  const _zTestIncoming = useOpenWorkordersStore((state) => state.testIncoming);
   // testing
   // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
@@ -119,20 +129,25 @@ export function BaseScreen() {
 
   // subscribe to database listeners
   useEffect(() => {
-    openWorkordersSubscribe(_zModWorkorderItem);
-    inventorySubscribe(_zModInventoryItem);
-    settingsSubscribe(_zSetSettingsItem); // subscribe to changes only
-    punchClockSubscribe(_zSetClockedInUser);
-
-    // one-off reads due to only subscribing to changes in above
-    // getRealtimeNodeItem(REALTIME_DATABASE_NODE_NAMES.settings).then((res) => {
-    //   _zSetSettingsObj(res);
-    // });
-    dbGetSettings().then((settingsObj) => {
-      // log("s", settingsObj);
-      _zSetSettingsObj({ settingsObj, sendToDB: false });
-      // log("res", res);
+    // subscribeToDBChanges("open workorders", _zTestIncoming);
+    subscribeToDBNodeChanges({
+      option: "settings",
+      ignoreObj: { remove: true },
+      callback: (key, val) => _zSetSettingsItem(key, val, false),
+      // clog(key, val);
+      // _zSetSettingsObj(val, false, false);
     });
+
+    // subscribeToDBChanges("punch clock", (val) => {
+    //   _zSetPunchClockArr(val);
+    // });
+    // subscribeToDBChanges(
+    //   "inventory",
+    //   (item) => {
+    //     clog(item);
+    //   }
+    //   // _zSetInventoryItem({ item, sendToDB: false })
+    // );
   }, []);
 
   useEffect(() => {
@@ -165,6 +180,7 @@ export function BaseScreen() {
     // fillReceipt();
     // fillPrinterNames();
     // fillPunchHistory()
+    // fillInventory();
   }, []);
   // log(zSettingsObj);
   return (

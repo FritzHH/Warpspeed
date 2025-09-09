@@ -30,10 +30,7 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../../stores";
-import {
-  dbGetCustomerObj,
-  dbSetOpenWorkorderItem,
-} from "../../../db_call_wrapper";
+import { dbGetCustomerObj } from "../../../db_call_wrapper";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { getDatabase } from "firebase/database";
 import LinearGradient from "react-native-web-linear-gradient";
@@ -46,8 +43,8 @@ export function WorkordersComponent({}) {
     state.getWorkorderArr()
   );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getWorkorderObj()
+  const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
   );
 
   // setters ////////////////////////////////////////////////////////
@@ -74,8 +71,8 @@ export function WorkordersComponent({}) {
   const _zModOpenWorkorderArrItem = useOpenWorkordersStore(
     (state) => state.modItem
   );
-  const _zSetWorkorder = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
+  const _zSetWorkorderObj = useOpenWorkordersStore(
+    (state) => state.setOpenWorkorderObj
   );
 
   ///////////////////////////////////////////////////////////////////////////////////
@@ -208,11 +205,11 @@ export function WorkordersComponent({}) {
     // log("obj", obj);
     obj = cloneDeep(obj);
     dbGetCustomerObj(obj.customerID).then((custObj) => {
-      // log("cust obj", custObj);
+      // clog("cust obj", custObj);
       _zSetCurrentCustomer(custObj);
     });
-    _zSetWorkorder(obj);
 
+    _zSetWorkorderObj(obj);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);

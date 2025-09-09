@@ -477,26 +477,22 @@ export function useInterval(callback, delay) {
   }, [delay]);
 }
 
-export function applyDiscountToWorkorderItem(
-  discountObj,
-  workorderLineObj,
-  inventoryObj
-) {
+export function applyDiscountToWorkorderItem(discountObj, workorderLineObj) {
   let newPrice;
   let savings;
 
   if (discountObj.type === "Percent") {
     let multiplier = discountObj.value;
     multiplier = 1 - Number("." + multiplier);
-    newPrice = inventoryObj.price * workorderLineObj.qty * multiplier;
-    savings = inventoryObj.price * workorderLineObj.qty - newPrice;
+    newPrice = workorderLineObj.price * workorderLineObj.qty * multiplier;
+    savings = workorderLineObj.price * workorderLineObj.qty - newPrice;
     // log("newprice", trimToTwoDecimals(newPrice));
     // log("savings", savings);
   } else {
     newPrice =
-      inventoryObj.price * workorderLineObj.qty -
+      workorderLineObj.price * workorderLineObj.qty -
       workorderLineObj.qty * discountObj.value;
-    savings = inventoryObj.price * workorderLineObj.qty - newPrice;
+    savings = workorderLineObj.price * workorderLineObj.qty - newPrice;
   }
   // log("newprice", newPrice);
   return {

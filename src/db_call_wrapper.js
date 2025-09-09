@@ -142,9 +142,9 @@ export function dbSetCustomerObj(customerObj, removeOption = false) {
   return setFirestoreCollectionItem("CUSTOMERS", id, customerObj);
 }
 
-export function dbSetOpenWorkorderItem(item, removeOption = false) {
-  let path = "OPEN-WORKORDERS/" + item.id;
-  if (removeOption) item = null;
+export function dbSetWorkorder(item, batch = true, remove = false) {
+  let path = build_db_path.openWorkorders(item.id);
+  if (batch) return batchDBCall(path, item, remove);
   return setRealtimeNodeItem(path, item);
 }
 

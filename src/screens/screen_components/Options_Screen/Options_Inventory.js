@@ -6,14 +6,14 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
 } from "react-native-web";
 import {
   dim,
   generateBarcode,
   generateRandomID,
   log,
-  trimToTwoDecimals
+  trimToTwoDecimals,
 } from "../../../utils";
 import {
   TabMenuDivider as Divider,
@@ -22,14 +22,14 @@ import {
   InventoryItemScreeenModalComponent,
   CheckBox_,
   TabMenuButton,
-  TabMenuDivider
+  TabMenuDivider,
 } from "../../../components";
 import { Colors } from "../../../styles";
 import {
   INVENTORY_ITEM_PROTO,
   INVENTORY_CATEGORY_NAMES,
   TAB_NAMES,
-  WORKORDER_ITEM_PROTO
+  WORKORDER_ITEM_PROTO,
 } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
@@ -39,13 +39,9 @@ import {
   useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
-  useTabNamesStore
+  useTabNamesStore,
 } from "../../../stores";
-import {
-  dbSetInventoryItem,
-  dbSetOpenWorkorderItem,
-  dbSetSettings
-} from "../../../db_call_wrapper";
+import { dbSetInventoryItem, dbSetSettings } from "../../../db_call_wrapper";
 
 const tabMargin = 20;
 export function InventoryComponent({}) {
@@ -123,7 +119,7 @@ export function InventoryComponent({}) {
     if (res.length === 0 && searchTerm.length === 12) {
       _setNewItemObject({
         ...cloneDeep(INVENTORY_ITEM_PROTO),
-        upc: searchTerm
+        upc: searchTerm,
       });
       _setModalInventoryObjIdx(-1);
       _setSearchTerm("");
@@ -179,7 +175,7 @@ export function InventoryComponent({}) {
           flex: 1,
           // width: "100%",
           // height: __screenHeight,
-          paddingHorizontal: 5
+          paddingHorizontal: 5,
         }}
       >
         <View
@@ -188,7 +184,7 @@ export function InventoryComponent({}) {
             height: "5%",
             flexDirection: "row",
             paddingHorizontal: 4,
-            alignItems: "center"
+            alignItems: "center",
             // backgroundColor: "blue",
           }}
         >
@@ -207,7 +203,7 @@ export function InventoryComponent({}) {
               outlineWidth: 0,
               width: "90%",
               marginLeft: 20,
-              marginRight: 30
+              marginRight: 30,
             }}
             placeholder="Search inventory..."
             placeholderTextColor={"gray"}
@@ -232,7 +228,7 @@ export function InventoryComponent({}) {
           <FlatList
             style={{
               width: "100%",
-              height: "100%"
+              height: "100%",
             }}
             data={sSearchResults}
             ItemSeparatorComponent={() => (
@@ -240,7 +236,7 @@ export function InventoryComponent({}) {
                 style={{
                   width: "100%",
                   backgroundColor: "gray",
-                  height: 1
+                  height: 1,
                   // marginVertical: 1,
                 }}
               />
@@ -257,7 +253,7 @@ export function InventoryComponent({}) {
                     flexDirection: "row",
                     width: "100%",
                     justifyContent: "space-between",
-                    alignItems: "center"
+                    alignItems: "center",
                   }}
                 >
                   <Button
@@ -277,13 +273,13 @@ export function InventoryComponent({}) {
                           flexDirection: "row",
                           // backgroundColor: "blue",
                           justifyContent: "space-between",
-                          alignItems: "center"
+                          alignItems: "center",
                         }}
                       >
                         <Button
                           mouseOverOptions={{ highlightColor: "red" }}
                           buttonStyle={{
-                            backgroundColor: "transparent"
+                            backgroundColor: "transparent",
                             // width: "8%",
                           }}
                           text={"i"}
@@ -308,13 +304,13 @@ export function InventoryComponent({}) {
                             borderColor: "gray",
                             paddingLeft: 5,
                             width: "10%",
-                            alignItems: "flex-end"
+                            alignItems: "flex-end",
                           }}
                         >
                           <Text
                             style={{
                               fontSize: 11,
-                              color: "dimgray"
+                              color: "dimgray",
                               // width: "100%",
                             }}
                           >
@@ -344,7 +340,7 @@ export function InventoryComponent({}) {
           textStyle={{ fontSize: 14 }}
           showOuterModal={true}
           outerModalStyle={{
-            backgroundColor: "rgba(50,50,50,.5)"
+            backgroundColor: "rgba(50,50,50,.5)",
           }}
           Component={() => {
             return (
@@ -371,14 +367,14 @@ const TabBar = ({
   zOptionsTabName,
   _zSetOptionsTabName,
   __setShowWorkorderModal,
-  __setShowInventoryModal
+  __setShowInventoryModal,
 }) => (
   <View
     style={{
       flexDirection: "row",
       // width: "100%",
       // justifyContent: "space-between",
-      height
+      height,
     }}
   >
     <TabMenuButton

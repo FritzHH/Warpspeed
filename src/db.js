@@ -102,7 +102,7 @@ async function set_firestore_field(path, obj, remove) {
   updateDoc(docRef, obj);
 }
 
-export function setRealtimeNodeItem(path, item) {
+export function setRealtimeNodeItem(path, item, remove) {
   return set(createRealtimeRef(path), item);
 }
 
@@ -111,7 +111,7 @@ export function getRealtimeNodeItem(path) {
   return getNodeObject(dbRef);
 }
 
-// subscriptions ////////////////////////////////////////
+// exposed subscriptions ////////////////////////////////////////
 export function subscribeToNodeChange(path, callback) {
   let dbRef = ref(RDB, path);
   return onChildChanged(dbRef, (snap) => {
@@ -142,7 +142,7 @@ export function subscribeToNodeAddition(path, callback) {
   });
 }
 
-// exposed //////////////////////////////f
+// exposed db calls ////////////////////////////////
 
 export function newSetDatabaseField(path, item, remove) {
   if (checkDBPath(path) === "firestore") {

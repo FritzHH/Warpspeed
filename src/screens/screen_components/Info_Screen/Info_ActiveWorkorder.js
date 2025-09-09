@@ -3,6 +3,7 @@
 import { View, Text, TextInput } from "react-native-web";
 import {
   addDashesToPhone,
+  clog,
   dim,
   generateRandomID,
   log,
@@ -44,15 +45,12 @@ import {
   useSettingsStore,
   useTabNamesStore,
 } from "../../../stores";
-import {
-  dbSetCustomerObj,
-  dbSetOpenWorkorderItem,
-} from "../../../db_call_wrapper";
+import { dbSetCustomerObj, dbSetWorkorder } from "../../../db_call_wrapper";
 
 export const ActiveWorkorderComponent = ({}) => {
   // store setters /////////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
+    (state) => state.setWorkorder
   );
   const _zSetCustomerObj = useCurrentCustomerStore(
     (state) => state.setCustomerObj
@@ -72,7 +70,9 @@ export const ActiveWorkorderComponent = ({}) => {
 
   // store getters ///////////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
-  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
+  zWorkorderObj = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
+  );
   let zCustomerObj = CUSTOMER_PROTO;
   zCustomerObj = useCurrentCustomerStore((state) => state.getCustomerObj());
   var zSettingsObj = SETTINGS_OBJ;
@@ -98,6 +98,7 @@ export const ActiveWorkorderComponent = ({}) => {
   ///////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
 
+  // log("wo", zWorkorderObj);
   function setBikeColor(incomingColorVal, fieldName) {
     let foundColor = false;
     let newColorObj = {};
@@ -176,6 +177,8 @@ export const ActiveWorkorderComponent = ({}) => {
   };
 
   const DROPDOWN_SELECTED_OPACITY = 0.3;
+  // clog("wo", zWorkorderObj);
+  // clog("cust", zCustomerObj);
   function setComponent() {
     return (
       <View
@@ -522,7 +525,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       let wo = cloneDeep(zWorkorderObj);
                       wo.color1 = item;
                       _zSetWorkorderObj(wo);
-                      dbSetOpenWorkorderItem(wo);
+                      // ''(wo);
                     }}
                     // itemViewStyle={{ borderRadius: 0 }}
                     // itemTextStyle={{ fontSize: 14 }}
@@ -558,7 +561,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       let wo = cloneDeep(zWorkorderObj);
                       wo.color2 = item;
                       _zSetWorkorderObj(wo);
-                      dbSetOpenWorkorderItem(wo);
+                      // ''(wo);
                     }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
@@ -614,7 +617,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         (o) => o.label == "Service"
                       );
                       _zSetWorkorderObj(wo);
-                      dbSetOpenWorkorderItem(wo);
+                      // ''(wo);
                     }}
                     // itemViewStyle={{ backgroundColor: "gray", width: null }}
                     // itemTextStyle={{ fontSize: 14, color: "black" }}
@@ -784,12 +787,12 @@ export const ActiveWorkorderComponent = ({}) => {
     );
   }
 
-  return setComponent();
+  // return setComponent();
 
   try {
     return setComponent();
   } catch (e) {
-    log("Error returning ActiveWorkorderComponent", e);
+    // log("Error returning ActiveWorkorderComponent", e);
     return null;
   }
 };

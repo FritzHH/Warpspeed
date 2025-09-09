@@ -33,50 +33,30 @@ import {
   useLoginStore,
   useTabNamesStore,
 } from "../../../stores";
-import {
-  dbSetOpenWorkorderItem,
-  dbSetSettings,
-} from "../../../db_call_wrapper";
+import { dbSetSettings } from "../../../db_call_wrapper";
 
 const SEARCH_STRING_TIMER = 45 * 1000;
 
 export function QuickItemComponent({}) {
   // store setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
+    (state) => state.setWorkorder
   );
   const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
-  const _zModInventoryItem = useInventoryStore((state) => state.modItem);
-  const _zSetLoginFunctionCallback = useLoginStore(
-    (state) => state.setLoginFunctionCallback
-  );
-  const _zSetShowLoginScreen = useLoginStore(
-    (state) => state.setShowLoginScreen
-  );
-  const _zExecute = useLoginStore((state) => state.execute);
-  const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
-  const _zSetOptionsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
 
   // store getters //////////////////////////////////////////////////////////////
   let zWorkorderObj = WORKORDER_PROTO;
   let zSettingsObj = SETTINGS_OBJ;
   zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
-  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
-  const zOptionsTabName = useTabNamesStore((state) =>
-    state.getOptionsTabName()
+  zWorkorderObj = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
   );
+  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
 
   ///////////////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
-  const [sModalInventoryObj, _setModalInventoryObj] = React.useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
-  const [sNewItemObj, _setNewItemObject] = useState(null);
-  const [sLineItemBackgroundColor, _setLineItemBackgroundColor] =
-    useState("transparent");
 
   useEffect(() => {
     let arr = [];
@@ -116,59 +96,17 @@ export function QuickItemComponent({}) {
     _setSearchResults(res);
   }
 
-  function handleSearchItemSelected(item) {
-    // log(item);
-    // return;
-    if (!zWorkorderObj) {
-      _setModalInventoryObj(item);
-      return;
-    }
-
-    let wo = cloneDeep(zWorkorderObj);
-    if (!wo.workorderLines) wo.workorderLines = [];
-    // log("item", item);
-    let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-    lineItem.invItemID = item.id;
-    lineItem.id = generateRandomID();
-    wo.workorderLines.push(lineItem);
-    _zSetWorkorderObj(wo, !zWorkorderObj.isStandaloneSale);
-  }
-
+  // to do make sure that deleting an inventory item or button alse removes it from the settings button lists
   function handleQuickButtonPress(buttonObj) {
-    // log("here");
-    let assignmentsArr = buttonObj.assignments;
-    if (!assignmentsArr) return;
-    let arr = [];
-    let notFoundArr = [];
-    assignmentsArr.forEach((id) => {
-      let item = zInventoryArr.find((o) => o.id === id);
-      if (item) {
-        arr.push(item);
-      } else {
-        notFoundArr.push(id);
-      }
+    let inventoryItemsForButton = [];
+    buttonObj.items?.forEach((invItemID) => {
+      let invItem = zInventoryArr.find((item) => item.id === invItem);
+      if (invItem) inventoryItemsForButton.push(invItem);
     });
-    // return;
-    // log(notFoundArr);
-    if (notFoundArr.length > 0) {
-      notFoundArr.forEach((id) => {
-        let idx = assignmentsArr.findIndex((o) => o === id);
-        assignmentsArr[idx] = null;
-      });
-      let newAssignmentsArr = assignmentsArr.filter((o) => o !== null);
-      buttonObj.assignments = newAssignmentsArr;
-      let settingsObj = { ...zSettingsObj };
-      let idx = settingsObj.quickItemButtonNames.findIndex(
-        (o) => o.name === buttonObj.name
-      );
-      settingsObj[idx] = buttonObj;
-      _zSetSettings(settingsObj);
-      dbSetSettings(settingsObj);
-      // log("settings", settingsObj);
-      // log("idx", idx.toString());
-    }
-    // settingsObj.quickItemButtonNames
-    _setSearchResults(arr);
+    let subMenuButtonsForButton = [];
+    buttonObj.buttons?.forEach((buttonID) => {
+      // let buttonObj = zSettingsObj.quickItemButtons.find(btn => btn.id ===)
+    });
   }
 
   function inventoryItemSelected(item, buttonName) {
@@ -267,21 +205,14 @@ export function QuickItemComponent({}) {
         <View
           style={{
             justifyContent: "flex-start",
-            // backgroundColor: "red",
             width: "20%",
-            // borderRightWidth: 1,
-            // borderColor: "gray",
             paddingHorizontal: 2,
-            // marginBottom: 30,
-            // paddingBottom: 20,
-            // height: "50%",
-            // maxHeight: "100%",
           }}
         >
           {zSettingsObj?.quickItemButtons?.map((item) => (
             <Button_
               onPress={() => handleQuickButtonPress(item)}
-              colorGradientArr={COLOR_GRADIENTS.blue}
+              colorGradientArr={COLOR_GRADIENTS.lightBlue}
               buttonStyle={{
                 ...SHADOW_RADIUS_NOTHING,
                 borderWidth: 1,
@@ -315,7 +246,7 @@ export function QuickItemComponent({}) {
             data={[...sSearchResults]}
             renderItem={(item) => {
               // if (!item.item) return null;
-              let itemIndex = item.index;
+              let idx = item.index;
               item = item.item;
               // log("item", item);
               return (
@@ -457,4 +388,9 @@ export function QuickItemComponent({}) {
       </View>
     </View>
   );
+}
+
+function QuickButtonViewComponent({ buttonArr }) {
+  let invItems = buttonArr.inventoryItems;
+  let subMenuButtons = buttonArr.subMenuButtons;
 }

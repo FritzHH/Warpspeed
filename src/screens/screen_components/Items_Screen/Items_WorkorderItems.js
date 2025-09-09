@@ -43,17 +43,14 @@ import {
   useLoginStore,
   useSettingsStore,
 } from "../../../stores";
-import {
-  dbSetClosedWorkorderItem,
-  dbSetOpenWorkorderItem,
-} from "../../../db_call_wrapper";
+import { dbSetClosedWorkorderItem } from "../../../db_call_wrapper";
 import LinearGradient from "react-native-web-linear-gradient";
 // import {} from '../../../assets/tools1.png'
 
 export const Items_WorkorderItemsTab = ({}) => {
   // store setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
+    (state) => state.setWorkorder
   );
   const _zExecute = useLoginStore((state) => state.execute);
   const _zSetIsCheckingOut = useCheckoutStore(
@@ -62,8 +59,8 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // store getters ///////////////////////////////////////////////////////////////
 
-  const zWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getWorkorderObj()
+  const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
   );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
@@ -84,22 +81,26 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   ///////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////
-
+  // clog("wo", zOpenWorkorderObj);
+  // log("inv", zInventoryArr);
   function calculateLineItems() {
-    let wo = cloneDeep(zWorkorderObj);
-    zWorkorderObj.workorderLines.forEach((line, idx) => {
+    let wo = cloneDeep(zOpenWorkorderObj);
+    zOpenWorkorderObj.workorderLines.forEach((line, idx) => {
+      // clog("lin", line);
       let newWOLine = cloneDeep(line);
       let discountObj = line.discountObj;
       let inventoryItem = zInventoryArr.find(
-        (item) => item.id == line.invItemID
+        (item) => item.id === line.invItemID
       );
 
-      newWOLine.price = inventoryItem.price;
+      //EDGE CASE if we cannot find the inventory item, that means its been removed from inventory. skip the next and use the price that was in the system originally.
+
+      // clog(inventoryItem);
+      newWOLine.price = inventoryItem?.price || newWOLine.price;
       if (discountObj.name) {
         let newDiscountObj = applyDiscountToWorkorderItem(
           newWOLine.discountObj,
-          newWOLine,
-          inventoryItem
+          newWOLine
         );
         if (discountObj.newPrice > 0) newWOLine.discountObj = newDiscountObj;
       }
@@ -109,25 +110,26 @@ export const Items_WorkorderItemsTab = ({}) => {
     return wo;
   }
 
+  // log('wo', zOpe)
   // make sure the previous session discount object prices are up to date with inventory changes
   useEffect(() => {
-    if (!zWorkorderObj?.workorderLines?.length > 0) return;
+    if (!zOpenWorkorderObj?.workorderLines?.length > 0) return;
     let wo = calculateLineItems();
     _zSetWorkorderObj(wo);
-    if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
+    // if (!zOpenWorkorderObj.isStandaloneSale) ''(wo);
   }, []);
 
   // calculate running sale totaLS
   useEffect(() => {
     // log("here");
-    if (!zWorkorderObj?.workorderLines) return;
+    if (!zOpenWorkorderObj?.workorderLines) return;
     let wo = calculateLineItems();
     const { runningQty, runningTotal, runningDiscount } =
       calculateRunningTotals(wo, zInventoryArr);
     _setNumItems(runningQty);
     _setTotalDiscount(runningDiscount);
     _setTotalPrice(runningTotal);
-  }, [zWorkorderObj, zInventoryArr]);
+  }, [zOpenWorkorderObj, zInventoryArr]);
 
   ///////////////////////////////////////////////////
   function checkoutPressed() {
@@ -138,11 +140,11 @@ export const Items_WorkorderItemsTab = ({}) => {
     //     log("need to fix this method");
     // return;
     let fun = () => {
-      let woCopy = cloneDeep(zWorkorderObj);
+      let woCopy = cloneDeep(zOpenWorkorderObj);
       woCopy.workorderLines.splice(index, 1);
       // log("res", WO);
       _zSetWorkorderObj(woCopy);
-      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(woCopy);
+      // if (!zOpenWorkorderObj.isStandaloneSale) ''(woCopy);
     };
     fun();
   }
@@ -152,7 +154,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     // return;
     // let fun = () => {
     let newWOLine = cloneDeep(workorderLine);
-    let wo = cloneDeep(zWorkorderObj);
+    let wo = cloneDeep(zOpenWorkorderObj);
     if (option === "up") {
       newWOLine.qty = newWOLine.qty + 1;
     } else {
@@ -170,7 +172,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     }
     wo.workorderLines[idx] = newWOLine;
     _zSetWorkorderObj(wo);
-    if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
+    // if (!zOpenWorkorderObj.isStandaloneSale) ''(wo);
     // };
     // _zExecute(fun);
   }
@@ -192,13 +194,13 @@ export const Items_WorkorderItemsTab = ({}) => {
         if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
       }
 
-      let idx = zWorkorderObj.workorderLines.findIndex(
+      let idx = zOpenWorkorderObj.workorderLines.findIndex(
         (o) => o.id == workorderLine.id
       );
-      let wo = cloneDeep(zWorkorderObj);
+      let wo = cloneDeep(zOpenWorkorderObj);
       wo.workorderLines[idx] = newWOLine;
       _zSetWorkorderObj(wo);
-      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
+      // if (!zOpenWorkorderObj.isStandaloneSale) ''(wo);
     };
 
     fun();
@@ -217,16 +219,16 @@ export const Items_WorkorderItemsTab = ({}) => {
       }
 
       // log(newDiscountObj);
-      let woCopy = cloneDeep(zWorkorderObj);
+      let woCopy = cloneDeep(zOpenWorkorderObj);
       woCopy.workorderLines[index].discountObj = newDiscountObj;
       _zSetWorkorderObj(woCopy);
-      if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(woCopy);
+      // if (!zOpenWorkorderObj.isStandaloneSale) ''(woCopy);
     };
     fun();
   }
 
   function splitItems(inventoryItem, workorderLine, index) {
-    let wo = cloneDeep(zWorkorderObj);
+    let wo = cloneDeep(zOpenWorkorderObj);
     let num = workorderLine.qty;
     for (let i = 0; i <= num - 1; i++) {
       let newLine = cloneDeep(workorderLine);
@@ -248,7 +250,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       // wo.workorderLines.push(newLine);
     }
     _zSetWorkorderObj(wo);
-    if (!zWorkorderObj.isStandaloneSale) dbSetOpenWorkorderItem(wo);
+    // if (!zOpenWorkorderObj.isStandaloneSale) ''(wo);
   }
 
   // clog("wo", zWorkorderObj);
@@ -262,7 +264,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       >
         <FlatList
           style={{ marginTop: 3, marginRight: 5 }}
-          data={zWorkorderObj.workorderLines}
+          data={zOpenWorkorderObj.workorderLines}
           keyExtractor={(item, idx) => idx}
           renderItem={(item) => {
             let idx = item.index;
@@ -278,7 +280,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                 __setWorkorderLineItem={editWorkorderLine}
                 inventoryItem={invItem}
                 workorderLine={item}
-                zWorkorderObj={zWorkorderObj}
+                zWorkorderObj={zOpenWorkorderObj}
                 __splitItems={splitItems}
                 __modQtyPressed={modQtyPressed}
                 index={idx}
@@ -382,7 +384,8 @@ export const Items_WorkorderItemsTab = ({}) => {
               }}
             >
               {"$" +
-                calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj).tax}
+                calculateTaxes(sTotalPrice, zOpenWorkorderObj, zSettingsObj)
+                  .tax}
             </Text>
           </Text>
           <View
@@ -414,11 +417,11 @@ export const Items_WorkorderItemsTab = ({}) => {
               }}
             >
               {"$" +
-                calculateTaxes(sTotalPrice, zWorkorderObj, zSettingsObj)
+                calculateTaxes(sTotalPrice, zOpenWorkorderObj, zSettingsObj)
                   .totalAmount}
             </Text>
           </Text>
-          {!zWorkorderObj?.isStandaloneSale ? (
+          {!zOpenWorkorderObj?.isStandaloneSale ? (
             <Button_
               textStyle={{ fontSize: 16 }}
               icon={ICONS.shoppingCart}

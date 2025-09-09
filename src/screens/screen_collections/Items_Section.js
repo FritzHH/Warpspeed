@@ -19,7 +19,7 @@ import {
   useOpenWorkordersStore,
   useCustomerSearchStore,
   useTabNamesStore,
-  useWorkorderPreviewStore
+  useWorkorderPreviewStore,
 } from "../../stores";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 
@@ -33,7 +33,9 @@ export function Items_Section({}) {
   );
 
   let zWorkorderObj = WORKORDER_PROTO;
-  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
+  zWorkorderObj = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
+  );
   const zCustomerSearchArr = useCustomerSearchStore((state) =>
     state.getSearchResultsArr()
   );
@@ -80,21 +82,21 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
       style={{
         flexDirection: "row",
         width: "100%",
-        justifyContent: "space-between"
+        justifyContent: "space-between",
         // backgroundColor: "green",
         // height: 50,
       }}
     >
       <View
         style={{
-          flexDirection: "row"
+          flexDirection: "row",
         }}
       >
         {zWorkorderObj?.id ? (
           <View>
             <TabMenuButton
               buttonStyle={{
-                borderTopLeftRadius: 15
+                borderTopLeftRadius: 15,
               }}
               onPress={() =>
                 _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)
@@ -126,13 +128,13 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
 
       <View
         style={{
-          flexDirection: "row"
+          flexDirection: "row",
           // paddingRight: 10,
         }}
       >
         <TabMenuButton
           buttonStyle={{
-            borderTopRightRadius: 15
+            borderTopRightRadius: 15,
           }}
           onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.dashboard)}
           text={TAB_NAMES.itemsTab.dashboard}

@@ -19,20 +19,20 @@ import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
 import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
-import { dbSetOpenWorkorderItem } from "../../../db_call_wrapper";
+import { dbSetWorkorder } from "../../../db_call_wrapper";
 
 /// Notes Tab Component
 export function Notes_MainComponent() {
   // setters /////////////////////////////////////////////////////////////////////
   const _zSetWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
+    (state) => state.setWorkorder
   );
   const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
   const _zExecute = useLoginStore((state) => state.execute);
 
   // getters /////////////////////////////////////////////////////////////////////
   const zWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getWorkorderObj()
+    state.getOpenWorkorderObj()
   );
 
   /////////////////////////////////////////////////////////////////////////////////
@@ -73,7 +73,7 @@ export function Notes_MainComponent() {
 
     _setFocusIdx(0);
     _zSetWorkorderObj(wo);
-    dbSetOpenWorkorderItem(wo);
+    // ''(wo);
   }
 
   function deleteItem(item, index, option) {
@@ -91,7 +91,7 @@ export function Notes_MainComponent() {
       newObj.internalNotes = arr;
     }
     _zSetWorkorderObj(newObj);
-    dbSetOpenWorkorderItem(newObj);
+    // ''(newObj);
   }
 
   function textChanged(value, index, option) {
@@ -112,7 +112,7 @@ export function Notes_MainComponent() {
       wo.internalNotes = item;
     }
     _zSetWorkorderObj(wo);
-    dbSetOpenWorkorderItem(wo);
+    // ''(wo);
   }
 
   const handleCustomerContentSizeChange = (event, index) => {

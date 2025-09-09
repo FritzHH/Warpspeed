@@ -334,6 +334,7 @@ export const MENU_BUTTON_PROTO = {
   type: "",
   name: "",
   items: [],
+  buttons: [],
 };
 
 // Objects with initial data /////////////////////////////////////////
@@ -370,25 +371,38 @@ export const SETTINGS_OBJ = {
     {
       id: "38trrneg",
       name: "Tune-Up",
-      type: "Menu",
       items: [],
+      buttons: [],
     },
-    { id: "38trrdfdneg", name: "Tube", type: "Sub-menu", items: [] },
-    { id: "38trrsdfneg", name: "Tire", type: "Sub-menu", items: [] },
-    { id: "38trdfdrneg", name: "Tube & Tire", type: "Menu", items: [] },
-    { id: "38trdfadrneg", name: "Brakes", type: "Menu", items: [] },
-    { id: "38tradfdrneg", name: "Cable", type: "Menu", items: [] },
-    { id: "38trrnebfdgdg", name: "Shifting", type: "Menu", items: [] },
-    { id: "38trrnadfvceg", name: "Drivetrain", type: "Menu", items: [] },
-
-    { id: "38trsadgdvdrneg", name: "Spoke", type: "Menu", items: [] },
-    { id: "38trerfedgbdrneg", name: "Cleaning", type: "Menu", items: [] },
-    { id: "38trrfrdggdneg", name: "Scooter", type: "Menu", items: [] },
-    { id: "bnfdeqw", name: "Pickup/Delivery", type: "Menu", items: [] },
-    { id: "34trhrg", name: "Diagnostics", type: "Menu", items: [] },
-    { id: "labor", name: "$Labor", type: "Menu", items: [] },
-
-    { id: "part", name: "$Part", type: "Menu", items: [] },
+    {
+      id: "38trrdfdneg",
+      name: "Tube",
+      items: ["3Rh6JaP75v1esbywt18E", "9xCMXA89wZeAt1IBfLoU"],
+      buttons: ["38tradfdrneg"],
+    },
+    { id: "38trrsdfneg", name: "Tire", items: [], buttons: [] },
+    { id: "38trdfdrneg", name: "Tube & Tire", items: [], buttons: [] },
+    { id: "38trdfadrneg", name: "Brakes", items: [], buttons: [] },
+    {
+      id: "38tradfdrneg",
+      name: "Cable",
+      items: ["Rcr7QgWyNPapdoYVuS7P", "9xCMXA89wZeAt1IBfLoU"],
+      buttons: ["38trrnebfdgdg"],
+    },
+    {
+      id: "38trrnebfdgdg",
+      name: "Shifting",
+      items: ["iBFklersI6UmzR8x1ADn", "Rcr7QgWyNPapdoYVuS7P"],
+      buttons: [],
+    },
+    { id: "38trrnadfvceg", name: "Drivetrain", items: [], buttons: [] },
+    { id: "38trsadgdvdrneg", name: "Spoke", items: [], buttons: [] },
+    { id: "38trerfedgbdrneg", name: "Cleaning", items: [], buttons: [] },
+    { id: "38trrfrdggdneg", name: "Scooter", items: [], buttons: [] },
+    { id: "bnfdeqw", name: "Pickup/Delivery", items: [], buttons: [] },
+    { id: "34trhrg", name: "Diagnostics", items: [], buttons: [] },
+    { id: "labor", name: "$Labor", items: [], buttons: [] },
+    { id: "part", name: "$Part", items: [], buttons: [] },
   ],
   // colors:
   bikeBrands: ["Trek", "Specialized", "Sun", "Marin", "Cannondale", "Jamis"],

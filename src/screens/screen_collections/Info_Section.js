@@ -19,7 +19,7 @@ export const Info_Section = ({}) => {
   // store getters
   const zInfoTabName = useTabNamesStore((state) => state.getInfoTabName());
   const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getWorkorderObj()
+    state.getOpenWorkorderObj()
   );
 
   function ScreenComponent(tabName) {

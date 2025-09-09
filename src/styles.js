@@ -51,9 +51,10 @@ export const C = {
 };
 
 export const COLOR_GRADIENTS = {
-  green: ["rgb(71,185,119)", C.green],
+  green: ["rgb(71,185,119)", lightenRGBByPercent(C.green, 20)],
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
   blue: [lightenRGBByPercent(C.blue, 20), C.blue],
+  lightBlue: [lightenRGBByPercent(C.blue, 60), lightenRGBByPercent(C.blue, 45)],
 };
 
 const ASSETS_PATH = "./assets/";

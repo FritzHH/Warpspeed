@@ -256,7 +256,7 @@ export function NewWorkorderComponent({}) {
 
     _zSetCurrentCustomer(newCustomerObj);
     // dbSetCustomerObj(newCustomerObj);
-    // dbSetOpenWorkorderItem(newWorkorder);
+    // ''(newWorkorder);
     _zSetNewWorkorderInArr(newWorkorder, "add");
     _zSetOpenWorkorder(newWorkorder);
     // _zResetSearch();

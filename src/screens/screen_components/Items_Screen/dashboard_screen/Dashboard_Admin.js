@@ -957,15 +957,16 @@ const AppUserListComponent = ({
                         <DropdownMenu
                           enabled={editable}
                           ref={userListItemRefs.current[idx]}
-                          dataArr={
-                            editable ? PERMISSION_LEVELS.map((o) => o.name) : []
-                          }
+                          dataArr={Object.values(PERMISSION_LEVELS).map(
+                            (o) => o.name
+                          )}
                           onSelect={(item) => {
                             if (!editable) return;
-                            let perm = PERMISSION_LEVELS.find(
-                              (o) => o.name == item
+                            let perm = Object.values(PERMISSION_LEVELS).find(
+                              (o) => o.name === item
                             );
                             userObj.permissions = perm;
+                            // clog(userObj);
                             commitUserInfoChange(userObj);
                           }}
                           buttonStyle={{

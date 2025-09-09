@@ -14,10 +14,10 @@ import { cloneDeep } from "lodash";
 import {
   batchDBCall,
   dbSetPunchClockArr,
-  dbSetOpenWorkorderItem,
   dbSetOrUpdateUserPunchObj,
   dbSetSettings,
   dbSetInventoryItem,
+  dbSetWorkorder,
 } from "./db_call_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
@@ -483,23 +483,30 @@ export const useCurrentCustomerStore = create((set, get) => ({
 export const useInventoryStore = create((set, get) => ({
   inventoryArr: [],
   getInventoryArr: () => get().inventoryArr,
-  modItem: (item, option) => {
-    if (option === "change")
-      return set((state) => ({
-        inventoryArr: changeItem(get().inventoryArr, item),
-      }));
-    if (option === "add")
-      return set((state) => ({
-        inventoryArr: addItem(get().inventoryArr, item),
-      }));
-    if (option === "remove")
-      return set((state) => ({
-        inventoryArr: removeItem(get().inventoryArr, item),
-      }));
-  },
+  // modItem: (item, option) => {
+  //   if (option === "change")
+  //     return set((state) => ({
+  //       inventoryArr: changeItem(get().inventoryArr, item),
+  //     }));
+  //   if (option === "add")
+  //     return set((state) => ({
+  //       inventoryArr: addItem(get().inventoryArr, item),
+  //     }));
+  //   if (option === "remove")
+  //     return set((state) => ({
+  //       inventoryArr: removeItem(get().inventoryArr, item),
+  //     }));
+  // },
 
-  removeItem: (item, batch = true, sendToDB = true) => {},
-  setItem: ({ item, batch = true, sendToDB = true }) => {
+  removeItem: (item, sendToDB = true, batch = true) => {
+    let inventoryArr = cloneDeep(get().inventoryArr);
+    let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
+    inventoryArr = inventoryArr.filter((o) => o.id === item.id);
+    set({ inventoryArr });
+
+    if (sendToDB) dbSetInventoryItem(item, batch, true);
+  },
+  setItem: (item, sendToDB = true, batch = true) => {
     // clog("item", item);
     let inventoryArr = cloneDeep(get().inventoryArr);
     let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
@@ -517,43 +524,54 @@ export const useInventoryStore = create((set, get) => ({
 export const useOpenWorkordersStore = create((set, get) => ({
   workorderArr: [],
   openWorkorderObj: null,
+  openWorkorderObj: null,
 
-  getOpenWorkorderIdx: () => get().openWorkorderIdx,
-  getWorkorderObj: () => get().openWorkorderObj,
+  // getOpenWorkorderObj: () => {
+  //   let openWorkorderID = get().openWorkorderObjID;
+  //   let arr = get().workorderArr;
+  //   let openWorkorderObj = arr.find((o) => o.id === openWorkorderID);
+  //   // clog("wo", openWorkorderObj);
+  //   return openWorkorderObj;
+  // },
+  getOpenWorkorderObj: () => get().openWorkorderObj,
   getWorkorderArr: () => get().workorderArr,
 
-  setWorkorderObj: (wo, saveToDB = true) => {
-    // clog("setting", wo);
-    if (wo == null) {
-      set((state) => ({ openWorkorderObj: null }));
-      return;
-    }
+  // setters
+  setOpenWorkorderObj: (openWorkorderObj) => {
+    set({ openWorkorderObj });
+  },
 
-    if (wo.isStandaloneSale) {
-      set((state) => ({ openWorkorderObj: wo }));
-      return;
-    }
-
-    let openWorkorderIdx = get().workorderArr.findIndex((o) => o.id == wo?.id);
+  setWorkorder: (wo, saveToDB = true, batch = true) => {
     let workorderArr = cloneDeep(get().workorderArr);
-    if (openWorkorderIdx >= 0) {
-      // log("here 1");
-      workorderArr[openWorkorderIdx] = wo;
-      if (saveToDB && !wo.isStandaloneSale) dbSetOpenWorkorderItem(wo);
+    let foundWOIdx = workorderArr.findIndex((o) => o.id === wo.id) >= 0;
+    if (foundWOIdx) {
+      workorderArr[foundWOIdx] = wo;
     } else {
       workorderArr.push(wo);
     }
+    set({ workorderArr });
 
-    set((state) => ({
-      workorderArr,
-      openWorkorderObj: wo,
-    }));
+    if (get().openWorkorderObj?.id === wo.id) set({ openWorkorderObj: wo });
+
+    if (saveToDB) {
+      dbSetWorkorder(wo, batch, false);
+    } // need db fun
   },
+
+  removeWorkorder: (wo, saveToDB = true, batch = true) => {
+    let workorderArr = cloneDeep(get().workorderArr);
+    workorderArr = workorderArr.filter((o) => o.id != wo.id);
+    set({ workorderArr });
+
+    if (get().openWorkorderObj?.id === wo.id) set({ openWorkorderObj: null });
+
+    if (saveToDB) {
+      dbSetWorkorder(wo, batch, true);
+    }
+  },
+
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
 
-  testIncoming: (val) => {
-    log("incoming open workorders zustand", val);
-  },
   // handles live DB subscription changes
   modItem: (item, option) => {
     // log(item, option);

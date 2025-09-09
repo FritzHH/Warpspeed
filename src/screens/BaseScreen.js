@@ -1,25 +1,10 @@
 /* eslint-disable */
 
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableWithoutFeedback,
-} from "react-native-web";
+import { View } from "react-native-web";
 import { Button } from "react-native-web";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
 
-import {
-  clog,
-  dim,
-  formatDateTimeForReceipt,
-  generateBarcode,
-  generateRandomID,
-  log,
-  searchPhoneNum,
-  useInterval,
-} from "../utils";
 import {
   AlertBox_,
   LoginScreenModalComponent,
@@ -29,53 +14,24 @@ import { Info_Section } from "./screen_collections/Info_Section";
 import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
+
+import { subscribeToDBNodeChanges } from "../db_subscription_wrapper";
 import {
-  get_firestore_field,
-  get_firestore_field2,
-  getRealtimeNodeItem,
-  searchCollection,
-  set_firestore_field,
-  set_firestore_field2,
-  subscribeToFirestorePath,
-} from "../db";
-import {
-  fillSettings,
-  fillPrinterNames,
-  fillPunchHistory,
-  fillReceipt,
-  fillInventory,
-} from "../testing";
-import {
-  customerPreviewListSubscribe,
-  inventorySubscribe,
-  openWorkordersSubscribe,
-  punchClockSubscribe,
-  settingsSubscribe,
-  subscribeToDBNodeChanges,
-} from "../db_subscription_wrapper";
-import {
-  useCustomerPreviewStore,
   useInventoryStore,
   useOpenWorkordersStore,
   useSettingsStore,
-  useActionStore,
   useLoginStore,
   useDatabaseBatchStore,
 } from "../stores";
-import {
-  dbGetSettings,
-  dbSearchForPhoneNumber,
-  executeDBBatch,
-} from "../db_call_wrapper";
+import { executeDBBatch } from "../db_call_wrapper";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
-import {
-  DB_BATCH_INTERVAL_MILLIS,
-  REALTIME_DATABASE_NODE_NAMES,
-} from "../constants";
+import { DB_BATCH_INTERVAL_MILLIS } from "../constants";
+import { fillSettings } from "../testing";
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
   const _zSetInventoryItem = useInventoryStore((state) => state.setItem);
+  const _zRemoveInventoryItem = useInventoryStore((state) => state.removeItem);
   const _zSetSettingsItem = useSettingsStore((state) => state.setField);
   const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
   const _zSetLastActionMillis = useLoginStore(
@@ -92,7 +48,12 @@ export function BaseScreen() {
   const _zSetLastDatabaseWriteMillis = useDatabaseBatchStore(
     (state) => state.setLastWriteMillis
   );
-  const _zTestIncoming = useOpenWorkordersStore((state) => state.testIncoming);
+  const _zSetWorkorderObj = useOpenWorkordersStore(
+    (state) => state.setWorkorder
+  );
+  const _zRemoveWorkorderObj = useOpenWorkordersStore(
+    (state) => state.removeWorkorder
+  );
   // testing
   // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
@@ -143,11 +104,33 @@ export function BaseScreen() {
       addCallback: (key, val) => {
         _zSetPunchClockItem(val, "add");
       },
-      // changeCallback: (key, val) => {
-      //   _zSetPunchClockItem(val, "change");
-      // },
       removeCallback: (key, val) => {
         _zSetPunchClockItem(val, "remove");
+      },
+    });
+
+    subscribeToDBNodeChanges({
+      option: "open workorders",
+      addCallback: (key, val) => {
+        _zSetWorkorderObj(val, false);
+      },
+      removeCallback: (key, val) => {
+        _zRemoveWorkorderObj(val, false);
+      },
+      changeCallback: (key, val) => {
+        _zSetWorkorderObj(val, false);
+      },
+    });
+    subscribeToDBNodeChanges({
+      option: "inventory",
+      addCallback: (key, val) => {
+        _zSetInventoryItem(val, false);
+      },
+      removeCallback: (key, val) => {
+        _zRemoveInventoryItem(val, false);
+      },
+      changeCallback: (key, val) => {
+        _zSetInventoryItem(val, false);
       },
     });
   }, []);

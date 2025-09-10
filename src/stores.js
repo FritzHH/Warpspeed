@@ -497,6 +497,7 @@ export const useCustomerPreviewStore = create((set, get) => ({
   },
 }));
 
+// TODODODO gotta update to the new database call format
 export const useCurrentCustomerStore = create((set, get) => ({
   customerObj: { ...CUSTOMER_PROTO },
   getCustomerObj: () => get().customerObj,

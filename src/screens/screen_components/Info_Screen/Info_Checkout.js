@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { FlatList, View, Text, TextInput } from "react-native-web";
-import { TAB_NAMES, WORKORDER_PROTO } from "../../../data";
+import { PAYMENT_OBJECT, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import {
   useCheckoutStore,
   useInventoryStore,
@@ -192,10 +192,13 @@ export const CheckoutComponent = ({}) => {
     return workorders;
   }
 
-  const handlePaymentSuccess = async (paymentObj) => {
+  const handlePaymentSuccess = async (payment) => {
     log("incoming payment success obj in Checkout Component", paymentObj);
-    let cardSale = paymentObj.last4;
+    let paymentObj = cloneDeep(PAYMENT_OBJECT);
+    paymentObj.last4 = payment.last4;
+
     let paymentsArr = cloneDeep(zPaymentsArr);
+
     paymentsArr.push(paymentObj);
 
     let totalCaptured = 0;
@@ -217,7 +220,7 @@ export const CheckoutComponent = ({}) => {
       log("Payment complete!");
     }
 
-    _setCashChangeNeeded(changeNeeded);
+    let saleObj = _setCashChangeNeeded(changeNeeded);
     _setTotalAmountCaptured(totalCaptured);
     _zSetPaymentArr(paymentsArr);
   };

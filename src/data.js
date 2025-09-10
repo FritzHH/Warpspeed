@@ -240,6 +240,22 @@ export const DISCOUNT_OBJ_PROTO = {
   discountType: "",
 };
 
+export const PAYMENT_OBJECT = {
+  totalAmount: "",
+  last4: "",
+  saleID: "",
+  customerFirst: "",
+  customerLast: "",
+  customerID: "",
+  numberOfItems: 0,
+  cash: false,
+  check: false,
+  cardType: "",
+  cardIssuer: "",
+  workordersAttached: [],
+  millis: "",
+};
+
 export const WORKORDER_PROTO = {
   isStandaloneSale: false,
   id: "",

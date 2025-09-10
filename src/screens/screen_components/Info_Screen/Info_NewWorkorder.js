@@ -229,7 +229,7 @@ export function NewWorkorderComponent({}) {
 
     _zSetOpenWorkorder(wo, false);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
-    _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
+    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 

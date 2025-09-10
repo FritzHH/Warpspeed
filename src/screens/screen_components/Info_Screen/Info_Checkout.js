@@ -34,7 +34,7 @@ import {
   trimToTwoDecimals,
 } from "../../../utils";
 import { useEffect, useState } from "react";
-import { Colors, ICONS } from "../../../styles";
+import { COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import { sendFCMMessage } from "../../../db";
 import {
   dbProcessServerDrivenStripePayment,
@@ -369,25 +369,30 @@ export const CheckoutComponent = ({}) => {
               justifyContent: "space-evenly",
             }}
           >
-            <Button
+            <Button_
               textStyle={{ color: "white" }}
+              icon={ICONS.cashBag}
+              colorGradientArr={COLOR_GRADIENTS.green}
               buttonStyle={{
-                width: 150,
+                width: 190,
                 height: 40,
-                backgroundColor: Colors.tabMenuButton,
-                borderRadius: 0,
+
+                // backgroundColor: Colors.tabMenuButton,
+                // borderRadius: 0,
               }}
               visible={!sPaymentComplete}
               text={"Cash / Check"}
               onPress={() => _sSetShowCashSaleModal(true)}
             />
-            <Button
+            <Button_
+              colorGradientArr={COLOR_GRADIENTS.green}
               textStyle={{ color: "white" }}
+              icon={ICONS.creditCard}
               buttonStyle={{
-                width: 150,
+                width: 140,
                 height: 40,
-                backgroundColor: Colors.tabMenuButton,
-                borderRadius: 0,
+                // backgroundColor: Colors.tabMenuButton,
+                // borderRadius: 0,
               }}
               visible={!sPaymentComplete}
               text={"Card"}

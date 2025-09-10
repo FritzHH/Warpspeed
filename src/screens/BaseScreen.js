@@ -30,6 +30,7 @@ import { fillSettings } from "../testing";
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
+
   const _zSetInventoryItem = useInventoryStore((state) => state.setItem);
   const _zRemoveInventoryItem = useInventoryStore((state) => state.removeItem);
   const _zSetSettingsItem = useSettingsStore((state) => state.setField);

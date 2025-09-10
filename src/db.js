@@ -573,6 +573,10 @@ export function cancelServerDrivenStripePayment(readerID, paymentIntentID) {
     });
 }
 
+// export function retrieveAvailableStripeReaders(readerID) {
+//   const functions = getFunctions(firebaseApp);
+// }
+
 export function retrieveAvailableStripeReaders(readerID) {
   return fetch(STRIPE_SERVER_DRIVEN_GET_AVAIALABLE_STRIPE_READERS_URL, {
     method: "POST",

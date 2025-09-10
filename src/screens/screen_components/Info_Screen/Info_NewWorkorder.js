@@ -13,6 +13,7 @@ import {
   removeDashesFromPhone,
   searchCustomerNames,
   searchPhoneNum,
+  showAlert,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -68,7 +69,7 @@ export function NewWorkorderComponent({}) {
     (state) => state.modItem
   );
   const _zSetOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
+    (state) => state.setWorkorder
   );
   const _zSetCurrentCustomer = useCurrentCustomerStore(
     (state) => state.setCustomerObj
@@ -83,7 +84,7 @@ export function NewWorkorderComponent({}) {
     state.getCustPreviewArr()
   );
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUserObj());
+  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
   const zSearchResults = useCustomerSearchStore((state) =>
     state.getSearchResultsArr()
   );
@@ -210,10 +211,20 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleStartStandaloneSalePress() {
+    // log(zCurrentUserObj);
+    // return;
+    if (!zCurrentUserObj) {
+      showAlert({
+        message: "No user logged in. Please log in and try again",
+      });
+      log("no user logged in yet");
+      return;
+    }
+
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateRandomID();
-    wo.startedBy = zCurrentUser.id;
+    wo.startedBy = zCurrentUserObj.id;
     wo.startedOnMillis = new Date().getTime();
 
     _zSetOpenWorkorder(wo, false);
@@ -248,10 +259,10 @@ export function NewWorkorderComponent({}) {
     newWorkorder.customerPhone =
       sCustomerInfoObj.cell || sCustomerInfoObj.landline;
     newWorkorder.customerID = sCustomerInfoObj.id;
-    newWorkorder.startedBy = zCurrentUser.first;
+    newWorkorder.startedBy = zCurrentUserObj.first;
     newWorkorder.status = "Service";
     newWorkorder.changeLog.push(
-      "Started by: " + zCurrentUser.first + " " + zCurrentUser.last
+      "Started by: " + zCurrentUserObj.first + " " + zCurrentUserObj.last
     );
 
     _zSetCurrentCustomer(newCustomerObj);

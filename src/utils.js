@@ -6,6 +6,7 @@ import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
+import { useAlertScreenStore } from "./stores";
 
 // const fs = require("node:fs");
 export const dim = {
@@ -864,4 +865,46 @@ export function lightenRGB(r, g, b, amount) {
   b = Math.min(255, b + amount);
 
   return { r, g, b };
+}
+
+export function showAlert({
+  title,
+  message,
+  subMessage,
+  btn1Text,
+  btn2Text,
+  btn3Text,
+  btn1Icon,
+  btn2Icon,
+  btn3Icon,
+  icon1Size,
+  icon2Size,
+  icon3Size,
+  handleBtn1Press = () => {},
+  handleBtn2Press,
+  handleBtn3Press,
+  canExitOnOuterClick,
+  alertBoxStyle,
+  showAlert = true,
+}) {
+  useAlertScreenStore.setState({
+    title,
+    message,
+    subMessage,
+    btn1Text,
+    btn2Text,
+    btn3Text,
+    btn1Icon,
+    btn2Icon,
+    btn3Icon,
+    icon1Size,
+    icon2Size,
+    icon3Size,
+    handleBtn1Press,
+    handleBtn2Press,
+    handleBtn3Press,
+    canExitOnOuterClick,
+    alertBoxStyle,
+    showAlert,
+  });
 }

@@ -30,6 +30,7 @@ import {
   clog,
   generateRandomID,
   log,
+  showAlert,
   trimToTwoDecimals,
 } from "../../../utils";
 import { useEffect, useState } from "react";
@@ -43,7 +44,7 @@ import {
 export const CheckoutComponent = ({}) => {
   // store setters
   const _zSetOpenWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
+    (state) => state.setOpenWorkorderObj
   );
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
@@ -64,8 +65,10 @@ export const CheckoutComponent = ({}) => {
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
 
   // store getters
-  let zWorkorderObj = WORKORDER_PROTO;
-  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
+  let zOpenWorkorderObj = WORKORDER_PROTO;
+  zOpenWorkorderObj = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
+  );
   // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
   const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
     state.getWorkorderArr()
@@ -83,9 +86,8 @@ export const CheckoutComponent = ({}) => {
   //////////////////////////////////////////////////////////////////////
   const [sHasOtherOpenWorkorders, _sSetHasOtherOpenworkorders] = useState(null);
   const [sTotalsObj, _sSetTotalsObj] = useState({
-    runningQty: "0.00",
-    runningTotal: "0.00",
-    runningDiscount: "0.00",
+    total: 0,
+    discount: 0,
   });
   const [sTotalAmountCaptured, _setTotalAmountCaptured] = useState(0);
   const [sPaymentComplete, _setPaymentComplete] = useState(false);
@@ -127,18 +129,18 @@ export const CheckoutComponent = ({}) => {
   // TODO need to add in combined workorders after completed the next effect
   useEffect(() => {
     // log("z", zWorkorderObj);
-    if (!zWorkorderObj?.workorderLines) return;
+    if (!zOpenWorkorderObj?.workorderLines) return;
     const { runningQty, runningTotal, runningDiscount } =
-      calculateRunningTotals(zWorkorderObj, zInventoryArr);
-    _sSetTotalsObj({ runningQty, runningTotal, runningDiscount });
-  }, [zWorkorderObj]);
+      calculateRunningTotals(zOpenWorkorderObj, zInventoryArr);
+    _sSetTotalsObj({ total: runningTotal, discount: runningDiscount });
+  }, [zOpenWorkorderObj]);
 
   // TODO check for other open workorders and add them in a checklist to combine
   useEffect(() => {
-    if (!zWorkorderObj || zWorkorderObj.isStandaloneSale) return;
+    if (!zOpenWorkorderObj || zOpenWorkorderObj.isStandaloneSale) return;
 
     let otherWorkorders = zOpenWorkordersArr.find(
-      (o) => o.customerID == zWorkorderObj.customerID
+      (o) => o.customerID == zOpenWorkorderObj.customerID
     );
     // log("others", otherWorkorders);
   }, []);
@@ -146,17 +148,43 @@ export const CheckoutComponent = ({}) => {
   // server find all available stripe readers
   async function getAllAvailableStripeReaders() {
     let readers = await dbRetrieveAvailableStripeReaders();
-    _zSetReadersArr(readers.data);
-    _zSetReader(readers.data[0]); // dev
+
+    if (!readers) {
+      log("no Stripe card readers returned");
+      showAlert({
+        message:
+          "There are no Stripe card readers connected to account. Please check your settings.",
+      });
+      return;
+    }
+
     log("connected card readers", readers.data);
+    _zSetReadersArr(readers?.data);
+    let selectedCardReader = zSettingsObj.selectedCardReaderObj;
+    let found = readers.data.find(
+      (reader) => reader.id === selectedCardReader.id
+    );
+    // log("found", found);
+    if (!found || found.status !== "online") {
+      showAlert({
+        message:
+          "Your selected reader in Settings:   " +
+          selectedCardReader.label +
+          "    is currently offline, but connected.\n\nPlease power up device, connect to the network and try again.",
+      });
+      return;
+    }
+
+    _zSetReader(readers.data[0]); // todo
+    //todo the reader will return as connected but the status is "offline", handle this
   }
 
   function getAllCustomerOpenWorkorders() {
     let workorders = [];
     zOpenWorkordersArr.forEach((openWO) => {
       if (
-        openWO?.customerID == zWorkorderObj?.customerID &&
-        openWO.id != zWorkorderObj?.id
+        openWO?.customerID == zOpenWorkorderObj?.customerID &&
+        openWO.id != zOpenWorkorderObj?.id
       )
         workorders.push(openWO);
     });
@@ -212,7 +240,7 @@ export const CheckoutComponent = ({}) => {
 
   function actionButtonPressed() {
     // _zSetIsCheckingOut(!zIsCheckingOut);
-    if (zWorkorderObj?.isStandaloneSale) {
+    if (zOpenWorkorderObj?.isStandaloneSale) {
       _zSetOpenWorkorderObj(null);
       _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders);
       _zSetInfoTabName(TAB_NAMES.infoTab.customer);
@@ -220,12 +248,12 @@ export const CheckoutComponent = ({}) => {
       return;
     }
 
-    let wo = cloneDeep(WORKORDER_PROTO);
-    wo.isStandaloneSale = true;
-    wo.id = generateRandomID();
-    _zSetOpenWorkorderObj(wo);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    // let wo = cloneDeep(WORKORDER_PROTO);
+    // wo.isStandaloneSale = true;
+    // wo.id = generateRandomID();
+    // _zSetOpenWorkorderObj(wo);
+    // _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    // _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
 
   function setComponent() {
@@ -254,7 +282,7 @@ export const CheckoutComponent = ({}) => {
                     _zSetIsRefund(false);
                   }}
                   isRefund={zIsRefund}
-                  totalAmount={zTotalAmount}
+                  totalAmount={sTotalsObj.total - sTotalsObj.discount}
                   splitPayment={zSplitPayment}
                   onComplete={handlePaymentSuccess}
                   paymentsArr={zPaymentsArr}
@@ -263,7 +291,7 @@ export const CheckoutComponent = ({}) => {
             return (
               <CashSaleModalComponent
                 onCancel={() => _sSetShowCashSaleModal(false)}
-                totalAmount={zTotalAmount}
+                totalAmount={sTotalsObj.total - sTotalsObj.discount}
                 onComplete={handlePaymentSuccess}
                 isRefund={zIsRefund}
                 splitPayment={zSplitPayment}

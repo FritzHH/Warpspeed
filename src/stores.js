@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import {
   CUSTOMER_PROTO,
+  FRITZ_USER_OBJ,
   INVENTORY_ITEM_PROTO,
   PRIVILEDGE_LEVELS,
   TAB_NAMES,
@@ -128,6 +129,27 @@ export const useCheckoutStore = create((set, get) => ({
   },
 }));
 
+export const ALERT_SCREEN_PROTO = {
+  showAlert: true,
+  title: "Alert",
+  message: "",
+  alertBoxStyle: {},
+  subMessage: "",
+  btn1Text: "",
+  btn2Text: "",
+  btn3Text: "",
+  btn1Icon: null,
+  btn2Icon: null,
+  btn3Icon: null,
+  icon1Size: null,
+  icon2Size: null,
+  icon3Size: null,
+  handleBtn1Press: null,
+  handleBtn2Press: null,
+  handleBtn3Press: null,
+  canExitOnOuterClick: true,
+};
+
 export const useAlertScreenStore = create((set, get) => ({
   showAlert: false,
   title: "Alert",
@@ -185,6 +207,7 @@ export const useAlertScreenStore = create((set, get) => ({
     handleBtn3Press,
     canExitOnOuterClick = true,
     alertBoxStyle = {},
+    showAlert,
   }) => {
     set(() => ({
       title,
@@ -204,6 +227,7 @@ export const useAlertScreenStore = create((set, get) => ({
       handleBtn3Press,
       canExitOnOuterClick,
       alertBoxStyle,
+      showAlert,
     }));
   },
   setMessage: (message) => {
@@ -245,6 +269,7 @@ export const useAlertScreenStore = create((set, get) => ({
   setIcon2Size: (icon2Size) => {
     set(() => ({ icon2Size }));
   },
+  setShowAlert: (showAlert) => set({ showAlert }),
 
   resetAll: () => {
     set(() => ({
@@ -327,8 +352,8 @@ export const useLoginStore = create((set, get) => ({
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
-  // currentUserObj: { first: "Fritz", last: "Hieb", id: "1234" }, //testing
-  currentUserObj: null,
+  currentUserObj: cloneDeep(FRITZ_USER_OBJ), //testing
+  // currentUserObj: null,
   punchClockArr: [],
   modalVisible: false,
   lastActionMillis: 0,
@@ -526,13 +551,6 @@ export const useOpenWorkordersStore = create((set, get) => ({
   openWorkorderObj: null,
   openWorkorderObj: null,
 
-  // getOpenWorkorderObj: () => {
-  //   let openWorkorderID = get().openWorkorderObjID;
-  //   let arr = get().workorderArr;
-  //   let openWorkorderObj = arr.find((o) => o.id === openWorkorderID);
-  //   // clog("wo", openWorkorderObj);
-  //   return openWorkorderObj;
-  // },
   getOpenWorkorderObj: () => get().openWorkorderObj,
   getWorkorderArr: () => get().workorderArr,
 
@@ -542,6 +560,11 @@ export const useOpenWorkordersStore = create((set, get) => ({
   },
 
   setWorkorder: (wo, saveToDB = true, batch = true) => {
+    if (wo.isStandaloneSale) {
+      set({ openWorkorderObj: wo });
+      return;
+    }
+
     let workorderArr = cloneDeep(get().workorderArr);
     let foundWOIdx = workorderArr.findIndex((o) => o.id === wo.id) >= 0;
     if (foundWOIdx) {

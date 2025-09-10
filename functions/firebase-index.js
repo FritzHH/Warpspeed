@@ -5,6 +5,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const fs = require("fs");
 const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
+const functions = require("firebase-functions");
 const { defineSecret } = require("firebase-functions/params");
 const Stripe = require("stripe");
 const { isArray } = require("lodash");
@@ -123,6 +124,8 @@ function log(one, two) {
 exports.processServerDrivenStripePayment = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+
     log("Incoming process Stripe server-driven payment", req.body);
     let readerResult = await stripe.terminal.readers.retrieve(
       req.body.readerID
@@ -210,6 +213,8 @@ exports.processServerDrivenStripePayment = onRequest(
 exports.cancelServerDrivenStripePayment = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+
     log("Incoming cancel Stripe payment cancellation body", req.body);
     const readerResult = await stripe.terminal.readers.cancelAction(
       req.body.readerID
@@ -225,6 +230,8 @@ exports.cancelServerDrivenStripePayment = onRequest(
 exports.refundStripePayment = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+
     log("Incoming refund Stripe payment", req.body);
     const refund = await stripe.refunds.create({
       payment_intent: req.body.paymentIntentID,
@@ -234,12 +241,29 @@ exports.refundStripePayment = onRequest(
   }
 );
 
-exports.getAvailableStripeReaders = onRequest(
+// exports.getAvailableStripeReaders = functions.https.onCall(
+//   { secrets: [stripeSecretKey] },
+//   async (request) => {
+//     log("Incoming get available Stripe readers body", request);
+//     const readers = await stripe.terminal.readers.list({
+//       // limit: ,
+//     });
+//     log("available Stripe readers", readers);
+//     // functions
+//     return readers;
+//   }
+// );
+
+exports.getAvailableStripeReaders1 = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    // res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    // res.set("Access-Control-Allow-Headers", "Content-Type");
+
     log("Incoming get available Stripe readers body", req.body);
     const readers = await stripe.terminal.readers.list({
-      limit: 3,
+      // limit: ,
     });
     log("available Stripe readers", readers);
     sendSuccessfulResult(res, readers);
@@ -305,6 +329,8 @@ const sendTwilioMessage = (messageObj) => {
 };
 
 exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
+  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+
   let body = request.body;
   log("Incoming SMS body from APP", body);
 
@@ -316,6 +342,8 @@ exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
 });
 
 exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
+  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+
   let body = request.body;
   log("incoming sms body", body);
 
@@ -399,104 +427,3 @@ const sendUnsuccessfulResult = (response, body) =>
   response.status(500).send(JSON.stringify(body));
 
 ////////////////////////////////////////////////////////////////////////
-// client driven (old)
-// exports.createPaymentIntent = onRequest({ cors: true }, async (req, res) => {
-//   log("payment intent request body", req.body);
-//   let body = req.body;
-//   try {
-//     const paymentIntent = await stripe.paymentIntents.create({
-//       amount: Number(body.amount) * 100,
-//       payment_method_types: ["card_present", "card", "link"],
-//       capture_method: req.body.captureMethod || "automatic",
-//       currency: "usd",
-//     });
-//     res.status(200).send(paymentIntent);
-//   } catch (error) {
-//     log("stripe error", error.message);
-//     res.status(500).send({ error: error.message });
-//   }
-// });
-
-// exports.createRefund = onRequest({ cors: true }, async (req, res) => {
-//   log("creating refund");
-//   try {
-//     const refund = await stripe.refunds.create({
-//       payment_intent: req.body.paymentIntent,
-//       amount: Number(req.body.amount),
-//     });
-//     log("refund successful", refund);
-//     res.status(200).send(refund);
-//   } catch (e) {
-//     res.status(500).send({ error: e.message });
-//   }
-// });
-
-// exports.getActivePaymentIntents = onRequest(
-//   { cors: true },
-//   async (req, res) => {
-//     log("getting active payment intents");
-//     try {
-//       let paymentIntents = await stripe.paymentIntents.list();
-//       res.status(200).send(paymentIntents);
-//     } catch (error) {
-//       log("stripe error", error.message);
-//       res.status(500).send({ error: error.message });
-//     }
-//   }
-// );
-
-// exports.cancelCardReaderAction = onRequest({ cors: true }, async (req, res) => {
-//   try {
-//     res = await stripe.terminal.readers.cancelAction(req.body.reader);
-//     log("Result canceling card reader action", res);
-//     res.status(200).send("Server says finished canceling card reader action!");
-//   } catch (e) {
-//     log("Error canceling card reader action", e);
-//     res
-//       .status(500)
-//       .send("Server says error canceling card reader action: " + e.message);
-//   }
-// });
-
-// exports.cancelPaymentIntent = onRequest({ cors: true }, async (req, res) => {
-//   try {
-//     let intentList = req.body.intentList;
-//     if (intentList && isArray(intentList)) {
-//       log("canceling these payment intents from APP", intentList);
-//       intentList.forEach(async (intentSecret) => {
-//         await stripe.paymentIntents.cancel(intentSecret);
-//       });
-//     } else {
-//       log("getting all active payment intents to cancel");
-//       let paymentIntents = await stripe.paymentIntents.list();
-//       log("payment intents", paymentIntents);
-//       // paymentIntents = await paymentIntents;
-//       paymentIntents.data.forEach(async (intent) => {
-//         log("intent to cancel", intent.id);
-//         try {
-//           let res = await stripe.paymentIntents.cancel(intent.id);
-//           log("Result canceling payment intent", res);
-//         } catch (e) {
-//           log("Error canceling payment intent", e);
-//         }
-//       });
-//     }
-//     res.status(200).send("finished canceling intents");
-//   } catch (error) {
-//     log("stripe error", error.message);
-//     res.status(500).send({ error: error.message });
-//   }
-// });
-
-// exports.createStripeConnectionToken = onRequest(
-//   { cors: true },
-//   async (req, res) => {
-//     try {
-//       const connectionToken = await stripe.terminal.connectionTokens.create();
-//       res.status(200).send(connectionToken);
-//     } catch (e) {
-//       log("stripe error", error.message);
-//       res.status(500).send({ error: error.message });
-//     }
-//   }
-// );

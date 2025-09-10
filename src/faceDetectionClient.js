@@ -255,7 +255,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       // log("descriptor", detection.descriptor);
       return detection.descriptor;
     } else {
-      log("no face descriptor detection");
+      // log("no face descriptor detection");
       return null;
     }
   };

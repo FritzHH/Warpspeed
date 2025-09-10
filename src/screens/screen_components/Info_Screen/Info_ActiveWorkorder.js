@@ -60,9 +60,9 @@ export const ActiveWorkorderComponent = ({}) => {
     (state) => state.setOptionsTabName
   );
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  // const _zSetOpenWorkorderIdx = useOpenWorkordersStore(
-  //   (state) => state.setOpenWorkorderIdx
-  // );
+  const _zSetOpenWorkorderObj = useOpenWorkordersStore(
+    (state) => state.setOpenWorkorderObj
+  );
   const _zExecute = useLoginStore((state) => state.execute);
   const _zSetWorkorder = useOpenWorkordersStore(
     (state) => state.setWorkorderObj
@@ -142,16 +142,19 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleStartStandaloneSalePress() {
+    log(zCurrentUser);
+    return;
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateRandomID();
     wo.startedBy = zCurrentUser.id;
+    wo.startedOnMillis = new Date().getTime();
 
+    _zSetOpenWorkorderObj(wo, false);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
-
   function handleNewWorkorderPress() {
     null;
     _zSetCustomerObj(null);

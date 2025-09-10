@@ -23,4 +23,4 @@ export const STRIPE_SERVER_DRIVEN_CANCEL_PAYMENT_INTENT_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/cancelServerDrivenStripePayment";
 
 export const STRIPE_SERVER_DRIVEN_GET_AVAIALABLE_STRIPE_READERS_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/getAvailableStripeReaders";
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/getAvailableStripeReaders1";

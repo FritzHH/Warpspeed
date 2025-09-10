@@ -241,19 +241,34 @@ export const DISCOUNT_OBJ_PROTO = {
 };
 
 export const PAYMENT_OBJECT = {
-  totalAmount: "",
+  amountCaptured: 0,
+  amountTendered: 0,
   last4: "",
   saleID: "",
-  customerFirst: "",
-  customerLast: "",
-  customerID: "",
-  numberOfItems: 0,
   cash: false,
   check: false,
   cardType: "",
   cardIssuer: "",
-  workordersAttached: [],
   millis: "",
+  id: "",
+  customerID: "",
+  saleID: "",
+};
+
+// PAYMENT objects get their own node for increased cc searchability
+// store their id's in the SALE object's paymentObjectIDArr
+export const SALE_OBJECT = {
+  id: "",
+  workordersID: [],
+  inventoryItems: [],
+  customerFirst: "",
+  customerLast: "",
+  customerID: "",
+  totalAmount: 0,
+  totalDiscount: 0,
+  amountCaptured: 0,
+  millis: "",
+  paymentObjectIDArr: [],
 };
 
 export const WORKORDER_PROTO = {

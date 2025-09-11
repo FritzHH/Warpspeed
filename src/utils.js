@@ -80,49 +80,32 @@ export function applyLineItemDiscounts(wo, zInventoryArr) {
   return wo;
 }
 
-export function calculateRunningTotals(
-  workorderObj,
-  inventoryArr,
-  salesTaxRatePercent
-) {
-  let blankReturnObj = {
-    runningTotal: 0,
-    runningDiscount: 0,
-    runningQty: 0,
-  };
-  if (!(inventoryArr?.length > 0)) return { ...blankReturnObj };
-  // clog(inventoryArr);
+export function calculateRunningTotals(input, salesTaxRatePercent) {
   let runningTotal = 0;
   let runningDiscount = 0;
   let runningSubtotal = 0;
   let runningQty = 0;
-  let runningTax = 0;
-  // log("inv", workorderObj);
-  // log("items", workorderObj.workorderLines);
-  workorderObj.workorderLines?.forEach((line, idx) => {
-    let invItem = inventoryArr.find((o) => o.id == line.invItemID);
-    // clog("line", invItem);
+  clog("input", input);
+  if (!Array.isArray(input)) input = [input];
 
-    // clog(line);
-    if (!invItem) return { ...blankReturnObj };
-    let qty = line.qty;
-    let discountObj = line.discountObj;
-    // log("discount obj", discountObj);
-    let discountPrice = line.discountObj.newPrice;
-    let price = invItem.price;
-    let discountSavings = line.discountObj.savings;
-    // log("price", price);
-    runningSubtotal = runningSubtotal + Number(price) * qty;
-    if (discountPrice) {
-      runningTotal = runningTotal + Number(discountPrice);
-      runningDiscount = runningDiscount + Number(discountSavings);
-    } else {
-      runningTotal = runningTotal + Number(price) * qty;
-    }
-    runningQty += qty;
+  input.forEach((workorderObj) => {
+    workorderObj.workorderLines?.forEach((line, idx) => {
+      let qty = line.qty;
+      // clog("line", line.discountObj);
+      let discountPrice = line.discountObj.newPrice;
+      let discountSavings = line.discountObj.savings;
+      runningSubtotal =
+        runningSubtotal + Number(line.inventoryItem.price) * qty;
+      if (discountPrice) {
+        runningTotal = runningTotal + Number(discountPrice);
+        runningDiscount = runningDiscount + Number(discountSavings);
+      } else {
+        runningTotal = runningTotal + line.inventoryItem.price * qty;
+      }
+      runningQty += qty;
+    });
   });
-  // log(workorderObj);
-  // log("total", trimToTwoDecimals(runningDiscount));
+
   let obj = {
     runningTotal: roundToTwoDecimals(runningTotal),
     runningSubtotal: roundToTwoDecimals(runningSubtotal),
@@ -556,30 +539,86 @@ export function useInterval(callback, delay) {
   }, [delay]);
 }
 
-export function applyDiscountToWorkorderItem(workorderLineObj) {
+export function deepEqual(obj1, obj2) {
+  if (obj1 === obj2) return true;
+  if (
+    typeof obj1 !== "object" ||
+    obj1 === null ||
+    typeof obj2 !== "object" ||
+    obj2 === null
+  )
+    return false;
+
+  const stack = [[obj1, obj2]];
+
+  while (stack.length) {
+    const [a, b] = stack.pop();
+
+    if (a === b) continue;
+    if (
+      typeof a !== "object" ||
+      a === null ||
+      typeof b !== "object" ||
+      b === null
+    )
+      return false;
+
+    const keysA = Object.keys(a).sort();
+    const keysB = Object.keys(b).sort();
+
+    // Compare field names
+    if (keysA.length !== keysB.length) return false;
+    for (let i = 0; i < keysA.length; i++) {
+      if (keysA[i] !== keysB[i]) return false;
+    }
+
+    // Compare field values
+    for (let key of keysA) {
+      stack.push([a[key], b[key]]);
+    }
+  }
+  return true;
+}
+
+export function applyDiscountToWorkorderItem(
+  workorderLineObj,
+  returnAsDiscountObj
+) {
+  workorderLineObj = cloneDeep(workorderLineObj);
   let discountObj = workorderLineObj.discountObj;
+  if (!discountObj.value) return workorderLineObj;
+
   let newPrice;
   let savings;
 
   if (discountObj.type === DISCOUNT_TYPES.percent) {
     let multiplier = discountObj.value;
     multiplier = 1 - Number("." + multiplier);
-    newPrice = workorderLineObj.price * workorderLineObj.qty * multiplier;
-    savings = workorderLineObj.price * workorderLineObj.qty - newPrice;
+    newPrice =
+      workorderLineObj.inventoryItem.price * workorderLineObj.qty * multiplier;
+    savings =
+      workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
     // log("newprice", trimToTwoDecimals(newPrice));
     // log("savings", savings);
   } else {
     newPrice =
-      workorderLineObj.price * workorderLineObj.qty -
+      workorderLineObj.inventoryItem.price * workorderLineObj.qty -
       workorderLineObj.qty * discountObj.value;
-    savings = workorderLineObj.price * workorderLineObj.qty - newPrice;
+    savings =
+      workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
   }
   // log("newprice", newPrice);
-  return {
+  let newDiscountObj = {
     ...discountObj,
-    newPrice: Number(trimToTwoDecimals(newPrice)),
-    savings: Number(trimToTwoDecimals(savings)),
+    newPrice: roundToTwoDecimals(newPrice),
+    savings: roundToTwoDecimals(savings),
   };
+
+  if (returnAsDiscountObj) {
+    return newDiscountObj;
+  }
+  workorderLineObj.discountObj = newDiscountObj;
+  return workorderLineObj;
 }
 
 export function insertOpacityIntoRGBString(rgbString, opacity) {

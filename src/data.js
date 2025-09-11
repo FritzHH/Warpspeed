@@ -274,6 +274,7 @@ export const WORKORDER_PROTO = {
   customerFirst: "",
   customerLast: "",
   customerPhone: "",
+  model: "",
   brand: "",
   description: "",
   color1: {

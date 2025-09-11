@@ -6,6 +6,8 @@ import {
   calculateRunningTotals,
   calculateTaxes,
   clog,
+  deepEqual,
+  formatNumberForCurrencyDisplay,
   generateRandomID,
   generateUPCBarcode,
   lightenRGBByPercent,
@@ -51,6 +53,7 @@ import {
   dbSetClosedWorkorderItem,
 } from "../../../db_call_wrapper";
 import LinearGradient from "react-native-web-linear-gradient";
+import { loadFaceDetectionModel } from "face-api.js";
 // import {} from '../../../assets/tools1.png'
 
 export const Items_WorkorderItemsTab = ({}) => {
@@ -68,6 +71,9 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // store getters ///////////////////////////////////////////////////////////////
 
+  const zCustomerObj = useCurrentCustomerStore((state) =>
+    state.getCustomerObj()
+  );
   const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
     state.getOpenWorkorderObj()
   );
@@ -80,7 +86,6 @@ export const Items_WorkorderItemsTab = ({}) => {
   // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 
   ///////////////////////////////////////////////////////////////////////////
-  const [sCalculatedWorkorder, _setCalculatedWorkorder] = useState([]);
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
   const [sTotalPrice, _setTotalPrice] = useState("");
   const [sTotalDiscount, _setTotalDiscount] = useState("");
@@ -90,43 +95,78 @@ export const Items_WorkorderItemsTab = ({}) => {
   // dev
   const checkoutBtnRef = useRef();
   useEffect(() => {
-    if (zOpenWorkorderObj && zOpenWorkordersArr && zSettingsObj) {
-      // log("here");
-      // let wo = calculateLineItemDiscounts(zOpenWorkorderObj);
-      dbGetCustomerObj(zOpenWorkorderObj.customerID).then((res) => {
+    if (zOpenWorkorderObj && zOpenWorkordersArr && zSettingsObj.salesTax) {
+      dbGetCustomerObj("3d2E63TXCY2bzmOdeQc8").then((res) => {
+        // log("res", res);
         _zSetCustomerObj(res);
         _zSetIsCheckingOut(true);
       });
     }
-  }, [zOpenWorkorderObj, zOpenWorkordersArr, zSettingsObj, zOpenWorkorderObj]);
+  }, [zOpenWorkorderObj, zOpenWorkordersArr, zSettingsObj]);
 
   ///////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////
+
+  // update the workorder inventory items to the latest prices, also watching inventory array to keep current price. also update the discont object
+  useEffect(() => {
+    if (!zOpenWorkorderObj || !zInventoryArr.length > 0) return;
+    let wo = cloneDeep(zOpenWorkorderObj);
+    let linesToChange = [];
+
+    let invIdxArr = [];
+    let discountsIdxArr = [];
+    wo.workorderLines.forEach((line, idx) => {
+      let curInvItem = zInventoryArr.find(
+        (o) => o.id === line.inventoryItem.id
+      );
+      if (!curInvItem) return;
+      if (!deepEqual(curInvItem, line.inventoryItem)) {
+        // clog("cur inv", curInvItem.price);
+        // clog("previous", line.inventoryItem.price);
+        linesToChange.push(curInvItem);
+        invIdxArr.push({ idx, curInvItem });
+      }
+
+      // let curDiscount = line.discountObj;
+    });
+
+    // the price has changed. now reset the discount object to reflect the new price as well
+    invIdxArr.forEach((obj) => {
+      // log("changing");
+      wo.workorderLines[obj.idx].inventoryItem = obj.curInvItem;
+      // clog("old line", wo.workorderLines[obj.idx].discountObj);
+      let discountedLine = applyDiscountToWorkorderItem(
+        wo.workorderLines[obj.idx]
+      );
+      // clog("new line", discountedLine.discountObj);
+      wo.workorderLines[obj.idx] = discountedLine;
+    });
+
+    if (invIdxArr.length > 0) {
+      // log("found new inventory prices");
+      _zSetWorkorderObj(wo);
+    }
+  }, [zInventoryArr, zOpenWorkorderObj]);
 
   // calculate running sale totaLS
   useEffect(() => {
     // log("here");
     if (!zOpenWorkorderObj?.workorderLines) return;
     // log("inv", zInventoryArr);
-    let wo = applyLineItemDiscounts(
-      cloneDeep(zOpenWorkorderObj),
-      zInventoryArr
-    );
-    // clog(wo);
+
     const {
       runningQty,
       runningTotal,
       runningDiscount,
       runningSubtotal,
       runningTax,
-    } = calculateRunningTotals(wo, zInventoryArr, zSettingsObj.salesTax);
-    // clog(calculateRunningTotals(wo, zInventoryArr));
+    } = calculateRunningTotals(zOpenWorkorderObj, zSettingsObj.salesTax);
+    // clog(calculateRunningTotals(zOpenWorkorderObj, zInventoryArr));
     _setNumItems(runningQty);
     _setTotalDiscount(runningDiscount);
     _setTotalPrice(runningTotal);
-    _setCalculatedWorkorder(wo); // use a copy in local state with calculated discounts so that we can keep fresh inventory prices
     // _zSetWorkorderObj(wo, false);
-  }, [zOpenWorkorderObj, zInventoryArr]);
+  }, [zOpenWorkorderObj]);
 
   ///////////////////////////////////////////////////
   // function checkoutPressed() {
@@ -146,10 +186,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     fun();
   }
 
-  function modQtyPressed(inventoryItem, workorderLine, option, idx) {
-    // log("need to fix this method");
-    // return;
-    // let fun = () => {
+  function modQtyPressed(workorderLine, option, idx) {
     let newWOLine = cloneDeep(workorderLine);
     let wo = cloneDeep(zOpenWorkorderObj);
     if (option === "up") {
@@ -159,52 +196,49 @@ export const Items_WorkorderItemsTab = ({}) => {
       if (qty <= 0) return;
       newWOLine.qty = qty;
     }
+
     if (newWOLine.discountObj.name) {
-      let discountObj = applyDiscountToWorkorderItem(newWOLine);
-      if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
+      let newLine = applyDiscountToWorkorderItem(newWOLine);
+      if (newLine.discountObj.newPrice > 0) newWOLine = newLine;
     }
+
     wo.workorderLines[idx] = newWOLine;
     _zSetWorkorderObj(wo);
-    // if (!zOpenWorkorderObj.isStandaloneSale) ''(wo);
-    // };
-    // _zExecute(fun);
   }
 
   function editWorkorderLine(workorderLine) {
+    let wo = cloneDeep(zOpenWorkorderObj);
     let newWOLine = cloneDeep(workorderLine);
     if (newWOLine.discountObj.name) {
-      let discountObj = applyDiscountToWorkorderItem(newWOLine);
-      if (discountObj.newPrice > 0) newWOLine.discountObj = discountObj;
+      let newLine = applyDiscountToWorkorderItem(newWOLine);
+      if (newLine.discountObj.newPrice > 0) newWOLine = newLine;
     }
 
     let idx = zOpenWorkorderObj.workorderLines.findIndex(
       (o) => o.id == workorderLine.id
     );
-    let wo = cloneDeep(zOpenWorkorderObj);
     wo.workorderLines[idx] = newWOLine;
     _zSetWorkorderObj(wo);
     // if (!zOpenWorkorderObj.isStandaloneSale) ''(wo);
   }
 
-  function applyDiscount(inventoryItem, workorderLine, discountObj, index) {
-    let fun = () => {
-      let newDiscountObj = DISCOUNT_OBJ_PROTO;
-      if (discountObj.value) {
-        newDiscountObj = applyDiscountToWorkorderItem(
-          discountObj,
-          workorderLine,
-          inventoryItem
-        );
-        if (newDiscountObj.newPrice <= 0) return;
-      }
+  function applyDiscount(workorderLine, discountObj) {
+    // log(discountObj);
+    // return;
 
-      // log(newDiscountObj);
-      let woCopy = cloneDeep(zOpenWorkorderObj);
-      woCopy.workorderLines[index].discountObj = newDiscountObj;
-      _zSetWorkorderObj(woCopy);
-      // if (!zOpenWorkorderObj.isStandaloneSale) ''(woCopy);
-    };
-    fun();
+    if (!discountObj.value) discountObj = cloneDeep(DISCOUNT_OBJ_PROTO);
+
+    workorderLine = cloneDeep(workorderLine);
+    workorderLine.discountObj = discountObj;
+    workorderLine = applyDiscountToWorkorderItem(workorderLine);
+
+    let wo = cloneDeep(zOpenWorkorderObj);
+    wo.workorderLines = wo.workorderLines.map((o) => {
+      if (o.id === workorderLine.id) return workorderLine;
+      return o;
+    });
+
+    _zSetWorkorderObj(wo);
   }
 
   function splitItems(inventoryItem, workorderLine, index) {
@@ -215,11 +249,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       newLine.qty = 1;
       newLine.id = generateUPCBarcode();
       if (newLine.discountObj.name) {
-        let discountObj = applyDiscountToWorkorderItem(
-          newLine.discountObj,
-          newLine,
-          inventoryItem
-        );
+        let discountObj = applyDiscountToWorkorderItem(newLine);
         if (discountObj.newPrice > 0) newLine.discountObj = discountObj;
       }
       if (i === 0) {
@@ -244,14 +274,12 @@ export const Items_WorkorderItemsTab = ({}) => {
       >
         <FlatList
           style={{ marginTop: 3, marginRight: 5 }}
-          data={sCalculatedWorkorder.workorderLines}
+          data={zOpenWorkorderObj.workorderLines}
           keyExtractor={(item, idx) => idx}
           renderItem={(item) => {
             let idx = item.index;
             item = item.item;
-            let invItem =
-              zInventoryArr?.find((obj) => obj.id === item.inventoryItem.id) ||
-              item.inventoryItem;
+            let invItem = item.inventoryItem;
 
             // log("item", item);
             return (
@@ -297,10 +325,31 @@ export const Items_WorkorderItemsTab = ({}) => {
                 marginRight: 10,
                 fontWeight: "bold",
                 color: C.textMain,
-                fontSize: 15,
+                fontSize: 14,
               }}
             >
               {sNumItems}
+            </Text>
+          </Text>
+          <View
+            style={{
+              width: 1,
+              height: "100%",
+              backgroundColor: C.buttonLightGreenOutline,
+            }}
+          />
+
+          <Text style={{ fontSize: 13, color: "gray" }}>
+            {"SUBTOTAL: "}
+            <Text
+              style={{
+                marginRight: 10,
+                color: C.textMain,
+                fontWeight: "bold",
+                fontSize: 14,
+              }}
+            >
+              {"$" + formatNumberForCurrencyDisplay(sTotalPrice)}
             </Text>
           </Text>
           <View
@@ -319,10 +368,10 @@ export const Items_WorkorderItemsTab = ({}) => {
                     marginRight: 10,
                     fontWeight: "bold",
                     color: C.textMain,
-                    fontSize: 15,
+                    fontSize: 14,
                   }}
                 >
-                  {"$" + sTotalDiscount}
+                  {"$" + formatNumberForCurrencyDisplay(sTotalDiscount)}
                 </Text>
               </Text>
               <View
@@ -335,37 +384,19 @@ export const Items_WorkorderItemsTab = ({}) => {
             </View>
           ) : null}
           <Text style={{ fontSize: 13, color: "gray" }}>
-            {"SUBTOTAL: "}
-            <Text
-              style={{
-                marginRight: 10,
-                color: C.textMain,
-                fontWeight: "bold",
-                fontSize: 15,
-              }}
-            >
-              {"$" + sTotalPrice}
-            </Text>
-          </Text>
-          <View
-            style={{
-              width: 1,
-              height: "100%",
-              backgroundColor: C.buttonLightGreenOutline,
-            }}
-          />
-          <Text style={{ fontSize: 13, color: "gray" }}>
             {"TAX: "}
             <Text
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
                 color: C.textMain,
-                fontSize: 15,
+                fontSize: 14,
               }}
             >
               {"$" +
-                trimToTwoDecimals((sTotalPrice * zSettingsObj.salesTax) / 100)}
+                formatNumberForCurrencyDisplay(
+                  (sTotalPrice * zSettingsObj.salesTax) / 100
+                )}
             </Text>
           </Text>
           <View
@@ -382,7 +413,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               borderColor: C.buttonLightGreenOutline,
               borderRadius: 15,
               borderWidth: 1,
-              paddingHorizontal: 15,
+              paddingHorizontal: 14,
               paddingVertical: 3,
               color: "gray",
             }}
@@ -397,25 +428,21 @@ export const Items_WorkorderItemsTab = ({}) => {
               }}
             >
               {"$" +
-                trimToTwoDecimals(
+                formatNumberForCurrencyDisplay(
                   sTotalPrice * (zSettingsObj.salesTax / 100) + sTotalPrice
                 )}
             </Text>
           </Text>
           <Button_
             ref={checkoutBtnRef}
-            textStyle={{ fontSize: 16 }}
+            textStyle={{ color: C.textWhite, fontSize: 16 }}
             icon={ICONS.shoppingCart}
             text={"Check Out"}
             colorGradientArr={COLOR_GRADIENTS.green}
             buttonStyle={{
-              // height: 25,
               paddingHorizontal: 20,
               paddingVertical: 2,
               borderRadius: 15,
-              // width: 150,
-              backgroundColor: "green",
-              // marginRight: 5,
             }}
             onPress={() => _zSetIsCheckingOut(true)}
           />
@@ -451,7 +478,6 @@ export const LineItemComponent = ({
 
   /////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
-  // if (workorderLine.id === "D3A4rBwWPJXLpOLyDMTb") clog(workorderLine);
 
   function formatDiscountsArr(discountArr) {
     if (discountArr[discountArr.length - 1].name === "No Discount")
@@ -557,9 +583,7 @@ export const LineItemComponent = ({
                 }}
               />
               <Button_
-                onPress={() =>
-                  __modQtyPressed(inventoryItem, workorderLine, "up", index)
-                }
+                onPress={() => __modQtyPressed(workorderLine, "up", index)}
                 buttonStyle={{
                   backgroundColor: "transparent",
                   // width: null,
@@ -611,16 +635,15 @@ export const LineItemComponent = ({
                 marginRight: 1,
               }}
             >
-              <Text
-                style={{
-                  paddingHorizontal: 0,
-                }}
-              >
-                {"$ " +
-                  trimToTwoDecimals(
-                    inventoryItem?.price || workorderLine.price
-                  )}
-              </Text>
+              {workorderLine.qty > 1 || workorderLine.discountObj.newPrice ? (
+                <Text
+                  style={{
+                    paddingHorizontal: 0,
+                  }}
+                >
+                  {"$ " + trimToTwoDecimals(inventoryItem.price)}
+                </Text>
+              ) : null}
               {workorderLine.discountObj.savings ? (
                 <Text
                   style={{
@@ -634,7 +657,7 @@ export const LineItemComponent = ({
               ) : null}
               <Text
                 style={{
-                  fontWeight: "600",
+                  fontWeight: "500",
                   minWidth: 30,
                   marginTop: 0,
                   paddingHorizontal: 0,
@@ -643,13 +666,8 @@ export const LineItemComponent = ({
               >
                 {workorderLine.discountObj.newPrice
                   ? "$ " + workorderLine.discountObj.newPrice
-                  : workorderLine.qty > 1
-                  ? "$" +
-                    trimToTwoDecimals(
-                      inventoryItem?.price ||
-                        workorderLine.price * workorderLine.qty
-                    )
-                  : ""}
+                  : "$" +
+                    trimToTwoDecimals(inventoryItem.price * workorderLine.qty)}
               </Text>
             </View>
             <View
@@ -750,10 +768,8 @@ export const LineItemComponent = ({
                             }}
                             onPress={() => {
                               applyDiscount(
-                                inventoryItem,
                                 workorderLine,
-                                item,
-                                index
+                                zSettingsObj.discounts[idx]
                               );
                               _setShowDiscountModal(null);
                               __setButtonsRowID(null);

@@ -568,7 +568,6 @@ export const useInventoryStore = create((set, get) => ({
 
 export const useOpenWorkordersStore = create((set, get) => ({
   workorderArr: [],
-  // openWorkorderObj: null,
   openWorkorderObj: null,
 
   getOpenWorkorderObj: () => get().openWorkorderObj,
@@ -586,11 +585,13 @@ export const useOpenWorkordersStore = create((set, get) => ({
       return;
     }
 
-    // dev
-    if (wo.id === "096708192223" && !get().openWorkorderObj) {
-      clog("setting", wo);
+    // dev*************************************************
+    if (wo.id === "189998095784" && !get().openWorkorderObj) {
+      // clog("setting", wo);
       set({ openWorkorderObj: wo });
     }
+
+    // ****************************************************
 
     let workorderArr = cloneDeep(get().workorderArr);
     let foundWOIdx = workorderArr.findIndex((o) => o.id === wo.id) >= 0;
@@ -607,7 +608,8 @@ export const useOpenWorkordersStore = create((set, get) => ({
     }
 
     if (saveToDB) {
-      clog(wo);
+      // log("dbb");
+      // clog(wo);
       dbSetWorkorder(wo, batch, false);
     } // need db fun
   },
@@ -627,21 +629,21 @@ export const useOpenWorkordersStore = create((set, get) => ({
   setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
 
   // handles live DB subscription changes
-  modItem: (item, option) => {
-    // log(item, option);
-    if (option === "change")
-      set((state) => ({
-        workorderArr: changeItem(get().workorderArr, item),
-      }));
-    if (option === "add")
-      set((state) => ({
-        workorderArr: addItem(get().workorderArr, item),
-      }));
-    if (option === "remove")
-      set((state) => ({
-        workorderArr: removeItem(get().workorderArr, item),
-      }));
-  },
+  // modItem: (item, option) => {
+  //   // log(item, option);
+  //   if (option === "change")
+  //     set((state) => ({
+  //       workorderArr: changeItem(get().workorderArr, item),
+  //     }));
+  //   if (option === "add")
+  //     set((state) => ({
+  //       workorderArr: addItem(get().workorderArr, item),
+  //     }));
+  //   if (option === "remove")
+  //     set((state) => ({
+  //       workorderArr: removeItem(get().workorderArr, item),
+  //     }));
+  // },
 }));
 
 export const useCustMessagesStore = create((set, get) => ({

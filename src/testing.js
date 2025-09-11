@@ -97,8 +97,10 @@ export async function fillInventory() {
 }
 
 export async function fillOpenWorkorders(zInventoryArr) {
+  let arr = [];
   for (let i = 1; i <= 5; i++) {
-    let wo = { ...WORKORDER_PROTO, id: generateUPCBarcode() };
+    let wo = cloneDeep(WORKORDER_PROTO);
+    wo.id = generateUPCBarcode();
     wo.brand = SETTINGS_OBJ.bikeBrands[Math.floor(Math.random() * 4)];
     wo.color1 = COLORS[Math.floor(Math.random() * 6)];
     wo.color2 = COLORS[Math.floor(Math.random() * 6)];
@@ -118,19 +120,22 @@ export async function fillOpenWorkorders(zInventoryArr) {
 
     wo.waitTime = SETTINGS_OBJ.waitTimes[Math.floor(Math.random() * 9)];
 
-    for (let i = 0; i <= 3; i++) {
+    for (let i = 1; i <= 3; i++) {
       let val = Math.round(Math.random() * 6);
-      if (val < 1) val = 2;
-      let line = { ...WORKORDER_ITEM_PROTO };
+      let line = cloneDeep(WORKORDER_ITEM_PROTO);
       line.id = generateUPCBarcode();
       line.inventoryItem = zInventoryArr[val];
-      line.qty = val - 1;
+      line.qty = i;
       wo.workorderLines.push(line);
-      // clog(line);
+      // clog(line, i);
     }
+
+    // log(wo.workorderLines.length.toString());
+    // arr.push(wo);
     // log("status", wo.status);
     dbSetWorkorder(wo, false);
   }
+  // clog(arr);
   // }
 }
 

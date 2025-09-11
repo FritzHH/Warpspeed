@@ -16,6 +16,7 @@ import {
   clog,
   generateRandomID,
   generateTimesForListDisplay,
+  generateUPCBarcode,
   getDayOfWeekFrom0To7Input,
   log,
   makeGrey,
@@ -581,7 +582,7 @@ const AppUserListComponent = ({
 
   function handleNewUserPress() {
     let userObj = cloneDeep(APP_USER);
-    userObj.id = generateRandomID();
+    userObj.id = generateUPCBarcode();
     let role = PERMISSION_LEVELS.user;
     userObj.permissions = role;
     commitUserInfoChange(userObj, true);

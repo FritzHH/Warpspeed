@@ -1,7 +1,8 @@
 /* eslint-disable */
 
-import { cloneDeep } from "lodash";
+import { cloneDeep, last } from "lodash";
 import {
+  COLORS,
   CUSTOMER_PROTO,
   INVENTORY_CATEGORY_NAMES,
   INVENTORY_ITEM_PROTO,
@@ -11,6 +12,7 @@ import {
   RECEIPT_TYPES,
   SETTINGS_OBJ,
   SMS_PROTO,
+  WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "./data";
 import {
@@ -22,13 +24,14 @@ import {
 import {
   convertMillisToHoursMins,
   formatDateTimeForReceipt,
-  generateBarcode,
+  generateUPCBarcode,
   generateRandomID,
   generateRandomNumber,
   formatMillisForDisplay,
   log,
   randomWordGenerator,
   clog,
+  roundToTwoDecimals,
 } from "./utils";
 import {
   dbSetCustomerObj,
@@ -37,9 +40,11 @@ import {
   setDBItem,
   build_db_path,
   dbSetInventoryItem,
+  dbSetWorkorder,
 } from "./db_call_wrapper";
 import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "./constants";
 import { LogBox } from "react-native";
+import { useOpenWorkordersStore } from "./stores";
 
 export function testPayment() {}
 
@@ -51,15 +56,19 @@ export function sendTestMessage() {
   message.phoneNumber = "2393369177";
   message.message = "Here is the last message sent number 18";
   message.customerID = "testid";
-  message.id = generateRandomID();
+  message.id = generateUPCBarcode();
   message.canRespond = false;
 
   // sendSMS(message);
 }
 
 export async function fillInventory() {
-  for (let i = 1; i <= 2; i++) {
-    let inv = { ...INVENTORY_ITEM_PROTO, id: generateRandomID() };
+  for (let i = 1; i <= 1; i++) {
+    let lastDigit = new Date().getTime().toString();
+    lastDigit = lastDigit.slice(lastDigit.length - 1);
+    if (lastDigit == 0) lastDigit = 2;
+    if (lastDigit == 9) lastDigit = 8;
+    let inv = { ...INVENTORY_ITEM_PROTO, id: generateUPCBarcode() };
     inv.formalName =
       (await randomWordGenerator()) +
       " " +
@@ -67,54 +76,68 @@ export async function fillInventory() {
       " " +
       (await randomWordGenerator());
     inv.informalName =
-      "Informal " +
+      "Informal name " +
       (await randomWordGenerator()) +
       " " +
       (await randomWordGenerator());
-    inv.price = i * 4 + "." + i + i * 2;
-    if (i === 1 || i === 3) inv.salePrice = i * 2 + "." + i + i * 2;
+    inv.price = roundToTwoDecimals(
+      Number(lastDigit + "." + lastDigit - 1 + lastDigit + 1)
+    );
     inv.category = INVENTORY_CATEGORY_NAMES.parts;
-    inv.upc = generateBarcode();
+    inv.brand = "Brand " + (await randomWordGenerator());
+    inv.cost = roundToTwoDecimals(inv.price / 2);
+    // inv.category = INVENTORY_CATEGORY_NAMES.labor;
+    // inv.upc = generateBarcode();
     // setInventoryItem(inv);
     // clog(inv);
+    // clog(inv);
+    // return;
     dbSetInventoryItem(inv, false);
   }
 }
 
-export function fillOpenWorkorders() {
-  let statusCount = 0;
-  for (let i = 0; i <= 14; i++) {
-    let j = i;
-    let wo = { ...WORKORDER_PROTO, id: generateRandomID() };
-    j = i;
-    if (j > 3) j = 2;
-    wo.brand = SETTINGS_OBJ.bikeBrands[j];
-    j = i;
-    if (j > 13) j = 4;
-    wo.color1 = SETTINGS_OBJ.colors[j];
-    j = i;
-    if (j > 3) j = 2;
-    wo.description = SETTINGS_OBJ.bikeDescriptions[j];
-    wo.startedBy = "Test User";
-    j = i;
-    if (statusCount == 14) statusCount = 0;
-    wo.status = SETTINGS_OBJ.statuses[statusCount];
-    statusCount++;
-    wo.customerFirst = "Test";
-    wo.customerLast = "Customer";
-    wo.customerPhone = "1111111111";
-    wo.customerID = "HtFHEOIqZzDR3BF7ZH8k";
-    wo.startedBy = "Test User";
-    wo.changeLog.push("Started by: " + "Test" + " " + "User");
+export async function fillOpenWorkorders(zInventoryArr) {
+  for (let i = 1; i <= 5; i++) {
+    let wo = { ...WORKORDER_PROTO, id: generateUPCBarcode() };
+    wo.brand = SETTINGS_OBJ.bikeBrands[Math.floor(Math.random() * 4)];
+    wo.color1 = COLORS[Math.floor(Math.random() * 6)];
+    wo.color2 = COLORS[Math.floor(Math.random() * 6)];
+    wo.description =
+      SETTINGS_OBJ.bikeDescriptions[Math.floor(Math.random() * 4)];
+    wo.status = SETTINGS_OBJ.statuses[Math.floor(Math.random() * 5)];
+    wo.customerFirst = "Fritz";
+    wo.customerLast = "Hieb";
+    wo.customerPhone = "2393369177";
+    wo.customerID = "1234";
+    wo.startedBy = "Fritz Hieb";
+    wo.changeLog.push("Started by: " + "Fritz" + " " + "Hieb");
+    wo.startedOnMillis = new Date().getTime();
+
+    wo.partSource = SETTINGS_OBJ.partSources[Math.floor(Math.random() * 2)];
+    wo.partOrdered = "Part: " + (await randomWordGenerator());
+
+    wo.waitTime = SETTINGS_OBJ.waitTimes[Math.floor(Math.random() * 9)];
+
+    for (let i = 0; i <= 3; i++) {
+      let val = Math.round(Math.random() * 6);
+      if (val < 1) val = 2;
+      let line = { ...WORKORDER_ITEM_PROTO };
+      line.id = generateUPCBarcode();
+      line.inventoryItem = zInventoryArr[val];
+      line.qty = val - 1;
+      wo.workorderLines.push(line);
+      // clog(line);
+    }
     // log("status", wo.status);
-    setOpenWorkorder(wo);
+    dbSetWorkorder(wo, false);
   }
+  // }
 }
 
 export function fillCustomers() {
   for (let i = 5; i <= 8; i++) {
     let cust = { ...CUSTOMER_PROTO };
-    cust.id = generateRandomID();
+    cust.id = generateUPCBarcode();
     cust.first = "test first" + i;
     cust.last = "test last " + i;
     cust.cell = "111111111" + i;
@@ -207,17 +230,6 @@ export function fillPunchHistory() {
   let running = ref;
   // running = running - MILLIS_IN_DAY * 1;
   for (let i = 2; i <= 60; i++) {
-    // if (i === 2) {
-    //   let obj = {
-    //     userID,
-    //     millis: running,
-    //     id: generateRandomID(),
-    //     option: "out",
-    //   };
-    //   setDBItem(build_db_path.punchClock(userID), obj);
-    //   continue;
-    // }
-
     let num = Math.round(MILLIS_IN_MINUTE * i * 120);
     running += num;
     // log(formatMillisForDisplay(val, true, true));
@@ -225,7 +237,7 @@ export function fillPunchHistory() {
     let obj = {
       userID,
       millis: running,
-      id: generateRandomID(),
+      id: generateUPCBarcode(),
       option: option ? "in" : "out",
     };
     // log(formatMillisForDisplay(obj.millis));

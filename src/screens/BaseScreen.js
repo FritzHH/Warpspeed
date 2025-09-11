@@ -27,7 +27,7 @@ import {
 import { executeDBBatch } from "../db_call_wrapper";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { DB_BATCH_INTERVAL_MILLIS } from "../constants";
-import { fillSettings } from "../testing";
+import { fillInventory, fillOpenWorkorders, fillSettings } from "../testing";
 import { CheckoutModalScreen } from "./screen_components/modal_screens/CheckoutModalScreen";
 
 export function BaseScreen() {
@@ -77,6 +77,8 @@ export function BaseScreen() {
   const zRunBackgroundRecognition = useLoginStore((state) =>
     state.getRunBackgroundRecognition()
   );
+
+  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
 
   // local state ////////////////////////////////////////////////////////////////////////
   const [screenWidth, _setScreenWidth] = useState(window.innerWidth);
@@ -173,7 +175,8 @@ export function BaseScreen() {
     // fillPrinterNames();
     // fillPunchHistory()
     // fillInventory();
-  }, []);
+    // if (zInventoryArr.length > 0) fillOpenWorkorders(zInventoryArr);
+  }, [zInventoryArr]);
   // log(zSettingsObj);
   return (
     <View

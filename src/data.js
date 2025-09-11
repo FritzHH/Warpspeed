@@ -251,7 +251,6 @@ export const PAYMENT_OBJECT_PROTO = {
   cardIssuer: "",
   millis: "",
   id: "",
-  customerID: "",
   saleID: "",
   isRefund: false,
 };
@@ -261,18 +260,14 @@ export const PAYMENT_OBJECT_PROTO = {
 export const SALE_OBJECT_PROTO = {
   id: "",
   workorderIDArr: [],
-  inventoryItemsArr: [],
   customerID: "",
-  totalAmount: 0,
-  totalDiscount: 0,
-  amountCaptured: 0,
   millis: "",
   paymentObjArr: [],
 };
 
 export const WORKORDER_PROTO = {
   paymentComplete: false,
-  saleObjArr: [],
+  saleObjID: "",
   isStandaloneSale: false,
   id: "",
   customerID: "",
@@ -309,7 +304,7 @@ export const WORKORDER_ITEM_PROTO = {
   // itemName: "",
   qty: 1,
   notes: "",
-  invItemID: "",
+  inventoryItem: null,
   discountObj: { ...DISCOUNT_OBJ_PROTO },
   id: "",
   // priceOverride: "",
@@ -351,7 +346,6 @@ export const INVENTORY_ITEM_PROTO = {
   salePrice: 0,
   // category: ,
   id: "",
-  upc: "",
   cost: "",
 };
 

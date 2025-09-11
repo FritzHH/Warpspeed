@@ -10,7 +10,13 @@ import {
   TIME_PUNCH_PROTO,
   WORKORDER_PROTO,
 } from "./data";
-import { checkArr, clog, generateRandomID, log } from "./utils";
+import {
+  checkArr,
+  clog,
+  generateRandomID,
+  generateUPCBarcode,
+  log,
+} from "./utils";
 import { cloneDeep } from "lodash";
 import {
   batchDBCall,
@@ -398,7 +404,7 @@ export const useLoginStore = create((set, get) => ({
   setCreateUserClockObj: (userID, millis, option) =>
     set(() => {
       let punchObj = { ...TIME_PUNCH_PROTO };
-      punchObj.id = generateRandomID();
+      punchObj.id = generateUPCBarcode();
       punchObj.userID = userID;
       punchObj.option = option;
       punchObj.millis = millis;
@@ -508,7 +514,7 @@ export const useCustomerPreviewStore = create((set, get) => ({
   },
 }));
 
-// TODODODO gotta update to the new database call format
+/// database also
 export const useCurrentCustomerStore = create((set, get) => ({
   customerObj: { ...CUSTOMER_PROTO },
   getCustomerObj: () => get().customerObj,
@@ -534,7 +540,9 @@ export const useInventoryStore = create((set, get) => ({
   //       inventoryArr: removeItem(get().inventoryArr, item),
   //     }));
   // },
-
+  getInventoryItem: (itemID) => {
+    return get().inventoryArr.find((o) => o.id === itemID);
+  },
   removeItem: (item, sendToDB = true, batch = true) => {
     let inventoryArr = cloneDeep(get().inventoryArr);
     let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
@@ -567,7 +575,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
   getWorkorderArr: () => get().workorderArr,
 
   // setters
-  setOpenWorkorderObj: (openWorkorderObj) => {
+  setInitialOpenWorkorderObj: (openWorkorderObj) => {
     // log(openWorkorderObj);
     set({ openWorkorderObj });
   },
@@ -579,7 +587,8 @@ export const useOpenWorkordersStore = create((set, get) => ({
     }
 
     // dev
-    if (wo.id === "4zXSq6GXUqixBmLApx3F" && !get().openWorkorderObj) {
+    if (wo.id === "096708192223" && !get().openWorkorderObj) {
+      clog("setting", wo);
       set({ openWorkorderObj: wo });
     }
 
@@ -592,12 +601,13 @@ export const useOpenWorkordersStore = create((set, get) => ({
     }
     set({ workorderArr });
 
+    // not set it as open workorder if it is such
     if (get().openWorkorderObj?.id === wo.id) {
-      // log("setting open workorder");
       set({ openWorkorderObj: wo });
     }
 
     if (saveToDB) {
+      clog(wo);
       dbSetWorkorder(wo, batch, false);
     } // need db fun
   },

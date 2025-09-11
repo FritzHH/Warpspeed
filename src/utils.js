@@ -298,6 +298,8 @@ export function trimToTwoDecimals(num) {
 
   return Number(num).toFixed(2);
   let res;
+
+  // old code
   if (strNum.includes(".")) {
     let split = strNum.split(".");
     // log("split", split);
@@ -609,13 +611,20 @@ export function generateRandomID(collectionPath) {
   return ref.id;
 }
 
-export function generateBarcode() {
-  let num = Math.random().toString();
-  num = num.split(".")[1];
-  num = num.slice(0, 8);
-  let barcode = "0000" + num;
-  return barcode;
-  // log(barcode.length, barcode);
+export function generateUPCBarcode() {
+  // Get current millis since epoch
+  const millis = Date.now().toString();
+
+  // Take the last 8 digits of millis
+  const timePart = millis.slice(-8);
+
+  // Add a 4-digit random number
+  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+
+  // Combine → 12 digits
+  const upc = timePart + randomPart;
+
+  return upc;
 }
 
 export async function randomWordGenerator() {

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { FlatList, View, Text, TextInput } from "react-native-web";
+import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
 import {
   PAYMENT_OBJECT_PROTO,
   SALE_OBJECT_PROTO,
@@ -32,6 +32,7 @@ import {
   Button_,
   DropdownMenu,
   SliderButton_,
+  GradientView,
 } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
@@ -42,6 +43,7 @@ import {
   formatDecimal,
   formatNumberForCurrencyDisplay,
   generateRandomID,
+  generateUPCBarcode,
   lightenRGBByPercent,
   log,
   makeGrey,
@@ -70,6 +72,7 @@ export function CheckoutModalScreen({}) {
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
+  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
 
   // store getters
   let zOpenWorkorderObj = WORKORDER_PROTO;
@@ -84,26 +87,26 @@ export function CheckoutModalScreen({}) {
     state.getWorkorderArr()
   );
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zGetInventoryItem = useInventoryStore(
+    (state) => state.getInventoryItem
+  );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   //////////////////////////////////////////////////////////////////////
 
   const [sPaymentComplete, _setPaymentComplete] = useState(false);
   const [sRefundScan, _sSetRefundScan] = useState("");
   const [sIsRefund, _setIsRefund] = useState(false);
-  //   const [sSplitPayment, _setSplitPayment] = useState(false);
   const [sTotalAmount, _setTotalAmount] = useState(0);
   const [sSubtotalAmount, _setSubtotalAmount] = useState(0);
   const [sTotalDiscountAmount, _setTotalDiscountAmount] = useState(0);
   const [sTotalTaxAmount, _setTotalTaxAmount] = useState(0);
 
   const [sPaymentsCaptured, _setPaymentsCaptured] = useState([]);
-  //   const [sAmountCaptured, _setAmountCaptured] = useState(0);
   const [sSelectedWorkordersToCombine, _setSelectedWorkordersToCombine] =
     useState([]);
-  //   const [sLineItemsToDisplay, _setLineItemsToDisplay] = useState([]);
-  const [sActiveSaleObj, _setActiveSaleObj] = useState();
   const [sCalculatedOpenWorkorder, _setCalculatedOpenWorkorder] = useState();
   const [sAmountLeftToPay, _setAmountLeftToPay] = useState();
+  const [sSaleObj, _setSaleObj] = useState();
   //
 
   useEffect(() => {
@@ -114,9 +117,9 @@ export function CheckoutModalScreen({}) {
       _setTotalDiscountAmount(0);
       _setPaymentsCaptured([]);
       _setSelectedWorkordersToCombine([]);
-      _setActiveSaleObj(null);
       _setPaymentComplete(false);
     } else {
+      _setSelectedWorkordersToCombine([zOpenWorkorderObj.id]);
       setTotals(zOpenWorkorderObj);
     }
   }, [zIsCheckingOut]);
@@ -142,39 +145,52 @@ export function CheckoutModalScreen({}) {
     _setAmountLeftToPay(runningTax + runningTotal);
   }
 
+  function createSaleObj() {
+    let saleObj = {
+      ...SALE_OBJECT_PROTO,
+      id: generateUPCBarcode(),
+      millis: new Date().getTime(),
+      customerID: zCustomerObj?.id,
+      paymentObjArr: [],
+      workorderIDArr: [zOpenWorkorderObj.id],
+    };
+    return saleObj;
+  }
+
   function handlePaymentCapture(paymentObj = PAYMENT_OBJECT_PROTO) {
+    let openWorkorderObj = cloneDeep(zOpenWorkorderObj);
     let saleObj;
-    if (!sActiveSaleObj) {
-      saleObj = {
-        ...SALE_OBJECT_PROTO,
-        id: generateRandomID(),
-        millis: new Date().getTime(),
-        customerID: zCustomerObj?.id,
-      };
+
+    // create or find existing sale object
+    if (!sSaleObj) {
+      saleObj = createSaleObj();
     } else {
-      saleObj = cloneDeep(sActiveSaleObj);
+      saleObj = cloneDeep(sSaleObj);
     }
+
+    // add payment obj to sale obj
+    paymentObj.saleID = saleObj.id;
     saleObj.paymentObjArr.push(paymentObj);
-    _setActiveSaleObj(saleObj);
+    _setSaleObj(saleObj);
+    // clog(saleObj);
 
-    let idx = zOpenWorkorderObj.saleObjArr?.findIndex(
-      (o) => o.id === saleObj.id
-    );
-    if (idx) {
-      [(zOpenWorkorderObj.saleObjArr[idx] = saleObj)];
-    } else {
-    }
+    // _zSetWorkorder(openWorkorderObj, false, false); // send to db
 
+    // calculate total paid on this workorder
     let totalPaid = 0;
     saleObj.paymentObjArr.forEach((paymentObj) => {
       totalPaid += paymentObj.amountCaptured;
     });
 
-    log("total paid", totalPaid);
+    // log("total paid", totalPaid);
   }
 
-  function handleCombineWorkorderCheck(wo) {}
-  //   log("s", sSubtotalAmount);
+  function handleCombineWorkorderCheck(wo, option) {
+    let saleObj;
+    saleObj = sSaleObj || createSaleObj();
+
+    let selectedWorkorderIDsToCombine = cloneDeep(sSelectedWorkordersToCombine);
+  }
   return (
     <ScreenModal
       modalVisible={zIsCheckingOut}
@@ -191,7 +207,7 @@ export function CheckoutModalScreen({}) {
             // alignItems: "center",
             flexDirection: "row",
             backgroundColor: C.backgroundWhite,
-            width: "80%",
+            width: "70%",
             height: "80%",
             borderRadius: 15,
             ...SHADOW_RADIUS_PROTO,
@@ -200,7 +216,7 @@ export function CheckoutModalScreen({}) {
         >
           <View
             style={{
-              width: "25%",
+              width: "30%",
               height: "100%",
               justifyContent: "space-around",
               paddingVertical: 20,
@@ -225,7 +241,7 @@ export function CheckoutModalScreen({}) {
           </View>
           <View
             style={{
-              width: "20%",
+              width: "30%",
               height: "100%",
               padding: 20,
             }}
@@ -500,7 +516,226 @@ export function CheckoutModalScreen({}) {
             {/* </View> */}
             <SliderButton_ onConfirm={(val) => log("val", val)} />
           </View>
-          <View style={{ width: "55%", height: "100%", padding: 20 }}></View>
+          <ScrollView style={{ width: "40%", padding: 20 }}>
+            {sSelectedWorkordersToCombine.map((workorderID) => {
+              let workorder = zOpenWorkordersArr.find(
+                (o) => o.id === workorderID
+              );
+              return (
+                <View
+                  style={{
+                    width: "100%",
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.backgroundListWhite,
+                    borderWidth: 1,
+                    borderRadius: 10,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: "100%",
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <View style={{}}>
+                      <Text>{workorder.brand}</Text>
+                      <Text>{workorder.description}</Text>
+                    </View>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <Text
+                        style={{
+                          paddingHorizontal: 5,
+                          paddingVertical: 2,
+                          borderRadius: 5,
+                          backgroundColor: workorder.color1?.backgroundColor,
+                          color: workorder.color1?.textColor,
+                        }}
+                      >
+                        {workorder.color1?.label}
+                      </Text>
+                      <Text style={{}}>{workorder.color2?.label}</Text>
+                    </View>
+                    <Text>{workorder.description}</Text>
+                  </View>
+                  <FlatList
+                    data={workorder.workorderLines}
+                    renderItem={(obj) => {
+                      let index = obj.index;
+                      let workorderLine = obj.item;
+                      let inventoryItem = zGetInventoryItem(
+                        workorderLine.inventoryItem.id
+                      );
+                      // log("item", inventoryItem);
+                      return (
+                        // <View
+                        //   style={{
+                        //     width: "100%",
+                        //   }}
+                        // >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            width: "100%",
+                            alignItems: "center",
+                            backgroundColor: C.listItemWhite,
+                            paddingVertical: 3,
+                            paddingRight: 5,
+                            paddingLeft: 8,
+                            marginVertical: 3,
+                            marginHorizontal: 8,
+                            borderColor: "transparent",
+                            borderLeftColor: lightenRGBByPercent(C.green, 60),
+                            borderWidth: 2,
+                            borderRadius: 15,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: "73%",
+                              justifyContent: "flex-start",
+                              alignItems: "center",
+                              flexDirection: "row",
+                              // backgroundColor: "green",
+                            }}
+                          >
+                            <View>
+                              {workorderLine.discountObj.name ? (
+                                <Text style={{ color: C.lightred }}>
+                                  {workorderLine.discountObj.name ||
+                                    "discount goes here"}
+                                </Text>
+                              ) : null}
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  color: Colors.darkText,
+                                  fontWeight: "500",
+                                }}
+                              >
+                                {inventoryItem?.formalName || "Item Not Found"}
+                              </Text>
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "flex-start",
+                                }}
+                              >
+                                <TextInput
+                                  disabled={true}
+                                  numberOfLines={4}
+                                  style={{
+                                    fontSize: 14,
+                                    outlineWidth: 0,
+                                    color: "dimgray",
+                                  }}
+                                  placeholder="Intake and service notes..."
+                                  placeholderTextColor={"gray"}
+                                  value={workorderLine.intakeNotes}
+                                />
+                              </View>
+                            </View>
+                          </View>
+                          <View
+                            style={{
+                              width: "27%",
+                              flexDirection: "row",
+                              justifyContent: "flex-end",
+                              alignItems: "center",
+                              height: "100%",
+                              // backgroundColor: "green",
+                            }}
+                          >
+                            <GradientView
+                              colorArr={COLOR_GRADIENTS.grey}
+                              style={{
+                                borderRadius: 10,
+                                width: 30,
+                                height: 20,
+                              }}
+                            >
+                              <TextInput
+                                disabled={true}
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: 700,
+                                  textAlign: "center",
+                                  color: C.textWhite,
+                                  outlineWidth: 0,
+                                  width: "100%",
+                                }}
+                                value={workorderLine.qty}
+                              />
+                            </GradientView>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                // marginRight: 5,
+                              }}
+                            ></View>
+                            <View
+                              style={{
+                                alignItems: "flex-end",
+                                minWidth: 80,
+                                // backgroundColor: "green",
+                                marginRight: 1,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  paddingHorizontal: 0,
+                                }}
+                              >
+                                {"$ " +
+                                  trimToTwoDecimals(
+                                    inventoryItem?.price || workorderLine.price
+                                  )}
+                              </Text>
+                              {workorderLine.discountObj.savings ? (
+                                <Text
+                                  style={{
+                                    paddingHorizontal: 0,
+                                    minWidth: 30,
+                                    color: C.lightred,
+                                  }}
+                                >
+                                  {"$ -" + workorderLine.discountObj.savings}
+                                </Text>
+                              ) : null}
+                              <Text
+                                style={{
+                                  fontWeight: "600",
+                                  minWidth: 30,
+                                  marginTop: 0,
+                                  paddingHorizontal: 0,
+                                  color: Colors.darkText,
+                                }}
+                              >
+                                {workorderLine.discountObj.newPrice
+                                  ? "$ " + workorderLine.discountObj.newPrice
+                                  : workorderLine.qty > 1
+                                  ? "$" +
+                                    trimToTwoDecimals(
+                                      inventoryItem?.price ||
+                                        workorderLine.price * workorderLine.qty
+                                    )
+                                  : ""}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                        // </View>
+                      );
+                    }}
+                  />
+                </View>
+              );
+            })}
+          </ScrollView>
         </View>
       )}
     />
@@ -543,25 +778,14 @@ const CashSaleComponent = ({
     paymentObject.cash = !sIsCheck;
     paymentObject.check = sIsCheck;
     paymentObject.millis = new Date().getTime();
+    paymentObject.id = generateRandomID();
 
     onComplete(paymentObject);
     handleCancelPress();
   }
 
   function handleKeyPress(event) {
-    log("do something with enter key");
-    // log("event", event.nativeEvent.key);
-    // if (event.nativeEvent.key == "Enter") {
-    //   if (!splitPayment) {
-    //     handleProcessButtonPress();
-    //   } else {
-    //     if (sTenderAmount >= sRequestedAmount) {
-    //       handleProcessButtonPress();
-    //     } else {
-    //       _setInputBoxFocus("tender");
-    //     }
-    //   }
-    // }
+    if (event.nativeEvent.key == "Enter") handleProcessButtonPress();
   }
 
   //   log(sProcessButtonEnabled.toString());

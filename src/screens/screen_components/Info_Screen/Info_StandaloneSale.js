@@ -33,6 +33,7 @@ import {
   calculateRunningTotals,
   clog,
   generateRandomID,
+  generateUPCBarcode,
   log,
   showAlert,
   trimToTwoDecimals,
@@ -48,7 +49,7 @@ import {
 export const StandaloneSaleComponent = ({}) => {
   // store setters
   const _zSetOpenWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setOpenWorkorderObj
+    (state) => state.setInitialOpenWorkorderObj
   );
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
@@ -172,7 +173,7 @@ export const StandaloneSaleComponent = ({}) => {
 
     paymentObj.amountCaptured = incomingPayment.amount;
     paymentObj.amountTendered = incomingPayment.amountTendered;
-    paymentObj.saleID = generateRandomID();
+    paymentObj.saleID = generateUPCBarcode();
     paymentObj.cash = !incomingPayment.isCheck;
     paymentObj.check = incomingPayment.isCheck;
     let millis = new Date().getTime;

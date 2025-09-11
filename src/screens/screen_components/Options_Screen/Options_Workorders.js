@@ -71,8 +71,8 @@ export function WorkordersComponent({}) {
   const _zModOpenWorkorderArrItem = useOpenWorkordersStore(
     (state) => state.modItem
   );
-  const _zSetWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setOpenWorkorderObj
+  const _zSetInitialOpenWorkorderObj = useOpenWorkordersStore(
+    (state) => state.setInitialOpenWorkorderObj
   );
 
   ///////////////////////////////////////////////////////////////////////////////////
@@ -209,7 +209,7 @@ export function WorkordersComponent({}) {
       _zSetCurrentCustomer(custObj);
     });
 
-    _zSetWorkorderObj(obj);
+    _zSetInitialOpenWorkorderObj(obj);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);

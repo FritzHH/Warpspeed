@@ -1,5 +1,10 @@
 import { cloneDeep } from "lodash";
-import { generateBarcode, generateRandomID, trimToTwoDecimals } from "./utils";
+import {
+  generateBarcode,
+  generateRandomID,
+  generateUPCBarcode,
+  trimToTwoDecimals,
+} from "./utils";
 import { dbSetInventoryItem } from "./db_call_wrapper";
 import { INVENTORY_ITEM_PROTO } from "./data";
 import * as XLSX from "xlsx";
@@ -59,7 +64,7 @@ export function fillInventoryFromLightspeedObjArr(lightspeedObjArr) {
   for (let i = 0; i <= lightspeedObjArr.length - 1; i++) {
     let obj = lightspeedObjArr[i];
     let inv = cloneDeep(INVENTORY_ITEM_PROTO);
-    inv.id = generateRandomID();
+    inv.id = generateUPCBarcode();
     inv.formalName = obj.description;
     inv.upc = obj.upc;
     inv.cost = trimToTwoDecimals(obj.cost);

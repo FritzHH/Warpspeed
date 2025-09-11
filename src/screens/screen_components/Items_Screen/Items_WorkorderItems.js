@@ -7,6 +7,7 @@ import {
   calculateTaxes,
   clog,
   generateRandomID,
+  generateUPCBarcode,
   lightenRGBByPercent,
   log,
   trimToTwoDecimals,
@@ -92,7 +93,6 @@ export const Items_WorkorderItemsTab = ({}) => {
     if (zOpenWorkorderObj && zOpenWorkordersArr && zSettingsObj) {
       // log("here");
       // let wo = calculateLineItemDiscounts(zOpenWorkorderObj);
-
       dbGetCustomerObj(zOpenWorkorderObj.customerID).then((res) => {
         _zSetCustomerObj(res);
         _zSetIsCheckingOut(true);
@@ -213,7 +213,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     for (let i = 0; i <= num - 1; i++) {
       let newLine = cloneDeep(workorderLine);
       newLine.qty = 1;
-      newLine.id = generateRandomID();
+      newLine.id = generateUPCBarcode();
       if (newLine.discountObj.name) {
         let discountObj = applyDiscountToWorkorderItem(
           newLine.discountObj,
@@ -249,9 +249,10 @@ export const Items_WorkorderItemsTab = ({}) => {
           renderItem={(item) => {
             let idx = item.index;
             item = item.item;
-            let invItem = zInventoryArr?.find(
-              (obj) => obj.id === item.invItemID
-            );
+            let invItem =
+              zInventoryArr?.find((obj) => obj.id === item.inventoryItem.id) ||
+              item.inventoryItem;
+
             // log("item", item);
             return (
               <LineItemComponent
@@ -615,7 +616,10 @@ export const LineItemComponent = ({
                   paddingHorizontal: 0,
                 }}
               >
-                {"$ " + trimToTwoDecimals(inventoryItem.price)}
+                {"$ " +
+                  trimToTwoDecimals(
+                    inventoryItem?.price || workorderLine.price
+                  )}
               </Text>
               {workorderLine.discountObj.savings ? (
                 <Text
@@ -641,7 +645,10 @@ export const LineItemComponent = ({
                   ? "$ " + workorderLine.discountObj.newPrice
                   : workorderLine.qty > 1
                   ? "$" +
-                    trimToTwoDecimals(inventoryItem.price * workorderLine.qty)
+                    trimToTwoDecimals(
+                      inventoryItem?.price ||
+                        workorderLine.price * workorderLine.qty
+                    )
                   : ""}
               </Text>
             </View>

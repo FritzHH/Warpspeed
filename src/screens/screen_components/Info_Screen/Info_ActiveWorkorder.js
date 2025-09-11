@@ -6,6 +6,7 @@ import {
   clog,
   dim,
   generateRandomID,
+  generateUPCBarcode,
   log,
   trimToTwoDecimals,
 } from "../../../utils";
@@ -63,8 +64,8 @@ export const ActiveWorkorderComponent = ({}) => {
     (state) => state.setOptionsTabName
   );
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  const _zSetOpenWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setOpenWorkorderObj
+  const _zSetInitialOpenWorkorderObj = useOpenWorkordersStore(
+    (state) => state.setInitialOpenWorkorderObj
   );
   const _zExecute = useLoginStore((state) => state.execute);
   const _zSetWorkorder = useOpenWorkordersStore(
@@ -150,11 +151,11 @@ export const ActiveWorkorderComponent = ({}) => {
     // return;
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
-    wo.id = generateRandomID();
+    wo.id = generateUPCBarcode();
     wo.startedBy = zCurrentUser.id;
     wo.startedOnMillis = new Date().getTime();
 
-    _zSetOpenWorkorderObj(wo, false);
+    _zSetInitialOpenWorkorderObj(wo, false);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);

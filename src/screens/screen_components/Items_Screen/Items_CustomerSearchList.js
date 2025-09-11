@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
-import { generateRandomID, log } from "../../../utils";
+import { generateRandomID, generateUPCBarcode, log } from "../../../utils";
 import {
   Button,
   CustomerInfoScreenModalComponent,
@@ -72,7 +72,7 @@ export function CustomerSearchListComponent({}) {
     wo.customerFirst = customerObj.first;
     wo.customerLast = customerObj.last;
     wo.customerPhone = customerObj.cell || customerObj.landline;
-    wo.id = generateRandomID();
+    wo.id = generateUPCBarcode();
     wo.startedOnMillis = new Date().getTime();
     wo.status = SETTINGS_OBJ.statuses[0];
     _zSetOpenWorkorder(wo, false);

@@ -7,6 +7,7 @@ import {
   clog,
   dim,
   generateRandomID,
+  generateUPCBarcode,
   LETTERS,
   log,
   NUMS,
@@ -223,7 +224,7 @@ export function NewWorkorderComponent({}) {
 
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
-    wo.id = generateRandomID();
+    wo.id = generateUPCBarcode();
     wo.startedBy = zCurrentUserObj.id;
     wo.startedOnMillis = new Date().getTime();
 
@@ -246,13 +247,13 @@ export function NewWorkorderComponent({}) {
     // log("create new customer pressed", log(zCurrentUser));
     // first create new customer
     let newCustomerObj = cloneDeep(sCustomerInfoObj);
-    newCustomerObj.id = generateRandomID();
+    newCustomerObj.id = generateUPCBarcode();
     newCustomerObj.dateCreated = new Date().getTime();
     newCustomerObj.workorders.push(newWorkorder.id);
 
     // next create new empty workorder for automatic population of next screen
     let newWorkorder = cloneDeep(WORKORDER_PROTO);
-    newWorkorder.id = generateRandomID();
+    newWorkorder.id = generateUPCBarcode();
     newWorkorder.startedOnMillis = new Date().getTime();
     newWorkorder.customerFirst = sCustomerInfoObj.first;
     newWorkorder.customerLast = sCustomerInfoObj.last;

@@ -12,6 +12,7 @@ import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
 import {
   dim,
+  generateUPCBarcode,
   generateRandomID,
   log,
   randomWordGenerator,
@@ -123,8 +124,8 @@ export function QuickItemComponent({}) {
     if (!wo.workorderLines) wo.workorderLines = [];
     // log("item", item);
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-    lineItem.invItemID = item.id;
-    lineItem.id = generateRandomID();
+    lineItem.inventoryItemObj = item;
+    lineItem.id = generateUPCBarcode();
     wo.workorderLines.push(lineItem);
     _zSetWorkorderObj(wo);
   }

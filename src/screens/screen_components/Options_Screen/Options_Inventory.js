@@ -12,6 +12,7 @@ import {
   dim,
   generateBarcode,
   generateRandomID,
+  generateUPCBarcode,
   log,
   trimToTwoDecimals,
 } from "../../../utils";
@@ -141,7 +142,7 @@ export function InventoryComponent({}) {
     // log("item", item);
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
     lineItem.invItemID = item.id;
-    lineItem.id = generateRandomID();
+    lineItem.id = generateUPCBarcode();
     wo.workorderLines.push(lineItem);
     _zSetWorkorderObj(wo);
     return;

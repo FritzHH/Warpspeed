@@ -155,6 +155,11 @@ export function newSetDatabaseField(path, item, remove) {
   return setRealtimeNodeItem(path, item);
 }
 
+export async function getFirestoreDoc(path) {
+  let ref = doc(FIRESTORE, path);
+  return (await getDoc(ref)).data();
+}
+
 // END NEW **********************************************************
 
 ////////////////////////////////////////////////////////////////////////

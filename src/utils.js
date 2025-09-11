@@ -7,6 +7,7 @@ import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
 import { useAlertScreenStore } from "./stores";
+import { DISCOUNT_TYPES } from "./constants";
 
 // const fs = require("node:fs");
 export const dim = {
@@ -48,17 +49,62 @@ export function clog(one, two) {
   if (two) console.log(two);
 }
 
-export function calculateRunningTotals(workorderObj, inventoryArr) {
+export function applyLineItemDiscounts(wo, zInventoryArr) {
+  // let wo = cloneDeep(openWorkorderObj);
+  wo.workorderLines.forEach((line, idx) => {
+    // clog("lin", line);
+    let newWOLine = cloneDeep(line);
+    let discountObj = line.discountObj;
+    let inventoryItem = zInventoryArr.find(
+      (item) => item.id === line.invItemID
+    );
+
+    //EDGE CASE if we cannot find the inventory item, that means its been removed from inventory. use the price that was in the system originally.
+    newWOLine.price = inventoryItem?.price || newWOLine.price;
+
+    if (discountObj.name) {
+      let newDiscountObj = applyDiscountToWorkorderItem(newWOLine);
+      // clog(newDiscountObj);
+      if (Number(newDiscountObj.newPrice) > 0) {
+        newWOLine.discountObj = cloneDeep(newDiscountObj);
+        // log("here");
+      }
+      // clog(newWOLine);
+    }
+    // clog(newWOLine);
+    // if (newWOLine.discountObj.discountValue > 0) clog(newWOLine);
+    wo.workorderLines[idx] = newWOLine;
+    // log(wo.workorderLines[idx]);
+  });
+
+  return wo;
+}
+
+export function calculateRunningTotals(
+  workorderObj,
+  inventoryArr,
+  salesTaxRatePercent
+) {
+  let blankReturnObj = {
+    runningTotal: 0,
+    runningDiscount: 0,
+    runningQty: 0,
+  };
+  if (!(inventoryArr?.length > 0)) return { ...blankReturnObj };
+  // clog(inventoryArr);
   let runningTotal = 0;
   let runningDiscount = 0;
+  let runningSubtotal = 0;
   let runningQty = 0;
   let runningTax = 0;
   // log("inv", workorderObj);
   // log("items", workorderObj.workorderLines);
-  workorderObj.workorderLines.forEach((line, idx) => {
-    // log("line", inventoryArr.length);
-    let invItem = inventoryArr?.find((o) => o.id == line.invItemID);
-    if (!invItem) return;
+  workorderObj.workorderLines?.forEach((line, idx) => {
+    let invItem = inventoryArr.find((o) => o.id == line.invItemID);
+    // clog("line", invItem);
+
+    // clog(line);
+    if (!invItem) return { ...blankReturnObj };
     let qty = line.qty;
     let discountObj = line.discountObj;
     // log("discount obj", discountObj);
@@ -66,6 +112,7 @@ export function calculateRunningTotals(workorderObj, inventoryArr) {
     let price = invItem.price;
     let discountSavings = line.discountObj.savings;
     // log("price", price);
+    runningSubtotal = runningSubtotal + Number(price) * qty;
     if (discountPrice) {
       runningTotal = runningTotal + Number(discountPrice);
       runningDiscount = runningDiscount + Number(discountSavings);
@@ -77,8 +124,10 @@ export function calculateRunningTotals(workorderObj, inventoryArr) {
   // log(workorderObj);
   // log("total", trimToTwoDecimals(runningDiscount));
   let obj = {
-    runningTotal: trimToTwoDecimals(runningTotal),
-    runningDiscount: trimToTwoDecimals(runningDiscount),
+    runningTotal: roundToTwoDecimals(runningTotal),
+    runningSubtotal: roundToTwoDecimals(runningSubtotal),
+    runningDiscount: roundToTwoDecimals(runningDiscount),
+    runningTax: roundToTwoDecimals((runningTotal * salesTaxRatePercent) / 100),
     runningQty,
   };
   // clog(obj);
@@ -203,9 +252,30 @@ export function checkInputForNumbersOnly(valString, includeDecimal = true) {
   return isGood;
 }
 
+export function formatNumberForCurrencyDisplay(input, dollarSign = false) {
+  // log(input);
+  const num = parseFloat(input);
+  if (isNaN(num)) return "";
+
+  let obj = num.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (dollarSign) {
+    return obj;
+  } else {
+    return obj.toString().slice(1);
+  }
+}
+
 export function formatDecimal(value) {
   // log("incoming", val);
   // Remove all non-digit characters
+  if (!value) return "0.00";
+  value = value.toString();
+  // log("val", value);
   const cleaned = value.replace(/\D/g, "");
   // Parse as cents, so pad or cut to two decimal places
   let num = parseFloat(cleaned);
@@ -217,10 +287,16 @@ export function formatDecimal(value) {
   return num.slice(1);
 }
 
+export function roundToTwoDecimals(num) {
+  return parseFloat(num.toFixed(2));
+}
+
 export function trimToTwoDecimals(num) {
   // log("incoming num to trim to 2 decimals", num);
 
   let strNum = num.toString();
+
+  return Number(num).toFixed(2);
   let res;
   if (strNum.includes(".")) {
     let split = strNum.split(".");
@@ -478,11 +554,12 @@ export function useInterval(callback, delay) {
   }, [delay]);
 }
 
-export function applyDiscountToWorkorderItem(discountObj, workorderLineObj) {
+export function applyDiscountToWorkorderItem(workorderLineObj) {
+  let discountObj = workorderLineObj.discountObj;
   let newPrice;
   let savings;
 
-  if (discountObj.type === "Percent") {
+  if (discountObj.type === DISCOUNT_TYPES.percent) {
     let multiplier = discountObj.value;
     multiplier = 1 - Number("." + multiplier);
     newPrice = workorderLineObj.price * workorderLineObj.qty * multiplier;
@@ -497,11 +574,9 @@ export function applyDiscountToWorkorderItem(discountObj, workorderLineObj) {
   }
   // log("newprice", newPrice);
   return {
-    type: discountObj.type,
-    value: discountObj.value,
-    newPrice: trimToTwoDecimals(newPrice),
-    savings: trimToTwoDecimals(savings),
-    name: discountObj.name,
+    ...discountObj,
+    newPrice: Number(trimToTwoDecimals(newPrice)),
+    savings: Number(trimToTwoDecimals(savings)),
   };
 }
 

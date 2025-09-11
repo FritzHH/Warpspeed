@@ -90,7 +90,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // cleanup state
   useEffect(() => {
     return () => {
-      log("Cleaning up Face Detection Client; still active?");
+      // log("Cleaning up Face Detection Client; still active?");
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());

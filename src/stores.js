@@ -55,9 +55,9 @@ export const useInvModalStore = create((set, get) => ({
 }));
 
 export const useTabNamesStore = create((set, get) => ({
-  itemsTabName: TAB_NAMES.itemsTab.dashboard,
-  optionsTabName: TAB_NAMES.optionsTab.workorders,
-  infoTabName: TAB_NAMES.infoTab.customer,
+  infoTabName: TAB_NAMES.infoTab.workorder,
+  itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+  optionsTabName: TAB_NAMES.optionsTab.quickItems,
 
   getItemsTabName: () => get().itemsTabName,
   getOptionsTabName: () => get().optionsTabName,
@@ -94,19 +94,34 @@ export const useCustomerSearchStore = create((set, get) => ({
 }));
 
 export const useCheckoutStore = create((set, get) => ({
-  splitPayment: false,
+  isCheckingOut: false,
   paymentArr: [],
-  splitPayment: false,
-  totalAmount: null,
+  totalAmount: 0,
+  totalDiscounts: 0,
   isRefund: false,
+  ticketScan: "",
+  combinedWorkordersArr: [],
+  paymentComplete: false,
+  saleObj: null,
+  cashChangeNeeded: 0,
+
+  getCashChangeNeeded: () => get().cashChangeNeeded,
+  getSaleObj: () => get().saleObj,
+  getPaymentComplete: () => get().paymentComplete,
+  getIsCheckingOut: () => get().isCheckingOut,
   getIsRefund: () => get().isRefund,
   getTotalAmount: () => get().totalAmount,
-  getSplitPayment: () => get().splitPayment,
   getPaymentArr: () => get().paymentArr,
-  // getIsCheckingOut: () => get().isCheckingOut,
-  setSplitPayment: (splitPayment) => {
-    set(() => ({ splitPayment }));
-  },
+  getTicketScan: () => get().ticketScan,
+  getCombinedWorkordersArr: () => get().combinedWorkordersArr,
+
+  setCashChangeNeeded: (cashChangeNeeded) => set({ cashChangeNeeded }),
+  setSaleObj: (saleObj) => set({ saleObj }),
+  setPaymentComplete: (paymentComplete) => set({ paymentComplete }),
+  addToCombinedWorkordersArr: (workorderObj) => {},
+  setCombinedWorkordersArr: (combinedWorkordersArr) =>
+    set({ combinedWorkordersArr }),
+  setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),
   setIsRefund: (isRefund) => {
     set(() => ({ isRefund }));
   },
@@ -116,16 +131,12 @@ export const useCheckoutStore = create((set, get) => ({
   setPaymentArr: (paymentArr) => {
     set(() => ({ paymentArr }));
   },
+  addToPaymentArr: (paymentObj) => {},
   setSplitPayment: (splitPayment) => {
     set(() => ({ splitPayment }));
   },
   reset: () => {
-    set(() => ({
-      splitPayment: false,
-      paymentArr: [],
-      isRefund: false,
-      totalAmount: 0,
-    }));
+    set(() => ({}));
   },
 }));
 
@@ -549,7 +560,7 @@ export const useInventoryStore = create((set, get) => ({
 
 export const useOpenWorkordersStore = create((set, get) => ({
   workorderArr: [],
-  openWorkorderObj: null,
+  // openWorkorderObj: null,
   openWorkorderObj: null,
 
   getOpenWorkorderObj: () => get().openWorkorderObj,
@@ -557,6 +568,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
 
   // setters
   setOpenWorkorderObj: (openWorkorderObj) => {
+    // log(openWorkorderObj);
     set({ openWorkorderObj });
   },
 
@@ -564,6 +576,11 @@ export const useOpenWorkordersStore = create((set, get) => ({
     if (wo.isStandaloneSale) {
       set({ openWorkorderObj: wo });
       return;
+    }
+
+    // dev
+    if (wo.id === "4zXSq6GXUqixBmLApx3F" && !get().openWorkorderObj) {
+      set({ openWorkorderObj: wo });
     }
 
     let workorderArr = cloneDeep(get().workorderArr);
@@ -575,7 +592,10 @@ export const useOpenWorkordersStore = create((set, get) => ({
     }
     set({ workorderArr });
 
-    if (get().openWorkorderObj?.id === wo.id) set({ openWorkorderObj: wo });
+    if (get().openWorkorderObj?.id === wo.id) {
+      // log("setting open workorder");
+      set({ openWorkorderObj: wo });
+    }
 
     if (saveToDB) {
       dbSetWorkorder(wo, batch, false);

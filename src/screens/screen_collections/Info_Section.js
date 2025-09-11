@@ -6,7 +6,7 @@ import { Colors } from "../../styles";
 import { TAB_NAMES, WORKORDER_PROTO } from "../../data";
 import { ActiveWorkorderComponent } from "../screen_components/Info_Screen/Info_ActiveWorkorder";
 import { NewWorkorderComponent } from "../screen_components/Info_Screen/Info_NewWorkorder";
-import { CheckoutComponent } from "../screen_components/Info_Screen/Info_Checkout";
+import { StandaloneSaleComponent } from "../screen_components/Info_Screen/Info_StandaloneSale";
 import React from "react";
 import {
   useOpenWorkordersStore,
@@ -31,7 +31,7 @@ export const Info_Section = ({}) => {
       case TAB_NAMES.infoTab.customer:
         return <NewWorkorderComponent />;
       case TAB_NAMES.infoTab.checkout:
-        return <CheckoutComponent />;
+        return <StandaloneSaleComponent />;
     }
     return null;
   }

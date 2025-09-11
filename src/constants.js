@@ -34,6 +34,7 @@ export const REALTIME_DATABASE_NODE_NAMES = {
 export const FIRESTORE_COLLECTION_NAMES = {
   punchHistory: "PUNCH-HISTORY/",
   closedWorkorders: "CLOSED-WORKORDERS/",
+  customers: "CUSTOMERS/",
 };
 
 // dimensions
@@ -93,5 +94,8 @@ export const build_db_path = {
       FIRESTORE_COLLECTION_NAMES.closedWorkorders + "closed-workorders-obj/";
     if (fieldID) str += fieldID + "/";
     return str;
+  },
+  customer: (customerID) => {
+    return FIRESTORE_COLLECTION_NAMES.customers + customerID + "/";
   },
 };

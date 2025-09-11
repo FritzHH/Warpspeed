@@ -19,7 +19,7 @@ import {
   Button,
   SHADOW_RADIUS_NOTHING,
   SHADOW_RADIUS_PROTO,
-  LoginScreenModalComponent,
+  LoginModalScreen,
   DropdownMenu,
   Button_,
   Icon_,
@@ -49,6 +49,9 @@ import { dbSetCustomerObj, dbSetWorkorder } from "../../../db_call_wrapper";
 
 export const ActiveWorkorderComponent = ({}) => {
   // store setters /////////////////////////////////////////////////////////////////
+  const _zSetIsCheckingOut = useCheckoutStore(
+    (state) => state.setIsCheckingOut
+  );
   const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorder
   );
@@ -95,6 +98,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const partSourcesRef = useRef();
   const statusRef = useRef();
 
+  // dev
   ///////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
 
@@ -142,8 +146,8 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleStartStandaloneSalePress() {
-    log(zCurrentUser);
-    return;
+    // log(zCurrentUser);
+    // return;
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateRandomID();
@@ -215,7 +219,7 @@ export const ActiveWorkorderComponent = ({}) => {
             // paddingHorizontal: 5,
           }}
         >
-          <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+          <LoginModalScreen modalVisible={zShowLoginScreen} />
           <View
             style={{
               width: "100%",

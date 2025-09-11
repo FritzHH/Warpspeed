@@ -7,7 +7,7 @@ import { C, Colors, ICONS, ViewStyles } from "../styles";
 
 import {
   AlertBox_,
-  LoginScreenModalComponent,
+  LoginModalScreen,
   SHADOW_RADIUS_PROTO,
 } from "../components";
 import { Info_Section } from "./screen_collections/Info_Section";
@@ -22,11 +22,13 @@ import {
   useSettingsStore,
   useLoginStore,
   useDatabaseBatchStore,
+  useCheckoutStore,
 } from "../stores";
 import { executeDBBatch } from "../db_call_wrapper";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { DB_BATCH_INTERVAL_MILLIS } from "../constants";
 import { fillSettings } from "../testing";
+import { CheckoutModalScreen } from "./screen_components/modal_screens/CheckoutModalScreen";
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
@@ -55,10 +57,14 @@ export function BaseScreen() {
   const _zRemoveWorkorderObj = useOpenWorkordersStore(
     (state) => state.removeWorkorder
   );
+  const _zSetIsCheckingOut = useCheckoutStore(
+    (state) => state.setIsCheckingOut
+  );
   // testing
   // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
   // store getters /////////////////////////////////////////////////////////////////
+  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
   const zLastDatabaseBatchMillis = useDatabaseBatchStore((state) =>
     state.getLastBatchMillis()
   );
@@ -67,7 +73,7 @@ export function BaseScreen() {
   );
   const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
-  const zModalVisible = useLoginStore((state) => state.getModalVisible());
+  const zLoginModalVisible = useLoginStore((state) => state.getModalVisible());
   const zRunBackgroundRecognition = useLoginStore((state) =>
     state.getRunBackgroundRecognition()
   );
@@ -189,8 +195,9 @@ export function BaseScreen() {
         style={{ width: "100%", height: 0 }}
       />
 
-      <LoginScreenModalComponent
-        modalVisible={zShowLoginScreen && !zModalVisible}
+      <CheckoutModalScreen />
+      <LoginModalScreen
+        modalVisible={zShowLoginScreen && !zLoginModalVisible}
       />
       {zRunBackgroundRecognition ? <FaceDetectionClientComponent /> : null}
       <AlertBox_ />

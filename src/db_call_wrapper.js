@@ -31,6 +31,7 @@ import {
   setFirestoreSubCollectionItem,
   setRealtimeNodeItem,
   newSetDatabaseField,
+  getFirestoreDoc,
 } from "./db";
 import { useDatabaseBatchStore } from "./stores";
 import { clog, generateRandomID, log } from "./utils";
@@ -201,8 +202,9 @@ export function dbGetSaleItem(id) {
   return getDocument("SALES", id);
 }
 
-export function dbGetCustomerObj(id) {
-  return getDocument("CUSTOMERS", id);
+export function dbGetCustomerObj(customerID) {
+  let path = build_db_path.customer(customerID);
+  return getFirestoreDoc(path);
 }
 
 // database filters //////////////////////////////////////////////////

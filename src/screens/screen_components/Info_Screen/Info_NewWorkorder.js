@@ -20,7 +20,7 @@ import {
   Button,
   CustomerInfoScreenModalComponent,
   SHADOW_RADIUS_PROTO,
-  LoginScreenModalComponent,
+  LoginModalScreen,
   ColorSelectorModalComponent,
   Button_,
 } from "../../../components";
@@ -348,7 +348,7 @@ export function NewWorkorderComponent({}) {
               }}
             /> */}
         {/* </View> */}
-        <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+        <LoginModalScreen modalVisible={zShowLoginScreen} />
         <View style={{ alignItems: "center" }}>
           <TextInput
             style={{

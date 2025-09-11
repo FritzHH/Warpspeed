@@ -97,6 +97,7 @@ import Svg, {
   Rect,
   Stop,
 } from "react-native-svg";
+import { StyleSheet } from "react-native";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -159,10 +160,10 @@ const styles = {
 };
 
 export const SHADOW_RADIUS_PROTO = {
-  shadowColor: "black",
+  shadowColor: C.green,
   shadowOffset: { width: 2, height: 2 },
   shadowOpacity: 0.25,
-  shadowRadius: 1,
+  shadowRadius: 15,
 };
 
 export const SHADOW_RADIUS_NOTHING = {
@@ -995,7 +996,7 @@ export const InventoryItemScreeenModalComponent = ({
             backgroundColor: "white",
           }}
         >
-          <LoginScreenModalComponent modalVisible={zShowLoginScreen} />
+          <LoginModalScreen modalVisible={zShowLoginScreen} />
           <View
             style={{
               width: "100%",
@@ -1506,7 +1507,7 @@ export const CustomerInfoScreenModalComponent = ({
   }
 };
 
-export const LoginScreenModalComponent = ({ modalVisible }) => {
+export const LoginModalScreen = ({ modalVisible }) => {
   // setters /////////////////////////////////////////////////////////////
   const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
   const _zSetShowLoginScreen = useLoginStore(
@@ -1608,788 +1609,7 @@ export const LoginScreenModalComponent = ({ modalVisible }) => {
   );
 };
 
-const checkoutScreenStyle = {
-  base: {
-    alignItems: "center",
-    paddingTop: 20,
-    width: 500,
-    height: 380,
-    backgroundColor: "white",
-  },
-  titleText: {
-    fontSize: 30,
-    color: "dimgray",
-  },
-  boxDollarSign: {
-    fontSize: 15,
-    // marginRight: 5,
-  },
-  totalText: {
-    fontSize: 10,
-    color: "darkgray",
-  },
-  boxText: {
-    outlineWidth: 0,
-    fontSize: 25,
-    textAlign: "right",
-    placeholderTextColor: "lightgray",
-    // backgroundColor: "green",
-    width: "90%",
-  },
-  buttonText: {
-    fontSize: 13,
-    fontWeight: Fonts.weight.textRegular,
-  },
-  boxStyle: {
-    marginTop: 5,
-    borderColor: Colors.tabMenuButton,
-    borderWidth: 2,
-    backgroundColor: "whitesmoke",
-    padding: 5,
-    width: 100,
-    height: 50,
-    alignItems: "space-between",
-    justifyContent: "space-between",
-    flexDirection: "row",
-  },
-  totalTextStyle: {
-    marginTop: 15,
-  },
-  titleStyle: {
-    marginTop: 20,
-  },
-  buttonRowStyle: {
-    marginTop: 20,
-  },
-  statusText: {
-    width: "80%",
-    textAlign: "center",
-    marginTop: 15,
-    color: "green",
-    fontSize: 15,
-    fontWeight: 600,
-  },
-  loadingIndicatorStyle: {
-    marginTop: 10,
-  },
-};
-
-export const CashSaleModalComponent = ({
-  totalAmount,
-  onCancel,
-  isRefund,
-  splitPayment,
-  onComplete,
-  acceptsChecks,
-  paymentsArr,
-}) => {
-  const [sTenderAmount, _setTenderAmount] = useState("");
-  const [sRequestedAmount, _setRequestedAmount] = useState("");
-  const [sSplitTotalPaidAlready, _setSplitTotalPaidAlready] = useState("");
-  const [sAmountLeftToPay, _setAmountLeftToPay] = useState("");
-  const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sProcessButtonLabel, _setProcessButtonLabel] = useState("");
-  const [sIsCheck, _setIsCheck] = useState(false);
-  const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
-  const [sPaymentAmountTextColor, _setPaymentAmountTextColor] = useState(null);
-  const [sTenderAmountTextColor, _setTenderAmountTextColor] = useState(null);
-
-  useEffect(() => {
-    let totalPaid = 0.0;
-    paymentsArr.forEach((paymentObj) => {
-      totalPaid += paymentObj.amount;
-    });
-
-    _setSplitTotalPaidAlready(trimToTwoDecimals(totalPaid));
-    _setAmountLeftToPay(trimToTwoDecimals(totalAmount - totalPaid));
-  }, []);
-
-  function handleTextChange(val, boxName) {
-    // log("text change val", val);
-    if (LETTERS.includes(val[val.length - 1])) return;
-    let formattedVal = val != "." ? formatDecimal(val) : "";
-
-    let tendAmount = Number(sTenderAmount);
-    let reqAmount = Number(sRequestedAmount);
-    if (boxName == "tender") {
-      tendAmount = formattedVal;
-    } else {
-      reqAmount = formattedVal;
-    }
-
-    if (boxName == "tender") {
-      tendAmount = formattedVal;
-    } else {
-      reqAmount = formattedVal;
-    }
-    let buttonLabel = "Process";
-    let textColor = null;
-
-    const minVal = 0.5;
-    if (
-      splitPayment &&
-      (reqAmount < minVal ||
-        reqAmount > totalAmount ||
-        reqAmount > sAmountLeftToPay ||
-        reqAmount > tendAmount)
-    ) {
-      buttonLabel = null;
-      textColor = "red";
-    }
-    if (
-      tendAmount < minVal ||
-      (splitPayment && tendAmount < reqAmount) ||
-      (!splitPayment && tendAmount < Number(totalAmount))
-    ) {
-      // log("ten", tendAmount < Number(totalAmount));
-      // log("total", totalAmount);
-      // log("diff", tendAmount - Number(totalAmount));
-      buttonLabel = null;
-      textColor = "red";
-    }
-
-    boxName == "tender"
-      ? _setTenderAmount(formattedVal)
-      : _setRequestedAmount(formattedVal);
-
-    _setProcessButtonLabel(buttonLabel);
-    _setPaymentAmountTextColor(textColor);
-    // _setTenderAmountTextColor(tenderTextColor);
-  }
-
-  function handleProcessButtonPress() {
-    onComplete({
-      amountTendered: Number(sTenderAmount),
-      amount: Number(sRequestedAmount || totalAmount),
-      isCheck: sIsCheck,
-    });
-    onCancel();
-  }
-
-  function handleKeyPress(event) {
-    // log("event", event.nativeEvent.key);
-    if (event.nativeEvent.key == "Enter") {
-      if (!splitPayment) {
-        handleProcessButtonPress();
-      } else {
-        if (sTenderAmount >= sRequestedAmount) {
-          handleProcessButtonPress();
-        } else {
-          _setInputBoxFocus("tender");
-        }
-      }
-    }
-  }
-  return (
-    <View
-      style={{
-        ...checkoutScreenStyle.base,
-      }}
-    >
-      {acceptsChecks ? (
-        <View style={{ width: "100%" }}>
-          <CheckBox_
-            textStyle={{ fontSize: 12 }}
-            boxStyle={{ width: 14, height: 14 }}
-            text={"Paper Check"}
-            onCheck={() => _setIsCheck(!sIsCheck)}
-            isChecked={sIsCheck}
-            viewStyle={{ alignSelf: "flex-end", marginRight: 20 }}
-          />
-        </View>
-      ) : null}
-      <Text
-        style={{
-          ...checkoutScreenStyle.titleText,
-        }}
-      >
-        Cash Sale
-      </Text>
-
-      <Text style={{ ...checkoutScreenStyle.totalTextStyle }}>
-        {"Total: $ " + totalAmount}
-      </Text>
-      {splitPayment ? (
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={{ alignItems: "flex-end", marginRight: 10 }}>
-            <Text
-              style={{
-                marginTop: 10,
-                fontSize: 14,
-                color: "gray",
-              }}
-            >
-              {"Amount paid:"}
-            </Text>
-
-            <Text
-              style={{
-                marginTop: 10,
-                fontSize: 14,
-                color: "gray",
-              }}
-            >
-              {"Amount left:"}
-            </Text>
-          </View>
-          <View style={{ alignItems: "flex-end" }}>
-            <Text
-              style={{
-                marginTop: 10,
-                fontSize: 14,
-                color: "",
-              }}
-            >
-              {"$" + sSplitTotalPaidAlready}
-            </Text>
-            <Text
-              style={{
-                marginTop: 10,
-                fontSize: 14,
-                color: "red",
-              }}
-            >
-              {"$" + sAmountLeftToPay}
-            </Text>
-          </View>
-        </View>
-      ) : null}
-      <View style={{ flexDirection: "row" }}>
-        {splitPayment ? (
-          <View
-            style={{
-              ...checkoutScreenStyle.boxStyle,
-              paddingBottom: 6,
-              paddingRight: 7,
-              marginTop: 10,
-            }}
-          >
-            <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
-
-            <View
-              style={{
-                width: "100%",
-                height: "100%",
-                // backgroundColor: "green",
-                alignItems: "flex-end",
-                paddingRight: 5,
-              }}
-            >
-              <TextInput
-                style={{
-                  ...checkoutScreenStyle.boxText,
-                  height: "70%",
-                  // backgroundColor: "blue",
-                  color: sPaymentAmountTextColor,
-                }}
-                placeholder="0.00"
-                placeholderTextColor={
-                  checkoutScreenStyle.boxText.placeholderTextColor
-                }
-                value={sRequestedAmount}
-                onChangeText={(val) => handleTextChange(val)}
-                autoFocus={true}
-                onKeyPress={handleKeyPress}
-              />
-              <Text
-                style={{
-                  fontStyle: "italic",
-                  color: "darkgray",
-                  fontSize: 12,
-                }}
-              >
-                Pay Amount
-              </Text>
-            </View>
-          </View>
-        ) : null}
-        <View
-          style={{
-            marginLeft: 20,
-            ...checkoutScreenStyle.boxStyle,
-            paddingBottom: 6,
-            paddingRight: 7,
-            marginTop: 10,
-          }}
-        >
-          <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
-
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              // backgroundColor: "green",
-              alignItems: "flex-end",
-              paddingRight: 5,
-            }}
-          >
-            <TextInput
-              style={{
-                ...checkoutScreenStyle.boxText,
-                height: "70%",
-                color: sPaymentAmountTextColor,
-                // backgroundColor: "blue",
-              }}
-              placeholder="0.00"
-              placeholderTextColor={
-                checkoutScreenStyle.boxText.placeholderTextColor
-              }
-              value={sTenderAmount}
-              onChangeText={(val) => handleTextChange(val, "tender")}
-              autoFocus={sInputBoxFocus == "tender" || !splitPayment}
-              onKeyPress={handleKeyPress}
-              // onFocus={() => _zSetPaymentAmount("")}
-            />
-            <Text
-              style={{
-                fontStyle: "italic",
-                color: "darkgray",
-                fontSize: 12,
-              }}
-            >
-              Tender
-            </Text>
-          </View>
-        </View>
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-around",
-          width: "100%",
-          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
-        }}
-      >
-        <Button
-          buttonStyle={{ backgroundColor: "green" }}
-          textStyle={{ color: "white" }}
-          visible={sProcessButtonLabel}
-          onPress={handleProcessButtonPress}
-          text={sProcessButtonLabel ? sProcessButtonLabel : ""}
-        />
-        <Button onPress={onCancel} text={"Cancel"} />
-      </View>
-      <Text
-        style={{
-          ...checkoutScreenStyle.statusText,
-          color: "red",
-        }}
-      >
-        {sStatusMessage}
-      </Text>
-
-      {/* <View style={{ ...checkoutScreenStyle.loadingIndicatorStyle }}>
-        <LoadingIndicator visible={sStatus} />
-      </View> */}
-    </View>
-  );
-};
-
-export const StripeCreditCardModalComponent = ({
-  onCancel,
-  isRefund,
-  splitPayment,
-  totalAmount,
-  onComplete,
-  paymentsArr,
-}) => {
-  // store setters
-  const _zSetPaymentIntentID = useStripePaymentStore(
-    (state) => state.setPaymentIntentID
-  );
-  const zResetStripeStore = useStripePaymentStore((state) => state.reset);
-
-  // store getters
-  const zReader = useStripePaymentStore((state) => state.getReader());
-  const zReadersArr = useStripePaymentStore((state) => state.getReadersArr());
-  const zPaymentIntentID = useStripePaymentStore((state) =>
-    state.getPaymentIntentID()
-  );
-
-  /////////////////////////////////////////////////////////////////////////
-  const [sStatus, _sSetStatus] = useState(false);
-  const [sStatusMessage, _sSetStatusMessage] = useState(
-    !splitPayment ? "Starting payment intent..." : "Reader ready"
-  );
-  const [sStatusTextColor, _sSetStatusTextColor] = useState("green");
-  const [sListenerArr, _sSetListenerArr] = useState(null);
-  const [sCardWasDeclined, _sSetCardWasDeclined] = useState(false);
-  const [sReaderBusy, _sSetReaderBudy] = useState(false);
-  const [sPaymentAmount, _setPaymentAmount] = useState(totalAmount);
-  const [sSplitTotalPaidAlready, _setSplitTotalPaidAlready] = useState("");
-  const [sAmountLeftToPay, _setAmountLeftToPay] = useState("");
-  const [sProcessButtonLabel, _setProcessButtonLabel] = useState("");
-  const [sTextColor, _setTextColor] = useState(null);
-  const [sRunningReader, _setRunningReader] = useState(false);
-
-  //////////////////////////////////////////////////////////////////
-
-  // gather the previous payments made on a split payment
-  useEffect(() => {
-    if (!splitPayment) return;
-
-    let totalPaid = 0.0;
-    paymentsArr.forEach((paymentObj) => {
-      totalPaid += paymentObj.amount;
-    });
-
-    log("running");
-    _setSplitTotalPaidAlready(trimToTwoDecimals(totalPaid));
-    _setAmountLeftToPay(trimToTwoDecimals(totalAmount - totalPaid));
-  }, []);
-
-  // automatically start card process if not split payment
-  useEffect(() => {
-    if (!splitPayment && !sRunningReader) {
-      startServerDrivenStripePaymentIntent(totalAmount);
-      _setRunningReader(true);
-    }
-
-    return () => {
-      zResetStripeStore();
-      if (sListenerArr) {
-        sListenerArr.forEach((listener) => listener());
-      }
-    };
-  }, []);
-
-  function handleTextChange(val) {
-    if (LETTERS.includes(val[val.length - 1])) return;
-    let formattedVal = val != "." ? formatDecimal(val) : "";
-
-    let num = Number(formattedVal);
-    let amountLeftToPay = Number(sAmountLeftToPay);
-
-    if (!splitPayment) amountLeftToPay = totalAmount;
-    let buttonLabel = "";
-    let textColor = "red";
-    // log("amount", amountLeftToPay);
-    // log("num", num);
-    if (num <= amountLeftToPay && num >= 0.5) {
-      buttonLabel = "Process";
-      textColor = null;
-    }
-
-    _setProcessButtonLabel(buttonLabel);
-    _setTextColor(textColor);
-    _setPaymentAmount(formattedVal);
-  }
-
-  function handleKeyPress(event) {
-    if (event.nativeEvent.key != "Enter") return;
-
-    let amountLeftToPay = Number(sAmountLeftToPay);
-    if (!splitPayment) amountLeftToPay = totalAmount;
-    let paymentAmount = Number(sPaymentAmount);
-
-    if (
-      splitPayment &&
-      paymentAmount >= 0.5 &&
-      paymentAmount > amountLeftToPay &&
-      paymentAmount <= totalAmount
-    ) {
-      startServerDrivenStripePaymentIntent(paymentAmount);
-    } else if (!splitPayment) {
-      startServerDrivenStripePaymentIntent(totalAmount);
-    }
-  }
-
-  // todo
-  function setCurrentReader(reader) {
-    // log("cur", reader);
-    if (reader?.id) _zSetReader(reader);
-  }
-
-  async function startServerDrivenStripePaymentIntent(paymentAmount) {
-    log("payment amouint", paymentAmount);
-    if (!(paymentAmount > 0)) return;
-    _sSetStatus(true);
-    _sSetStatusTextColor("red");
-    _sSetStatusMessage("Retrieving card reader activation...");
-    log("starting server driven payment attempt, amount", paymentAmount);
-    // return;
-
-    // readerResult obj contains readerResult object key/val and paymentIntentID key/val
-    let paymentIntentID = zPaymentIntentID;
-    let readerResult = await dbProcessServerDrivenStripePayment(
-      paymentAmount,
-      zReader.id,
-      false,
-      paymentIntentID
-    );
-    console.log("reader result", readerResult);
-
-    if (readerResult == "in_progress") {
-      handleStripeReaderActivationError(readerResult);
-      _sSetReaderBudy(true);
-    } else {
-      _sSetReaderBudy(false);
-      _sSetStatusTextColor("green");
-      _sSetStatusMessage("Waiting for customer...");
-      _zSetPaymentIntentID(readerResult.paymentIntentID);
-      // log("pi id", readerResult.paymentIntentID);
-      let listenerArr = await paymentIntentSubscribe(
-        readerResult.paymentIntentID,
-        handleStripeCardPaymentDBSubscriptionUpdate,
-        readerResult.paymentIntentID
-      );
-      _sSetListenerArr(listenerArr);
-    }
-  }
-
-  async function handleStripeReaderActivationError(error) {
-    _sSetStatusTextColor("red");
-    _sSetStatus(false);
-    log("Handling Stripe reader activation error", error);
-    let message = "";
-    if (error == "in_progress") {
-      message =
-        "Card Reader in use. Please wait until screen clears, or use a different reader.\n\n If not in use, try resetting the card reader";
-    } else {
-      switch (error.code) {
-        case "terminal_reader_timeout":
-          message =
-            "Could not connect to reader, possible network issue\n" +
-            error.code;
-          break;
-        case "terminal_reader_offline":
-          message =
-            "Reader appears to be offline. Please check power and internet connection\n" +
-            error.code;
-          break;
-        case "terminal_reader_busy":
-          message = "Reader busy. Please try a different reader\n" + error.code;
-          break;
-        case "intent_invalid_state":
-          message =
-            "Invalid payment intent state. Please clear the reader and try again";
-          break;
-        default:
-          message = "Unknown processing error: \n" + error.code;
-      }
-    }
-    _sSetStatusMessage(message);
-  }
-
-  function handleStripeCardPaymentDBSubscriptionUpdate(
-    type,
-    key,
-    val,
-    zzPaymentIntentID
-  ) {
-    // log("Stripe webhook properties", type + " : " + key);
-    clog("Stripe webhook update Obj", val);
-    let failureCode = val?.failure_code;
-    if (failureCode == "card_declined") {
-      let paymentIntentID = val?.process_payment_intent?.payment_intent;
-      log("CARD DECLINED");
-      // log("payment intent id", paymentIntentID);
-      // log("z payment intent id", zzPaymentIntentID);
-      if (paymentIntentID == zzPaymentIntentID) {
-        _sSetCardWasDeclined(true);
-        _sSetStatusTextColor("red");
-        _sSetStatusMessage("Card Declined");
-        _sSetStatus(false);
-      }
-    } else if (key == "complete") {
-      _sSetCardWasDeclined(false);
-      _sSetStatusTextColor("green");
-      _sSetStatusMessage("Payment Complete!");
-      _sSetStatus(false);
-      clog("Payment complete object", val);
-      let paymentMethodDetails = val.payment_method_details.card_present;
-      // log("trimming", trimToTwoDecimals(Number(val.amount_captured) / 100));
-      // log("num", Number(val.amountCaptured));
-      let paymentDetailsObj = {
-        last4: paymentMethodDetails.last4,
-        cardType: paymentMethodDetails.description,
-        issuer: paymentMethodDetails.receipt.application_preferred_name,
-        authorizationCode: paymentMethodDetails.receipt.authorization_code,
-        paymentIntentID: val.payment_intent,
-        chargeID: val.id,
-        amount: trimToTwoDecimals(val.amount_captured / 100),
-        paymentProcessor: "stripe",
-        totalCaptured: trimToTwoDecimals(val.amount_captured / 100),
-      };
-      clog("Successful Payment details obj", paymentDetailsObj);
-      onComplete(paymentDetailsObj);
-      setTimeout(() => {
-        onCancel();
-      }, 1500);
-    }
-  }
-
-  async function cancelServerDrivenStripePaymentIntent() {
-    _sSetStatusTextColor("red");
-    _sSetStatusMessage("Canceling payment request...");
-    log("canceling server driven payment attempt", zReader);
-    if (!zPaymentIntentID) {
-      onCancel();
-      return;
-    }
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      zReader?.id,
-      zPaymentIntentID
-    );
-
-    onCancel();
-  }
-
-  async function resetCardReader() {
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      zReader?.id,
-      zPaymentIntentID
-    );
-    onCancel();
-  }
-
-  async function clearReader() {
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      zReader?.id,
-      zPaymentIntentID
-    );
-
-    onCancel();
-  }
-
-  return (
-    <View
-      style={{
-        ...checkoutScreenStyle.base,
-      }}
-    >
-      <Text
-        style={{
-          ...checkoutScreenStyle.titleText,
-        }}
-      >
-        Credit Card Sale
-      </Text>
-      <Text style={{ ...checkoutScreenStyle.totalTextStyle }}>
-        {"Total: $ " + totalAmount}
-      </Text>
-      {splitPayment ? (
-        <View style={{ alignItems: "center" }}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <View style={{ alignItems: "flex-end", marginRight: 10 }}>
-              <Text
-                style={{
-                  marginTop: 10,
-                  fontSize: 14,
-                  color: "gray",
-                }}
-              >
-                {"Amount paid:"}
-              </Text>
-
-              <Text
-                style={{
-                  marginTop: 10,
-                  fontSize: 14,
-                  color: "gray",
-                }}
-              >
-                {"Amount left:"}
-              </Text>
-            </View>
-            <View style={{ alignItems: "flex-end" }}>
-              <Text
-                style={{
-                  marginTop: 10,
-                  fontSize: 14,
-                  color: "gray",
-                }}
-              >
-                {"$" + sSplitTotalPaidAlready}
-              </Text>
-              <Text
-                style={{
-                  marginTop: 10,
-                  fontSize: 14,
-                  color: "red",
-                  fontWeight: "500",
-                }}
-              >
-                {"$" + sAmountLeftToPay}
-              </Text>
-            </View>
-          </View>
-          <View
-            style={{
-              ...checkoutScreenStyle.boxStyle,
-            }}
-          >
-            <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
-            <TextInput
-              style={{
-                ...checkoutScreenStyle.boxText,
-                color: sTextColor,
-              }}
-              placeholder="0.00"
-              placeholderTextColor={
-                checkoutScreenStyle.boxText.placeholderTextColor
-              }
-              value={sPaymentAmount}
-              onChangeText={handleTextChange}
-              autoFocus={true}
-              onKeyPress={handleKeyPress}
-            />
-          </View>
-        </View>
-      ) : null}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-around",
-          width: "100%",
-          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
-        }}
-      >
-        {splitPayment ? (
-          <Button
-            onPress={() => startServerDrivenStripePaymentIntent(sPaymentAmount)}
-            text={isRefund ? "Process Refund" : "Process Amount"}
-            textStyle={{ color: "white" }}
-            buttonStyle={{ backgroundColor: "green" }}
-            visible={sProcessButtonLabel}
-          />
-        ) : null}
-        <Button
-          onPress={cancelServerDrivenStripePaymentIntent}
-          text={"Cancel"}
-        />
-      </View>
-      <Text
-        style={{
-          // fontFamily: "Inter",
-          ...checkoutScreenStyle.statusText,
-          color: sStatusTextColor,
-        }}
-      >
-        {sStatusMessage}
-      </Text>
-
-      <View style={{ ...checkoutScreenStyle.loadingIndicatorStyle }}>
-        <LoadingIndicator visible={sStatus} />
-      </View>
-      <View style={{ width: "100%", alignItems: "flex-end", marginRight: 5 }}>
-        <Button
-          text={"Reset Reader"}
-          textStyle={{ fontSize: 12 }}
-          buttonStyle={{
-            backgroundColor: "lightgray",
-            height: null,
-            width: null,
-            padding: 5,
-            marginRight: 15,
-            marginTop: 20,
-          }}
-          onPress={resetCardReader}
-        />
-      </View>
-    </View>
-  );
-};
+export const SaleModalComponent = ({}) => {};
 
 export const Button = ({
   visible = true,
@@ -2682,6 +1902,7 @@ export const Button_ = ({
   }
 
   function handleButtonPress() {
+    if (!enabled) return;
     if (visible) {
       _setMouseOver(false);
       onPress();
@@ -2700,12 +1921,13 @@ export const Button_ = ({
     if (sMouseOver && enabled) {
       return mouseOverOptions.opacity;
     } else if (!enabled) {
-      return 0.4;
+      return null;
     } else {
       return 1;
     }
   }
 
+  // log(enabled.toString());
   return (
     <TouchableOpacity
       style={{
@@ -2728,7 +1950,8 @@ export const Button_ = ({
       onLongPress={visible ? onLongPress : () => {}}
     >
       <GradientView
-        colorArr={enabled ? colorGradientArr : []}
+        // colorArr={enabled ? colorGradientArr : []}
+        colorArr={colorGradientArr || []}
         style={{
           alignItems: "center",
           justifyContent: "center",
@@ -2740,6 +1963,7 @@ export const Button_ = ({
           ...shadowStyle,
           ...buttonStyle,
           backgroundColor: icon && !text ? null : getBackgroundColor(),
+          opacity: enabled ? 1 : 0.2,
         }}
         {...gradientViewProps}
       >
@@ -3023,6 +2247,106 @@ export function TimeSpinner({
         ]}
         pointerEvents="none"
       />
+    </View>
+  );
+}
+
+export function SliderButton_({
+  onConfirm,
+  toConfirmLabel = "Slide to confirm",
+  confirmLabel = "Confirmed!",
+  showLabel = false,
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  const SLIDER_WIDTH = 280;
+  const KNOB_SIZE = 50;
+
+  const styles2 = StyleSheet.create({
+    container: {
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+    },
+    label: {
+      marginBottom: 10,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    slider: {
+      width: SLIDER_WIDTH,
+      height: KNOB_SIZE,
+      borderRadius: KNOB_SIZE / 2,
+      backgroundColor: "#eee",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
+    knob: {
+      width: KNOB_SIZE,
+      height: KNOB_SIZE,
+      borderRadius: KNOB_SIZE / 2,
+      backgroundColor: "#4CAF50",
+      justifyContent: "center",
+      alignItems: "center",
+      position: "absolute",
+
+      // 👇 Works only in react-native-web
+      cursor: "pointer",
+    },
+    knobText: {
+      color: "white",
+      fontSize: 20,
+      fontWeight: "bold",
+    },
+  });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !confirmed,
+      onMoveShouldSetPanResponder: () => !confirmed,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx > 0) {
+          translateX.setValue(
+            Math.min(gestureState.dx, SLIDER_WIDTH - KNOB_SIZE)
+          );
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > SLIDER_WIDTH - KNOB_SIZE - 10) {
+          // Trigger action if slid to end
+          setConfirmed(true);
+          onConfirm?.();
+          Animated.spring(translateX, {
+            toValue: SLIDER_WIDTH - KNOB_SIZE,
+            useNativeDriver: true,
+          }).start();
+        } else {
+          // Reset back if not completed
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <View style={styles2.container}>
+      {showLabel ? (
+        <Text style={styles2.label}>
+          {confirmed ? confirmLabel : toConfirmLabel}
+        </Text>
+      ) : null}
+      <View style={styles2.slider}>
+        <Animated.View
+          {...panResponder.panHandlers}
+          style={[styles2.knob, { transform: [{ translateX }] }]}
+        >
+          <Text style={styles2.knobText}>➔</Text>
+        </Animated.View>
+      </View>
     </View>
   );
 }

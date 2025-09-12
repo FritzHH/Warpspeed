@@ -142,6 +142,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
       zSettingsObj?.salesTax
     );
 
+    // log(runningTax);
     _setSubtotalAmount(runningSubtotal);
     _setTotalDiscountAmount(runningDiscount);
     _setTotalTaxAmount(runningTax);
@@ -297,7 +298,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
           >
             <MiddleItemComponent
               sAmountLeftToPay={sAmountLeftToPay}
-              sPaymentsCaptured={sPaymentsCaptured}
+              // sPaymentsCaptured={sPaymentsCaptured}
               sPaymentComplete={sPaymentComplete}
               sTotalAmount={sTotalAmount}
               sTotalDiscountAmount={sTotalDiscountAmount}
@@ -306,7 +307,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sRefundScan={sRefundScan}
               _sSetRefundScan={_sSetRefundScan}
               sSubtotalAmount={sSubtotalAmount}
-              sTotalTaxAmount={sTotalAmount}
+              sTotalTaxAmount={sTotalTaxAmount}
               _zSetIsCheckingOut={_zSetIsCheckingOut}
               handleCancelPress={closeCheckoutScreenModal}
               paymentsArr={sSaleObj?.paymentArr}
@@ -869,7 +870,7 @@ const MiddleItemComponent = ({
   amountLeftToPay,
 }) => {
   const [sFocusedItem, _setFocusedItem] = useState("");
-
+  // clog(paymentsArr);
   return (
     <View
       style={{
@@ -1059,7 +1060,7 @@ const MiddleItemComponent = ({
                   color: C.lightred,
                 }}
               >
-                {"- " + trimToTwoDecimals(sTotalDiscountAmount)}
+                {"- " + formatNumberForCurrencyDisplay(sTotalDiscountAmount)}
               </Text>
             </View>
           </View>
@@ -1098,7 +1099,9 @@ const MiddleItemComponent = ({
                   color: lightenRGBByPercent(C.green, 20),
                 }}
               >
-                {trimToTwoDecimals(sSubtotalAmount - sTotalDiscountAmount)}
+                {formatNumberForCurrencyDisplay(
+                  sSubtotalAmount - sTotalDiscountAmount
+                )}
               </Text>
             </View>
           </View>
@@ -1109,7 +1112,6 @@ const MiddleItemComponent = ({
               width: "100%",
               height: 1,
               marginVertical: 10,
-
               backgroundColor: C.buttonLightGreenOutline,
             }}
           />
@@ -1139,7 +1141,7 @@ const MiddleItemComponent = ({
                 color: lightenRGBByPercent(C.green, 20),
               }}
             >
-              {trimToTwoDecimals(sTotalTaxAmount)}
+              {formatNumberForCurrencyDisplay(sTotalTaxAmount)}
             </Text>
           </View>
         </View>
@@ -1177,7 +1179,7 @@ const MiddleItemComponent = ({
                 color: C.green,
               }}
             >
-              {trimToTwoDecimals(sTotalAmount)}
+              {formatNumberForCurrencyDisplay(sTotalAmount)}
             </Text>
           </View>
         </View>
@@ -1286,14 +1288,15 @@ const MiddleItemComponent = ({
           alignItems: "center",
           justifyContent: "space-around",
           marginTop: 25,
+          // justifySelf: "flex-end",
         }}
       >
         {paymentsArr?.length > 0 && amountLeftToPay != 0 ? (
           <SliderButton_ onConfirm={(val) => log("val", val)} />
         ) : null}
-        {paymentsArr?.length == 0 ? (
+        {!paymentsArr || paymentsArr?.length == 0 ? (
           <Button_
-            colorGradientArr={COLOR_GRADIENTS.red}
+            colorGradientArr={COLOR_GRADIENTS.green}
             text={"Cancel"}
             onPress={handleCancelPress}
           />

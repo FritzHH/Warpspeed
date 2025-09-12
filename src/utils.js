@@ -85,7 +85,7 @@ export function calculateRunningTotals(input, salesTaxRatePercent) {
   let runningDiscount = 0;
   let runningSubtotal = 0;
   let runningQty = 0;
-  clog("input", input);
+  // clog("input", input);
   if (!Array.isArray(input)) input = [input];
 
   input.forEach((workorderObj) => {
@@ -207,6 +207,159 @@ export const FileInputComponent = ({
     </TouchableOpacity>
   );
 };
+
+export function fuzzySearch(searchTerms, items) {
+  // --- Helpers ---
+  function normalize(str) {
+    return str ? str.toString().toLowerCase().trim() : "";
+  }
+
+  // Levenshtein distance similarity
+  function levenshteinSim(a, b) {
+    const m = [];
+    for (let i = 0; i <= b.length; i++) m[i] = [i];
+    for (let j = 0; j <= a.length; j++) m[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          m[i][j] = m[i - 1][j - 1];
+        } else {
+          m[i][j] = Math.min(
+            m[i - 1][j - 1] + 1,
+            m[i][j - 1] + 1,
+            m[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    const distance = m[b.length][a.length];
+    const maxLen = Math.max(a.length, b.length);
+    return maxLen ? 1 - distance / maxLen : 1;
+  }
+
+  // Jaro–Winkler similarity
+  function jaroWinklerSim(s1, s2) {
+    s1 = normalize(s1);
+    s2 = normalize(s2);
+    const m = getMatchingCharacters(s1, s2);
+    if (!m.matches) return 0;
+    let t = 0;
+    for (let i = 0; i < m.matches; i++) {
+      if (m.s1Matches[i] !== m.s2Matches[i]) t++;
+    }
+    t = t / 2;
+    const jaro =
+      (m.matches / s1.length +
+        m.matches / s2.length +
+        (m.matches - t) / m.matches) /
+      3;
+    // Winkler adjustment
+    let prefix = 0;
+    for (let i = 0; i < Math.min(4, s1.length, s2.length); i++) {
+      if (s1[i] === s2[i]) prefix++;
+      else break;
+    }
+    return jaro + prefix * 0.1 * (1 - jaro);
+  }
+
+  function getMatchingCharacters(s1, s2) {
+    const matchWindow = Math.floor(Math.max(s1.length, s2.length) / 2) - 1;
+    const s1Matches = [];
+    const s2Matches = [];
+    const s1Flags = Array(s1.length).fill(false);
+    const s2Flags = Array(s2.length).fill(false);
+
+    let matches = 0;
+    for (let i = 0; i < s1.length; i++) {
+      const start = Math.max(0, i - matchWindow);
+      const end = Math.min(i + matchWindow + 1, s2.length);
+      for (let j = start; j < end; j++) {
+        if (!s2Flags[j] && s1[i] === s2[j]) {
+          s1Flags[i] = true;
+          s2Flags[j] = true;
+          s1Matches.push(s1[i]);
+          s2Matches.push(s2[j]);
+          matches++;
+          break;
+        }
+      }
+    }
+    return { matches, s1Matches, s2Matches };
+  }
+
+  // Dice coefficient (bigram similarity)
+  function diceCoefficient(a, b) {
+    a = normalize(a);
+    b = normalize(b);
+    if (!a.length || !b.length) return 0;
+    if (a === b) return 1;
+    const bigrams = (str) => {
+      const res = [];
+      for (let i = 0; i < str.length - 1; i++) {
+        res.push(str.slice(i, i + 2));
+      }
+      return res;
+    };
+    const aBigrams = bigrams(a);
+    const bBigrams = bigrams(b);
+    const aMap = {};
+    aBigrams.forEach((bg) => (aMap[bg] = (aMap[bg] || 0) + 1));
+    let intersection = 0;
+    bBigrams.forEach((bg) => {
+      if (aMap[bg]) {
+        intersection++;
+        aMap[bg]--;
+      }
+    });
+    return (2.0 * intersection) / (aBigrams.length + bBigrams.length);
+  }
+
+  // Combined match score
+  function matchScore(term, field) {
+    const t = normalize(term);
+    const f = normalize(field);
+    if (!t || !f) return 0;
+
+    // Direct equality or includes
+    if (t === f) return 1;
+    if (f.includes(t)) return 0.9;
+
+    // Combine three algorithms
+    const lev = levenshteinSim(t, f);
+    const jw = jaroWinklerSim(t, f);
+    const dice = diceCoefficient(t, f);
+    return (lev + jw + dice) / 3; // average score
+  }
+
+  // Score an item
+  function itemScore(item) {
+    let totalScore = 0;
+    for (let term of searchTerms) {
+      const fields = [item.formalName, item["informal name"], item.brand];
+      let bestFieldScore = 0;
+      for (let field of fields) {
+        const score = matchScore(term, field);
+        if (score > bestFieldScore) bestFieldScore = score;
+      }
+      totalScore += bestFieldScore; // accumulate for each term
+    }
+    // Normalize by number of terms
+    return totalScore / searchTerms.length;
+  }
+
+  // Compute and sort
+  const scoredItems = items.map((item) => ({
+    item,
+    score: itemScore(item),
+  }));
+  const filtered = scoredItems.filter((s) => s.score > 0.25); // threshold
+  filtered.sort((a, b) => b.score - a.score);
+
+  return filtered.map((s) => ({
+    ...s.item,
+    _score: s.score,
+  }));
+}
 
 // array ops
 export function moveItemInArr(arr, index, direction) {
@@ -490,6 +643,7 @@ export function removeDashesFromPhone(num = "") {
 }
 
 export function addDashesToPhone(num) {
+  if (!num) return "";
   let phone = num.toString();
   const digits = phone.replace(/\D/g, "");
   if (digits.length <= 3) return digits;

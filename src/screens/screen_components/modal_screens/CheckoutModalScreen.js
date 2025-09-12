@@ -36,12 +36,14 @@ import {
 } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
+  addDashesToPhone,
   applyLineItemDiscounts,
   calculateRunningTotals,
   checkInputForNumbersOnly,
   clog,
   formatDecimal,
   formatNumberForCurrencyDisplay,
+  fuzzySearch,
   generateRandomID,
   generateUPCBarcode,
   lightenRGBByPercent,
@@ -51,7 +53,7 @@ import {
   showAlert,
   trimToTwoDecimals,
 } from "../../../utils";
-import { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
 import { sendFCMMessage } from "../../../db";
 import {
@@ -60,7 +62,7 @@ import {
 } from "../../../db_call_wrapper";
 import { TouchableOpacity } from "react-native";
 
-export function CheckoutModalScreen({}) {
+export function CheckoutModalScreen({ openWorkorder }) {
   // store setters
   const _zSetOpenWorkorderObj = useOpenWorkordersStore(
     (state) => state.setOpenWorkorderObj
@@ -76,8 +78,7 @@ export function CheckoutModalScreen({}) {
   const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
 
   // store getters
-  let zOpenWorkorderObj = WORKORDER_PROTO;
-  zOpenWorkorderObj = useOpenWorkordersStore((state) =>
+  const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
     state.getOpenWorkorderObj()
   );
   const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
@@ -104,33 +105,28 @@ export function CheckoutModalScreen({}) {
 
   const [sPaymentsCaptured, _setPaymentsCaptured] = useState([]);
   const [sSelectedWorkordersToCombine, _setSelectedWorkordersToCombine] =
-    useState([]);
+    useState([zOpenWorkorderObj]);
   const [sCalculatedOpenWorkorder, _setCalculatedOpenWorkorder] = useState();
   const [sAmountLeftToPay, _setAmountLeftToPay] = useState();
   const [sSaleObj, _setSaleObj] = useState();
+  const [sSearchString, _setSearchString] = useState("");
+  const [sInventorySearchRes, _setInventorySearchRes] = useState([]);
+  const [sFocusedItem, _setFocusedItem] = useState("");
   //
 
   useEffect(() => {
-    if (!zIsCheckingOut) {
-      _sSetRefundScan("");
-      _setIsRefund(false);
-      _setTotalAmount(0);
-      _setTotalDiscountAmount(0);
-      _setPaymentsCaptured([]);
-      _setSelectedWorkordersToCombine([]);
-      _setPaymentComplete(false);
-    } else {
-      // clog("cust", zCustomerObj);
-      _setSelectedWorkordersToCombine([zOpenWorkorderObj]);
-      // setTotals(zOpenWorkorderObj);
-    }
-  }, [zIsCheckingOut]);
+    // searchInventory("prch");
+    return () => {
+      // log("returning");
+    };
+  }, [zOpenWorkordersArr]);
 
   // watch the combined workorders array and adjust accordingly
   useEffect(() => {
     setTotals();
     // log(sSelectedWorkordersToCombine);
-  }, [sSelectedWorkordersToCombine]);
+    // clog(zOpenWorkorderObj);
+  }, [sSelectedWorkordersToCombine, zOpenWorkorderObj]);
 
   function setTotals(workorder) {
     // clog(wo);
@@ -152,18 +148,6 @@ export function CheckoutModalScreen({}) {
 
     // now run through the payments, update the amountLeftToPay field
     _setAmountLeftToPay(runningTax + runningTotal);
-  }
-
-  function createSaleObj() {
-    let saleObj = {
-      ...SALE_OBJECT_PROTO,
-      id: generateUPCBarcode(),
-      millis: new Date().getTime(),
-      customerID: zCustomerObj?.id,
-      paymentObjArr: [],
-      workorderIDArr: [zOpenWorkorderObj.id],
-    };
-    return saleObj;
   }
 
   function handlePaymentCapture(paymentObj = PAYMENT_OBJECT_PROTO) {
@@ -205,10 +189,48 @@ export function CheckoutModalScreen({}) {
     _setSelectedWorkordersToCombine([...sSelectedWorkordersToCombine, wo]);
   }
 
+  function searchInventory(searchStr) {
+    let split = searchStr.split(" ");
+    if (searchStr.length < 3) return;
+    _setSearchString(searchStr);
+    let res = fuzzySearch(split, zInventoryArr);
+    // clog(res);
+    _setInventorySearchRes(res);
+  }
+
+  function handleInventorySelect(invItem) {
+    let wo = cloneDeep(zOpenWorkorderObj);
+    let line = wo.workorderLines.find((o) => o.inventoryItem.id === invItem.id);
+
+    if (!line) {
+      line = cloneDeep(WORKORDER_ITEM_PROTO);
+      line.id = generateUPCBarcode();
+      line.qty = 1;
+      line.inventoryItem = invItem;
+      wo.workorderLines.push(line);
+    } else {
+      line.qty = line.qty + 1;
+      wo.workorderLines.map((o) => (o.id === line.id ? line : o));
+    }
+
+    _setSearchString("");
+    _zSetWorkorder(wo);
+    let arr = sSelectedWorkordersToCombine.map((o) =>
+      o.id === wo.id ? wo : o
+    );
+    // clog(arr);
+    _setSelectedWorkordersToCombine(arr);
+  }
+
+  function closeCheckoutScreenModal() {
+    _zSetIsCheckingOut(false);
+  }
+
+  // clog(zCustomerObj);
   return (
     <ScreenModal
       modalVisible={zIsCheckingOut}
-      handleOuterClick={() => log("here")}
+      // handleOuterClick={() => log("here")}
       showOuterModal={true}
       outerModalStyle={{
         backgroundColor: "rgba(50,50,50,.65)",
@@ -221,8 +243,8 @@ export function CheckoutModalScreen({}) {
             // alignItems: "center",
             flexDirection: "row",
             backgroundColor: C.backgroundWhite,
-            width: "70%",
-            height: "80%",
+            width: "80%",
+            height: "85%",
             borderRadius: 15,
             ...SHADOW_RADIUS_PROTO,
             shadowColor: C.green,
@@ -253,6 +275,7 @@ export function CheckoutModalScreen({}) {
               cardReaderArr={zSettingsObj?.cardReaders}
             />
           </View>
+
           <View
             style={{
               width: "30%",
@@ -260,693 +283,908 @@ export function CheckoutModalScreen({}) {
               padding: 20,
             }}
           >
-            <View
-              style={{ width: "100%", height: "10%", alignItems: "flex-start" }}
-            >
-              <CheckBox_
-                text={"Refund"}
-                isChecked={sIsRefund}
-                onCheck={() => _setIsRefund(!sIsRefund)}
-              />
-              <TextInput
-                style={{
-                  marginTop: 5,
-                  width: "100%",
-                  borderColor: C.buttonLightGreenOutline,
-                  borderRadius: 7,
-                  padding: 5,
-                  textAlign: "left",
-                  borderWidth: 1,
-                  outlineWidth: 0,
-                  backgroundColor: C.backgroundListWhite,
-                }}
-                onFocus={() => _sSetRefundScan("")}
-                placeholder="Scan or enter ticket ID"
-                placeholderTextColor={makeGrey(0.38)}
-                value={sRefundScan}
-                onChangeText={_sSetRefundScan}
-              />
-            </View>
-
-            {/** totals element ////////////////////////////////////////// */}
-
-            <View
-              style={{
-                width: "100%",
-                minHeight: "20%",
-                maxHeight: "30%",
-                // alignItems: "flex-start",
-                justifyContent: "space-between",
-                marginTop: 10,
-                paddingHorizontal: 10,
-                paddingVertical: 10,
-                backgroundColor: C.backgroundListWhite,
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-              }}
-            >
-              <View
-                style={{
-                  alignItems: "center",
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  width: "100%",
-                }}
-              >
-                <Text style={{ fontSize: 13, color: makeGrey(0.5) }}>
-                  SUBTOTAL
-                </Text>
-                <View style={{ flexDirection: "row" }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: makeGrey(0.5),
-                      marginRight: 10,
-                    }}
-                  >
-                    $
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 18,
-                      color: lightenRGBByPercent(C.green, 20),
-                    }}
-                  >
-                    {trimToTwoDecimals(sSubtotalAmount)}
-                  </Text>
-                </View>
-              </View>
-              {sTotalDiscountAmount ? (
-                <View
-                  style={{
-                    width: "100%",
-                    height: 1,
-                    marginVertical: 10,
-                    backgroundColor: C.buttonLightGreenOutline,
-                  }}
-                />
-              ) : null}
-              {sTotalDiscountAmount ? (
-                <View
-                  style={{
-                    alignItems: "center",
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    width: "100%",
-                  }}
-                >
-                  <Text
-                    style={{
-                      marginLeft: 15,
-                      fontSize: 13,
-                      color: C.lightred,
-                    }}
-                  >
-                    DISCOUNT
-                  </Text>
-                  <View style={{ flexDirection: "row" }}>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: C.lightred,
-                        marginRight: 10,
-                      }}
-                    >
-                      $
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 18,
-                        color: C.lightred,
-                      }}
-                    >
-                      {"- " + trimToTwoDecimals(sTotalDiscountAmount)}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
-              {sTotalDiscountAmount ? (
-                <View
-                  style={{
-                    alignItems: "center",
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    width: "100%",
-                  }}
-                >
-                  <Text
-                    style={{
-                      marginLeft: 15,
-                      fontSize: 13,
-                      color: makeGrey(0.5),
-                    }}
-                  >
-                    DISCOUNTED TOTAL
-                  </Text>
-                  <View style={{ flexDirection: "row" }}>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: makeGrey(0.5),
-                        marginRight: 10,
-                      }}
-                    >
-                      $
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 18,
-                        color: lightenRGBByPercent(C.green, 20),
-                      }}
-                    >
-                      {trimToTwoDecimals(
-                        sSubtotalAmount - sTotalDiscountAmount
-                      )}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
-              {sTotalDiscountAmount ? (
-                <View
-                  style={{
-                    width: "100%",
-                    height: 1,
-                    marginVertical: 10,
-
-                    backgroundColor: C.buttonLightGreenOutline,
-                  }}
-                />
-              ) : null}
-              <View
-                style={{
-                  alignItems: "center",
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  width: "100%",
-                }}
-              >
-                <Text style={{ fontSize: 13, color: makeGrey(0.5) }}>
-                  SALES TAX
-                </Text>
-                <View style={{ flexDirection: "row" }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: makeGrey(0.5),
-                      marginRight: 10,
-                    }}
-                  >
-                    $
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 18,
-                      color: lightenRGBByPercent(C.green, 20),
-                    }}
-                  >
-                    {trimToTwoDecimals(sTotalTaxAmount)}
-                  </Text>
-                </View>
-              </View>
-              <View
-                style={{
-                  width: "100%",
-                  height: 1,
-                  backgroundColor: C.buttonLightGreenOutline,
-                  marginVertical: 10,
-                }}
-              />
-              <View
-                style={{
-                  alignItems: "center",
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  width: "100%",
-                }}
-              >
-                <Text style={{ fontSize: 16, color: makeGrey(0.5) }}>
-                  TOTAL SALE
-                </Text>
-                <View style={{ flexDirection: "row" }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: makeGrey(0.5),
-                      marginRight: 10,
-                    }}
-                  >
-                    $
-                  </Text>
-                  <Text
-                    style={{
-                      fontWeight: 500,
-                      fontSize: 21,
-                      color: C.green,
-                    }}
-                  >
-                    {trimToTwoDecimals(sTotalAmount)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <Text style={{ marginTop: 20, color: makeGrey(0.4), fontSize: 12 }}>
-              PAYMENTS
-            </Text>
-            {sPaymentsCaptured.map((paymentObj) => {
-              <View
-                style={{
-                  padding: 6,
-                  backgroundColor: C.backgroundListWhite,
-                  borderColor: C.buttonLightGreenOutline,
-                  borderLeftWidth: 2,
-                  borderRadius: 5,
-                  borderLeftWidth: 2,
-                  width: "90%",
-                }}
-              ></View>;
-            })}
-            {/* </View> */}
-            <SliderButton_ onConfirm={(val) => log("val", val)} />
-            <Button_
-              text={"Cancel"}
-              onPress={() => _zSetIsCheckingOut(false)}
+            <MiddleItemComponent
+              sAmountLeftToPay={sAmountLeftToPay}
+              sPaymentsCaptured={sPaymentsCaptured}
+              sPaymentComplete={sPaymentComplete}
+              sTotalAmount={sTotalAmount}
+              sTotalDiscountAmount={sTotalDiscountAmount}
+              zCustomerObj={zCustomerObj}
+              sIsRefund={sIsRefund}
+              sRefundScan={sRefundScan}
+              _sSetRefundScan={_sSetRefundScan}
+              sSubtotalAmount={sSubtotalAmount}
+              sTotalTaxAmount={sTotalAmount}
+              _zSetIsCheckingOut={_zSetIsCheckingOut}
+              handleCancelPress={closeCheckoutScreenModal}
             />
           </View>
 
-          {/** workorders scrollview list element  ////////// */}
+          <View style={{ width: "40%", padding: 20 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                width: "100%",
+                paddingHorizontal: 10,
+              }}
+            >
+              <TextInput
+                onFocus={() => _setFocusedItem("search")}
+                autoFocus={sFocusedItem === "search"}
+                style={{
+                  borderBottomColor: makeGrey(0.3),
+                  borderBottomWidth: 1,
+                  width: "100%",
+                  marginBottom: 10,
+                  fontSize: 16,
+                  color: C.textMain,
+                  outlineWidth: 0,
+                }}
+                value={sSearchString}
+                onChangeText={(val) => {
+                  _setSearchString(val);
+                  searchInventory(val);
+                }}
+                placeholder="Scan or search inventory..."
+                placeholderTextColor={makeGrey(0.3)}
+              />
+            </View>
 
-          <ScrollView style={{ width: "40%", padding: 20 }}>
-            {zOpenWorkordersArr
-              .filter((o) => o.customerID === zCustomerObj?.id)
-              .map((workorder, idx) => {
-                return (
-                  <View
-                    style={{
-                      width: "100%",
-                      borderColor: C.buttonLightGreenOutline,
-                      backgroundColor: C.backgroundListWhite,
-                      borderWidth: 1,
-                      borderRadius: 10,
-                      padding: 10,
-                      marginBottom: 7,
-                    }}
-                  >
-                    {idx !== 0 ? (
-                      <CheckBox_
-                        buttonStyle={{
-                          alignSelf: "flex-start",
-                          marginTop: 5,
-                          marginBottom: 5,
-                        }}
-                        isChecked={sSelectedWorkordersToCombine.find(
-                          (o) => o.id === workorder.id
-                        )}
-                        text={"ADD TO SALE"}
-                        onCheck={() => handleCombineWorkorderCheck(workorder)}
-                      />
-                    ) : null}
-                    <View
-                      style={{
-                        opacity:
-                          idx === 0
-                            ? 1
-                            : sSelectedWorkordersToCombine.find(
-                                (o) => o.id === workorder.id
-                              )
-                            ? 1
-                            : 0.4,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: "100%",
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          padding: 10,
-                          borderBottomWidth: 1,
-                          borderBottomColor: makeGrey(0.1),
-                          marginBottom: 10,
-                        }}
-                      >
-                        <View style={{}}>
-                          <Text
-                            style={{
-                              color: C.textMain,
-                              fontSize: 16,
-                              fontWeight: "500",
-                            }}
-                          >
-                            {workorder.brand || ""}
-                          </Text>
-                          <Text
-                            style={{
-                              color: makeGrey(0.6),
-                              fontSize: 16,
-                              fontWeight: "500",
-                              fontStyle: "italic",
-                            }}
-                          >
-                            {workorder.model || ""}
-                          </Text>
-                        </View>
-                        <View
-                          style={{ flexDirection: "row", alignItems: "center" }}
-                        >
-                          <Text
-                            style={{
-                              paddingHorizontal: 5,
-                              paddingVertical: 2,
-                              borderRadius: 5,
-                              backgroundColor:
-                                workorder.color1?.backgroundColor,
-                              color: workorder.color1?.textColor,
-                            }}
-                          >
-                            {workorder.color1?.label || ""}
-                          </Text>
-                          <Text
-                            style={{
-                              marginLeft: 5,
-                              paddingHorizontal: 5,
-                              paddingVertical: 2,
-                              borderRadius: 5,
-                              backgroundColor:
-                                workorder.color2?.backgroundColor,
-                              color: workorder.color2?.textColor,
-                            }}
-                          >
-                            {workorder.color2?.label || ""}
-                          </Text>
-                        </View>
-                        <Text
-                          style={{
-                            color: C.textMain,
-                            fontSize: 16,
-                            fontWeight: "500",
-                          }}
-                        >
-                          {workorder.description || ""}
-                        </Text>
-                      </View>
-                      <FlatList
-                        data={workorder.workorderLines}
-                        renderItem={(obj) => {
-                          let index = obj.index;
-                          let workorderLine = obj.item;
-                          let inventoryItem = zGetInventoryItem(
-                            workorderLine.inventoryItem.id
-                          );
-                          // log("item", inventoryItem);
-                          return (
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                width: "100%",
-                                alignItems: "center",
-                                backgroundColor: C.listItemWhite,
-                                paddingVertical: 3,
-                                marginVertical: 2,
-                                borderColor: "transparent",
-                                borderLeftColor: lightenRGBByPercent(
-                                  C.green,
-                                  60
-                                ),
-                                borderWidth: 2,
-                                paddingLeft: 10,
-                                borderRadius: 15,
-                              }}
-                            >
-                              <View
-                                style={{
-                                  width: "65%",
-                                  justifyContent: "flex-start",
-                                  alignItems: "center",
-                                  flexDirection: "row",
-                                  // backgroundColor: "green",
-                                }}
-                              >
-                                <View>
-                                  {workorderLine.discountObj.name ? (
-                                    <Text style={{ color: C.lightred }}>
-                                      {workorderLine.discountObj.name ||
-                                        "discount goes here"}
-                                    </Text>
-                                  ) : null}
-                                  <Text
-                                    style={{
-                                      fontSize: 14,
-                                      color: Colors.darkText,
-                                      fontWeight: "500",
-                                    }}
-                                  >
-                                    {inventoryItem?.formalName ||
-                                      "Item Not Found"}
-                                  </Text>
-                                  <View
-                                    style={{
-                                      flexDirection: "row",
-                                      alignItems: "flex-start",
-                                    }}
-                                  >
-                                    <TextInput
-                                      disabled={true}
-                                      numberOfLines={4}
-                                      style={{
-                                        fontSize: 14,
-                                        outlineWidth: 0,
-                                        color: "dimgray",
-                                      }}
-                                      placeholder="Intake and service notes..."
-                                      placeholderTextColor={"gray"}
-                                      value={workorderLine.intakeNotes}
-                                    />
-                                  </View>
-                                </View>
-                              </View>
-                              <View
-                                style={{
-                                  width: "35%",
-                                  flexDirection: "row",
-                                  justifyContent: "flex-end",
-                                  alignItems: "center",
-                                  height: "100%",
-                                  paddingRight: 0,
-                                  // backgroundColor: "red",
-                                }}
-                              >
-                                <GradientView
-                                  colorArr={COLOR_GRADIENTS.grey}
-                                  style={{
-                                    borderRadius: 10,
-                                    width: 30,
-                                    height: 20,
-                                  }}
-                                >
-                                  <TextInput
-                                    disabled={true}
-                                    style={{
-                                      fontSize: 16,
-                                      fontWeight: 700,
-                                      textAlign: "center",
-                                      color: C.textWhite,
-                                      outlineWidth: 0,
-                                      width: "100%",
-                                    }}
-                                    value={workorderLine.qty}
-                                  />
-                                </GradientView>
-                                <View
-                                  style={{
-                                    alignItems: "flex-end",
-                                    minWidth: 80,
-                                    // backgroundColor: "green",
-                                    // marginRight: 1,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      paddingHorizontal: 0,
-                                    }}
-                                  >
-                                    {"$ " +
-                                      trimToTwoDecimals(
-                                        inventoryItem?.price ||
-                                          workorderLine.price
-                                      )}
-                                  </Text>
-                                  {workorderLine.discountObj.savings ? (
-                                    <Text
-                                      style={{
-                                        paddingHorizontal: 0,
-                                        minWidth: 30,
-                                        color: C.lightred,
-                                      }}
-                                    >
-                                      {"$ -" +
-                                        workorderLine.discountObj.savings}
-                                    </Text>
-                                  ) : null}
-                                  <Text
-                                    style={{
-                                      fontWeight: "600",
-                                      minWidth: 30,
-                                      marginTop: 0,
-                                      paddingHorizontal: 0,
-                                      color: Colors.darkText,
-                                    }}
-                                  >
-                                    {workorderLine.discountObj.newPrice
-                                      ? "$ " +
-                                        workorderLine.discountObj.newPrice
-                                      : workorderLine.qty > 1
-                                      ? "$" +
-                                        trimToTwoDecimals(
-                                          inventoryItem?.price ||
-                                            workorderLine.price *
-                                              workorderLine.qty
-                                        )
-                                      : ""}
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                            // </View>
-                          );
-                        }}
-                      />
-                      <View
-                        style={{
-                          width: "100%",
-                          flexDirection: "row",
-                          justifyContent: "space-around",
-                          alignItems: "center",
-                          borderTopWidth: 1,
-                          borderTopColor: makeGrey(0.1),
-                          marginTop: 5,
-                          paddingTop: 5,
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, color: "gray" }}>
-                          {"SUBTOTAL: "}
-                          <Text
-                            style={{
-                              marginRight: 10,
-                              color: C.textMain,
-                              fontWeight: "500",
-                              fontSize: 14,
-                            }}
-                          >
-                            {"$" +
-                              formatNumberForCurrencyDisplay(
-                                calculateRunningTotals(workorder)
-                                  .runningSubtotal
-                              )}
-                          </Text>
-                        </Text>
-                        <View
-                          style={{
-                            width: 1,
-                            height: "100%",
-                            backgroundColor: C.buttonLightGreenOutline,
-                          }}
-                        />
-                        {calculateRunningTotals(workorder).runningDiscount >
-                        0 ? (
-                          <View>
-                            <Text style={{ fontSize: 13, color: C.lightred }}>
-                              {"DISCOUNT: "}
-                              <Text
-                                style={{
-                                  marginRight: 10,
-                                  fontWeight: "500",
-                                  color: C.lightred,
-                                  fontSize: 14,
-                                }}
-                              >
-                                {"$" +
-                                  formatNumberForCurrencyDisplay(
-                                    calculateRunningTotals(workorder)
-                                      .runningDiscount
-                                  )}
-                              </Text>
-                            </Text>
-                            <View
-                              style={{
-                                width: 1,
-                                height: "100%",
-                                backgroundColor: C.buttonLightGreenOutline,
-                              }}
-                            />
-                          </View>
-                        ) : null}
-                        <Text style={{ fontSize: 13, color: "gray" }}>
-                          {"TAX: "}
-                          <Text
-                            style={{
-                              marginRight: 10,
-                              fontWeight: "500",
-                              color: C.textMain,
-                              fontSize: 14,
-                            }}
-                          >
-                            {"$" +
-                              formatNumberForCurrencyDisplay(
-                                (calculateRunningTotals(workorder)
-                                  .runningTotal *
-                                  zSettingsObj.salesTax) /
-                                  100
-                              )}
-                          </Text>
-                        </Text>
-                        <View
-                          style={{
-                            width: 1,
-                            height: "100%",
-                            backgroundColor: C.buttonLightGreenOutline,
-                          }}
-                        />
-
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            borderColor: C.buttonLightGreenOutline,
-                            borderRadius: 15,
-                            borderWidth: 1,
-                            paddingHorizontal: 14,
-                            paddingVertical: 3,
-                            color: "gray",
-                          }}
-                        >
-                          {"TOTAL: "}
-                          <Text
-                            style={{
-                              marginRight: 10,
-                              fontWeight: "700",
-                              color: C.textMain,
-                              fontSize: 15,
-                            }}
-                          >
-                            {"$" +
-                              formatNumberForCurrencyDisplay(
-                                calculateRunningTotals(workorder).runningTotal *
-                                  (zSettingsObj.salesTax / 100) +
-                                  calculateRunningTotals(workorder).runningTotal
-                              )}
-                          </Text>
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-          </ScrollView>
+            {/** workorders scrollview list element  ////////// */}
+            {sSearchString.length > 1 ? (
+              <InventoryListComponent
+                inventoryObjArr={sInventorySearchRes}
+                onSelect={handleInventorySelect}
+                quickItemButtons={zSettingsObj.quickItemButtons}
+                _setSearchStr={_setSearchString}
+              />
+            ) : (
+              <WorkorderListComponent
+                sSelectedWorkordersToCombine={sSelectedWorkordersToCombine}
+                zOpenWorkorderObj={zOpenWorkorderObj}
+                zOpenWorkordersArr={zOpenWorkordersArr}
+                zInventoryArr={zInventoryArr}
+                zCustomerObj={zCustomerObj}
+                zSettingsObj={zSettingsObj}
+                zGetInventoryItem={zGetInventoryItem}
+                handleCombineWorkorderCheck={handleCombineWorkorderCheck}
+              />
+            )}
+          </View>
         </View>
       )}
     />
   );
 }
+
+const InventoryListComponent = ({
+  inventoryObjArr,
+  onSelect,
+  quickItemButtons,
+  _setSearchStr,
+}) => {
+  return (
+    <View style={{ width: "100%" }}>
+      <Button_
+        text={"CLOSE INVENTORY"}
+        onPress={() => _setSearchStr("")}
+        textStyle={{ fontSize: 13, color: C.textWhite }}
+        colorGradientArr={COLOR_GRADIENTS.lightBlue}
+        buttonStyle={{ width: 150, marginBottom: 10 }}
+      />
+      <FlatList
+        data={inventoryObjArr}
+        renderItem={(obj) => {
+          let idx = obj.index;
+          let item = obj.item;
+          return (
+            <TouchableOpacity
+              onPress={() => {
+                _setSearchStr("");
+                onSelect(item);
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  width: "100%",
+                  marginBottom: 3,
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  borderRadius: 5,
+                  padding: 5,
+                  borderLeftWidth: 3,
+                }}
+              >
+                <View>
+                  <Text style={{ color: C.textMain }}>{item.formalName}</Text>
+                  <Text style={{ color: C.textMain }}>{item.informalName}</Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={{ color: C.textMain }}>
+                    <Text style={{ color: C.textMain, fontSize: 13 }}>
+                      {"$  "}
+                    </Text>
+                    {item.price}
+                  </Text>
+                  {item.salePrice ? (
+                    <Text style={{ color: C.lightred }}>
+                      <Text style={{ color: C.lightred, fontSize: 13 }}>
+                        {"SALE PRICE $  "}
+                      </Text>
+                      {item.price}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+      />
+    </View>
+  );
+};
+
+const WorkorderListComponent = ({
+  sSelectedWorkordersToCombine,
+  zOpenWorkordersArr,
+  zOpenWorkorderObj,
+  zInventoryArr,
+  zCustomerObj,
+  zSettingsObj,
+  zGetInventoryItem,
+  handleCombineWorkorderCheck,
+}) => {
+  return (
+    <ScrollView style={{ width: "100%" }}>
+      {zOpenWorkordersArr
+        .filter((o) => o.customerID === zCustomerObj?.id)
+        .map((workorder, idx) => {
+          if (workorder.id === zOpenWorkorderObj.id)
+            workorder = zOpenWorkorderObj;
+          return (
+            <View
+              style={{
+                width: "100%",
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.backgroundListWhite,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 10,
+                marginBottom: 7,
+              }}
+            >
+              {idx !== 0 ? (
+                <CheckBox_
+                  buttonStyle={{
+                    alignSelf: "flex-start",
+                    marginTop: 5,
+                    marginBottom: 5,
+                  }}
+                  isChecked={sSelectedWorkordersToCombine.find(
+                    (o) => o.id === workorder.id
+                  )}
+                  text={"ADD TO SALE"}
+                  onCheck={() => handleCombineWorkorderCheck(workorder)}
+                />
+              ) : null}
+              <View
+                style={{
+                  opacity:
+                    idx === 0
+                      ? 1
+                      : sSelectedWorkordersToCombine.find(
+                          (o) => o.id === workorder.id
+                        )
+                      ? 1
+                      : 0.4,
+                }}
+              >
+                <View
+                  style={{
+                    width: "100%",
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    padding: 10,
+                    borderBottomWidth: 1,
+                    borderBottomColor: makeGrey(0.1),
+                    marginBottom: 10,
+                  }}
+                >
+                  <View style={{}}>
+                    <Text
+                      style={{
+                        color: C.textMain,
+                        fontSize: 16,
+                        fontWeight: "500",
+                      }}
+                    >
+                      {workorder.brand || ""}
+                    </Text>
+                    <Text
+                      style={{
+                        color: makeGrey(0.6),
+                        fontSize: 16,
+                        fontWeight: "500",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      {workorder.model || ""}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text
+                      style={{
+                        paddingHorizontal: 5,
+                        paddingVertical: 2,
+                        borderRadius: 5,
+                        backgroundColor: workorder.color1?.backgroundColor,
+                        color: workorder.color1?.textColor,
+                      }}
+                    >
+                      {workorder.color1?.label || ""}
+                    </Text>
+                    <Text
+                      style={{
+                        marginLeft: 5,
+                        paddingHorizontal: 5,
+                        paddingVertical: 2,
+                        borderRadius: 5,
+                        backgroundColor: workorder.color2?.backgroundColor,
+                        color: workorder.color2?.textColor,
+                      }}
+                    >
+                      {workorder.color2?.label || ""}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      color: C.textMain,
+                      fontSize: 16,
+                      fontWeight: "500",
+                    }}
+                  >
+                    {workorder.description || ""}
+                  </Text>
+                </View>
+                <FlatList
+                  data={workorder.workorderLines}
+                  renderItem={(obj) => {
+                    let index = obj.index;
+                    let workorderLine = obj.item;
+                    let inventoryItem = zGetInventoryItem(
+                      workorderLine.inventoryItem.id
+                    );
+                    // log("item", inventoryItem);
+                    return (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          width: "100%",
+                          alignItems: "center",
+                          backgroundColor: C.listItemWhite,
+                          paddingVertical: 3,
+                          marginVertical: 2,
+                          borderColor: "transparent",
+                          borderLeftColor: lightenRGBByPercent(C.green, 60),
+                          borderWidth: 2,
+                          paddingLeft: 10,
+                          borderRadius: 15,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: "65%",
+                            justifyContent: "flex-start",
+                            alignItems: "center",
+                            flexDirection: "row",
+                            // backgroundColor: "green",
+                          }}
+                        >
+                          <View>
+                            {workorderLine.discountObj.name ? (
+                              <Text style={{ color: C.lightred }}>
+                                {workorderLine.discountObj.name ||
+                                  "discount goes here"}
+                              </Text>
+                            ) : null}
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: Colors.darkText,
+                                fontWeight: "500",
+                              }}
+                            >
+                              {inventoryItem?.formalName || "Item Not Found"}
+                            </Text>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "flex-start",
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  color: Colors.darkText,
+                                  fontWeight: "400",
+                                }}
+                              >
+                                {inventoryItem?.informalName}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                        <View
+                          style={{
+                            width: "35%",
+                            flexDirection: "row",
+                            justifyContent: "flex-end",
+                            alignItems: "center",
+                            height: "100%",
+                            paddingRight: 0,
+                            // backgroundColor: "red",
+                          }}
+                        >
+                          <GradientView
+                            colorArr={COLOR_GRADIENTS.grey}
+                            style={{
+                              borderRadius: 10,
+                              width: 30,
+                              height: 20,
+                            }}
+                          >
+                            <TextInput
+                              disabled={true}
+                              style={{
+                                fontSize: 16,
+                                fontWeight: 700,
+                                textAlign: "center",
+                                color: C.textWhite,
+                                outlineWidth: 0,
+                                width: "100%",
+                              }}
+                              value={workorderLine.qty}
+                            />
+                          </GradientView>
+                          <View
+                            style={{
+                              alignItems: "flex-end",
+                              minWidth: 80,
+                              // backgroundColor: "green",
+                              // marginRight: 1,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                paddingHorizontal: 0,
+                              }}
+                            >
+                              {"$ " +
+                                formatNumberForCurrencyDisplay(
+                                  inventoryItem?.price || workorderLine.price
+                                )}
+                            </Text>
+                            {workorderLine.discountObj.savings ? (
+                              <Text
+                                style={{
+                                  paddingHorizontal: 0,
+                                  minWidth: 30,
+                                  color: C.lightred,
+                                }}
+                              >
+                                {"$ -" +
+                                  formatNumberForCurrencyDisplay(
+                                    workorderLine.discountObj.savings
+                                  )}
+                              </Text>
+                            ) : null}
+                            <Text
+                              style={{
+                                fontWeight: "600",
+                                minWidth: 30,
+                                marginTop: 0,
+                                paddingHorizontal: 0,
+                                color: Colors.darkText,
+                              }}
+                            >
+                              {workorderLine.discountObj.newPrice
+                                ? "$ " +
+                                  formatNumberForCurrencyDisplay(
+                                    workorderLine.discountObj.newPrice
+                                  )
+                                : workorderLine.qty > 1
+                                ? "$" +
+                                  formatNumberForCurrencyDisplay(
+                                    inventoryItem?.price ||
+                                      workorderLine.price * workorderLine.qty
+                                  )
+                                : ""}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                      // </View>
+                    );
+                  }}
+                />
+                <View
+                  style={{
+                    width: "100%",
+                    flexDirection: "row",
+                    justifyContent: "space-around",
+                    alignItems: "center",
+                    borderTopWidth: 1,
+                    borderTopColor: makeGrey(0.1),
+                    marginTop: 5,
+                    paddingTop: 5,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: "gray" }}>
+                    {"SUBTOTAL: "}
+                    <Text
+                      style={{
+                        marginRight: 10,
+                        color: C.textMain,
+                        fontWeight: "500",
+                        fontSize: 14,
+                      }}
+                    >
+                      {"$" +
+                        formatNumberForCurrencyDisplay(
+                          calculateRunningTotals(workorder).runningSubtotal
+                        )}
+                    </Text>
+                  </Text>
+                  <View
+                    style={{
+                      width: 1,
+                      height: "100%",
+                      backgroundColor: C.buttonLightGreenOutline,
+                    }}
+                  />
+                  {calculateRunningTotals(workorder).runningDiscount > 0 ? (
+                    <View>
+                      <Text style={{ fontSize: 13, color: C.lightred }}>
+                        {"DISCOUNT: "}
+                        <Text
+                          style={{
+                            marginRight: 10,
+                            fontWeight: "500",
+                            color: C.lightred,
+                            fontSize: 14,
+                          }}
+                        >
+                          {"$" +
+                            formatNumberForCurrencyDisplay(
+                              calculateRunningTotals(workorder).runningDiscount
+                            )}
+                        </Text>
+                      </Text>
+                      <View
+                        style={{
+                          width: 1,
+                          height: "100%",
+                          backgroundColor: C.buttonLightGreenOutline,
+                        }}
+                      />
+                    </View>
+                  ) : null}
+                  <Text style={{ fontSize: 13, color: "gray" }}>
+                    {"TAX: "}
+                    <Text
+                      style={{
+                        marginRight: 10,
+                        fontWeight: "500",
+                        color: C.textMain,
+                        fontSize: 14,
+                      }}
+                    >
+                      {"$" +
+                        formatNumberForCurrencyDisplay(
+                          (calculateRunningTotals(workorder).runningTotal *
+                            zSettingsObj.salesTax) /
+                            100
+                        )}
+                    </Text>
+                  </Text>
+                  <View
+                    style={{
+                      width: 1,
+                      height: "100%",
+                      backgroundColor: C.buttonLightGreenOutline,
+                    }}
+                  />
+
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 15,
+                      borderWidth: 1,
+                      paddingHorizontal: 14,
+                      paddingVertical: 3,
+                      color: "gray",
+                    }}
+                  >
+                    {"TOTAL: "}
+                    <Text
+                      style={{
+                        marginRight: 10,
+                        fontWeight: "700",
+                        color: C.textMain,
+                        fontSize: 15,
+                      }}
+                    >
+                      {"$" +
+                        formatNumberForCurrencyDisplay(
+                          calculateRunningTotals(workorder).runningTotal *
+                            (zSettingsObj.salesTax / 100) +
+                            calculateRunningTotals(workorder).runningTotal
+                        )}
+                    </Text>
+                  </Text>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+    </ScrollView>
+  );
+};
+
+const MiddleItemComponent = ({
+  sPaymentsCaptured,
+  sTotalAmount,
+  sTotalDiscountAmount,
+  sAmountLeftToPay,
+  zCustomerObj,
+  sIsRefund,
+  sRefundScan,
+  _sSetRefundScan,
+  sTotalTaxAmount,
+  sSubtotalAmount,
+  _zSetIsCheckingOut,
+  handleCancelPress,
+}) => {
+  const [sFocusedItem, _setFocusedItem] = useState("");
+
+  return (
+    <View
+      style={{
+        width: "100%",
+        height: "100%",
+        // padding: 20,
+      }}
+    >
+      {zCustomerObj.id ? (
+        <View
+          style={{
+            width: "100%",
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 10,
+            padding: 10,
+            marginBottom: 30,
+            backgroundColor: C.backgroundListWhite,
+            // flexDirection:
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+            }}
+          >
+            <View>
+              <Text style={{ color: C.textMain }}>
+                {zCustomerObj.first + " " + zCustomerObj.last}
+              </Text>
+              <Text style={{ color: makeGrey(0.6), fontSize: 12 }}>
+                {zCustomerObj.email}
+              </Text>
+            </View>
+            <View>
+              {zCustomerObj.cell ? (
+                <Text style={{ color: C.textMain }}>
+                  <Text style={{ color: makeGrey(0.5) }}>{"cell: "}</Text>
+                  {addDashesToPhone(zCustomerObj.cell)}
+                </Text>
+              ) : null}
+              {zCustomerObj.land ? (
+                <Text style={{ color: C.textMain }}>
+                  <Text style={{ color: makeGrey(0.5) }}>{"land: "}</Text>
+                  {addDashesToPhone(zCustomerObj.land)}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+          <Text style={{ fontSize: 13, color: makeGrey(0.7), paddingTop: 5 }}>
+            {/* {zCustomerObj.streetAddress} */}
+            {zCustomerObj.streetAddress +
+              "  " +
+              (zCustomerObj.unit ? "unit: " + zCustomerObj.unit + "\n" : "\n") +
+              zCustomerObj.city +
+              "\n" +
+              zCustomerObj.notes}
+          </Text>
+        </View>
+      ) : null}
+      <View
+        style={{
+          width: "100%",
+          alignItems: "flex-start",
+          marginBottom: 30,
+        }}
+      >
+        <CheckBox_
+          text={"Refund"}
+          isChecked={sIsRefund}
+          onCheck={() => _setIsRefund(!sIsRefund)}
+        />
+        <TextInput
+          style={{
+            marginTop: 5,
+            width: "100%",
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 7,
+            padding: 5,
+            textAlign: "left",
+            borderWidth: 1,
+            outlineWidth: 0,
+            backgroundColor: C.backgroundListWhite,
+          }}
+          onFocus={() => {
+            _setFocusedItem("refund");
+            // _sSetRefundScan("");
+          }}
+          placeholder="Scan or enter ticket ID"
+          placeholderTextColor={makeGrey(0.38)}
+          autoFocus={sFocusedItem === "refund"}
+          value={sRefundScan}
+          onChangeText={_sSetRefundScan}
+        />
+      </View>
+
+      {/** totals element ////////////////////////////////////////// */}
+
+      <View
+        style={{
+          width: "100%",
+          minHeight: "20%",
+          maxHeight: "30%",
+          // alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginTop: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 10,
+          backgroundColor: C.backgroundListWhite,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+        }}
+      >
+        <View
+          style={{
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <Text style={{ fontSize: 13, color: makeGrey(0.5) }}>SUBTOTAL</Text>
+          <View style={{ flexDirection: "row" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: makeGrey(0.5),
+                marginRight: 10,
+              }}
+            >
+              $
+            </Text>
+            <Text
+              style={{
+                fontSize: 18,
+                color: lightenRGBByPercent(C.green, 20),
+              }}
+            >
+              {trimToTwoDecimals(sSubtotalAmount)}
+            </Text>
+          </View>
+        </View>
+        {sTotalDiscountAmount ? (
+          <View
+            style={{
+              width: "100%",
+              height: 1,
+              marginVertical: 10,
+              backgroundColor: C.buttonLightGreenOutline,
+            }}
+          />
+        ) : null}
+        {sTotalDiscountAmount ? (
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text
+              style={{
+                marginLeft: 15,
+                fontSize: 13,
+                color: C.lightred,
+              }}
+            >
+              DISCOUNT
+            </Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: C.lightred,
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  color: C.lightred,
+                }}
+              >
+                {"- " + trimToTwoDecimals(sTotalDiscountAmount)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+        {sTotalDiscountAmount ? (
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text
+              style={{
+                marginLeft: 15,
+                fontSize: 13,
+                color: makeGrey(0.5),
+              }}
+            >
+              DISCOUNTED TOTAL
+            </Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: makeGrey(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  color: lightenRGBByPercent(C.green, 20),
+                }}
+              >
+                {trimToTwoDecimals(sSubtotalAmount - sTotalDiscountAmount)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+        {sTotalDiscountAmount ? (
+          <View
+            style={{
+              width: "100%",
+              height: 1,
+              marginVertical: 10,
+
+              backgroundColor: C.buttonLightGreenOutline,
+            }}
+          />
+        ) : null}
+        <View
+          style={{
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <Text style={{ fontSize: 13, color: makeGrey(0.5) }}>SALES TAX</Text>
+          <View style={{ flexDirection: "row" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: makeGrey(0.5),
+                marginRight: 10,
+              }}
+            >
+              $
+            </Text>
+            <Text
+              style={{
+                fontSize: 18,
+                color: lightenRGBByPercent(C.green, 20),
+              }}
+            >
+              {trimToTwoDecimals(sTotalTaxAmount)}
+            </Text>
+          </View>
+        </View>
+        <View
+          style={{
+            width: "100%",
+            height: 1,
+            backgroundColor: C.buttonLightGreenOutline,
+            marginVertical: 10,
+          }}
+        />
+        <View
+          style={{
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <Text style={{ fontSize: 16, color: makeGrey(0.5) }}>TOTAL SALE</Text>
+          <View style={{ flexDirection: "row" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: makeGrey(0.5),
+                marginRight: 10,
+              }}
+            >
+              $
+            </Text>
+            <Text
+              style={{
+                fontWeight: 500,
+                fontSize: 21,
+                color: C.green,
+              }}
+            >
+              {trimToTwoDecimals(sTotalAmount)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <Text style={{ marginTop: 20, color: makeGrey(0.4), fontSize: 12 }}>
+        PAYMENTS
+      </Text>
+      {sPaymentsCaptured.map((paymentObj) => {
+        <View
+          style={{
+            padding: 6,
+            backgroundColor: C.backgroundListWhite,
+            borderColor: C.buttonLightGreenOutline,
+            borderLeftWidth: 2,
+            borderRadius: 5,
+            borderLeftWidth: 2,
+            width: "90%",
+          }}
+        ></View>;
+      })}
+      {/* </View> */}
+      <SliderButton_ onConfirm={(val) => log("val", val)} />
+      <Button_ text={"Cancel"} onPress={handleCancelPress} />
+    </View>
+  );
+};
 
 const CashSaleComponent = ({
   amountLeftToPay,
@@ -962,6 +1200,7 @@ const CashSaleComponent = ({
   const [sIsCheck, _setIsCheck] = useState(false);
   const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
   const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
+  const [sFocusedItem, _setFocusedItem] = useState("");
 
   // calculate running cash change needed for tender amount
   useEffect(() => {
@@ -1062,7 +1301,11 @@ const CashSaleComponent = ({
             {"$ " + formatNumberForCurrencyDisplay(amountLeftToPay)}
           </Text>
           <TextInput
-            onFocus={() => _setRequestedAmount("")}
+            onFocus={() => {
+              _setFocusedItem("amount");
+              _setRequestedAmount("");
+            }}
+            autoFocus={sFocusedItem === "amount"}
             style={{
               fontSize: 15,
               outlineWidth: 0,
@@ -1120,6 +1363,7 @@ const CashSaleComponent = ({
                 height: "70%",
                 // backgroundColor: "blue",
               }}
+              autoFocus={sFocusedItem === "tender"}
               placeholder="0.00"
               placeholderTextColor={makeGrey(0.3)}
               value={sTenderAmount}
@@ -1137,9 +1381,12 @@ const CashSaleComponent = ({
                   _setProcessButtonEnabled(false);
                 }
               }}
-              autoFocus={sInputBoxFocus == "tender"}
+              // autoFocus={sInputBoxFocus == "tender"}
               onKeyPress={handleKeyPress}
-              // onFocus={() => _zSetPaymentAmount("")}
+              onFocus={() => {
+                _setFocusedItem("tender");
+                _setTenderAmount("");
+              }}
             />
             <Text
               style={{
@@ -1209,6 +1456,7 @@ const StripeCreditCardComponent = ({
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
   const [sSelectedCardReaderObj, _setSelectedCardReaderObj] =
     useState(cardReaderObj);
+  const [sFocusedItem, _setFocusedItem] = useState("");
 
   //////////////////////////////////////////////////////////////////
 
@@ -1492,7 +1740,11 @@ const StripeCreditCardComponent = ({
             {"$ " + formatNumberForCurrencyDisplay(amountLeftToPay)}
           </Text>
           <TextInput
-            onFocus={() => _setRequestedAmount("")}
+            onFocus={() => {
+              _setFocusedItem("amount");
+              _setRequestedAmount("");
+            }}
+            autoFocus={sFocusedItem === "amount"}
             style={{
               fontSize: 20,
               outlineWidth: 0,

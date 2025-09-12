@@ -64,6 +64,9 @@ export function BaseScreen() {
   // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
   // store getters /////////////////////////////////////////////////////////////////
+  const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
+  );
   const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
   const zLastDatabaseBatchMillis = useDatabaseBatchStore((state) =>
     state.getLastBatchMillis()
@@ -198,7 +201,9 @@ export function BaseScreen() {
         style={{ width: "100%", height: 0 }}
       />
 
-      <CheckoutModalScreen />
+      {zIsCheckingOut ? (
+        <CheckoutModalScreen openWorkorder={zOpenWorkorderObj} />
+      ) : null}
       <LoginModalScreen
         modalVisible={zShowLoginScreen && !zLoginModalVisible}
       />

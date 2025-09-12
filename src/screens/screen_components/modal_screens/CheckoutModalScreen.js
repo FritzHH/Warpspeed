@@ -584,21 +584,10 @@ const WorkorderListComponent = ({
                           }}
                         >
                           <View>
-                            {workorderLine.discountObj.name ? (
-                              <Text style={{ color: C.lightred }}>
-                                {workorderLine.discountObj.name ||
-                                  "discount goes here"}
-                              </Text>
-                            ) : null}
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                color: C.textMain,
-                                fontWeight: "500",
-                              }}
-                            >
-                              {inventoryItem?.formalName || "Item Not Found"}
+                            <Text style={{ color: C.lightred, fontSize: 12 }}>
+                              {workorderLine.discountObj.name}
                             </Text>
+
                             <View
                               style={{
                                 flexDirection: "row",
@@ -612,9 +601,19 @@ const WorkorderListComponent = ({
                                   fontWeight: "400",
                                 }}
                               >
-                                {inventoryItem?.informalName}
+                                {inventoryItem.formalName}
                               </Text>
                             </View>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: makeGrey(0.65),
+                                fontWeight: "500",
+                              }}
+                            >
+                              {workorderLine.notes}
+                              {/* {inventoryItem?.formalName || "Item Not Found"} */}
+                            </Text>
                           </View>
                         </View>
                         <View

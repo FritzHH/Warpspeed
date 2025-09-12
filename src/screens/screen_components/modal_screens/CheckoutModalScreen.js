@@ -593,7 +593,7 @@ const WorkorderListComponent = ({
                             <Text
                               style={{
                                 fontSize: 14,
-                                color: Colors.darkText,
+                                color: C.textMain,
                                 fontWeight: "500",
                               }}
                             >
@@ -608,7 +608,7 @@ const WorkorderListComponent = ({
                               <Text
                                 style={{
                                   fontSize: 14,
-                                  color: Colors.darkText,
+                                  color: C.textMain,
                                   fontWeight: "400",
                                 }}
                               >

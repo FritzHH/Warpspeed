@@ -1424,18 +1424,43 @@ const CashSaleComponent = ({
           text={"Cancel"}
         />
       </View>
-      <Text
-        style={{
-          ...checkoutScreenStyle.statusText,
-          fontSize: 25,
-          color: C.green,
-        }}
-      >
-        {sCashChangeNeeded >= 0 && sTenderAmount >= sRequestedAmount
-          ? formatNumberForCurrencyDisplay(sCashChangeNeeded, true)
-          : ""}
-      </Text>
-
+      {sCashChangeNeeded >= 0 && sTenderAmount >= sRequestedAmount ? (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 10,
+            paddingTop: 2,
+            paddingBottom: 3,
+            paddingLeft: 2,
+            paddingRight: 10,
+            marginTop: 16,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              color: makeGrey(0.3),
+              width: 110,
+              marginBottom: 5,
+              // paddingBottom: 10,
+              // paddingHorizontal: 10,
+            }}
+          >
+            CHANGE
+          </Text>
+          <Text
+            style={{
+              // ...checkoutScreenStyle.statusText,
+              textAlign: "right",
+              fontSize: 25,
+              color: C.green,
+            }}
+          >
+            {formatNumberForCurrencyDisplay(sCashChangeNeeded, true)}
+          </Text>
+        </View>
+      ) : null}
       {/* <View style={{ ...checkoutScreenStyle.loadingIndicatorStyle }}>
         <LoadingIndicator visible={sStatus} />
       </View> */}

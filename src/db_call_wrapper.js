@@ -129,18 +129,19 @@ export function dbSetSettings(settingsObj, batch) {
 }
 
 export function dbSetCustomerObj(customerObj, removeOption = false) {
-  let id = customerObj.id;
-  let previewObj = {};
-  previewObj.cell = customerObj.cell;
-  previewObj.first = customerObj.first;
-  previewObj.id = customerObj.id;
-  previewObj.landline = customerObj.landline;
-  previewObj.last = customerObj.last;
-  if (removeOption) {
-    previewObj = null;
-    customerObj = null;
-  }
-  return setFirestoreCollectionItem("CUSTOMERS", id, customerObj);
+  // fix this
+  // let id = customerObj.id;
+  // let previewObj = {};
+  // previewObj.cell = customerObj.cell;
+  // previewObj.first = customerObj.first;
+  // previewObj.id = customerObj.id;
+  // previewObj.landline = customerObj.landline;
+  // previewObj.last = customerObj.last;
+  // if (removeOption) {
+  //   previewObj = null;
+  //   customerObj = null;
+  // }
+  // return setFirestoreCollectionItem("CUSTOMERS", id, customerObj);
 }
 
 export function dbSetWorkorder(item, batch = true, remove = false) {
@@ -175,6 +176,11 @@ export function dbSetPunchClockObj(obj, remove = false) {
 export function dbSetOrUpdateUserPunchObj(punchObj, remove = false) {
   let punchClockPath = build_db_path.punchHistory(punchObj.id);
   setDBField(punchClockPath, punchObj, remove);
+}
+
+export function dbSetSalesObj(salesObj) {
+  let path = build_db_path.sales(salesObj.id);
+  newSetDatabaseField(path, salesObj);
 }
 
 export function dbSetPunchClockArr(arr) {

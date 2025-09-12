@@ -59,6 +59,7 @@ import { sendFCMMessage } from "../../../db";
 import {
   dbProcessServerDrivenStripePayment,
   dbRetrieveAvailableStripeReaders,
+  dbSetSalesObj,
 } from "../../../db_call_wrapper";
 import { TouchableOpacity } from "react-native";
 
@@ -147,35 +148,46 @@ export function CheckoutModalScreen({ openWorkorder }) {
     _setTotalAmount(runningTax + runningTotal);
 
     // now run through the payments, update the amountLeftToPay field
-    _setAmountLeftToPay(runningTax + runningTotal);
-  }
-
-  function handlePaymentCapture(paymentObj = PAYMENT_OBJECT_PROTO) {
-    let openWorkorderObj = cloneDeep(zOpenWorkorderObj);
-    let saleObj;
-
-    // create or find existing sale object
-    if (!sSaleObj) {
-      saleObj = createSaleObj();
-    } else {
-      saleObj = cloneDeep(sSaleObj);
-    }
-
-    // add payment obj to sale obj
-    paymentObj.saleID = saleObj.id;
-    saleObj.paymentObjArr.push(paymentObj);
-    _setSaleObj(saleObj);
-    // clog(saleObj);
-
-    // _zSetWorkorder(openWorkorderObj, false, false); // send to db
-
     // calculate total paid on this workorder
     let totalPaid = 0;
-    saleObj.paymentObjArr.forEach((paymentObj) => {
+    sSaleObj?.paymentArr.forEach((paymentObj) => {
       totalPaid += paymentObj.amountCaptured;
     });
 
-    // log("total paid", totalPaid);
+    _setAmountLeftToPay(runningTax + runningTotal - totalPaid);
+  }
+
+  function handlePaymentCapture(paymentObj = PAYMENT_OBJECT_PROTO) {
+    // let saleObj = openW
+    // create or find existing sale object
+    let saleObj = cloneDeep(sSaleObj);
+    if (!sSaleObj) {
+      saleObj = cloneDeep(SALE_OBJECT_PROTO);
+      saleObj.id = generateUPCBarcode();
+      saleObj.millis = new Date().getTime();
+    }
+
+    // need to send print object here
+
+    // add payment obj to sale obj
+    paymentObj.saleID = saleObj.id;
+    saleObj.paymentArr.push(paymentObj);
+
+    sSelectedWorkordersToCombine.forEach((wo) => {
+      wo.saleObjID = saleObj.id;
+      _zSetWorkorder(wo); // send to db
+    });
+
+    _setSaleObj(saleObj);
+    dbSetSalesObj(saleObj);
+
+    // calculate total paid on this workorder
+    let totalPaid = 0;
+    saleObj.paymentArr.forEach((paymentObj) => {
+      totalPaid += paymentObj.amountCaptured;
+    });
+
+    _setAmountLeftToPay(sTotalAmount - totalPaid);
   }
 
   function handleCombineWorkorderCheck(wo) {
@@ -297,6 +309,8 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sTotalTaxAmount={sTotalAmount}
               _zSetIsCheckingOut={_zSetIsCheckingOut}
               handleCancelPress={closeCheckoutScreenModal}
+              paymentsArr={sSaleObj?.paymentArr}
+              amountLeftToPay={sAmountLeftToPay}
             />
           </View>
 
@@ -348,6 +362,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 zSettingsObj={zSettingsObj}
                 zGetInventoryItem={zGetInventoryItem}
                 handleCombineWorkorderCheck={handleCombineWorkorderCheck}
+                amountLeftToPay={sAmountLeftToPay}
               />
             )}
           </View>
@@ -436,9 +451,12 @@ const WorkorderListComponent = ({
   zSettingsObj,
   zGetInventoryItem,
   handleCombineWorkorderCheck,
+  amountLeftToPay,
 }) => {
   return (
-    <ScrollView style={{ width: "100%" }}>
+    <ScrollView
+      style={{ width: "100%", opacity: amountLeftToPay == 0 ? 0.2 : 1 }}
+    >
       {zOpenWorkordersArr
         .filter((o) => o.customerID === zCustomerObj?.id)
         .map((workorder, idx) => {
@@ -847,6 +865,8 @@ const MiddleItemComponent = ({
   sSubtotalAmount,
   _zSetIsCheckingOut,
   handleCancelPress,
+  paymentsArr,
+  amountLeftToPay,
 }) => {
   const [sFocusedItem, _setFocusedItem] = useState("");
 
@@ -855,6 +875,7 @@ const MiddleItemComponent = ({
       style={{
         width: "100%",
         height: "100%",
+        // justifyContent:
         // padding: 20,
       }}
     >
@@ -1162,25 +1183,136 @@ const MiddleItemComponent = ({
         </View>
       </View>
 
-      <Text style={{ marginTop: 20, color: makeGrey(0.4), fontSize: 12 }}>
-        PAYMENTS
-      </Text>
-      {sPaymentsCaptured.map((paymentObj) => {
+      {paymentsArr ? (
         <View
-          style={{
-            padding: 6,
-            backgroundColor: C.backgroundListWhite,
-            borderColor: C.buttonLightGreenOutline,
-            borderLeftWidth: 2,
-            borderRadius: 5,
-            borderLeftWidth: 2,
-            width: "90%",
-          }}
-        ></View>;
+          style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
+        >
+          <Text style={{ color: makeGrey(0.4) }}>PAYMENTS</Text>
+        </View>
+      ) : null}
+      {paymentsArr?.map((paymentObj) => {
+        return (
+          <View
+            style={{
+              padding: 5,
+              backgroundColor: C.listItemWhite,
+              width: "99%",
+              backgroundColor: C.listItemWhite,
+              borderRadius: 10,
+              marginBottom: 5,
+            }}
+          >
+            <Text style={{ color: C.green }}>
+              {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
+            </Text>
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <Text>Amount received: </Text>
+              <Text>
+                {formatNumberForCurrencyDisplay(paymentObj.amountCaptured)}
+              </Text>
+            </View>
+            {paymentObj.last4 ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text>Last 4 Digits: </Text>
+                <Text>{paymentObj.last4}</Text>
+              </View>
+            ) : null}
+            {paymentObj.cash ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text>Amount Tendered: </Text>
+                <Text>
+                  {formatNumberForCurrencyDisplay(paymentObj.amountTendered)}
+                </Text>
+              </View>
+            ) : null}
+            {paymentObj.cash ? (
+              <View
+                style={{
+                  justifyContent: "space-between",
+                  flexDirection: "row",
+                }}
+              >
+                <Text>Change needed: </Text>
+                <Text>
+                  {formatNumberForCurrencyDisplay(
+                    paymentObj.amountTendered - paymentObj.amountCaptured
+                  )}
+                </Text>
+              </View>
+            ) : null}
+            {paymentObj.isRefund ? <Text>{REFUND}</Text> : null}
+          </View>
+        );
       })}
-      {/* </View> */}
-      <SliderButton_ onConfirm={(val) => log("val", val)} />
-      <Button_ text={"Cancel"} onPress={handleCancelPress} />
+
+      <View
+        style={{
+          width: "100%",
+          alignItems: "flex-end",
+          marginTop: 10,
+          paddingRight: 7,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: 500,
+            color: amountLeftToPay == 0 ? C.green : C.lightred,
+          }}
+        >
+          {amountLeftToPay == 0
+            ? "PAYMENT COMPLETE!"
+            : "AMOUNT LEFT: $" +
+              formatNumberForCurrencyDisplay(amountLeftToPay)}
+        </Text>
+      </View>
+
+      <View
+        style={{
+          width: "100%",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-around",
+          marginTop: 25,
+        }}
+      >
+        {paymentsArr?.length > 0 && amountLeftToPay != 0 ? (
+          <SliderButton_ onConfirm={(val) => log("val", val)} />
+        ) : null}
+        {paymentsArr?.length == 0 ? (
+          <Button_
+            colorGradientArr={COLOR_GRADIENTS.red}
+            text={"Cancel"}
+            onPress={handleCancelPress}
+          />
+        ) : null}
+        {paymentsArr?.length > 0 ? (
+          <Button_
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            text={sAmountLeftToPay == 0 ? "Close" : "Cancel"}
+            onPress={handleCancelPress}
+          />
+        ) : null}
+        {paymentsArr?.length > 0 && sAmountLeftToPay == 0 ? (
+          <Button_
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            text={"Reprint"}
+            onPress={() => log("reprint receit method needed")}
+          />
+        ) : null}
+      </View>
     </View>
   );
 };
@@ -1193,7 +1325,7 @@ const CashSaleComponent = ({
 }) => {
   const [sTenderAmount, _setTenderAmount] = useState();
   const [sRequestedAmount, _setRequestedAmount] = useState(amountLeftToPay);
-  // const [sAmountLeftToPay, _setAmountLeftToPay] = useState();
+  const [sAmountLeftToPay, _setAmountLeftToPay] = useState();
   const [sStatusMessage, _setStatusMessage] = useState("");
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
   const [sIsCheck, _setIsCheck] = useState(false);
@@ -1237,6 +1369,7 @@ const CashSaleComponent = ({
     <View
       style={{
         ...checkoutScreenStyle.base,
+        opacity: amountLeftToPay == 0 ? 0.2 : 1,
       }}
     >
       {acceptsChecks ? (
@@ -1685,6 +1818,7 @@ const StripeCreditCardComponent = ({
     <View
       style={{
         ...checkoutScreenStyle.base,
+        opacity: amountLeftToPay == 0 ? 0.2 : 1,
       }}
     >
       <View

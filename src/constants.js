@@ -35,6 +35,7 @@ export const FIRESTORE_COLLECTION_NAMES = {
   punchHistory: "PUNCH-HISTORY/",
   closedWorkorders: "CLOSED-WORKORDERS/",
   customers: "CUSTOMERS/",
+  sales: "SALES/",
 };
 
 // dimensions
@@ -69,8 +70,8 @@ export const PERMISSION_LEVELS = {
 // database path builder /////////////////////////////////////////////////
 export const build_db_path = {
   punchHistory: (punchID) => {
-    let str = FIRESTORE_COLLECTION_NAMES.punchHistory + "punch-history-obj";
-    if (punchID) str += punchID + "/";
+    let str = FIRESTORE_COLLECTION_NAMES.punchHistory;
+    if (punchID) str += "/" + punchID + "/";
     return str;
   },
   settings: (fieldName) => {
@@ -97,5 +98,8 @@ export const build_db_path = {
   },
   customer: (customerID) => {
     return FIRESTORE_COLLECTION_NAMES.customers + customerID + "/";
+  },
+  sales: (salesObjID) => {
+    return FIRESTORE_COLLECTION_NAMES.sales + salesObjID + "/";
   },
 };

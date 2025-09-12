@@ -99,7 +99,7 @@ async function set_firestore_field(path, obj, remove) {
   // log(path, item);
   let docRef = doc(FIRESTORE, path);
   // return await setDoc(docRef, { ...obj });
-  updateDoc(docRef, obj);
+  setDoc(docRef, obj);
 }
 
 export function setRealtimeNodeItem(path, item, remove) {

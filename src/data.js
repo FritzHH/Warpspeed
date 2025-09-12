@@ -260,9 +260,8 @@ export const PAYMENT_OBJECT_PROTO = {
 export const SALE_OBJECT_PROTO = {
   id: "",
   workorderIDArr: [],
-  customerID: "",
   millis: "",
-  paymentObjArr: [],
+  paymentArr: [],
 };
 
 export const WORKORDER_PROTO = {

@@ -98,7 +98,7 @@ export async function fillInventory() {
 
 export async function fillOpenWorkorders(zInventoryArr) {
   let arr = [];
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 1; i++) {
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.id = generateUPCBarcode();
     wo.brand = SETTINGS_OBJ.bikeBrands[Math.floor(Math.random() * 4)];

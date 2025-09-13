@@ -18,7 +18,7 @@ export const dim = {
 export const LETTERS = "qwertyuioplkjhgfdsazxcvbnm-";
 export const NUMS = "1234567890-";
 
-export function log(one, two) {
+export function clog(one, two) {
   // console.log("hdfkjdkjfak");
   let str = "";
 
@@ -44,7 +44,7 @@ export function log(one, two) {
   console.log(str);
 }
 
-export function clog(one, two) {
+export function log(one, two) {
   console.log(one);
   if (two) console.log(two);
 }
@@ -359,6 +359,23 @@ export function fuzzySearch(searchTerms, items) {
     ...s.item,
     _score: s.score,
   }));
+}
+
+export function getRgbFromNamedColor(colorName) {
+  // log(colorName);
+  const el = document.createElement("div");
+  el.style.color = colorName;
+  document.body.appendChild(el);
+  let rgb = getComputedStyle(el).color; // yields 'rgb(r,g,b)'
+  // log("rgb", rgb);
+  document.body.removeChild(el);
+  rgb = rgb.toString();
+
+  // log(rgb);
+  const match = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  // log("match", match[0]);
+
+  return match[0];
 }
 
 // array ops
@@ -783,6 +800,7 @@ export function insertOpacityIntoRGBString(rgbString, opacity) {
 }
 
 export function lightenRGBByPercent(rgb, percent) {
+  // log("rgb", rgb);
   const match = rgb.match(/^rgb\s*\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)$/i);
   if (!match) throw new Error("Invalid RGB format");
   let [r, g, b] = match.slice(1, 4).map(Number);

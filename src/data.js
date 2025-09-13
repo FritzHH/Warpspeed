@@ -1,6 +1,7 @@
 /* eslint-disable */
 
 import { DISCOUNT_TYPES, MILLIS_IN_HOUR, PERMISSION_LEVELS } from "./constants";
+import { getRgbFromNamedColor, lightenRGBByPercent } from "./utils";
 
 ////////// hardcoded settings and options ///////
 export const SHADOW_RADIUS_NOTHING = {
@@ -269,6 +270,11 @@ export const SALE_OBJECT_PROTO = {
   workorderIDArr: [],
   millis: "",
   paymentArr: [],
+  subtotal: 0,
+  discount: 0,
+  salesTax: 0,
+  total: 0,
+  amountCaptured: 0,
 };
 
 export const WORKORDER_PROTO = {

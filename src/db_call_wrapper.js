@@ -32,6 +32,8 @@ import {
   setRealtimeNodeItem,
   newSetDatabaseField,
   getFirestoreDoc,
+  subscribeToNodeAddition,
+  subscribeToNodeChange,
 } from "./db";
 import { useDatabaseBatchStore } from "./stores";
 import { clog, generateRandomID, log } from "./utils";
@@ -281,13 +283,22 @@ export function dbSendMessageToCustomer(messageObj) {
 }
 
 // server driven Stripe payment processing (new)
-export function dbProcessServerDrivenStripePayment(
+
+export function dbSubscribeToStripePaymentProcess(paymentIntentID, callback) {
+  let path = build_db_path.cardPaymentFlow(paymentIntentID);
+  // subscribeToNodeChange(path, (key, val) => callback(key, val, paymentIntentID));
+  return subscribeToNodeAddition(path, (key, val) =>
+    callback(key, val, paymentIntentID)
+  );
+}
+
+export async function dbProcessServerDrivenStripePayment(
   saleAmount,
   terminalID,
   warmUp,
   paymentIntentID
 ) {
-  return processServerDrivenStripePayment(
+  return await processServerDrivenStripePayment(
     saleAmount,
     terminalID,
     warmUp,

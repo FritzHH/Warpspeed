@@ -49,7 +49,7 @@ import {
   FCM_MESSAGING_URL,
   firebaseConfig,
   STRIPE_EVENT_WEBHOOK_URL,
-} from "./app_user_constants";
+} from "./private_user_constants";
 import { firebaseApp } from "./init";
 import { isArray } from "lodash";
 
@@ -57,10 +57,10 @@ import { isArray } from "lodash";
 import {
   SMS_URL,
   STRIPE_CONNECTION_TOKEN_FIREBASE_URL,
-  STRIPE_SERVER_DRIVEN_CANCEL_PAYMENT_INTENT_URL,
-  STRIPE_SERVER_DRIVEN_INITIATE_PAYMENT_INTENT_URL,
-  STRIPE_SERVER_DRIVEN_GET_AVAIALABLE_STRIPE_READERS_URL,
-} from "./app_user_constants";
+  STRIPE_CANCEL_PAYMENT_INTENT_URL,
+  STRIPE_INITIATE_PAYMENT_INTENT_URL,
+  STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
+} from "./private_user_constants";
 import { FIRESTORE_COLLECTION_NAMES } from "./constants";
 
 // Initialize Firebase
@@ -113,11 +113,13 @@ export function getRealtimeNodeItem(path) {
 
 // exposed subscriptions ////////////////////////////////////////
 export function subscribeToNodeChange(path, callback) {
+  // log("path2 ", path);
+
   let dbRef = ref(RDB, path);
   return onChildChanged(dbRef, (snap) => {
-    // log(snap);
+    // log("snap", snap);
     if (snap.val()) {
-      // log("subscription change", snap.val());
+      // log("node change", snap.val());
       callback(snap.key, snap.val());
     }
   });
@@ -133,10 +135,12 @@ export function subscribeToNodeRemoval(nodePath, callback) {
 }
 
 export function subscribeToNodeAddition(path, callback) {
+  // log("path", path);
   let dbRef = ref(RDB, path);
   return onChildAdded(dbRef, (snap) => {
+    // log("snap", snap);
     if (snap.val()) {
-      // clog("added", snap.val());
+      // clog("node addition", snap.val());
       callback(snap.key, snap.val());
     }
   });
@@ -531,7 +535,7 @@ export function processServerDrivenStripePayment(
   warmUp,
   paymentIntentID
 ) {
-  return fetch(STRIPE_SERVER_DRIVEN_INITIATE_PAYMENT_INTENT_URL, {
+  return fetch(STRIPE_INITIATE_PAYMENT_INTENT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -546,17 +550,20 @@ export function processServerDrivenStripePayment(
     .then((res) => {
       if (!res.ok) {
         return null;
+        // log("res not ok", res);
       } else {
+        // log("res ok");
         return res.json();
       }
     })
     .catch((e) => {
       log("error in Stripe processServerDrivenStripePayment() call", e);
+      return e;
     });
 }
 
 export function cancelServerDrivenStripePayment(readerID, paymentIntentID) {
-  return fetch(STRIPE_SERVER_DRIVEN_CANCEL_PAYMENT_INTENT_URL, {
+  return fetch(STRIPE_CANCEL_PAYMENT_INTENT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -583,7 +590,7 @@ export function cancelServerDrivenStripePayment(readerID, paymentIntentID) {
 // }
 
 export function retrieveAvailableStripeReaders(readerID) {
-  return fetch(STRIPE_SERVER_DRIVEN_GET_AVAIALABLE_STRIPE_READERS_URL, {
+  return fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

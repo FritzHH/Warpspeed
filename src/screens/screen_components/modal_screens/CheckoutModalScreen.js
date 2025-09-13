@@ -34,7 +34,7 @@ import {
   SliderButton_,
   GradientView,
 } from "../../../components";
-import { cloneDeep } from "lodash";
+import { cloneDeep, initial } from "lodash";
 import {
   addDashesToPhone,
   applyLineItemDiscounts,
@@ -57,11 +57,17 @@ import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
 import { sendFCMMessage } from "../../../db";
 import {
+  dbCancelServerDrivenStripePayment,
   dbProcessServerDrivenStripePayment,
   dbRetrieveAvailableStripeReaders,
   dbSetSalesObj,
+  dbSubscribeToStripePaymentProcess,
 } from "../../../db_call_wrapper";
 import { TouchableOpacity } from "react-native";
+import {
+  STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
+  STRIPE_INITIATE_PAYMENT_INTENT_URL,
+} from "../../../private_user_constants";
 
 export function CheckoutModalScreen({ openWorkorder }) {
   // store setters
@@ -168,19 +174,12 @@ export function CheckoutModalScreen({ openWorkorder }) {
       saleObj.millis = new Date().getTime();
     }
 
+    //************************************************************** */
     // need to send print object here
 
     // add payment obj to sale obj
     paymentObj.saleID = saleObj.id;
     saleObj.paymentArr.push(paymentObj);
-
-    sSelectedWorkordersToCombine.forEach((wo) => {
-      wo.saleObjID = saleObj.id;
-      _zSetWorkorder(wo); // send to db
-    });
-
-    _setSaleObj(saleObj);
-    dbSetSalesObj(saleObj);
 
     // calculate total paid on this workorder
     let totalPaid = 0;
@@ -188,7 +187,17 @@ export function CheckoutModalScreen({ openWorkorder }) {
       totalPaid += paymentObj.amountCaptured;
     });
 
+    sSelectedWorkordersToCombine.forEach((wo) => {
+      wo.saleObjID = saleObj.id;
+      if (totalPaid === sTotalAmount) {
+        wo.paymentComplete = true;
+      }
+      _zSetWorkorder(wo); // send to db
+    });
+
     _setAmountLeftToPay(sTotalAmount - totalPaid);
+    _setSaleObj(saleObj);
+    dbSetSalesObj(saleObj);
   }
 
   function handleCombineWorkorderCheck(wo) {
@@ -284,8 +293,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
               onComplete={handlePaymentCapture}
               onCancel={() => {}}
               amountLeftToPay={sAmountLeftToPay}
-              cardReaderObj={zSettingsObj?.selectedCardReaderObj}
-              cardReaderArr={zSettingsObj?.cardReaders}
+              // cardReaderObj={zSettingsObj?.selectedCardReaderObj}
+              zSettingsObj={zSettingsObj}
+              // cardReaderArr={zSettingsObj?.cardReaders}
             />
           </View>
 
@@ -536,9 +546,9 @@ const WorkorderListComponent = ({
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <Text
                       style={{
-                        paddingHorizontal: 5,
-                        paddingVertical: 2,
-                        borderRadius: 5,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 100,
                         backgroundColor: workorder.color1?.backgroundColor,
                         color: workorder.color1?.textColor,
                       }}
@@ -548,9 +558,9 @@ const WorkorderListComponent = ({
                     <Text
                       style={{
                         marginLeft: 5,
-                        paddingHorizontal: 5,
-                        paddingVertical: 2,
-                        borderRadius: 5,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 100,
                         backgroundColor: workorder.color2?.backgroundColor,
                         color: workorder.color2?.textColor,
                       }}
@@ -1606,38 +1616,239 @@ const CashSaleComponent = ({
 const StripeCreditCardComponent = ({
   amountLeftToPay,
   onComplete,
-  cardReaderObj,
-  cardReaderArr,
+  zSettingsObj,
   isRefund,
 }) => {
   const [sRequestedAmount, _setRequestedAmount] = useState(amountLeftToPay);
   // const [sAmountLeftToPay, _setAmountLeftToPay] = useState();
   const [sStatusMessage, _setStatusMessage] = useState("");
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
-  const [sSelectedCardReaderObj, _setSelectedCardReaderObj] =
-    useState(cardReaderObj);
   const [sFocusedItem, _setFocusedItem] = useState("");
+  const [sCardReaderObj, _setCardReaderObj] = useState("");
+  const [sCardReaderArr, _setCardReaderArr] = useState([]);
+  const [sListenerArr, _setListenerArr] = useState([]);
+  const [sPaymentIntentID, _setPaymentIntentID] = useState("");
+  const [sStatusTextColor, _setStatusTextColor] = useState(C.green);
 
-  //////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////
+  const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
-    if (sRequestedAmount <= amountLeftToPay) {
+    // log(sRequestedAmount);
+    getAvailableStripeReaders();
+    if (sRequestedAmount <= amountLeftToPay && sRequestedAmount >= 3) {
       _setProcessButtonEnabled(true);
+    } else {
+      _setProcessButtonEnabled(false);
     }
-  }, [sRequestedAmount, amountLeftToPay]);
 
-  useEffect(() => {
-    // if (!sRunningReader) {
-    //   startServerDrivenStripePaymentIntent(amountLeftToPay);
-    //   _setRunningReader(true);
-    // }
-    // return () => {
-    //   zResetStripeStore();
-    //   if (sListenerArr) {
-    //     sListenerArr.forEach((listener) => listener());
-    //   }
-    // };
-  }, []);
+    return () => {
+      try {
+        sListenerArr.forEach((listener) => listener());
+      } catch (e) {
+        log("error canceling listener", e);
+      }
+    };
+  }, [sRequestedAmount]);
+
+  async function getAvailableStripeReaders() {
+    log("getting available Stripe readers");
+    const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await res.json();
+    let readerArr = data.data;
+    let arr = [];
+    readerArr.forEach((connectedReader) => {
+      let match = zSettingsObj.cardReaders.find(
+        (o) => o.id === connectedReader.id
+      );
+      if (match) {
+        arr.push(match);
+      } else {
+        arr.push(connectedReader);
+      }
+    });
+    _setCardReaderArr(arr);
+    if (
+      arr.find((o) =>
+        o.id === zSettingsObj.selectedCardReaderObj.id ? true : false
+      )
+    ) {
+      _setCardReaderObj(zSettingsObj.selectedCardReaderObj);
+      startPayment(sRequestedAmount, zSettingsObj.selectedCardReaderObj.id);
+    }
+  }
+
+  // unnecessary, DB will create it for us
+  async function createPaymentIntent(reader) {
+    log("creating payment intent");
+    try {
+      const res = await fetch(STRIPE_INITIATE_PAYMENT_INTENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: Number(sRequestedAmount),
+          currency: "usd",
+          readerID: reader?.id || sCardReaderObj.id,
+        }),
+      });
+      const data = await res.json();
+      clog("intent", data);
+    } catch (e) {
+      log("Error creating payment intent", e);
+    }
+
+    // setClientSecret(data.clientSecret);
+  }
+
+  async function startPayment(paymentAmount, readerID) {
+    if (!(paymentAmount > 0)) return;
+    _setStatusTextColor("green");
+    _setStatusMessage("Retrieving card reader activation...");
+    log("starting server driven payment attempt, amount", paymentAmount);
+    // return;
+
+    // readerResult obj contains readerResult object key/val and paymentIntentID key/val
+    let readerResult = await dbProcessServerDrivenStripePayment(
+      paymentAmount,
+      readerID || sCardReaderObj.id,
+      false,
+      sPaymentIntentID
+    );
+
+    console.log("reader result", readerResult);
+
+    if (!readerResult) {
+      _setStatusMessage("No reader found\n\nCheck connections");
+      log("no result");
+      return;
+    }
+
+    if (readerResult.error && readerResult.error.code) {
+      handleStripeReaderActivationError(readerResult.error.code);
+    } else {
+      _setStatusTextColor("green");
+      _setStatusMessage("Waiting for customer...");
+      // log("readerkdfjkdjf", readerResult.paymentIntentID);
+      _setPaymentIntentID(readerResult.paymentIntentID);
+      let listenerArr = cloneDeep(sListenerArr);
+      let listener = dbSubscribeToStripePaymentProcess(
+        readerResult.paymentIntentID,
+        handleStripeCardPaymentDBSubscriptionUpdate
+      );
+      listenerArr.push(listener);
+      _setListenerArr(listenerArr);
+    }
+  }
+  async function handleStripeReaderActivationError(error) {
+    _setStatusTextColor("red");
+    log("Handling Stripe reader activation error", error);
+    let message = "";
+    if (error == "in_progress") {
+      message =
+        "error code: in_progress\n\nCard Reader in use. Please wait, use a different reader, or reset this reader";
+    } else {
+      switch (error.code) {
+        case "terminal_reader_timeout":
+          message =
+            "error code: terminal_reader_timeout\n\nCould not connect to reader, possible network issue\n" +
+            error.code;
+          break;
+        case "terminal_reader_offline":
+          message =
+            "error code: terminal_reader_offline\n\n Please check power and internet connection\n" +
+            error.code;
+          break;
+        case "terminal_reader_busy":
+          message =
+            "error code: terminal_reader_busy\n\nPlease try a different reader or reset this reader\n" +
+            error.code;
+          break;
+        case "intent_invalid_state":
+          message =
+            "error code: intent_invalid_state\n\nPlease clear the reader, refresh the page and try again";
+          break;
+        default:
+        // message = "Unknown processing error: \n" + error.code;
+      }
+    }
+    _setStatusMessage(message);
+  }
+
+  function handleStripeCardPaymentDBSubscriptionUpdate(
+    key,
+    val,
+    ssPaymentIntentID
+  ) {
+    clog("Stripe webhook update Obj", val);
+
+    let failureCode = val?.failure_code;
+    if (
+      failureCode &&
+      val?.process_payment_intent?.payment_intent == ssPaymentIntentID
+    ) {
+      log("card failure code", failureCode);
+      _setStatusTextColor("red");
+      _setStatusMessage(
+        "Failure code:  " + val.failure_code + "\n\nPayment Rejected by Stripe"
+      );
+    } else if (
+      val.status === "succeeded" &&
+      val.payment_intent === ssPaymentIntentID
+    ) {
+      _setStatusTextColor("green");
+      _setStatusMessage("Payment Complete!");
+      clog("Payment complete object", val);
+      let paymentMethodDetails = val.payment_method_details.card_present;
+      // log("trimming", trimToTwoDecimals(Number(val.amount_captured) / 100));
+      // log("num", Number(val.amountCaptured));
+
+      let paymentDetailsObj = cloneDeep(PAYMENT_OBJECT_PROTO);
+      paymentDetailsObj.amountCaptured = trimToTwoDecimals(
+        val.amount_captured / 100
+      );
+      paymentDetailsObj.cardIssuer =
+        paymentMethodDetails.receipt.application_preferred_name;
+      paymentDetailsObj.cardType = paymentMethodDetails.description;
+      paymentDetailsObj.id = generateUPCBarcode();
+      paymentDetailsObj.isRefund = isRefund;
+      paymentDetailsObj.millis = new Date().getTime();
+      paymentDetailsObj.authorizationCode =
+        paymentMethodDetails.receipt.authorization_code;
+      paymentDetailsObj.paymentIntentID = val.payment_intent;
+      paymentDetailsObj.chargeID = val.id;
+      paymentDetailsObj.paymentProcessor = "stripe";
+      paymentDetailsObj.receiptURL = val.receipt_url;
+      paymentDetailsObj.last4 = val.payment_method_details.card_present.last4;
+      paymentDetailsObj.expMonth =
+        val.payment_method_details.card_present.exp_month;
+      paymentDetailsObj.expYear =
+        val.payment_method_details.card_present.exp_year;
+      paymentDetailsObj.networkTransactionID =
+        val.payment_method_details.card_present.network_transaction_id;
+      paymentDetailsObj.amountRefunded = val.amount_refunded;
+
+      clog("Successful Payment details obj", paymentDetailsObj);
+    }
+  }
+
+  async function cancelServerDrivenStripePaymentIntent() {
+    _setStatusTextColor("red");
+    _setStatusMessage("Canceling payment request...");
+    log("canceling server driven payment attempt", zReader);
+    if (!zPaymentIntentID) {
+      // onCancel();
+      return;
+    }
+    let readerResult = await dbCancelServerDrivenStripePayment(
+      zReader?.id,
+      zPaymentIntentID
+    );
+
+    // onCancel();
+  }
 
   function handleCancelPress() {
     _setTenderAmount("");
@@ -1646,8 +1857,26 @@ const StripeCreditCardComponent = ({
   }
 
   function handleProcessButtonPress() {
+    startPayment(amountLeftToPay);
+  }
+
+  async function resetCardReader() {
+    _setStatusMessage("red");
+    _setStatusMessage("\nCard reader reset in progress...");
+    _setPaymentIntentID(null);
+    sListenerArr.forEach((listener) => listener());
+    _setProcessButtonEnabled(true);
+    let readerResult = await dbCancelServerDrivenStripePayment(
+      sCardReaderObj.id,
+      sPaymentIntentID
+    );
+    _setStatusTextColor("green");
+    _setStatusMessage("\nReset complete!");
+    clog("cancelation results", readerResult);
+  }
+
+  function onPaymentComplete(obj) {
     let paymentObject = { ...PAYMENT_OBJECT_PROTO };
-    paymentObject.amountTendered = Number(sTenderAmount);
     paymentObject.amountCaptured = Number(sRequestedAmount);
     paymentObject.cash = !sIsCheck;
     paymentObject.check = sIsCheck;
@@ -1658,165 +1887,7 @@ const StripeCreditCardComponent = ({
     handleCancelPress();
   }
 
-  function handleKeyPress(event) {
-    if (event.nativeEvent.key != "Enter") return;
-  }
-
-  // todo
-  function setCurrentReader(reader) {}
-
-  async function startServerDrivenStripePaymentIntent(paymentAmount) {
-    log("payment amouint", paymentAmount);
-    if (!(paymentAmount > 0)) return;
-    _sSetStatus(true);
-    _sSetStatusTextColor("red");
-    _sSetStatusMessage("Retrieving card reader activation...");
-    log("starting server driven payment attempt, amount", paymentAmount);
-    // return;
-
-    // readerResult obj contains readerResult object key/val and paymentIntentID key/val
-    let paymentIntentID = zPaymentIntentID;
-    let readerResult = await dbProcessServerDrivenStripePayment(
-      paymentAmount,
-      zReader.id,
-      false,
-      paymentIntentID
-    );
-    console.log("reader result", readerResult);
-
-    if (readerResult == "in_progress") {
-      handleStripeReaderActivationError(readerResult);
-      _sSetReaderBudy(true);
-    } else {
-      _sSetReaderBudy(false);
-      _sSetStatusTextColor("green");
-      _sSetStatusMessage("Waiting for customer...");
-      _zSetPaymentIntentID(readerResult.paymentIntentID);
-      // log("pi id", readerResult.paymentIntentID);
-      let listenerArr = await paymentIntentSubscribe(
-        readerResult.paymentIntentID,
-        handleStripeCardPaymentDBSubscriptionUpdate,
-        readerResult.paymentIntentID
-      );
-      _sSetListenerArr(listenerArr);
-    }
-  }
-
-  async function handleStripeReaderActivationError(error) {
-    _sSetStatusTextColor("red");
-    _sSetStatus(false);
-    log("Handling Stripe reader activation error", error);
-    let message = "";
-    if (error == "in_progress") {
-      message =
-        "Card Reader in use. Please wait until screen clears, or use a different reader.\n\n If not in use, try resetting the card reader";
-    } else {
-      switch (error.code) {
-        case "terminal_reader_timeout":
-          message =
-            "Could not connect to reader, possible network issue\n" +
-            error.code;
-          break;
-        case "terminal_reader_offline":
-          message =
-            "Reader appears to be offline. Please check power and internet connection\n" +
-            error.code;
-          break;
-        case "terminal_reader_busy":
-          message = "Reader busy. Please try a different reader\n" + error.code;
-          break;
-        case "intent_invalid_state":
-          message =
-            "Invalid payment intent state. Please clear the reader and try again";
-          break;
-        default:
-          message = "Unknown processing error: \n" + error.code;
-      }
-    }
-    _sSetStatusMessage(message);
-  }
-
-  function handleStripeCardPaymentDBSubscriptionUpdate(
-    type,
-    key,
-    val,
-    zzPaymentIntentID
-  ) {
-    // log("Stripe webhook properties", type + " : " + key);
-    clog("Stripe webhook update Obj", val);
-    let failureCode = val?.failure_code;
-    if (failureCode == "card_declined") {
-      let paymentIntentID = val?.process_payment_intent?.payment_intent;
-      log("CARD DECLINED");
-      // log("payment intent id", paymentIntentID);
-      // log("z payment intent id", zzPaymentIntentID);
-      if (paymentIntentID == zzPaymentIntentID) {
-        _sSetCardWasDeclined(true);
-        _sSetStatusTextColor("red");
-        _sSetStatusMessage("Card Declined");
-        _sSetStatus(false);
-      }
-    } else if (key == "complete") {
-      _sSetCardWasDeclined(false);
-      _sSetStatusTextColor("green");
-      _sSetStatusMessage("Payment Complete!");
-      _sSetStatus(false);
-      clog("Payment complete object", val);
-      let paymentMethodDetails = val.payment_method_details.card_present;
-      // log("trimming", trimToTwoDecimals(Number(val.amount_captured) / 100));
-      // log("num", Number(val.amountCaptured));
-      let paymentDetailsObj = {
-        last4: paymentMethodDetails.last4,
-        cardType: paymentMethodDetails.description,
-        issuer: paymentMethodDetails.receipt.application_preferred_name,
-        authorizationCode: paymentMethodDetails.receipt.authorization_code,
-        paymentIntentID: val.payment_intent,
-        chargeID: val.id,
-        amount: trimToTwoDecimals(val.amount_captured / 100),
-        paymentProcessor: "stripe",
-        totalCaptured: trimToTwoDecimals(val.amount_captured / 100),
-      };
-      clog("Successful Payment details obj", paymentDetailsObj);
-      onComplete(paymentDetailsObj);
-      setTimeout(() => {
-        onCancel();
-      }, 1500);
-    }
-  }
-
-  async function cancelServerDrivenStripePaymentIntent() {
-    _sSetStatusTextColor("red");
-    _sSetStatusMessage("Canceling payment request...");
-    log("canceling server driven payment attempt", zReader);
-    if (!zPaymentIntentID) {
-      onCancel();
-      return;
-    }
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      zReader?.id,
-      zPaymentIntentID
-    );
-
-    onCancel();
-  }
-
-  async function resetCardReader() {
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      zReader?.id,
-      zPaymentIntentID
-    );
-    onCancel();
-  }
-
-  async function clearReader() {
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      zReader?.id,
-      zPaymentIntentID
-    );
-
-    onCancel();
-  }
-
+  // log(sProcessButtonEnabled.toString());
   return (
     <View
       style={{
@@ -1828,29 +1899,55 @@ const StripeCreditCardComponent = ({
         style={{
           width: "100%",
           alignItems: "flex-start",
-          marginBottom: 10,
-          marginLeft: 20,
+          paddingBottom: 10,
+          paddingHorizontal: 10,
+          // marginLeft: 20,
         }}
       >
-        <View style={{}}>
-          <Text style={{ color: makeGrey(0.6), fontSize: 11 }}>
-            Card Readers
-          </Text>
-          <DropdownMenu
-            buttonIcon={ICONS.menu2}
-            buttonIconSize={15}
-            buttonTextStyle={{ fontSize: 13 }}
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexDirection: "row",
+          }}
+        >
+          <View style={{}}>
+            <Text style={{ color: makeGrey(0.6), fontSize: 11 }}>
+              Card Readers
+            </Text>
+            <DropdownMenu
+              buttonIcon={ICONS.menu2}
+              buttonIconSize={15}
+              buttonTextStyle={{ fontSize: 13 }}
+              buttonStyle={{
+                borderRadius: 5,
+                paddingVertical: 2,
+                paddingHorizontal: 5,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+              }}
+              itemStyle={{ width: null }}
+              dataArr={sCardReaderArr || []}
+              buttonText={sCardReaderObj?.label || sCardReaderObj.id}
+              onSelect={_setCardReaderObj}
+            />
+          </View>
+          <Button_
+            text={"Reset Card Reader"}
             buttonStyle={{
-              borderRadius: 5,
-              paddingVertical: 2,
+              backgroundColor: makeGrey(0.2),
               paddingHorizontal: 5,
+              paddingVertical: 2,
+              borderRadius: 5,
+              borderColor: makeGrey(0.23),
               borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
             }}
-            itemStyle={{ width: null }}
-            dataArr={cardReaderArr || []}
-            buttonText={sSelectedCardReaderObj?.label}
-            onSelect={_setSelectedCardReaderObj}
+            textStyle={{
+              color: C.textMain,
+              fontSize: 11,
+            }}
+            onPress={resetCardReader}
           />
         </View>
       </View>
@@ -1904,6 +2001,7 @@ const StripeCreditCardComponent = ({
             onFocus={() => {
               _setFocusedItem("amount");
               _setRequestedAmount("");
+              _setProcessButtonEnabled(false);
             }}
             autoFocus={sFocusedItem === "amount"}
             style={{
@@ -1923,11 +2021,14 @@ const StripeCreditCardComponent = ({
             value={formatNumberForCurrencyDisplay(sRequestedAmount)}
             onChangeText={(val) => {
               val = formatDecimal(val);
-              if (val > amountLeftToPay) {
-                _setStatusMessage("Amount greater than balance");
-                return;
+              if (val > amountLeftToPay || val <= 3) {
+                // _setStatusMessage("Improper payment amount...");
+                log("here");
+                _setRequestedAmount(val);
+                _setProcessButtonEnabled(false);
               } else {
-                _setStatusMessage("");
+                _setProcessButtonEnabled(true);
+                // _setStatusMessage("");
                 _setRequestedAmount(val);
               }
             }}
@@ -1944,35 +2045,27 @@ const StripeCreditCardComponent = ({
       >
         <Button_
           colorGradientArr={COLOR_GRADIENTS.green}
-          //   buttonStyle={{ backgroundColor: "green" }}
-          //   style={{ ...checkoutScreenStyle.mainButtonStyle }}
           textStyle={{ color: C.textWhite }}
           enabled={sProcessButtonEnabled}
-          //   visible={sProcessButtonLabel}
           onPress={handleProcessButtonPress}
           text={"Process"}
-          buttonStyle={{ width: 130 }}
+          buttonStyle={{
+            width: 130,
+            cursor: sProcessButtonEnabled ? "inherit" : "default",
+          }}
         />
-        {/* <Button_
-            enabled={sTenderAmount}
-          onPress={handleCancelPress}
-          text={"Cancel"}
-        /> */}
+
         <Text
           style={{
             ...checkoutScreenStyle.statusText,
-            fontSize: 25,
-            color: C.green,
-            marginTop: 30,
+            fontSize: 15,
+            color: sStatusTextColor,
+            marginTop: 10,
           }}
         >
-          Captured
+          {sStatusMessage}
         </Text>
       </View>
-
-      {/* <View style={{ ...checkoutScreenStyle.loadingIndicatorStyle }}>
-        <LoadingIndicator visible={sStatus} />
-      </View> */}
     </View>
   );
 };

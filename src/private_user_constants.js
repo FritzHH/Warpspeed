@@ -16,11 +16,11 @@ export const SMS_URL =
 export const STRIPE_CONNECTION_TOKEN_FIREBASE_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createStripeConnectionToken";
 
-export const STRIPE_SERVER_DRIVEN_INITIATE_PAYMENT_INTENT_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/processServerDrivenStripePayment";
+export const STRIPE_INITIATE_PAYMENT_INTENT_URL =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/initiatePaymentIntent";
 
-export const STRIPE_SERVER_DRIVEN_CANCEL_PAYMENT_INTENT_URL =
+export const STRIPE_CANCEL_PAYMENT_INTENT_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/cancelServerDrivenStripePayment";
 
-export const STRIPE_SERVER_DRIVEN_GET_AVAIALABLE_STRIPE_READERS_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/getAvailableStripeReaders1";
+export const STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/getAvailableStripeReaders";

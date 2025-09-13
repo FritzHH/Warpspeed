@@ -26,7 +26,7 @@ export const REALTIME_DATABASE_NODE_NAMES = {
   settings: "SETTINGS/",
   inventory: "INVENTORY/",
   openWorkorders: "OPEN-WORKORDERS/",
-  paymentProcessing: "PAYMENT-PROCESSSING/",
+  paymentProcessing: "PAYMENT-PROCESSING/",
   printing: "PRINTING/",
   punchClock: "PUNCH-CLOCK/",
 };
@@ -101,5 +101,8 @@ export const build_db_path = {
   },
   sales: (salesObjID) => {
     return FIRESTORE_COLLECTION_NAMES.sales + salesObjID + "/";
+  },
+  cardPaymentFlow: (id) => {
+    return REALTIME_DATABASE_NODE_NAMES.paymentProcessing + id + "/";
   },
 };

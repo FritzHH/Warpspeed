@@ -253,10 +253,17 @@ export const PAYMENT_OBJECT_PROTO = {
   id: "",
   saleID: "",
   isRefund: false,
+  paymentProcessor: "",
+  chargeID: "",
+  authorizationCode: "",
+  paymentIntentID: "",
+  receiptURL: "",
+  expMonth: "",
+  expYear: "",
+  networkTransactionID: "",
+  amountRefunded: "",
 };
 
-// PAYMENT objects get their own node for increased cc searchability
-// store their id's in the SALE object's paymentObjectIDArr
 export const SALE_OBJECT_PROTO = {
   id: "",
   workorderIDArr: [],

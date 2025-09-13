@@ -79,49 +79,20 @@ function log(one, two) {
   logger.log(str);
 }
 
-// ftp reader
-// exports.readFTPFile = onRequest(
-//   { cors: true, secrets: [stripeSecretKey] },
-//   async (req, res) => {
-//     log("Incoming FTP read request");
-//     const client = new ftp.Client();
-//     client.ftp.verbose = true; // Optional: for debug logging
-
-//     //     Server                   : ftp.jbi.bike
-//     // Login name         : 121080
-//     // Password            : g3QX&bn5
-
-//     try {
-//       // Connect to FTP server
-//       await client.access({
-//         host: "ftp.jbi.bike",
-//         user: "121080",
-//         password: "g3QX&bn5",
-//         secure: false, // Set to true if using FTPS
-//       });
-
-//       // List files in the root directory
-//       log("Directory listing for FTP host:");
-//       const list = await client.list();
-//       list.forEach((item) => console.log(item.name));
-
-//       // Download a file (change 'file.txt' to your file name)
-//       await client.downloadTo("local-file.txt", "file.txt");
-//       log("File downloaded!");
-
-//       // Read the downloaded file
-//       const content = fs.readFileSync("local-file.txt", "utf8");
-//       log("File content for FTP transfer:");
-//       log(content);
-//     } catch (err) {
-//       console.error(err);
-//     }
-//     client.close();
-//   }
-// );
-
 // server driven Stripe payments
-exports.processServerDrivenStripePayment = onRequest(
+
+exports.getAvailableStripeReaders = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    log("Incoming get available Stripe readers body", req.body);
+    const readers = await stripe.terminal.readers.list({});
+    log("available Stripe readers", readers);
+    sendSuccessfulResult(res, readers);
+  }
+);
+
+exports.initiatePaymentIntent = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "http://localhost:3000");
@@ -131,6 +102,7 @@ exports.processServerDrivenStripePayment = onRequest(
       req.body.readerID
     );
     log("Requested card reader object", readerResult);
+
     if (req.body.warmUp) {
       log("warming up!");
       try {
@@ -143,7 +115,13 @@ exports.processServerDrivenStripePayment = onRequest(
 
     // check to see if reader is in use
     if (readerResult?.action?.status) {
-      sendSuccessfulResult(res, readerResult.action.status);
+      log(
+        "Card reader is currently in progress with another payment intent",
+        readerResult
+      );
+      sendSuccessfulResult(res, {
+        error: { code: readerResult.action.status },
+      });
       return;
     }
     try {
@@ -156,7 +134,7 @@ exports.processServerDrivenStripePayment = onRequest(
         log("Getting a new payment intent");
         paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(Number(req.body.amount) * 100),
-          payment_method_types: ["card_present", "card", "link"],
+          payment_method_types: ["card_present", "card", "link", "cashapp"],
           capture_method: req.body.captureMethod || "automatic",
           currency: "usd",
         });
@@ -167,7 +145,7 @@ exports.processServerDrivenStripePayment = onRequest(
         );
       } else {
         // we are reusing
-        log("Recycling the previous payment intent!");
+        log("Recycling the previous payment intent");
         paymentIntentID = req.body.paymentIntentID;
       }
       var attempt = 0;
@@ -184,7 +162,7 @@ exports.processServerDrivenStripePayment = onRequest(
           );
           log("Stripe server-driven payment process complete!", readerResult);
           if (!req.body.paymentIntentID) {
-            let ref = RDB.ref("PAYMENT_PROCESSING/" + paymentIntentID);
+            let ref = RDB.ref("PAYMENT-PROCESSING/" + paymentIntentID);
             ref.set({ paymentIntent: paymentIntent, updates: [] });
           }
           return sendSuccessfulResult(res, {
@@ -194,11 +172,11 @@ exports.processServerDrivenStripePayment = onRequest(
         } catch (error) {
           log("Stripe server-driven payment process ERROR ERROR ERROR!", error);
           if (attempt == tries) {
-            sendSuccessfulResult(res, error);
+            sendSuccessfulResult(res, { error, paymentIntentID });
             return;
           }
           if (error.code != "terminal_reader_timeout") {
-            sendSuccessfulResult(res, error);
+            sendSuccessfulResult(res, { error, paymentIntentID });
             return;
           }
         }
@@ -207,6 +185,45 @@ exports.processServerDrivenStripePayment = onRequest(
       log("stripe server driven payment attempt error", error.message);
       return sendUnsuccessfulResult(res, error);
     }
+  }
+);
+
+exports.stripeEventWebhook = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    log("Incoming Stripe webhook event body", req.body);
+    let paymentIntentID =
+      req.body.data.object.action.process_payment_intent.payment_intent;
+    log("payment intent id", paymentIntentID);
+
+    let action = req.body.data.object.action;
+    action.randomVal = Math.random();
+
+    let dbRef = RDB.ref("PAYMENT-PROCESSING/" + paymentIntentID + "/update/");
+    dbRef.set(action);
+
+    log("data package to show reader ID", req.body.data);
+    if (action.status == "succeeded") {
+      log("Payment attempt succeeded");
+      const paymentIntentComplete = await stripe.paymentIntents.retrieve(
+        paymentIntentID
+      );
+      let chargeID = paymentIntentComplete.latest_charge;
+      log("Payment Intent complete obj", paymentIntentComplete);
+      log("Charge ID", chargeID);
+      const charge = await stripe.charges.retrieve(chargeID);
+      dbRef = RDB.ref("PAYMENT-PROCESSING/" + paymentIntentID + "/complete/");
+      dbRef.set(charge);
+      log("Card charge object", charge);
+    }
+
+    const readerResult = await stripe.terminal.readers.cancelAction(
+      req.body.data.object.id
+    );
+    log(
+      "Result of canceling reader after a card was declined or payment approved or any other update just to be safe",
+      readerResult
+    );
   }
 );
 
@@ -220,7 +237,7 @@ exports.cancelServerDrivenStripePayment = onRequest(
       req.body.readerID
     );
     stripe.paymentIntents.cancel(req.body.paymentIntentID);
-    let ref = RDB.ref("PAYMENT_PROCESSING/" + req.body.paymentIntentID);
+    let ref = RDB.ref("PAYMENT-PROCESSING/" + req.body.paymentIntentID);
     ref.set(null);
     log("reader cancellation result", readerResult);
     sendSuccessfulResult(res, readerResult);
@@ -238,74 +255,6 @@ exports.refundStripePayment = onRequest(
       amount: req.body.amount,
     });
     sendSuccessfulResult(res, readerResult);
-  }
-);
-
-// exports.getAvailableStripeReaders = functions.https.onCall(
-//   { secrets: [stripeSecretKey] },
-//   async (request) => {
-//     log("Incoming get available Stripe readers body", request);
-//     const readers = await stripe.terminal.readers.list({
-//       // limit: ,
-//     });
-//     log("available Stripe readers", readers);
-//     // functions
-//     return readers;
-//   }
-// );
-
-exports.getAvailableStripeReaders1 = onRequest(
-  { cors: true, secrets: [stripeSecretKey] },
-  async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
-    // res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    // res.set("Access-Control-Allow-Headers", "Content-Type");
-
-    log("Incoming get available Stripe readers body", req.body);
-    const readers = await stripe.terminal.readers.list({
-      // limit: ,
-    });
-    log("available Stripe readers", readers);
-    sendSuccessfulResult(res, readers);
-  }
-);
-
-exports.stripeEventWebhook = onRequest(
-  { cors: true, secrets: [stripeSecretKey] },
-  async (req, res) => {
-    log("Incoming Stripe webhook event body", req.body);
-    let paymentIntentID =
-      req.body.data.object.action.process_payment_intent.payment_intent;
-    log("payment intent id", paymentIntentID);
-
-    let action = req.body.data.object.action;
-    action.randomVal = Math.random();
-
-    let dbRef = RDB.ref("PAYMENT_PROCESSING/" + paymentIntentID + "/update");
-    dbRef.set(action);
-
-    log("data package to show reader ID", req.body.data);
-    if (action.status == "succeeded") {
-      log("Payment attempt succeeded");
-      const paymentIntentComplete = await stripe.paymentIntents.retrieve(
-        paymentIntentID
-      );
-      let chargeID = paymentIntentComplete.latest_charge;
-      log("Payment Intent complete obj", paymentIntentComplete);
-      log("Charge ID", chargeID);
-      const charge = await stripe.charges.retrieve(chargeID);
-      dbRef = RDB.ref("PAYMENT_PROCESSING/" + paymentIntentID + "/complete");
-      dbRef.set(charge);
-      log("Card charge object", charge);
-    }
-
-    const readerResult = await stripe.terminal.readers.cancelAction(
-      req.body.data.object.id
-    );
-    log(
-      "Result of canceling reader after a card was declined or payment approved or any other update just to be safe",
-      readerResult
-    );
   }
 );
 
@@ -427,3 +376,44 @@ const sendUnsuccessfulResult = (response, body) =>
   response.status(500).send(JSON.stringify(body));
 
 ////////////////////////////////////////////////////////////////////////
+
+// ftp reader
+// exports.readFTPFile = onRequest(
+//   { cors: true, secrets: [stripeSecretKey] },
+//   async (req, res) => {
+//     log("Incoming FTP read request");
+//     const client = new ftp.Client();
+//     client.ftp.verbose = true; // Optional: for debug logging
+
+//     //     Server                   : ftp.jbi.bike
+//     // Login name         : 121080
+//     // Password            : g3QX&bn5
+
+//     try {
+//       // Connect to FTP server
+//       await client.access({
+//         host: "ftp.jbi.bike",
+//         user: "121080",
+//         password: "g3QX&bn5",
+//         secure: false, // Set to true if using FTPS
+//       });
+
+//       // List files in the root directory
+//       log("Directory listing for FTP host:");
+//       const list = await client.list();
+//       list.forEach((item) => console.log(item.name));
+
+//       // Download a file (change 'file.txt' to your file name)
+//       await client.downloadTo("local-file.txt", "file.txt");
+//       log("File downloaded!");
+
+//       // Read the downloaded file
+//       const content = fs.readFileSync("local-file.txt", "utf8");
+//       log("File content for FTP transfer:");
+//       log(content);
+//     } catch (err) {
+//       console.error(err);
+//     }
+//     client.close();
+//   }
+// );

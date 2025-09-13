@@ -485,6 +485,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 isRefund={sIsRefund}
                 sTransactionComplete={sTransactionComplete}
                 _setRefundItemArr={_setRefundItemArr}
+                sRefundItemArr={sRefundItemArr}
               />
             )}
           </View>
@@ -1891,9 +1892,12 @@ const WorkorderListComponent = ({
   isRefund,
   sTransactionComplete,
   _setRefundItemArr,
+  sRefundItemArr,
 }) => {
   // clog("combined in WorkorderListComponent", sCombinedWorkordersArr);
   // clog("open", zOpenWorkorderObj);
+
+  function handleItemPress(wo, id) {}
 
   function sortWorkorders() {
     if (!isRefund) {
@@ -2071,6 +2075,20 @@ const WorkorderListComponent = ({
                         borderRadius: 15,
                       }}
                     >
+                      {isRefund || !isRefund ? (
+                        <CheckBox_
+                          onCheck={(workorder) => {
+                            let arr = cloneDeep(sRefundItemArr);
+                            let found = arr.find((o) => o.id === workorder.id);
+                            if (!found) arr.push(workorder);
+                            _setRefundItemArr(arr);
+                          }}
+                          buttonStyle={{
+                            marginRight: 15,
+                          }}
+                        />
+                      ) : null}
+
                       <View
                         style={{
                           width: "65%",

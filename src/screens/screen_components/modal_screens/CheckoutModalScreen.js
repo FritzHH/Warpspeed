@@ -86,6 +86,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
     (state) => state.setIsCheckingOut
   );
   const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
+  const _zSetOpenWorkorder = useOpenWorkordersStore(
+    (state) => state.setInitialOpenWorkorderObj
+  );
 
   // store getters
   const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
@@ -125,7 +128,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sCashSaleActive, _setCashSaleActive] = useState(true);
   const [sCardSaleActive, _setCardSaleActive] = useState(true);
   const [sWorkorderArrActive, _setWorkorderArrActive] = useState(true);
-  const [sRefundScanObj, _setRefundScanObj] = useState(null);
+  const [sRefundScanSaleObj, _setRefundScanSaleObj] = useState(null);
   //
 
   // watch the combined workorders array and adjust accordingly
@@ -134,20 +137,27 @@ export function CheckoutModalScreen({ openWorkorder }) {
   }, [sSelectedWorkordersToCombine, zOpenWorkorderObj]);
 
   // watch refund text box and go find the receipt when upc entered
-  let scan = "684922883088";
+  let scan = "594243572493";
 
   useEffect(() => {
     if (sRefundScan.length === 12) {
       dbGetSaleItem(sRefundScan)
         .then((res) => {
           if (res) {
+            _setRefundScanSaleObj(res);
             let workorders = [];
             res.workorderIDArr.forEach((workorderID) => {
               dbGetOpenWorkorderItem(workorderID).then((res) => {
-                log("result of open workorder grab", res);
+                if (res) {
+                  log("result of open workorder grab", res);
+                  _zSetOpenWorkorder(res);
+                }
               });
               dbGetClosedWorkorderItem(workorderID).then((res) => {
-                log("result of CLOSED workorder grab", res);
+                if (res) {
+                  log("result of CLOSED workorder grab", res);
+                  _zSetOpenWorkorder(res);
+                }
               });
             });
           } else {
@@ -929,6 +939,7 @@ const MiddleItemComponent = ({
 }) => {
   // const [sFocusedItem, _setFocusedItem] = useState("");
   // clog(paymentsArr);
+  if (!zCustomerObj) return null;
   return (
     <View
       style={{
@@ -938,7 +949,7 @@ const MiddleItemComponent = ({
         // padding: 20,
       }}
     >
-      {zCustomerObj.id ? (
+      {zCustomerObj?.id ? (
         <View
           style={{
             width: "100%",
@@ -1955,7 +1966,7 @@ const StripeCreditCardComponent = ({
     // setClientSecret(data.clientSecret);
   }
 
-  log(sProcessButtonEnabled.toString());
+  // log(sProcessButtonEnabled.toString());
   return (
     <View
       style={{

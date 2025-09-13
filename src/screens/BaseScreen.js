@@ -178,7 +178,7 @@ export function BaseScreen() {
     // fillPrinterNames();
     // fillPunchHistory()
     // fillInventory();
-    if (zInventoryArr.length > 0) fillOpenWorkorders(zInventoryArr);
+    // if (zInventoryArr.length > 0) fillOpenWorkorders(zInventoryArr);
   }, [zInventoryArr]);
   // log(zSettingsObj);
   return (

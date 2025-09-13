@@ -207,7 +207,8 @@ export function dbGetOpenWorkorderItem(id) {
 }
 
 export function dbGetSaleItem(id) {
-  return getDocument("SALES", id);
+  let path = build_db_path.sales(id);
+  return getFirestoreDoc(path);
 }
 
 export function dbGetCustomerObj(customerID) {

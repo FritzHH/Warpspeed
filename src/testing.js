@@ -125,6 +125,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
       let line = cloneDeep(WORKORDER_ITEM_PROTO);
       line.id = generateUPCBarcode();
       line.inventoryItem = zInventoryArr[val];
+      line.inventoryItem.price = 0.5;
       line.qty = i;
       wo.workorderLines.push(line);
       // clog(line, i);

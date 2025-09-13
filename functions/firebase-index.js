@@ -249,7 +249,7 @@ exports.refundStripePayment = onRequest(
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "http://localhost:3000");
 
-    log("Incoming refund Stripe payment", req.body);
+    log("Incoming REFUND**** Stripe payment", req.body);
     const refund = await stripe.refunds.create({
       payment_intent: req.body.paymentIntentID,
       amount: req.body.amount,

@@ -96,10 +96,10 @@ export const Items_WorkorderItemsTab = ({}) => {
   const checkoutBtnRef = useRef();
   useEffect(() => {
     if (zOpenWorkorderObj && zOpenWorkordersArr && zSettingsObj.salesTax) {
+      _zSetIsCheckingOut(true);
       dbGetCustomerObj("3d2E63TXCY2bzmOdeQc8").then((res) => {
-        // log("res", res);
         _zSetCustomerObj(res);
-        _zSetIsCheckingOut(true);
+        // log("res", res);
       });
     }
   }, [zOpenWorkorderObj, zOpenWorkordersArr, zSettingsObj]);
@@ -109,13 +109,14 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // update the workorder inventory items to the latest prices, also watching inventory array to keep current price. also update the discont object
   useEffect(() => {
-    if (!zOpenWorkorderObj || !zInventoryArr.length > 0) return;
+    if (!zOpenWorkorderObj?.workorderLines || !zInventoryArr.length > 0) return;
     let wo = cloneDeep(zOpenWorkorderObj);
     let linesToChange = [];
 
     let invIdxArr = [];
     let discountsIdxArr = [];
     wo.workorderLines.forEach((line, idx) => {
+      // log("line", line);
       let curInvItem = zInventoryArr.find(
         (o) => o.id === line.inventoryItem.id
       );
@@ -152,6 +153,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   useEffect(() => {
     // log("here");
     if (!zOpenWorkorderObj?.workorderLines) return;
+    // log("z", zOpenWorkorderObj);
     // log("inv", zInventoryArr);
 
     const {

@@ -124,7 +124,7 @@ export function QuickItemComponent({}) {
     if (!wo.workorderLines) wo.workorderLines = [];
     // log("item", item);
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-    lineItem.inventoryItemObj = item;
+    lineItem.inventoryItem = item;
     lineItem.id = generateUPCBarcode();
     wo.workorderLines.push(lineItem);
     _zSetWorkorderObj(wo);

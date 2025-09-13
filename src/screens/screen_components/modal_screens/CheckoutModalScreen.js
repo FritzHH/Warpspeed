@@ -58,6 +58,9 @@ import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
 import { sendFCMMessage } from "../../../db";
 import {
   dbCancelServerDrivenStripePayment,
+  dbGetClosedWorkorderItem,
+  dbGetOpenWorkorderItem,
+  dbGetSaleItem,
   dbProcessServerDrivenStripePayment,
   dbRetrieveAvailableStripeReaders,
   dbSetSalesObj,
@@ -104,7 +107,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
   const [sPaymentComplete, _setPaymentComplete] = useState(false);
   const [sRefundScan, _sSetRefundScan] = useState("");
-  const [sIsRefund, _setIsRefund] = useState(false);
+  const [sIsRefund, _setIsRefund] = useState(true);
   const [sTotalAmount, _setTotalAmount] = useState(0);
   const [sSubtotalAmount, _setSubtotalAmount] = useState(0);
   const [sTotalDiscountAmount, _setTotalDiscountAmount] = useState(0);
@@ -119,21 +122,42 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sSearchString, _setSearchString] = useState("");
   const [sInventorySearchRes, _setInventorySearchRes] = useState([]);
   const [sFocusedItem, _setFocusedItem] = useState("");
+  const [sCashSaleActive, _setCashSaleActive] = useState(true);
+  const [sCardSaleActive, _setCardSaleActive] = useState(true);
+  const [sWorkorderArrActive, _setWorkorderArrActive] = useState(true);
+  const [sRefundScanObj, _setRefundScanObj] = useState(null);
   //
-
-  useEffect(() => {
-    // searchInventory("prch");
-    return () => {
-      // log("returning");
-    };
-  }, [zOpenWorkordersArr]);
 
   // watch the combined workorders array and adjust accordingly
   useEffect(() => {
     setTotals();
-    // log(sSelectedWorkordersToCombine);
-    // clog(zOpenWorkorderObj);
   }, [sSelectedWorkordersToCombine, zOpenWorkorderObj]);
+
+  // watch refund text box and go find the receipt when upc entered
+  let scan = "684922883088";
+
+  useEffect(() => {
+    if (sRefundScan.length === 12) {
+      dbGetSaleItem(sRefundScan)
+        .then((res) => {
+          if (res) {
+            let workorders = [];
+            res.workorderIDArr.forEach((workorderID) => {
+              dbGetOpenWorkorderItem(workorderID).then((res) => {
+                log("result of open workorder grab", res);
+              });
+              dbGetClosedWorkorderItem(workorderID).then((res) => {
+                log("result of CLOSED workorder grab", res);
+              });
+            });
+          } else {
+            // todo message does not exist
+            log("This sale scan does not exist");
+          }
+        })
+        .catch((e) => log("refund error", e));
+    }
+  }, [sRefundScan]);
 
   function setTotals(workorder) {
     // clog(wo);
@@ -148,6 +172,12 @@ export function CheckoutModalScreen({ openWorkorder }) {
       zSettingsObj?.salesTax
     );
 
+    // clog(
+    //   calculateRunningTotals(
+    //     workorder || sSelectedWorkordersToCombine,
+    //     zSettingsObj?.salesTax
+    //   )
+    // );
     // log(runningTax);
     _setSubtotalAmount(runningSubtotal);
     _setTotalDiscountAmount(runningDiscount);
@@ -161,7 +191,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
       totalPaid += paymentObj.amountCaptured;
     });
 
-    _setAmountLeftToPay(runningTax + runningTotal - totalPaid);
+    _setAmountLeftToPay(
+      trimToTwoDecimals(runningTax + runningTotal - totalPaid)
+    );
   }
 
   function handlePaymentCapture(paymentObj = PAYMENT_OBJECT_PROTO) {
@@ -184,17 +216,25 @@ export function CheckoutModalScreen({ openWorkorder }) {
     // calculate total paid on this workorder
     let totalPaid = 0;
     saleObj.paymentArr.forEach((paymentObj) => {
-      totalPaid += paymentObj.amountCaptured;
+      // log("captured", paymentObj.amountCaptured);
+      totalPaid += roundToTwoDecimals(paymentObj.amountCaptured);
     });
 
+    // log("total paid", totalPaid);
+
     sSelectedWorkordersToCombine.forEach((wo) => {
-      wo.saleObjID = saleObj.id;
+      wo.saleID = saleObj.id;
+
+      let found = saleObj.workorderIDArr.find((id) => id === wo.id);
+      if (!found) saleObj.workorderIDArr.push(wo.id);
+
       if (totalPaid === sTotalAmount) {
         wo.paymentComplete = true;
       }
       _zSetWorkorder(wo); // send to db
     });
 
+    // log("total amount", sTotalAmount);
     _setAmountLeftToPay(sTotalAmount - totalPaid);
     _setSaleObj(saleObj);
     dbSetSalesObj(saleObj);
@@ -287,8 +327,10 @@ export function CheckoutModalScreen({ openWorkorder }) {
               onCancel={() => {}}
               amountLeftToPay={sAmountLeftToPay}
               acceptsChecks={zSettingsObj?.acceptChecks}
+              sCashSaleActive={sCashSaleActive}
             />
             <StripeCreditCardComponent
+              sCardSaleActive={sCardSaleActive}
               isRefund={sIsRefund}
               onComplete={handlePaymentCapture}
               onCancel={() => {}}
@@ -322,6 +364,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
               handleCancelPress={closeCheckoutScreenModal}
               paymentsArr={sSaleObj?.paymentArr}
               amountLeftToPay={sAmountLeftToPay}
+              sFocusedItem={sFocusedItem}
+              _setFocusedItem={_setFocusedItem}
+              _setIsRefund={_setIsRefund}
             />
           </View>
 
@@ -878,8 +923,11 @@ const MiddleItemComponent = ({
   handleCancelPress,
   paymentsArr,
   amountLeftToPay,
+  sFocusedItem,
+  _setFocusedItem,
+  _setIsRefund,
 }) => {
-  const [sFocusedItem, _setFocusedItem] = useState("");
+  // const [sFocusedItem, _setFocusedItem] = useState("");
   // clog(paymentsArr);
   return (
     <View
@@ -1284,10 +1332,9 @@ const MiddleItemComponent = ({
             color: amountLeftToPay == 0 ? C.green : C.lightred,
           }}
         >
-          {amountLeftToPay == 0
-            ? "PAYMENT COMPLETE!"
-            : "AMOUNT LEFT: $" +
-              formatNumberForCurrencyDisplay(amountLeftToPay)}
+          {Number(amountLeftToPay) > 0
+            ? "AMOUNT LEFT: $" + formatNumberForCurrencyDisplay(amountLeftToPay)
+            : "PAYMENT COMPLETE!"}
         </Text>
       </View>
 
@@ -1335,6 +1382,8 @@ const CashSaleComponent = ({
   onComplete,
   acceptsChecks,
   isRefund,
+  sCashSaleActive,
+  _setCardSaleActive,
 }) => {
   const [sTenderAmount, _setTenderAmount] = useState();
   const [sRequestedAmount, _setRequestedAmount] = useState(amountLeftToPay);
@@ -1446,6 +1495,7 @@ const CashSaleComponent = ({
             {"$ " + formatNumberForCurrencyDisplay(amountLeftToPay)}
           </Text>
           <TextInput
+            disabled={!sCashSaleActive}
             onFocus={() => {
               _setFocusedItem("amount");
               _setRequestedAmount("");
@@ -1502,6 +1552,7 @@ const CashSaleComponent = ({
             }}
           >
             <TextInput
+              disabled={!sCashSaleActive}
               style={{
                 ...checkoutScreenStyle.boxText,
                 color: C.textMain,
@@ -1562,9 +1613,15 @@ const CashSaleComponent = ({
           //   visible={sProcessButtonLabel}
           onPress={handleProcessButtonPress}
           text={"Process"}
+          buttonStyle={{
+            cursor: sProcessButtonEnabled ? "inherit" : "default",
+          }}
         />
         <Button_
-          enabled={sTenderAmount}
+          buttonStyle={{
+            cursor: sProcessButtonEnabled ? "inherit" : "default",
+          }}
+          enabled={sTenderAmount >= sRequestedAmount}
           onPress={handleCancelPress}
           text={"Cancel"}
         />
@@ -1606,9 +1663,6 @@ const CashSaleComponent = ({
           </Text>
         </View>
       ) : null}
-      {/* <View style={{ ...checkoutScreenStyle.loadingIndicatorStyle }}>
-        <LoadingIndicator visible={sStatus} />
-      </View> */}
     </View>
   );
 };
@@ -1618,11 +1672,14 @@ const StripeCreditCardComponent = ({
   onComplete,
   zSettingsObj,
   isRefund,
+  refundPaymentIntentID,
+  sCardSaleActive,
+  _setCashSaleActive,
 }) => {
   const [sRequestedAmount, _setRequestedAmount] = useState(amountLeftToPay);
   // const [sAmountLeftToPay, _setAmountLeftToPay] = useState();
   const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
+  const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(true);
   const [sFocusedItem, _setFocusedItem] = useState("");
   const [sCardReaderObj, _setCardReaderObj] = useState("");
   const [sCardReaderArr, _setCardReaderArr] = useState([]);
@@ -1636,7 +1693,7 @@ const StripeCreditCardComponent = ({
   useEffect(() => {
     // log(sRequestedAmount);
     getAvailableStripeReaders();
-    if (sRequestedAmount <= amountLeftToPay && sRequestedAmount >= 3) {
+    if (sRequestedAmount <= amountLeftToPay && sRequestedAmount >= 1) {
       _setProcessButtonEnabled(true);
     } else {
       _setProcessButtonEnabled(false);
@@ -1652,7 +1709,7 @@ const StripeCreditCardComponent = ({
   }, [sRequestedAmount]);
 
   async function getAvailableStripeReaders() {
-    log("getting available Stripe readers");
+    // log("getting available Stripe readers");
     const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1677,48 +1734,34 @@ const StripeCreditCardComponent = ({
       )
     ) {
       _setCardReaderObj(zSettingsObj.selectedCardReaderObj);
-      startPayment(sRequestedAmount, zSettingsObj.selectedCardReaderObj.id);
+      // startPayment(sRequestedAmount, zSettingsObj.selectedCardReaderObj.id);
     }
-  }
-
-  // unnecessary, DB will create it for us
-  async function createPaymentIntent(reader) {
-    log("creating payment intent");
-    try {
-      const res = await fetch(STRIPE_INITIATE_PAYMENT_INTENT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Number(sRequestedAmount),
-          currency: "usd",
-          readerID: reader?.id || sCardReaderObj.id,
-        }),
-      });
-      const data = await res.json();
-      clog("intent", data);
-    } catch (e) {
-      log("Error creating payment intent", e);
-    }
-
-    // setClientSecret(data.clientSecret);
   }
 
   async function startPayment(paymentAmount, readerID) {
     if (!(paymentAmount > 0)) return;
     _setStatusTextColor("green");
     _setStatusMessage("Retrieving card reader activation...");
-    log("starting server driven payment attempt, amount", paymentAmount);
+    // log("starting server driven payment attempt, amount", paymentAmount);
     // return;
 
     // readerResult obj contains readerResult object key/val and paymentIntentID key/val
-    let readerResult = await dbProcessServerDrivenStripePayment(
-      paymentAmount,
-      readerID || sCardReaderObj.id,
-      false,
-      sPaymentIntentID
-    );
+    let readerResult;
+    if (isRefund) {
+      readerResult = await dbCancelServerDrivenStripePayment(
+        readerID || sCardReaderObj.id,
+        refundPaymentIntentID
+      );
+    } else {
+      readerResult = await dbProcessServerDrivenStripePayment(
+        paymentAmount,
+        readerID || sCardReaderObj.id,
+        false,
+        sPaymentIntentID
+      );
+    }
 
-    console.log("reader result", readerResult);
+    // console.log("reader result", readerResult);
 
     if (!readerResult) {
       _setStatusMessage("No reader found\n\nCheck connections");
@@ -1742,9 +1785,10 @@ const StripeCreditCardComponent = ({
       _setListenerArr(listenerArr);
     }
   }
+
   async function handleStripeReaderActivationError(error) {
     _setStatusTextColor("red");
-    log("Handling Stripe reader activation error", error);
+    // log("Handling Stripe reader activation error", error);
     let message = "";
     if (error == "in_progress") {
       message =
@@ -1782,7 +1826,7 @@ const StripeCreditCardComponent = ({
     val,
     ssPaymentIntentID
   ) {
-    clog("Stripe webhook update Obj", val);
+    // clog("Stripe webhook update Obj", val);
 
     let failureCode = val?.failure_code;
     if (
@@ -1800,13 +1844,14 @@ const StripeCreditCardComponent = ({
     ) {
       _setStatusTextColor("green");
       _setStatusMessage("Payment Complete!");
-      clog("Payment complete object", val);
+      log("Stripe payment complete!");
+      // clog("Payment complete object", val);
       let paymentMethodDetails = val.payment_method_details.card_present;
       // log("trimming", trimToTwoDecimals(Number(val.amount_captured) / 100));
       // log("num", Number(val.amountCaptured));
 
       let paymentDetailsObj = cloneDeep(PAYMENT_OBJECT_PROTO);
-      paymentDetailsObj.amountCaptured = trimToTwoDecimals(
+      paymentDetailsObj.amountCaptured = roundToTwoDecimals(
         val.amount_captured / 100
       );
       paymentDetailsObj.cardIssuer =
@@ -1830,7 +1875,8 @@ const StripeCreditCardComponent = ({
         val.payment_method_details.card_present.network_transaction_id;
       paymentDetailsObj.amountRefunded = val.amount_refunded;
 
-      clog("Successful Payment details obj", paymentDetailsObj);
+      // clog("Successful Payment details obj", paymentDetailsObj);
+      onComplete(paymentDetailsObj);
     }
   }
 
@@ -1887,7 +1933,29 @@ const StripeCreditCardComponent = ({
     handleCancelPress();
   }
 
-  // log(sProcessButtonEnabled.toString());
+  // unnecessary, DB will create it for us
+  async function createPaymentIntent(reader) {
+    log("creating payment intent");
+    try {
+      const res = await fetch(STRIPE_INITIATE_PAYMENT_INTENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: Number(sRequestedAmount),
+          currency: "usd",
+          readerID: reader?.id || sCardReaderObj.id,
+        }),
+      });
+      const data = await res.json();
+      clog("intent", data);
+    } catch (e) {
+      log("Error creating payment intent", e);
+    }
+
+    // setClientSecret(data.clientSecret);
+  }
+
+  log(sProcessButtonEnabled.toString());
   return (
     <View
       style={{
@@ -1917,10 +1985,12 @@ const StripeCreditCardComponent = ({
               Card Readers
             </Text>
             <DropdownMenu
+              enabled={sCardSaleActive}
               buttonIcon={ICONS.menu2}
               buttonIconSize={15}
               buttonTextStyle={{ fontSize: 13 }}
               buttonStyle={{
+                cursor: sProcessButtonEnabled ? "inherit" : "default",
                 borderRadius: 5,
                 paddingVertical: 2,
                 paddingHorizontal: 5,
@@ -1935,7 +2005,9 @@ const StripeCreditCardComponent = ({
           </View>
           <Button_
             text={"Reset Card Reader"}
+            enabled={sCardSaleActive}
             buttonStyle={{
+              cursor: sProcessButtonEnabled ? "inherit" : "default",
               backgroundColor: makeGrey(0.2),
               paddingHorizontal: 5,
               paddingVertical: 2,
@@ -1976,8 +2048,10 @@ const StripeCreditCardComponent = ({
           }}
         >
           <Text style={{ color: C.textMain, marginTop: 10 }}>Balance</Text>
-          <Text style={{ marginBottom: 15, color: C.textMain }}>
-            Pay Amount
+          <Text
+            style={{ marginBottom: 15, color: isRefund ? "red" : C.textMain }}
+          >
+            {isRefund ? "Refund Amount" : "Pay Amount"}
           </Text>
         </View>
         <View
@@ -2001,13 +2075,14 @@ const StripeCreditCardComponent = ({
             onFocus={() => {
               _setFocusedItem("amount");
               _setRequestedAmount("");
-              _setProcessButtonEnabled(false);
+              // _setProcessButtonEnabled(false);
             }}
             autoFocus={sFocusedItem === "amount"}
+            disabled={!sCardSaleActive}
             style={{
               fontSize: 20,
               outlineWidth: 0,
-              color: C.textMain,
+              color: isRefund ? "red" : C.textMain,
               width: 80,
               borderColor: C.buttonLightGreenOutline,
               borderRadius: 5,
@@ -2035,22 +2110,29 @@ const StripeCreditCardComponent = ({
           />
         </View>
       </View>
-
+      {isRefund ? (
+        <View style={{ width: "100%", alignItems: "center", marginTop: 10 }}>
+          <Text style={{ fontSize: 12 }}>
+            {"Last 4: " + "1236     " + "exp: " + "month" + " / " + "year"}
+          </Text>
+          <Text style={{ fontSize: 12 }}>{"World Mastercard Original"}</Text>
+        </View>
+      ) : null}
       <View
         style={{
           width: "100%",
-          marginVertical: "10%",
+          marginVertical: isRefund ? "2%" : "8%",
           alignItems: "center",
         }}
       >
         <Button_
           colorGradientArr={COLOR_GRADIENTS.green}
           textStyle={{ color: C.textWhite }}
-          enabled={sProcessButtonEnabled}
+          enabled={sProcessButtonEnabled && sCardSaleActive}
           onPress={handleProcessButtonPress}
-          text={"Process"}
+          text={isRefund ? "Process Refund" : "Process"}
           buttonStyle={{
-            width: 130,
+            // width: 130,
             cursor: sProcessButtonEnabled ? "inherit" : "default",
           }}
         />

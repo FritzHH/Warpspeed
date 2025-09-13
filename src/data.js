@@ -273,7 +273,7 @@ export const SALE_OBJECT_PROTO = {
 
 export const WORKORDER_PROTO = {
   paymentComplete: false,
-  saleObjID: "",
+  saleID: "",
   isStandaloneSale: false,
   id: "",
   customerID: "",

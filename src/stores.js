@@ -586,7 +586,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     }
 
     // dev*************************************************
-    if (wo.id === "189998095784" && !get().openWorkorderObj) {
+    if (wo.id === "540286345956" && !get().openWorkorderObj) {
       // clog("setting", wo);
       set({ openWorkorderObj: wo });
     }

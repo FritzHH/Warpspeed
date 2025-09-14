@@ -80,16 +80,34 @@ export function applyLineItemDiscounts(wo, zInventoryArr) {
   return wo;
 }
 
-export function calculateRunningTotals(input, salesTaxRatePercent) {
+export function calculateRunningTotals(
+  workorderArr,
+  salesTaxRatePercent,
+  workorderlinesArr = [],
+  isRefund
+) {
   let runningTotal = 0;
   let runningDiscount = 0;
   let runningSubtotal = 0;
   let runningQty = 0;
   // clog("input", input);
-  if (!Array.isArray(input)) input = [input];
 
-  input.forEach((workorderObj) => {
-    workorderObj.workorderLines?.forEach((line, idx) => {
+  // log(workorderlinesArr);
+
+  if (!Array.isArray(workorderArr)) workorderArr = [workorderArr];
+  workorderArr.forEach((workorderObj) => {
+    let arrToIterate = isRefund
+      ? workorderlinesArr
+      : workorderObj.workorderLines;
+    arrToIterate.forEach((line, idx) => {
+      if (
+        isRefund &&
+        !arrHasItem(
+          workorderObj.workorderLines.map((o) => o.inventoryItem),
+          line.inventoryItem
+        )
+      )
+        return;
       let qty = line.qty;
       // clog("line", line.discountObj);
       let discountPrice = line.discountObj.newPrice;
@@ -107,10 +125,10 @@ export function calculateRunningTotals(input, salesTaxRatePercent) {
   });
 
   let obj = {
-    runningTotal: roundToTwoDecimals(runningTotal),
-    runningSubtotal: roundToTwoDecimals(runningSubtotal),
-    runningDiscount: roundToTwoDecimals(runningDiscount),
-    runningTax: roundToTwoDecimals((runningTotal * salesTaxRatePercent) / 100),
+    runningTotal: runningTotal,
+    runningSubtotal: runningSubtotal,
+    runningDiscount: runningDiscount,
+    runningTax: (runningTotal * salesTaxRatePercent) / 100,
     runningQty,
   };
   // clog(obj);
@@ -676,6 +694,24 @@ export function addDashesToPhone(num) {
 
 export function makeGrey(opacity) {
   return "rgba(0,0,0," + opacity + ")";
+}
+
+export function arrHasItem(arr, item) {
+  return arr.find((o) => o.id === item.id);
+}
+
+export function removeArrItem(arr, item, fieldID = "id") {
+  return arr.filter((o) => o[fieldID] !== item[fieldID]);
+}
+
+export function replaceOrAddToArr(arr, obj, by = "id") {
+  const predicate =
+    typeof by === "function" ? by : (el) => el?.[by] === obj?.[by];
+  const i = arr.findIndex(predicate);
+  if (i === -1) return [...arr, obj];
+  const copy = arr.slice();
+  copy[i] = obj;
+  return copy;
 }
 
 // text formatting

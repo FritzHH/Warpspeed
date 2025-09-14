@@ -39,6 +39,7 @@ import {
   addDashesToPhone,
   applyLineItemDiscounts,
   arrayAddObjCheckForDupes,
+  arrHasItem,
   calculateRunningTotals,
   checkInputForNumbersOnly,
   clog,
@@ -51,6 +52,8 @@ import {
   lightenRGBByPercent,
   log,
   makeGrey,
+  removeArrItem,
+  replaceOrAddToArr,
   roundToTwoDecimals,
   showAlert,
   trimToTwoDecimals,
@@ -73,6 +76,7 @@ import {
   STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
   STRIPE_INITIATE_PAYMENT_INTENT_URL,
 } from "../../../private_user_constants";
+import { isRegExp } from "lodash";
 
 const RED_COLOR = lightenRGBByPercent(getRgbFromNamedColor("red"), 20);
 
@@ -114,8 +118,11 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
   const [sRefundScan, _sSetRefundScan] = useState();
   const [sIsRefund, _setIsRefund] = useState(false);
+  const [sAmountRefunded, _setAmountRefunded] = useState(0);
+  const [sAmountPaid, _setAmountPaid] = useState(0);
   const [sRefundSaleObj, _setRefundSaleObj] = useState(null);
   const [sTotalAmount, _setTotalAmount] = useState(0);
+  const [sCardRefundFee, _setCardRefundFee] = useState(0);
   const [sSubtotalAmount, _setSubtotalAmount] = useState(0);
   const [sTotalDiscountAmount, _setTotalDiscountAmount] = useState(0);
   const [sTotalTaxAmount, _setTotalTaxAmount] = useState(0);
@@ -134,28 +141,22 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sTransactionComplete, _setTransactionComplete] = useState(false);
   const [sRefundAmount, _setRefundAmount] = useState(0);
   const [sRefundItemArr, _setRefundItemArr] = useState([]);
+  const [sShouldChargeCardRefundFee, _setShouldChargeCardRefundFee] =
+    useState(true);
 
   // watch the combined workorders array and adjust accordingly
   let scan = "932730115940"; // test
   useEffect(() => {
-    // log("rendering");
-    // clog("open", zOpenWorkorderObj);
-    // clog("combined", sCombinedWorkordersArr);
-    // clog("arr", sCombinedWorkordersArr);
     setTotals();
-    // if (zOpenWorkorderObj) {
     _sSetRefundScan(scan);
-    // handleRefundScan(scan);
-    // }
   }, [
     zOpenWorkorderObj,
     sCombinedWorkordersArr,
     zSettingsObj,
     sSaleObj,
     sIsRefund,
+    sRefundItemArr,
   ]);
-
-  // watch refund text box and go find the receipt when upc entered
 
   function setTotals(workorder) {
     // clog(wo);
@@ -167,32 +168,57 @@ export function CheckoutModalScreen({ openWorkorder }) {
       runningTax,
     } = calculateRunningTotals(
       workorder || sCombinedWorkordersArr,
-      zSettingsObj?.salesTax
+      zSettingsObj?.salesTax,
+      sRefundItemArr,
+      sIsRefund
     );
+    // log(
+    //   calculateRunningTotals(
+    //     workorder || sCombinedWorkordersArr,
+    //     zSettingsObj?.salesTax,
+    //     sRefundItemArr,
+    //     sIsRefund
+    //   )
+    // );
 
-    // log(runningTax);
     _setSubtotalAmount(runningSubtotal);
     _setTotalDiscountAmount(runningDiscount);
     _setTotalTaxAmount(runningTax);
+    _setCardRefundFee(runningTotal * (zSettingsObj.cardRefundFeePercent / 100));
     _setTotalAmount(runningTax + runningTotal);
 
     // now run through the payments, update the amountLeftToPay field
     // calculate total paid on this workorder
     let totalPaid = 0;
+    let totalRefunded = 0;
+    // add in card or cash split REFUND
     sSaleObj?.paymentArr.forEach((paymentObj) => {
-      totalPaid += paymentObj.amountCaptured;
+      if (sIsRefund) {
+        totalRefunded += paymentObj.amountRefunded;
+      } else {
+        totalPaid += paymentObj.amountCaptured;
+      }
     });
 
-    let amountLeftToPay = roundToTwoDecimals(
-      runningTax + runningTotal - totalPaid
-    );
+    _setAmountPaid(totalPaid);
+    _setAmountRefunded(totalRefunded);
 
-    _setAmountLeftToPay(amountLeftToPay);
-    if (amountLeftToPay === 0 && !sIsRefund) {
-      _setTransactionComplete(true);
+    if (sIsRefund) {
+      let amountLeftToRefund = runningTax + runningTotal - totalRefunded;
+
+      if (sShouldChargeCardRefundFee) {
+        amountLeftToRefund =
+          amountLeftToRefund -
+          amountLeftToRefund * (zSettingsObj.cardRefundFeePercent / 100);
+      }
+      _setRefundAmount(amountLeftToRefund);
+      // if (amountLeftToRefund === 0) _setTransactionComplete(true);
+    } else {
+      let amountLeftToPay = runningTax + runningTotal - totalPaid;
+
+      if (amountLeftToPay === 0) _setTransactionComplete(true);
+      _setAmountLeftToPay(amountLeftToPay);
     }
-
-    // if (sIs)
   }
 
   function handlePaymentCapture(paymentObj = PAYMENT_OBJECT_PROTO) {
@@ -258,6 +284,13 @@ export function CheckoutModalScreen({ openWorkorder }) {
   }
 
   function handleRefundScan(refundScan) {
+    function addToCombinedArr(workorderObj) {
+      // clog(workorderObj);
+      let arr = cloneDeep(sCombinedWorkordersArr);
+      if (!arr.find((o) => o.id === workorderObj.id)) arr.push(workorderObj);
+      _setCombinedWorkordersArr(arr);
+    }
+
     if (refundScan.length === 12) {
       _setRefundScanMessage("Searching for transaction...");
       _setCombinedWorkordersArr([]);
@@ -269,7 +302,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
           if (res) {
             // log("found");
             _setRefundScanMessage("Transaction Found!");
-            _setRefundSaleObj(res);
+            _setSaleObj(res);
             let count = 0;
             let max = res.workorderIDArr.length;
             res.workorderIDArr.forEach((workorderID) => {
@@ -292,17 +325,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
       _setRefundScanMessage("");
     }
   }
-
-  function addToCombinedArr(workorderObj) {
-    // clog(workorderObj);
-    let arr = cloneDeep(sCombinedWorkordersArr);
-    if (!arr.find((o) => o.id === workorderObj.id)) arr.push(workorderObj);
-    _setCombinedWorkordersArr(arr);
-  }
-
-  useEffect(() => {
-    // clog("combined", sCombinedWorkordersArr);
-  }, [sCombinedWorkordersArr]);
 
   function searchInventory(searchStr) {
     let split = searchStr.split(" ");
@@ -426,6 +448,10 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sTransactionComplete={sTransactionComplete}
               sRefundAmount={sRefundAmount}
               _setRefundAmount={_setRefundAmount}
+              sCardRefundFee={sCardRefundFee}
+              sShouldChargeCardRefundFee={sShouldChargeCardRefundFee}
+              sCardRefundFeePercentage={zSettingsObj.cardRefundFeePercent}
+              sAmountRefunded={sAmountRefunded}
             />
           </View>
 
@@ -518,6 +544,10 @@ const MiddleItemComponent = ({
   sRefundAmount,
   _setRefundAmount,
   sRefundObj,
+  sShouldChargeCardRefundFee,
+  sCardRefundFee,
+  sCardRefundFeePercentage,
+  sAmountRefunded,
 }) => {
   // const [sFocusedItem, _setFocusedItem] = useState("");
   // clog(paymentsArr);
@@ -608,7 +638,7 @@ const MiddleItemComponent = ({
             onCheck={() =>
               sRefundScan.length !== 12
                 ? _setScanFailureMessage("Must scan/enter 12-digit sale ID")
-                : _setIsRefund(!sIsRefund)
+                : null
             }
           />
           <Text style={{ fontSize: 12, color: RED_COLOR }}>
@@ -647,8 +677,8 @@ const MiddleItemComponent = ({
       <View
         style={{
           width: "100%",
-          minHeight: "20%",
-          maxHeight: "30%",
+          // minHeight: "20%",
+          // maxHeight: "30%",
           // alignItems: "flex-start",
           justifyContent: "space-between",
           marginTop: 10,
@@ -685,7 +715,7 @@ const MiddleItemComponent = ({
                 color: lightenRGBByPercent(C.green, 20),
               }}
             >
-              {trimToTwoDecimals(sSubtotalAmount)}
+              {formatNumberForCurrencyDisplay(sSubtotalAmount)}
             </Text>
           </View>
         </View>
@@ -818,12 +848,105 @@ const MiddleItemComponent = ({
             </Text>
           </View>
         </View>
+        {sShouldChargeCardRefundFee && sIsRefund ? (
+          <View
+            style={{
+              width: "100%",
+              height: 1,
+              backgroundColor: C.buttonLightGreenOutline,
+              marginVertical: 10,
+            }}
+          />
+        ) : null}
+        {sShouldChargeCardRefundFee && sIsRefund ? (
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text style={{ fontSize: 13, color: makeGrey(0.5) }}>
+              {"SUBTOTAL"}
+            </Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: makeGrey(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontWeight: 500,
+                  fontSize: 18,
+                  color: C.green,
+                }}
+              >
+                {formatNumberForCurrencyDisplay(
+                  sSubtotalAmount + sTotalTaxAmount - sTotalDiscountAmount
+                )}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {sShouldChargeCardRefundFee && sIsRefund ? (
+          <View
+            style={{
+              width: "100%",
+              height: 1,
+              marginVertical: 10,
+              backgroundColor: C.buttonLightGreenOutline,
+            }}
+          />
+        ) : null}
+
+        {sShouldChargeCardRefundFee && sIsRefund ? (
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.red }}>
+              {"CARD RE-PROCESSING FEE (" + sCardRefundFeePercentage + "%)"}
+            </Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: makeGrey(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontWeight: 500,
+                  fontSize: 18,
+                  color: C.red,
+                }}
+              >
+                {formatNumberForCurrencyDisplay(sCardRefundFee)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <View
           style={{
             width: "100%",
             height: 1,
-            backgroundColor: C.buttonLightGreenOutline,
             marginVertical: 10,
+            backgroundColor: C.buttonLightGreenOutline,
           }}
         />
         <View
@@ -834,7 +957,9 @@ const MiddleItemComponent = ({
             width: "100%",
           }}
         >
-          <Text style={{ fontSize: 16, color: makeGrey(0.5) }}>TOTAL SALE</Text>
+          <Text style={{ fontSize: 16, color: makeGrey(0.5) }}>
+            {sIsRefund ? "TOTAL REFUND" : "TOTAL SALE"}
+          </Text>
           <View style={{ flexDirection: "row" }}>
             <Text
               style={{
@@ -852,11 +977,50 @@ const MiddleItemComponent = ({
                 color: C.green,
               }}
             >
-              {formatNumberForCurrencyDisplay(sTotalAmount)}
+              {formatNumberForCurrencyDisplay(
+                sIsRefund ? sRefundAmount : sAmountLeftToPay
+              )}
             </Text>
           </View>
         </View>
       </View>
+      <View
+        style={{
+          width: "100%",
+          alignItems: "flex-end",
+          marginTop: 10,
+          paddingRight: 7,
+        }}
+      >
+        {sIsRefund ? (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: sTransactionComplete ? C.green : C.red,
+            }}
+          >
+            {sTransactionComplete
+              ? "REFUND COMPLETE!"
+              : "AMOUNT REFUNDED:   $" + sAmountRefunded}
+          </Text>
+        ) : (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: sTransactionComplete ? C.green : RED_COLOR,
+            }}
+          >
+            {!sTransactionComplete
+              ? "AMOUNT LEFT TO PAY:   $" +
+                formatNumberForCurrencyDisplay(sAmountLeftToPay)
+              : "PAYMENT COMPLETE!"}
+          </Text>
+        )}
+      </View>
+
+      {/**Payments list //////////////////////////////////////////////////// */}
 
       {paymentsArr ? (
         <View
@@ -865,6 +1029,7 @@ const MiddleItemComponent = ({
           <Text style={{ color: makeGrey(0.4) }}>PAYMENTS</Text>
         </View>
       ) : null}
+
       {paymentsArr?.map((paymentObj) => {
         return (
           <View
@@ -927,32 +1092,10 @@ const MiddleItemComponent = ({
                 </Text>
               </View>
             ) : null}
-            {paymentObj.isRefund ? <Text>{REFUND}</Text> : null}
+            {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
           </View>
         );
       })}
-
-      <View
-        style={{
-          width: "100%",
-          alignItems: "flex-end",
-          marginTop: 10,
-          paddingRight: 7,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: 500,
-            color: sTransactionComplete ? C.green : RED_COLOR,
-          }}
-        >
-          {!sTransactionComplete
-            ? "AMOUNT TO PAY: $" +
-              formatNumberForCurrencyDisplay(sAmountLeftToPay)
-            : "PAYMENT COMPLETE!"}
-        </Text>
-      </View>
 
       <View
         style={{
@@ -1047,6 +1190,7 @@ const CashSaleComponent = ({
 
   let refundReady = true;
   if (isRefund && !sRefundAmount) refundReady = false;
+
   return (
     <View
       style={{
@@ -2065,30 +2209,22 @@ const WorkorderListComponent = ({
                         flexDirection: "row",
                         width: "100%",
                         alignItems: "center",
-                        backgroundColor: C.listItemWhite,
-                        paddingVertical: 3,
-                        marginVertical: 2,
+                        backgroundColor: !arrHasItem(
+                          sRefundItemArr,
+                          workorderLine
+                        )
+                          ? C.listItemWhite
+                          : lightenRGBByPercent(C.blue, 60),
+                        paddingVertical: 2,
+                        marginBottom: 3,
                         borderColor: "transparent",
                         borderLeftColor: lightenRGBByPercent(C.green, 60),
-                        borderWidth: 2,
+                        borderLeftWidth: isRefund ? 0 : 2,
                         paddingLeft: 10,
                         borderRadius: 15,
+                        paddingRight: 10,
                       }}
                     >
-                      {isRefund || !isRefund ? (
-                        <CheckBox_
-                          onCheck={(workorder) => {
-                            let arr = cloneDeep(sRefundItemArr);
-                            let found = arr.find((o) => o.id === workorder.id);
-                            if (!found) arr.push(workorder);
-                            _setRefundItemArr(arr);
-                          }}
-                          buttonStyle={{
-                            marginRight: 15,
-                          }}
-                        />
-                      ) : null}
-
                       <View
                         style={{
                           width: "65%",
@@ -2098,6 +2234,30 @@ const WorkorderListComponent = ({
                           // backgroundColor: "green",
                         }}
                       >
+                        {isRefund ? (
+                          <CheckBox_
+                            onCheck={() => {
+                              let checkedArr = cloneDeep(sRefundItemArr);
+                              if (arrHasItem(checkedArr, workorderLine)) {
+                                checkedArr = removeArrItem(
+                                  checkedArr,
+                                  workorderLine
+                                );
+                              } else {
+                                checkedArr.push(workorderLine);
+                              }
+                              _setRefundItemArr(checkedArr);
+                            }}
+                            isChecked={arrHasItem(
+                              sRefundItemArr,
+                              workorderLine
+                            )}
+                            buttonStyle={{
+                              marginRight: 15,
+                            }}
+                          />
+                        ) : null}
+
                         <View>
                           <Text style={{ color: C.lightred, fontSize: 12 }}>
                             {workorderLine.discountObj.name}

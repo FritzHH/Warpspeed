@@ -262,7 +262,8 @@ export const PAYMENT_OBJECT_PROTO = {
   expMonth: "",
   expYear: "",
   networkTransactionID: "",
-  amountRefunded: "",
+  amountRefunded: 0,
+  workorderLinesRefundedIDArr: [],
 };
 
 export const SALE_OBJECT_PROTO = {
@@ -275,6 +276,7 @@ export const SALE_OBJECT_PROTO = {
   salesTax: 0,
   total: 0,
   amountCaptured: 0,
+  amountRefunded: 0,
 };
 
 export const WORKORDER_PROTO = {
@@ -768,6 +770,7 @@ export const SETTINGS_OBJ = {
   salesTax: 6.5,
   acceptChecks: true,
   userPinStrength: 2,
+  cardRefundFeePercent: 3,
   lockScreenWhenUserLogsOut: false,
   users: [
     FRITZ_USER_OBJ,

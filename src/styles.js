@@ -1,4 +1,9 @@
-import { dim, lightenRGBByPercent, makeGrey } from "./utils";
+import {
+  dim,
+  getRgbFromNamedColor,
+  lightenRGBByPercent,
+  makeGrey,
+} from "./utils";
 // const { getDefaultConfig } = require("metro"); // Or require('metro-config') for bare React Native
 
 export const Colors = {
@@ -36,6 +41,7 @@ export const C = {
   orange: "",
   blue: "rgb(53, 135, 210)",
   lightred: "rgb(227, 116, 112)",
+  red: lightenRGBByPercent(getRgbFromNamedColor("red"), 10),
 
   backgroundWhite: "rgb(240, 241, 251)",
   backgroundGreen: "rgb(232, 243, 239)",
@@ -55,7 +61,7 @@ export const COLOR_GRADIENTS = {
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
   blue: [lightenRGBByPercent(C.blue, 20), C.blue],
   lightBlue: [lightenRGBByPercent(C.blue, 60), lightenRGBByPercent(C.blue, 45)],
-  grey: [makeGrey(0.3), makeGrey(0.5)],
+  grey: [makeGrey(0.27), makeGrey(0.4)],
 };
 
 const ASSETS_PATH = "./assets/";

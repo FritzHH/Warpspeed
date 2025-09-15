@@ -137,6 +137,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sTotalDiscountAmount, _setTotalDiscountAmount] = useState(0);
   const [sTotalTaxAmount, _setTotalTaxAmount] = useState(0);
   const [sIsSplitPayment, _setIsSplitPayment] = useState(false);
+  const [sIsDeposit, _setIsDeposit] = useState(false);
 
   const [sCombinedWorkordersArr, _setCombinedWorkordersArr] = useState([]);
   const [sAmountLeftToPay, _setAmountLeftToPay] = useState();
@@ -355,6 +356,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
     }
 
     payment.saleID = sale.id;
+    payment.isDeposit = sIsDeposit;
     sale.payments.push(payment);
     sale.amountCaptured = sale.amountCaptured + payment.amountCaptured;
 
@@ -566,6 +568,8 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sTransactionComplete={sTransactionComplete}
               sRefundAmount={sRefundAmount}
               sRefundObj={sRefundObj}
+              sIsDeposit={sIsDeposit}
+              _setIsDeposit={_setIsDeposit}
               // sIsDeposit={sIsDeposit}
             />
             <StripeCreditCardComponent
@@ -579,7 +583,8 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sTransactionComplete={sTransactionComplete}
               sRefundAmount={sRefundAmount}
               sRefundObj={sRefundObj}
-              // sIsDeposit={sIsDeposit}
+              sIsDeposit={sIsDeposit}
+              _setIsDeposit={_setIsDeposit}
             />
           </View>
 
@@ -1429,6 +1434,8 @@ const CashSaleComponent = ({
   sIsRefund,
   sCashSaleActive,
   sTransactionComplete,
+  sIsDeposit,
+  _setIsDeposit,
   sRefundObj = {
     cashRefundRequested: 0,
     cardRefundRequested: 0,
@@ -1526,7 +1533,7 @@ const CashSaleComponent = ({
     handleRefundCapture(arr1);
   }
 
-  function handleProcessPaymentPress(isDeposit) {
+  function handleProcessPaymentPress() {
     // log("process payment pressed");
     let paymentObject = { ...PAYMENT_OBJECT_PROTO };
     paymentObject.amountTendered = Number(sTenderAmount);
@@ -1535,8 +1542,6 @@ const CashSaleComponent = ({
     paymentObject.check = sIsCheck;
     paymentObject.millis = new Date().getTime();
     paymentObject.id = generateRandomID();
-    paymentObject.isDeposit = isDeposit;
-    // log(paymentObject);
     handlePaymentCapture(paymentObject);
 
     // handleCancelPress();
@@ -1678,6 +1683,13 @@ const CashSaleComponent = ({
         </View>
       </View>
 
+      <CheckBox_
+        buttonStyle={{ marginTop: 10 }}
+        textStyle={{ color: makeGrey(0.6), fontWeight: 500 }}
+        text={"DEPOSIT TO ACCOUNT"}
+        isChecked={sIsDeposit}
+        onCheck={() => _setIsDeposit(!sIsDepost)}
+      />
       <View style={{ flexDirection: "row" }}>
         <View
           style={{
@@ -1689,7 +1701,6 @@ const CashSaleComponent = ({
           }}
         >
           <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
-
           <View
             style={{
               width: "100%",
@@ -1745,45 +1756,19 @@ const CashSaleComponent = ({
           marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
         }}
       >
-        {!sPartialPaymentAlert ? (
-          <Button_
-            colorGradientArr={COLOR_GRADIENTS.green}
-            textStyle={{ color: C.textWhite }}
-            enabled={
-              sProcessButtonEnabled && !sTransactionComplete && sCashSaleActive
-            }
-            onPress={() =>
-              sRequestedAmount < sAmountLeftToPay
-                ? _setPartialPaymentAlert(true)
-                : handleProcessPaymentPress()
-            }
-            text={sIsRefund ? "PROCESS REFUND" : "PROCESS PAYMENT"}
-            buttonStyle={{
-              cursor: sProcessButtonEnabled ? "inherit" : "default",
-            }}
-          />
-        ) : (
-          <View style={{ flexDirection: "row" }}>
-            <Button_
-              textStyle={{ color: C.textWhite }}
-              colorGradientArr={COLOR_GRADIENTS.green}
-              buttonStyle={{ padding: 0 }}
-              text={"SPLIT PAYMENT"}
-              onPress={() => {
-                handleProcessPaymentPress();
-              }}
-            />
-            <Button_
-              textStyle={{ color: C.textWhite }}
-              colorGradientArr={COLOR_GRADIENTS.blue}
-              buttonStyle={{ padding: 0, marginLeft: 7 }}
-              text={"DEPOSIT"}
-              onPress={() => {
-                handleProcessPaymentPress(true);
-              }}
-            />
-          </View>
-        )}
+        <Button_
+          colorGradientArr={COLOR_GRADIENTS.green}
+          textStyle={{ color: C.textWhite }}
+          enabled={
+            sProcessButtonEnabled && !sTransactionComplete && sCashSaleActive
+          }
+          onPress={() => handleProcessPaymentPress()}
+          text={sIsRefund ? "PROCESS REFUND" : "PROCESS PAYMENT"}
+          buttonStyle={{
+            cursor: sProcessButtonEnabled ? "inherit" : "default",
+          }}
+        />
+
         <Button_
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
@@ -1852,6 +1837,7 @@ const StripeCreditCardComponent = ({
   _setCashSaleActive,
   sTransactionComplete,
   sRefundAmount,
+  _setIsDeposit,
   sRefundObj = {
     cashRefundRequested: 0,
     cardRefundRequested: 0,
@@ -1863,6 +1849,10 @@ const StripeCreditCardComponent = ({
     totalRefundRequested: 0,
     cardTransactionArr: [],
     cashTransactionArr: [],
+    last4: "",
+    cardType: "",
+    cardExpMonth: "",
+    cardExpYear: "",
   },
 }) => {
   const [sRequestedAmount, _setRequestedAmount] = useState(sAmountLeftToPay);
@@ -1874,6 +1864,7 @@ const StripeCreditCardComponent = ({
   const [sListenerArr, _setListenerArr] = useState([]);
   const [sPaymentIntentID, _setPaymentIntentID] = useState("");
   const [sStatusTextColor, _setStatusTextColor] = useState(C.green);
+  const [sPartialPaymentAlert, _setPartialPaymentAlert] = useState(false);
 
   /////////////////////////////////////////////////////////////////////////
   const [seconds, setSeconds] = useState(0);
@@ -2002,14 +1993,14 @@ const StripeCreditCardComponent = ({
   function handleStripeCardPaymentDBSubscriptionUpdate(
     key,
     val,
-    ssPaymentIntentID
+    paymentIntentID
   ) {
     // clog("Stripe webhook update Obj", val);
 
     let failureCode = val?.failure_code;
     if (
       failureCode &&
-      val?.process_payment_intent?.payment_intent == ssPaymentIntentID
+      val?.process_payment_intent?.payment_intent == paymentIntentID
     ) {
       log("card failure code", failureCode);
       _setStatusTextColor(RED_COLOR);
@@ -2018,7 +2009,7 @@ const StripeCreditCardComponent = ({
       );
     } else if (
       val.status === "succeeded" &&
-      val.payment_intent === ssPaymentIntentID
+      val.payment_intent === paymentIntentID
     ) {
       _setStatusTextColor("green");
       _setStatusMessage("Payment Complete!");
@@ -2026,33 +2017,29 @@ const StripeCreditCardComponent = ({
       // clog("Payment complete object", val);
       let paymentMethodDetails = val.payment_method_details.card_present;
 
-      let paymentDetailsObj = cloneDeep(PAYMENT_OBJECT_PROTO);
-      paymentDetailsObj.amountCaptured = roundToTwoDecimals(
-        val.amount_captured / 100
-      );
-      paymentDetailsObj.cardIssuer =
+      let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
+      payment.amountCaptured = roundToTwoDecimals(val.amount_captured / 100);
+      payment.cardIssuer =
         paymentMethodDetails.receipt.application_preferred_name;
-      paymentDetailsObj.cardType = paymentMethodDetails.description;
-      paymentDetailsObj.id = generateUPCBarcode();
-      paymentDetailsObj.isRefund = sIsRefund;
-      paymentDetailsObj.millis = new Date().getTime();
-      paymentDetailsObj.authorizationCode =
+      payment.cardType = paymentMethodDetails.description;
+      payment.id = generateUPCBarcode();
+      payment.isRefund = sIsRefund;
+      payment.millis = new Date().getTime();
+      payment.authorizationCode =
         paymentMethodDetails.receipt.authorization_code;
-      paymentDetailsObj.paymentIntentID = val.payment_intent;
-      paymentDetailsObj.chargeID = val.id;
-      paymentDetailsObj.paymentProcessor = "stripe";
-      paymentDetailsObj.receiptURL = val.receipt_url;
-      paymentDetailsObj.last4 = val.payment_method_details.card_present.last4;
-      paymentDetailsObj.expMonth =
-        val.payment_method_details.card_present.exp_month;
-      paymentDetailsObj.expYear =
-        val.payment_method_details.card_present.exp_year;
-      paymentDetailsObj.networkTransactionID =
+      payment.paymentIntentID = val.payment_intent;
+      payment.chargeID = val.id;
+      payment.paymentProcessor = "stripe";
+      payment.receiptURL = val.receipt_url;
+      payment.last4 = val.payment_method_details.card_present.last4;
+      payment.expMonth = val.payment_method_details.card_present.exp_month;
+      payment.expYear = val.payment_method_details.card_present.exp_year;
+      payment.networkTransactionID =
         val.payment_method_details.card_present.network_transaction_id;
-      paymentDetailsObj.amountRefunded = val.amount_refunded;
+      payment.amountRefunded = val.amount_refunded;
 
       // clog("Successful Payment details obj", paymentDetailsObj);
-      handlePaymentCapture(paymentDetailsObj);
+      handlePaymentCapture(payment);
     }
   }
 
@@ -2095,18 +2082,6 @@ const StripeCreditCardComponent = ({
     _setStatusTextColor("green");
     _setStatusMessage("\nReset complete!");
     clog("cancelation results", readerResult);
-  }
-
-  function onPaymentComplete(obj) {
-    let paymentObject = { ...PAYMENT_OBJECT_PROTO };
-    paymentObject.amountCaptured = Number(sRequestedAmount);
-    paymentObject.cash = !sIsCheck;
-    paymentObject.check = sIsCheck;
-    paymentObject.millis = new Date().getTime();
-    // paymentObject
-
-    handlePaymentCapture(paymentObject);
-    handleCancelPress();
   }
 
   // unnecessary, DB will create it for us
@@ -2299,12 +2274,24 @@ const StripeCreditCardComponent = ({
           />
         </View>
       </View>
+      <CheckBox_
+        buttonStyle={{ marginTop: 10 }}
+        textStyle={{ color: makeGrey(0.6), fontWeight: 500 }}
+        text={"DEPOSIT TO ACCOUNT"}
+        isChecked={sIsDeposit}
+        onCheck={() => _setIsDeposit(!sIsDeposit)}
+      />
       {sIsRefund ? (
         <View style={{ width: "100%", alignItems: "center", marginTop: 10 }}>
           <Text style={{ fontSize: 12 }}>
-            {"Last 4: " + "1236     " + "exp: " + "month" + " / " + "year"}
+            {"**" +
+              sRefundObj.last4 +
+              "exp: " +
+              sRefundObj.cardExpMonth +
+              " / " +
+              sRefundObj.cardExpYear}
           </Text>
-          <Text style={{ fontSize: 12 }}>{"World Mastercard Original"}</Text>
+          <Text style={{ fontSize: 12 }}>{sRefundObj.cardType}</Text>
         </View>
       ) : null}
       <View
@@ -2314,23 +2301,19 @@ const StripeCreditCardComponent = ({
           alignItems: "center",
         }}
       >
+        {/* {!sPartialPaymentAlert ? ( */}
         <Button_
           colorGradientArr={COLOR_GRADIENTS.green}
           textStyle={{ color: C.textWhite }}
           enabled={
-            sProcessButtonEnabled &&
-            sCardSaleActive &&
-            !sTransactionComplete &&
-            refundReady
+            sProcessButtonEnabled && !sTransactionComplete && sCardSaleActive
           }
-          onPress={handleProcessButtonPress}
-          text={sIsRefund ? "Process Refund" : "Process"}
+          onPress={() => handleProcessPaymentPress()}
+          text={sIsRefund ? "PROCESS REFUND" : "PROCESS PAYMENT"}
           buttonStyle={{
-            // width: 130,
             cursor: sProcessButtonEnabled ? "inherit" : "default",
           }}
         />
-
         <Text
           style={{
             ...checkoutScreenStyle.statusText,

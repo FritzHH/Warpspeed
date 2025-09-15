@@ -146,6 +146,14 @@ export function dbSetCustomerObj(customerObj, removeOption = false) {
   // return setFirestoreCollectionItem("CUSTOMERS", id, customerObj);
 }
 
+export function dbSetCustomerField(
+  customerID,
+  fieldObj = { fieldName: "fieldValue" }
+) {
+  let path = build_db_path.customer(customerID);
+  return newSetDatabaseField(path, fieldObj, false, true);
+}
+
 export function dbSetWorkorder(item, batch = true, remove = false) {
   let path = build_db_path.openWorkorders(item.id);
   if (batch) return batchDBCall(path, item, remove);
@@ -164,11 +172,11 @@ export function dbSetInventoryItem(item, batch = true, remove = false) {
   return newSetDatabaseField(path, item, remove);
 }
 
-export function dbSetSaleItem(item, batch = true, removeOption = false) {
-  let id = item.id;
-  if (removeOption) item = null;
-  return setFirestoreCollectionItem("SALES", id, item);
-}
+// export function dbSetSaleItem(item, removeOption = false) {
+//   let id = item.id;
+//   if (removeOption) item = null;
+//   return setFirestoreCollectionItem("SALES", id, item);
+// }
 
 export function dbSetPunchClockObj(obj, remove = false) {
   let path = build_db_path.punchClock(obj.id);
@@ -180,7 +188,7 @@ export function dbSetOrUpdateUserPunchObj(punchObj, remove = false) {
   setDBField(punchClockPath, punchObj, remove);
 }
 
-export function dbSetSalesObj(salesObj) {
+export function dbSetSalesObj(salesObj, updatedCustomerObj) {
   let path = build_db_path.sales(salesObj.id);
   newSetDatabaseField(path, salesObj);
 }

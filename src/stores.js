@@ -25,9 +25,31 @@ import {
   dbSetSettings,
   dbSetInventoryItem,
   dbSetWorkorder,
+  dbSetCustomerField,
 } from "./db_call_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
+export const ALERT_SCREEN_PROTO = {
+  showAlert: true,
+  title: "Alert",
+  message: "",
+  alertBoxStyle: {},
+  subMessage: "",
+  btn1Text: "",
+  btn2Text: "",
+  btn3Text: "",
+  btn1Icon: null,
+  btn2Icon: null,
+  btn3Icon: null,
+  icon1Size: null,
+  icon2Size: null,
+  icon3Size: null,
+  handleBtn1Press: null,
+  handleBtn2Press: null,
+  handleBtn3Press: null,
+  canExitOnOuterClick: false,
+  pauseOnBaseComponent: false,
+};
 
 export const useInvModalStore = create((set, get) => ({
   currentFocusName: null,
@@ -146,27 +168,6 @@ export const useCheckoutStore = create((set, get) => ({
   },
 }));
 
-export const ALERT_SCREEN_PROTO = {
-  showAlert: true,
-  title: "Alert",
-  message: "",
-  alertBoxStyle: {},
-  subMessage: "",
-  btn1Text: "",
-  btn2Text: "",
-  btn3Text: "",
-  btn1Icon: null,
-  btn2Icon: null,
-  btn3Icon: null,
-  icon1Size: null,
-  icon2Size: null,
-  icon3Size: null,
-  handleBtn1Press: null,
-  handleBtn2Press: null,
-  handleBtn3Press: null,
-  canExitOnOuterClick: true,
-};
-
 export const useAlertScreenStore = create((set, get) => ({
   showAlert: false,
   title: "Alert",
@@ -186,7 +187,9 @@ export const useAlertScreenStore = create((set, get) => ({
   handleBtn2Press: null,
   handleBtn3Press: null,
   canExitOnOuterClick: true,
+  pauseOnBaseComponent: false,
 
+  getPauseOnBaseComponent: () => get().pauseOnBaseComponent,
   getMessage: () => get().message,
   getSubMessage: () => get().subMessage,
   getCanExitOnOuterClick: () => get().canExitOnOuterClick,
@@ -222,9 +225,10 @@ export const useAlertScreenStore = create((set, get) => ({
     handleBtn1Press,
     handleBtn2Press,
     handleBtn3Press,
-    canExitOnOuterClick = true,
+    canExitOnOuterClick = false,
     alertBoxStyle = {},
-    showAlert,
+    showAlert = true,
+    pauseOnBaseComponent = false,
   }) => {
     set(() => ({
       title,
@@ -245,6 +249,7 @@ export const useAlertScreenStore = create((set, get) => ({
       canExitOnOuterClick,
       alertBoxStyle,
       showAlert,
+      pauseOnBaseComponent,
     }));
   },
   setMessage: (message) => {
@@ -291,8 +296,9 @@ export const useAlertScreenStore = create((set, get) => ({
   resetAll: () => {
     set(() => ({
       showAlert: false,
-      title: "",
+      title: "Alert",
       message: "",
+      alertBoxStyle: {},
       subMessage: "",
       btn1Text: "",
       btn2Text: "",
@@ -307,7 +313,7 @@ export const useAlertScreenStore = create((set, get) => ({
       handleBtn2Press: null,
       handleBtn3Press: null,
       canExitOnOuterClick: true,
-      alertBoxStyle: {},
+      pauseOnBaseComponent: false,
     }));
   },
 }));
@@ -518,6 +524,13 @@ export const useCustomerPreviewStore = create((set, get) => ({
 export const useCurrentCustomerStore = create((set, get) => ({
   customerObj: { ...CUSTOMER_PROTO },
   getCustomerObj: () => get().customerObj,
+
+  setCustomerField: (fieldName, value) => {
+    let customerObj = cloneDeep(get().customerObj);
+    if (fieldName && value) customerObj[fieldName] = value;
+    set({ customerObj });
+    dbSetCustomerField(customerObj.id, { [fieldName]: value });
+  },
   setCustomerObj: (obj) => {
     set((state) => ({ customerObj: obj }));
   },

@@ -263,20 +263,23 @@ export const PAYMENT_OBJECT_PROTO = {
   expYear: "",
   networkTransactionID: "",
   amountRefunded: 0,
-  workorderLinesRefundedIDArr: [],
+  workorderLinesRefundedID: [],
+  isDeposit: false,
 };
 
 export const SALE_OBJECT_PROTO = {
   id: "",
-  workorderIDArr: [],
+  workordersID: [],
   millis: "",
-  paymentArr: [],
+  payments: [],
   subtotal: 0,
   discount: 0,
-  salesTax: 0,
+  salesTaxPercent: 0,
   total: 0,
   amountCaptured: 0,
+  isDeposit: false,
   amountRefunded: 0,
+  isDeposit: false,
 };
 
 export const WORKORDER_PROTO = {
@@ -341,7 +344,7 @@ export const CUSTOMER_PROTO = {
   id: "",
   interactionRating: "",
   workorders: [],
-  payments: [],
+  salesID: [],
   dateCreated: "",
 };
 
@@ -382,7 +385,7 @@ export const MENU_BUTTON_PROTO = {
 export const FRITZ_USER_OBJ = {
   first: "Fritz",
   last: "Hieb",
-  id: "1234",
+  id: "3d2E63TXCY2bzmOdeQc8",
   permissions: {
     name: "Owner",
     level: 4,

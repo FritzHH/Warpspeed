@@ -220,7 +220,7 @@ export const TextInputOnMainBackground = ({
   );
 };
 
-export const AlertBox_ = ({}) => {
+export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   // store setters /////////////////////////////////////////////////////////////
   const _zResetAll = useAlertScreenStore((state) => state.resetAll);
 
@@ -272,12 +272,14 @@ export const AlertBox_ = ({}) => {
     _zResetAll();
   }
 
+  useEffect(() => {});
+
   // log(zButton1Text, zButton2Text);
   return (
     <TouchableWithoutFeedback
       onPress={() => (zCanExitOnOuterClick ? _zResetAll() : null)}
     >
-      <Modal visible={zShowAlert} transparent>
+      <Modal visible={true} transparent>
         <View
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -479,10 +481,10 @@ export const ScreenModal = ({
 
   //////////////////////////////////////////////////////////////
   useEffect(() => {
-    _zSetModalVisible(true);
-    return () => {
-      _zSetModalVisible(false);
-    };
+    // _zSetModalVisible(true);
+    // return () => {
+    //   _zSetModalVisible(false);
+    // };
   });
   if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
   // log("ref in ScreenModal", ref);

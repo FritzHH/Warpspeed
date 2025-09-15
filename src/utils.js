@@ -145,8 +145,8 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
   let tax = Number(totalAmount) * Number(settingsObj.salesTax);
   let total = tax + Number(totalAmount);
   return {
-    totalAmount: trimToTwoDecimals(total),
-    tax: trimToTwoDecimals(tax),
+    totalAmount: total,
+    tax: tax,
   };
 }
 
@@ -396,20 +396,7 @@ export function getRgbFromNamedColor(colorName) {
   return match[0];
 }
 
-// array ops
-export function moveItemInArr(arr, index, direction) {
-  const newArr = cloneDeep(arr); // copy so original isn’t mutated
-
-  if (direction === "up" && index > 0) {
-    [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
-  } else if (direction === "down" && index < arr.length - 1) {
-    [newArr[index + 1], newArr[index]] = [newArr[index], newArr[index + 1]];
-  }
-
-  return newArr;
-}
-
-// numbers
+// numbers /////////////////////////////////////////////////////////
 export function checkInputForNumbersOnly(valString, includeDecimal = true) {
   let isGood = true;
   let nums = NUMS;
@@ -458,8 +445,10 @@ export function formatDecimal(value) {
   return num.slice(1);
 }
 
-export function roundToTwoDecimals(num) {
-  return parseFloat(num.toFixed(2));
+export function roundToTwoDecimals(n) {
+  if (!Number.isFinite(n)) return n;
+  const f = 1e2;
+  return Math.round((n + Number.EPSILON) * f) / f;
 }
 
 export function trimToTwoDecimals(num) {
@@ -504,6 +493,11 @@ export function trimToTwoDecimals(num) {
   }
   // log("trim 2 decimals val", res);
   return res;
+}
+
+export function trimToThreeDecimals(n) {
+  if (!Number.isFinite(n)) return n;
+  return Math.trunc(n * 1e3) / 1e3;
 }
 
 export function ifNumIsOdd(num) {
@@ -696,24 +690,6 @@ export function makeGrey(opacity) {
   return "rgba(0,0,0," + opacity + ")";
 }
 
-export function arrHasItem(arr, item) {
-  return arr.find((o) => o.id === item.id);
-}
-
-export function removeArrItem(arr, item, fieldID = "id") {
-  return arr.filter((o) => o[fieldID] !== item[fieldID]);
-}
-
-export function replaceOrAddToArr(arr, obj, by = "id") {
-  const predicate =
-    typeof by === "function" ? by : (el) => el?.[by] === obj?.[by];
-  const i = arr.findIndex(predicate);
-  if (i === -1) return [...arr, obj];
-  const copy = arr.slice();
-  copy[i] = obj;
-  return copy;
-}
-
 // text formatting
 export function capitalizeFirstLetterOfString(str) {
   if (!str) return "";
@@ -849,10 +825,6 @@ export function lightenRGBByPercent(rgb, percent) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-export function getItemFromArr(value, arrKey, arr) {
-  return arr.find((obj) => obj[arrKey] === value);
-}
-
 export function generateRandomID(collectionPath) {
   let ref = getNewCollectionRef(collectionPath || "CUSTOMERS");
   return ref.id;
@@ -878,6 +850,41 @@ export async function randomWordGenerator() {
   return generate({ minLength: 4, maxLength: 8 });
 }
 
+export function checkArr(arr, obj) {
+  return arr.find((o) => o.id === obj.id);
+}
+
+// OBJECT operations /////////////////////////////////////////////////
+export function removeUnusedFields(obj) {
+  if (!isObject(obj)) return obj;
+
+  let usedFields = [];
+  let keys = Object.keys(obj);
+  keys.forEach((key) => {
+    if (obj[key]) usedFields.push(key);
+  });
+
+  let newObj = {};
+  usedFields.forEach((field) => (newObj[field] = obj[field]));
+  return newObj;
+}
+
+function isObject(v) {
+  return v != null && Object.prototype.toString.call(v) === "[object Object]";
+}
+// ARRAY operations ///////////////////////////////////////////////////
+
+export function moveItemInArr(arr, index, direction) {
+  const newArr = cloneDeep(arr); // copy so original isn’t mutated
+
+  if (direction === "up" && index > 0) {
+    [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
+  } else if (direction === "down" && index < arr.length - 1) {
+    [newArr[index + 1], newArr[index]] = [newArr[index], newArr[index + 1]];
+  }
+
+  return newArr;
+}
 export function searchArray(
   searchTerms = [],
   arrOfObjToSearch = [],
@@ -901,18 +908,6 @@ export function searchArray(
   });
 }
 
-export function arrayAddObjCheckForDupes(arr, arrKey, obj, objKey) {
-  let found = arr.find((o) => o[arrKey] === obj[objKey]);
-  if (!found) {
-    arr.push(obj);
-  }
-  return arr;
-}
-
-export function checkArr(arr, obj) {
-  return arr.find((o) => o.id === obj.id);
-}
-
 export function combine2ArraysOrderByMillis(arr1, arr2) {
   let newArr = [...arr1, ...arr2];
   newArr.sort((a, b) => {
@@ -922,7 +917,49 @@ export function combine2ArraysOrderByMillis(arr1, arr2) {
   return newArr;
 }
 
-// date & time
+export function arrayAddObjCheckForDupes(arr, arrKey, obj, objKey) {
+  let found = arr.find((o) => o[arrKey] === obj[objKey]);
+  if (!found) {
+    arr.push(obj);
+  }
+  return arr;
+}
+
+export function getItemFromArr(value, arrKey, arr) {
+  return arr.find((obj) => obj[arrKey] === value);
+}
+
+export function arrHasItem(arr, item) {
+  return arr.find((o) => o.id === item.id);
+}
+
+export function removeArrItem(arr, item, fieldID = "id") {
+  return arr.filter((o) => o[fieldID] !== item[fieldID]);
+}
+
+export function replaceOrAddToArr(arr, input, fieldName = "id") {
+  let isObj = isObject(input);
+  let copy = cloneDeep(arr);
+
+  if (isObj) {
+    let idx = copy.findIndex((o) => o[fieldName] === input[fieldName]);
+    if (idx >= 0) {
+      copy[idx] = input;
+    } else {
+      copy.push(input);
+    }
+  } else {
+    // log("arr", copy);
+    // log("input", input);
+    let idx = copy.findIndex((str) => str === input);
+    if (idx < 0) copy.push(input);
+    // log("copy", copy);
+  }
+
+  return copy;
+}
+
+// date & time //////////////////////////////////////////////////////////
 export function getDayOfWeekFrom0To7Input(n, startSunday = false) {
   const daysSundayStart = [
     "Sunday",

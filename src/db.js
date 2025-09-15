@@ -95,11 +95,11 @@ async function remove_firestore_field(path, fieldID) {
   return await deleteDoc(docRef);
 }
 
-async function set_firestore_field(path, obj, remove) {
+async function set_firestore_field(path, obj, merge) {
   // log(path, item);
   let docRef = doc(FIRESTORE, path);
   // return await setDoc(docRef, { ...obj });
-  setDoc(docRef, obj);
+  setDoc(docRef, obj, { merge });
 }
 
 export function setRealtimeNodeItem(path, item, remove) {
@@ -148,11 +148,11 @@ export function subscribeToNodeAddition(path, callback) {
 
 // exposed db calls ////////////////////////////////
 
-export function newSetDatabaseField(path, item, remove) {
+export function newSetDatabaseField(path, item, remove, merge) {
   if (checkDBPath(path) === "firestore") {
-    // log(path, item);
+    // log(item, merge.toString());
     if (remove) return remove_firestore_field(path, item.id);
-    return set_firestore_field(path, item);
+    return set_firestore_field(path, item, merge);
   }
   // log(path, item);
   if (remove) return setRealtimeNodeItem(path, null);
@@ -245,12 +245,14 @@ export function subscribeToFirestorePath(path, callback) {
 
 // sort of new???????????
 
-export async function SET_FIRESTORE_FIELD(path, item) {
+export async function SET_FIRESTORE_FIELD(path, item, merge) {
   if (item.id) {
     // is document
     let docRef = doc(FIRESTORE, path, item.id);
-    return await setDoc(docRef, item);
+    return await setDoc(docRef, item, { merge });
   } else {
+    let docRef = doc(FIRESTORE, path);
+    return await setDoc(docRef, item, { merge });
   }
 }
 

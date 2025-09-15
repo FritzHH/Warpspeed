@@ -23,6 +23,7 @@ import {
   useLoginStore,
   useDatabaseBatchStore,
   useCheckoutStore,
+  useAlertScreenStore,
 } from "../stores";
 import { executeDBBatch } from "../db_call_wrapper";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
@@ -80,6 +81,10 @@ export function BaseScreen() {
   const zRunBackgroundRecognition = useLoginStore((state) =>
     state.getRunBackgroundRecognition()
   );
+  const zPauseAlertOnBaseComponent = useAlertScreenStore((state) =>
+    state.getPauseOnBaseComponent()
+  );
+  const zShowAlert = useAlertScreenStore((state) => state.getShowAlert());
 
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
 
@@ -208,7 +213,7 @@ export function BaseScreen() {
         modalVisible={zShowLoginScreen && !zLoginModalVisible}
       />
       {zRunBackgroundRecognition ? <FaceDetectionClientComponent /> : null}
-      <AlertBox_ />
+      {!zPauseAlertOnBaseComponent && zShowAlert ? <AlertBox_ /> : null}
       <View
         style={{
           width: "65%",

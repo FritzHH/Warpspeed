@@ -110,7 +110,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
     wo.customerFirst = "Fritz";
     wo.customerLast = "Hieb";
     wo.customerPhone = "2393369177";
-    wo.customerID = "1234";
+    wo.customerID = "3d2E63TXCY2bzmOdeQc8";
     wo.startedBy = "Fritz Hieb";
     wo.changeLog.push("Started by: " + "Fritz" + " " + "Hieb");
     wo.startedOnMillis = new Date().getTime();

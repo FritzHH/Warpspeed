@@ -97,7 +97,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   useEffect(() => {
     if (zOpenWorkorderObj && zOpenWorkordersArr && zSettingsObj.salesTax) {
       _zSetIsCheckingOut(true);
-      dbGetCustomerObj("3d2E63TXCY2bzmOdeQc8").then((res) => {
+      dbGetCustomerObj("99PoyazsHo3khMK1dySJ").then((res) => {
         _zSetCustomerObj(res);
         // log("res", res);
       });

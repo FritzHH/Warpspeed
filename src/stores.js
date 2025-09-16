@@ -26,6 +26,7 @@ import {
   dbSetInventoryItem,
   dbSetWorkorder,
   dbSetCustomerField,
+  dbSetCustomerObj,
 } from "./db_call_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
@@ -495,8 +496,10 @@ export const useCurrentCustomerStore = create((set, get) => ({
     set({ customerObj });
     dbSetCustomerField(customerObj.id, { [fieldName]: value });
   },
-  setCustomerObj: (obj) => {
-    set((state) => ({ customerObj: obj }));
+  setCustomerObj: (obj, sendToDB = false) => {
+    set({ customerObj: obj });
+
+    if (sendToDB) dbSetCustomerObj(obj);
   },
 }));
 

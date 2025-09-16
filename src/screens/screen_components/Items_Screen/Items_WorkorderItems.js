@@ -65,7 +65,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
-  const _zSetCustomerObj = useCurrentCustomerStore(
+  const _zSetCustomer = useCurrentCustomerStore(
     (state) => state.setCustomerObj
   );
 
@@ -99,7 +99,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       // log("here");
       _zSetIsCheckingOut(true);
       dbGetCustomerObj("1236").then((res) => {
-        _zSetCustomerObj(res);
+        _zSetCustomer(res);
         // log("res", res);
       });
     }

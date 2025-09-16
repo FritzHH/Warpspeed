@@ -40,11 +40,8 @@ import {
 import { cloneDeep, initial } from "lodash";
 import {
   addDashesToPhone,
-  applyLineItemDiscounts,
-  arrayAddObjCheckForDupes,
   arrHasItem,
   calculateRunningTotals,
-  checkInputForNumbersOnly,
   clog,
   formatDecimal,
   formatCurrencyDisp,
@@ -59,8 +56,8 @@ import {
   removeUnusedFields,
   replaceOrAddToArr,
   roundToTwoDecimals,
-  showAlert,
-  trimToTwoDecimals,
+  usdTypeMask,
+  dollarsToCents,
 } from "../../../utils";
 import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
@@ -519,7 +516,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sSale={sSale}
               // sIsDeposit={sIsDeposit}
             />
-            {/* <StripeCreditCardComponent
+            <StripeCreditCardComponent
               sCardSaleActive={sCardSaleActive}
               sIsRefund={sIsRefund}
               handlePaymentCapture={handlePaymentCapture}
@@ -527,13 +524,12 @@ export function CheckoutModalScreen({ openWorkorder }) {
               onCancel={() => {}}
               sAmountLeftToPay={sAmountLeftToPay}
               zSettingsObj={zSettings}
-              sSale.paymentComplete={sSale.paymentComplete}
               sRefundAmount={sRefundAmount}
               sRefundObj={sRefund}
               sIsDeposit={sIsDeposit}
               _setIsDeposit={_setIsDeposit}
               sSale={sSale}
-            /> */}
+            />
           </View>
 
           <View
@@ -548,7 +544,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
               onPress={() => handleRefundScan(sRefundScan)}
             />
             <MiddleItemComponent
-              zCustomerObj={zCustomer}
+              zCustomer={zCustomer}
               sIsRefund={sIsRefund}
               sRefundScan={sRefundScan}
               _sSetRefundScan={handleRefundScan}
@@ -567,7 +563,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sShouldChargeCardRefundFee={sShouldChargeCardRefundFee}
               sCardRefundFeePercentage={zSettings.cardRefundFeePercent}
               sAmountRefunded={sAmountRefunded}
-              sRefundObj={sRefund}
+              sRefund={sRefund}
               sApplyDeposit={sApplyDeposit}
               sSale={sSale}
             />
@@ -728,15 +724,12 @@ const MiddleItemComponent = ({
               ) : null}
             </View>
           </View>
-          <Text style={{ fontSize: 13, color: makeGrey(0.7), paddingTop: 5 }}>
-            {/* {zCustomer?.streetAddress} */}
-            {zCustomer?.streetAddress +
-              "  " +
-              (zCustomer?.unit ? "unit: " + zCustomer?.unit + "\n" : "\n") +
-              zCustomer?.city +
-              "\n" +
-              zCustomer?.notes}
-          </Text>
+
+          {zCustomer?.streetAddress ? (
+            <Text>{zCustomer.streetAddress}</Text>
+          ) : null}
+          {zCustomer?.unit ? <Text>{zCustomer.unit}</Text> : null}
+          {zCustomer?.city ? <Text>{zCustomer.city}</Text> : null}
         </View>
       ) : null}
 
@@ -1392,24 +1385,34 @@ const CashSaleComponent = ({
       ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
       : sSale?.total - sSale?.amountCaptured
   );
+  const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(
+    formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)
+  ); // dev sAmountLeftToPay
   const [sRequestedAmount, _setRequestedAmount] = useState(
     sSale?.total - sSale?.amountCaptured
-  ); // dev sAmountLeftToPay
+  );
   const [sStatusMessage, _setStatusMessage] = useState("");
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
   const [sIsCheck, _setIsCheck] = useState(false);
   const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
   const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
   const [sFocusedItem, _setFocusedItem] = useState("");
-  const [sPartialPaymentAlert, _setPartialPaymentAlert] = useState(false);
+
+  const onBlur = useCallback(() => {
+    // Normalize formatting on blur (force 2 decimals)
+    const parsed = usdDisplayToCents(sRequestedAmountDisp);
+    _setRequestedAmountDisp(
+      centsToUsdDisplay(parsed != null ? parsed : cents, { withDollar: false })
+    );
+  }, [sRequestedAmount, sRequestedAmountDisp]);
 
   // calculate running cash change needed for tender amount
   useEffect(() => {
-    if (sTenderAmount >= sRequestedAmount) {
-      let diff = Number(sTenderAmount) - Number(sRequestedAmount);
+    if (sTenderAmount >= sRequestedAmountDisp) {
+      let diff = Number(sTenderAmount) - Number(sRequestedAmountDisp);
       _setCashChangeNeeded(diff);
     }
-  }, [sTenderAmount, sRequestedAmount]);
+  }, [sTenderAmount, sRequestedAmountDisp]);
 
   useEffect(() => {
     let tenderAmount = Number(sTenderAmount);
@@ -1418,7 +1421,7 @@ const CashSaleComponent = ({
         _setProcessButtonEnabled(true);
       }
     } else {
-      if (tenderAmount >= sRequestedAmount && tenderAmount > 1) {
+      if (tenderAmount >= sRequestedAmountDisp && tenderAmount > 1) {
         _setProcessButtonEnabled(true);
       }
     }
@@ -1426,9 +1429,8 @@ const CashSaleComponent = ({
 
   function handleCancelPress() {
     _setTenderAmount("");
-    _setRequestedAmount(sAmountLeftToPay);
+    _setRequestedAmountDisp(sAmountLeftToPay);
     _setProcessButtonEnabled(false);
-    _setPartialPaymentAlert(false);
   }
 
   function handleProcessRefundPress() {
@@ -1476,7 +1478,7 @@ const CashSaleComponent = ({
     // log("process payment pressed");
     let paymentObject = { ...PAYMENT_OBJECT_PROTO };
     paymentObject.amountTendered = Number(sTenderAmount);
-    paymentObject.amountCaptured = Number(sRequestedAmount);
+    paymentObject.amountCaptured = Number(sRequestedAmountDisp);
     paymentObject.cash = !sIsCheck;
     paymentObject.check = sIsCheck;
     paymentObject.millis = new Date().getTime();
@@ -1589,8 +1591,9 @@ const CashSaleComponent = ({
               }
               onFocus={() => {
                 _setFocusedItem("amount");
-                _setRequestedAmount("");
+                _setRequestedAmountDisp("");
               }}
+              // onBlur={onBlur}
               autoFocus={sFocusedItem === "amount"}
               style={{
                 fontSize: 15,
@@ -1604,19 +1607,25 @@ const CashSaleComponent = ({
                 paddingRight: 1,
                 textAlign: "right",
               }}
+              inputMode="decimal"
               placeholder="0.00"
               placeholderTextColor={makeGrey(0.3)}
-              value={formatCurrencyDisp(
-                sIsRefund ? sRefund.cashRefundRequested : sRequestedAmount
-              )}
+              value={
+                sIsRefund ? sRefund.cashRefundRequested : sRequestedAmountDisp
+              }
+              // value={sRequestedAmount}
               onChangeText={(val) => {
-                val = formatDecimal(val);
-                if (val > sSale?.total - sSale?.amountCaptured) {
+                val = usdTypeMask(val).display;
+                if (val === "0.00") val = "";
+                let cents = dollarsToCents(val);
+
+                if (cents > sSale?.total - sSale?.amountCaptured) {
                   _setStatusMessage("Amount greater than balance");
                   return;
                 } else {
                   _setStatusMessage("");
-                  _setRequestedAmount(val);
+                  _setRequestedAmount(cents);
+                  _setRequestedAmountDisp(val);
                 }
               }}
             />
@@ -1704,7 +1713,7 @@ const CashSaleComponent = ({
             sProcessButtonEnabled && !sSale?.paymentComplete && sCashSaleActive
           }
           onPress={() => handleProcessPaymentPress()}
-          text={sIsRefund ? "PROCESS REFUND" : "PROCESS PAYMENT"}
+          text={sIsRefund ? "PROCESS REFUND" : "COMPLETE"}
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
           }}
@@ -1715,7 +1724,7 @@ const CashSaleComponent = ({
             cursor: sProcessButtonEnabled ? "inherit" : "default",
           }}
           enabled={
-            sTenderAmount >= sRequestedAmount &&
+            sTenderAmount >= sRequestedAmountDisp &&
             !sSale?.paymentComplete &&
             sCashSaleActive
           }
@@ -1724,7 +1733,7 @@ const CashSaleComponent = ({
         />
       </View>
       {sCashChangeNeeded >= 0 &&
-      sTenderAmount >= sRequestedAmount &&
+      sTenderAmount >= sRequestedAmountDisp &&
       !sIsRefund ? (
         <View
           style={{
@@ -1771,7 +1780,6 @@ const StripeCreditCardComponent = ({
   sIsDeposit,
   sAmountLeftToPay,
   handlePaymentCapture,
-  handleRefundCapture,
   zSettings,
   sIsRefund,
   refundPaymentIntentID,
@@ -1795,7 +1803,9 @@ const StripeCreditCardComponent = ({
     cardExpYear: "",
   },
 }) => {
-  const [sRequestedAmount, _setRequestedAmount] = useState(sAmountLeftToPay);
+  const [sRequestedAmount, _setRequestedAmount] = useState(
+    sSale?.total - sSale?.amountCaptured
+  );
   const [sStatusMessage, _setStatusMessage] = useState("");
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(true);
   const [sFocusedItem, _setFocusedItem] = useState("");
@@ -1812,7 +1822,10 @@ const StripeCreditCardComponent = ({
   useEffect(() => {
     // log(sRequestedAmount);
     getAvailableStripeReaders();
-    if (sRequestedAmount <= sAmountLeftToPay && sRequestedAmount >= 1) {
+    if (
+      sRequestedAmount <= sSale?.total - sSale?.amountCaptured &&
+      sRequestedAmount >= 1
+    ) {
       _setProcessButtonEnabled(true);
     } else {
       _setProcessButtonEnabled(false);
@@ -2175,7 +2188,7 @@ const StripeCreditCardComponent = ({
               color: C.textMain,
             }}
           >
-            {"$ " + formatCurrencyDisp(sSale.total - sSale.amountCaptured)}
+            {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
           </Text>
           <TextInput
             onFocus={() => {
@@ -2253,7 +2266,7 @@ const StripeCreditCardComponent = ({
             sProcessButtonEnabled && !sSale?.paymentComplete && sCardSaleActive
           }
           onPress={() => handleProcessPaymentPress()}
-          text={sIsRefund ? "PROCESS REFUND" : "PROCESS PAYMENT"}
+          text={sIsRefund ? "PROCESS REFUND" : "PROCESS CARD"}
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
           }}

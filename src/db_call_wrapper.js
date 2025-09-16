@@ -131,6 +131,7 @@ export function dbSetSettings(settingsObj, batch) {
 }
 
 export function dbSetCustomerObj(customerObj, removeOption = false) {
+  log("you need to fix dbSetCustomerObj");
   // fix this
   // let id = customerObj.id;
   // let previewObj = {};
@@ -148,9 +149,12 @@ export function dbSetCustomerObj(customerObj, removeOption = false) {
 
 export function dbSetCustomerField(
   customerID,
-  fieldObj = { fieldName: "fieldValue" }
+  fieldObj = { fieldName: "fieldValue" },
+  batch = true
 ) {
   let path = build_db_path.customer(customerID);
+  log("need to fix batch for Firestore, its only written for Realtime");
+  // if (batch) batch
   return newSetDatabaseField(path, fieldObj, false, true);
 }
 

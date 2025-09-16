@@ -444,6 +444,78 @@ export function formatCurrencyDisp(
   }
 }
 
+export function usdTypeMask(raw, { withDollar = false } = {}) {
+  if (raw == null) return { display: withDollar ? "$0.00" : "0.00", cents: 0 };
+
+  let s = String(raw)
+    .trim()
+    .replace(/[,$\s]/g, "");
+  let neg = false;
+
+  // Accounting negatives "(123.45)"
+  const parens = /^\((.*)\)$/.exec(s);
+  if (parens) {
+    neg = true;
+    s = parens[1];
+  }
+  if (s.startsWith("-")) {
+    neg = !neg;
+    s = s.slice(1);
+  }
+
+  // Keep only digits (works even if user types a dot; we "force" the decimal position)
+  const digits = s.replace(/\D/g, "");
+  if (digits.length === 0) {
+    const display = `${neg ? "-" : ""}${withDollar ? "$" : ""}0.00`;
+    return { display, cents: 0 };
+  }
+  // Split into dollars & cents (last two digits are cents)
+  const len = digits.length;
+  const dollarsStr =
+    (digits.slice(0, Math.max(0, len - 2)) || "0").replace(/^0+(?=\d)/, "") ||
+    "0";
+  const centsStr = digits.slice(-2).padStart(2, "0");
+
+  // Compute integer cents (use BigInt when available to avoid overflow on huge inputs)
+  let centsVal;
+  try {
+    centsVal = Number(BigInt(dollarsStr) * 100n + BigInt(centsStr));
+  } catch {
+    centsVal = parseInt(dollarsStr, 10) * 100 + parseInt(centsStr, 10);
+  }
+  if (neg) centsVal = -centsVal;
+
+  const display = `${neg ? "-" : ""}${
+    withDollar ? "$" : ""
+  }${dollarsStr}.${centsStr}`;
+  return { display, cents: centsVal };
+}
+
+export function dollarsToCents(input) {
+  if (input == null) return NaN;
+
+  // Normalize to a clean numeric string
+  let s = String(input)
+    .trim()
+    .replace(/[,$\s]/g, "") // drop $, commas, spaces
+    .replace(/^\((.*)\)$/, "-$1"); // (123.45) -> -123.45 (accounting negatives)
+
+  const m = s.match(/^([+-])?\s*(?:(\d+)(?:\.(\d*))?|\.(\d+))$/);
+  if (!m) return NaN;
+
+  const neg = m[1] === "-";
+  const intPart = m[2] || "0";
+  let frac = m[3] ?? m[4] ?? ""; // digits after decimal (may be empty)
+
+  // Round to 2 decimals using string digits (no floating point pitfalls)
+  while (frac.length < 3) frac += "0"; // ensure at least 3 digits to decide rounding
+  let cents =
+    parseInt(intPart, 10) * 100 + parseInt(frac.slice(0, 2) || "0", 10);
+  if (frac[2] >= "5") cents += 1; // round up if 3rd frac digit >= 5
+
+  return neg ? -cents : cents;
+}
+
 export function convertMillisToHoursMins(millis) {
   const totalMinutes = Math.floor(millis / 60000);
   const hours = Math.floor(totalMinutes / 60);

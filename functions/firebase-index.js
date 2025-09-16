@@ -133,7 +133,7 @@ exports.initiatePaymentIntent = onRequest(
         // we are not
         log("Getting a new payment intent");
         paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(Number(req.body.amount) * 100),
+          amount: req.body.amount,
           payment_method_types: ["card_present", "card", "link", "cashapp"],
           capture_method: req.body.captureMethod || "automatic",
           currency: "usd",

@@ -123,49 +123,13 @@ export const useCustomerSearchStore = create((set, get) => ({
 
 export const useCheckoutStore = create((set, get) => ({
   isCheckingOut: false,
-  paymentArr: [],
-  totalAmount: 0,
-  totalDiscounts: 0,
-  isRefund: false,
-  ticketScan: "",
-  combinedWorkordersArr: [],
-  paymentComplete: false,
   saleObj: null,
-  cashChangeNeeded: 0,
 
-  getCashChangeNeeded: () => get().cashChangeNeeded,
   getSaleObj: () => get().saleObj,
-  getPaymentComplete: () => get().paymentComplete,
   getIsCheckingOut: () => get().isCheckingOut,
-  getIsRefund: () => get().isRefund,
-  getTotalAmount: () => get().totalAmount,
-  getPaymentArr: () => get().paymentArr,
-  getTicketScan: () => get().ticketScan,
-  getCombinedWorkordersArr: () => get().combinedWorkordersArr,
 
-  setCashChangeNeeded: (cashChangeNeeded) => set({ cashChangeNeeded }),
   setSaleObj: (saleObj) => set({ saleObj }),
-  setPaymentComplete: (paymentComplete) => set({ paymentComplete }),
-  addToCombinedWorkordersArr: (workorderObj) => {},
-  setCombinedWorkordersArr: (combinedWorkordersArr) =>
-    set({ combinedWorkordersArr }),
   setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),
-  setIsRefund: (isRefund) => {
-    set(() => ({ isRefund }));
-  },
-  setTotalAmount: (totalAmount) => {
-    set(() => ({ totalAmount }));
-  },
-  setPaymentArr: (paymentArr) => {
-    set(() => ({ paymentArr }));
-  },
-  addToPaymentArr: (paymentObj) => {},
-  setSplitPayment: (splitPayment) => {
-    set(() => ({ splitPayment }));
-  },
-  reset: () => {
-    set(() => ({}));
-  },
 }));
 
 export const useAlertScreenStore = create((set, get) => ({
@@ -579,6 +543,28 @@ export const useInventoryStore = create((set, get) => ({
   // setEntireArr: ()
 }));
 
+export const useCustMessagesStore = create((set, get) => ({
+  incomingMessagesArr: [],
+  outgoingMessagesArr: [],
+  getIncomingMessagesArr: () => get().incomingMessagesArr,
+  getOutgoingMessagesArr: () => get().outgoingMessagesArr,
+  setIncomingMessage: (obj) => {
+    let messages = get().incomingMessagesArr;
+    if (checkArr(messages, obj)) return;
+    set((state) => ({
+      incomingMessagesArr: [...state.incomingMessagesArr, obj],
+    }));
+  },
+  setOutgoingMessage: (obj) => {
+    let messages = get().outgoingMessagesArr;
+    if (checkArr(messages, obj)) return;
+    // log("out", obj);
+    set((state) => ({
+      outgoingMessagesArr: [...state.outgoingMessagesArr, obj],
+    }));
+  },
+}));
+
 export const useOpenWorkordersStore = create((set, get) => ({
   workorderArr: [],
   openWorkorderObj: null,
@@ -599,7 +585,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     }
 
     // dev*************************************************
-    if (wo.id === "540286345956") {
+    if (wo.id === "812140743019") {
       // clog("setting", wo);
       set({ openWorkorderObj: wo });
     }
@@ -657,28 +643,6 @@ export const useOpenWorkordersStore = create((set, get) => ({
   //       workorderArr: removeItem(get().workorderArr, item),
   //     }));
   // },
-}));
-
-export const useCustMessagesStore = create((set, get) => ({
-  incomingMessagesArr: [],
-  outgoingMessagesArr: [],
-  getIncomingMessagesArr: () => get().incomingMessagesArr,
-  getOutgoingMessagesArr: () => get().outgoingMessagesArr,
-  setIncomingMessage: (obj) => {
-    let messages = get().incomingMessagesArr;
-    if (checkArr(messages, obj)) return;
-    set((state) => ({
-      incomingMessagesArr: [...state.incomingMessagesArr, obj],
-    }));
-  },
-  setOutgoingMessage: (obj) => {
-    let messages = get().outgoingMessagesArr;
-    if (checkArr(messages, obj)) return;
-    // log("out", obj);
-    set((state) => ({
-      outgoingMessagesArr: [...state.outgoingMessagesArr, obj],
-    }));
-  },
 }));
 
 export const useWorkorderPreviewStore = create((set, get) => ({

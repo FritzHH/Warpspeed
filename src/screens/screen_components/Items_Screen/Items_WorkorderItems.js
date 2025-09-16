@@ -7,7 +7,7 @@ import {
   calculateTaxes,
   clog,
   deepEqual,
-  formatNumberForCurrencyDisplay,
+  formatCurrencyDisp,
   generateRandomID,
   generateUPCBarcode,
   lightenRGBByPercent,
@@ -96,8 +96,9 @@ export const Items_WorkorderItemsTab = ({}) => {
   const checkoutBtnRef = useRef();
   useEffect(() => {
     if (zOpenWorkorderObj && zOpenWorkordersArr && zSettingsObj.salesTax) {
+      // log("here");
       _zSetIsCheckingOut(true);
-      dbGetCustomerObj("99PoyazsHo3khMK1dySJ").then((res) => {
+      dbGetCustomerObj("1236").then((res) => {
         _zSetCustomerObj(res);
         // log("res", res);
       });
@@ -351,7 +352,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                 fontSize: 14,
               }}
             >
-              {"$" + formatNumberForCurrencyDisplay(sTotalPrice)}
+              {"$" + formatCurrencyDisp(sTotalPrice)}
             </Text>
           </Text>
           <View
@@ -373,7 +374,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                     fontSize: 14,
                   }}
                 >
-                  {"$" + formatNumberForCurrencyDisplay(sTotalDiscount)}
+                  {"$" + formatCurrencyDisp(sTotalDiscount)}
                 </Text>
               </Text>
               <View
@@ -396,9 +397,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               }}
             >
               {"$" +
-                formatNumberForCurrencyDisplay(
-                  (sTotalPrice * zSettingsObj.salesTax) / 100
-                )}
+                formatCurrencyDisp((sTotalPrice * zSettingsObj.salesTax) / 100)}
             </Text>
           </Text>
           <View
@@ -430,7 +429,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               }}
             >
               {"$" +
-                formatNumberForCurrencyDisplay(
+                formatCurrencyDisp(
                   sTotalPrice * (zSettingsObj.salesTax / 100) + sTotalPrice
                 )}
             </Text>

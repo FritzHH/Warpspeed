@@ -96,6 +96,7 @@ export function calculateRunningTotals(
 
   if (!Array.isArray(workorderArr)) workorderArr = [workorderArr];
   workorderArr.forEach((workorderObj) => {
+    // log(workorderObj)
     let arrToIterate = isRefund
       ? workorderlinesArr
       : workorderObj.workorderLines;
@@ -410,7 +411,22 @@ export function checkInputForNumbersOnly(valString, includeDecimal = true) {
   return isGood;
 }
 
-export function formatNumberForCurrencyDisplay(input, dollarSign = false) {
+export function formatCurrencyDisp(
+  value,
+  { locale = "en-US", currency = "USD", withCurrency = false } = {}
+) {
+  const cents = typeof value === "string" ? Number(value) : value;
+  if (!Number.isFinite(cents)) return "";
+  const amount = cents / 100;
+  const opts = withCurrency
+    ? {
+        style: "currency",
+        currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }
+    : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return amount.toLocaleString(locale, opts);
   // log(input);
   const num = parseFloat(input);
   if (isNaN(num)) return "";
@@ -426,6 +442,36 @@ export function formatNumberForCurrencyDisplay(input, dollarSign = false) {
   } else {
     return obj.toString().slice(1);
   }
+}
+
+export function convertMillisToHoursMins(millis) {
+  const totalMinutes = Math.floor(millis / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const formattedHoursMin = hours + ":" + minutes;
+  return { hours, minutes, totalMinutes, formattedHoursMin };
+}
+
+export function removeDashesFromPhone(num = "") {
+  let split = num.split("-");
+  let newVal = "";
+  split.forEach((s) => (newVal += s));
+  return newVal;
+}
+
+export function addDashesToPhone(num) {
+  if (!num) return "";
+  let phone = num.toString();
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  if (digits.length <= 10)
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  // If longer than 10 digits, format first 10, append rest
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(
+    6,
+    10
+  )} ${digits.slice(10)}`;
 }
 
 export function formatDecimal(value) {
@@ -664,28 +710,6 @@ export function getConnectionStrength() {
   }
 }
 
-export function removeDashesFromPhone(num = "") {
-  let split = num.split("-");
-  let newVal = "";
-  split.forEach((s) => (newVal += s));
-  return newVal;
-}
-
-export function addDashesToPhone(num) {
-  if (!num) return "";
-  let phone = num.toString();
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  if (digits.length <= 10)
-    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  // If longer than 10 digits, format first 10, append rest
-  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(
-    6,
-    10
-  )} ${digits.slice(10)}`;
-}
-
 export function makeGrey(opacity) {
   return "rgba(0,0,0," + opacity + ")";
 }
@@ -869,6 +893,17 @@ export function removeUnusedFields(obj) {
   return newObj;
 }
 
+export function removeFieldFromObj(obj, key) {
+  if (obj == null) return obj;
+  const out = {};
+  for (const k in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, k) && k !== key) {
+      out[k] = obj[k];
+    }
+  }
+  return out;
+}
+
 function isObject(v) {
   return v != null && Object.prototype.toString.call(v) === "[object Object]";
 }
@@ -885,6 +920,7 @@ export function moveItemInArr(arr, index, direction) {
 
   return newArr;
 }
+
 export function searchArray(
   searchTerms = [],
   arrOfObjToSearch = [],
@@ -930,6 +966,7 @@ export function getItemFromArr(value, arrKey, arr) {
 }
 
 export function arrHasItem(arr, item) {
+  if (!arr || !item) return false;
   return arr.find((o) => o.id === item.id);
 }
 
@@ -938,6 +975,7 @@ export function removeArrItem(arr, item, fieldID = "id") {
 }
 
 export function replaceOrAddToArr(arr, input, fieldName = "id") {
+  if (!input) return arr;
   let isObj = isObject(input);
   let copy = cloneDeep(arr);
 
@@ -1144,14 +1182,6 @@ export function formatDateTimeForReceipt(dateObj, millis) {
     topTicketDateTimeString,
     dayOfWeek,
   };
-}
-
-export function convertMillisToHoursMins(millis) {
-  const totalMinutes = Math.floor(millis / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  const formattedHoursMin = hours + ":" + minutes;
-  return { hours, minutes, totalMinutes, formattedHoursMin };
 }
 
 // colors

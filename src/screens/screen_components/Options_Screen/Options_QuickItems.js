@@ -212,6 +212,7 @@ export function QuickItemComponent({}) {
         >
           {zSettingsObj?.quickItemButtons?.map((item) => (
             <Button_
+              key={item.id}
               onPress={() => handleQuickButtonPress(item)}
               colorGradientArr={COLOR_GRADIENTS.lightBlue}
               buttonStyle={{

@@ -47,7 +47,7 @@ import {
   checkInputForNumbersOnly,
   clog,
   formatDecimal,
-  formatNumberForCurrencyDisplay,
+  formatCurrencyDisp,
   fuzzySearch,
   generateRandomID,
   generateUPCBarcode,
@@ -64,7 +64,11 @@ import {
 } from "../../../utils";
 import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
-import { sendFCMMessage, SET_FIRESTORE_FIELD } from "../../../db";
+import {
+  sendFCMMessage,
+  SET_FIRESTORE_FIELD,
+  setOpenWorkorder,
+} from "../../../db";
 import {
   dbCancelServerDrivenStripePayment,
   dbGetClosedWorkorderItem,
@@ -88,69 +92,52 @@ const RED_COLOR = lightenRGBByPercent(getRgbFromNamedColor("red"), 20);
 
 export function CheckoutModalScreen({ openWorkorder }) {
   // store setters
-  const _zSetOpenWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setOpenWorkorderObj
-  );
-  const _zSetOptionsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
-  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
+
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
   const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-  const _zSetOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setInitialOpenWorkorderObj
-  );
+
   const _zSetCustomerField = useCurrentCustomerStore(
     (state) => state.setCustomerField
   );
-  const _zSetAlert = useAlertScreenStore((state) => state.setValues);
   // store getters
-  const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
     state.getOpenWorkorderObj()
   );
   const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-  const zCustomerObj = useCurrentCustomerStore((state) =>
-    state.getCustomerObj()
-  );
-  const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
+  const zCustomer = useCurrentCustomerStore((state) => state.getCustomerObj());
+  const zOpenWorkorders = useOpenWorkordersStore((state) =>
     state.getWorkorderArr()
   );
-  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zInventory = useInventoryStore((state) => state.getInventoryArr());
   const zGetInventoryItem = useInventoryStore(
     (state) => state.getInventoryItem
   );
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  const zShowAlert = useAlertScreenStore((state) => state.getShowAlert());
+  const zSettings = useSettingsStore((state) => state.getSettingsObj());
+  const zSale = useCheckoutStore((state) => state.saleObj);
   //////////////////////////////////////////////////////////////////////
 
   const [sRefundScan, _sSetRefundScan] = useState();
   const [sIsRefund, _setIsRefund] = useState(false);
-  const [sRefundObj, _setRefundObj] = useState({});
+  const [sRefund, _setRefund] = useState({});
   const [sAmountRefunded, _setAmountRefunded] = useState(0);
-  const [sAmountPaid, _setAmountPaid] = useState(0);
   const [sTotalAmount, _setTotalAmount] = useState(0);
   const [sCardRefundFee, _setCardRefundFee] = useState(0);
-  const [sSubtotalAmount, _setSubtotalAmount] = useState(0);
-  const [sTotalDiscountAmount, _setTotalDiscountAmount] = useState(0);
-  const [sTotalTaxAmount, _setTotalTaxAmount] = useState(0);
-  const [sIsSplitPayment, _setIsSplitPayment] = useState(false);
   const [sIsDeposit, _setIsDeposit] = useState(false);
+  const [sApplyDeposit, _setApplyDeposit] = useState(false);
 
-  const [sCombinedWorkordersArr, _setCombinedWorkordersArr] = useState([]);
+  const [sCombinedWorkorders, _setCombinedWorkorders] = useState([]);
   const [sAmountLeftToPay, _setAmountLeftToPay] = useState();
-  const [sSaleObj, _setSaleObj] = useState();
+  const [sSale, _setSale] = useState();
   const [sSearchString, _setSearchString] = useState("");
   const [sInventorySearchRes, _setInventorySearchRes] = useState([]);
   const [sFocusedItem, _setFocusedItem] = useState("");
   const [sCashSaleActive, _setCashSaleActive] = useState(true);
   const [sCardSaleActive, _setCardSaleActive] = useState(true);
   const [sRefundScanMessage, _setRefundScanMessage] = useState("");
-  const [sTransactionComplete, _setTransactionComplete] = useState(false);
   const [sRefundAmount, _setRefundAmount] = useState(0);
-  const [sRefundItemArr, _setRefundItemArr] = useState([]);
+  const [sRefundItems, _setRefundItems] = useState([]);
   const [sShouldChargeCardRefundFee, _setShouldChargeCardRefundFee] =
     useState(true);
 
@@ -158,46 +145,58 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
   // 730921185148
   let scan = "730921185148"; // test
-  useEffect(() => {
-    setTotals();
 
+  // all startup stuff here
+  useEffect(() => {
+    // insert open workorder into combined workorders array
+    let combinedWorkorders = [];
     if (
-      zOpenWorkorderObj &&
-      !arrHasItem(sCombinedWorkordersArr, zOpenWorkorderObj) &&
+      zOpenWorkorder &&
+      !arrHasItem(sCombinedWorkorders, zOpenWorkorder) &&
       !sIsRefund
     ) {
-      let arr = replaceOrAddToArr(sCombinedWorkordersArr, zOpenWorkorderObj);
-      // let arr = sortWorkorders(sCombinedWorkordersArr);
-      _setCombinedWorkordersArr(arr);
-      // log("arr", arr);
-    }
-
-    if (!sSaleObj) {
-      let saleIDArr = [];
-      sCombinedWorkordersArr.forEach(
-        (wo) => (saleIDArr = replaceOrAddToArr(saleIDArr, wo.saleID))
+      combinedWorkorders = replaceOrAddToArr(
+        sCombinedWorkorders,
+        zOpenWorkorder
       );
-      // log("sale ID array in useEffect", saleIDArr);
 
-      /** need to fix this -- if the customer makes a partial payment on 2 different workorders, then tries to combine them at checkout, then only one sale object will be attached, and the amounts will be off. this would be an insanely rare event, so just don't let the customer combine multiple workorders that already have partial payments. easy! */
-      if (saleIDArr.length > 0)
-        dbGetSaleItem(saleIDArr[0]).then((res) => {
-          if (res) _setSaleObj(res);
-        });
+      // look for incoming sale object from scan
+      if (zSale && !sSale) {
+        _setSale(cloneDeep(zSale));
+      } else if (!sSale) {
+        // create new sale object to work with
+        let sale = cloneDeep(SALE_OBJECT_PROTO);
+        sale.id = generateUPCBarcode(); //////// dev
+        sale.salesTaxPercent = zSettings.salesTax;
+        sale.millis = new Date().getTime();
+        setRunningTotals(sale, combinedWorkorders);
+        // setRefund(zOpenWorkorder, sale);
+      }
+      _setCombinedWorkorders(combinedWorkorders);
     }
 
     _sSetRefundScan(scan); // testing
   }, [
-    zOpenWorkorderObj,
-    sCombinedWorkordersArr,
-    zSettingsObj,
-    sSaleObj,
+    zOpenWorkorder,
+    sCombinedWorkorders,
+    zSettings,
+    sSale,
     sIsRefund,
-    sRefundItemArr,
+    sRefundItems,
   ]);
 
-  function setTotals(workorder) {
-    // clog(wo);
+  useEffect(() => {
+    if (sSale && sCombinedWorkorders)
+      setRunningTotals(sSale, sCombinedWorkorders);
+    // log("running");
+  }, [sCombinedWorkorders]);
+
+  useEffect(() => {}, [sSale]);
+
+  function setRunningTotals(sale, combinedWorkorders, refundItems = []) {
+    // log("sale", sale);
+    // log("combined", combinedWorkorders);
+    sale = cloneDeep(sale);
     let {
       runningQty,
       runningSubtotal,
@@ -205,214 +204,162 @@ export function CheckoutModalScreen({ openWorkorder }) {
       runningDiscount,
       runningTax,
     } = calculateRunningTotals(
-      workorder || sCombinedWorkordersArr,
-      zSettingsObj?.salesTax,
-      sRefundItemArr,
+      combinedWorkorders,
+      zSettings?.salesTax,
+      refundItems,
       sIsRefund
     );
 
-    _setSubtotalAmount(runningSubtotal);
-    _setTotalDiscountAmount(runningDiscount);
-    _setTotalTaxAmount(runningTax);
-    _setCardRefundFee(runningTotal * (zSettingsObj.cardRefundFeePercent / 100));
-    _setTotalAmount(runningTax + runningTotal);
+    sale.subtotal = runningSubtotal;
+    sale.discount = runningDiscount;
+    sale.total = runningTax + runningTotal;
+    sale.tax = runningTax;
+    sale.cardRefundFee = runningTotal * (zSettings.cardRefundFeePercent / 100);
+    // log("new sale", sale);
+    _setSale(sale);
+  }
 
-    ///////////////////////////////////////////////////////////////////
-    if (sIsRefund) {
-      _setTransactionComplete(false);
-      if (!sSaleObj) return;
-      let cardRefundObj = {
-        last4: "",
-        cardType: "",
-        amountCaptured: 0,
-        expMonth: "",
-        expYear: "",
-        paymentIntentID: "",
-        chargeID: "",
-        amountRefunded: 0,
-      };
+  function setRefund() {
+    // log("here");
+    let refundDetailsObj = {
+      cashRefundRequested: 0,
+      cardRefundRequested: 0,
+      totalCashRefundAllowed: 0,
+      totalCardRefundAllowed: 0,
+      cashAmountRefunded: 0,
+      cardAmountRefunded: 0,
+      totalRefundRequested: 0,
+      cardTransactions: [],
+      cashTransactions: [],
+    };
 
-      let refundDetailsObj = {
-        cashRefundRequested: 0,
-        cardRefundRequested: 0,
-        totalCashRefundAllowed: 0,
-        // totalCardRefundAllowedArr: [],
-        totalCardRefundAllowed: 0,
-        cashAmountRefunded: 0,
-        cardAmountRefunded: 0,
-        totalRefundRequested: 0,
-        cardTransactionArr: [],
-        cashTransactionArr: [],
-      };
-
-      sSaleObj.payments.forEach((paymentObj) => {
-        paymentObj = cloneDeep(paymentObj);
-        if (paymentObj.last4) {
-          // let obj = { ...cardRefundObj };
-          // obj.last4 = paymentObj.last4;
-          // obj.cardType = paymentObj.cardType;
-          // obj.amountCaptured = paymentObj.amountCaptured;
-          // obj.expMonth = paymentObj.expMonth;
-          // obj.expYear = paymentObj.expYear;
-          // obj.paymentIntentID = paymentObj.paymentIntentID;
-          // obj.chargeID = paymentObj.chargeID;
-          refundDetailsObj = cloneDeep(refundDetailsObj);
-
-          refundDetailsObj.cardTransactionArr = replaceOrAddToArr(
-            refundDetailsObj.cardTransactionArr,
-            paymentObj
-          );
-          // refundDetailsObj.totalCardRefundAllowedArr.push(paymentObj);
-          refundDetailsObj.totalCardRefundAllowed =
-            refundDetailsObj.totalCardRefundAllowed + paymentObj.amountCaptured;
-        } else {
-          refundDetailsObj.cashTransactionArr = replaceOrAddToArr(
-            refundDetailsObj.cashTransactionArr,
-            paymentObj
-          );
-          refundDetailsObj.totalCashRefundAllowed =
-            refundDetailsObj.totalCashRefundAllowed + paymentObj.amountCaptured;
-          refundDetailsObj.cashAmountRefunded =
-            refundDetailsObj.cashAmountRefunded +
-              Number(paymentObj.amountRefunded) >
-            0
-              ? paymentObj.amountRefunded
-              : 0;
-        }
-      });
-      let totalRefund = 0;
-      sRefundItemArr.forEach((item) => {
-        if (item.discountObj.newPrice > 0) {
-          totalRefund = totalRefund + item.discountObj.newPrice;
-        } else {
-          totalRefund = totalRefund + item.inventoryItem.price;
-        }
-      });
-
-      totalRefund =
-        totalRefund + (totalRefund * sSaleObj.salesTaxPercent) / 100;
-      refundDetailsObj.totalRefundRequested = totalRefund;
-
-      if (refundDetailsObj.totalCardRefundAllowed > 0) {
-        if (refundDetailsObj.totalCardRefundAllowed - totalRefund < 0) {
-          refundDetailsObj.cardRefundRequested =
-            refundDetailsObj.totalCardRefundAllowed;
-        } else {
-          refundDetailsObj.cardRefundRequested = totalRefund;
-        }
-      }
-
-      if (refundDetailsObj.totalCashRefundAllowed > 0) {
-        if (refundDetailsObj.totalCashRefundAllowed - totalRefund < 0) {
-          refundDetailsObj.cashRefundRequested =
-            refundDetailsObj.totalCashRefundAllowed;
-        } else {
-          refundDetailsObj.cashRefundRequested = totalRefund;
-        }
-      }
-
-      // log(refundDetailsObj);
-      _setRefundObj(refundDetailsObj);
-    } else {
-      let totalPaid = 0;
-      sSaleObj?.payments.forEach((paymentObj) => {
-        totalPaid += paymentObj.amountCaptured;
-      });
-
-      let amountLeftToPay = runningTax + runningTotal - totalPaid;
-
-      if (amountLeftToPay === 0) {
-        // log(sSaleObj);
-        _setTransactionComplete(true);
+    sSale?.payments.forEach((payment) => {
+      payment = cloneDeep(payment);
+      if (payment.last4) {
+        refundDetailsObj = cloneDeep(refundDetailsObj);
+        refundDetailsObj.cardTransactionArr = replaceOrAddToArr(
+          refundDetailsObj.cardTransactionArr,
+          payment
+        );
+        refundDetailsObj.totalCardRefundAllowed =
+          refundDetailsObj.totalCardRefundAllowed + payment.amountCaptured;
       } else {
-        _setTransactionComplete(false);
+        refundDetailsObj.cashTransactionArr = replaceOrAddToArr(
+          refundDetailsObj.cashTransactionArr,
+          payment
+        );
+        refundDetailsObj.totalCashRefundAllowed =
+          refundDetailsObj.totalCashRefundAllowed + payment.amountCaptured;
+        refundDetailsObj.cashAmountRefunded =
+          refundDetailsObj.cashAmountRefunded + Number(payment.amountRefunded) >
+          0
+            ? payment.amountRefunded
+            : 0;
       }
-      _setAmountLeftToPay(amountLeftToPay);
-      _setAmountPaid(totalPaid);
+    });
+    let totalRefund = 0;
+    sRefundItems.forEach((item) => {
+      if (item.discountObj.newPrice > 0) {
+        totalRefund = totalRefund + item.discountObj.newPrice;
+      } else {
+        totalRefund = totalRefund + item.inventoryItem.price;
+      }
+    });
+
+    totalRefund = totalRefund + (totalRefund * sale.salesTaxPercent) / 100;
+    refundDetailsObj.totalRefundRequested = totalRefund;
+
+    if (refundDetailsObj.totalCardRefundAllowed > 0) {
+      if (refundDetailsObj.totalCardRefundAllowed - totalRefund < 0) {
+        refundDetailsObj.cardRefundRequested =
+          refundDetailsObj.totalCardRefundAllowed;
+      } else {
+        refundDetailsObj.cardRefundRequested = totalRefund;
+      }
     }
 
-    // let arr = sortRefundWorkorderArr(sCombinedWorkordersArr);
-    // _setCombinedWorkordersArr(arr);
-    // log(arr);
-    //////////////////////////////////
+    if (refundDetailsObj.totalCashRefundAllowed > 0) {
+      if (refundDetailsObj.totalCashRefundAllowed - totalRefund < 0) {
+        refundDetailsObj.cashRefundRequested =
+          refundDetailsObj.totalCashRefundAllowed;
+      } else {
+        refundDetailsObj.cashRefundRequested = totalRefund;
+      }
+    }
+
+    // log(refundDetailsObj);
+    _setRefund(refundDetailsObj);
   }
 
   function handleRefundCapture(paymentObjArr) {}
 
   function handlePaymentCapture(payment = PAYMENT_OBJECT_PROTO) {
     // log(paymentObj);
-    // let saleObj = openW
-    // create or find existing sale object
-    let sale = cloneDeep(sSaleObj);
-    if (!sSaleObj) {
-      sale = cloneDeep(SALE_OBJECT_PROTO);
-      sale.id = "730921185148"; //////// dev
-      // saleObj.id = generateUPCBarcode();
-      sale.millis = new Date().getTime();
-      sale.subtotal = sSubtotalAmount;
-      sale.discount = sTotalDiscountAmount;
-      sale.salesTaxPercent = zSettingsObj.salesTax;
-      sale.total = sTotalAmount;
-    }
-
-    payment.saleID = sale.id;
+    payment.saleID = sSale.id;
     payment.isDeposit = sIsDeposit;
-    sale.payments.push(payment);
-    sale.amountCaptured = sale.amountCaptured + payment.amountCaptured;
+    sSale.payments.push(payment);
+    sSale.amountCaptured = sSale.amountCaptured + payment.amountCaptured;
 
     //************************************************************** */
-    // need to send print object here
+    // need to send print object here //////////////////////////////////
 
     // saleObj.amountCaptured = saleObj.amountCaptured + paymentObj.amountCaptured;
-    let deposits = cloneDeep(zCustomerObj.depositArr);
-    if (!isArray(deposits)) deposits = [];
-    let salesID = cloneDeep(zCustomerObj.salesID);
-    if (!isArray(salesID)) salesID = [];
+    let deposits = cloneDeep(zCustomer.depositArr);
+
+    if (!isArray(saleIDs)) saleIDs = [];
     if (!payment.isDeposit) {
-      let workordersID = sCombinedWorkordersArr.map((o) => o.id);
-      sale.workordersID = workordersID;
-      sCombinedWorkordersArr.forEach((wo) => {
-        wo.saleID = sale.id;
-        sale.workordersID = replaceOrAddToArr(sale.workordersID, wo.id);
-        if (sale.amountCaptured === sTotalAmount) {
+      let workorderIDs = sCombinedWorkorders.map((o) => o.id);
+      sSale.workorderIDs = workorderIDs;
+      sCombinedWorkorders.forEach((wo) => {
+        wo.saleID = sSale.id;
+        sSale.workorderIDs = replaceOrAddToArr(sSale.workorderIDs, wo.id);
+        if (sSale.amountCaptured === sTotalAmount) {
           wo.paymentComplete = true;
         }
-        if (sale.amountCaptured === sTotalAmount) _setTransactionComplete(true);
-        _setAmountLeftToPay(sTotalAmount - sale.amountCaptured);
-        _zSetWorkorder(wo); // send to db
+        if (sSale.amountCaptured === sSale.total) {
+          sSale.paymentComplete = true;
+          _setTransactionComplete(true);
+        }
+        // _setAmountLeftToPay(sSale.total -);
+        // _zSetWorkorder(wo); // send to db
       });
     } else {
-      sale.isDeposit = true;
-      payment.isDeposit = true;
-      deposits.push(sale);
+      deposits.push(sSale);
       _zSetCustomerField("deposits", deposits);
     }
 
-    salesID = replaceOrAddToArr(salesID, sale.id);
+    let saleIDs = cloneDeep(zCustomer.salesID);
+    if (!isArray(saleIDs)) saleIDs = [];
+    saleIDs = replaceOrAddToArr(saleIDs, sSale.id);
 
-    _setSaleObj(sale);
+    // remove unused fields
+    sSale.payments = sSale.payments.map((payment) =>
+      removeUnusedFields(payment)
+    );
+
+    // log("sale", payment);
+    _setSale(sSale);
     _zSetCustomerField("salesID", salesID);
-    sale.payments = sale.payments.map((payment) => removeUnusedFields(payment));
-    dbSetSalesObj(removeUnusedFields(sale));
+    dbSetSalesObj(removeUnusedFields(sSale));
+    printReceipt(payment);
+    if (sIsDeposit || sSale.paymentComplete) closeCheckoutScreenModal();
   }
+
+  function printReceipt(payment) {}
 
   function handleRefundScan(refundScan) {
     function addToCombinedArr(workorderObj) {
-      // clog(workorderObj);
-      // log("arr", sCombinedWorkordersArr);
-      let arr = cloneDeep(sCombinedWorkordersArr);
+      let arr = cloneDeep(sCombinedWorkorders);
       arr = replaceOrAddToArr(arr, workorderObj);
-      // log("unsorted", arr);
       arr = sortRefundWorkorderArr(arr);
-      // log("sorted ", arr);
-      _setCombinedWorkordersArr(arr);
+      _setCombinedWorkorders(arr);
+      setRefund();
+      _setIsRefund(true);
     }
 
     if (refundScan.length === 12) {
       _setRefundScanMessage("Searching for transaction...");
-      _setCombinedWorkordersArr([]);
-      _setTransactionComplete(false);
-      _setIsRefund(true);
+      _setCombinedWorkorders([]);
 
       dbGetSaleItem(refundScan)
         .then((res) => {
@@ -420,7 +367,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
             // log("found");
             _setRefundScanMessage("Transaction Found!");
             // log(res);
-            _setSaleObj(res);
+            _setSale(res);
             res.workordersID.forEach((workorderID) => {
               dbGetOpenWorkorderItem(workorderID).then((res) => {
                 if (res) addToCombinedArr(res);
@@ -447,26 +394,26 @@ export function CheckoutModalScreen({ openWorkorder }) {
     let split = searchStr.split(" ");
     if (searchStr.length < 3) return;
     _setSearchString(searchStr);
-    let res = fuzzySearch(split, zInventoryArr);
+    let res = fuzzySearch(split, zInventory);
     // clog(res);
     _setInventorySearchRes(res);
   }
 
   function handleCombineWorkorderCheck(wo) {
-    if (wo.id === zOpenWorkorderObj?.id) return;
+    if (wo.id === zOpenWorkorder?.id) return;
     let newArr = [];
-    if (sCombinedWorkordersArr.find((o) => o.id === wo.id)) {
-      newArr = cloneDeep(sCombinedWorkordersArr).filter((o) => o.id !== wo.id);
+    if (sCombinedWorkorders.find((o) => o.id === wo.id)) {
+      newArr = cloneDeep(sCombinedWorkorders).filter((o) => o.id !== wo.id);
     } else {
-      newArr = [...cloneDeep(sCombinedWorkordersArr), wo];
+      newArr = [...cloneDeep(sCombinedWorkorders), wo];
     }
 
     // newArr = sortWorkorders(newArr);
-    _setCombinedWorkordersArr(newArr);
+    _setCombinedWorkorders(newArr);
   }
 
   function handleInventorySelect(invItem) {
-    let wo = cloneDeep(zOpenWorkorderObj);
+    let wo = cloneDeep(zOpenWorkorder);
     let line = wo.workorderLines.find((o) => o.inventoryItem.id === invItem.id);
 
     if (!line) {
@@ -482,19 +429,19 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
     _setSearchString("");
     _zSetWorkorder(wo);
-    let arr = sCombinedWorkordersArr.map((o) => (o.id === wo.id ? wo : o));
+    let arr = sCombinedWorkorders.map((o) => (o.id === wo.id ? wo : o));
     // clog(arr);
-    _setCombinedWorkordersArr(arr);
+    _setCombinedWorkorders(arr);
   }
 
   function handleRefundItemCheck(workorderLine) {
-    let checkedArr = cloneDeep(sRefundItemArr);
+    let checkedArr = cloneDeep(sRefundItems);
     if (arrHasItem(checkedArr, workorderLine)) {
       checkedArr = removeArrItem(checkedArr, workorderLine);
     } else {
       checkedArr.push(workorderLine);
     }
-    _setRefundItemArr(checkedArr);
+    _setRefundItems(checkedArr);
   }
 
   function sortRefundWorkorderArr(combinedArr) {
@@ -563,29 +510,30 @@ export function CheckoutModalScreen({ openWorkorder }) {
               handleRefundCapture={handleRefundCapture}
               onCancel={() => {}}
               sAmountLeftToPay={sAmountLeftToPay}
-              acceptsChecks={zSettingsObj?.acceptChecks}
+              acceptsChecks={zSettings?.acceptChecks}
               sCashSaleActive={sCashSaleActive}
-              sTransactionComplete={sTransactionComplete}
               sRefundAmount={sRefundAmount}
-              sRefundObj={sRefundObj}
+              sRefundObj={sRefund}
               sIsDeposit={sIsDeposit}
               _setIsDeposit={_setIsDeposit}
+              sSale={sSale}
               // sIsDeposit={sIsDeposit}
             />
-            <StripeCreditCardComponent
+            {/* <StripeCreditCardComponent
               sCardSaleActive={sCardSaleActive}
               sIsRefund={sIsRefund}
               handlePaymentCapture={handlePaymentCapture}
               handleRefundCapture={handleRefundCapture}
               onCancel={() => {}}
               sAmountLeftToPay={sAmountLeftToPay}
-              zSettingsObj={zSettingsObj}
-              sTransactionComplete={sTransactionComplete}
+              zSettingsObj={zSettings}
+              sSale.paymentComplete={sSale.paymentComplete}
               sRefundAmount={sRefundAmount}
-              sRefundObj={sRefundObj}
+              sRefundObj={sRefund}
               sIsDeposit={sIsDeposit}
               _setIsDeposit={_setIsDeposit}
-            />
+              sSale={sSale}
+            /> */}
           </View>
 
           <View
@@ -600,31 +548,28 @@ export function CheckoutModalScreen({ openWorkorder }) {
               onPress={() => handleRefundScan(sRefundScan)}
             />
             <MiddleItemComponent
-              sTotalAmount={sTotalAmount}
-              sTotalDiscountAmount={sTotalDiscountAmount}
-              zCustomerObj={zCustomerObj}
+              zCustomerObj={zCustomer}
               sIsRefund={sIsRefund}
               sRefundScan={sRefundScan}
               _sSetRefundScan={handleRefundScan}
-              sSubtotalAmount={sSubtotalAmount}
-              sTotalTaxAmount={sTotalTaxAmount}
               _zSetIsCheckingOut={_zSetIsCheckingOut}
               handleCancelPress={closeCheckoutScreenModal}
-              paymentsArr={sSaleObj?.payments}
+              payments={sSale?.payments}
               sAmountLeftToPay={sAmountLeftToPay}
               sFocusedItem={sFocusedItem}
               _setFocusedItem={_setFocusedItem}
               _setIsRefund={_setIsRefund}
               sScanFailureMessage={sRefundScanMessage}
               _setScanFailureMessage={_setRefundScanMessage}
-              sTransactionComplete={sTransactionComplete}
               sRefundAmount={sRefundAmount}
               _setRefundAmount={_setRefundAmount}
               sCardRefundFee={sCardRefundFee}
               sShouldChargeCardRefundFee={sShouldChargeCardRefundFee}
-              sCardRefundFeePercentage={zSettingsObj.cardRefundFeePercent}
+              sCardRefundFeePercentage={zSettings.cardRefundFeePercent}
               sAmountRefunded={sAmountRefunded}
-              sRefundObj={sRefundObj}
+              sRefundObj={sRefund}
+              sApplyDeposit={sApplyDeposit}
+              sSale={sSale}
             />
           </View>
 
@@ -638,7 +583,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 }}
               >
                 <TextInput
-                  disabled={sTransactionComplete || sIsRefund}
+                  disabled={sSale?.paymentComplete || sIsRefund}
                   onFocus={() => _setFocusedItem("search")}
                   autoFocus={sFocusedItem === "search"}
                   style={{
@@ -666,27 +611,25 @@ export function CheckoutModalScreen({ openWorkorder }) {
               <InventoryListComponent
                 inventoryObjArr={sInventorySearchRes}
                 onSelect={handleInventorySelect}
-                quickItemButtons={zSettingsObj.quickItemButtons}
+                quickItemButtons={zSettings.quickItemButtons}
                 _setSearchStr={_setSearchString}
-                sTransactionComplete={sTransactionComplete}
               />
             ) : (
               <WorkorderListComponent
-                sCombinedWorkordersArr={sCombinedWorkordersArr}
-                zOpenWorkorderObj={zOpenWorkorderObj}
-                zOpenWorkordersArr={zOpenWorkordersArr}
-                zInventoryArr={zInventoryArr}
-                zCustomerObj={zCustomerObj}
-                zSettingsObj={zSettingsObj}
-                zGetInventoryItem={zGetInventoryItem}
+                sCombinedWorkorders={sCombinedWorkorders}
+                zOpenWorkorder={zOpenWorkorder}
+                zOpenWorkorders={zOpenWorkorders}
+                zInventory={zInventory}
+                zCustomer={zCustomer}
+                zSettings={zSettings}
+                _zGetInventoryItem={zGetInventoryItem}
                 handleCombineWorkorderCheck={handleCombineWorkorderCheck}
                 sAmountLeftToPay={sAmountLeftToPay}
                 isRefund={sIsRefund}
-                sTransactionComplete={sTransactionComplete}
-                _setRefundItemArr={_setRefundItemArr}
-                sRefundItemArr={sRefundItemArr}
+                _setRefundItem={_setRefundItems}
+                sRefundItem={sRefundItems}
                 handleRefundItemCheck={handleRefundItemCheck}
-                _setCombinedWorkordersArr={_setCombinedWorkordersArr}
+                _setCombinedWorkorders={_setCombinedWorkorders}
               />
             )}
           </View>
@@ -699,21 +642,21 @@ export function CheckoutModalScreen({ openWorkorder }) {
 const MiddleItemComponent = ({
   sTotalDiscountAmount,
   sAmountLeftToPay,
-  zCustomerObj,
+  zCustomer,
   sIsRefund,
   sRefundScan,
   _sSetRefundScan,
   sTotalTaxAmount,
   sSubtotalAmount,
   handleCancelPress,
-  paymentsArr,
+  payments,
   sFocusedItem,
   _setFocusedItem,
   sScanFailureMessage,
   _setScanFailureMessage,
-  sTransactionComplete,
   sRefundAmount,
-  sRefundObj = {
+  sApplyDeposit,
+  sRefund = {
     cashRefundRequested: 0,
     cardRefundRequested: 0,
     totalCashRefundAllowed: 0,
@@ -729,10 +672,11 @@ const MiddleItemComponent = ({
   sCardRefundFee,
   sCardRefundFeePercentage,
   sAmountRefunded,
+  sSale,
 }) => {
   // const [sFocusedItem, _setFocusedItem] = useState("");
   // clog(paymentsArr);
-  if (!zCustomerObj) return null;
+  // if (!zCustomerObj || sSale?) return null;
   return (
     <View
       style={{
@@ -742,7 +686,7 @@ const MiddleItemComponent = ({
         // padding: 20,
       }}
     >
-      {zCustomerObj?.id ? (
+      {zCustomer?.id ? (
         <View
           style={{
             width: "100%",
@@ -763,35 +707,35 @@ const MiddleItemComponent = ({
           >
             <View>
               <Text style={{ color: C.textMain }}>
-                {zCustomerObj.first + " " + zCustomerObj.last}
+                {zCustomer?.first + " " + zCustomer?.last}
               </Text>
               <Text style={{ color: makeGrey(0.6), fontSize: 12 }}>
-                {zCustomerObj.email}
+                {zCustomer?.email}
               </Text>
             </View>
             <View>
-              {zCustomerObj.cell ? (
+              {zCustomer?.cell ? (
                 <Text style={{ color: C.textMain }}>
                   <Text style={{ color: makeGrey(0.5) }}>{"cell: "}</Text>
-                  {addDashesToPhone(zCustomerObj.cell)}
+                  {addDashesToPhone(zCustomer?.cell)}
                 </Text>
               ) : null}
-              {zCustomerObj.land ? (
+              {zCustomer?.land ? (
                 <Text style={{ color: C.textMain }}>
                   <Text style={{ color: makeGrey(0.5) }}>{"land: "}</Text>
-                  {addDashesToPhone(zCustomerObj.land)}
+                  {addDashesToPhone(zCustomer?.land)}
                 </Text>
               ) : null}
             </View>
           </View>
           <Text style={{ fontSize: 13, color: makeGrey(0.7), paddingTop: 5 }}>
-            {/* {zCustomerObj.streetAddress} */}
-            {zCustomerObj.streetAddress +
+            {/* {zCustomer?.streetAddress} */}
+            {zCustomer?.streetAddress +
               "  " +
-              (zCustomerObj.unit ? "unit: " + zCustomerObj.unit + "\n" : "\n") +
-              zCustomerObj.city +
+              (zCustomer?.unit ? "unit: " + zCustomer?.unit + "\n" : "\n") +
+              zCustomer?.city +
               "\n" +
-              zCustomerObj.notes}
+              zCustomer?.notes}
           </Text>
         </View>
       ) : null}
@@ -896,11 +840,11 @@ const MiddleItemComponent = ({
                 color: lightenRGBByPercent(C.green, 20),
               }}
             >
-              {formatNumberForCurrencyDisplay(sSubtotalAmount)}
+              {formatCurrencyDisp(sSale?.subtotal)}
             </Text>
           </View>
         </View>
-        {sTotalDiscountAmount ? (
+        {sSale?.discount ? (
           <View
             style={{
               width: "100%",
@@ -910,7 +854,7 @@ const MiddleItemComponent = ({
             }}
           />
         ) : null}
-        {sTotalDiscountAmount ? (
+        {sSale?.discount ? (
           <View
             style={{
               alignItems: "center",
@@ -944,12 +888,12 @@ const MiddleItemComponent = ({
                   color: C.lightred,
                 }}
               >
-                {"- " + formatNumberForCurrencyDisplay(sTotalDiscountAmount)}
+                {"- " + formatCurrencyDisp(sSale?.discount)}
               </Text>
             </View>
           </View>
         ) : null}
-        {sTotalDiscountAmount ? (
+        {sSale?.discount ? (
           <View
             style={{
               alignItems: "center",
@@ -983,14 +927,12 @@ const MiddleItemComponent = ({
                   color: lightenRGBByPercent(C.green, 20),
                 }}
               >
-                {formatNumberForCurrencyDisplay(
-                  sSubtotalAmount - sTotalDiscountAmount
-                )}
+                {formatCurrencyDisp(sSale?.subtotal - sSale?.discount)}
               </Text>
             </View>
           </View>
         ) : null}
-        {sTotalDiscountAmount ? (
+        {sSale?.discount ? (
           <View
             style={{
               width: "100%",
@@ -1025,13 +967,13 @@ const MiddleItemComponent = ({
                 color: lightenRGBByPercent(C.green, 20),
               }}
             >
-              {formatNumberForCurrencyDisplay(sTotalTaxAmount)}
+              {formatCurrencyDisp(sSale?.tax)}
             </Text>
           </View>
         </View>
         {sShouldChargeCardRefundFee &&
         sIsRefund &&
-        sRefundObj.totalCardRefundAllowed > 0 ? (
+        sRefund.totalCardRefundAllowed > 0 ? (
           <View
             style={{
               width: "100%",
@@ -1043,7 +985,7 @@ const MiddleItemComponent = ({
         ) : null}
         {sShouldChargeCardRefundFee &&
         sIsRefund &&
-        sRefundObj.totalCardRefundAllowed > 0 ? (
+        sRefund.totalCardRefundAllowed > 0 ? (
           <View
             style={{
               alignItems: "center",
@@ -1072,8 +1014,8 @@ const MiddleItemComponent = ({
                   color: C.green,
                 }}
               >
-                {formatNumberForCurrencyDisplay(
-                  sSubtotalAmount + sTotalTaxAmount - sTotalDiscountAmount
+                {formatCurrencyDisp(
+                  sSale?.subtotal + sSale?.tax - sSale?.discount
                 )}
               </Text>
             </View>
@@ -1082,7 +1024,7 @@ const MiddleItemComponent = ({
 
         {sShouldChargeCardRefundFee &&
         sIsRefund &&
-        sRefundObj.totalCardRefundAllowed > 0 ? (
+        sRefund.totalCardRefundAllowed > 0 ? (
           <View
             style={{
               width: "100%",
@@ -1093,7 +1035,7 @@ const MiddleItemComponent = ({
           />
         ) : null}
 
-        {sShouldChargeCardRefundFee && sRefundObj.totalCardRefundAllowed > 0 ? (
+        {sShouldChargeCardRefundFee && sRefund.totalCardRefundAllowed > 0 ? (
           <View
             style={{
               alignItems: "center",
@@ -1122,7 +1064,7 @@ const MiddleItemComponent = ({
                   color: C.red,
                 }}
               >
-                {formatNumberForCurrencyDisplay(sCardRefundFee)}
+                {formatCurrencyDisp(sCardRefundFee)}
               </Text>
             </View>
           </View>
@@ -1137,7 +1079,7 @@ const MiddleItemComponent = ({
         chargeID: "",
         amountRefunded: 0, */}
 
-        {sRefundObj?.totalCardRefundAllowedArr?.map((cardObj) => (
+        {sRefund?.totalCardRefundAllowedArr?.map((cardObj) => (
           <View
             style={{
               width: "100%",
@@ -1170,7 +1112,7 @@ const MiddleItemComponent = ({
                 $
               </Text>
               <Text style={{ fontSize: 18, fontWeight: 500 }}>
-                {formatNumberForCurrencyDisplay(
+                {formatCurrencyDisp(
                   cardObj.amountCaptured - sShouldChargeCardRefundFee
                     ? sCardRefundFee
                     : 0
@@ -1179,7 +1121,7 @@ const MiddleItemComponent = ({
             </View>
           </View>
         ))}
-        {sRefundObj.totalCashRefundAllowed ? (
+        {sRefund.totalCashRefundAllowed ? (
           <View
             style={{
               width: "100%",
@@ -1189,7 +1131,7 @@ const MiddleItemComponent = ({
             }}
           />
         ) : null}
-        {sRefundObj.totalCashRefundAllowed ? (
+        {sRefund.totalCashRefundAllowed ? (
           <View
             style={{
               width: "100%",
@@ -1209,11 +1151,7 @@ const MiddleItemComponent = ({
               >
                 $
               </Text>
-              <Text>
-                {formatNumberForCurrencyDisplay(
-                  sRefundObj.totalCashRefundAllowed
-                )}
-              </Text>
+              <Text>{formatCurrencyDisp(sRefund.totalCashRefundAllowed)}</Text>
             </View>
           </View>
         ) : null}
@@ -1253,8 +1191,10 @@ const MiddleItemComponent = ({
                 color: C.green,
               }}
             >
-              {formatNumberForCurrencyDisplay(
-                sIsRefund ? sRefundObj.totalRefundRequested : sAmountLeftToPay
+              {formatCurrencyDisp(
+                sIsRefund
+                  ? sRefund.totalRefundRequested
+                  : sSale?.total - sSale?.amountCaptured
               )}
             </Text>
           </View>
@@ -1268,30 +1208,30 @@ const MiddleItemComponent = ({
           paddingRight: 7,
         }}
       >
-        {sIsRefund && sRefundObj.totalCashRefundAllowed > 0 ? (
+        {sIsRefund && sRefund.totalCashRefundAllowed > 0 ? (
           <Text
             style={{
               fontSize: 18,
               fontWeight: 500,
-              color: sTransactionComplete ? C.green : C.red,
+              color: sSale?.paymentComplete ? C.green : C.red,
             }}
           >
-            {sTransactionComplete
+            {sSale?.paymentComplete
               ? "CASH REFUND COMPLETE!"
-              : "CASH REFUNDED:   $" + sRefundObj.cashAmountRefunded}
+              : "CASH REFUNDED:   $" + sRefund.cashAmountRefunded}
           </Text>
         ) : null}
-        {sIsRefund && sRefundObj.totalCardRefundAllowed > 0 ? (
+        {sIsRefund && sRefund.totalCardRefundAllowed > 0 ? (
           <Text
             style={{
               fontSize: 18,
               fontWeight: 500,
-              color: sTransactionComplete ? C.green : C.red,
+              color: sSale?.paymentComplete ? C.green : C.red,
             }}
           >
-            {sTransactionComplete
+            {sSale?.paymentComplete
               ? "CARD REFUND COMPLETE!"
-              : "CARD REFUNDED:   $" + sRefundObj.cardAmountRefunded}
+              : "CARD REFUNDED:   $" + sRefund.cardAmountRefunded}
           </Text>
         ) : null}
         {!sIsRefund ? (
@@ -1299,12 +1239,12 @@ const MiddleItemComponent = ({
             style={{
               fontSize: 18,
               fontWeight: 500,
-              color: sTransactionComplete ? C.green : RED_COLOR,
+              color: sSale?.paymentComplete ? C.green : RED_COLOR,
             }}
           >
-            {!sTransactionComplete
+            {!sSale?.paymentComplete
               ? "AMOUNT LEFT TO PAY:   $" +
-                formatNumberForCurrencyDisplay(sAmountLeftToPay)
+                formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)
               : "PAYMENT COMPLETE!"}
           </Text>
         ) : null}
@@ -1312,7 +1252,7 @@ const MiddleItemComponent = ({
 
       {/**Payments list //////////////////////////////////////////////////// */}
 
-      {paymentsArr ? (
+      {payments ? (
         <View
           style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
         >
@@ -1320,9 +1260,10 @@ const MiddleItemComponent = ({
         </View>
       ) : null}
 
-      {paymentsArr?.map((paymentObj) => {
+      {payments?.map((paymentObj) => {
         return (
           <View
+            key={paymentObj.id}
             style={{
               padding: 5,
               backgroundColor: C.listItemWhite,
@@ -1339,9 +1280,7 @@ const MiddleItemComponent = ({
               style={{ flexDirection: "row", justifyContent: "space-between" }}
             >
               <Text>Amount received: </Text>
-              <Text>
-                {formatNumberForCurrencyDisplay(paymentObj.amountCaptured)}
-              </Text>
+              <Text>{formatCurrencyDisp(paymentObj.amountCaptured)}</Text>
             </View>
             {paymentObj.last4 ? (
               <View
@@ -1362,9 +1301,7 @@ const MiddleItemComponent = ({
                 }}
               >
                 <Text>Amount Tendered: </Text>
-                <Text>
-                  {formatNumberForCurrencyDisplay(paymentObj.amountTendered)}
-                </Text>
+                <Text>{formatCurrencyDisp(paymentObj.amountTendered)}</Text>
               </View>
             ) : null}
             {paymentObj.cash ? (
@@ -1376,7 +1313,7 @@ const MiddleItemComponent = ({
               >
                 <Text>Change needed: </Text>
                 <Text>
-                  {formatNumberForCurrencyDisplay(
+                  {formatCurrencyDisp(
                     paymentObj.amountTendered - paymentObj.amountCaptured
                   )}
                 </Text>
@@ -1397,24 +1334,24 @@ const MiddleItemComponent = ({
           // justifySelf: "flex-end",
         }}
       >
-        {paymentsArr?.length > 0 && !sTransactionComplete ? (
+        {payments?.length > 0 && !sSale?.paymentComplete ? (
           <SliderButton_ onConfirm={(val) => log("val", val)} />
         ) : null}
-        {!paymentsArr || paymentsArr?.length == 0 ? (
+        {!payments || payments?.length == 0 ? (
           <Button_
             colorGradientArr={COLOR_GRADIENTS.green}
             text={"Cancel"}
             onPress={handleCancelPress}
           />
         ) : null}
-        {paymentsArr?.length > 0 ? (
+        {payments?.length > 0 ? (
           <Button_
             colorGradientArr={COLOR_GRADIENTS.blue}
-            text={sTransactionComplete ? "Close" : "Cancel"}
+            text={sSale?.paymentComplete ? "Close" : "Cancel"}
             onPress={handleCancelPress}
           />
         ) : null}
-        {paymentsArr?.length > 0 && sTransactionComplete ? (
+        {payments?.length > 0 && sSale?.paymentComplete ? (
           <Button_
             colorGradientArr={COLOR_GRADIENTS.blue}
             text={"Reprint"}
@@ -1427,16 +1364,16 @@ const MiddleItemComponent = ({
 };
 
 const CashSaleComponent = ({
+  sSale,
   sAmountLeftToPay,
   handlePaymentCapture,
   handleRefundCapture,
   acceptsChecks,
   sIsRefund,
   sCashSaleActive,
-  sTransactionComplete,
   sIsDeposit,
   _setIsDeposit,
-  sRefundObj = {
+  sRefund = {
     cashRefundRequested: 0,
     cardRefundRequested: 0,
     totalCashRefundAllowed: 0,
@@ -1452,10 +1389,12 @@ const CashSaleComponent = ({
   // log(sAmountLeftToPay);
   const [sTenderAmount, _setTenderAmount] = useState(
     sIsRefund
-      ? sRefundObj.cashRefundRequested - sRefundObj.cashAmountRefunded
-      : sAmountLeftToPay
+      ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
+      : sSale?.total - sSale?.amountCaptured
   );
-  const [sRequestedAmount, _setRequestedAmount] = useState(1); // dev sAmountLeftToPay
+  const [sRequestedAmount, _setRequestedAmount] = useState(
+    sSale?.total - sSale?.amountCaptured
+  ); // dev sAmountLeftToPay
   const [sStatusMessage, _setStatusMessage] = useState("");
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
   const [sIsCheck, _setIsCheck] = useState(false);
@@ -1475,7 +1414,7 @@ const CashSaleComponent = ({
   useEffect(() => {
     let tenderAmount = Number(sTenderAmount);
     if (sIsRefund) {
-      if (tenderAmount <= sRefundObj.cashRefundRequested && tenderAmount > 1) {
+      if (tenderAmount <= sRefund.cashRefundRequested && tenderAmount > 1) {
         _setProcessButtonEnabled(true);
       }
     } else {
@@ -1496,7 +1435,7 @@ const CashSaleComponent = ({
     let paymentObject = { ...PAYMENT_OBJECT_PROTO };
 
     let availableCashRefundObjArr = [];
-    sRefundObj.cashTransactionArr.forEach((cashPaymentObj) => {
+    sRefund.cashTransactionArr.forEach((cashPaymentObj) => {
       availableCashRefundObjArr.push({
         id: cashPaymentObj.id,
         amount: cashPaymentObj.amountCaptured,
@@ -1522,7 +1461,7 @@ const CashSaleComponent = ({
       arr.push(...availableAmountObj);
     });
 
-    let arr1 = sRefundObj.cashTransactionArr.map((cashPaymentObj) => {
+    let arr1 = sRefund.cashTransactionArr.map((cashPaymentObj) => {
       cashPaymentObj = cloneDeep(cashPaymentObj);
       let amountObj = arr.find((o) => o.id === cashPaymentObj.id);
       cashPaymentObj.amountRefunded = amountObj?.amountRefunded;
@@ -1555,13 +1494,13 @@ const CashSaleComponent = ({
   //   log(sProcessButtonEnabled.toString());
 
   let refundReady = true;
-  if (sIsRefund && !sRefundObj.cashRefundRequested) refundReady = false;
+  if (sIsRefund && !sRefund.cashRefundRequested) refundReady = false;
 
   return (
     <View
       style={{
         ...checkoutScreenStyle.base,
-        opacity: sTransactionComplete || !refundReady ? 0.2 : 1,
+        opacity: sSale?.paymentComplete || !refundReady ? 0.2 : 1,
       }}
     >
       {acceptsChecks ? (
@@ -1575,7 +1514,9 @@ const CashSaleComponent = ({
               onCheck={() => {
                 _setIsCheck(!sIsCheck);
                 _setProcessButtonEnabled(sIsCheck ? false : true);
-                _setTenderAmount(sIsCheck ? "" : sAmountLeftToPay);
+                _setTenderAmount(
+                  sIsCheck ? "" : sSale?.total - sSale?.amountCaptured
+                );
               }}
               isChecked={sIsCheck}
             />
@@ -1636,15 +1577,15 @@ const CashSaleComponent = ({
           >
             {sIsRefund
               ? "$ " +
-                formatNumberForCurrencyDisplay(
-                  sRefundObj.cashRefundRequested - sRefundObj.cashAmountRefunded
+                formatCurrencyDisp(
+                  sRefund.cashRefundRequested - sRefund.cashAmountRefunded
                 )
-              : "$ " + formatNumberForCurrencyDisplay(sAmountLeftToPay)}
+              : "$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
           </Text>
           {!sIsRefund ? (
             <TextInput
               disabled={
-                !sCashSaleActive || sTransactionComplete || !refundReady
+                !sCashSaleActive || sSale?.paymentComplete || !refundReady
               }
               onFocus={() => {
                 _setFocusedItem("amount");
@@ -1665,12 +1606,12 @@ const CashSaleComponent = ({
               }}
               placeholder="0.00"
               placeholderTextColor={makeGrey(0.3)}
-              value={formatNumberForCurrencyDisplay(
-                sIsRefund ? sRefundObj.cashRefundRequested : sRequestedAmount
+              value={formatCurrencyDisp(
+                sIsRefund ? sRefund.cashRefundRequested : sRequestedAmount
               )}
               onChangeText={(val) => {
                 val = formatDecimal(val);
-                if (val > sAmountLeftToPay) {
+                if (val > sSale?.total - sSale?.amountCaptured) {
                   _setStatusMessage("Amount greater than balance");
                   return;
                 } else {
@@ -1688,7 +1629,7 @@ const CashSaleComponent = ({
         textStyle={{ color: makeGrey(0.6), fontWeight: 500 }}
         text={"DEPOSIT TO ACCOUNT"}
         isChecked={sIsDeposit}
-        onCheck={() => _setIsDeposit(!sIsDepost)}
+        onCheck={() => _setIsDeposit(!sIsDeposit)}
       />
       <View style={{ flexDirection: "row" }}>
         <View
@@ -1712,7 +1653,7 @@ const CashSaleComponent = ({
           >
             <TextInput
               disabled={
-                !sCashSaleActive || sTransactionComplete || !refundReady
+                !sCashSaleActive || sSale?.paymentComplete || !refundReady
               }
               style={{
                 ...checkoutScreenStyle.boxText,
@@ -1723,7 +1664,7 @@ const CashSaleComponent = ({
               autoFocus={sFocusedItem === "tender"}
               placeholder="0.00"
               placeholderTextColor={makeGrey(0.3)}
-              value={formatNumberForCurrencyDisplay(sTenderAmount)}
+              value={formatCurrencyDisp(sTenderAmount)}
               onChangeText={(val) => {
                 val = formatDecimal(val);
                 if (val === "0.00") val = "";
@@ -1760,7 +1701,7 @@ const CashSaleComponent = ({
           colorGradientArr={COLOR_GRADIENTS.green}
           textStyle={{ color: C.textWhite }}
           enabled={
-            sProcessButtonEnabled && !sTransactionComplete && sCashSaleActive
+            sProcessButtonEnabled && !sSale?.paymentComplete && sCashSaleActive
           }
           onPress={() => handleProcessPaymentPress()}
           text={sIsRefund ? "PROCESS REFUND" : "PROCESS PAYMENT"}
@@ -1775,7 +1716,7 @@ const CashSaleComponent = ({
           }}
           enabled={
             sTenderAmount >= sRequestedAmount &&
-            !sTransactionComplete &&
+            !sSale?.paymentComplete &&
             sCashSaleActive
           }
           onPress={handleCancelPress}
@@ -1817,7 +1758,7 @@ const CashSaleComponent = ({
               color: C.green,
             }}
           >
-            {formatNumberForCurrencyDisplay(sCashChangeNeeded, true)}
+            {formatCurrencyDisp(sCashChangeNeeded, true)}
           </Text>
         </View>
       ) : null}
@@ -1826,19 +1767,18 @@ const CashSaleComponent = ({
 };
 
 const StripeCreditCardComponent = ({
+  sSale,
   sIsDeposit,
   sAmountLeftToPay,
   handlePaymentCapture,
   handleRefundCapture,
-  zSettingsObj,
+  zSettings,
   sIsRefund,
   refundPaymentIntentID,
   sCardSaleActive,
-  _setCashSaleActive,
-  sTransactionComplete,
   sRefundAmount,
   _setIsDeposit,
-  sRefundObj = {
+  sRefundObj: sRefund = {
     cashRefundRequested: 0,
     cardRefundRequested: 0,
     totalCashRefundAllowed: 0,
@@ -1885,7 +1825,7 @@ const StripeCreditCardComponent = ({
         log("error canceling listener", e);
       }
     };
-  }, [sRefundObj, zSettingsObj]);
+  }, [sRefund, zSettings]);
 
   async function getAvailableStripeReaders() {
     // log("getting available Stripe readers");
@@ -1900,8 +1840,8 @@ const StripeCreditCardComponent = ({
       arr.push(connectedReader);
     });
     _setCardReaderArr(arr);
-    if (arrHasItem(arr, zSettingsObj?.selectedCardReaderObj)) {
-      _setCardReaderObj(zSettingsObj?.selectedCardReaderObj);
+    if (arrHasItem(arr, zSettings?.selectedCardReaderObj)) {
+      _setCardReaderObj(zSettings?.selectedCardReaderObj);
     } else {
       _setCardReaderObj(arr[0]);
     }
@@ -2114,7 +2054,7 @@ const StripeCreditCardComponent = ({
     <View
       style={{
         ...checkoutScreenStyle.base,
-        opacity: sTransactionComplete || !refundReady ? 0.2 : 1,
+        opacity: sSale?.paymentComplete || !refundReady ? 0.2 : 1,
       }}
     >
       <View
@@ -2139,7 +2079,9 @@ const StripeCreditCardComponent = ({
               Card Readers
             </Text>
             <DropdownMenu
-              enabled={sCardSaleActive && !sTransactionComplete && refundReady}
+              enabled={
+                sCardSaleActive && !sSale?.paymentComplete && refundReady
+              }
               buttonIcon={ICONS.menu2}
               buttonIconSize={15}
               buttonTextStyle={{ fontSize: 13 }}
@@ -2159,7 +2101,7 @@ const StripeCreditCardComponent = ({
           </View>
           <Button_
             text={"Reset Card Reader"}
-            enabled={sCardSaleActive && !sTransactionComplete && refundReady}
+            enabled={sCardSaleActive && !sSale?.paymentComplete && refundReady}
             buttonStyle={{
               cursor: sProcessButtonEnabled ? "inherit" : "default",
               backgroundColor: makeGrey(0.2),
@@ -2233,7 +2175,7 @@ const StripeCreditCardComponent = ({
               color: C.textMain,
             }}
           >
-            {"$ " + formatNumberForCurrencyDisplay(sAmountLeftToPay)}
+            {"$ " + formatCurrencyDisp(sSale.total - sSale.amountCaptured)}
           </Text>
           <TextInput
             onFocus={() => {
@@ -2242,7 +2184,9 @@ const StripeCreditCardComponent = ({
               // _setProcessButtonEnabled(false);
             }}
             autoFocus={sFocusedItem === "amount"}
-            disabled={!sCardSaleActive || sTransactionComplete || !refundReady}
+            disabled={
+              !sCardSaleActive || sSale?.paymentComplete || !refundReady
+            }
             style={{
               fontSize: 20,
               outlineWidth: 0,
@@ -2257,7 +2201,7 @@ const StripeCreditCardComponent = ({
             }}
             placeholder="0.00"
             placeholderTextColor={makeGrey(0.3)}
-            value={formatNumberForCurrencyDisplay(sRequestedAmount)}
+            value={formatCurrencyDisp(sRequestedAmount)}
             onChangeText={(val) => {
               val = formatDecimal(val);
               if (val > sAmountLeftToPay || val <= 3) {
@@ -2285,13 +2229,13 @@ const StripeCreditCardComponent = ({
         <View style={{ width: "100%", alignItems: "center", marginTop: 10 }}>
           <Text style={{ fontSize: 12 }}>
             {"**" +
-              sRefundObj.last4 +
+              sRefund.last4 +
               "exp: " +
-              sRefundObj.cardExpMonth +
+              sRefund.cardExpMonth +
               " / " +
-              sRefundObj.cardExpYear}
+              sRefund.cardExpYear}
           </Text>
-          <Text style={{ fontSize: 12 }}>{sRefundObj.cardType}</Text>
+          <Text style={{ fontSize: 12 }}>{sRefund.cardType}</Text>
         </View>
       ) : null}
       <View
@@ -2306,7 +2250,7 @@ const StripeCreditCardComponent = ({
           colorGradientArr={COLOR_GRADIENTS.green}
           textStyle={{ color: C.textWhite }}
           enabled={
-            sProcessButtonEnabled && !sTransactionComplete && sCardSaleActive
+            sProcessButtonEnabled && !sSale?.paymentComplete && sCardSaleActive
           }
           onPress={() => handleProcessPaymentPress()}
           text={sIsRefund ? "PROCESS REFUND" : "PROCESS PAYMENT"}
@@ -2330,11 +2274,10 @@ const StripeCreditCardComponent = ({
 };
 
 const InventoryListComponent = ({
-  inventoryObjArr,
+  inventoryItems,
   onSelect,
   quickItemButtons,
   _setSearchStr,
-  sTransactionComplete,
 }) => {
   return (
     <View style={{ width: "100%" }}>
@@ -2346,7 +2289,7 @@ const InventoryListComponent = ({
         buttonStyle={{ width: 150, marginBottom: 10 }}
       />
       <FlatList
-        data={inventoryObjArr}
+        data={inventoryItems}
         renderItem={(obj) => {
           let idx = obj.index;
           let item = obj.item;
@@ -2401,36 +2344,33 @@ const InventoryListComponent = ({
 };
 
 const WorkorderListComponent = ({
-  sCombinedWorkordersArr,
-  zOpenWorkordersArr,
-  zOpenWorkorderObj,
-  zInventoryArr,
+  sCombinedWorkorders,
+  zOpenWorkorders,
+  zOpenWorkorder,
+  zInventory,
   zCustomerObj,
-  zSettingsObj,
-  zGetInventoryItem,
+  zSettings,
+  _zGetInventoryItem,
   handleCombineWorkorderCheck,
-  sAmountLeftToPay,
   isRefund,
-  sTransactionComplete,
-  _setRefundItemArr,
   sRefundItemArr,
   handleRefundItemCheck,
-  _setCombinedWorkordersArr,
+  sSale,
 }) => {
-  if (!zInventoryArr.length > 0) return;
+  if (!zInventory?.length > 0) return;
 
   function getWorkorderArr() {
     if (isRefund) {
       // log("here", sCombinedWorkordersArr);
-      return sCombinedWorkordersArr;
+      return sCombinedWorkorders;
     } else {
       // log("not refund");
       return [
-        ...sCombinedWorkordersArr,
-        ...zOpenWorkordersArr.filter(
+        ...sCombinedWorkorders,
+        ...zOpenWorkorders.filter(
           (o) =>
-            o.customerID === zOpenWorkorderObj?.customerID &&
-            !arrHasItem(sCombinedWorkordersArr, o)
+            o.customerID === zOpenWorkorder?.customerID &&
+            !arrHasItem(sCombinedWorkorders, o)
         ),
       ];
     }
@@ -2440,12 +2380,13 @@ const WorkorderListComponent = ({
     <ScrollView
       style={{
         width: "100%",
-        opacity: sTransactionComplete ? 0.2 : 1,
+        opacity: sSale?.paymentComplete ? 0.2 : 1,
       }}
     >
       {getWorkorderArr().map((workorder, idx) => {
         return (
           <View
+            key={workorder.id}
             style={{
               width: "100%",
               borderColor: C.buttonLightGreenOutline,
@@ -2463,14 +2404,14 @@ const WorkorderListComponent = ({
                   marginTop: 5,
                   marginBottom: 5,
                 }}
-                isChecked={sCombinedWorkordersArr.find(
+                isChecked={sCombinedWorkorders.find(
                   (o) => o.id === workorder.id
                 )}
                 text={"ADD TO SALE"}
                 onCheck={() =>
-                  zOpenWorkorderObj.id === workorder.id ||
+                  zOpenWorkorder.id === workorder.id ||
                   isRefund ||
-                  sTransactionComplete
+                  sSale?.paymentComplete
                     ? null
                     : handleCombineWorkorderCheck(workorder)
                 }
@@ -2481,7 +2422,7 @@ const WorkorderListComponent = ({
                 opacity:
                   idx === 0
                     ? 1
-                    : sCombinedWorkordersArr.find((o) => o.id === workorder.id)
+                    : sCombinedWorkorders.find((o) => o.id === workorder.id)
                     ? 1
                     : 0.4,
               }}
@@ -2558,7 +2499,7 @@ const WorkorderListComponent = ({
                 renderItem={(obj) => {
                   let index = obj.index;
                   let workorderLine = obj.item;
-                  let inventoryItem = zGetInventoryItem(
+                  let inventoryItem = _zGetInventoryItem(
                     workorderLine.inventoryItem.id
                   );
                   // log("item", inventoryItem);
@@ -2687,7 +2628,7 @@ const WorkorderListComponent = ({
                             }}
                           >
                             {"$ " +
-                              formatNumberForCurrencyDisplay(
+                              formatCurrencyDisp(
                                 inventoryItem?.price || workorderLine.price
                               )}
                           </Text>
@@ -2700,7 +2641,7 @@ const WorkorderListComponent = ({
                               }}
                             >
                               {"$ -" +
-                                formatNumberForCurrencyDisplay(
+                                formatCurrencyDisp(
                                   workorderLine.discountObj.savings
                                 )}
                             </Text>
@@ -2716,12 +2657,12 @@ const WorkorderListComponent = ({
                           >
                             {workorderLine.discountObj.newPrice
                               ? "$ " +
-                                formatNumberForCurrencyDisplay(
+                                formatCurrencyDisp(
                                   workorderLine.discountObj.newPrice
                                 )
                               : workorderLine.qty > 1
                               ? "$" +
-                                formatNumberForCurrencyDisplay(
+                                formatCurrencyDisp(
                                   inventoryItem?.price ||
                                     workorderLine.price * workorderLine.qty
                                 )
@@ -2757,7 +2698,7 @@ const WorkorderListComponent = ({
                     }}
                   >
                     {"$" +
-                      formatNumberForCurrencyDisplay(
+                      formatCurrencyDisp(
                         calculateRunningTotals(workorder).runningSubtotal
                       )}
                   </Text>
@@ -2782,7 +2723,7 @@ const WorkorderListComponent = ({
                         }}
                       >
                         {"$" +
-                          formatNumberForCurrencyDisplay(
+                          formatCurrencyDisp(
                             calculateRunningTotals(workorder).runningDiscount
                           )}
                       </Text>
@@ -2807,9 +2748,9 @@ const WorkorderListComponent = ({
                     }}
                   >
                     {"$" +
-                      formatNumberForCurrencyDisplay(
+                      formatCurrencyDisp(
                         (calculateRunningTotals(workorder).runningTotal *
-                          zSettingsObj.salesTax) /
+                          zSettings.salesTax) /
                           100
                       )}
                   </Text>
@@ -2843,9 +2784,9 @@ const WorkorderListComponent = ({
                     }}
                   >
                     {"$" +
-                      formatNumberForCurrencyDisplay(
+                      formatCurrencyDisp(
                         calculateRunningTotals(workorder).runningTotal *
-                          (zSettingsObj.salesTax / 100) +
+                          (zSettings.salesTax / 100) +
                           calculateRunningTotals(workorder).runningTotal
                       )}
                   </Text>
@@ -2931,3 +2872,19 @@ const checkoutScreenStyle = {
     marginTop: 10,
   },
 };
+
+/**
+ *  cash sale obj
+ *
+ * sale : {"id":"730921185148","workorderIDs":[],"millis":1757977293182,"payments":[{"amountCaptured":1,"amountTendered":2.8755,"saleID":"730921185148","cash":true,"millis":1757977293182,"id":"nXaw9FsU6kOVgj2s60MR","workorderLinesRefundedIDs":[]}],"subtotal":2.7,"discount":0,"salesTaxPercent":6.5,"total":2.8755,"amountCaptured":1,"isDeposit":false,"amountRefunded":0,"workordersID":["540286345956"]}
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ */

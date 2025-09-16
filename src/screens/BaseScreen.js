@@ -182,9 +182,11 @@ export function BaseScreen() {
     // fillReceipt();
     // fillPrinterNames();
     // fillPunchHistory()
-    // fillInventory();
+    // fillInventory(); // BE VERY CAREFUL BUDDY
     // if (zInventoryArr.length > 0) fillOpenWorkorders(zInventoryArr);
   }, [zInventoryArr]);
+  // }, []);
+
   // log(zSettingsObj);
   return (
     <View

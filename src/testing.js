@@ -63,6 +63,10 @@ export function sendTestMessage() {
 }
 
 export async function fillInventory() {
+  function generate() {
+    return Math.floor(Math.random() * (100000 - 500 + 1)) + 500;
+  }
+
   for (let i = 1; i <= 1; i++) {
     let lastDigit = new Date().getTime().toString();
     lastDigit = lastDigit.slice(lastDigit.length - 1);
@@ -76,13 +80,12 @@ export async function fillInventory() {
       " " +
       (await randomWordGenerator());
     inv.informalName =
-      "Informal name " +
+      "(informal name)" +
       (await randomWordGenerator()) +
       " " +
       (await randomWordGenerator());
-    inv.price = roundToTwoDecimals(
-      Number(lastDigit + "." + lastDigit - 1 + lastDigit + 1)
-    );
+    inv.price = generate();
+
     inv.category = INVENTORY_CATEGORY_NAMES.parts;
     inv.brand = "Brand " + (await randomWordGenerator());
     inv.cost = roundToTwoDecimals(inv.price / 2);
@@ -107,26 +110,23 @@ export async function fillOpenWorkorders(zInventoryArr) {
     wo.description =
       SETTINGS_OBJ.bikeDescriptions[Math.floor(Math.random() * 4)];
     wo.status = SETTINGS_OBJ.statuses[Math.floor(Math.random() * 5)];
-    wo.customerFirst = "Fritz";
-    wo.customerLast = "Hieb";
+    wo.customerFirst = "Ricky";
+    wo.customerLast = "Bobby";
     wo.customerPhone = "2393369177";
-    wo.customerID = "3d2E63TXCY2bzmOdeQc8";
+    wo.customerID = "1236";
     wo.startedBy = "Fritz Hieb";
     wo.changeLog.push("Started by: " + "Fritz" + " " + "Hieb");
     wo.startedOnMillis = new Date().getTime();
-
     wo.partSource = SETTINGS_OBJ.partSources[Math.floor(Math.random() * 2)];
     wo.partOrdered = "Part: " + (await randomWordGenerator());
-
     wo.waitTime = SETTINGS_OBJ.waitTimes[Math.floor(Math.random() * 9)];
 
-    for (let i = 1; i <= 3; i++) {
-      let val = Math.round(Math.random() * 6);
+    for (let i = 1; i <= 5; i++) {
+      let val = Math.round(Math.random() * 8);
       let line = cloneDeep(WORKORDER_ITEM_PROTO);
       line.id = generateUPCBarcode();
       line.inventoryItem = zInventoryArr[val];
-      line.inventoryItem.price = 0.5;
-      line.qty = i;
+      line.qty = Math.ceil(i / 2);
       wo.workorderLines.push(line);
       // clog(line, i);
     }

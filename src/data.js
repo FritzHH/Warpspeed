@@ -263,23 +263,24 @@ export const PAYMENT_OBJECT_PROTO = {
   expYear: "",
   networkTransactionID: "",
   amountRefunded: 0,
-  workorderLinesRefundedID: [],
+  workorderLinesRefundedIDs: [],
   isDeposit: false,
+  depositUsed: false,
 };
 
 export const SALE_OBJECT_PROTO = {
   id: "",
-  workordersID: [],
+  workorderIDs: [],
   millis: "",
   payments: [],
   subtotal: 0,
   discount: 0,
+  tax: 0,
   salesTaxPercent: 0,
   total: 0,
   amountCaptured: 0,
-  isDeposit: false,
   amountRefunded: 0,
-  isDeposit: false,
+  paymentComplete: false,
 };
 
 export const WORKORDER_PROTO = {
@@ -344,7 +345,7 @@ export const CUSTOMER_PROTO = {
   id: "",
   interactionRating: "",
   workorders: [],
-  salesID: [],
+  saleIDs: [],
   dateCreated: "",
 };
 
@@ -385,7 +386,7 @@ export const MENU_BUTTON_PROTO = {
 export const FRITZ_USER_OBJ = {
   first: "Fritz",
   last: "Hieb",
-  id: "3d2E63TXCY2bzmOdeQc8",
+  id: "1234",
   permissions: {
     name: "Owner",
     level: 4,
@@ -637,10 +638,15 @@ export const SETTINGS_OBJ = {
     {
       id: "3k3nh",
       name: "2-bike purchase, $100 Off Each Bike",
-      value: "100",
+      value: "10000",
       type: DISCOUNT_TYPES.dollar,
     },
-    { id: "343gfg", name: "$10 Off", value: "10", type: DISCOUNT_TYPES.dollar },
+    {
+      id: "343gfg",
+      name: "$10 Off",
+      value: "1000",
+      type: DISCOUNT_TYPES.dollar,
+    },
   ],
   waitTimes: [
     {
@@ -778,12 +784,12 @@ export const SETTINGS_OBJ = {
   users: [
     FRITZ_USER_OBJ,
     {
-      first: "Jennifer ",
-      last: "Udebrock",
-      id: "12345",
+      first: "Ricky",
+      last: "Bobby",
+      id: "1234dkfjd5",
       permissions: PERMISSION_LEVELS.user,
-      phone: "2489370426",
-      pin: "22",
+      phone: "2393369177",
+      pin: "00",
       hourlyWage: 20,
       faceDescriptor: {},
       // role: PERMISSION_LEVELS.user,

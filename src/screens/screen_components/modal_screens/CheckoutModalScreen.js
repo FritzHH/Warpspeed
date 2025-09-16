@@ -51,7 +51,7 @@ import {
   getRgbFromNamedColor,
   lightenRGBByPercent,
   log,
-  makeGrey,
+  gray,
   removeArrItem,
   removeUnusedFields,
   replaceOrAddToArr,
@@ -137,11 +137,12 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sRefundItems, _setRefundItems] = useState([]);
   const [sShouldChargeCardRefundFee, _setShouldChargeCardRefundFee] =
     useState(true);
+  const [sCashChangeNeeded, _setCashChangeNeeded] = useState(null);
 
   // watch the combined workorders array and adjust accordingly
 
   // 730921185148
-  let scan = "730921185148"; // test
+  let scan = "592218957081"; // test
 
   // all startup stuff here
   useEffect(() => {
@@ -292,65 +293,66 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
   function handlePaymentCapture(payment = PAYMENT_OBJECT_PROTO) {
     // log(paymentObj);
-    payment.saleID = sSale.id;
+    let sale = cloneDeep(sSale);
+    payment.saleID = sale.id;
     payment.isDeposit = sIsDeposit;
-    sSale.payments.push(payment);
-    sSale.amountCaptured = sSale.amountCaptured + payment.amountCaptured;
+    sale.payments.push(payment);
+    sale.amountCaptured = sale.amountCaptured + payment.amountCaptured;
 
     //************************************************************** */
     // need to send print object here //////////////////////////////////
 
     // saleObj.amountCaptured = saleObj.amountCaptured + paymentObj.amountCaptured;
     let deposits = cloneDeep(zCustomer.depositArr);
+    if (!Array.isArray(deposits)) deposits = [];
 
-    if (!isArray(saleIDs)) saleIDs = [];
     if (!payment.isDeposit) {
       let workorderIDs = sCombinedWorkorders.map((o) => o.id);
-      sSale.workorderIDs = workorderIDs;
-      sCombinedWorkorders.forEach((wo) => {
-        wo.saleID = sSale.id;
-        sSale.workorderIDs = replaceOrAddToArr(sSale.workorderIDs, wo.id);
-        if (sSale.amountCaptured === sTotalAmount) {
+      sale.workorderIDs = workorderIDs;
+      cloneDeep(sCombinedWorkorders).forEach((wo) => {
+        wo.saleID = sale.id;
+        _zSetWorkorder(wo); // db
+        sale.workorderIDs = replaceOrAddToArr(sale.workorderIDs, wo.id);
+        if (sale.amountCaptured === sTotalAmount) {
           wo.paymentComplete = true;
         }
-        if (sSale.amountCaptured === sSale.total) {
-          sSale.paymentComplete = true;
-          _setTransactionComplete(true);
+        if (sale.amountCaptured === sale.total) {
+          sale.paymentComplete = true;
         }
-        // _setAmountLeftToPay(sSale.total -);
-        // _zSetWorkorder(wo); // send to db
       });
     } else {
-      deposits.push(sSale);
-      _zSetCustomerField("deposits", deposits);
+      deposits.push(sale);
     }
 
     let saleIDs = cloneDeep(zCustomer.salesID);
     if (!isArray(saleIDs)) saleIDs = [];
-    saleIDs = replaceOrAddToArr(saleIDs, sSale.id);
+    saleIDs = replaceOrAddToArr(saleIDs, sale.id);
 
     // remove unused fields
-    sSale.payments = sSale.payments.map((payment) =>
-      removeUnusedFields(payment)
-    );
+    sale.payments = sale.payments.map((payment) => removeUnusedFields(payment));
+    if (payment.cash)
+      _setCashChangeNeeded(payment.amountTendered - payment.amountCaptured);
 
-    // log("sale", payment);
-    _setSale(sSale);
-    _zSetCustomerField("salesID", salesID);
-    dbSetSalesObj(removeUnusedFields(sSale));
-    printReceipt(payment);
-    if (sIsDeposit || sSale.paymentComplete) closeCheckoutScreenModal();
+    // printReceipt(payment);
+    _setSale(sale);
+    dbSetSalesObj(removeUnusedFields(sale)); // db
+    _zSetCustomerField("deposits", deposits); // db
+    _zSetCustomerField("saleIDs", saleIDs); // db
+
+    if (!sale.payments[sale.payments.length - 1].cash) {
+      if (sIsDeposit || sale.paymentComplete) closeCheckoutScreenModal();
+    }
   }
 
   function printReceipt(payment) {}
 
   function handleRefundScan(refundScan) {
     function addToCombinedArr(workorderObj) {
+      _setRefundScanMessage("Transaction Found!");
       let arr = cloneDeep(sCombinedWorkorders);
       arr = replaceOrAddToArr(arr, workorderObj);
       arr = sortRefundWorkorderArr(arr);
       _setCombinedWorkorders(arr);
-      setRefund();
       _setIsRefund(true);
     }
 
@@ -362,10 +364,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
         .then((res) => {
           if (res) {
             // log("found");
-            _setRefundScanMessage("Transaction Found!");
             // log(res);
             _setSale(res);
-            res.workordersID.forEach((workorderID) => {
+            res.workorderIDs.forEach((workorderID) => {
               dbGetOpenWorkorderItem(workorderID).then((res) => {
                 if (res) addToCombinedArr(res);
               });
@@ -484,9 +485,11 @@ export function CheckoutModalScreen({ openWorkorder }) {
             // justifyContent: "center",
             // alignItems: "center",
             flexDirection: "row",
-            backgroundColor: C.backgroundWhite,
-            width: "80%",
-            height: sIsRefund ? "95%" : "85%",
+            backgroundColor: sIsRefund
+              ? lightenRGBByPercent(C.red, 80)
+              : C.backgroundWhite,
+            width: "85%",
+            height: sIsRefund ? "95%" : "90%",
             borderRadius: 15,
             ...SHADOW_RADIUS_PROTO,
             shadowColor: C.green,
@@ -514,6 +517,8 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sIsDeposit={sIsDeposit}
               _setIsDeposit={_setIsDeposit}
               sSale={sSale}
+              sCashChangeNeeded={sCashChangeNeeded}
+              _setCashChangeNeeded={_setCashChangeNeeded}
               // sIsDeposit={sIsDeposit}
             />
             <StripeCreditCardComponent
@@ -566,6 +571,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sRefund={sRefund}
               sApplyDeposit={sApplyDeposit}
               sSale={sSale}
+              sCashChangeNeeded={sCashChangeNeeded}
             />
           </View>
 
@@ -583,7 +589,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
                   onFocus={() => _setFocusedItem("search")}
                   autoFocus={sFocusedItem === "search"}
                   style={{
-                    borderBottomColor: makeGrey(0.3),
+                    borderBottomColor: gray(0.3),
                     borderBottomWidth: 1,
                     width: "100%",
                     marginBottom: 10,
@@ -597,7 +603,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
                     searchInventory(val);
                   }}
                   placeholder="Scan or search inventory..."
-                  placeholderTextColor={makeGrey(0.3)}
+                  placeholderTextColor={gray(0.3)}
                 />
               </View>
             ) : null}
@@ -609,6 +615,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 onSelect={handleInventorySelect}
                 quickItemButtons={zSettings.quickItemButtons}
                 _setSearchStr={_setSearchString}
+                sSale={sSale}
               />
             ) : (
               <WorkorderListComponent
@@ -626,6 +633,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 sRefundItem={sRefundItems}
                 handleRefundItemCheck={handleRefundItemCheck}
                 _setCombinedWorkorders={_setCombinedWorkorders}
+                sSale={sSale}
               />
             )}
           </View>
@@ -669,10 +677,8 @@ const MiddleItemComponent = ({
   sCardRefundFeePercentage,
   sAmountRefunded,
   sSale,
+  sCashChangeNeeded,
 }) => {
-  // const [sFocusedItem, _setFocusedItem] = useState("");
-  // clog(paymentsArr);
-  // if (!zCustomerObj || sSale?) return null;
   return (
     <View
       style={{
@@ -705,20 +711,20 @@ const MiddleItemComponent = ({
               <Text style={{ color: C.textMain }}>
                 {zCustomer?.first + " " + zCustomer?.last}
               </Text>
-              <Text style={{ color: makeGrey(0.6), fontSize: 12 }}>
+              <Text style={{ color: gray(0.6), fontSize: 12 }}>
                 {zCustomer?.email}
               </Text>
             </View>
             <View>
               {zCustomer?.cell ? (
                 <Text style={{ color: C.textMain }}>
-                  <Text style={{ color: makeGrey(0.5) }}>{"cell: "}</Text>
+                  <Text style={{ color: gray(0.5) }}>{"cell: "}</Text>
                   {addDashesToPhone(zCustomer?.cell)}
                 </Text>
               ) : null}
               {zCustomer?.land ? (
                 <Text style={{ color: C.textMain }}>
-                  <Text style={{ color: makeGrey(0.5) }}>{"land: "}</Text>
+                  <Text style={{ color: gray(0.5) }}>{"land: "}</Text>
                   {addDashesToPhone(zCustomer?.land)}
                 </Text>
               ) : null}
@@ -751,6 +757,7 @@ const MiddleItemComponent = ({
           }}
         >
           <CheckBox_
+            enabled={!sIsRefund && !sSale?.payments.length > 0}
             text={"Refund"}
             isChecked={sIsRefund}
             onCheck={() =>
@@ -760,10 +767,11 @@ const MiddleItemComponent = ({
             }
           />
           <Text style={{ fontSize: 12, color: RED_COLOR }}>
-            {sScanFailureMessage}
+            {sSale?.payments.length > 0 ? "" : sScanFailureMessage}
           </Text>
         </View>
         <TextInput
+          disabled={sSale?.payments.length > 0}
           style={{
             marginTop: 5,
             width: "100%",
@@ -774,13 +782,14 @@ const MiddleItemComponent = ({
             borderWidth: 1,
             outlineWidth: 0,
             backgroundColor: C.backgroundListWhite,
+            color: sSale?.payments.length > 0 ? gray(0.3) : C.textMain,
           }}
           onFocus={() => {
             _setFocusedItem("refund");
             // _sSetRefundScan("");
           }}
           placeholder="Scan sale receipt (12 digit number)"
-          placeholderTextColor={makeGrey(0.38)}
+          placeholderTextColor={gray(0.38)}
           autoFocus={sFocusedItem === "refund"}
           value={sRefundScan}
           onChangeText={(val) => {
@@ -816,12 +825,12 @@ const MiddleItemComponent = ({
             width: "100%",
           }}
         >
-          <Text style={{ fontSize: 13, color: makeGrey(0.5) }}>SUBTOTAL</Text>
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>SUBTOTAL</Text>
           <View style={{ flexDirection: "row" }}>
             <Text
               style={{
                 fontSize: 13,
-                color: makeGrey(0.5),
+                color: gray(0.5),
                 marginRight: 10,
               }}
             >
@@ -899,7 +908,7 @@ const MiddleItemComponent = ({
               style={{
                 marginLeft: 15,
                 fontSize: 13,
-                color: makeGrey(0.5),
+                color: gray(0.5),
               }}
             >
               DISCOUNTED TOTAL
@@ -908,7 +917,7 @@ const MiddleItemComponent = ({
               <Text
                 style={{
                   fontSize: 13,
-                  color: makeGrey(0.5),
+                  color: gray(0.5),
                   marginRight: 10,
                 }}
               >
@@ -943,12 +952,12 @@ const MiddleItemComponent = ({
             width: "100%",
           }}
         >
-          <Text style={{ fontSize: 13, color: makeGrey(0.5) }}>SALES TAX</Text>
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>SALES TAX</Text>
           <View style={{ flexDirection: "row" }}>
             <Text
               style={{
                 fontSize: 13,
-                color: makeGrey(0.5),
+                color: gray(0.5),
                 marginRight: 10,
               }}
             >
@@ -987,14 +996,12 @@ const MiddleItemComponent = ({
               width: "100%",
             }}
           >
-            <Text style={{ fontSize: 13, color: makeGrey(0.5) }}>
-              {"SUBTOTAL"}
-            </Text>
+            <Text style={{ fontSize: 13, color: gray(0.5) }}>{"SUBTOTAL"}</Text>
             <View style={{ flexDirection: "row" }}>
               <Text
                 style={{
                   fontSize: 13,
-                  color: makeGrey(0.5),
+                  color: gray(0.5),
                   marginRight: 10,
                 }}
               >
@@ -1044,7 +1051,7 @@ const MiddleItemComponent = ({
               <Text
                 style={{
                   fontSize: 13,
-                  color: makeGrey(0.5),
+                  color: gray(0.5),
                   marginRight: 10,
                 }}
               >
@@ -1062,15 +1069,6 @@ const MiddleItemComponent = ({
             </View>
           </View>
         ) : null}
-
-        {/* last4: "",
-        cardType: "",
-        amountCaptured: 0,
-        expMonth: "",
-        expYear: "",
-        paymentIntentID: "",
-        chargeID: "",
-        amountRefunded: 0, */}
 
         {sRefund?.totalCardRefundAllowedArr?.map((cardObj) => (
           <View
@@ -1098,7 +1096,7 @@ const MiddleItemComponent = ({
               <Text
                 style={{
                   fontSize: 13,
-                  color: makeGrey(0.5),
+                  color: gray(0.5),
                   marginRight: 10,
                 }}
               >
@@ -1138,7 +1136,7 @@ const MiddleItemComponent = ({
               <Text
                 style={{
                   fontSize: 13,
-                  color: makeGrey(0.5),
+                  color: gray(0.5),
                   marginRight: 10,
                 }}
               >
@@ -1164,14 +1162,14 @@ const MiddleItemComponent = ({
             width: "100%",
           }}
         >
-          <Text style={{ fontSize: 16, color: makeGrey(0.5) }}>
+          <Text style={{ fontSize: 16, color: gray(0.5) }}>
             {sIsRefund ? "TOTAL REFUND" : "TOTAL SALE"}
           </Text>
           <View style={{ flexDirection: "row" }}>
             <Text
               style={{
                 fontSize: 13,
-                color: makeGrey(0.5),
+                color: gray(0.5),
                 marginRight: 10,
               }}
             >
@@ -1185,9 +1183,7 @@ const MiddleItemComponent = ({
               }}
             >
               {formatCurrencyDisp(
-                sIsRefund
-                  ? sRefund.totalRefundRequested
-                  : sSale?.total - sSale?.amountCaptured
+                sIsRefund ? sRefund.totalRefundRequested : sSale?.total
               )}
             </Text>
           </View>
@@ -1249,73 +1245,82 @@ const MiddleItemComponent = ({
         <View
           style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
         >
-          <Text style={{ color: makeGrey(0.4) }}>PAYMENTS</Text>
+          <Text style={{ color: gray(0.4) }}>PAYMENTS</Text>
         </View>
       ) : null}
 
-      {payments?.map((paymentObj) => {
-        return (
-          <View
-            key={paymentObj.id}
-            style={{
-              padding: 5,
-              backgroundColor: C.listItemWhite,
-              width: "99%",
-              backgroundColor: C.listItemWhite,
-              borderRadius: 10,
-              marginBottom: 5,
-            }}
-          >
-            <Text style={{ color: C.green }}>
-              {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
-            </Text>
+      <ScrollView style={{ maxHeight: "30%", width: "100%" }}>
+        {payments?.map((paymentObj) => {
+          return (
             <View
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
+              key={paymentObj.id}
+              style={{
+                padding: 5,
+                backgroundColor: C.listItemWhite,
+                width: "99%",
+                backgroundColor: C.listItemWhite,
+                borderRadius: 10,
+                marginBottom: 5,
+              }}
             >
-              <Text>Amount received: </Text>
-              <Text>{formatCurrencyDisp(paymentObj.amountCaptured)}</Text>
+              <Text style={{ color: C.green }}>
+                {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text>Amount received: </Text>
+                <Text>{formatCurrencyDisp(paymentObj.amountCaptured)}</Text>
+              </View>
+              {paymentObj.last4 ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                    Last 4 Digits:{" "}
+                  </Text>
+                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                    {"***" + paymentObj.last4}
+                  </Text>
+                </View>
+              ) : null}
+              {paymentObj.cash ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text>Amount Tendered: </Text>
+                  <Text>{formatCurrencyDisp(paymentObj.amountTendered)}</Text>
+                </View>
+              ) : null}
+              {paymentObj.cash ? (
+                <View
+                  style={{
+                    justifyContent: "space-between",
+                    flexDirection: "row",
+                  }}
+                >
+                  <Text>Change needed: </Text>
+                  <Text>
+                    {formatCurrencyDisp(
+                      paymentObj.amountTendered - paymentObj.amountCaptured
+                    )}
+                  </Text>
+                </View>
+              ) : null}
+              {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
             </View>
-            {paymentObj.last4 ? (
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text>Last 4 Digits: </Text>
-                <Text>{paymentObj.last4}</Text>
-              </View>
-            ) : null}
-            {paymentObj.cash ? (
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text>Amount Tendered: </Text>
-                <Text>{formatCurrencyDisp(paymentObj.amountTendered)}</Text>
-              </View>
-            ) : null}
-            {paymentObj.cash ? (
-              <View
-                style={{
-                  justifyContent: "space-between",
-                  flexDirection: "row",
-                }}
-              >
-                <Text>Change needed: </Text>
-                <Text>
-                  {formatCurrencyDisp(
-                    paymentObj.amountTendered - paymentObj.amountCaptured
-                  )}
-                </Text>
-              </View>
-            ) : null}
-            {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
-          </View>
-        );
-      })}
+          );
+        })}
+      </ScrollView>
 
       <View
         style={{
@@ -1327,27 +1332,72 @@ const MiddleItemComponent = ({
           // justifySelf: "flex-end",
         }}
       >
-        {payments?.length > 0 && !sSale?.paymentComplete ? (
+        {/* {payments?.length > 0 && !sSale?.paymentComplete ? (
           <SliderButton_ onConfirm={(val) => log("val", val)} />
-        ) : null}
-        {!payments || payments?.length == 0 ? (
-          <Button_
-            colorGradientArr={COLOR_GRADIENTS.green}
-            text={"Cancel"}
-            onPress={handleCancelPress}
-          />
-        ) : null}
-        {payments?.length > 0 ? (
-          <Button_
-            colorGradientArr={COLOR_GRADIENTS.blue}
-            text={sSale?.paymentComplete ? "Close" : "Cancel"}
-            onPress={handleCancelPress}
-          />
+        ) : null} */}
+        <Button_
+          enabled={
+            sSale?.paymentComplete ||
+            (!sSale?.amountCaptured > 0 && !sSale?.paymentComplete)
+          }
+          colorGradientArr={
+            sSale?.paymentComplete ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.red
+          }
+          text={sSale?.paymentComplete ? "CLOSE" : "CANCEL"}
+          onPress={handleCancelPress}
+          textStyle={{ color: C.textWhite }}
+          buttonStyle={{ width: 150 }}
+        />
+        {sCashChangeNeeded ? (
+          <View
+            style={{
+              ...checkoutScreenStyle.boxStyle,
+              width: "30%",
+              paddingTop: 2,
+              paddingBottom: 2,
+              flexDirection: "column",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                color: gray(0.3),
+                width: "100%",
+                textAlign: "left",
+                paddingBottom: 3,
+              }}
+            >
+              CHANGE
+            </Text>
+            <Text
+              placeholder={"0.00"}
+              style={{
+                textAlign: "right",
+                fontSize: 25,
+                color: sCashChangeNeeded > 0 ? C.green : gray(0.3),
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  // color: C.green,
+                  paddingRight: 7,
+                  height: "100%",
+                  textAlignVertical: "top",
+                }}
+              >
+                $
+              </Text>
+              {sCashChangeNeeded}
+            </Text>
+          </View>
         ) : null}
         {payments?.length > 0 && sSale?.paymentComplete ? (
           <Button_
-            colorGradientArr={COLOR_GRADIENTS.blue}
-            text={"Reprint"}
+            buttonStyle={{ width: 150, color: C.textWhite }}
+            colorGradientArr={COLOR_GRADIENTS.greenblue}
+            text={"REPRINT"}
+            textStyle={{ color: C.textWhite }}
             onPress={() => log("reprint receit method needed")}
           />
         ) : null}
@@ -1366,6 +1416,8 @@ const CashSaleComponent = ({
   sCashSaleActive,
   sIsDeposit,
   _setIsDeposit,
+  // sCashChangeNeeded,
+  _setCashChangeNeeded,
   sRefund = {
     cashRefundRequested: 0,
     cardRefundRequested: 0,
@@ -1385,8 +1437,19 @@ const CashSaleComponent = ({
       ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
       : sSale?.total - sSale?.amountCaptured
   );
+  const [sTenderAmountDisp, _setTenderAmountDisp] = useState(
+    formatCurrencyDisp(
+      sIsRefund
+        ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
+        : sSale?.total - sSale?.amountCaptured
+    )
+  );
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(
-    formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)
+    formatCurrencyDisp(
+      sIsRefund
+        ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
+        : sSale?.total - sSale?.amountCaptured
+    )
   ); // dev sAmountLeftToPay
   const [sRequestedAmount, _setRequestedAmount] = useState(
     sSale?.total - sSale?.amountCaptured
@@ -1395,41 +1458,33 @@ const CashSaleComponent = ({
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
   const [sIsCheck, _setIsCheck] = useState(false);
   const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
-  const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
+  // const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
   const [sFocusedItem, _setFocusedItem] = useState("");
 
-  const onBlur = useCallback(() => {
-    // Normalize formatting on blur (force 2 decimals)
-    const parsed = usdDisplayToCents(sRequestedAmountDisp);
-    _setRequestedAmountDisp(
-      centsToUsdDisplay(parsed != null ? parsed : cents, { withDollar: false })
-    );
-  }, [sRequestedAmount, sRequestedAmountDisp]);
-
-  // calculate running cash change needed for tender amount
   useEffect(() => {
-    if (sTenderAmount >= sRequestedAmountDisp) {
-      let diff = Number(sTenderAmount) - Number(sRequestedAmountDisp);
-      _setCashChangeNeeded(diff);
-    }
-  }, [sTenderAmount, sRequestedAmountDisp]);
-
-  useEffect(() => {
-    let tenderAmount = Number(sTenderAmount);
-    if (sIsRefund) {
-      if (tenderAmount <= sRefund.cashRefundRequested && tenderAmount > 1) {
-        _setProcessButtonEnabled(true);
-      }
+    if (
+      sTenderAmount < sRequestedAmount ||
+      sRequestedAmount === 0 ||
+      sTenderAmount === 0 ||
+      sRequestedAmount > sSale?.total - sSale?.amountCaptured
+    ) {
+      _setProcessButtonEnabled(false);
     } else {
-      if (tenderAmount >= sRequestedAmountDisp && tenderAmount > 1) {
-        _setProcessButtonEnabled(true);
-      }
+      _setProcessButtonEnabled(true);
     }
-  }, [sTenderAmount]);
+  }, [sTenderAmount, sRequestedAmount]);
 
   function handleCancelPress() {
-    _setTenderAmount("");
-    _setRequestedAmountDisp(sAmountLeftToPay);
+    _setTenderAmount(sSale?.total - sSale?.amountCaptured);
+    _setTenderAmountDisp("");
+    _setRequestedAmount(sSale?.total - sSale?.amountCaptured);
+    _setRequestedAmountDisp(
+      formatCurrencyDisp(
+        sIsRefund
+          ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
+          : sSale?.total - sSale?.amountCaptured
+      )
+    );
     _setProcessButtonEnabled(false);
   }
 
@@ -1477,15 +1532,23 @@ const CashSaleComponent = ({
   function handleProcessPaymentPress() {
     // log("process payment pressed");
     let paymentObject = { ...PAYMENT_OBJECT_PROTO };
-    paymentObject.amountTendered = Number(sTenderAmount);
-    paymentObject.amountCaptured = Number(sRequestedAmountDisp);
+    paymentObject.amountTendered = sTenderAmount;
+    paymentObject.amountCaptured = sRequestedAmount;
     paymentObject.cash = !sIsCheck;
     paymentObject.check = sIsCheck;
     paymentObject.millis = new Date().getTime();
-    paymentObject.id = generateRandomID();
+    paymentObject.id = generateUPCBarcode();
     handlePaymentCapture(paymentObject);
 
-    // handleCancelPress();
+    let diff = sTenderAmount - sRequestedAmount;
+    log(diff);
+    if (diff < 0) {
+      // log("here1");
+      _setCashChangeNeeded(formatCurrencyDisp(0));
+    } else {
+      // log("here2");
+      _setCashChangeNeeded(formatCurrencyDisp(diff));
+    }
   }
 
   function handleKeyPress(event) {
@@ -1497,9 +1560,10 @@ const CashSaleComponent = ({
 
   let refundReady = true;
   if (sIsRefund && !sRefund.cashRefundRequested) refundReady = false;
-
+  // log("cash sale complete", sSale?.paymentComplete);
   return (
     <View
+      pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
       style={{
         ...checkoutScreenStyle.base,
         opacity: sSale?.paymentComplete || !refundReady ? 0.2 : 1,
@@ -1511,6 +1575,7 @@ const CashSaleComponent = ({
         >
           {!sIsRefund ? (
             <CheckBox_
+              enabled={!sSale?.payments.length > 0}
               textStyle={{ fontSize: 12 }}
               text={"Paper Check"}
               onCheck={() => {
@@ -1539,34 +1604,40 @@ const CashSaleComponent = ({
           flexDirection: "row",
           justifyContent: "flex-end",
           alignItems: "center",
+          marginTop: 5,
           backgroundColor: C.listItemWhite,
-          marginTop: 10,
           padding: 10,
           borderRadius: 10,
           borderWidth: 1,
           borderColor: C.buttonLightGreenOutline,
+          width: "70%",
         }}
       >
         <View
           style={{
             alignItems: "flex-end",
-            justifyContent: "center",
+            justifyContent: "space-between",
             // backgroundColor: "green",
             height: "100%",
+            paddingRight: 5,
           }}
         >
-          <Text style={{ color: C.textMain }}>
-            {sIsRefund ? "Requested Amount" : "Balance"}
+          <Text style={{ color: C.textMain, marginTop: 4 }}>Balance</Text>
+          <Text
+            style={{
+              marginBottom: 15,
+              color: sIsRefund ? RED_COLOR : C.textMain,
+            }}
+          >
+            {sIsRefund ? "Refund Amount" : "Pay Amount"}
           </Text>
-          {!sIsRefund ? (
-            <Text style={{ marginTop: 10, color: C.textMain }}>Pay Amount</Text>
-          ) : null}
         </View>
         <View
           style={{
             alignItems: "flex-end",
             marginLeft: 10,
             color: C.textMain,
+            // width: "60%",
           }}
         >
           <Text
@@ -1577,80 +1648,95 @@ const CashSaleComponent = ({
               color: C.textMain,
             }}
           >
-            {sIsRefund
-              ? "$ " +
-                formatCurrencyDisp(
-                  sRefund.cashRefundRequested - sRefund.cashAmountRefunded
-                )
-              : "$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
+            {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
           </Text>
-          {!sIsRefund ? (
-            <TextInput
-              disabled={
-                !sCashSaleActive || sSale?.paymentComplete || !refundReady
-              }
-              onFocus={() => {
-                _setFocusedItem("amount");
-                _setRequestedAmountDisp("");
-              }}
-              // onBlur={onBlur}
-              autoFocus={sFocusedItem === "amount"}
+          <View
+            style={{
+              marginLeft: 10,
+              ...checkoutScreenStyle.boxStyle,
+              paddingBottom: 6,
+              paddingRight: 7,
+              // marginTop: 10,
+            }}
+          >
+            <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
+            <View
               style={{
-                fontSize: 15,
-                outlineWidth: 0,
-                color: C.textMain,
-                width: 80,
-                borderColor: C.buttonLightGreenOutline,
-                borderRadius: 2,
-                borderWidth: 1,
-                padding: 5,
-                paddingRight: 1,
-                textAlign: "right",
-              }}
-              inputMode="decimal"
-              placeholder="0.00"
-              placeholderTextColor={makeGrey(0.3)}
-              value={
-                sIsRefund ? sRefund.cashRefundRequested : sRequestedAmountDisp
-              }
-              // value={sRequestedAmount}
-              onChangeText={(val) => {
-                val = usdTypeMask(val).display;
-                if (val === "0.00") val = "";
-                let cents = dollarsToCents(val);
+                // width: "100%",
+                height: "100%",
+                width: 100,
 
-                if (cents > sSale?.total - sSale?.amountCaptured) {
-                  _setStatusMessage("Amount greater than balance");
-                  return;
-                } else {
+                // backgroundColor: "green",
+                alignItems: "flex-end",
+                paddingRight: 5,
+              }}
+            >
+              <TextInput
+                onFocus={() => {
+                  _setFocusedItem("amount");
+                  _setRequestedAmountDisp("");
+                  _setTenderAmountDisp("");
+                  _setRequestedAmount(0);
+                  _setTenderAmount(0);
+                }}
+                autoFocus={sFocusedItem === "amount"}
+                disabled={
+                  !sCashSaleActive || sSale?.paymentComplete || !refundReady
+                }
+                style={{
+                  fontSize: 20,
+                  outlineWidth: 0,
+                  color: sIsRefund ? RED_COLOR : C.textMain,
+                  paddingRight: 2,
+                  textAlign: "right",
+                }}
+                placeholder="0.00"
+                placeholderTextColor={gray(0.3)}
+                value={sRequestedAmountDisp}
+                onChangeText={(val) => {
+                  val = usdTypeMask(val).display;
+                  let cents = dollarsToCents(val);
+                  if (!cents) cents = 0;
+                  if (val === "0.00") val = "";
                   _setStatusMessage("");
                   _setRequestedAmount(cents);
                   _setRequestedAmountDisp(val);
-                }
-              }}
-            />
-          ) : null}
+                }}
+              />
+            </View>
+          </View>
         </View>
       </View>
 
       <CheckBox_
-        buttonStyle={{ marginTop: 10 }}
-        textStyle={{ color: makeGrey(0.6), fontWeight: 500 }}
+        enabled={!sSale?.payments.length > 0}
+        buttonStyle={{ marginTop: 7 }}
+        textStyle={{ color: gray(0.6), fontWeight: 500, fontSize: 14 }}
         text={"DEPOSIT TO ACCOUNT"}
         isChecked={sIsDeposit}
         onCheck={() => _setIsDeposit(!sIsDeposit)}
       />
-      <View style={{ flexDirection: "row" }}>
+      <View
+        style={{
+          width: "100%",
+          alignItems: "center",
+          marginVertical: 5,
+        }}
+      >
         <View
           style={{
             marginLeft: 20,
             ...checkoutScreenStyle.boxStyle,
+            width: "35%",
             paddingBottom: 6,
             paddingRight: 7,
-            marginTop: 10,
           }}
         >
-          <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
+          <Text
+            style={{ ...checkoutScreenStyle.boxDollarSign, color: C.green }}
+          >
+            $
+          </Text>
           <View
             style={{
               width: "100%",
@@ -1666,24 +1752,27 @@ const CashSaleComponent = ({
               }
               style={{
                 ...checkoutScreenStyle.boxText,
-                color: C.textMain,
+                color: C.green,
                 height: "70%",
                 // backgroundColor: "blue",
               }}
               autoFocus={sFocusedItem === "tender"}
               placeholder="0.00"
-              placeholderTextColor={makeGrey(0.3)}
-              value={formatCurrencyDisp(sTenderAmount)}
+              placeholderTextColor={gray(0.3)}
+              value={sTenderAmountDisp}
               onChangeText={(val) => {
-                val = formatDecimal(val);
+                val = usdTypeMask(val).display;
+                let cents = dollarsToCents(val);
+                if (!cents) cents = 0;
                 if (val === "0.00") val = "";
-                _setTenderAmount(val);
+                _setTenderAmount(cents);
+                _setTenderAmountDisp(val);
               }}
-              // autoFocus={sInputBoxFocus == "tender"}
               onKeyPress={handleKeyPress}
               onFocus={() => {
                 _setFocusedItem("tender");
-                _setTenderAmount("");
+                _setTenderAmountDisp("");
+                _setTenderAmount(0);
               }}
             />
             <Text
@@ -1703,12 +1792,13 @@ const CashSaleComponent = ({
           flexDirection: "row",
           justifyContent: "space-around",
           width: "100%",
-          marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
+          alignItems: "center",
+          marginTop: 10,
         }}
       >
         <Button_
           colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ color: C.textWhite }}
+          textStyle={{ color: C.textWhite, fontSize: 16 }}
           enabled={
             sProcessButtonEnabled && !sSale?.paymentComplete && sCashSaleActive
           }
@@ -1716,61 +1806,73 @@ const CashSaleComponent = ({
           text={sIsRefund ? "PROCESS REFUND" : "COMPLETE"}
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
+            width: 120,
           }}
         />
-
         <Button_
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
+            // width: 120,
           }}
-          enabled={
-            sTenderAmount >= sRequestedAmountDisp &&
-            !sSale?.paymentComplete &&
-            sCashSaleActive
-          }
+          textStyle={{ fontSize: 15, color: C.textMain }}
+          colorGradientArr={COLOR_GRADIENTS.grey}
+          enabled={!sSale?.paymentComplete && sCashSaleActive}
           onPress={handleCancelPress}
-          text={"Cancel"}
+          text={"CANCEL"}
         />
-      </View>
-      {sCashChangeNeeded >= 0 &&
-      sTenderAmount >= sRequestedAmountDisp &&
-      !sIsRefund ? (
-        <View
+        {/* <View
           style={{
-            borderWidth: 1,
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 10,
+            ...checkoutScreenStyle.boxStyle,
+            width: "30%",
+            // borderWidth: 1,
+            // borderColor: C.buttonLightGreenOutline,
+            // borderRadius: 10,
             paddingTop: 2,
-            paddingBottom: 3,
-            paddingLeft: 2,
-            paddingRight: 10,
-            marginTop: 16,
+            paddingBottom: 2,
+            // paddingLeft: 2,
+            // paddingRight: 10,
+            flexDirection: "column",
+
+            // marginTop: 16,
           }}
         >
           <Text
             style={{
               fontSize: 11,
-              color: makeGrey(0.3),
-              width: 110,
-              marginBottom: 5,
-              // paddingBottom: 10,
+              color: gray(0.3),
+              // marginBottom: 10,
+              width: "100%",
+              textAlign: "left",
+              paddingBottom: 3,
               // paddingHorizontal: 10,
             }}
           >
             CHANGE
           </Text>
           <Text
+            placeholder={"0.00"}
             style={{
               // ...checkoutScreenStyle.statusText,
               textAlign: "right",
               fontSize: 25,
-              color: C.green,
+              color: sCashChangeNeeded > 0 ? C.green : gray(0.3),
             }}
           >
-            {formatCurrencyDisp(sCashChangeNeeded, true)}
+            <Text
+              style={{
+                fontSize: 15,
+                // color: C.green,
+                paddingRight: 7,
+                height: "100%",
+                textAlignVertical: "top",
+              }}
+            >
+              $
+            </Text>
+            {sCashChangeNeeded}
           </Text>
-        </View>
-      ) : null}
+        </View> */}
+      </View>
     </View>
   );
 };
@@ -1806,34 +1908,43 @@ const StripeCreditCardComponent = ({
   const [sRequestedAmount, _setRequestedAmount] = useState(
     sSale?.total - sSale?.amountCaptured
   );
+  const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(
+    formatCurrencyDisp(
+      sRefund.cashRefundRequested
+        ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
+        : sSale?.total - sSale?.amountCaptured
+    )
+  );
+  // const [sRefundAmountDisp, _setRefundAmountDisp] = useState(forma);
   const [sStatusMessage, _setStatusMessage] = useState("");
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(true);
   const [sFocusedItem, _setFocusedItem] = useState("");
-  const [sCardReaderObj, _setCardReaderObj] = useState("");
-  const [sCardReaderArr, _setCardReaderArr] = useState([]);
-  const [sListenerArr, _setListenerArr] = useState([]);
+  const [sCardReader, _setCardReader] = useState("");
+  const [sCardReaders, _setCardReaders] = useState([]);
+  const [sListeners, _setListeners] = useState([]);
   const [sPaymentIntentID, _setPaymentIntentID] = useState("");
   const [sStatusTextColor, _setStatusTextColor] = useState(C.green);
   const [sPartialPaymentAlert, _setPartialPaymentAlert] = useState(false);
 
   /////////////////////////////////////////////////////////////////////////
-  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (
+      sRequestedAmount > sSale?.total - sSale?.amountCaptured ||
+      sRequestedAmount < 50
+    ) {
+      _setProcessButtonEnabled(false);
+    } else {
+      _setProcessButtonEnabled(true);
+    }
+  }, [sRequestedAmount]);
 
   useEffect(() => {
     // log(sRequestedAmount);
     getAvailableStripeReaders();
-    if (
-      sRequestedAmount <= sSale?.total - sSale?.amountCaptured &&
-      sRequestedAmount >= 1
-    ) {
-      _setProcessButtonEnabled(true);
-    } else {
-      _setProcessButtonEnabled(false);
-    }
 
     return () => {
       try {
-        sListenerArr.forEach((listener) => listener());
+        sListeners.forEach((listener) => listener());
       } catch (e) {
         log("error canceling listener", e);
       }
@@ -1852,42 +1963,38 @@ const StripeCreditCardComponent = ({
     readerArr.forEach((connectedReader) => {
       arr.push(connectedReader);
     });
-    _setCardReaderArr(arr);
+    _setCardReaders(arr);
     if (arrHasItem(arr, zSettings?.selectedCardReaderObj)) {
-      _setCardReaderObj(zSettings?.selectedCardReaderObj);
+      _setCardReader(zSettings?.selectedCardReaderObj);
     } else {
-      _setCardReaderObj(arr[0]);
+      _setCardReader(arr[0]);
     }
   }
 
-  async function startPayment(paymentAmount, readerID) {
+  async function startPayment(paymentAmount, reader) {
+    let readerID = reader.id;
     if (!(paymentAmount > 0)) return;
     _setStatusTextColor("green");
     _setStatusMessage("Retrieving card reader activation...");
-    // log("starting server driven payment attempt, amount", paymentAmount);
-    // return;
 
-    // readerResult obj contains readerResult object key/val and paymentIntentID key/val
     let readerResult;
     if (sIsRefund) {
       readerResult = await dbCancelServerDrivenStripePayment(
-        readerID || sCardReaderObj.id,
+        readerID || sCardReader.id,
         refundPaymentIntentID
       );
     } else {
       readerResult = await dbProcessServerDrivenStripePayment(
         paymentAmount,
-        readerID || sCardReaderObj.id,
+        readerID || sCardReader.id,
         false,
         sPaymentIntentID
       );
     }
 
-    // console.log("reader result", readerResult);
-
     if (!readerResult) {
-      _setStatusMessage("No reader found\n\nCheck connections");
-      log("no result");
+      _setStatusMessage("No reader found\n(check connections/start/restart)");
+      log("no result from start Stripe payment");
       return;
     }
 
@@ -1898,13 +2005,13 @@ const StripeCreditCardComponent = ({
       _setStatusMessage("Waiting for customer...");
       // log("readerkdfjkdjf", readerResult.paymentIntentID);
       _setPaymentIntentID(readerResult.paymentIntentID);
-      let listenerArr = cloneDeep(sListenerArr);
+      let listenerArr = cloneDeep(sListeners);
       let listener = dbSubscribeToStripePaymentProcess(
         readerResult.paymentIntentID,
         handleStripeCardPaymentDBSubscriptionUpdate
       );
       listenerArr.push(listener);
-      _setListenerArr(listenerArr);
+      _setListeners(listenerArr);
     }
   }
 
@@ -1969,9 +2076,8 @@ const StripeCreditCardComponent = ({
       log("Stripe payment complete!");
       // clog("Payment complete object", val);
       let paymentMethodDetails = val.payment_method_details.card_present;
-
       let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
-      payment.amountCaptured = roundToTwoDecimals(val.amount_captured / 100);
+      payment.amountCaptured = val.amount_captured;
       payment.cardIssuer =
         paymentMethodDetails.receipt.application_preferred_name;
       payment.cardType = paymentMethodDetails.description;
@@ -2018,18 +2124,16 @@ const StripeCreditCardComponent = ({
     _setProcessButtonEnabled(false);
   }
 
-  function handleProcessButtonPress() {
-    startPayment(sAmountLeftToPay);
-  }
+  function handleProcessButtonPress() {}
 
   async function resetCardReader() {
     _setStatusMessage(RED_COLOR);
     _setStatusMessage("\nCard reader reset in progress...");
     _setPaymentIntentID(null);
-    sListenerArr.forEach((listener) => listener());
+    sListeners.forEach((listener) => listener());
     _setProcessButtonEnabled(true);
     let readerResult = await dbCancelServerDrivenStripePayment(
-      sCardReaderObj.id,
+      sCardReader.id,
       sPaymentIntentID
     );
     _setStatusTextColor("green");
@@ -2047,11 +2151,11 @@ const StripeCreditCardComponent = ({
         body: JSON.stringify({
           amount: Number(sRequestedAmount),
           currency: "usd",
-          readerID: reader?.id || sCardReaderObj.id,
+          readerID: reader?.id || sCardReader.id,
         }),
       });
       const data = await res.json();
-      clog("intent", data);
+      // clog("intent", data);
     } catch (e) {
       log("Error creating payment intent", e);
     }
@@ -2062,9 +2166,10 @@ const StripeCreditCardComponent = ({
   // log(sProcessButtonEnabled.toString());
   let refundReady = true;
   if (sIsRefund && !sRefundAmount) refundReady = false;
-
+  // log("stripe sale", sSale?.paymentComplete.toString());
   return (
     <View
+      pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
       style={{
         ...checkoutScreenStyle.base,
         opacity: sSale?.paymentComplete || !refundReady ? 0.2 : 1,
@@ -2088,9 +2193,7 @@ const StripeCreditCardComponent = ({
           }}
         >
           <View style={{}}>
-            <Text style={{ color: makeGrey(0.6), fontSize: 11 }}>
-              Card Readers
-            </Text>
+            <Text style={{ color: gray(0.6), fontSize: 11 }}>Card Readers</Text>
             <DropdownMenu
               enabled={
                 sCardSaleActive && !sSale?.paymentComplete && refundReady
@@ -2107,9 +2210,9 @@ const StripeCreditCardComponent = ({
                 borderColor: C.buttonLightGreenOutline,
               }}
               itemStyle={{ width: null }}
-              dataArr={sCardReaderArr || []}
-              buttonText={sCardReaderObj?.label || sCardReaderObj?.id}
-              onSelect={_setCardReaderObj}
+              dataArr={sCardReaders || []}
+              buttonText={sCardReader?.label || sCardReader?.id}
+              onSelect={_setCardReader}
             />
           </View>
           <Button_
@@ -2117,11 +2220,11 @@ const StripeCreditCardComponent = ({
             enabled={sCardSaleActive && !sSale?.paymentComplete && refundReady}
             buttonStyle={{
               cursor: sProcessButtonEnabled ? "inherit" : "default",
-              backgroundColor: makeGrey(0.2),
+              backgroundColor: gray(0.2),
               paddingHorizontal: 5,
               paddingVertical: 2,
               borderRadius: 5,
-              borderColor: makeGrey(0.23),
+              borderColor: gray(0.23),
               borderWidth: 1,
             }}
             textStyle={{
@@ -2152,6 +2255,9 @@ const StripeCreditCardComponent = ({
           borderRadius: 10,
           borderWidth: 1,
           borderColor: C.buttonLightGreenOutline,
+          // backgroundColor: "green",
+          // ...checkoutScreenStyle.boxStyle,
+          width: "70%",
         }}
       >
         <View
@@ -2178,6 +2284,7 @@ const StripeCreditCardComponent = ({
             alignItems: "flex-end",
             marginLeft: 10,
             color: C.textMain,
+            // width: "60%",
           }}
         >
           <Text
@@ -2190,50 +2297,61 @@ const StripeCreditCardComponent = ({
           >
             {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
           </Text>
-          <TextInput
-            onFocus={() => {
-              _setFocusedItem("amount");
-              _setRequestedAmount("");
-              // _setProcessButtonEnabled(false);
-            }}
-            autoFocus={sFocusedItem === "amount"}
-            disabled={
-              !sCardSaleActive || sSale?.paymentComplete || !refundReady
-            }
+          <View
             style={{
-              fontSize: 20,
-              outlineWidth: 0,
-              color: sIsRefund ? RED_COLOR : C.textMain,
-              width: 80,
-              borderColor: C.buttonLightGreenOutline,
-              borderRadius: 5,
-              borderWidth: 2,
-              padding: 10,
-              paddingRight: 2,
-              textAlign: "right",
+              marginLeft: 10,
+              ...checkoutScreenStyle.boxStyle,
+              paddingBottom: 6,
+              paddingRight: 7,
             }}
-            placeholder="0.00"
-            placeholderTextColor={makeGrey(0.3)}
-            value={formatCurrencyDisp(sRequestedAmount)}
-            onChangeText={(val) => {
-              val = formatDecimal(val);
-              if (val > sAmountLeftToPay || val <= 3) {
-                // _setStatusMessage("Improper payment amount...");
-                log("here");
-                _setRequestedAmount(val);
-                _setProcessButtonEnabled(false);
-              } else {
-                _setProcessButtonEnabled(true);
-                // _setStatusMessage("");
-                _setRequestedAmount(val);
-              }
-            }}
-          />
+          >
+            <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
+            <View
+              style={{
+                height: "100%",
+                width: 100,
+                alignItems: "flex-end",
+                paddingRight: 5,
+              }}
+            >
+              <TextInput
+                onFocus={() => {
+                  _setFocusedItem("amount");
+                  _setRequestedAmountDisp("");
+                  _setRequestedAmount(0);
+                }}
+                autoFocus={sFocusedItem === "amount"}
+                disabled={
+                  !sCardSaleActive || sSale?.paymentComplete || !refundReady
+                }
+                style={{
+                  fontSize: 20,
+                  outlineWidth: 0,
+                  color: sIsRefund ? RED_COLOR : C.textMain,
+                  paddingRight: 2,
+                  textAlign: "right",
+                }}
+                placeholder="0.00"
+                placeholderTextColor={gray(0.3)}
+                value={sRequestedAmountDisp}
+                onChangeText={(val) => {
+                  val = usdTypeMask(val).display;
+                  let cents = dollarsToCents(val);
+                  if (!cents) cents = 0;
+                  if (val === "0.00") val = "";
+                  _setStatusMessage("");
+                  _setRequestedAmount(cents);
+                  _setRequestedAmountDisp(val);
+                }}
+              />
+            </View>
+          </View>
         </View>
       </View>
       <CheckBox_
+        enabled={!sSale?.payments.length > 0}
         buttonStyle={{ marginTop: 10 }}
-        textStyle={{ color: makeGrey(0.6), fontWeight: 500 }}
+        textStyle={{ color: gray(0.6), fontWeight: 500 }}
         text={"DEPOSIT TO ACCOUNT"}
         isChecked={sIsDeposit}
         onCheck={() => _setIsDeposit(!sIsDeposit)}
@@ -2261,11 +2379,11 @@ const StripeCreditCardComponent = ({
         {/* {!sPartialPaymentAlert ? ( */}
         <Button_
           colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ color: C.textWhite }}
+          textStyle={{ color: C.textWhite, fontSize: 16 }}
           enabled={
             sProcessButtonEnabled && !sSale?.paymentComplete && sCardSaleActive
           }
-          onPress={() => handleProcessPaymentPress()}
+          onPress={() => startPayment(sRequestedAmount, sCardReader)}
           text={sIsRefund ? "PROCESS REFUND" : "PROCESS CARD"}
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
@@ -2276,7 +2394,7 @@ const StripeCreditCardComponent = ({
             ...checkoutScreenStyle.statusText,
             fontSize: 15,
             color: sStatusTextColor,
-            marginTop: 10,
+            marginTop: 5,
           }}
         >
           {sStatusMessage}
@@ -2291,9 +2409,13 @@ const InventoryListComponent = ({
   onSelect,
   quickItemButtons,
   _setSearchStr,
+  sSale,
 }) => {
   return (
-    <View style={{ width: "100%" }}>
+    <View
+      pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
+      style={{ width: "100%" }}
+    >
       <Button_
         text={"CLOSE INVENTORY"}
         onPress={() => _setSearchStr("")}
@@ -2389,29 +2511,39 @@ const WorkorderListComponent = ({
     }
   }
   // clog(sCombinedWorkordersArr);
+  // log("pay", sSale.payments.length);
   return (
     <ScrollView
       style={{
         width: "100%",
-        opacity: sSale?.paymentComplete ? 0.2 : 1,
+        opacity: sSale?.paymentComplete || sSale?.payments.length > 0 ? 0.5 : 1,
       }}
     >
       {getWorkorderArr().map((workorder, idx) => {
         return (
           <View
+            pointerEvents="none"
             key={workorder.id}
             style={{
               width: "100%",
               borderColor: C.buttonLightGreenOutline,
-              backgroundColor: C.backgroundListWhite,
+              // backgroundColor: C.backgroundListWhite,
+              backgroundColor: sCombinedWorkorders.find(
+                (o) => o.id === workorder.id
+              )
+                ? C.backgroundListWhite
+                : gray(0.03),
               borderWidth: 1,
               borderRadius: 10,
               padding: 10,
               marginBottom: 7,
+              opacity: sSale?.paymentComplete ? 0.2 : null,
             }}
           >
-            {!isRefund ? (
+            {!isRefund && idx !== 0 ? (
               <CheckBox_
+                enabled={!sSale?.payments.length > 0}
+                // enabled={!sSale?.paymentComplete && !sSale?.payments.length > 0}
                 buttonStyle={{
                   alignSelf: "flex-start",
                   marginTop: 5,
@@ -2422,7 +2554,7 @@ const WorkorderListComponent = ({
                 )}
                 text={"ADD TO SALE"}
                 onCheck={() =>
-                  zOpenWorkorder.id === workorder.id ||
+                  zOpenWorkorder?.id === workorder.id ||
                   isRefund ||
                   sSale?.paymentComplete
                     ? null
@@ -2447,7 +2579,7 @@ const WorkorderListComponent = ({
                   justifyContent: "space-between",
                   padding: 10,
                   borderBottomWidth: 1,
-                  borderBottomColor: makeGrey(0.1),
+                  borderBottomColor: gray(0.1),
                   marginBottom: 10,
                 }}
               >
@@ -2463,7 +2595,7 @@ const WorkorderListComponent = ({
                   </Text>
                   <Text
                     style={{
-                      color: makeGrey(0.6),
+                      color: gray(0.6),
                       fontSize: 16,
                       fontWeight: "500",
                       fontStyle: "italic",
@@ -2586,7 +2718,7 @@ const WorkorderListComponent = ({
                           <Text
                             style={{
                               fontSize: 14,
-                              color: makeGrey(0.65),
+                              color: gray(0.65),
                               fontWeight: "500",
                             }}
                           >
@@ -2695,7 +2827,7 @@ const WorkorderListComponent = ({
                   justifyContent: "space-around",
                   alignItems: "center",
                   borderTopWidth: 1,
-                  borderTopColor: makeGrey(0.1),
+                  borderTopColor: gray(0.1),
                   marginTop: 5,
                   paddingTop: 5,
                 }}
@@ -2819,13 +2951,13 @@ const checkoutScreenStyle = {
     paddingTop: 20,
     width: "100%",
     height: "48%",
-    backgroundColor: C.backgroundListWhite,
+    // backgroundColor: C.listItemWhite,
     borderRadius: 15,
     ...SHADOW_RADIUS_PROTO,
   },
   titleText: {
     fontSize: 25,
-    color: makeGrey(0.55),
+    color: gray(0.6),
   },
   boxDollarSign: {
     fontSize: 15,
@@ -2851,21 +2983,19 @@ const checkoutScreenStyle = {
   boxStyle: {
     marginTop: 5,
     borderColor: C.buttonLightGreenOutline,
-    borderRadius: 5,
+    borderRadius: 10,
     borderWidth: 2,
     backgroundColor: C.listItemWhite,
-    // padding: 10,
     paddingVertical: 10,
     paddingHorizontal: 10,
-    width: 120,
-    // height: 70,
+    // width: 120,
     alignItems: "space-between",
     justifyContent: "space-between",
     flexDirection: "row",
   },
   totalTextStyle: {
     marginTop: 15,
-    color: makeGrey(0.75),
+    color: gray(0.75),
   },
   titleStyle: {
     marginTop: 20,
@@ -2887,6 +3017,10 @@ const checkoutScreenStyle = {
 };
 
 /**
+ *
+ *
+ *
+ *
  *  cash sale obj
  *
  * sale : {"id":"730921185148","workorderIDs":[],"millis":1757977293182,"payments":[{"amountCaptured":1,"amountTendered":2.8755,"saleID":"730921185148","cash":true,"millis":1757977293182,"id":"nXaw9FsU6kOVgj2s60MR","workorderLinesRefundedIDs":[]}],"subtotal":2.7,"discount":0,"salesTaxPercent":6.5,"total":2.8755,"amountCaptured":1,"isDeposit":false,"amountRefunded":0,"workordersID":["540286345956"]}

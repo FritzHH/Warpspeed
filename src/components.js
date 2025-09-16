@@ -31,7 +31,7 @@ import {
   LETTERS,
   lightenRGBByPercent,
   log,
-  makeGrey,
+  gray,
   NUMS,
   readAsBinaryString,
   removeDashesFromPhone,
@@ -1801,9 +1801,11 @@ export const CheckBox_ = ({
   isChecked,
   buttonStyle = {},
   textStyle = {},
+  enabled,
 }) => {
   return (
     <Button_
+      enabled={enabled}
       mouseOverOptions={mouseOverOptions}
       icon={isChecked ? ICONS.checkbox : ICONS.checkoxEmpty}
       iconSize={15}
@@ -1826,6 +1828,7 @@ export const GradientView = ({
   children,
   style,
   props,
+  pointerEvents,
 }) => {
   return (
     <LinearGradient
@@ -1931,77 +1934,79 @@ export const Button_ = ({
 
   // log(enabled.toString());
   return (
-    <TouchableOpacity
-      style={{
-        opacity: getOpacity(),
-        ...viewStyle,
-      }}
-      activeOpacity={enabled ? null : 1}
-      ref={ref}
-      onMouseOver={() => {
-        if (!enabled) return;
-        handleMouseOver();
-        enableMouseOver ? _setMouseOver(true) : null;
-      }}
-      onMouseLeave={() => {
-        handleMouseExit();
-        _setMouseOver(false);
-      }}
-      // on={() => log("here")}
-      onPress={() => (enabled ? handleButtonPress() : null)}
-      onLongPress={visible ? onLongPress : () => {}}
-    >
-      <GradientView
-        // colorArr={enabled ? colorGradientArr : []}
-        colorArr={colorGradientArr || []}
+    <View pointerEvents={!enabled ? "none" : "auto"}>
+      <TouchableOpacity
         style={{
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "row",
-          paddingHorizontal: 5,
-          borderRadius: 15,
-          paddingVertical: 5,
-          paddingHorizontal: icon ? 5 : 15,
-          paddingLeft: icon ? 2 : 15,
-          ...shadowStyle,
-          ...buttonStyle,
-          backgroundColor: icon && !text ? null : getBackgroundColor(),
-          opacity: enabled ? 1 : 0.2,
+          opacity: getOpacity(),
+          ...viewStyle,
         }}
-        {...gradientViewProps}
+        activeOpacity={enabled ? null : 1}
+        ref={ref}
+        onMouseOver={() => {
+          if (!enabled) return;
+          handleMouseOver();
+          enableMouseOver ? _setMouseOver(true) : null;
+        }}
+        onMouseLeave={() => {
+          handleMouseExit();
+          _setMouseOver(false);
+        }}
+        // on={() => log("here")}
+        onPress={() => (enabled ? handleButtonPress() : null)}
+        onLongPress={visible ? onLongPress : () => {}}
       >
-        {icon ? (
-          <Image_
-            icon={icon}
-            size={iconSize}
-            style={{
-              marginRight: text ? 10 : 0,
-              ...iconStyle,
-              opacity: sMouseOver
-                ? mouseOverOptions.opacity
-                : buttonStyle.opacity,
-            }}
-          />
-        ) : null}
-        {/* {text ? <Text style={{ ...textStyle }}>{text}</Text> : null} */}
-        {TextComponent ? (
-          <TextComponent />
-        ) : (
-          <Text
-            numberOfLines={numLines}
-            style={{
-              textAlign: "center",
-              textAlignVertical: "center",
-              fontSize: 17,
-              color: C.textMain,
-              ...textStyle,
-            }}
-          >
-            {text}
-          </Text>
-        )}
-      </GradientView>
-    </TouchableOpacity>
+        <GradientView
+          // colorArr={enabled ? colorGradientArr : []}
+          colorArr={colorGradientArr || []}
+          style={{
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+            paddingHorizontal: 5,
+            borderRadius: 15,
+            paddingVertical: 5,
+            paddingHorizontal: icon ? 5 : 15,
+            paddingLeft: icon ? 2 : 15,
+            ...shadowStyle,
+            ...buttonStyle,
+            backgroundColor: icon && !text ? null : getBackgroundColor(),
+            opacity: enabled ? 1 : 0.2,
+          }}
+          {...gradientViewProps}
+        >
+          {icon ? (
+            <Image_
+              icon={icon}
+              size={iconSize}
+              style={{
+                marginRight: text ? 10 : 0,
+                ...iconStyle,
+                opacity: sMouseOver
+                  ? mouseOverOptions.opacity
+                  : buttonStyle.opacity,
+              }}
+            />
+          ) : null}
+          {/* {text ? <Text style={{ ...textStyle }}>{text}</Text> : null} */}
+          {TextComponent ? (
+            <TextComponent />
+          ) : (
+            <Text
+              numberOfLines={numLines}
+              style={{
+                textAlign: "center",
+                textAlignVertical: "center",
+                fontSize: 17,
+                color: C.textMain,
+                ...textStyle,
+              }}
+            >
+              {text}
+            </Text>
+          )}
+        </GradientView>
+      </TouchableOpacity>
+    </View>
   );
 };
 

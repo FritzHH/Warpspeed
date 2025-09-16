@@ -153,6 +153,7 @@ export function dbSetCustomerField(
   batch = true
 ) {
   let path = build_db_path.customer(customerID);
+  // log("path", path);
   log("need to fix batch for Firestore, its only written for Realtime");
   // if (batch) batch
   return newSetDatabaseField(path, fieldObj, false, true);

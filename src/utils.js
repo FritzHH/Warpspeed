@@ -428,20 +428,6 @@ export function formatCurrencyDisp(
     : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
   return amount.toLocaleString(locale, opts);
   // log(input);
-  const num = parseFloat(input);
-  if (isNaN(num)) return "";
-
-  let obj = num.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  if (dollarSign) {
-    return obj;
-  } else {
-    return obj.toString().slice(1);
-  }
 }
 
 export function usdTypeMask(raw, { withDollar = false } = {}) {
@@ -463,31 +449,35 @@ export function usdTypeMask(raw, { withDollar = false } = {}) {
     s = s.slice(1);
   }
 
-  // Keep only digits (works even if user types a dot; we "force" the decimal position)
+  // Keep only digits — we'll force the decimal position ourselves
   const digits = s.replace(/\D/g, "");
   if (digits.length === 0) {
     const display = `${neg ? "-" : ""}${withDollar ? "$" : ""}0.00`;
     return { display, cents: 0 };
   }
+
   // Split into dollars & cents (last two digits are cents)
   const len = digits.length;
-  const dollarsStr =
+  const rawDollars =
     (digits.slice(0, Math.max(0, len - 2)) || "0").replace(/^0+(?=\d)/, "") ||
     "0";
   const centsStr = digits.slice(-2).padStart(2, "0");
 
-  // Compute integer cents (use BigInt when available to avoid overflow on huge inputs)
+  // Add commas to dollars
+  const dollarsWithCommas = rawDollars.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  // Compute integer cents (BigInt for very large inputs)
   let centsVal;
   try {
-    centsVal = Number(BigInt(dollarsStr) * 100n + BigInt(centsStr));
+    centsVal = Number(BigInt(rawDollars) * 100n + BigInt(centsStr));
   } catch {
-    centsVal = parseInt(dollarsStr, 10) * 100 + parseInt(centsStr, 10);
+    centsVal = parseInt(rawDollars, 10) * 100 + parseInt(centsStr, 10);
   }
   if (neg) centsVal = -centsVal;
 
   const display = `${neg ? "-" : ""}${
     withDollar ? "$" : ""
-  }${dollarsStr}.${centsStr}`;
+  }${dollarsWithCommas}.${centsStr}`;
   return { display, cents: centsVal };
 }
 
@@ -782,7 +772,15 @@ export function getConnectionStrength() {
   }
 }
 
-export function makeGrey(opacity) {
+export function gray(u, alpha = 1) {
+  // u in [0,1]: 0 -> white (255), 1 -> black (0)
+  let x = Number(u);
+  if (!Number.isFinite(x)) x = 0;
+  x = Math.min(1, Math.max(0, x));
+  const v = Math.round((1 - x) * 255);
+
+  alpha = Math.min(1, Math.max(0, Number(alpha)));
+  return alpha === 1 ? `rgb(${v},${v},${v})` : `rgba(${v},${v},${v},${alpha})`;
   return "rgba(0,0,0," + opacity + ")";
 }
 
@@ -959,9 +957,10 @@ export function removeUnusedFields(obj) {
   keys.forEach((key) => {
     if (obj[key]) usedFields.push(key);
   });
-
+  // log("sed", usedFields);
   let newObj = {};
   usedFields.forEach((field) => (newObj[field] = obj[field]));
+  log(newObj);
   return newObj;
 }
 
@@ -1307,7 +1306,7 @@ export function bestForegroundHex(bgHex) {
   const contrastWithWhite = contrastRatio(bgLum, whiteLum);
   const contrastWithBlack = contrastRatio(bgLum, blackLum);
 
-  return contrastWithWhite >= contrastWithBlack ? C.textWhite : makeGrey(0.85);
+  return contrastWithWhite >= contrastWithBlack ? C.textWhite : gray(0.85);
 }
 // utils
 export const localStorageWrapper = {

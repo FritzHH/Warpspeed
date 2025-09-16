@@ -26,7 +26,7 @@ import {
   getWordDayOfWeek,
   incrementNumByFive,
   log,
-  makeGrey,
+  gray,
   numberIsEven,
   trimToTwoDecimals,
 } from "../../../utils";
@@ -473,7 +473,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                   textAlign: "right",
                 }}
               >
-                <Text style={{ fontSize: 16, color: makeGrey(0.6) }}>$</Text>
+                <Text style={{ fontSize: 16, color: gray(0.6) }}>$</Text>
                 {Number(sRunningTotalWages)?.toLocaleString()}
               </Text>
             </View>
@@ -518,7 +518,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                         opacity: editable ? 1 : !sEditableRowIdx ? 1 : 0.15,
                         backgroundColor: isEven(idx)
                           ? C.listItemWhite
-                          : makeGrey(0.075),
+                          : gray(0.075),
                         paddingVertical: 8,
                         paddingHorizontal: 5,
                       }}
@@ -531,7 +531,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           width: "8%",
                         }}
                       >
-                        <Text style={{ color: makeGrey(0.4), marginRight: 5 }}>
+                        <Text style={{ color: gray(0.4), marginRight: 5 }}>
                           {item.in?.year || item.out?.year}
                         </Text>
                       </View>
@@ -714,7 +714,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 borderRadius: 5,
                               }}
                               buttonTextStyle={{
-                                color: makeGrey(0.6),
+                                color: gray(0.6),
                                 fontSize: 14,
                                 // paddingHorizontal: 0,
                               }}
@@ -915,7 +915,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 borderRadius: 5,
                               }}
                               buttonTextStyle={{
-                                color: makeGrey(0.6),
+                                color: gray(0.6),
                                 fontSize: 14,
                                 // paddingHorizontal: 0,
                               }}
@@ -946,7 +946,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               // backgroundColor: "blue",
                             }}
                           >
-                            <Text style={{ color: makeGrey(0.6) }}>Total:</Text>
+                            <Text style={{ color: gray(0.6) }}>Total:</Text>
                             <Text style={{ textAlign: "right", width: 50 }}>
                               {(item.hoursDiff ? item.hoursDiff : "") +
                                 " : " +
@@ -1006,7 +1006,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
               >
                 <Text
                   style={{
-                    color: makeGrey(0.4),
+                    color: gray(0.4),
                     fontSize: 17,
                     paddingVertical: 10,
                   }}

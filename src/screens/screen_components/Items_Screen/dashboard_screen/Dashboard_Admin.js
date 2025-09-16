@@ -19,7 +19,7 @@ import {
   generateUPCBarcode,
   getDayOfWeekFrom0To7Input,
   log,
-  makeGrey,
+  gray,
   moveItemInArr,
   NUMS,
   removeDashesFromPhone,
@@ -183,8 +183,7 @@ export function Dashboard_Admin({}) {
               text={TAB_NAMES.quickItems}
               style={{
                 fontWeight: sExpand === TAB_NAMES.quickItems ? 500 : null,
-                color:
-                  sExpand === TAB_NAMES.quickItems ? C.green : makeGrey(0.6),
+                color: sExpand === TAB_NAMES.quickItems ? C.green : gray(0.6),
               }}
             />
             <VerticalSpacer />
@@ -196,7 +195,7 @@ export function Dashboard_Admin({}) {
               text={TAB_NAMES.users}
               style={{
                 fontWeight: sExpand === TAB_NAMES.users ? 500 : null,
-                color: sExpand === TAB_NAMES.users ? C.green : makeGrey(0.6),
+                color: sExpand === TAB_NAMES.users ? C.green : gray(0.6),
               }}
             />
             <VerticalSpacer />
@@ -211,7 +210,7 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.payments ? 500 : null,
 
-                color: sExpand === TAB_NAMES.payments ? C.green : makeGrey(0.6),
+                color: sExpand === TAB_NAMES.payments ? C.green : gray(0.6),
               }}
             />
             <VerticalSpacer />
@@ -226,7 +225,7 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.statuses ? 500 : null,
 
-                color: sExpand === TAB_NAMES.statuses ? C.green : makeGrey(0.6),
+                color: sExpand === TAB_NAMES.statuses ? C.green : gray(0.6),
               }}
             />
             <VerticalSpacer />
@@ -238,7 +237,7 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.lists ? 500 : null,
 
-                color: sExpand === TAB_NAMES.lists ? C.green : makeGrey(0.6),
+                color: sExpand === TAB_NAMES.lists ? C.green : gray(0.6),
               }}
               text={TAB_NAMES.lists}
             />
@@ -252,8 +251,7 @@ export function Dashboard_Admin({}) {
               }
               style={{
                 fontWeight: sExpand === TAB_NAMES.storeInfo ? 500 : null,
-                color:
-                  sExpand === TAB_NAMES.storeInfo ? C.green : makeGrey(0.6),
+                color: sExpand === TAB_NAMES.storeInfo ? C.green : gray(0.6),
               }}
               text={TAB_NAMES.storeInfo}
             />
@@ -280,7 +278,7 @@ export function Dashboard_Admin({}) {
               handleExpandPress={() => _setShowSalesReportModal(true)}
               style={{
                 fontWeight: sExpand === TAB_NAMES.sales ? 500 : null,
-                color: sExpand === TAB_NAMES.sales ? C.green : makeGrey(0.6),
+                color: sExpand === TAB_NAMES.sales ? C.green : gray(0.6),
               }}
               text={TAB_NAMES.sales}
               icon={ICONS.dollarYellow}
@@ -309,7 +307,7 @@ export function Dashboard_Admin({}) {
               selected={sExpand === TAB_NAMES.ordering}
               handleExpandPress={() => {}}
               style={{
-                color: sExpand === TAB_NAMES.ordering ? C.green : makeGrey(0.6),
+                color: sExpand === TAB_NAMES.ordering ? C.green : gray(0.6),
               }}
               dropdownLabel={"ORDERING"}
               text={TAB_NAMES.ordering}
@@ -329,7 +327,7 @@ export function Dashboard_Admin({}) {
           <Text
             style={{
               borderColor: C.buttonLightGreenOutline,
-              color: makeGrey(0.6),
+              color: gray(0.6),
               marginBottom: 10,
               fontSize: 17,
               fontWeight: 500,
@@ -394,7 +392,7 @@ function VerticalSpacer({ height }) {
         height: 1,
         marginVertical: 7,
         width: "100%",
-        backgroundColor: makeGrey(0.1),
+        backgroundColor: gray(0.1),
       }}
     />
   );
@@ -448,7 +446,7 @@ function MenuListLabelComponent({
         <Text
           style={{
             fontSize: 16,
-            color: makeGrey(0.5),
+            color: gray(0.5),
             fontWeight: "500",
           }}
         >
@@ -470,7 +468,7 @@ function MenuListLabelComponent({
           onSelect={onDropdownSelect}
           buttonTextStyle={{
             fontSize: 15,
-            color: makeGrey(0.5),
+            color: gray(0.5),
             textAlign: "left",
             fontWeight: "500",
           }}
@@ -517,12 +515,12 @@ function BoxButton1({
       text={label}
       icon={icon || ICONS.add}
       iconSize={iconSize || 30}
-      textStyle={{ fontSize: 14, color: makeGrey(0.6), ...textStyle }}
+      textStyle={{ fontSize: 14, color: gray(0.6), ...textStyle }}
       buttonStyle={{
         paddingHorizontal: 0,
         paddingVertical: 0,
         borderRadius: 5,
-        backgroundColor: makeGrey(0.2),
+        backgroundColor: gray(0.2),
         marginBottom: 0,
         ...style,
       }}
@@ -1506,7 +1504,7 @@ const DiscountsComponent = ({
                       handleSettingsFieldChange("discounts", discountsArr);
                     }}
                     placeholder={"Discount Name"}
-                    placeholderTextColor={makeGrey(0.15)}
+                    placeholderTextColor={gray(0.15)}
                     style={{
                       borderColor: C.buttonLightGreenOutline,
                       borderWidth: 1,
@@ -1678,7 +1676,7 @@ const WaitTimesComponent = ({
                       handleSettingsFieldChange("waitTimes", arr);
                     }}
                     placeholder={"Wait time label"}
-                    placeholderTextColor={makeGrey(0.15)}
+                    placeholderTextColor={gray(0.15)}
                     style={{
                       borderColor: C.buttonLightGreenOutline,
                       borderWidth: 1,
@@ -1704,7 +1702,7 @@ const WaitTimesComponent = ({
                       handleSettingsFieldChange("waitTimes", arr);
                     }}
                     placeholder={"Days"}
-                    placeholderTextColor={makeGrey(0.15)}
+                    placeholderTextColor={gray(0.15)}
                     style={{
                       borderColor: C.buttonLightGreenOutline,
                       borderWidth: 1,
@@ -2267,7 +2265,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     borderWidth: 1,
                     borderRadius: 5,
                     marginLeft: 2,
-                    outlineColor: makeGrey(0.5),
+                    outlineColor: gray(0.5),
                     backgroundColor: "transparent",
                     width: 30,
                   }}
@@ -2478,7 +2476,7 @@ const PaymentProcessingComponent = ({
                   icon={ICONS.add}
                   style={{ marginRight: 10, paddingLeft: 0 }}
                 />
-                <Text style={{ fontSize: 12, color: makeGrey(0.6) }}>
+                <Text style={{ fontSize: 12, color: gray(0.6) }}>
                   {"STRIPE CARD READERS"}
                 </Text>
               </View>
@@ -2508,7 +2506,7 @@ const PaymentProcessingComponent = ({
                         alignItems: "center",
                       }}
                     >
-                      <Text style={{ color: makeGrey(0.55), marginRight: 10 }}>
+                      <Text style={{ color: gray(0.55), marginRight: 10 }}>
                         ID:
                       </Text>
                       <TextInput
@@ -2516,7 +2514,7 @@ const PaymentProcessingComponent = ({
                         editable={true}
                         value={item.id}
                         placeholder="Assign reader name..."
-                        placeholderTextColor={makeGrey(0.4)}
+                        placeholderTextColor={gray(0.4)}
                         onChangeText={(val) => {
                           let cardReaderArr = zSettingsObj.cardReaders?.map(
                             (o) => {
@@ -2545,7 +2543,7 @@ const PaymentProcessingComponent = ({
                           );
                         }}
                         placeholder="Assign reader name..."
-                        placeholderTextColor={makeGrey(0.4)}
+                        placeholderTextColor={gray(0.4)}
                         style={{
                           textAlign: "right",
                           paddingRight: 2,
@@ -2683,7 +2681,7 @@ const WorkorderStatusesComponent = ({
                 });
                 proto.label = "New Status";
                 proto.id = generateRandomID();
-                proto.backgroundColor = makeGrey(0.3);
+                proto.backgroundColor = gray(0.3);
                 proto.textColor = C.textMain;
                 proto.removable = true;
                 let statuses = [proto, ...zSettingsObj.statuses];
@@ -2809,7 +2807,7 @@ const WorkorderStatusesComponent = ({
                           borderWidth: 1,
                           borderColor:
                             sEditableInputIdx === idx && item.removable
-                              ? makeGrey(0.4)
+                              ? gray(0.4)
                               : "transparent",
                         }}
                         onChangeText={(val) => {
@@ -3012,7 +3010,7 @@ const QuickItemButtonsComponent = ({
                         );
                       }}
                       placeholder="Quick item button name..."
-                      placeholderTextColor={makeGrey(0.3)}
+                      placeholderTextColor={gray(0.3)}
                       style={{
                         marginLeft: 20,
                         borderColor: C.buttonLightGreenOutline,

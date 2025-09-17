@@ -98,11 +98,13 @@ export const CashSaleComponent = ({
   _setIsDeposit,
   // sCashChangeNeeded,
   _setCashChangeNeeded,
+  sRefundPaymentOverride,
   sRefund = {
     cashRefundRequested: 0,
     cardRefundRequested: 0,
     totalCashRefundAllowed: 0,
     totalCardRefundAllowed: 0,
+    totalRefundRequested: 0,
     cardRefunded: 0,
     cashRefunded: 0,
     cardTransactions: [],
@@ -111,30 +113,30 @@ export const CashSaleComponent = ({
     requestedRefundLines: [],
   },
 }) => {
-      const _zSetIsCheckingOut = useCheckoutStore(
-        (state) => state.setIsCheckingOut
-      );
-    
-      const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-    
-      const _zSetCustomerField = useCurrentCustomerStore(
-        (state) => state.setCustomerField
-      );
-      // store getters
-      const zOpenWorkorder = useOpenWorkordersStore((state) =>
-        state.getOpenWorkorderObj()
-      );
-      const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-      const zCustomer = useCurrentCustomerStore((state) => state.getCustomerObj());
-      const zOpenWorkorders = useOpenWorkordersStore((state) =>
-        state.getWorkorderArr()
-      );
-      const zInventory = useInventoryStore((state) => state.getInventoryArr());
-      const zGetInventoryItem = useInventoryStore(
-        (state) => state.getInventoryItem
-      );
-      const zSettings = useSettingsStore((state) => state.getSettingsObj());
-      const zSale = useCheckoutStore((state) => state.saleObj);
+  const _zSetIsCheckingOut = useCheckoutStore(
+    (state) => state.setIsCheckingOut
+  );
+
+  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
+
+  const _zSetCustomerField = useCurrentCustomerStore(
+    (state) => state.setCustomerField
+  );
+  // store getters
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
+  );
+  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
+  const zCustomer = useCurrentCustomerStore((state) => state.getCustomerObj());
+  const zOpenWorkorders = useOpenWorkordersStore((state) =>
+    state.getWorkorderArr()
+  );
+  const zInventory = useInventoryStore((state) => state.getInventoryArr());
+  const zGetInventoryItem = useInventoryStore(
+    (state) => state.getInventoryItem
+  );
+  const zSettings = useSettingsStore((state) => state.getSettingsObj());
+  const zSale = useCheckoutStore((state) => state.saleObj);
   // log(sAmountLeftToPay);
   const [sTenderAmount, _setTenderAmount] = useState(
     sIsRefund
@@ -260,17 +262,13 @@ export const CashSaleComponent = ({
       sIsRefund ? handleProcessRefundPress() : handleProcessPaymentPress();
   }
 
-  //   log(sProcessButtonEnabled.toString());
-
-  let refundReady = true;
-  // if (sIsRefund && !sRefund.cashRefundRequested) refundReady = false;
-  // log("cash sale complete", sSale?.paymentComplete);
   return (
     <View
-      pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
+      //   pointerEvents={sSale?.paymentComplete && !refundReady ? "none" : "auto"}
       style={{
         ...checkoutScreenStyle.base,
-        opacity: sSale?.paymentComplete || !refundReady ? 0.2 : 1,
+        opacity:
+          sSale?.paymentComplete && !sRefund.cashRefundRequested ? 0.2 : 1,
       }}
     >
       {acceptsChecks ? (
@@ -385,7 +383,10 @@ export const CashSaleComponent = ({
                 }}
                 autoFocus={sFocusedItem === "amount"}
                 disabled={
-                  !sCashSaleActive || sSale?.paymentComplete || !refundReady
+                  !sCashSaleActive &&
+                  sSale?.paymentComplete &&
+                  !sRefund.cashRefundRequested &&
+                  sRefundPaymentOverride
                 }
                 style={{
                   fontSize: 20,
@@ -413,7 +414,7 @@ export const CashSaleComponent = ({
       </View>
 
       <CheckBox_
-        enabled={!sSale?.payments.length > 0}
+        enabled={sSale?.payments.length === 0}
         buttonStyle={{ marginTop: 7 }}
         textStyle={{ color: gray(0.6), fontWeight: 500, fontSize: 14 }}
         text={"DEPOSIT TO ACCOUNT"}
@@ -452,7 +453,9 @@ export const CashSaleComponent = ({
           >
             <TextInput
               disabled={
-                !sCashSaleActive || sSale?.paymentComplete || !refundReady
+                !sCashSaleActive ||
+                sSale?.paymentComplete ||
+                !sRefund.cashRefundRequested
               }
               style={{
                 ...checkoutScreenStyle.boxText,
@@ -486,7 +489,7 @@ export const CashSaleComponent = ({
                 fontSize: 12,
               }}
             >
-              {sIsRefund ? "Refund Amount" : "Tender"}
+              {sIsRefund ? "Cash Refund Owed" : "Tender"}
             </Text>
           </View>
         </View>
@@ -579,8 +582,6 @@ export const CashSaleComponent = ({
       </View>
     </View>
   );
-
-
 };
 
 const checkoutScreenStyle = {

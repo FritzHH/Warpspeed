@@ -299,14 +299,14 @@ export const MiddleItemComponent = ({
             <Text
               style={{
                 fontSize: 18,
-                color: lightenRGBByPercent(C.green, 20),
+                color: sIsRefund ? gray(0.5) : lightenRGBByPercent(C.green, 20),
               }}
             >
               {formatCurrencyDisp(sSale?.subtotal)}
             </Text>
           </View>
         </View>
-        {sSale?.discount ? (
+        {sSale?.discount && (
           <View
             style={{
               width: "100%",
@@ -315,8 +315,8 @@ export const MiddleItemComponent = ({
               backgroundColor: C.buttonLightGreenOutline,
             }}
           />
-        ) : null}
-        {sSale?.discount ? (
+        )}
+        {sSale?.discount && (
           <View
             style={{
               alignItems: "center",
@@ -329,7 +329,7 @@ export const MiddleItemComponent = ({
               style={{
                 marginLeft: 15,
                 fontSize: 13,
-                color: C.lightred,
+                color: sIsRefund ? gray(0.5) : C.lightred,
               }}
             >
               DISCOUNT
@@ -338,7 +338,7 @@ export const MiddleItemComponent = ({
               <Text
                 style={{
                   fontSize: 13,
-                  color: C.lightred,
+                  color: sIsRefund ? gray(0.5) : C.lightred,
                   marginRight: 10,
                 }}
               >
@@ -347,15 +347,16 @@ export const MiddleItemComponent = ({
               <Text
                 style={{
                   fontSize: 18,
-                  color: C.lightred,
+                  color: sIsRefund ? gray(0.5) : C.lightred,
                 }}
               >
-                {"- " + formatCurrencyDisp(sSale?.discount)}
+                {"- " +
+                  formatCurrencyDisp(sSale?.discount || sRefund.sale?.discount)}
               </Text>
             </View>
           </View>
-        ) : null}
-        {sSale?.discount ? (
+        )}
+        {sSale?.discount || sRefund.sale?.discount ? (
           <View
             style={{
               alignItems: "center",
@@ -386,7 +387,9 @@ export const MiddleItemComponent = ({
               <Text
                 style={{
                   fontSize: 18,
-                  color: lightenRGBByPercent(C.green, 20),
+                  color: sIsRefund
+                    ? gray(0.5)
+                    : lightenRGBByPercent(C.green, 20),
                 }}
               >
                 {formatCurrencyDisp(sSale?.subtotal - sSale?.discount)}
@@ -394,7 +397,7 @@ export const MiddleItemComponent = ({
             </View>
           </View>
         ) : null}
-        {sSale?.discount ? (
+        {!!sSale?.discount && (
           <View
             style={{
               width: "100%",
@@ -403,7 +406,7 @@ export const MiddleItemComponent = ({
               backgroundColor: C.buttonLightGreenOutline,
             }}
           />
-        ) : null}
+        )}
         <View
           style={{
             alignItems: "center",
@@ -426,10 +429,39 @@ export const MiddleItemComponent = ({
             <Text
               style={{
                 fontSize: 18,
-                color: lightenRGBByPercent(C.green, 20),
+                color: sIsRefund ? gray(0.5) : lightenRGBByPercent(C.green, 20),
               }}
             >
               {formatCurrencyDisp(sSale?.tax)}
+            </Text>
+          </View>
+        </View>
+        <View
+          style={{
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>TOTAL SALE</Text>
+          <View style={{ flexDirection: "row" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: gray(0.5),
+                marginRight: 10,
+              }}
+            >
+              $
+            </Text>
+            <Text
+              style={{
+                fontSize: 18,
+                color: sIsRefund ? gray(0.5) : lightenRGBByPercent(C.green, 20),
+              }}
+            >
+              {formatCurrencyDisp(sSale?.total)}
             </Text>
           </View>
         </View>
@@ -631,7 +663,8 @@ export const MiddleItemComponent = ({
               color: C.red,
             }}
           >
-            {"CASH REFUND REQUESTED:   $" + formatCurrencyDisp(sRefund.cashRefundRequested)}
+            {"CASH REFUND REQUESTED:   $" +
+              formatCurrencyDisp(sRefund.cashRefundRequested)}
           </Text>
         )}
         {!!sRefund.cardRefundRequested && (
@@ -642,7 +675,8 @@ export const MiddleItemComponent = ({
               color: C.red,
             }}
           >
-            {"CARD REFUND REQUESTED:   $" + formatCurrencyDisp(sRefund.cardRefundRequested)}
+            {"CARD REFUND REQUESTED:   $" +
+              formatCurrencyDisp(sRefund.cardRefundRequested)}
           </Text>
         )}
         {!!sRefund.cashAmountRefunded && (
@@ -653,7 +687,8 @@ export const MiddleItemComponent = ({
               color: C.green,
             }}
           >
-            {"CASH REFUNDED:   $" + formatCurrencyDisp(sRefund.cashAmountRefunded)}
+            {"CASH REFUNDED:   $" +
+              formatCurrencyDisp(sRefund.cashAmountRefunded)}
           </Text>
         )}
         {!!sRefund.cardAmountRefunded && (
@@ -664,7 +699,8 @@ export const MiddleItemComponent = ({
               color: C.green,
             }}
           >
-            {"CARD AMOUNT REFUNDED:   $" + formatCurrencyDisp(sRefund.cardAmountRefunded)}
+            {"CARD AMOUNT REFUNDED:   $" +
+              formatCurrencyDisp(sRefund.cardAmountRefunded)}
           </Text>
         )}
         {!sIsRefund && !sSale?.paymentComplete && (

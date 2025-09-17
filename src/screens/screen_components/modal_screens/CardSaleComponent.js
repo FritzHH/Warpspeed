@@ -95,6 +95,7 @@ export const StripeCreditCardComponent = ({
   refundPaymentIntentID,
   sCardSaleActive,
   _setIsDeposit,
+  sRefundPaymentOverride,
   sRefund = {
     refundedLines: [],
     cashRefundRequested: 0,
@@ -105,29 +106,29 @@ export const StripeCreditCardComponent = ({
     cashTransactionArr: [],
   },
 }) => {
-      const _zSetIsCheckingOut = useCheckoutStore(
-        (state) => state.setIsCheckingOut
-      );
-    
-      const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-    
-      const _zSetCustomerField = useCurrentCustomerStore(
-        (state) => state.setCustomerField
-      );
-      // store getters
-      const zOpenWorkorder = useOpenWorkordersStore((state) =>
-        state.getOpenWorkorderObj()
-      );
-      const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-      const zCustomer = useCurrentCustomerStore((state) => state.getCustomerObj());
-      const zOpenWorkorders = useOpenWorkordersStore((state) =>
-        state.getWorkorderArr()
-      );
-      const zInventory = useInventoryStore((state) => state.getInventoryArr());
-      const zGetInventoryItem = useInventoryStore(
-        (state) => state.getInventoryItem
-      );
-      const zSale = useCheckoutStore((state) => state.saleObj);
+  const _zSetIsCheckingOut = useCheckoutStore(
+    (state) => state.setIsCheckingOut
+  );
+
+  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
+
+  const _zSetCustomerField = useCurrentCustomerStore(
+    (state) => state.setCustomerField
+  );
+  // store getters
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
+  );
+  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
+  const zCustomer = useCurrentCustomerStore((state) => state.getCustomerObj());
+  const zOpenWorkorders = useOpenWorkordersStore((state) =>
+    state.getWorkorderArr()
+  );
+  const zInventory = useInventoryStore((state) => state.getInventoryArr());
+  const zGetInventoryItem = useInventoryStore(
+    (state) => state.getInventoryItem
+  );
+  const zSale = useCheckoutStore((state) => state.saleObj);
   const [sRequestedAmount, _setRequestedAmount] = useState(
     sSale?.total - sSale?.amountCaptured
   );
@@ -324,8 +325,6 @@ export const StripeCreditCardComponent = ({
       handlePaymentCapture(payment);
     }
   }
-
-
 
   function handleProcessButtonPress() {}
 

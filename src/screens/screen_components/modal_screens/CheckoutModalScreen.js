@@ -195,6 +195,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
   // watch incoming refund sale. check to see which lines have already been refunded
   useEffect(() => {
     if (sIsRefund) {
+      // log(sCombinedWorkorders);
       let alreadyRefundedLines = [];
       sCombinedWorkorders.forEach((combinedWorkorder) => {
         // log("comb", combinedWorkorder);
@@ -291,10 +292,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
   }
 
   function handleRefundScan(refundScan) {
-    function addToCombinedArr(workorders) {
-      workorders = sortRefundWorkorderArr(workorders);
-      _setCombinedWorkorders(workorders);
-    }
+
 
     if (refundScan.length === 12) {
       _setIsRefund(false);
@@ -316,9 +314,11 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 // if (workorder) addToCombinedArr(workorder);
                 if (workorder) workorders.push(workorder);
                 if (count === sale.workorderIDs.length) {
-                  _setCombinedWorkorders(workorders);
-                }
-                addToCombinedArr(workorders, sale);
+                  workorders = sortRefundWorkorderArr(workorders, sale);
+                  _setCombinedWorkorders(workorders)
+                  // _setCombinedWorkorders(workorders);
+                     }
+                // addToCombinedArr(workorders, sale);
               });
 
               dbGetClosedWorkorderItem(workorderID).then((workorder) => {
@@ -326,7 +326,8 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 // if (res) addToCombinedArr(res);
                 if (workorder) workorders.push(workorder);
                 if (count === sale.workorderIDs.length)
-                  addToCombinedArr(workorders, sale);
+                  workorders = sortRefundWorkorderArr(workorders, sale);
+                _setCombinedWorkorders(workorders);
               });
             });
           } else {
@@ -389,49 +390,52 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
   function handleRefundItemCheck(workorder, workorderLine) {
     let refund = cloneDeep(sRefund);
-    // let checkedArr = cloneDeep(sRefundItems);
-    // if (arrHasItem(checkedArr, workorderLine)) {
-    //   checkedArr = removeArrItem(checkedArr, workorderLine);
-    // } else {
-    //   checkedArr.push(workorderLine);
-    // }
-    // log("lineeee", workorderLine);
-
     // split apart lines if the quantity is more than 1
 
-    if ((arrHasItem(refund.requestedRefundLines), workorder)) {
+    if (arrHasItem(refund.requestedRefundLines, workorderLine)) {
       // remove it from selected refund lines
-      refund.requestedRefundLines.filter((wo) => wo.id === workorderLine.id);
+      refund.requestedRefundLines = refund.requestedRefundLines.filter(
+        (line) => line.id !== workorderLine.id
+      );
     } else {
       // add it to selected refund lines
+      // log("wo", workorder);
+      // log("line", workorderLine);
       let price;
-      let discount = 0;
-      if (workorderLine.discountObj) {
-        discount = discountObj.savings / qty;
+      let discountSavings = 0;
+      // first
+      if (workorderLine.discountObj.newPrice) {
+        discountSavings = workorderLine.discountObj.savings / workorderLine.qty;
         price = workorderLine.discountObj.newPrice / workorderLine.qty;
       } else {
         price = workorderLine.inventoryItem.price;
       }
 
+      refund.requestedRefundLines = refund.requestedRefundLines.filter(
+        (o) => o.id === workorderLine.id
+      );
       for (let i = 1; i <= workorderLine.qty; i++) {
         refund.requestedRefundLines.push({
           ...workorderLine,
           price,
           qty: 1,
-          discount,
+          discount: discountSavings,
         });
       }
-
-      refund.requestedRefundLines.push(workorderLine);
     }
 
     let runningRefund = 0;
-    refund.requestedRefundLines.forEach(
-      (line) => {}
-      // (runningRefund += (line.inventoryItem.price - lined.discountObj?.discount) * sSale.salesTaxPercent)
-    );
+    refund.requestedRefundLines.forEach((line) => {
+      log("line", line);
+      runningRefund =
+        runningRefund +
+        ((line.price - line.discount) * sSale.salesTaxPercent) / 100 +
+        line.price -
+        line.discount;
+    });
 
-    log("running", runningRefund);
+    // log("refund obj", refund);
+    log("running refund", formatCurrencyDisp(runningRefund));
 
     _setRefund(refund);
 
@@ -508,7 +512,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
     _setRefund(refundDetails);
   }
 
-  function sortRefundWorkorderArr(combinedWorkorders) {
+  function sortRefundWorkorderArr(combinedWorkorders, sale) {
     // log("here");
     let newArr = [];
     combinedWorkorders.forEach((wo) => {
@@ -516,8 +520,13 @@ export function CheckoutModalScreen({ openWorkorder }) {
       let workorderLines = [];
       wo.workorderLines.forEach((line) => {
         if (line.qty > 1) {
+          let totalDiscount = line.discountObj.savings || 0
+          let price = ((line.inventoryItem.price * line.qty - totalDiscount) )
+          price = price + price * sale.salesTaxPercent/100
+          price = price / line.qty
           for (let i = 0; i <= line.qty - 1; i++) {
-            workorderLines.push({ ...line, qty: 1, id: generateRandomID() });
+            // add on a randome string to end of workorder line, as we are splitting them apart by default to do a refund
+            workorderLines.push({ ...line, qty: 1, discountSavings: totalDiscount / line.qty, price, id: line.id + generateRandomID() });
           }
         } else {
           workorderLines.push(line);
@@ -1349,7 +1358,7 @@ const MiddleItemComponent = ({
                   <Text>{formatCurrencyDisp(paymentObj.amountTendered)}</Text>
                 </View>
               ) : null}
-              {paymentObj.cash ? (
+              {/* {paymentObj.cash ? (
                 <View
                   style={{
                     justifyContent: "space-between",
@@ -1363,7 +1372,7 @@ const MiddleItemComponent = ({
                     )}
                   </Text>
                 </View>
-              ) : null}
+              ) : null} */}
               {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
             </View>
           );
@@ -2717,19 +2726,19 @@ const WorkorderListComponent = ({
                   let inventoryItem = _zGetInventoryItem(
                     workorderLine.inventoryItem.id
                   );
-                  // log("item", inventoryItem);
+                  log("item", workorderLine.qty);
                   return (
                     <View
                       style={{
                         flexDirection: "row",
                         width: "100%",
                         alignItems: "center",
-                        // backgroundColor: !arrHasItem(
-                        //   sRefundItems,
-                        //   workorderLine
-                        // )
-                        // ? C.listItemWhite
-                        // : lightenRGBByPercent(C.blue, 60),
+                        backgroundColor: !arrHasItem(
+                          sRefund.requestedRefundLines,
+                          workorderLine
+                        )
+                          ? C.listItemWhite
+                          : lightenRGBByPercent(C.blue, 60),
                         paddingVertical: 2,
                         marginBottom: 3,
                         borderColor: "transparent",
@@ -2812,27 +2821,29 @@ const WorkorderListComponent = ({
                           // backgroundColor: RED_COLOR,
                         }}
                       >
-                        <GradientView
-                          colorArr={COLOR_GRADIENTS.grey}
-                          style={{
-                            borderRadius: 10,
-                            width: 30,
-                            height: 20,
-                          }}
-                        >
-                          <TextInput
-                            disabled={true}
+                        {!sIsRefund ? (
+                          <GradientView
+                            colorArr={COLOR_GRADIENTS.grey}
                             style={{
-                              fontSize: 16,
-                              fontWeight: 700,
-                              textAlign: "center",
-                              color: C.textWhite,
-                              outlineWidth: 0,
-                              width: "100%",
+                              borderRadius: 10,
+                              width: 30,
+                              height: 20,
                             }}
-                            value={workorderLine.qty}
-                          />
-                        </GradientView>
+                          >
+                            <TextInput
+                              disabled={true}
+                              style={{
+                                fontSize: 16,
+                                fontWeight: 700,
+                                textAlign: "center",
+                                color: C.textWhite,
+                                outlineWidth: 0,
+                                width: "100%",
+                              }}
+                              value={workorderLine.qty}
+                            />
+                          </GradientView>
+                        ) : null}
                         <View
                           style={{
                             alignItems: "flex-end",
@@ -2848,7 +2859,7 @@ const WorkorderListComponent = ({
                           >
                             {"$ " +
                               formatCurrencyDisp(
-                                inventoryItem?.price || workorderLine.price
+                                workorderLine.price || inventoryItem?.price
                               )}
                           </Text>
                           {workorderLine.discountObj.savings ? (
@@ -2861,7 +2872,8 @@ const WorkorderListComponent = ({
                             >
                               {"$ -" +
                                 formatCurrencyDisp(
-                                  workorderLine.discountObj.savings
+                                  workorderLine.discountSavings ||
+                                    workorderLine.discountObj.savings
                                 )}
                             </Text>
                           ) : null}

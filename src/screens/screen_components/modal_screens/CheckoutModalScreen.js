@@ -58,6 +58,8 @@ import {
   roundToTwoDecimals,
   usdTypeMask,
   dollarsToCents,
+  addOrRemoveFromArr,
+  findInMultipleArrs,
 } from "../../../utils";
 import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
@@ -84,8 +86,9 @@ import {
 } from "../../../private_user_constants";
 import { FIRESTORE_COLLECTION_NAMES } from "../../../constants";
 import { isArray } from "lodash";
-
-const RED_COLOR = lightenRGBByPercent(getRgbFromNamedColor("red"), 20);
+import { StripeCreditCardComponent } from "./CardSaleComponent";
+import { CashSaleComponent } from "./CashSaleComponent";
+import { MiddleItemComponent } from "./MiddleItemComponent";
 
 export function CheckoutModalScreen({ openWorkorder }) {
   // store setters
@@ -93,6 +96,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
+
   const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
 
   const _zSetCustomerField = useCurrentCustomerStore(
@@ -114,7 +118,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const zSettings = useSettingsStore((state) => state.getSettingsObj());
   const zSale = useCheckoutStore((state) => state.saleObj);
   //////////////////////////////////////////////////////////////////////
-
   const [sRefundScan, _sSetRefundScan] = useState();
   const [sIsRefund, _setIsRefund] = useState(false);
   const [sRefund, _setRefund] = useState({
@@ -122,6 +125,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
     requestedRefundLines: [],
     cashRefundRequested: 0,
     cardRefundRequested: 0,
+    totalRefundRequested: 0,
     totalCashRefundAllowed: 0,
     totalCardRefundAllowed: 0,
     cashAmountRefunded: 0,
@@ -147,6 +151,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sShouldChargeCardRefundFee, _setShouldChargeCardRefundFee] =
     useState(true);
   const [sCashChangeNeeded, _setCashChangeNeeded] = useState(null);
+  const [sRefundPaymentOverride, _setRefundPaymentOverride] = useState(false);
 
   // watch the combined workorders array and adjust accordingly
 
@@ -176,19 +181,22 @@ export function CheckoutModalScreen({ openWorkorder }) {
         sale.id = generateUPCBarcode(); //////// dev
         sale.salesTaxPercent = zSettings.salesTax;
         sale.millis = new Date().getTime();
-        setRunningTotals(sale, combinedWorkorders);
+        setRunningSaleTotals(sale, combinedWorkorders);
         // setRefund(zOpenWorkorder, sale);
       }
       _setCombinedWorkorders(combinedWorkorders);
     }
 
-    _sSetRefundScan(scan); // testing
+    // testing
+    _sSetRefundScan(scan);
+    if (sCombinedWorkorders.length > 0) return;
+    handleRefundScan(scan);
   }, [zOpenWorkorder, sCombinedWorkorders, zSettings, sSale, sIsRefund]);
 
   // run the totals on combined workorders change
   useEffect(() => {
     if (sSale && sCombinedWorkorders)
-      setRunningTotals(sSale, sCombinedWorkorders);
+      setRunningSaleTotals(sSale, sCombinedWorkorders);
     // log("running");
   }, [sCombinedWorkorders]);
 
@@ -212,9 +220,10 @@ export function CheckoutModalScreen({ openWorkorder }) {
     }
   }, [sCombinedWorkorders, sIsRefund, sSale]);
 
-  function setRunningTotals(sale, combinedWorkorders, refundItems = []) {
+  function setRunningSaleTotals(sale, combinedWorkorders) {
     // log("sale", sale);
     // log("combined", combinedWorkorders);
+    if (sIsRefund) return;
     sale = cloneDeep(sale);
     let {
       runningQty,
@@ -224,16 +233,16 @@ export function CheckoutModalScreen({ openWorkorder }) {
       runningTax,
     } = calculateRunningTotals(
       combinedWorkorders,
-      zSettings?.salesTax,
-      refundItems,
-      sIsRefund
+      zSettings?.salesTax
+      // refundItems,
+      // sIsRefund
     );
 
     sale.subtotal = runningSubtotal;
     sale.discount = runningDiscount;
     sale.total = runningTax + runningTotal;
     sale.tax = runningTax;
-    sale.cardRefundFee = runningTotal * (zSettings.cardRefundFeePercent / 100);
+    // sale.cardRefundFee = runningTotal * (zSettings.cardRefundFeePercent / 100);
     // log("new sale", sale);
     _setSale(sale);
   }
@@ -292,8 +301,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
   }
 
   function handleRefundScan(refundScan) {
-
-
     if (refundScan.length === 12) {
       _setIsRefund(false);
       _setCombinedWorkorders([]);
@@ -314,10 +321,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 // if (workorder) addToCombinedArr(workorder);
                 if (workorder) workorders.push(workorder);
                 if (count === sale.workorderIDs.length) {
-                  workorders = sortRefundWorkorderArr(workorders, sale);
-                  _setCombinedWorkorders(workorders)
+                  splitIncomingRefundWorkorderLines(workorders, sale);
                   // _setCombinedWorkorders(workorders);
-                     }
+                }
                 // addToCombinedArr(workorders, sale);
               });
 
@@ -326,8 +332,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 // if (res) addToCombinedArr(res);
                 if (workorder) workorders.push(workorder);
                 if (count === sale.workorderIDs.length)
-                  workorders = sortRefundWorkorderArr(workorders, sale);
-                _setCombinedWorkorders(workorders);
+                  splitIncomingRefundWorkorderLines(workorders, sale);
               });
             });
           } else {
@@ -390,154 +395,118 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
   function handleRefundItemCheck(workorder, workorderLine) {
     let refund = cloneDeep(sRefund);
-    // split apart lines if the quantity is more than 1
+    workorder = cloneDeep(workorder);
+    let salesTaxMultiplier = sSale.salesTaxPercent / 100 + 1;
 
-    if (arrHasItem(refund.requestedRefundLines, workorderLine)) {
-      // remove it from selected refund lines
-      refund.requestedRefundLines = refund.requestedRefundLines.filter(
-        (line) => line.id !== workorderLine.id
-      );
-    } else {
-      // add it to selected refund lines
-      // log("wo", workorder);
-      // log("line", workorderLine);
-      let price;
-      let discountSavings = 0;
-      // first
-      if (workorderLine.discountObj.newPrice) {
-        discountSavings = workorderLine.discountObj.savings / workorderLine.qty;
-        price = workorderLine.discountObj.newPrice / workorderLine.qty;
-      } else {
-        price = workorderLine.inventoryItem.price;
-      }
+    // add or remove the incoming checked item from requested refunds arr
+    refund.requestedRefundLines = addOrRemoveFromArr(
+      refund.requestedRefundLines,
+      workorderLine
+    );
 
-      refund.requestedRefundLines = refund.requestedRefundLines.filter(
-        (o) => o.id === workorderLine.id
-      );
-      for (let i = 1; i <= workorderLine.qty; i++) {
-        refund.requestedRefundLines.push({
-          ...workorderLine,
-          price,
-          qty: 1,
-          discount: discountSavings,
-        });
-      }
-    }
-
+    // calculate the running total refund requested
     let runningRefund = 0;
-    refund.requestedRefundLines.forEach((line) => {
-      log("line", line);
-      runningRefund =
-        runningRefund +
-        ((line.price - line.discount) * sSale.salesTaxPercent) / 100 +
-        line.price -
-        line.discount;
-    });
+    let runningCardRefund = 0;
+    let runningCashRefund = 0;
+    refund.requestedRefundLines.forEach(
+      (line) =>
+        (runningRefund +=
+          (line.inventoryItem.price - line.discountSavings) *
+          salesTaxMultiplier)
+    );
+    refund.totalRefundRequested = runningRefund;
 
-    // log("refund obj", refund);
-    log("running refund", formatCurrencyDisp(runningRefund));
+    // let cardRefund = 0;
+    // let cashRefund = 0;
 
+    refund.cashRefundRequested = 0;
+    refund.cardRefundRequested = 0;
+    if (!refund.totalCardRefundAllowed) {
+      refund.cashRefundRequested = runningRefund;
+    } else if (!refund.totalCashRefundAllowed) {
+      refund.cardRefundRequested = runningRefund;
+    } else if (runningRefund > refund.totalCardRefundAllowed) {
+      refund.cardRefundRequested = refund.totalCardRefundAllowed;
+      refund.cashRefundRequested =
+        runningRefund - refund.totalCardRefundAllowed;
+    } else {
+      refund.cardRefundRequested = runningRefund;
+    }
+
+    // log("cash", refund.cashRefundRequested);
+    // log("card", refund.cardRefundRequested);
+    // log("total", refund.totalRefundRequested);
     _setRefund(refund);
-
-    // log(checkedArr);
-    // _setRefundItems(checkedArr);
-
-    return;
-    // this runs every time we get a check mark, but really could just run once
-    sSale.payments.forEach((payment) => {
-      payment = cloneDeep(payment);
-      if (payment.last4) {
-        // is a credit card, add to credit card payment arr
-        refundDetails.cardTransactions = replaceOrAddToArr(
-          refundDetails.cardTransactions,
-          payment
-        );
-
-        // add the total card refund allowed, subtract what has alrerady been refunded
-        refundDetails.totalCardRefundAllowed =
-          refundDetails.totalCardRefundAllowed + payment.amountCaptured;
-      } else {
-        // cash, add to cash payment arr
-        refundDetails.cashTransactions = replaceOrAddToArr(
-          refundDetails.cashTransactions,
-          payment
-        );
-
-        // add to the total cash refund allowed, and subtract what has been refunded already in cash
-        refundDetails.totalCashRefundAllowed =
-          refundDetails.totalCashRefundAllowed +
-          payment.amountCaptured -
-          payment.amountRefunded;
-
-        // now subtract what has already been refunded in cash
-
-        // refundDetails.cashAmountRefunded =
-        //   refundDetails.cashAmountRefunded + payment.amountRefunded > 0
-        //     ? payment.amountRefunded
-        //     : 0;
-      }
-    });
-
-    let totalRefund = 0;
-    // sRefundItems.forEach((item) => {
-    //   if (item.discountObj.newPrice > 0) {
-    //     totalRefund = totalRefund + item.discountObj.newPrice;
-    //   } else {
-    //     totalRefund = totalRefund + item.inventoryItem.price;
-    //   }
-    // });
-
-    totalRefund = totalRefund + (totalRefund * sSale.salesTaxPercent) / 100;
-    refundDetails.totalRefundRequested = totalRefund;
-
-    if (refundDetails.totalCardRefundAllowed > 0) {
-      if (refundDetails.totalCardRefundAllowed - totalRefund < 0) {
-        refundDetails.cardRefundRequested =
-          refundDetails.totalCardRefundAllowed;
-      } else {
-        refundDetails.cardRefundRequested = totalRefund;
-      }
-    }
-
-    if (refundDetails.totalCashRefundAllowed > 0) {
-      if (refundDetails.totalCashRefundAllowed - totalRefund < 0) {
-        refundDetails.cashRefundRequested =
-          refundDetails.totalCashRefundAllowed;
-      } else {
-        refundDetails.cashRefundRequested = totalRefund;
-      }
-    }
-
-    // log(refundDetailsObj);
-    _setRefund(refundDetails);
   }
 
-  function sortRefundWorkorderArr(combinedWorkorders, sale) {
-    // log("here");
+  function applyRefunds(sale) {
+    // look at previous refunds and calculate what has been done, what we can do still
+    let refund = cloneDeep(sRefund);
+    sale.payments.forEach((payment) => {
+      let cardRefundAllowedTotal = 0;
+      let cashRefundAllowedTotal = 0;
+      payment = cloneDeep(payment);
+      if (payment.last4) {
+        // this is a credit card, add to credit card payment transactions arr
+        refund.cardTransactions = replaceOrAddToArr(
+          refund.cardTransactions,
+          payment
+        );
+
+        // add the total card refund allowed, subtract what has already been refunded. card payments have individual refunds at the Payment object level, cash payments we keep track of at the Sale object level in the Refund object
+        cardRefundAllowedTotal =
+          cardRefundAllowedTotal + payment.amountCaptured;
+        -payment.amountRefunded ? payment.amountRefunded : 0;
+        refund.totalCardRefundAllowed = cardRefundAllowedTotal;
+      } else {
+        // add cash transactions to cash transactions arr
+        refund.cashTransactions = replaceOrAddToArr(
+          refund.cashTransactions,
+          payment
+        );
+
+        // add to the total cash refund allowed
+        cashRefundAllowedTotal =
+          cardRefundAllowedTotal + payment.amountCaptured;
+      }
+      refund.totalCashRefundAllowed = cashRefundAllowedTotal;
+    });
+
+    // now look throught the previous refunds and see if there are any cash refunds, subtract them from the cash refund allowed
+    let cashRefunded = 0;
+    sale.refunds?.forEach(
+      (refund) =>
+        (cashRefunded += refund.cardPaymentID ? 0 : refund.amountRefunded)
+    );
+    refund.totalCashRefundAllowed =
+      refund.totalCashRefundAllowed - cashRefunded;
+
+    _setRefund(refund);
+  }
+
+  function splitIncomingRefundWorkorderLines(combinedWorkorders, sale) {
+    let refund = cloneDeep(sRefund);
+    // split the incoming refund sale workorders by default so we can select one at a time for refunding
     let newArr = [];
     combinedWorkorders.forEach((wo) => {
       let newWO = cloneDeep(wo);
       let workorderLines = [];
       wo.workorderLines.forEach((line) => {
-        if (line.qty > 1) {
-          let totalDiscount = line.discountObj.savings || 0
-          let price = ((line.inventoryItem.price * line.qty - totalDiscount) )
-          price = price + price * sale.salesTaxPercent/100
-          price = price / line.qty
-          for (let i = 0; i <= line.qty - 1; i++) {
-            // add on a randome string to end of workorder line, as we are splitting them apart by default to do a refund
-            workorderLines.push({ ...line, qty: 1, discountSavings: totalDiscount / line.qty, price, id: line.id + generateRandomID() });
-          }
-        } else {
-          workorderLines.push(line);
+        for (let i = 1; i <= line.qty; i++) {
+          // add on a random string to end of workorder line ID so they all have unique ID's
+          workorderLines.push({
+            ...line,
+            discountSavings: line.discountObj.savings / line.qty || 0,
+            id: line.id + generateRandomID(),
+          });
         }
       });
       newWO.workorderLines = workorderLines;
-      // log(newWO);
       newArr.push(newWO);
     });
     // log(newArr);
-    return newArr;
+    _setCombinedWorkorders(newArr);
+    applyRefunds(sale);
   }
 
   function closeCheckoutScreenModal() {
@@ -706,1752 +675,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
     />
   );
 }
-
-const MiddleItemComponent = ({
-  zCustomer,
-  sIsRefund,
-  sRefundScan,
-  _sSetRefundScan,
-  handleCancelPress,
-  payments,
-  sFocusedItem,
-  _setFocusedItem,
-  sScanFailureMessage,
-  _setScanFailureMessage,
-  sRefund = {
-    refundedLines: [],
-    requestedRefundLines: [],
-    cashRefundRequested: 0,
-    cardRefundRequested: 0,
-    totalCashRefundAllowed: 0,
-    totalCardRefundAllowed: 0,
-    cashAmountRefunded: 0,
-    cardAmountRefunded: 0,
-    cardTransactions: [],
-    cashTransactions: [],
-  },
-  sShouldChargeCardRefundFee,
-  sCardRefundFee,
-  sCardRefundFeePercentage,
-  sSale,
-  sCashChangeNeeded,
-}) => {
-  return (
-    <View
-      style={{
-        width: "100%",
-        height: "100%",
-        // justifyContent:
-        // padding: 20,
-      }}
-    >
-      {zCustomer?.id ? (
-        <View
-          style={{
-            width: "100%",
-            borderWidth: 1,
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 10,
-            padding: 10,
-            marginBottom: 30,
-            backgroundColor: C.backgroundListWhite,
-            // flexDirection:
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-            }}
-          >
-            <View>
-              <Text style={{ color: C.textMain }}>
-                {zCustomer?.first + " " + zCustomer?.last}
-              </Text>
-              <Text style={{ color: gray(0.6), fontSize: 12 }}>
-                {zCustomer?.email}
-              </Text>
-            </View>
-            <View>
-              {zCustomer?.cell ? (
-                <Text style={{ color: C.textMain }}>
-                  <Text style={{ color: gray(0.5) }}>{"cell: "}</Text>
-                  {addDashesToPhone(zCustomer?.cell)}
-                </Text>
-              ) : null}
-              {zCustomer?.land ? (
-                <Text style={{ color: C.textMain }}>
-                  <Text style={{ color: gray(0.5) }}>{"land: "}</Text>
-                  {addDashesToPhone(zCustomer?.land)}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
-          {zCustomer?.streetAddress ? (
-            <Text>{zCustomer.streetAddress}</Text>
-          ) : null}
-          {zCustomer?.unit ? <Text>{zCustomer.unit}</Text> : null}
-          {zCustomer?.city ? <Text>{zCustomer.city}</Text> : null}
-        </View>
-      ) : null}
-
-      {/** Refund element ///////////////////////////////////////////// */}
-
-      <View
-        style={{
-          width: "100%",
-          alignItems: "space-between",
-          // marginBottom: 30,
-        }}
-      >
-        <View
-          style={{
-            width: "100%",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <CheckBox_
-            enabled={!sIsRefund && !sSale?.payments.length > 0}
-            text={"Refund"}
-            isChecked={sIsRefund}
-            onCheck={() =>
-              sRefundScan.length !== 12
-                ? _setScanFailureMessage("Must scan/enter 12-digit sale ID")
-                : null
-            }
-          />
-          <Text style={{ fontSize: 12, color: RED_COLOR }}>
-            {sSale?.payments.length > 0 ? "" : sScanFailureMessage}
-          </Text>
-        </View>
-        <TextInput
-          disabled={sSale?.payments.length > 0}
-          style={{
-            marginTop: 5,
-            width: "100%",
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 7,
-            padding: 5,
-            textAlign: "left",
-            borderWidth: 1,
-            outlineWidth: 0,
-            backgroundColor: C.backgroundListWhite,
-            color: sSale?.payments.length > 0 ? gray(0.3) : C.textMain,
-          }}
-          onFocus={() => {
-            _setFocusedItem("refund");
-            // _sSetRefundScan("");
-          }}
-          placeholder="Scan sale receipt (12 digit number)"
-          placeholderTextColor={gray(0.38)}
-          autoFocus={sFocusedItem === "refund"}
-          value={sRefundScan}
-          onChangeText={(val) => {
-            _setScanFailureMessage("");
-            _sSetRefundScan(val);
-          }}
-        />
-      </View>
-
-      {/** totals element ////////////////////////////////////////// */}
-
-      <View
-        style={{
-          width: "100%",
-          // minHeight: "20%",
-          // maxHeight: "30%",
-          // alignItems: "flex-start",
-          justifyContent: "space-between",
-          marginTop: 10,
-          paddingHorizontal: 10,
-          paddingVertical: 10,
-          backgroundColor: C.backgroundListWhite,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-        }}
-      >
-        <View
-          style={{
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "space-between",
-            width: "100%",
-          }}
-        >
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>SUBTOTAL</Text>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{
-                fontSize: 13,
-                color: gray(0.5),
-                marginRight: 10,
-              }}
-            >
-              $
-            </Text>
-            <Text
-              style={{
-                fontSize: 18,
-                color: lightenRGBByPercent(C.green, 20),
-              }}
-            >
-              {formatCurrencyDisp(sSale?.subtotal)}
-            </Text>
-          </View>
-        </View>
-        {sSale?.discount ? (
-          <View
-            style={{
-              width: "100%",
-              height: 1,
-              marginVertical: 10,
-              backgroundColor: C.buttonLightGreenOutline,
-            }}
-          />
-        ) : null}
-        {sSale?.discount ? (
-          <View
-            style={{
-              alignItems: "center",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "100%",
-            }}
-          >
-            <Text
-              style={{
-                marginLeft: 15,
-                fontSize: 13,
-                color: C.lightred,
-              }}
-            >
-              DISCOUNT
-            </Text>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: C.lightred,
-                  marginRight: 10,
-                }}
-              >
-                $
-              </Text>
-              <Text
-                style={{
-                  fontSize: 18,
-                  color: C.lightred,
-                }}
-              >
-                {"- " + formatCurrencyDisp(sSale?.discount)}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-        {sSale?.discount ? (
-          <View
-            style={{
-              alignItems: "center",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "100%",
-            }}
-          >
-            <Text
-              style={{
-                marginLeft: 15,
-                fontSize: 13,
-                color: gray(0.5),
-              }}
-            >
-              DISCOUNTED TOTAL
-            </Text>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: gray(0.5),
-                  marginRight: 10,
-                }}
-              >
-                $
-              </Text>
-              <Text
-                style={{
-                  fontSize: 18,
-                  color: lightenRGBByPercent(C.green, 20),
-                }}
-              >
-                {formatCurrencyDisp(sSale?.subtotal - sSale?.discount)}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-        {sSale?.discount ? (
-          <View
-            style={{
-              width: "100%",
-              height: 1,
-              marginVertical: 10,
-              backgroundColor: C.buttonLightGreenOutline,
-            }}
-          />
-        ) : null}
-        <View
-          style={{
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "space-between",
-            width: "100%",
-          }}
-        >
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>SALES TAX</Text>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{
-                fontSize: 13,
-                color: gray(0.5),
-                marginRight: 10,
-              }}
-            >
-              $
-            </Text>
-            <Text
-              style={{
-                fontSize: 18,
-                color: lightenRGBByPercent(C.green, 20),
-              }}
-            >
-              {formatCurrencyDisp(sSale?.tax)}
-            </Text>
-          </View>
-        </View>
-        {sShouldChargeCardRefundFee &&
-        sIsRefund &&
-        sRefund.totalCardRefundAllowed > 0 ? (
-          <View
-            style={{
-              width: "100%",
-              height: 1,
-              backgroundColor: C.buttonLightGreenOutline,
-              marginVertical: 10,
-            }}
-          />
-        ) : null}
-        {sShouldChargeCardRefundFee &&
-        sIsRefund &&
-        sRefund.totalCardRefundAllowed > 0 ? (
-          <View
-            style={{
-              alignItems: "center",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "100%",
-            }}
-          >
-            <Text style={{ fontSize: 13, color: gray(0.5) }}>{"SUBTOTAL"}</Text>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: gray(0.5),
-                  marginRight: 10,
-                }}
-              >
-                $
-              </Text>
-              <Text
-                style={{
-                  fontWeight: 500,
-                  fontSize: 18,
-                  color: C.green,
-                }}
-              >
-                {formatCurrencyDisp(
-                  sSale?.subtotal + sSale?.tax - sSale?.discount
-                )}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        {sShouldChargeCardRefundFee &&
-        sIsRefund &&
-        sRefund.totalCardRefundAllowed > 0 ? (
-          <View
-            style={{
-              width: "100%",
-              height: 1,
-              marginVertical: 10,
-              backgroundColor: C.buttonLightGreenOutline,
-            }}
-          />
-        ) : null}
-
-        {sShouldChargeCardRefundFee && sRefund.totalCardRefundAllowed > 0 ? (
-          <View
-            style={{
-              alignItems: "center",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "100%",
-            }}
-          >
-            <Text style={{ fontSize: 13, color: C.red }}>
-              {"CARD RE-PROCESSING FEE (" + sCardRefundFeePercentage + "%)"}
-            </Text>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: gray(0.5),
-                  marginRight: 10,
-                }}
-              >
-                $
-              </Text>
-              <Text
-                style={{
-                  fontWeight: 500,
-                  fontSize: 15,
-                  color: C.red,
-                }}
-              >
-                {formatCurrencyDisp(sCardRefundFee)}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        {sRefund?.totalCardRefundAllowedArr?.map((cardObj) => (
-          <View
-            style={{
-              width: "100%",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <View>
-              <Text>{"CARD REFUND ALLOWED"}</Text>
-              <Text style={{ fontSize: 13 }}>
-                {cardObj.cardType +
-                  "      " +
-                  cardObj.expMonth +
-                  "/" +
-                  cardObj.expYear}
-              </Text>
-              <Text style={{ fontSize: 12 }}>
-                {"**********" + cardObj.last4}
-              </Text>
-            </View>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: gray(0.5),
-                  marginRight: 10,
-                }}
-              >
-                $
-              </Text>
-              <Text style={{ fontSize: 18, fontWeight: 500 }}>
-                {formatCurrencyDisp(
-                  cardObj.amountCaptured - sShouldChargeCardRefundFee
-                    ? sCardRefundFee
-                    : 0
-                )}
-              </Text>
-            </View>
-          </View>
-        ))}
-        {sRefund.totalCashRefundAllowed ? (
-          <View
-            style={{
-              width: "100%",
-              height: 1,
-              marginVertical: 10,
-              backgroundColor: C.buttonLightGreenOutline,
-            }}
-          />
-        ) : null}
-        {sRefund.totalCashRefundAllowed ? (
-          <View
-            style={{
-              width: "100%",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <Text>{"CASH REFUND ALLOWED"}</Text>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: gray(0.5),
-                  marginRight: 10,
-                }}
-              >
-                $
-              </Text>
-              <Text>{formatCurrencyDisp(sRefund.totalCashRefundAllowed)}</Text>
-            </View>
-          </View>
-        ) : null}
-        <View
-          style={{
-            width: "100%",
-            height: 1,
-            marginVertical: 10,
-            backgroundColor: C.buttonLightGreenOutline,
-          }}
-        />
-        <View
-          style={{
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "space-between",
-            width: "100%",
-          }}
-        >
-          <Text style={{ fontSize: 16, color: gray(0.5) }}>
-            {sIsRefund ? "TOTAL REFUND" : "TOTAL SALE"}
-          </Text>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{
-                fontSize: 13,
-                color: gray(0.5),
-                marginRight: 10,
-              }}
-            >
-              $
-            </Text>
-            <Text
-              style={{
-                fontWeight: 500,
-                fontSize: 21,
-                color: C.green,
-              }}
-            >
-              {formatCurrencyDisp(
-                sIsRefund ? sRefund.totalRefundRequested : sSale?.total
-              )}
-            </Text>
-          </View>
-        </View>
-      </View>
-      <View
-        style={{
-          width: "100%",
-          alignItems: "flex-end",
-          marginTop: 10,
-          paddingRight: 7,
-        }}
-      >
-        {sIsRefund && sRefund.totalCashRefundAllowed > 0 ? (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: sSale?.paymentComplete ? C.green : C.red,
-            }}
-          >
-            {sSale?.paymentComplete
-              ? "CASH REFUND COMPLETE!"
-              : "CASH REFUNDED:   $" + sRefund.cashAmountRefunded}
-          </Text>
-        ) : null}
-        {sIsRefund && sRefund.totalCardRefundAllowed > 0 ? (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: sSale?.paymentComplete ? C.green : C.red,
-            }}
-          >
-            {sSale?.paymentComplete
-              ? "CARD REFUND COMPLETE!"
-              : "CARD REFUNDED:   $" + sRefund.cardAmountRefunded}
-          </Text>
-        ) : null}
-        {!sIsRefund ? (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: sSale?.paymentComplete ? C.green : RED_COLOR,
-            }}
-          >
-            {!sSale?.paymentComplete
-              ? "AMOUNT LEFT TO PAY:   $" +
-                formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)
-              : "PAYMENT COMPLETE!"}
-          </Text>
-        ) : null}
-      </View>
-
-      {/**Payments list //////////////////////////////////////////////////// */}
-
-      {payments ? (
-        <View
-          style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
-        >
-          <Text style={{ color: gray(0.4) }}>PAYMENTS</Text>
-        </View>
-      ) : null}
-
-      <ScrollView style={{ maxHeight: "30%", width: "100%" }}>
-        {payments?.map((paymentObj) => {
-          return (
-            <View
-              key={paymentObj.id}
-              style={{
-                padding: 5,
-                backgroundColor: C.listItemWhite,
-                width: "99%",
-                backgroundColor: C.listItemWhite,
-                borderRadius: 10,
-                marginBottom: 5,
-              }}
-            >
-              <Text style={{ color: C.green }}>
-                {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
-              </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text>Amount received: </Text>
-                <Text>{formatCurrencyDisp(paymentObj.amountCaptured)}</Text>
-              </View>
-              {paymentObj.last4 ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                    Last 4 Digits:{" "}
-                  </Text>
-                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                    {"***" + paymentObj.last4}
-                  </Text>
-                </View>
-              ) : null}
-              {paymentObj.cash ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text>Amount Tendered: </Text>
-                  <Text>{formatCurrencyDisp(paymentObj.amountTendered)}</Text>
-                </View>
-              ) : null}
-              {/* {paymentObj.cash ? (
-                <View
-                  style={{
-                    justifyContent: "space-between",
-                    flexDirection: "row",
-                  }}
-                >
-                  <Text>Change needed: </Text>
-                  <Text>
-                    {formatCurrencyDisp(
-                      paymentObj.amountTendered - paymentObj.amountCaptured
-                    )}
-                  </Text>
-                </View>
-              ) : null} */}
-              {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-around",
-          marginTop: 25,
-          // justifySelf: "flex-end",
-        }}
-      >
-        {/* {payments?.length > 0 && !sSale?.paymentComplete ? (
-          <SliderButton_ onConfirm={(val) => log("val", val)} />
-        ) : null} */}
-        <Button_
-          enabled={
-            sSale?.paymentComplete ||
-            (!sSale?.amountCaptured > 0 && !sSale?.paymentComplete)
-          }
-          colorGradientArr={
-            sSale?.paymentComplete ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.red
-          }
-          text={sSale?.paymentComplete ? "CLOSE" : "CANCEL"}
-          onPress={handleCancelPress}
-          textStyle={{ color: C.textWhite }}
-          buttonStyle={{ width: 150 }}
-        />
-        {sCashChangeNeeded ? (
-          <View
-            style={{
-              ...checkoutScreenStyle.boxStyle,
-              width: "30%",
-              paddingTop: 2,
-              paddingBottom: 2,
-              flexDirection: "column",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                color: gray(0.3),
-                width: "100%",
-                textAlign: "left",
-                paddingBottom: 3,
-              }}
-            >
-              CHANGE
-            </Text>
-            <Text
-              placeholder={"0.00"}
-              style={{
-                textAlign: "right",
-                fontSize: 25,
-                color: sCashChangeNeeded > 0 ? C.green : gray(0.3),
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 15,
-                  // color: C.green,
-                  paddingRight: 7,
-                  height: "100%",
-                  textAlignVertical: "top",
-                }}
-              >
-                $
-              </Text>
-              {sCashChangeNeeded}
-            </Text>
-          </View>
-        ) : null}
-        {payments?.length > 0 && sSale?.paymentComplete ? (
-          <Button_
-            buttonStyle={{ width: 150, color: C.textWhite }}
-            colorGradientArr={COLOR_GRADIENTS.greenblue}
-            text={"REPRINT"}
-            textStyle={{ color: C.textWhite }}
-            onPress={() => log("reprint receit method needed")}
-          />
-        ) : null}
-      </View>
-    </View>
-  );
-};
-
-const CashSaleComponent = ({
-  sSale,
-  sAmountLeftToPay,
-  handlePaymentCapture,
-  handleRefundCapture,
-  acceptsChecks,
-  sIsRefund,
-  sCashSaleActive,
-  sIsDeposit,
-  _setIsDeposit,
-  // sCashChangeNeeded,
-  _setCashChangeNeeded,
-  sRefund = {
-    cashRefundRequested: 0,
-    cardRefundRequested: 0,
-    totalCashRefundAllowed: 0,
-    totalCardRefundAllowed: 0,
-    cardRefunded: 0,
-    cashRefunded: 0,
-    cardTransactions: [],
-    cashTransactions: [],
-    refundedLines: [],
-    requestedRefundLines: [],
-  },
-}) => {
-  // log(sAmountLeftToPay);
-  const [sTenderAmount, _setTenderAmount] = useState(
-    sIsRefund
-      ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
-      : sSale?.total - sSale?.amountCaptured
-  );
-  const [sTenderAmountDisp, _setTenderAmountDisp] = useState(
-    formatCurrencyDisp(
-      sIsRefund
-        ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
-        : sSale?.total - sSale?.amountCaptured
-    )
-  );
-  const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(
-    formatCurrencyDisp(
-      sIsRefund
-        ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
-        : sSale?.total - sSale?.amountCaptured
-    )
-  ); // dev sAmountLeftToPay
-  const [sRequestedAmount, _setRequestedAmount] = useState(
-    sSale?.total - sSale?.amountCaptured
-  );
-  const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
-  const [sIsCheck, _setIsCheck] = useState(false);
-  const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
-  // const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
-  const [sFocusedItem, _setFocusedItem] = useState("");
-
-  useEffect(() => {
-    if (
-      sTenderAmount < sRequestedAmount ||
-      sRequestedAmount === 0 ||
-      sTenderAmount === 0 ||
-      sRequestedAmount > sSale?.total - sSale?.amountCaptured
-    ) {
-      _setProcessButtonEnabled(false);
-    } else {
-      _setProcessButtonEnabled(true);
-    }
-  }, [sTenderAmount, sRequestedAmount]);
-
-  function handleCancelPress() {
-    _setTenderAmount(sSale?.total - sSale?.amountCaptured);
-    _setTenderAmountDisp("");
-    _setRequestedAmount(sSale?.total - sSale?.amountCaptured);
-    _setRequestedAmountDisp(
-      formatCurrencyDisp(
-        sIsRefund
-          ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
-          : sSale?.total - sSale?.amountCaptured
-      )
-    );
-    _setProcessButtonEnabled(false);
-  }
-
-  function handleProcessRefundPress() {
-    let paymentObject = { ...PAYMENT_OBJECT_PROTO };
-
-    let availableCashRefundObjArr = [];
-    sRefund.cashTransactionArr.forEach((cashPaymentObj) => {
-      availableCashRefundObjArr.push({
-        id: cashPaymentObj.id,
-        amount: cashPaymentObj.amountCaptured,
-      });
-    });
-
-    let total = 0;
-    let remain = 0;
-    let arr = [];
-    availableCashRefundObjArr.forEach((availableAmountObj) => {
-      if (total >= sTenderAmount) return;
-      let amountToUse = remain > 0 ? remain : sTenderAmount;
-      let diff = availableAmountObj.amount - amountToUse;
-      if (diff >= 0) {
-        total += sTenderAmount;
-        availableAmountObj.amountRefunded = amountToUse;
-        arr.push({ ...availableAmountObj });
-        return;
-      }
-
-      availableAmountObj.amountRefunded = availableAmountObj.amount;
-      remain = diff * -1;
-      arr.push(...availableAmountObj);
-    });
-
-    let arr1 = sRefund.cashTransactionArr.map((cashPaymentObj) => {
-      cashPaymentObj = cloneDeep(cashPaymentObj);
-      let amountObj = arr.find((o) => o.id === cashPaymentObj.id);
-      cashPaymentObj.amountRefunded = amountObj?.amountRefunded;
-      return cashPaymentObj;
-    });
-
-    // log("final arr", arr1);
-    handleRefundCapture(arr1);
-  }
-
-  function handleProcessPaymentPress() {
-    // log("process payment pressed");
-    let paymentObject = { ...PAYMENT_OBJECT_PROTO };
-    paymentObject.amountTendered = sTenderAmount;
-    paymentObject.amountCaptured = sRequestedAmount;
-    paymentObject.cash = !sIsCheck;
-    paymentObject.check = sIsCheck;
-    paymentObject.millis = new Date().getTime();
-    paymentObject.id = generateUPCBarcode();
-    handlePaymentCapture(paymentObject);
-
-    let diff = sTenderAmount - sRequestedAmount;
-    // log(diff);
-    if (diff < 0) {
-      // log("here1");
-      _setCashChangeNeeded(formatCurrencyDisp(0));
-    } else {
-      // log("here2");
-      _setCashChangeNeeded(formatCurrencyDisp(diff));
-    }
-  }
-
-  function handleKeyPress(event) {
-    if (event.nativeEvent.key == "Enter")
-      sIsRefund ? handleProcessRefundPress() : handleProcessPaymentPress();
-  }
-
-  //   log(sProcessButtonEnabled.toString());
-
-  let refundReady = true;
-  // if (sIsRefund && !sRefund.cashRefundRequested) refundReady = false;
-  // log("cash sale complete", sSale?.paymentComplete);
-  return (
-    <View
-      pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
-      style={{
-        ...checkoutScreenStyle.base,
-        opacity: sSale?.paymentComplete || !refundReady ? 0.2 : 1,
-      }}
-    >
-      {acceptsChecks ? (
-        <View
-          style={{ width: "100%", alignItems: "flex-start", paddingLeft: 10 }}
-        >
-          {!sIsRefund ? (
-            <CheckBox_
-              enabled={!sSale?.payments.length > 0}
-              textStyle={{ fontSize: 12 }}
-              text={"Paper Check"}
-              onCheck={() => {
-                _setIsCheck(!sIsCheck);
-                _setProcessButtonEnabled(sIsCheck ? false : true);
-                _setTenderAmount(
-                  sIsCheck ? "" : sSale?.total - sSale?.amountCaptured
-                );
-              }}
-              isChecked={sIsCheck}
-            />
-          ) : null}
-        </View>
-      ) : null}
-      <Text
-        style={{
-          ...checkoutScreenStyle.titleText,
-          color: sIsRefund ? RED_COLOR : checkoutScreenStyle.titleText.color,
-          fontWeight: 500,
-        }}
-      >
-        {sIsRefund ? "CASH REFUND" : "CASH SALE"}
-      </Text>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          marginTop: 5,
-          backgroundColor: C.listItemWhite,
-          padding: 10,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          width: "70%",
-        }}
-      >
-        <View
-          style={{
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            // backgroundColor: "green",
-            height: "100%",
-            paddingRight: 5,
-          }}
-        >
-          <Text style={{ color: C.textMain, marginTop: 4 }}>Balance</Text>
-          <Text
-            style={{
-              marginBottom: 15,
-              color: sIsRefund ? RED_COLOR : C.textMain,
-            }}
-          >
-            {sIsRefund ? "Refund Amount" : "Pay Amount"}
-          </Text>
-        </View>
-        <View
-          style={{
-            alignItems: "flex-end",
-            marginLeft: 10,
-            color: C.textMain,
-            // width: "60%",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 15,
-              padding: 5,
-              paddingRight: 1,
-              color: C.textMain,
-            }}
-          >
-            {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
-          </Text>
-          <View
-            style={{
-              marginLeft: 10,
-              ...checkoutScreenStyle.boxStyle,
-              paddingBottom: 6,
-              paddingRight: 7,
-              // marginTop: 10,
-            }}
-          >
-            <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
-            <View
-              style={{
-                // width: "100%",
-                height: "100%",
-                width: 100,
-
-                // backgroundColor: "green",
-                alignItems: "flex-end",
-                paddingRight: 5,
-              }}
-            >
-              <TextInput
-                onFocus={() => {
-                  _setFocusedItem("amount");
-                  _setRequestedAmountDisp("");
-                  _setTenderAmountDisp("");
-                  _setRequestedAmount(0);
-                  _setTenderAmount(0);
-                }}
-                autoFocus={sFocusedItem === "amount"}
-                disabled={
-                  !sCashSaleActive || sSale?.paymentComplete || !refundReady
-                }
-                style={{
-                  fontSize: 20,
-                  outlineWidth: 0,
-                  color: sIsRefund ? RED_COLOR : C.textMain,
-                  paddingRight: 2,
-                  textAlign: "right",
-                }}
-                placeholder="0.00"
-                placeholderTextColor={gray(0.3)}
-                value={sRequestedAmountDisp}
-                onChangeText={(val) => {
-                  val = usdTypeMask(val).display;
-                  let cents = dollarsToCents(val);
-                  if (!cents) cents = 0;
-                  if (val === "0.00") val = "";
-                  _setStatusMessage("");
-                  _setRequestedAmount(cents);
-                  _setRequestedAmountDisp(val);
-                }}
-              />
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <CheckBox_
-        enabled={!sSale?.payments.length > 0}
-        buttonStyle={{ marginTop: 7 }}
-        textStyle={{ color: gray(0.6), fontWeight: 500, fontSize: 14 }}
-        text={"DEPOSIT TO ACCOUNT"}
-        isChecked={sIsDeposit}
-        onCheck={() => _setIsDeposit(!sIsDeposit)}
-      />
-      <View
-        style={{
-          width: "100%",
-          alignItems: "center",
-          marginVertical: 5,
-        }}
-      >
-        <View
-          style={{
-            marginLeft: 20,
-            ...checkoutScreenStyle.boxStyle,
-            width: "35%",
-            paddingBottom: 6,
-            paddingRight: 7,
-          }}
-        >
-          <Text
-            style={{ ...checkoutScreenStyle.boxDollarSign, color: C.green }}
-          >
-            $
-          </Text>
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              // backgroundColor: "green",
-              alignItems: "flex-end",
-              paddingRight: 5,
-            }}
-          >
-            <TextInput
-              disabled={
-                !sCashSaleActive || sSale?.paymentComplete || !refundReady
-              }
-              style={{
-                ...checkoutScreenStyle.boxText,
-                color: C.green,
-                height: "70%",
-                // backgroundColor: "blue",
-              }}
-              autoFocus={sFocusedItem === "tender"}
-              placeholder="0.00"
-              placeholderTextColor={gray(0.3)}
-              value={sTenderAmountDisp}
-              onChangeText={(val) => {
-                val = usdTypeMask(val).display;
-                let cents = dollarsToCents(val);
-                if (!cents) cents = 0;
-                if (val === "0.00") val = "";
-                _setTenderAmount(cents);
-                _setTenderAmountDisp(val);
-              }}
-              onKeyPress={handleKeyPress}
-              onFocus={() => {
-                _setFocusedItem("tender");
-                _setTenderAmountDisp("");
-                _setTenderAmount(0);
-              }}
-            />
-            <Text
-              style={{
-                fontStyle: "italic",
-                color: "darkgray",
-                fontSize: 12,
-              }}
-            >
-              {sIsRefund ? "Refund Amount" : "Tender"}
-            </Text>
-          </View>
-        </View>
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-around",
-          width: "100%",
-          alignItems: "center",
-          marginTop: 10,
-        }}
-      >
-        <Button_
-          colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ color: C.textWhite, fontSize: 16 }}
-          enabled={
-            sProcessButtonEnabled && !sSale?.paymentComplete && sCashSaleActive
-          }
-          onPress={() => handleProcessPaymentPress()}
-          text={sIsRefund ? "PROCESS REFUND" : "COMPLETE"}
-          buttonStyle={{
-            cursor: sProcessButtonEnabled ? "inherit" : "default",
-            width: 120,
-          }}
-        />
-        <Button_
-          buttonStyle={{
-            cursor: sProcessButtonEnabled ? "inherit" : "default",
-            // width: 120,
-          }}
-          textStyle={{ fontSize: 15, color: C.textMain }}
-          colorGradientArr={COLOR_GRADIENTS.grey}
-          enabled={!sSale?.paymentComplete && sCashSaleActive}
-          onPress={handleCancelPress}
-          text={"CANCEL"}
-        />
-        {/* <View
-          style={{
-            ...checkoutScreenStyle.boxStyle,
-            width: "30%",
-            // borderWidth: 1,
-            // borderColor: C.buttonLightGreenOutline,
-            // borderRadius: 10,
-            paddingTop: 2,
-            paddingBottom: 2,
-            // paddingLeft: 2,
-            // paddingRight: 10,
-            flexDirection: "column",
-
-            // marginTop: 16,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              color: gray(0.3),
-              // marginBottom: 10,
-              width: "100%",
-              textAlign: "left",
-              paddingBottom: 3,
-              // paddingHorizontal: 10,
-            }}
-          >
-            CHANGE
-          </Text>
-          <Text
-            placeholder={"0.00"}
-            style={{
-              // ...checkoutScreenStyle.statusText,
-              textAlign: "right",
-              fontSize: 25,
-              color: sCashChangeNeeded > 0 ? C.green : gray(0.3),
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 15,
-                // color: C.green,
-                paddingRight: 7,
-                height: "100%",
-                textAlignVertical: "top",
-              }}
-            >
-              $
-            </Text>
-            {sCashChangeNeeded}
-          </Text>
-        </View> */}
-      </View>
-    </View>
-  );
-};
-
-const StripeCreditCardComponent = ({
-  sSale,
-  sIsDeposit,
-  sAmountLeftToPay,
-  handlePaymentCapture,
-  zSettings,
-  sIsRefund,
-  refundPaymentIntentID,
-  sCardSaleActive,
-  _setIsDeposit,
-  sRefund = {
-    refundedLines: [],
-    cashRefundRequested: 0,
-    cardRefundRequested: 0,
-    totalCashRefundAllowed: 0,
-    totalCardRefundAllowed: 0,
-    cardTransactionArr: [],
-    cashTransactionArr: [],
-  },
-}) => {
-  const [sRequestedAmount, _setRequestedAmount] = useState(
-    sSale?.total - sSale?.amountCaptured
-  );
-  const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(
-    formatCurrencyDisp(
-      sRefund.cashRefundRequested
-        ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
-        : sSale?.total - sSale?.amountCaptured
-    )
-  );
-  // const [sRefundAmountDisp, _setRefundAmountDisp] = useState(forma);
-  const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(true);
-  const [sFocusedItem, _setFocusedItem] = useState("");
-  const [sCardReader, _setCardReader] = useState("");
-  const [sCardReaders, _setCardReaders] = useState([]);
-  const [sListeners, _setListeners] = useState([]);
-  const [sPaymentIntentID, _setPaymentIntentID] = useState("");
-  const [sStatusTextColor, _setStatusTextColor] = useState(C.green);
-  const [sPartialPaymentAlert, _setPartialPaymentAlert] = useState(false);
-
-  /////////////////////////////////////////////////////////////////////////
-  useEffect(() => {
-    if (
-      sRequestedAmount > sSale?.total - sSale?.amountCaptured ||
-      sRequestedAmount < 50
-    ) {
-      _setProcessButtonEnabled(false);
-    } else {
-      _setProcessButtonEnabled(true);
-    }
-  }, [sRequestedAmount]);
-
-  useEffect(() => {
-    // log(sRequestedAmount);
-    getAvailableStripeReaders();
-
-    return () => {
-      try {
-        sListeners.forEach((listener) => listener());
-      } catch (e) {
-        log("error canceling listener", e);
-      }
-    };
-  }, [sRefund, zSettings]);
-
-  async function getAvailableStripeReaders() {
-    // log("getting available Stripe readers");
-    const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-    const data = await res.json();
-    let readerArr = data.data;
-    let arr = [];
-    readerArr.forEach((connectedReader) => {
-      arr.push(connectedReader);
-    });
-    _setCardReaders(arr);
-    if (arrHasItem(arr, zSettings?.selectedCardReaderObj)) {
-      _setCardReader(zSettings?.selectedCardReaderObj);
-    } else {
-      _setCardReader(arr[0]);
-    }
-  }
-
-  async function startPayment(paymentAmount, reader) {
-    let readerID = reader.id;
-    if (!(paymentAmount > 0)) return;
-    _setStatusTextColor("green");
-    _setStatusMessage("Retrieving card reader activation...");
-
-    let readerResult;
-    if (sIsRefund) {
-      readerResult = await dbCancelServerDrivenStripePayment(
-        readerID || sCardReader.id,
-        refundPaymentIntentID
-      );
-    } else {
-      readerResult = await dbProcessServerDrivenStripePayment(
-        paymentAmount,
-        readerID || sCardReader.id,
-        false,
-        sPaymentIntentID
-      );
-    }
-
-    if (!readerResult) {
-      _setStatusMessage("No reader found\n(check connections/start/restart)");
-      log("no result from start Stripe payment");
-      return;
-    }
-
-    if (readerResult.error && readerResult.error.code) {
-      handleStripeReaderActivationError(readerResult.error.code);
-    } else {
-      _setStatusTextColor("green");
-      _setStatusMessage("Waiting for customer...");
-      // log("readerkdfjkdjf", readerResult.paymentIntentID);
-      _setPaymentIntentID(readerResult.paymentIntentID);
-      let listenerArr = cloneDeep(sListeners);
-      let listener = dbSubscribeToStripePaymentProcess(
-        readerResult.paymentIntentID,
-        handleStripeCardPaymentDBSubscriptionUpdate
-      );
-      listenerArr.push(listener);
-      _setListeners(listenerArr);
-    }
-  }
-
-  async function handleStripeReaderActivationError(error) {
-    _setStatusTextColor(RED_COLOR);
-    // log("Handling Stripe reader activation error", error);
-    let message = "";
-    if (error == "in_progress") {
-      message =
-        "error code: in_progress\n\nCard Reader in use. Please wait, use a different reader, or reset this reader";
-    } else {
-      switch (error.code) {
-        case "terminal_reader_timeout":
-          message =
-            "error code: terminal_reader_timeout\n\nCould not connect to reader, possible network issue\n" +
-            error.code;
-          break;
-        case "terminal_reader_offline":
-          message =
-            "error code: terminal_reader_offline\n\n Please check power and internet connection\n" +
-            error.code;
-          break;
-        case "terminal_reader_busy":
-          message =
-            "error code: terminal_reader_busy\n\nPlease try a different reader or reset this reader\n" +
-            error.code;
-          break;
-        case "intent_invalid_state":
-          message =
-            "error code: intent_invalid_state\n\nPlease clear the reader, refresh the page and try again";
-          break;
-        default:
-        // message = "Unknown processing error: \n" + error.code;
-      }
-    }
-    _setStatusMessage(message);
-  }
-
-  function handleStripeCardPaymentDBSubscriptionUpdate(
-    key,
-    val,
-    paymentIntentID
-  ) {
-    // clog("Stripe webhook update Obj", val);
-
-    let failureCode = val?.failure_code;
-    if (
-      failureCode &&
-      val?.process_payment_intent?.payment_intent == paymentIntentID
-    ) {
-      log("card failure code", failureCode);
-      _setStatusTextColor(RED_COLOR);
-      _setStatusMessage(
-        "Failure code:  " + val.failure_code + "\n\nPayment Rejected by Stripe"
-      );
-    } else if (
-      val.status === "succeeded" &&
-      val.payment_intent === paymentIntentID
-    ) {
-      _setStatusTextColor("green");
-      _setStatusMessage("Payment Complete!");
-      log("Stripe payment complete!");
-      // clog("Payment complete object", val);
-      let paymentMethodDetails = val.payment_method_details.card_present;
-      let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
-      payment.amountCaptured = val.amount_captured;
-      payment.cardIssuer =
-        paymentMethodDetails.receipt.application_preferred_name;
-      payment.cardType = paymentMethodDetails.description;
-      payment.id = generateUPCBarcode();
-      payment.isRefund = sIsRefund;
-      payment.millis = new Date().getTime();
-      payment.authorizationCode =
-        paymentMethodDetails.receipt.authorization_code;
-      payment.paymentIntentID = val.payment_intent;
-      payment.chargeID = val.id;
-      payment.paymentProcessor = "stripe";
-      payment.receiptURL = val.receipt_url;
-      payment.last4 = val.payment_method_details.card_present.last4;
-      payment.expMonth = val.payment_method_details.card_present.exp_month;
-      payment.expYear = val.payment_method_details.card_present.exp_year;
-      payment.networkTransactionID =
-        val.payment_method_details.card_present.network_transaction_id;
-      payment.amountRefunded = val.amount_refunded;
-
-      // clog("Successful Payment details obj", paymentDetailsObj);
-      handlePaymentCapture(payment);
-    }
-  }
-
-  async function cancelServerDrivenStripePaymentIntent() {
-    _setStatusTextColor(RED_COLOR);
-    _setStatusMessage("Canceling payment request...");
-    log("canceling server driven payment attempt", zReader);
-    if (!zPaymentIntentID) {
-      // onCancel();
-      return;
-    }
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      zReader?.id,
-      zPaymentIntentID
-    );
-
-    // onCancel();
-  }
-
-  function handleCancelPress() {
-    _setTenderAmount("");
-    _setRequestedAmount(sAmountLeftToPay);
-    _setProcessButtonEnabled(false);
-  }
-
-  function handleProcessButtonPress() {}
-
-  async function resetCardReader() {
-    _setStatusMessage(RED_COLOR);
-    _setStatusMessage("\nCard reader reset in progress...");
-    _setPaymentIntentID(null);
-    sListeners.forEach((listener) => listener());
-    _setProcessButtonEnabled(true);
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      sCardReader.id,
-      sPaymentIntentID
-    );
-    _setStatusTextColor("green");
-    _setStatusMessage("\nReset complete!");
-    clog("cancelation results", readerResult);
-  }
-
-  // unnecessary, DB will create it for us
-  async function createPaymentIntent(reader) {
-    log("creating payment intent");
-    try {
-      const res = await fetch(STRIPE_INITIATE_PAYMENT_INTENT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: Number(sRequestedAmount),
-          currency: "usd",
-          readerID: reader?.id || sCardReader.id,
-        }),
-      });
-      const data = await res.json();
-      // clog("intent", data);
-    } catch (e) {
-      log("Error creating payment intent", e);
-    }
-
-    // setClientSecret(data.clientSecret);
-  }
-
-  // log(sProcessButtonEnabled.toString());
-  let refundReady = true;
-  // if (sIsRefund && !sRefundAmount) refundReady = false;
-  // log("stripe sale", sSale?.paymentComplete.toString());
-  return (
-    <View
-      pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
-      style={{
-        ...checkoutScreenStyle.base,
-        opacity: sSale?.paymentComplete || !refundReady ? 0.2 : 1,
-      }}
-    >
-      <View
-        style={{
-          width: "100%",
-          alignItems: "flex-start",
-          paddingBottom: 10,
-          paddingHorizontal: 10,
-          // marginLeft: 20,
-        }}
-      >
-        <View
-          style={{
-            width: "100%",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexDirection: "row",
-          }}
-        >
-          <View style={{}}>
-            <Text style={{ color: gray(0.6), fontSize: 11 }}>Card Readers</Text>
-            <DropdownMenu
-              enabled={
-                sCardSaleActive && !sSale?.paymentComplete && refundReady
-              }
-              buttonIcon={ICONS.menu2}
-              buttonIconSize={15}
-              buttonTextStyle={{ fontSize: 13 }}
-              buttonStyle={{
-                cursor: sProcessButtonEnabled ? "inherit" : "default",
-                borderRadius: 5,
-                paddingVertical: 2,
-                paddingHorizontal: 5,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-              }}
-              itemStyle={{ width: null }}
-              dataArr={sCardReaders || []}
-              buttonText={sCardReader?.label || sCardReader?.id}
-              onSelect={_setCardReader}
-            />
-          </View>
-          <Button_
-            text={"Reset Card Reader"}
-            enabled={sCardSaleActive && !sSale?.paymentComplete && refundReady}
-            buttonStyle={{
-              cursor: sProcessButtonEnabled ? "inherit" : "default",
-              backgroundColor: gray(0.2),
-              paddingHorizontal: 5,
-              paddingVertical: 2,
-              borderRadius: 5,
-              borderColor: gray(0.23),
-              borderWidth: 1,
-            }}
-            textStyle={{
-              color: C.textMain,
-              fontSize: 11,
-            }}
-            onPress={resetCardReader}
-          />
-        </View>
-      </View>
-      <Text
-        style={{
-          ...checkoutScreenStyle.titleText,
-          color: sIsRefund ? RED_COLOR : checkoutScreenStyle.titleText.color,
-          fontWeight: 500,
-        }}
-      >
-        {sIsRefund ? "CARD REFUND" : "CARD SALE"}
-      </Text>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          marginTop: 10,
-          backgroundColor: C.listItemWhite,
-          padding: 10,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          // backgroundColor: "green",
-          // ...checkoutScreenStyle.boxStyle,
-          width: "70%",
-        }}
-      >
-        <View
-          style={{
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            // backgroundColor: "green",
-            height: "100%",
-            paddingRight: 5,
-          }}
-        >
-          <Text style={{ color: C.textMain, marginTop: 10 }}>Balance</Text>
-          <Text
-            style={{
-              marginBottom: 15,
-              color: sIsRefund ? RED_COLOR : C.textMain,
-            }}
-          >
-            {sIsRefund ? "Refund Amount" : "Pay Amount"}
-          </Text>
-        </View>
-        <View
-          style={{
-            alignItems: "flex-end",
-            marginLeft: 10,
-            color: C.textMain,
-            // width: "60%",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 15,
-              padding: 5,
-              paddingRight: 1,
-              color: C.textMain,
-            }}
-          >
-            {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
-          </Text>
-          <View
-            style={{
-              marginLeft: 10,
-              ...checkoutScreenStyle.boxStyle,
-              paddingBottom: 6,
-              paddingRight: 7,
-            }}
-          >
-            <Text style={{ ...checkoutScreenStyle.boxDollarSign }}>$</Text>
-            <View
-              style={{
-                height: "100%",
-                width: 100,
-                alignItems: "flex-end",
-                paddingRight: 5,
-              }}
-            >
-              <TextInput
-                onFocus={() => {
-                  _setFocusedItem("amount");
-                  _setRequestedAmountDisp("");
-                  _setRequestedAmount(0);
-                }}
-                autoFocus={sFocusedItem === "amount"}
-                disabled={
-                  !sCardSaleActive || sSale?.paymentComplete || !refundReady
-                }
-                style={{
-                  fontSize: 20,
-                  outlineWidth: 0,
-                  color: sIsRefund ? RED_COLOR : C.textMain,
-                  paddingRight: 2,
-                  textAlign: "right",
-                }}
-                placeholder="0.00"
-                placeholderTextColor={gray(0.3)}
-                value={sRequestedAmountDisp}
-                onChangeText={(val) => {
-                  val = usdTypeMask(val).display;
-                  let cents = dollarsToCents(val);
-                  if (!cents) cents = 0;
-                  if (val === "0.00") val = "";
-                  _setStatusMessage("");
-                  _setRequestedAmount(cents);
-                  _setRequestedAmountDisp(val);
-                }}
-              />
-            </View>
-          </View>
-        </View>
-      </View>
-      <CheckBox_
-        enabled={!sSale?.payments.length > 0}
-        buttonStyle={{ marginTop: 10 }}
-        textStyle={{ color: gray(0.6), fontWeight: 500 }}
-        text={"DEPOSIT TO ACCOUNT"}
-        isChecked={sIsDeposit}
-        onCheck={() => _setIsDeposit(!sIsDeposit)}
-      />
-      {sIsRefund ? (
-        <View style={{ width: "100%", alignItems: "center", marginTop: 10 }}>
-          <Text style={{ fontSize: 12 }}>
-            {"**" +
-              sRefund.last4 +
-              "exp: " +
-              sRefund.cardExpMonth +
-              " / " +
-              sRefund.cardExpYear}
-          </Text>
-          <Text style={{ fontSize: 12 }}>{sRefund.cardType}</Text>
-        </View>
-      ) : null}
-      <View
-        style={{
-          width: "100%",
-          marginVertical: sIsRefund ? "2%" : "8%",
-          alignItems: "center",
-        }}
-      >
-        {/* {!sPartialPaymentAlert ? ( */}
-        <Button_
-          colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ color: C.textWhite, fontSize: 16 }}
-          enabled={
-            sProcessButtonEnabled && !sSale?.paymentComplete && sCardSaleActive
-          }
-          onPress={() => startPayment(sRequestedAmount, sCardReader)}
-          text={sIsRefund ? "PROCESS REFUND" : "PROCESS CARD"}
-          buttonStyle={{
-            cursor: sProcessButtonEnabled ? "inherit" : "default",
-          }}
-        />
-        <Text
-          style={{
-            ...checkoutScreenStyle.statusText,
-            fontSize: 15,
-            color: sStatusTextColor,
-            marginTop: 5,
-          }}
-        >
-          {sStatusMessage}
-        </Text>
-      </View>
-    </View>
-  );
-};
 
 const InventoryListComponent = ({
   inventoryItems,
@@ -2726,7 +949,7 @@ const WorkorderListComponent = ({
                   let inventoryItem = _zGetInventoryItem(
                     workorderLine.inventoryItem.id
                   );
-                  log("item", workorderLine.qty);
+                  // log("item", workorderLine.qty);
                   return (
                     <View
                       style={{
@@ -2818,7 +1041,7 @@ const WorkorderListComponent = ({
                           alignItems: "center",
                           height: "100%",
                           paddingRight: 0,
-                          // backgroundColor: RED_COLOR,
+                          // backgroundColor: C.red,
                         }}
                       >
                         {!sIsRefund ? (
@@ -2859,46 +1082,39 @@ const WorkorderListComponent = ({
                           >
                             {"$ " +
                               formatCurrencyDisp(
-                                workorderLine.price || inventoryItem?.price
+                                workorderLine.inventoryItem.price
                               )}
                           </Text>
                           {workorderLine.discountObj.savings ? (
-                            <Text
-                              style={{
-                                paddingHorizontal: 0,
-                                minWidth: 30,
-                                color: C.lightred,
-                              }}
-                            >
-                              {"$ -" +
-                                formatCurrencyDisp(
-                                  workorderLine.discountSavings ||
-                                    workorderLine.discountObj.savings
+                            <View style={{ alignItems: "flex-end" }}>
+                              <Text
+                                style={{
+                                  paddingHorizontal: 0,
+                                  minWidth: 30,
+                                  color: C.lightred,
+                                }}
+                              >
+                                {"$ -" +
+                                  formatCurrencyDisp(
+                                    workorderLine.discountSavings
+                                  )}
+                              </Text>
+                              <Text
+                                style={{
+                                  fontWeight: "600",
+                                  minWidth: 30,
+                                  marginTop: 0,
+                                  paddingHorizontal: 0,
+                                  color: Colors.darkText,
+                                }}
+                              >
+                                {formatCurrencyDisp(
+                                  workorderLine.inventoryItem.price -
+                                    workorderLine.discountSavings
                                 )}
-                            </Text>
+                              </Text>
+                            </View>
                           ) : null}
-                          <Text
-                            style={{
-                              fontWeight: "600",
-                              minWidth: 30,
-                              marginTop: 0,
-                              paddingHorizontal: 0,
-                              color: Colors.darkText,
-                            }}
-                          >
-                            {workorderLine.discountObj.newPrice
-                              ? "$ " +
-                                formatCurrencyDisp(
-                                  workorderLine.discountObj.newPrice
-                                )
-                              : workorderLine.qty > 1
-                              ? "$" +
-                                formatCurrencyDisp(
-                                  inventoryItem?.price ||
-                                    workorderLine.price * workorderLine.qty
-                                )
-                              : ""}
-                          </Text>
                         </View>
                       </View>
                     </View>

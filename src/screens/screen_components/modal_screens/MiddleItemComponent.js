@@ -1,0 +1,1036 @@
+import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
+import {
+  PAYMENT_OBJECT_PROTO,
+  SALE_OBJECT_PROTO,
+  TAB_NAMES,
+  WORKORDER_ITEM_PROTO,
+  WORKORDER_PROTO,
+} from "../../../data";
+import {
+  ALERT_SCREEN_PROTO,
+  useAlertScreenStore,
+  useCheckoutStore,
+  useCurrentCustomerStore,
+  useInventoryStore,
+  useOpenWorkordersStore,
+  useSettingsStore,
+  useStripePaymentStore,
+  useTabNamesStore,
+} from "../../../stores";
+import * as XLSX from "xlsx";
+
+import {
+  BicycleSpinner,
+  Button,
+  CashSaleModalComponent,
+  CheckBox_,
+  StripeCreditCardModalComponent,
+  FileInput,
+  LoadingIndicator,
+  PaymentComponent,
+  ScreenModal,
+  SHADOW_RADIUS_PROTO,
+  Button_,
+  DropdownMenu,
+  SliderButton_,
+  GradientView,
+  AlertBox_,
+} from "../../../components";
+import { cloneDeep, initial } from "lodash";
+import {
+  addDashesToPhone,
+  arrHasItem,
+  calculateRunningTotals,
+  clog,
+  formatDecimal,
+  formatCurrencyDisp,
+  fuzzySearch,
+  generateRandomID,
+  generateUPCBarcode,
+  getRgbFromNamedColor,
+  lightenRGBByPercent,
+  log,
+  gray,
+  removeArrItem,
+  removeUnusedFields,
+  replaceOrAddToArr,
+  roundToTwoDecimals,
+  usdTypeMask,
+  dollarsToCents,
+  addOrRemoveFromArr,
+  findInMultipleArrs,
+  formatMillisForDisplay,
+} from "../../../utils";
+import React, { useCallback, useEffect, useState } from "react";
+import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
+import {
+  sendFCMMessage,
+  SET_FIRESTORE_FIELD,
+  setOpenWorkorder,
+} from "../../../db";
+import {
+  dbCancelServerDrivenStripePayment,
+  dbGetClosedWorkorderItem,
+  dbGetOpenWorkorderItem,
+  dbGetSaleItem,
+  dbProcessServerDrivenStripePayment,
+  dbRetrieveAvailableStripeReaders,
+  dbSetCustomerField,
+  dbSetSalesObj,
+  dbSubscribeToStripePaymentProcess,
+} from "../../../db_call_wrapper";
+import { TouchableOpacity } from "react-native";
+import {
+  STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
+  STRIPE_INITIATE_PAYMENT_INTENT_URL,
+} from "../../../private_user_constants";
+import { FIRESTORE_COLLECTION_NAMES } from "../../../constants";
+import { isArray } from "lodash";
+
+export const MiddleItemComponent = ({
+  zCustomer,
+  sIsRefund,
+  sRefundScan,
+  _sSetRefundScan,
+  handleCancelPress,
+  sFocusedItem,
+  _setFocusedItem,
+  sScanFailureMessage,
+  _setScanFailureMessage,
+  sRefund = {
+    refundedLines: [],
+    requestedRefundLines: [],
+    cashRefundRequested: 0,
+    cardRefundRequested: 0,
+    totalCashRefundAllowed: 0,
+    totalCardRefundAllowed: 0,
+    cashAmountRefunded: 0,
+    cardAmountRefunded: 0,
+    cardTransactions: [],
+    cashTransactions: [],
+  },
+  sShouldChargeCardRefundFee,
+  sCardRefundFee,
+  sCardRefundFeePercentage,
+  sSale,
+  sCashChangeNeeded,
+}) => {
+  const _zSetIsCheckingOut = useCheckoutStore(
+    (state) => state.setIsCheckingOut
+  );
+
+  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
+
+  const _zSetCustomerField = useCurrentCustomerStore(
+    (state) => state.setCustomerField
+  );
+  // store getters
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorderObj()
+  );
+  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
+  const zOpenWorkorders = useOpenWorkordersStore((state) =>
+    state.getWorkorderArr()
+  );
+  const zInventory = useInventoryStore((state) => state.getInventoryArr());
+  const zGetInventoryItem = useInventoryStore(
+    (state) => state.getInventoryItem
+  );
+  const zSettings = useSettingsStore((state) => state.getSettingsObj());
+  const zSale = useCheckoutStore((state) => state.saleObj);
+
+  return (
+    <View
+      style={{
+        width: "100%",
+        height: "100%",
+        // justifyContent:
+        // padding: 20,
+      }}
+    >
+      {zCustomer?.id ? (
+        <View
+          style={{
+            width: "100%",
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 10,
+            padding: 10,
+            marginBottom: 30,
+            backgroundColor: C.backgroundListWhite,
+            // flexDirection:
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+            }}
+          >
+            <View>
+              <Text style={{ color: C.textMain }}>
+                {zCustomer?.first + " " + zCustomer?.last}
+              </Text>
+              <Text style={{ color: gray(0.6), fontSize: 12 }}>
+                {zCustomer?.email}
+              </Text>
+            </View>
+            <View>
+              {zCustomer?.cell ? (
+                <Text style={{ color: C.textMain }}>
+                  <Text style={{ color: gray(0.5) }}>{"cell: "}</Text>
+                  {addDashesToPhone(zCustomer?.cell)}
+                </Text>
+              ) : null}
+              {zCustomer?.land ? (
+                <Text style={{ color: C.textMain }}>
+                  <Text style={{ color: gray(0.5) }}>{"land: "}</Text>
+                  {addDashesToPhone(zCustomer?.land)}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+
+          {zCustomer?.streetAddress ? (
+            <Text>{zCustomer.streetAddress}</Text>
+          ) : null}
+          {zCustomer?.unit ? <Text>{zCustomer.unit}</Text> : null}
+          {zCustomer?.city ? <Text>{zCustomer.city}</Text> : null}
+        </View>
+      ) : null}
+
+      {/** Refund element ///////////////////////////////////////////// */}
+
+      <View
+        style={{
+          width: "100%",
+          alignItems: "space-between",
+          // marginBottom: 30,
+        }}
+      >
+        <View
+          style={{
+            width: "100%",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <CheckBox_
+            enabled={!sIsRefund && !sSale?.payments.length > 0}
+            text={"Refund"}
+            isChecked={sIsRefund}
+            onCheck={() =>
+              sRefundScan.length !== 12
+                ? _setScanFailureMessage("Must scan/enter 12-digit sale ID")
+                : null
+            }
+          />
+          <Text style={{ fontSize: 12, color: C.red }}>
+            {sSale?.payments.length > 0 ? "" : sScanFailureMessage}
+          </Text>
+        </View>
+        <TextInput
+          disabled={sSale?.payments.length > 0}
+          style={{
+            marginTop: 5,
+            width: "100%",
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 7,
+            padding: 5,
+            textAlign: "left",
+            borderWidth: 1,
+            outlineWidth: 0,
+            backgroundColor: C.backgroundListWhite,
+            color: sSale?.payments.length > 0 ? gray(0.3) : C.textMain,
+          }}
+          onFocus={() => {
+            _setFocusedItem("refund");
+            // _sSetRefundScan("");
+          }}
+          placeholder="Scan sale receipt (12 digit number)"
+          placeholderTextColor={gray(0.38)}
+          autoFocus={sFocusedItem === "refund"}
+          value={sRefundScan}
+          onChangeText={(val) => {
+            _setScanFailureMessage("");
+            _sSetRefundScan(val);
+          }}
+        />
+      </View>
+
+      {/** totals element ////////////////////////////////////////// */}
+
+      <View
+        style={{
+          width: "100%",
+          // minHeight: "20%",
+          // maxHeight: "30%",
+          // alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginTop: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 10,
+          backgroundColor: C.backgroundListWhite,
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+        }}
+      >
+        <View
+          style={{
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>SUBTOTAL</Text>
+          <View style={{ flexDirection: "row" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: gray(0.5),
+                marginRight: 10,
+              }}
+            >
+              $
+            </Text>
+            <Text
+              style={{
+                fontSize: 18,
+                color: lightenRGBByPercent(C.green, 20),
+              }}
+            >
+              {formatCurrencyDisp(sSale?.subtotal)}
+            </Text>
+          </View>
+        </View>
+        {sSale?.discount ? (
+          <View
+            style={{
+              width: "100%",
+              height: 1,
+              marginVertical: 10,
+              backgroundColor: C.buttonLightGreenOutline,
+            }}
+          />
+        ) : null}
+        {sSale?.discount ? (
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text
+              style={{
+                marginLeft: 15,
+                fontSize: 13,
+                color: C.lightred,
+              }}
+            >
+              DISCOUNT
+            </Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: C.lightred,
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  color: C.lightred,
+                }}
+              >
+                {"- " + formatCurrencyDisp(sSale?.discount)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+        {sSale?.discount ? (
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text
+              style={{
+                marginLeft: 15,
+                fontSize: 13,
+                color: gray(0.5),
+              }}
+            >
+              DISCOUNTED TOTAL
+            </Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: gray(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  color: lightenRGBByPercent(C.green, 20),
+                }}
+              >
+                {formatCurrencyDisp(sSale?.subtotal - sSale?.discount)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+        {sSale?.discount ? (
+          <View
+            style={{
+              width: "100%",
+              height: 1,
+              marginVertical: 10,
+              backgroundColor: C.buttonLightGreenOutline,
+            }}
+          />
+        ) : null}
+        <View
+          style={{
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>SALES TAX</Text>
+          <View style={{ flexDirection: "row" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: gray(0.5),
+                marginRight: 10,
+              }}
+            >
+              $
+            </Text>
+            <Text
+              style={{
+                fontSize: 18,
+                color: lightenRGBByPercent(C.green, 20),
+              }}
+            >
+              {formatCurrencyDisp(sSale?.tax)}
+            </Text>
+          </View>
+        </View>
+        {sShouldChargeCardRefundFee &&
+        sIsRefund &&
+        sRefund.totalCardRefundAllowed > 0 ? (
+          <VertListSpacer />
+        ) : null}
+
+        {/******************** REFUNDS ********************************************/}
+
+        {/* {sShouldChargeCardRefundFee &&
+        sIsRefund &&
+        sRefund.totalCardRefundAllowed > 0 ? (
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text style={{ fontSize: 13, color: gray(0.5) }}>{"SUBTOTAL"}</Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: gray(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontWeight: 500,
+                  fontSize: 18,
+                  color: C.green,
+                }}
+              >
+                {formatCurrencyDisp(
+                  sSale?.subtotal + sSale?.tax - sSale?.discount
+                )}
+              </Text>
+            </View>
+          </View>
+        ) : null} */}
+
+        {sRefund.totalCardRefundAllowed > 0 && (
+          <View
+            style={{
+              alignItems: "center",
+
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <View
+              style={{
+                width: "100%",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Text>{"CARD REFUND (MANDATORY)"}</Text>
+              <View style={{ flexDirection: "row" }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: gray(0.5),
+                    marginRight: 10,
+                  }}
+                >
+                  $
+                </Text>
+                <Text>
+                  {formatCurrencyDisp(sRefund.totalCardRefundAllowed)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {sShouldChargeCardRefundFee && sRefund.totalCardRefundAllowed > 0 && (
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text style={{ fontSize: 13, color: gray(0.5) }}>
+              {"CARD RE-PROCESSING FEE (" + sCardRefundFeePercentage + "%)"}
+            </Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: gray(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontWeight: 500,
+                  fontSize: 15,
+                  color: gray(0.5),
+                }}
+              >
+                {formatCurrencyDisp(sCardRefundFee)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {!!sRefund.totalCashRefundAllowed && <VertListSpacer />}
+        {!!sRefund.totalCashRefundAllowed && (
+          <View
+            style={{
+              width: "100%",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text>{"CASH REFUND ALLOWED"}</Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: gray(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text>{formatCurrencyDisp(sRefund.totalCashRefundAllowed)}</Text>
+            </View>
+          </View>
+        )}
+        <VertListSpacer />
+        <View
+          style={{
+            alignItems: "center",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+          <Text style={{ fontSize: 16, color: gray(0.5) }}>
+            {sIsRefund ? "TOTAL REFUND ALLOWED" : "TOTAL SALE"}
+          </Text>
+          <View style={{ flexDirection: "row" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                color: gray(0.5),
+                marginRight: 10,
+              }}
+            >
+              $
+            </Text>
+            <Text
+              style={{
+                fontWeight: 500,
+                fontSize: 21,
+                color: C.green,
+              }}
+            >
+              {formatCurrencyDisp(
+                sIsRefund
+                  ? sRefund.totalCardRefundAllowed +
+                      sRefund.totalCashRefundAllowed
+                  : sSale?.total
+              )}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View
+        style={{
+          width: "100%",
+          alignItems: "flex-end",
+          marginTop: 10,
+          paddingRight: 7,
+        }}
+      >
+        {!!sRefund.cashRefundRequested && (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: C.red,
+            }}
+          >
+            {"CASH REFUND REQUESTED:   $" + formatCurrencyDisp(sRefund.cashRefundRequested)}
+          </Text>
+        )}
+        {!!sRefund.cardRefundRequested && (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: C.red,
+            }}
+          >
+            {"CARD REFUND REQUESTED:   $" + formatCurrencyDisp(sRefund.cardRefundRequested)}
+          </Text>
+        )}
+        {!!sRefund.cashAmountRefunded && (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: C.green,
+            }}
+          >
+            {"CASH REFUNDED:   $" + formatCurrencyDisp(sRefund.cashAmountRefunded)}
+          </Text>
+        )}
+        {!!sRefund.cardAmountRefunded && (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: C.green,
+            }}
+          >
+            {"CARD AMOUNT REFUNDED:   $" + formatCurrencyDisp(sRefund.cardAmountRefunded)}
+          </Text>
+        )}
+        {!sIsRefund && !sSale?.paymentComplete && (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: sSale?.paymentComplete ? C.green : C.red,
+            }}
+          >
+            {"AMOUNT LEFT TO PAY:   $" +
+              formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
+          </Text>
+        )}
+        {!sIsRefund && sSale?.paymentComplete && (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: sSale?.paymentComplete ? C.green : C.red,
+            }}
+          >
+            {"PAYMENT COMPLETE!"}
+          </Text>
+        )}
+      </View>
+
+      {/******************** END REFUNDS ********************************************/}
+
+      {/** ************************************payments list *****************************************************/}
+      {!!sSale?.payments.length > 0 && (
+        <View
+          style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
+        >
+          <Text style={{ color: gray(0.4) }}>PAYMENTS</Text>
+        </View>
+      )}
+      <ScrollView style={{ maxHeight: "30%", width: "100%" }}>
+        {sSale?.payments.map((paymentObj) => {
+          return (
+            <View
+              key={paymentObj.id}
+              style={{
+                padding: 5,
+                backgroundColor: C.listItemWhite,
+                width: "99%",
+                backgroundColor: C.listItemWhite,
+                borderRadius: 10,
+                marginBottom: 5,
+              }}
+            >
+              <Text style={{ color: C.green }}>
+                {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text>Amount received: </Text>
+                <Text>
+                  {formatCurrencyDisp(paymentObj.amountCaptured, true)}
+                </Text>
+              </View>
+              {paymentObj.last4 ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                    Last 4 Digits:{" "}
+                  </Text>
+                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                    {"***" + paymentObj.last4}
+                  </Text>
+                </View>
+              ) : null}
+              {paymentObj.cash ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text>Amount Tendered: </Text>
+                  <Text>
+                    {formatCurrencyDisp(paymentObj.amountTendered, true)}
+                  </Text>
+                </View>
+              ) : null}
+              {/* {paymentObj.cash ? (
+                <View
+                  style={{
+                    justifyContent: "space-between",
+                    flexDirection: "row",
+                  }}
+                >
+                  <Text>Change needed: </Text>
+                  <Text>
+                    {formatCurrencyDisp(
+                      paymentObj.amountTendered - paymentObj.amountCaptured
+                    )}
+                  </Text>
+                </View>
+              ) : null} */}
+              {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/*******************************************refund list ********************************************************/}
+      {sSale?.refunds?.length > 0 ? (
+        <View
+          style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
+        >
+          <Text style={{ color: C.red }}>REFUNDS</Text>
+        </View>
+      ) : null}
+      <ScrollView style={{ maxHeight: "30%", width: "100%" }}>
+        {sSale?.refunds?.map((refund) => {
+          let cardDetails = sSale.payments.find(
+            (o) => o.id === refund.cardPaymentID
+          );
+          return (
+            <View
+              key={refund.id}
+              style={{
+                padding: 5,
+                backgroundColor: C.listItemWhite,
+                width: "99%",
+                backgroundColor: C.listItemWhite,
+                borderRadius: 10,
+                marginBottom: 5,
+              }}
+            >
+              <Text style={{ color: C.green }}>
+                {refund.cardPaymentID ? "CARD REFUND" : "CASH REFUND"}
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text>Amount refunded: </Text>
+                <Text>{formatCurrencyDisp(refund.amountRefunded)}</Text>
+              </View>
+              {cardDetails ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                    {formatMillisForDisplay(cardDetails.millis)}
+                  </Text>
+                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                    {cardDetails.cardType}
+                  </Text>
+                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                    {"***" + cardDetails.last4}
+                  </Text>
+                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                    {cardDetails.expMonth + "/" + cardDetails.expYear}
+                  </Text>
+                </View>
+              ) : null}
+              {!refund.cardPaymentID ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text>Amount Tendered: </Text>
+                  <Text>{formatCurrencyDisp(refund.amountTendered)}</Text>
+                </View>
+              ) : null}
+              {/* {paymentObj.cash ? (
+                <View
+                  style={{
+                    justifyContent: "space-between",
+                    flexDirection: "row",
+                  }}
+                >
+                  <Text>Change needed: </Text>
+                  <Text>
+                    {formatCurrencyDisp(
+                      paymentObj.amountTendered - paymentObj.amountCaptured
+                    )}
+                  </Text>
+                </View>
+              ) : null} */}
+              {refund.isRefund ? <Text>{"REFUND"}</Text> : null}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <View
+        style={{
+          width: "100%",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-around",
+          marginTop: 25,
+          // justifySelf: "flex-end",
+        }}
+      >
+        {/* {payments?.length > 0 && !sSale?.paymentComplete ? (
+          <SliderButton_ onConfirm={(val) => log("val", val)} />
+        ) : null} */}
+        <Button_
+          enabled={
+            sSale?.paymentComplete ||
+            (!sSale?.amountCaptured > 0 && !sSale?.paymentComplete)
+          }
+          colorGradientArr={
+            sSale?.paymentComplete ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.red
+          }
+          text={sSale?.paymentComplete ? "CLOSE" : "CANCEL"}
+          onPress={handleCancelPress}
+          textStyle={{ color: C.textWhite }}
+          buttonStyle={{ width: 150 }}
+        />
+        {sCashChangeNeeded ? (
+          <View
+            style={{
+              ...checkoutScreenStyle.boxStyle,
+              width: "30%",
+              paddingTop: 2,
+              paddingBottom: 2,
+              flexDirection: "column",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                color: gray(0.3),
+                width: "100%",
+                textAlign: "left",
+                paddingBottom: 3,
+              }}
+            >
+              CHANGE
+            </Text>
+            <Text
+              placeholder={"0.00"}
+              style={{
+                textAlign: "right",
+                fontSize: 25,
+                color: sCashChangeNeeded > 0 ? C.green : gray(0.3),
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 15,
+                  // color: C.green,
+                  paddingRight: 7,
+                  height: "100%",
+                  textAlignVertical: "top",
+                }}
+              >
+                $
+              </Text>
+              {sCashChangeNeeded}
+            </Text>
+          </View>
+        ) : null}
+        {sSale?.payments?.length > 0 && sSale?.paymentComplete ? (
+          <Button_
+            buttonStyle={{ width: 150, color: C.textWhite }}
+            colorGradientArr={COLOR_GRADIENTS.greenblue}
+            text={"REPRINT"}
+            textStyle={{ color: C.textWhite }}
+            onPress={() => log("reprint receipt method needed")}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+};
+
+const VertListSpacer = () => (
+
+          <View
+            style={{
+              width: "100%",
+                height: 1,
+                marginVertical: 10,
+              backgroundColor: C.buttonLightGreenOutline,
+            }}
+          />)
+
+const checkoutScreenStyle = {
+  base: {
+    alignItems: "center",
+    paddingTop: 20,
+    width: "100%",
+    height: "48%",
+    // backgroundColor: C.listItemWhite,
+    borderRadius: 15,
+    ...SHADOW_RADIUS_PROTO,
+  },
+  titleText: {
+    fontSize: 25,
+    color: gray(0.6),
+  },
+  boxDollarSign: {
+    fontSize: 15,
+    // marginRight: 5,
+  },
+  totalText: {
+    fontSize: 10,
+  },
+  boxText: {
+    outlineWidth: 0,
+    fontSize: 25,
+    textAlign: "right",
+    // placeholderTextColor: makeGrey,
+    // backgroundColor: "green",
+    color: C.textMain,
+    width: "90%",
+  },
+  buttonText: {
+    fontSize: 13,
+    fontWeight: Fonts.weight.textRegular,
+  },
+  mainButtonStyle: {},
+  boxStyle: {
+    marginTop: 5,
+    borderColor: C.buttonLightGreenOutline,
+    borderRadius: 10,
+    borderWidth: 2,
+    backgroundColor: C.listItemWhite,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    // width: 120,
+    alignItems: "space-between",
+    justifyContent: "space-between",
+    flexDirection: "row",
+  },
+  totalTextStyle: {
+    marginTop: 15,
+    color: gray(0.75),
+  },
+  titleStyle: {
+    marginTop: 20,
+  },
+  buttonRowStyle: {
+    marginTop: 20,
+  },
+  statusText: {
+    width: "80%",
+    textAlign: "center",
+    marginTop: 15,
+    color: "green",
+    fontSize: 15,
+    fontWeight: 600,
+  },
+  loadingIndicatorStyle: {
+    marginTop: 10,
+  },
+};

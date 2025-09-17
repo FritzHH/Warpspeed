@@ -413,8 +413,9 @@ export function checkInputForNumbersOnly(valString, includeDecimal = true) {
 
 export function formatCurrencyDisp(
   value,
-  { locale = "en-US", currency = "USD", withCurrency = false } = {}
+  withCurrency = false
 ) {
+  let locale = "en-US"; let currency = "USD"
   const cents = typeof value === "string" ? Number(value) : value;
   if (!Number.isFinite(cents)) return "";
   const amount = cents / 100;
@@ -1047,11 +1048,20 @@ export function removeArrItem(arr, item, fieldID = "id") {
   return arr.filter((o) => o[fieldID] !== item[fieldID]);
 }
 
+export function addOrRemoveFromArr(arr, input, fieldName = "id") {
+  if (!arr) arr = []
+  if (!input) return arr;
+  let found = arr.find((o) => o[fieldName] === input[fieldName]);
+  // log("found", found);
+  if (found) return arr.filter((o) => o[fieldName] !== input[fieldName]);
+  return [...arr, input];
+}
+
 export function replaceOrAddToArr(arr, input, fieldName = "id") {
+  if (!arr) arr = []
   if (!input) return arr;
   let isObj = isObject(input);
   let copy = cloneDeep(arr);
-
   if (isObj) {
     let idx = copy.findIndex((o) => o[fieldName] === input[fieldName]);
     if (idx >= 0) {

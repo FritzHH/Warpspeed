@@ -270,20 +270,28 @@ export const PAYMENT_OBJECT_PROTO = {
   depositUsed: false,
 };
 
+export const REFUND_PROTO = {
+  id: "",
+  workorderLines: [],
+  millis: "",
+  amountRefunded: 0,
+  cardPaymentID: "",
+  workorderLines: [],
+};
+
 export const SALE_OBJECT_PROTO = {
   id: "",
-  workorderIDs: [],
-  refundedWorkorderLines: [],
   millis: "",
-  payments: [],
   subtotal: 0,
   discount: 0,
   tax: 0,
   salesTaxPercent: 0,
   total: 0,
   amountCaptured: 0,
-  amountRefunded: 0,
   paymentComplete: false,
+  workorderIDs: [],
+  payments: [],
+  refunds: [],
 };
 
 export const WORKORDER_PROTO = {

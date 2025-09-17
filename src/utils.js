@@ -1037,6 +1037,8 @@ export function getItemFromArr(value, arrKey, arr) {
 }
 
 export function arrHasItem(arr, item) {
+  // log("arr", arr);
+  // log("item", item);
   if (!arr || !item) return false;
   return arr.find((o) => o.id === item.id);
 }

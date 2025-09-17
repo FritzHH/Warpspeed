@@ -117,7 +117,18 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
   const [sRefundScan, _sSetRefundScan] = useState();
   const [sIsRefund, _setIsRefund] = useState(false);
-  const [sRefund, _setRefund] = useState({});
+  const [sRefund, _setRefund] = useState({
+    refundedLines: [],
+    requestedRefundLines: [],
+    cashRefundRequested: 0,
+    cardRefundRequested: 0,
+    totalCashRefundAllowed: 0,
+    totalCardRefundAllowed: 0,
+    cashAmountRefunded: 0,
+    cardAmountRefunded: 0,
+    cardTransactions: [],
+    cashTransactions: [],
+  });
   const [sAmountRefunded, _setAmountRefunded] = useState(0);
   const [sTotalAmount, _setTotalAmount] = useState(0);
   const [sCardRefundFee, _setCardRefundFee] = useState(0);
@@ -133,8 +144,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sCashSaleActive, _setCashSaleActive] = useState(true);
   const [sCardSaleActive, _setCardSaleActive] = useState(true);
   const [sRefundScanMessage, _setRefundScanMessage] = useState("");
-  const [sRefundAmount, _setRefundAmount] = useState(0);
-  const [sRefundItems, _setRefundItems] = useState([]);
   const [sShouldChargeCardRefundFee, _setShouldChargeCardRefundFee] =
     useState(true);
   const [sCashChangeNeeded, _setCashChangeNeeded] = useState(null);
@@ -174,22 +183,33 @@ export function CheckoutModalScreen({ openWorkorder }) {
     }
 
     _sSetRefundScan(scan); // testing
-  }, [
-    zOpenWorkorder,
-    sCombinedWorkorders,
-    zSettings,
-    sSale,
-    sIsRefund,
-    sRefundItems,
-  ]);
+  }, [zOpenWorkorder, sCombinedWorkorders, zSettings, sSale, sIsRefund]);
 
+  // run the totals on combined workorders change
   useEffect(() => {
     if (sSale && sCombinedWorkorders)
       setRunningTotals(sSale, sCombinedWorkorders);
     // log("running");
   }, [sCombinedWorkorders]);
 
-  useEffect(() => {}, [sSale]);
+  // watch incoming refund sale. check to see which lines have already been refunded
+  useEffect(() => {
+    if (sIsRefund) {
+      let alreadyRefundedLines = [];
+      sCombinedWorkorders.forEach((combinedWorkorder) => {
+        // log("comb", combinedWorkorder);
+        combinedWorkorder.workorderLines.forEach((line) => {
+          let found = sSale.refundedWorkorderLines?.find(
+            (lineID) => lineID === line.id
+          );
+          if (found) alreadyRefundedLines.push(found);
+        });
+      });
+      let refund = cloneDeep(sRefund);
+      refund.refundedLines = alreadyRefundedLines;
+      _setRefund(refund);
+    }
+  }, [sCombinedWorkorders, sIsRefund, sSale]);
 
   function setRunningTotals(sale, combinedWorkorders, refundItems = []) {
     // log("sale", sale);
@@ -216,80 +236,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
     // log("new sale", sale);
     _setSale(sale);
   }
-
-  function setRefund() {
-    // log("here");
-    let refundDetailsObj = {
-      cashRefundRequested: 0,
-      cardRefundRequested: 0,
-      totalCashRefundAllowed: 0,
-      totalCardRefundAllowed: 0,
-      cashAmountRefunded: 0,
-      cardAmountRefunded: 0,
-      totalRefundRequested: 0,
-      cardTransactions: [],
-      cashTransactions: [],
-    };
-
-    sSale?.payments.forEach((payment) => {
-      payment = cloneDeep(payment);
-      if (payment.last4) {
-        refundDetailsObj = cloneDeep(refundDetailsObj);
-        refundDetailsObj.cardTransactionArr = replaceOrAddToArr(
-          refundDetailsObj.cardTransactionArr,
-          payment
-        );
-        refundDetailsObj.totalCardRefundAllowed =
-          refundDetailsObj.totalCardRefundAllowed + payment.amountCaptured;
-      } else {
-        refundDetailsObj.cashTransactionArr = replaceOrAddToArr(
-          refundDetailsObj.cashTransactionArr,
-          payment
-        );
-        refundDetailsObj.totalCashRefundAllowed =
-          refundDetailsObj.totalCashRefundAllowed + payment.amountCaptured;
-        refundDetailsObj.cashAmountRefunded =
-          refundDetailsObj.cashAmountRefunded + Number(payment.amountRefunded) >
-          0
-            ? payment.amountRefunded
-            : 0;
-      }
-    });
-    let totalRefund = 0;
-    sRefundItems.forEach((item) => {
-      if (item.discountObj.newPrice > 0) {
-        totalRefund = totalRefund + item.discountObj.newPrice;
-      } else {
-        totalRefund = totalRefund + item.inventoryItem.price;
-      }
-    });
-
-    totalRefund = totalRefund + (totalRefund * sale.salesTaxPercent) / 100;
-    refundDetailsObj.totalRefundRequested = totalRefund;
-
-    if (refundDetailsObj.totalCardRefundAllowed > 0) {
-      if (refundDetailsObj.totalCardRefundAllowed - totalRefund < 0) {
-        refundDetailsObj.cardRefundRequested =
-          refundDetailsObj.totalCardRefundAllowed;
-      } else {
-        refundDetailsObj.cardRefundRequested = totalRefund;
-      }
-    }
-
-    if (refundDetailsObj.totalCashRefundAllowed > 0) {
-      if (refundDetailsObj.totalCashRefundAllowed - totalRefund < 0) {
-        refundDetailsObj.cashRefundRequested =
-          refundDetailsObj.totalCashRefundAllowed;
-      } else {
-        refundDetailsObj.cashRefundRequested = totalRefund;
-      }
-    }
-
-    // log(refundDetailsObj);
-    _setRefund(refundDetailsObj);
-  }
-
-  function handleRefundCapture(paymentObjArr) {}
 
   function handlePaymentCapture(payment = PAYMENT_OBJECT_PROTO) {
     // log(paymentObj);
@@ -344,34 +290,43 @@ export function CheckoutModalScreen({ openWorkorder }) {
     }
   }
 
-  function printReceipt(payment) {}
-
   function handleRefundScan(refundScan) {
-    function addToCombinedArr(workorderObj) {
-      _setRefundScanMessage("Transaction Found!");
-      let arr = cloneDeep(sCombinedWorkorders);
-      arr = replaceOrAddToArr(arr, workorderObj);
-      arr = sortRefundWorkorderArr(arr);
-      _setCombinedWorkorders(arr);
-      _setIsRefund(true);
+    function addToCombinedArr(workorders) {
+      workorders = sortRefundWorkorderArr(workorders);
+      _setCombinedWorkorders(workorders);
     }
 
     if (refundScan.length === 12) {
-      _setRefundScanMessage("Searching for transaction...");
+      _setIsRefund(false);
       _setCombinedWorkorders([]);
+      _setRefundScanMessage("Searching for transaction...");
 
       dbGetSaleItem(refundScan)
-        .then((res) => {
-          if (res) {
-            // log("found");
-            // log(res);
-            _setSale(res);
-            res.workorderIDs.forEach((workorderID) => {
-              dbGetOpenWorkorderItem(workorderID).then((res) => {
-                if (res) addToCombinedArr(res);
+        .then((sale) => {
+          if (sale) {
+            _setRefundScanMessage("Transaction Found! Gathering details...");
+            _setIsRefund(true);
+            _setSale(sale);
+
+            let count = 0;
+            let workorders = [];
+            sale.workorderIDs.forEach((workorderID) => {
+              dbGetOpenWorkorderItem(workorderID).then((workorder) => {
+                count++;
+                // if (workorder) addToCombinedArr(workorder);
+                if (workorder) workorders.push(workorder);
+                if (count === sale.workorderIDs.length) {
+                  _setCombinedWorkorders(workorders);
+                }
+                addToCombinedArr(workorders, sale);
               });
-              dbGetClosedWorkorderItem(workorderID).then((res) => {
-                if (res) addToCombinedArr(res);
+
+              dbGetClosedWorkorderItem(workorderID).then((workorder) => {
+                count++;
+                // if (res) addToCombinedArr(res);
+                if (workorder) workorders.push(workorder);
+                if (count === sale.workorderIDs.length)
+                  addToCombinedArr(workorders, sale);
               });
             });
           } else {
@@ -432,20 +387,131 @@ export function CheckoutModalScreen({ openWorkorder }) {
     _setCombinedWorkorders(arr);
   }
 
-  function handleRefundItemCheck(workorderLine) {
-    let checkedArr = cloneDeep(sRefundItems);
-    if (arrHasItem(checkedArr, workorderLine)) {
-      checkedArr = removeArrItem(checkedArr, workorderLine);
+  function handleRefundItemCheck(workorder, workorderLine) {
+    let refund = cloneDeep(sRefund);
+    // let checkedArr = cloneDeep(sRefundItems);
+    // if (arrHasItem(checkedArr, workorderLine)) {
+    //   checkedArr = removeArrItem(checkedArr, workorderLine);
+    // } else {
+    //   checkedArr.push(workorderLine);
+    // }
+    // log("lineeee", workorderLine);
+
+    // split apart lines if the quantity is more than 1
+
+    if ((arrHasItem(refund.requestedRefundLines), workorder)) {
+      // remove it from selected refund lines
+      refund.requestedRefundLines.filter((wo) => wo.id === workorderLine.id);
     } else {
-      checkedArr.push(workorderLine);
+      // add it to selected refund lines
+      let price;
+      let discount = 0;
+      if (workorderLine.discountObj) {
+        discount = discountObj.savings / qty;
+        price = workorderLine.discountObj.newPrice / workorderLine.qty;
+      } else {
+        price = workorderLine.inventoryItem.price;
+      }
+
+      for (let i = 1; i <= workorderLine.qty; i++) {
+        refund.requestedRefundLines.push({
+          ...workorderLine,
+          price,
+          qty: 1,
+          discount,
+        });
+      }
+
+      refund.requestedRefundLines.push(workorderLine);
     }
-    _setRefundItems(checkedArr);
+
+    let runningRefund = 0;
+    refund.requestedRefundLines.forEach(
+      (line) => {}
+      // (runningRefund += (line.inventoryItem.price - lined.discountObj?.discount) * sSale.salesTaxPercent)
+    );
+
+    log("running", runningRefund);
+
+    _setRefund(refund);
+
+    // log(checkedArr);
+    // _setRefundItems(checkedArr);
+
+    return;
+    // this runs every time we get a check mark, but really could just run once
+    sSale.payments.forEach((payment) => {
+      payment = cloneDeep(payment);
+      if (payment.last4) {
+        // is a credit card, add to credit card payment arr
+        refundDetails.cardTransactions = replaceOrAddToArr(
+          refundDetails.cardTransactions,
+          payment
+        );
+
+        // add the total card refund allowed, subtract what has alrerady been refunded
+        refundDetails.totalCardRefundAllowed =
+          refundDetails.totalCardRefundAllowed + payment.amountCaptured;
+      } else {
+        // cash, add to cash payment arr
+        refundDetails.cashTransactions = replaceOrAddToArr(
+          refundDetails.cashTransactions,
+          payment
+        );
+
+        // add to the total cash refund allowed, and subtract what has been refunded already in cash
+        refundDetails.totalCashRefundAllowed =
+          refundDetails.totalCashRefundAllowed +
+          payment.amountCaptured -
+          payment.amountRefunded;
+
+        // now subtract what has already been refunded in cash
+
+        // refundDetails.cashAmountRefunded =
+        //   refundDetails.cashAmountRefunded + payment.amountRefunded > 0
+        //     ? payment.amountRefunded
+        //     : 0;
+      }
+    });
+
+    let totalRefund = 0;
+    // sRefundItems.forEach((item) => {
+    //   if (item.discountObj.newPrice > 0) {
+    //     totalRefund = totalRefund + item.discountObj.newPrice;
+    //   } else {
+    //     totalRefund = totalRefund + item.inventoryItem.price;
+    //   }
+    // });
+
+    totalRefund = totalRefund + (totalRefund * sSale.salesTaxPercent) / 100;
+    refundDetails.totalRefundRequested = totalRefund;
+
+    if (refundDetails.totalCardRefundAllowed > 0) {
+      if (refundDetails.totalCardRefundAllowed - totalRefund < 0) {
+        refundDetails.cardRefundRequested =
+          refundDetails.totalCardRefundAllowed;
+      } else {
+        refundDetails.cardRefundRequested = totalRefund;
+      }
+    }
+
+    if (refundDetails.totalCashRefundAllowed > 0) {
+      if (refundDetails.totalCashRefundAllowed - totalRefund < 0) {
+        refundDetails.cashRefundRequested =
+          refundDetails.totalCashRefundAllowed;
+      } else {
+        refundDetails.cashRefundRequested = totalRefund;
+      }
+    }
+
+    // log(refundDetailsObj);
+    _setRefund(refundDetails);
   }
 
-  function sortRefundWorkorderArr(combinedArr) {
+  function sortRefundWorkorderArr(combinedWorkorders) {
     // log("here");
     let newArr = [];
-    combinedArr.forEach((wo) => {
+    combinedWorkorders.forEach((wo) => {
       let newWO = cloneDeep(wo);
       let workorderLines = [];
       wo.workorderLines.forEach((line) => {
@@ -469,7 +535,8 @@ export function CheckoutModalScreen({ openWorkorder }) {
     _zSetIsCheckingOut(false);
   }
 
-  // clog(zCustomerObj);
+  function printReceipt(payment) {}
+
   return (
     <ScreenModal
       modalVisible={zIsCheckingOut}
@@ -485,9 +552,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
             // justifyContent: "center",
             // alignItems: "center",
             flexDirection: "row",
-            backgroundColor: sIsRefund
-              ? lightenRGBByPercent(C.red, 80)
-              : C.backgroundWhite,
+            backgroundColor: C.backgroundWhite,
             width: "85%",
             height: sIsRefund ? "95%" : "90%",
             borderRadius: 15,
@@ -507,17 +572,12 @@ export function CheckoutModalScreen({ openWorkorder }) {
             <CashSaleComponent
               sIsRefund={sIsRefund}
               handlePaymentCapture={handlePaymentCapture}
-              handleRefundCapture={handleRefundCapture}
-              onCancel={() => {}}
-              sAmountLeftToPay={sAmountLeftToPay}
               acceptsChecks={zSettings?.acceptChecks}
               sCashSaleActive={sCashSaleActive}
-              sRefundAmount={sRefundAmount}
-              sRefundObj={sRefund}
+              sRefund={sRefund}
               sIsDeposit={sIsDeposit}
               _setIsDeposit={_setIsDeposit}
               sSale={sSale}
-              sCashChangeNeeded={sCashChangeNeeded}
               _setCashChangeNeeded={_setCashChangeNeeded}
               // sIsDeposit={sIsDeposit}
             />
@@ -525,12 +585,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sCardSaleActive={sCardSaleActive}
               sIsRefund={sIsRefund}
               handlePaymentCapture={handlePaymentCapture}
-              handleRefundCapture={handleRefundCapture}
               onCancel={() => {}}
-              sAmountLeftToPay={sAmountLeftToPay}
               zSettingsObj={zSettings}
-              sRefundAmount={sRefundAmount}
-              sRefundObj={sRefund}
+              sRefund={sRefund}
               sIsDeposit={sIsDeposit}
               _setIsDeposit={_setIsDeposit}
               sSale={sSale}
@@ -562,8 +619,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
               _setIsRefund={_setIsRefund}
               sScanFailureMessage={sRefundScanMessage}
               _setScanFailureMessage={_setRefundScanMessage}
-              sRefundAmount={sRefundAmount}
-              _setRefundAmount={_setRefundAmount}
               sCardRefundFee={sCardRefundFee}
               sShouldChargeCardRefundFee={sShouldChargeCardRefundFee}
               sCardRefundFeePercentage={zSettings.cardRefundFeePercent}
@@ -628,12 +683,12 @@ export function CheckoutModalScreen({ openWorkorder }) {
                 _zGetInventoryItem={zGetInventoryItem}
                 handleCombineWorkorderCheck={handleCombineWorkorderCheck}
                 sAmountLeftToPay={sAmountLeftToPay}
-                isRefund={sIsRefund}
-                _setRefundItem={_setRefundItems}
-                sRefundItem={sRefundItems}
+                sIsRefund={sIsRefund}
+                // _setRefundItem={_setRefundItems}
                 handleRefundItemCheck={handleRefundItemCheck}
                 _setCombinedWorkorders={_setCombinedWorkorders}
                 sSale={sSale}
+                sRefund={sRefund}
               />
             )}
           </View>
@@ -644,38 +699,31 @@ export function CheckoutModalScreen({ openWorkorder }) {
 }
 
 const MiddleItemComponent = ({
-  sTotalDiscountAmount,
-  sAmountLeftToPay,
   zCustomer,
   sIsRefund,
   sRefundScan,
   _sSetRefundScan,
-  sTotalTaxAmount,
-  sSubtotalAmount,
   handleCancelPress,
   payments,
   sFocusedItem,
   _setFocusedItem,
   sScanFailureMessage,
   _setScanFailureMessage,
-  sRefundAmount,
-  sApplyDeposit,
   sRefund = {
+    refundedLines: [],
+    requestedRefundLines: [],
     cashRefundRequested: 0,
     cardRefundRequested: 0,
     totalCashRefundAllowed: 0,
-    totalCardRefundAllowedArr: [],
     totalCardRefundAllowed: 0,
     cashAmountRefunded: 0,
     cardAmountRefunded: 0,
-    totalRefundRequested: 0,
-    cardTransactionArr: [],
-    cashTransactionArr: [],
+    cardTransactions: [],
+    cashTransactions: [],
   },
   sShouldChargeCardRefundFee,
   sCardRefundFee,
   sCardRefundFeePercentage,
-  sAmountRefunded,
   sSale,
   sCashChangeNeeded,
 }) => {
@@ -1422,13 +1470,13 @@ const CashSaleComponent = ({
     cashRefundRequested: 0,
     cardRefundRequested: 0,
     totalCashRefundAllowed: 0,
-    totalCardRefundAllowedArr: [],
     totalCardRefundAllowed: 0,
-    cashAmountRefunded: 0,
-    cardAmountRefunded: 0,
-    totalRefundRequested: 0,
-    cardTransactionArr: [],
-    cashTransactionArr: [],
+    cardRefunded: 0,
+    cashRefunded: 0,
+    cardTransactions: [],
+    cashTransactions: [],
+    refundedLines: [],
+    requestedRefundLines: [],
   },
 }) => {
   // log(sAmountLeftToPay);
@@ -1541,7 +1589,7 @@ const CashSaleComponent = ({
     handlePaymentCapture(paymentObject);
 
     let diff = sTenderAmount - sRequestedAmount;
-    log(diff);
+    // log(diff);
     if (diff < 0) {
       // log("here1");
       _setCashChangeNeeded(formatCurrencyDisp(0));
@@ -1559,7 +1607,7 @@ const CashSaleComponent = ({
   //   log(sProcessButtonEnabled.toString());
 
   let refundReady = true;
-  if (sIsRefund && !sRefund.cashRefundRequested) refundReady = false;
+  // if (sIsRefund && !sRefund.cashRefundRequested) refundReady = false;
   // log("cash sale complete", sSale?.paymentComplete);
   return (
     <View
@@ -1886,23 +1934,15 @@ const StripeCreditCardComponent = ({
   sIsRefund,
   refundPaymentIntentID,
   sCardSaleActive,
-  sRefundAmount,
   _setIsDeposit,
-  sRefundObj: sRefund = {
+  sRefund = {
+    refundedLines: [],
     cashRefundRequested: 0,
     cardRefundRequested: 0,
     totalCashRefundAllowed: 0,
-    totalCardRefundAllowedArr: [],
     totalCardRefundAllowed: 0,
-    cashAmountRefunded: 0,
-    cardAmountRefunded: 0,
-    totalRefundRequested: 0,
     cardTransactionArr: [],
     cashTransactionArr: [],
-    last4: "",
-    cardType: "",
-    cardExpMonth: "",
-    cardExpYear: "",
   },
 }) => {
   const [sRequestedAmount, _setRequestedAmount] = useState(
@@ -2165,7 +2205,7 @@ const StripeCreditCardComponent = ({
 
   // log(sProcessButtonEnabled.toString());
   let refundReady = true;
-  if (sIsRefund && !sRefundAmount) refundReady = false;
+  // if (sIsRefund && !sRefundAmount) refundReady = false;
   // log("stripe sale", sSale?.paymentComplete.toString());
   return (
     <View
@@ -2410,6 +2450,17 @@ const InventoryListComponent = ({
   quickItemButtons,
   _setSearchStr,
   sSale,
+  sRefund = {
+    cashRefundRequested: 0,
+    cardRefundRequested: 0,
+    totalCashRefundAllowed: 0,
+    totalCardRefundAllowed: 0,
+    cardRefunded: 0,
+    cashRefunded: 0,
+    cardTransactions: [],
+    cashTransactions: [],
+    refundedLines: [],
+  },
 }) => {
   return (
     <View
@@ -2483,19 +2534,30 @@ const WorkorderListComponent = ({
   zOpenWorkorders,
   zOpenWorkorder,
   zInventory,
-  zCustomerObj,
+  zCustomer,
   zSettings,
   _zGetInventoryItem,
   handleCombineWorkorderCheck,
-  isRefund,
-  sRefundItemArr,
+  sIsRefund,
   handleRefundItemCheck,
   sSale,
+  sRefund = {
+    cashRefundRequested: 0,
+    cardRefundRequested: 0,
+    totalCashRefundAllowed: 0,
+    totalCardRefundAllowed: 0,
+    cardRefunded: 0,
+    cashRefunded: 0,
+    cardTransactions: [],
+    cashTransactions: [],
+    refundedLines: [],
+    requestedRefundLines: [],
+  },
 }) => {
   if (!zInventory?.length > 0) return;
 
   function getWorkorderArr() {
-    if (isRefund) {
+    if (sIsRefund) {
       // log("here", sCombinedWorkordersArr);
       return sCombinedWorkorders;
     } else {
@@ -2510,19 +2572,28 @@ const WorkorderListComponent = ({
       ];
     }
   }
-  // clog(sCombinedWorkordersArr);
-  // log("pay", sSale.payments.length);
+
+  // log(sIsRefund.toString());
+  function getOpacity() {
+    if (sIsRefund) {
+      // if ()
+    } else {
+      if (!sSale?.paymentComplete || sSale.payments.length > 0) return 0.5;
+    }
+    return 1;
+  }
+
+  // log(sRefund);
   return (
     <ScrollView
       style={{
         width: "100%",
-        opacity: sSale?.paymentComplete || sSale?.payments.length > 0 ? 0.5 : 1,
+        opacity: getOpacity(),
       }}
     >
       {getWorkorderArr().map((workorder, idx) => {
         return (
           <View
-            pointerEvents="none"
             key={workorder.id}
             style={{
               width: "100%",
@@ -2537,10 +2608,9 @@ const WorkorderListComponent = ({
               borderRadius: 10,
               padding: 10,
               marginBottom: 7,
-              opacity: sSale?.paymentComplete ? 0.2 : null,
             }}
           >
-            {!isRefund && idx !== 0 ? (
+            {!sIsRefund && idx !== 0 ? (
               <CheckBox_
                 enabled={!sSale?.payments.length > 0}
                 // enabled={!sSale?.paymentComplete && !sSale?.payments.length > 0}
@@ -2555,7 +2625,7 @@ const WorkorderListComponent = ({
                 text={"ADD TO SALE"}
                 onCheck={() =>
                   zOpenWorkorder?.id === workorder.id ||
-                  isRefund ||
+                  sIsRefund ||
                   sSale?.paymentComplete
                     ? null
                     : handleCombineWorkorderCheck(workorder)
@@ -2654,17 +2724,17 @@ const WorkorderListComponent = ({
                         flexDirection: "row",
                         width: "100%",
                         alignItems: "center",
-                        backgroundColor: !arrHasItem(
-                          sRefundItemArr,
-                          workorderLine
-                        )
-                          ? C.listItemWhite
-                          : lightenRGBByPercent(C.blue, 60),
+                        // backgroundColor: !arrHasItem(
+                        //   sRefundItems,
+                        //   workorderLine
+                        // )
+                        // ? C.listItemWhite
+                        // : lightenRGBByPercent(C.blue, 60),
                         paddingVertical: 2,
                         marginBottom: 3,
                         borderColor: "transparent",
                         borderLeftColor: lightenRGBByPercent(C.green, 60),
-                        borderLeftWidth: isRefund ? 0 : 2,
+                        borderLeftWidth: sIsRefund ? 0 : 2,
                         paddingLeft: 10,
                         borderRadius: 15,
                         paddingRight: 10,
@@ -2679,15 +2749,19 @@ const WorkorderListComponent = ({
                           // backgroundColor: "green",
                         }}
                       >
-                        {isRefund ? (
+                        {sIsRefund ? (
                           <CheckBox_
-                            onCheck={() => {
-                              handleRefundItemCheck(workorderLine);
-                            }}
-                            isChecked={arrHasItem(
-                              sRefundItemArr,
-                              workorderLine
-                            )}
+                            onCheck={() =>
+                              handleRefundItemCheck(workorder, workorderLine)
+                            }
+                            isChecked={
+                              arrHasItem(
+                                sRefund.requestedRefundLines,
+                                workorderLine
+                              )
+                                ? true
+                                : false
+                            }
                             buttonStyle={{
                               marginRight: 15,
                             }}

@@ -237,8 +237,11 @@ export const SMS_PROTO = {
 
 export const DISCOUNT_OBJ_PROTO = {
   discountName: "",
-  discountValue: "",
+  discountValue: 0,
   discountType: "",
+  id: "",
+  newPrice: 0,
+  savings: 0,
 };
 
 export const PAYMENT_OBJECT_PROTO = {
@@ -263,7 +266,6 @@ export const PAYMENT_OBJECT_PROTO = {
   expYear: "",
   networkTransactionID: "",
   amountRefunded: 0,
-  workorderLinesRefundedIDs: [],
   isDeposit: false,
   depositUsed: false,
 };
@@ -271,6 +273,7 @@ export const PAYMENT_OBJECT_PROTO = {
 export const SALE_OBJECT_PROTO = {
   id: "",
   workorderIDs: [],
+  refundedWorkorderLines: [],
   millis: "",
   payments: [],
   subtotal: 0,

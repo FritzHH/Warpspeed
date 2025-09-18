@@ -199,7 +199,7 @@ export const StripeCreditCardComponent = ({
   }
 
   async function getAvailableStripeReaders() {
-    log("getting available Stripe readers");
+    // log("getting available Stripe readers");
     const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -216,7 +216,7 @@ export const StripeCreditCardComponent = ({
     } else {
       _setCardReaders(readerArr);
     }
-    log("arr", readerArr);
+    // log("arr", readerArr);
     _setStatusTextColor(C.red);
     _setCardReaders(readerArr.filter((o) => o.status !== "offline"));
     let timer;
@@ -271,7 +271,7 @@ export const StripeCreditCardComponent = ({
         sPaymentIntentID
       );
     }
-    log("reader result", readerResult);
+    // log("reader result", readerResult);
     if (!readerResult || readerResult.code) {
       _setStatusMessage(
         "Error code: " +
@@ -436,6 +436,8 @@ export const StripeCreditCardComponent = ({
       pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
       style={{
         ...checkoutScreenStyle.base,
+        justifyContent: "space-between",
+        paddingBottom: 20,
         opacity:
           sSale?.paymentComplete ||
           (sIsRefund && !sRefund.cardRefundRequested > 0)
@@ -636,7 +638,6 @@ export const StripeCreditCardComponent = ({
       <View
         style={{
           width: "100%",
-          marginVertical: sIsRefund ? "2%" : "8%",
           alignItems: "center",
         }}
       >
@@ -648,7 +649,7 @@ export const StripeCreditCardComponent = ({
             sProcessButtonEnabled && !sSale?.paymentComplete && sCardSaleActive
           }
           onPress={() => startPayment(sRequestedAmount, sCardReader)}
-          text={sIsRefund ? "PROCESS REFUND" : "PROCESS CARD"}
+          text={sIsRefund ? "PROCESS REFUND" : "START CARD SALE"}
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
           }}
@@ -659,6 +660,8 @@ export const StripeCreditCardComponent = ({
             fontSize: 15,
             color: sStatusTextColor,
             marginTop: 5,
+            maxHeight: 100,
+            backgroundColor: "blue",
           }}
         >
           {sStatusMessage}

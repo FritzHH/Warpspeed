@@ -300,6 +300,8 @@ export const CashSaleComponent = ({
       //   pointerEvents={sSale?.paymentComplete && !refundReady ? "none" : "auto"}
       style={{
         ...checkoutScreenStyle.base,
+        justifyContent: "space-between",
+        paddingBottom: 20,
         opacity:
           sSale?.paymentComplete ||
           (sIsRefund && !sRefund.cashRefundRequested > 0)
@@ -538,14 +540,14 @@ export const CashSaleComponent = ({
           textStyle={{ color: C.textWhite, fontSize: 16 }}
           enabled={sProcessButtonEnabled}
           onPress={handleProcessPaymentPress}
-          text={sIsRefund ? "PROCESS REFUND" : "COMPLETE"}
+          text={sIsRefund ? "PROCESS REFUND" : "COMPLETE PAYMENT"}
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
             // width: 120,
           }}
         />
 
-        {!sIsRefund && (
+        {/* {!sIsRefund && (
           <Button_
             buttonStyle={
               {
@@ -559,7 +561,7 @@ export const CashSaleComponent = ({
             onPress={handleCancelPress}
             text={"CANCEL"}
           />
-        )}
+        )} */}
         {/* <View
           style={{
             ...checkoutScreenStyle.boxStyle,

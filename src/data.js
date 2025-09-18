@@ -139,6 +139,11 @@ export const NONREMOVABLE_STATUSES = [
   },
 ];
 
+export const CONTACT_RESTRICTIONS = {
+  call: "call",
+  email: "email",
+};
+
 export const WAIT_TIME_INCREMENTS = {
   day: "Days",
   week: "Weeks",
@@ -340,6 +345,14 @@ export const WORKORDER_ITEM_PROTO = {
   // priceOverride: "",
 };
 
+export const CUSTOMER_PREVIOUS_BIKE_PROTO = {
+  brand: "",
+  model: "",
+  description: "",
+  color1: null,
+  color2: null,
+};
+
 export const CUSTOMER_PROTO = {
   first: "",
   last: "",
@@ -352,10 +365,11 @@ export const CUSTOMER_PROTO = {
   city: "",
   state: "",
   zip: "",
-  notes: "",
+  addressNotes: "",
   id: "",
   interactionRating: "",
   workorders: [],
+  previousBikes: [],
   saleIDs: [],
   dateCreated: "",
 };

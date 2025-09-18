@@ -119,8 +119,10 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const zSettings = useSettingsStore((state) => state.getSettingsObj());
   const zSale = useCheckoutStore((state) => state.saleObj);
   //////////////////////////////////////////////////////////////////////
-  const [sRefundScan, _sSetRefundScan] = useState();
+  const [sRefundScan, _setRefundScan] = useState();
   const [sIsRefund, _setIsRefund] = useState(false);
+  const [sRefundPaymentOverride, _setRefundPaymentOverride] = useState(false);
+  const [sRefundScanMessage, _setRefundScanMessage] = useState("");
   const [sRefund, _setRefund] = useState({
     refundedLines: [],
     requestedRefundLines: [],
@@ -149,16 +151,14 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sFocusedItem, _setFocusedItem] = useState("");
   const [sCashSaleActive, _setCashSaleActive] = useState(true);
   const [sCardSaleActive, _setCardSaleActive] = useState(true);
-  const [sRefundScanMessage, _setRefundScanMessage] = useState("");
   const [sShouldChargeCardRefundFee, _setShouldChargeCardRefundFee] =
     useState(true);
   const [sCashChangeNeeded, _setCashChangeNeeded] = useState(null);
-  const [sRefundPaymentOverride, _setRefundPaymentOverride] = useState(false);
 
   // watch the combined workorders array and adjust accordingly
 
   // 730921185148
-  let scan = "592218957081"; // test
+  let scan = "670957054494"; // test
 
   // all startup stuff here
   useEffect(() => {
@@ -190,9 +190,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
       _setCombinedWorkorders(combinedWorkorders);
     }
 
-    // testing
-    _sSetRefundScan(scan);
-    if (sCombinedWorkorders.length > 0) return;
+    // testing /////////////////////////
+    // _setRefundScan(scan);
+    // if (sCombinedWorkorders.length > 0) return;
     // handleRefundScan(scan);
   }, [zOpenWorkorder, sCombinedWorkorders, zSettings, sSale, sIsRefund]);
 
@@ -351,7 +351,8 @@ export function CheckoutModalScreen({ openWorkorder }) {
   ////////////// REFUNDS ///////////////////////////////////////
 
   function handleRefundScan(refundScan) {
-    if (refundScan.length === 12) {
+    _setRefundScan(refundScan);
+    if (refundScan?.length === 12) {
       _setIsRefund(false);
       _setCombinedWorkorders([]);
       _setRefundScanMessage("Searching for transaction...");
@@ -390,11 +391,10 @@ export function CheckoutModalScreen({ openWorkorder }) {
           }
         })
         .catch((e) => log("refund error", e));
-    } else if (refundScan.length > 0) {
-      log("no refund found");
-      _setRefundScanMessage("Enter 12-digit sale ID");
+    } else if (refundScan.length > 0 && refundScan.length < 12) {
+      _setRefundScanMessage(refundScan.length + "/12   ");
     } else {
-      _setRefundScanMessage("");
+      // _setRefundScanMessage("");
     }
   }
 
@@ -521,7 +521,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
   }
 
   function printReceipt(payment) {}
-
   return (
     <ScreenModal
       modalVisible={zIsCheckingOut}
@@ -534,24 +533,22 @@ export function CheckoutModalScreen({ openWorkorder }) {
       Component={() => (
         <View
           style={{
-            // justifyContent: "center",
-            // alignItems: "center",
             flexDirection: "row",
-            backgroundColor: C.backgroundWhite,
+            justifyContent: "space-between",
+            backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
             width: "85%",
             height: sIsRefund ? "95%" : "90%",
             borderRadius: 15,
             ...SHADOW_RADIUS_PROTO,
             shadowColor: C.green,
+            padding: 20,
           }}
         >
           <View
             style={{
-              width: "30%",
+              width: "29%",
               height: "100%",
-              justifyContent: "space-around",
-              paddingVertical: 20,
-              paddingLeft: 20,
+              justifyContent: "space-between",
             }}
           >
             <CashSaleComponent
@@ -582,20 +579,18 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
           <View
             style={{
-              width: "30%",
+              width: "29%",
               height: "100%",
-              padding: 20,
+              // padding: 20,
             }}
           >
-            <Button_
-              text={"Press Meee"}
-              onPress={() => handleRefundScan(sRefundScan)}
-            />
             <MiddleItemComponent
               zCustomer={zCustomer}
               sIsRefund={sIsRefund}
+              handleRefundScan={handleRefundScan}
               sRefundScan={sRefundScan}
-              _sSetRefundScan={handleRefundScan}
+              // _setRefundScan={_setRefundScan}
+              sRefundScanMessage={sRefundScanMessage}
               _zSetIsCheckingOut={_zSetIsCheckingOut}
               handleCancelPress={closeCheckoutScreenModal}
               payments={sSale?.payments}
@@ -603,7 +598,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sFocusedItem={sFocusedItem}
               _setFocusedItem={_setFocusedItem}
               _setIsRefund={_setIsRefund}
-              sScanFailureMessage={sRefundScanMessage}
               _setScanFailureMessage={_setRefundScanMessage}
               sCardRefundFee={sCardRefundFee}
               sShouldChargeCardRefundFee={sShouldChargeCardRefundFee}
@@ -616,7 +610,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
             />
           </View>
 
-          <View style={{ width: "40%", padding: 20 }}>
+          <View style={{ width: "39%" }}>
             {!sIsRefund ? (
               <View
                 style={{
@@ -828,7 +822,7 @@ const WorkorderListComponent = ({
     <ScrollView
       style={{
         width: "100%",
-        opacity: getOpacity(),
+        // opacity: getOpacity(),
       }}
     >
       {getWorkorderArr().map((workorder, idx) => {
@@ -839,11 +833,11 @@ const WorkorderListComponent = ({
               width: "100%",
               borderColor: C.buttonLightGreenOutline,
               // backgroundColor: C.backgroundListWhite,
-              backgroundColor: sCombinedWorkorders.find(
-                (o) => o.id === workorder.id
-              )
-                ? C.backgroundListWhite
-                : gray(0.03),
+              // backgroundColor: sCombinedWorkorders.find(
+              //   (o) => o.id === workorder.id
+              // )
+              //   ? C.backgroundListWhite
+              //   : gray(0.03),
               borderWidth: 1,
               borderRadius: 10,
               padding: 10,
@@ -862,6 +856,7 @@ const WorkorderListComponent = ({
                 isChecked={sCombinedWorkorders.find(
                   (o) => o.id === workorder.id
                 )}
+                textStyle={{ color: C.textMain }}
                 text={"ADD TO SALE"}
                 onCheck={() =>
                   zOpenWorkorder?.id === workorder.id ||

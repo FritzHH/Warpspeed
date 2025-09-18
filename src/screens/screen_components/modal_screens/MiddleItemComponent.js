@@ -1,5 +1,6 @@
 import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
 import {
+  CONTACT_RESTRICTIONS,
   PAYMENT_OBJECT_PROTO,
   SALE_OBJECT_PROTO,
   TAB_NAMES,
@@ -60,6 +61,7 @@ import {
   addOrRemoveFromArr,
   findInMultipleArrs,
   formatMillisForDisplay,
+  checkInputForNumbersOnly,
 } from "../../../utils";
 import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
@@ -91,12 +93,12 @@ export const MiddleItemComponent = ({
   zCustomer,
   sIsRefund,
   sRefundScan,
-  _sSetRefundScan,
+  _setRefundScan,
+  handleRefundScan,
+  sRefundScanMessage,
   handleCancelPress,
   sFocusedItem,
   _setFocusedItem,
-  sScanFailureMessage,
-  _setScanFailureMessage,
   sRefund = {
     refundedLines: [],
     requestedRefundLines: [],
@@ -139,84 +141,137 @@ export const MiddleItemComponent = ({
   const zSettings = useSettingsStore((state) => state.getSettingsObj());
   const zSale = useCheckoutStore((state) => state.saleObj);
 
+  /////////////////////////////////////////////////////////////////////////
+  const [sEditingCustomerInfo, _setEditingCustomerInfo] = useState(false);
+
   return (
     <View
       style={{
-        width: "100%",
-        height: "100%",
-        // justifyContent:
-        // padding: 20,
+        flex: 1,
+        justifyContent: "space-between",
+        alignItems: "center",
       }}
     >
-      {zCustomer?.id ? (
+      <View
+        style={{
+          alignItems: "center",
+          width: "100%",
+        }}
+      >
+        <Button_
+          buttonStyle={{ padding: 0, backgroundColor: "blue" }}
+          textStyle={{ fontSize: 10 }}
+          text={"Press Meeeeeeeee"}
+          onPress={() => handleRefundScan(sRefundScan)}
+        />
+        {zCustomer?.id ? (
+          <View
+            style={{
+              width: "100%",
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              borderRadius: 10,
+              padding: 10,
+              backgroundColor: C.backgroundListWhite,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+              }}
+            >
+              <View>
+                <Text style={{ color: C.textMain }}>
+                  {zCustomer?.first + " " + zCustomer?.last}
+                  {!!zCustomer?.contactRestriction && (
+                    <Text style={{ color: C.red }}>
+                      {zCustomer.contactRestriction ===
+                      CONTACT_RESTRICTIONS.call
+                        ? "    (CALL ONLY)"
+                        : "    (EMAIL ONLY)"}
+                    </Text>
+                  )}
+                </Text>
+                <Text style={{ color: gray(0.6), fontSize: 12 }}>
+                  {zCustomer?.email}
+                </Text>
+              </View>
+              <View>
+                {zCustomer?.cell ? (
+                  <Text style={{ color: C.textMain }}>
+                    <Text>{"cell: "}</Text>
+                    {addDashesToPhone(zCustomer?.cell)}
+                  </Text>
+                ) : null}
+                {zCustomer?.land ? (
+                  <Text style={{ color: C.textMain, fontSize: 13 }}>
+                    <Text>{"land: "}</Text>
+                    {addDashesToPhone(zCustomer?.land)}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            {zCustomer?.streetAddress ? (
+              <Text style={{ color: C.textMain, fontSize: 13 }}>
+                {zCustomer.streetAddress}
+                {!!zCustomer.unit && (
+                  <Text style={{ color: C.textMain, fontSize: 13 }}>
+                    {"  |  Unit " + zCustomer.unit}
+                  </Text>
+                )}
+                {!!zCustomer.city && (
+                  <Text style={{ color: C.textMain, fontSize: 13 }}>
+                    {"   |   " + zCustomer.city}
+                  </Text>
+                )}
+              </Text>
+            ) : null}
+            <View
+              style={{
+                width: "100%",
+                justifyContent: "space-between",
+                flexDirection: "row",
+              }}
+            >
+              {!!zCustomer?.addressNotes && (
+                <Text style={{ color: gray(0.6), fontSize: 12 }}>
+                  {zCustomer?.addressNotes}
+                </Text>
+              )}
+              <Button_
+                buttonStyle={{
+                  paddingVertical: 0,
+                  backgroundColor: "green",
+                }}
+                icon={ICONS.editPencil}
+                iconSize={15}
+                onPress={() => {
+                  log("edit customer info fun needed");
+                }}
+              />
+            </View>
+          </View>
+        ) : null}
+        {/** Refund element ///////////////////////////////////////////// */}
         <View
           style={{
             width: "100%",
-            borderWidth: 1,
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 10,
-            padding: 10,
-            marginBottom: 30,
-            backgroundColor: C.backgroundListWhite,
-            // flexDirection:
+            marginTop: sIsRefund ? 5 : 15,
+            // marginBottom: 30,
           }}
         >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-            }}
-          >
-            <View>
-              <Text style={{ color: C.textMain }}>
-                {zCustomer?.first + " " + zCustomer?.last}
-              </Text>
-              <Text style={{ color: gray(0.6), fontSize: 12 }}>
-                {zCustomer?.email}
-              </Text>
-            </View>
-            <View>
-              {zCustomer?.cell ? (
-                <Text style={{ color: C.textMain }}>
-                  <Text style={{ color: gray(0.5) }}>{"cell: "}</Text>
-                  {addDashesToPhone(zCustomer?.cell)}
-                </Text>
-              ) : null}
-              {zCustomer?.land ? (
-                <Text style={{ color: C.textMain }}>
-                  <Text style={{ color: gray(0.5) }}>{"land: "}</Text>
-                  {addDashesToPhone(zCustomer?.land)}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
-          {zCustomer?.streetAddress ? (
-            <Text>{zCustomer.streetAddress}</Text>
-          ) : null}
-          {zCustomer?.unit ? <Text>{zCustomer.unit}</Text> : null}
-          {zCustomer?.city ? <Text>{zCustomer.city}</Text> : null}
-        </View>
-      ) : null}
-
-      {/** Refund element ///////////////////////////////////////////// */}
-
-      <View
-        style={{
-          width: "100%",
-          alignItems: "space-between",
-          // marginBottom: 30,
-        }}
-      >
-        <View
+          {/* <View
           style={{
             width: "100%",
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
+            marginTop: 3,
           }}
-        >
-          <CheckBox_
+        > */}
+          {/* <CheckBox_
             enabled={!sIsRefund && !sSale?.payments.length > 0}
             text={"Refund"}
             isChecked={sIsRefund}
@@ -225,98 +280,79 @@ export const MiddleItemComponent = ({
                 ? _setScanFailureMessage("Must scan/enter 12-digit sale ID")
                 : null
             }
-          />
-          <Text style={{ fontSize: 12, color: C.red }}>
-            {sSale?.payments.length > 0 ? "" : sScanFailureMessage}
-          </Text>
+          /> */}
+          {/* </View> */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              width: "100%",
+              borderColor: C.buttonLightGreenOutline,
+              borderRadius: 7,
+              padding: 5,
+              textAlign: "left",
+              borderWidth: 1,
+              outlineWidth: 0,
+              backgroundColor: C.backgroundListWhite,
+              color: sSale?.payments.length > 0 ? gray(0.3) : C.textMain,
+            }}
+          >
+            <TextInput
+              disabled={
+                sSale?.payments.length > 0 ||
+                sRefund.cashRefundRequested ||
+                sRefund.cardRefundRequested
+              }
+              style={{
+                outlineWidth: 0,
+                color: C.textMain,
+                width: "60%",
+                fontSize: 13,
+              }}
+              onFocus={() => {
+                _setFocusedItem("refund");
+                // _sSetRefundScan("");
+              }}
+              placeholder="Scan/enter receipt (12 digit numbers-only)"
+              placeholderTextColor={gray(0.38)}
+              autoFocus={sFocusedItem === "refund"}
+              value={sRefundScan}
+              onChangeText={(val) => {
+                if (!checkInputForNumbersOnly(val) || val.length > 12) return;
+                handleRefundScan(val);
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 11,
+                color: C.red,
+                fontStyle: "italic",
+              }}
+            >
+              {sSale?.payments.length > 0
+                ? "refund deactivated for sale"
+                : sRefundScanMessage}
+            </Text>
+          </View>
         </View>
-        <TextInput
-          disabled={sSale?.payments.length > 0}
-          style={{
-            marginTop: 5,
-            width: "100%",
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 7,
-            padding: 5,
-            textAlign: "left",
-            borderWidth: 1,
-            outlineWidth: 0,
-            backgroundColor: C.backgroundListWhite,
-            color: sSale?.payments.length > 0 ? gray(0.3) : C.textMain,
-          }}
-          onFocus={() => {
-            _setFocusedItem("refund");
-            // _sSetRefundScan("");
-          }}
-          placeholder="Scan sale receipt (12 digit number)"
-          placeholderTextColor={gray(0.38)}
-          autoFocus={sFocusedItem === "refund"}
-          value={sRefundScan}
-          onChangeText={(val) => {
-            _setScanFailureMessage("");
-            _sSetRefundScan(val);
-          }}
-        />
-      </View>
-
-      {/** totals element ////////////////////////////////////////// */}
-
-      <View
-        style={{
-          width: "100%",
-          // minHeight: "20%",
-          // maxHeight: "30%",
-          // alignItems: "flex-start",
-          justifyContent: "space-between",
-          marginTop: 10,
-          paddingHorizontal: 10,
-          paddingVertical: 10,
-          backgroundColor: C.backgroundListWhite,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-        }}
-      >
+        {/** totals element ////////////////////////////////////////// */}
         <View
           style={{
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "space-between",
             width: "100%",
+            // minHeight: "20%",
+            // maxHeight: "30%",
+            // alignItems: "flex-start",
+            justifyContent: "space-between",
+            marginTop: sIsRefund ? 5 : 15,
+            paddingHorizontal: 10,
+            paddingVertical: 10,
+            backgroundColor: C.backgroundListWhite,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
           }}
         >
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>SUBTOTAL</Text>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{
-                fontSize: 13,
-                color: gray(0.5),
-                marginRight: 10,
-              }}
-            >
-              $
-            </Text>
-            <Text
-              style={{
-                fontSize: 18,
-                color: sIsRefund ? gray(0.5) : lightenRGBByPercent(C.green, 20),
-              }}
-            >
-              {formatCurrencyDisp(sSale?.subtotal)}
-            </Text>
-          </View>
-        </View>
-        {sSale?.discount && (
-          <View
-            style={{
-              width: "100%",
-              height: 1,
-              marginVertical: 10,
-              backgroundColor: C.buttonLightGreenOutline,
-            }}
-          />
-        )}
-        {sSale?.discount && (
           <View
             style={{
               alignItems: "center",
@@ -325,55 +361,7 @@ export const MiddleItemComponent = ({
               width: "100%",
             }}
           >
-            <Text
-              style={{
-                marginLeft: 15,
-                fontSize: 13,
-                color: sIsRefund ? gray(0.5) : C.lightred,
-              }}
-            >
-              DISCOUNT
-            </Text>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: sIsRefund ? gray(0.5) : C.lightred,
-                  marginRight: 10,
-                }}
-              >
-                $
-              </Text>
-              <Text
-                style={{
-                  fontSize: 18,
-                  color: sIsRefund ? gray(0.5) : C.lightred,
-                }}
-              >
-                {"- " +
-                  formatCurrencyDisp(sSale?.discount || sRefund.sale?.discount)}
-              </Text>
-            </View>
-          </View>
-        )}
-        {sSale?.discount || sRefund.sale?.discount ? (
-          <View
-            style={{
-              alignItems: "center",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "100%",
-            }}
-          >
-            <Text
-              style={{
-                marginLeft: 15,
-                fontSize: 13,
-                color: gray(0.5),
-              }}
-            >
-              DISCOUNTED TOTAL
-            </Text>
+            <Text style={{ fontSize: 13, color: gray(0.5) }}>SUBTOTAL</Text>
             <View style={{ flexDirection: "row" }}>
               <Text
                 style={{
@@ -392,88 +380,184 @@ export const MiddleItemComponent = ({
                     : lightenRGBByPercent(C.green, 20),
                 }}
               >
-                {formatCurrencyDisp(sSale?.subtotal - sSale?.discount)}
+                {formatCurrencyDisp(sSale?.subtotal)}
               </Text>
             </View>
           </View>
-        ) : null}
-        {!!sSale?.discount && (
+          {sSale?.discount && (
+            <View
+              style={{
+                width: "100%",
+                height: 1,
+                marginVertical: 10,
+                backgroundColor: C.buttonLightGreenOutline,
+              }}
+            />
+          )}
+          {sSale?.discount && (
+            <View
+              style={{
+                alignItems: "center",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                width: "100%",
+              }}
+            >
+              <Text
+                style={{
+                  marginLeft: 15,
+                  fontSize: 13,
+                  color: sIsRefund ? gray(0.5) : C.lightred,
+                }}
+              >
+                DISCOUNT
+              </Text>
+              <View style={{ flexDirection: "row" }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: sIsRefund ? gray(0.5) : C.lightred,
+                    marginRight: 10,
+                  }}
+                >
+                  $
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    color: sIsRefund ? gray(0.5) : C.lightred,
+                  }}
+                >
+                  {"- " +
+                    formatCurrencyDisp(
+                      sSale?.discount || sRefund.sale?.discount
+                    )}
+                </Text>
+              </View>
+            </View>
+          )}
+          {sSale?.discount || sRefund.sale?.discount ? (
+            <View
+              style={{
+                alignItems: "center",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                width: "100%",
+              }}
+            >
+              <Text
+                style={{
+                  marginLeft: 15,
+                  fontSize: 13,
+                  color: gray(0.5),
+                }}
+              >
+                DISCOUNTED TOTAL
+              </Text>
+              <View style={{ flexDirection: "row" }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: gray(0.5),
+                    marginRight: 10,
+                  }}
+                >
+                  $
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    color: sIsRefund
+                      ? gray(0.5)
+                      : lightenRGBByPercent(C.green, 20),
+                  }}
+                >
+                  {formatCurrencyDisp(sSale?.subtotal - sSale?.discount)}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+          {!!sSale?.discount && (
+            <View
+              style={{
+                width: "100%",
+                height: 1,
+                marginVertical: 10,
+                backgroundColor: C.buttonLightGreenOutline,
+              }}
+            />
+          )}
           <View
             style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
               width: "100%",
-              height: 1,
-              marginVertical: 10,
-              backgroundColor: C.buttonLightGreenOutline,
             }}
-          />
-        )}
-        <View
-          style={{
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "space-between",
-            width: "100%",
-          }}
-        >
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>SALES TAX</Text>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{
-                fontSize: 13,
-                color: gray(0.5),
-                marginRight: 10,
-              }}
-            >
-              $
-            </Text>
-            <Text
-              style={{
-                fontSize: 18,
-                color: sIsRefund ? gray(0.5) : lightenRGBByPercent(C.green, 20),
-              }}
-            >
-              {formatCurrencyDisp(sSale?.tax)}
-            </Text>
+          >
+            <Text style={{ fontSize: 13, color: gray(0.5) }}>SALES TAX</Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: gray(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  color: sIsRefund
+                    ? gray(0.5)
+                    : lightenRGBByPercent(C.green, 20),
+                }}
+              >
+                {formatCurrencyDisp(sSale?.tax)}
+              </Text>
+            </View>
           </View>
-        </View>
-        <View
-          style={{
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "space-between",
-            width: "100%",
-          }}
-        >
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>TOTAL SALE</Text>
-          <View style={{ flexDirection: "row" }}>
-            <Text
-              style={{
-                fontSize: 13,
-                color: gray(0.5),
-                marginRight: 10,
-              }}
-            >
-              $
-            </Text>
-            <Text
-              style={{
-                fontSize: 18,
-                color: sIsRefund ? gray(0.5) : lightenRGBByPercent(C.green, 20),
-              }}
-            >
-              {formatCurrencyDisp(sSale?.total)}
-            </Text>
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              justifyContent: "space-between",
+              width: "100%",
+            }}
+          >
+            <Text style={{ fontSize: 13, color: gray(0.5) }}>TOTAL SALE</Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: gray(0.5),
+                  marginRight: 10,
+                }}
+              >
+                $
+              </Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  color: sIsRefund
+                    ? gray(0.5)
+                    : lightenRGBByPercent(C.green, 20),
+                }}
+              >
+                {formatCurrencyDisp(sSale?.total)}
+              </Text>
+            </View>
           </View>
-        </View>
-        {sShouldChargeCardRefundFee &&
-        sIsRefund &&
-        sRefund.totalCardRefundAllowed > 0 ? (
-          <VertListSpacer />
-        ) : null}
+          {sShouldChargeCardRefundFee &&
+          sIsRefund &&
+          sRefund.totalCardRefundAllowed > 0 ? (
+            <VertListSpacer />
+          ) : null}
 
-        {/******************** REFUNDS ********************************************/}
+          {/******************** REFUNDS ********************************************/}
 
-        {/* {sShouldChargeCardRefundFee &&
+          {/* {sShouldChargeCardRefundFee &&
         sIsRefund &&
         sRefund.totalCardRefundAllowed > 0 ? (
           <View
@@ -510,16 +594,80 @@ export const MiddleItemComponent = ({
           </View>
         ) : null} */}
 
-        {sRefund.totalCardRefundAllowed > 0 && (
-          <View
-            style={{
-              alignItems: "center",
+          {sRefund.totalCardRefundAllowed > 0 && (
+            <View
+              style={{
+                alignItems: "center",
 
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "100%",
-            }}
-          >
+                flexDirection: "row",
+                justifyContent: "space-between",
+                width: "100%",
+              }}
+            >
+              <View
+                style={{
+                  width: "100%",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text>{"CARD REFUND (MANDATORY)"}</Text>
+                <View style={{ flexDirection: "row" }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: gray(0.5),
+                      marginRight: 10,
+                    }}
+                  >
+                    $
+                  </Text>
+                  <Text>
+                    {formatCurrencyDisp(sRefund.totalCardRefundAllowed)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {sShouldChargeCardRefundFee && sRefund.totalCardRefundAllowed > 0 && (
+            <View
+              style={{
+                alignItems: "center",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                width: "100%",
+              }}
+            >
+              <Text style={{ fontSize: 13, color: gray(0.5) }}>
+                {"CARD RE-PROCESSING FEE (" + sCardRefundFeePercentage + "%)"}
+              </Text>
+              <View style={{ flexDirection: "row" }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: gray(0.5),
+                    marginRight: 10,
+                  }}
+                >
+                  $
+                </Text>
+                <Text
+                  style={{
+                    fontWeight: 500,
+                    fontSize: 15,
+                    color: gray(0.5),
+                  }}
+                >
+                  {formatCurrencyDisp(sCardRefundFee)}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {!!sRefund.totalCashRefundAllowed && <VertListSpacer />}
+          {!!sRefund.totalCashRefundAllowed && (
             <View
               style={{
                 width: "100%",
@@ -528,7 +676,7 @@ export const MiddleItemComponent = ({
                 justifyContent: "space-between",
               }}
             >
-              <Text>{"CARD REFUND (MANDATORY)"}</Text>
+              <Text>{"CASH REFUND ALLOWED"}</Text>
               <View style={{ flexDirection: "row" }}>
                 <Text
                   style={{
@@ -540,14 +688,12 @@ export const MiddleItemComponent = ({
                   $
                 </Text>
                 <Text>
-                  {formatCurrencyDisp(sRefund.totalCardRefundAllowed)}
+                  {formatCurrencyDisp(sRefund.totalCashRefundAllowed)}
                 </Text>
               </View>
             </View>
-          </View>
-        )}
-
-        {sShouldChargeCardRefundFee && sRefund.totalCardRefundAllowed > 0 && (
+          )}
+          <VertListSpacer />
           <View
             style={{
               alignItems: "center",
@@ -556,8 +702,8 @@ export const MiddleItemComponent = ({
               width: "100%",
             }}
           >
-            <Text style={{ fontSize: 13, color: gray(0.5) }}>
-              {"CARD RE-PROCESSING FEE (" + sCardRefundFeePercentage + "%)"}
+            <Text style={{ fontSize: 16, color: gray(0.5) }}>
+              {sIsRefund ? "TOTAL REFUND ALLOWED" : "TOTAL SALE"}
             </Text>
             <View style={{ flexDirection: "row" }}>
               <Text
@@ -572,325 +718,277 @@ export const MiddleItemComponent = ({
               <Text
                 style={{
                   fontWeight: 500,
-                  fontSize: 15,
-                  color: gray(0.5),
+                  fontSize: 21,
+                  color: C.green,
                 }}
               >
-                {formatCurrencyDisp(sCardRefundFee)}
+                {formatCurrencyDisp(
+                  sIsRefund
+                    ? sRefund.totalCardRefundAllowed +
+                        sRefund.totalCashRefundAllowed
+                    : sSale?.total
+                )}
               </Text>
             </View>
           </View>
-        )}
-
-        {!!sRefund.totalCashRefundAllowed && <VertListSpacer />}
-        {!!sRefund.totalCashRefundAllowed && (
+        </View>
+        {/******************** END REFUNDS ********************************************/}
+        {/** ************************************payments list *****************************************************/}
+        {!!sSale?.payments.length > 0 && (
           <View
             style={{
-              width: "100%",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
+              marginTop: sIsRefund ? 5 : 15,
+              alignItems: "flex-end",
+              paddingRight: 10,
             }}
           >
-            <Text>{"CASH REFUND ALLOWED"}</Text>
-            <View style={{ flexDirection: "row" }}>
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: gray(0.5),
-                  marginRight: 10,
-                }}
-              >
-                $
-              </Text>
-              <Text>{formatCurrencyDisp(sRefund.totalCashRefundAllowed)}</Text>
-            </View>
+            <Text style={{ color: gray(0.4) }}>PAYMENTS</Text>
           </View>
         )}
-        <VertListSpacer />
+        <View style={{ maxHeight: "25%" }}>
+          <ScrollView
+            style={{
+              width: "100%",
+            }}
+            contentContainerStyle={{ alignItems: "center" }}
+          >
+            {sSale?.payments.map((paymentObj) => {
+              return (
+                <View
+                  key={paymentObj.id}
+                  style={{
+                    padding: 5,
+                    backgroundColor: C.listItemWhite,
+                    width: "99%",
+                    backgroundColor: C.listItemWhite,
+                    borderRadius: 10,
+                    marginBottom: 5,
+                  }}
+                >
+                  <Text style={{ color: C.green }}>
+                    {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text>Amount received: </Text>
+                    <Text>
+                      {formatCurrencyDisp(paymentObj.amountCaptured, true)}
+                    </Text>
+                  </View>
+                  {paymentObj.last4 ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                        {"Last 4 Digits:  "}
+                      </Text>
+                      <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                        {"***" + paymentObj.last4}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {paymentObj.cash ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Text>Amount Tendered: </Text>
+                      <Text>
+                        {formatCurrencyDisp(paymentObj.amountTendered, true)}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {/* {paymentObj.cash ? (
+                <View
+                  style={{
+                    justifyContent: "space-between",
+                    flexDirection: "row",
+                  }}
+                >
+                  <Text>Change needed: </Text>
+                  <Text>
+                    {formatCurrencyDisp(
+                      paymentObj.amountTendered - paymentObj.amountCaptured
+                    )}
+                  </Text>
+                </View>
+              ) : null} */}
+                  {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
         <View
           style={{
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "space-between",
             width: "100%",
+            alignItems: "flex-end",
+            marginTop: sIsRefund ? 5 : 15,
+            // paddingRight: 7,
           }}
         >
-          <Text style={{ fontSize: 16, color: gray(0.5) }}>
-            {sIsRefund ? "TOTAL REFUND ALLOWED" : "TOTAL SALE"}
-          </Text>
-          <View style={{ flexDirection: "row" }}>
+          {!!sRefund.cashRefundRequested && (
             <Text
               style={{
-                fontSize: 13,
-                color: gray(0.5),
-                marginRight: 10,
+                fontSize: 18,
+                fontWeight: 500,
+                color: C.red,
               }}
             >
-              $
+              {"CASH REFUND REQUESTED:   $" +
+                formatCurrencyDisp(sRefund.cashRefundRequested)}
             </Text>
+          )}
+          {!!sRefund.cardRefundRequested && (
             <Text
               style={{
+                fontSize: 18,
                 fontWeight: 500,
-                fontSize: 21,
+                color: C.red,
+              }}
+            >
+              {"CARD REFUND REQUESTED:   $" +
+                formatCurrencyDisp(sRefund.cardRefundRequested)}
+            </Text>
+          )}
+          {!!sRefund.cashAmountRefunded && (
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: 500,
                 color: C.green,
               }}
             >
-              {formatCurrencyDisp(
-                sIsRefund
-                  ? sRefund.totalCardRefundAllowed +
-                      sRefund.totalCashRefundAllowed
-                  : sSale?.total
-              )}
+              {"CASH REFUNDED:   $" +
+                formatCurrencyDisp(sRefund.cashAmountRefunded)}
             </Text>
-          </View>
-        </View>
-      </View>
-
-      {/******************** END REFUNDS ********************************************/}
-
-      {/** ************************************payments list *****************************************************/}
-      {!!sSale?.payments.length > 0 && (
-        <View
-          style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
-        >
-          <Text style={{ color: gray(0.4) }}>PAYMENTS</Text>
-        </View>
-      )}
-
-      <View style={{ maxHeight: "20%" }}>
-        <ScrollView
-          style={{
-            width: "100%",
-          }}
-          contentContainerStyle={{ alignItems: "center" }}
-        >
-          {sSale?.payments.map((paymentObj) => {
-            return (
-              <View
-                key={paymentObj.id}
-                style={{
-                  padding: 5,
-                  backgroundColor: C.listItemWhite,
-                  width: "99%",
-                  backgroundColor: C.listItemWhite,
-                  borderRadius: 10,
-                  marginBottom: 5,
-                }}
-              >
-                <Text style={{ color: C.green }}>
-                  {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
-                </Text>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text>Amount received: </Text>
-                  <Text>
-                    {formatCurrencyDisp(paymentObj.amountCaptured, true)}
-                  </Text>
-                </View>
-                {paymentObj.last4 ? (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                      Last 4 Digits:{" "}
-                    </Text>
-                    <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                      {"***" + paymentObj.last4}
-                    </Text>
-                  </View>
-                ) : null}
-                {paymentObj.cash ? (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Text>Amount Tendered: </Text>
-                    <Text>
-                      {formatCurrencyDisp(paymentObj.amountTendered, true)}
-                    </Text>
-                  </View>
-                ) : null}
-                {/* {paymentObj.cash ? (
-                <View
-                  style={{
-                    justifyContent: "space-between",
-                    flexDirection: "row",
-                  }}
-                >
-                  <Text>Change needed: </Text>
-                  <Text>
-                    {formatCurrencyDisp(
-                      paymentObj.amountTendered - paymentObj.amountCaptured
-                    )}
-                  </Text>
-                </View>
-              ) : null} */}
-                {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
-              </View>
-            );
-          })}
-        </ScrollView>
-      </View>
-      <View
-        style={{
-          width: "100%",
-          alignItems: "flex-end",
-          marginTop: 10,
-          // paddingRight: 7,
-        }}
-      >
-        {!!sRefund.cashRefundRequested && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: C.red,
-            }}
-          >
-            {"CASH REFUND REQUESTED:   $" +
-              formatCurrencyDisp(sRefund.cashRefundRequested)}
-          </Text>
-        )}
-        {!!sRefund.cardRefundRequested && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: C.red,
-            }}
-          >
-            {"CARD REFUND REQUESTED:   $" +
-              formatCurrencyDisp(sRefund.cardRefundRequested)}
-          </Text>
-        )}
-        {!!sRefund.cashAmountRefunded && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: C.green,
-            }}
-          >
-            {"CASH REFUNDED:   $" +
-              formatCurrencyDisp(sRefund.cashAmountRefunded)}
-          </Text>
-        )}
-        {!!sRefund.cardAmountRefunded && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: C.green,
-            }}
-          >
-            {"CARD AMOUNT REFUNDED:   $" +
-              formatCurrencyDisp(sRefund.cardAmountRefunded)}
-          </Text>
-        )}
-        {sSale?.total - sSale?.amountCaptured > 0 && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: sSale?.paymentComplete ? C.green : C.red,
-            }}
-          >
-            {"AMOUNT LEFT TO PAY:   $" +
-              formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
-          </Text>
-        )}
-        {!sIsRefund && sSale?.paymentComplete && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: sSale?.paymentComplete ? C.green : C.red,
-            }}
-          >
-            {"PAYMENT COMPLETE!"}
-          </Text>
-        )}
-      </View>
-      {/*******************************************refund list ********************************************************/}
-      {sSale?.refunds?.length > 0 ? (
-        <View
-          style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
-        >
-          <Text style={{ color: C.red }}>REFUNDS</Text>
-        </View>
-      ) : null}
-      <ScrollView style={{ maxHeight: "30%", width: "100%" }}>
-        {sSale?.refunds?.map((refund) => {
-          let cardDetails = sSale.payments.find(
-            (o) => o.id === refund.cardPaymentID
-          );
-          return (
-            <View
-              key={refund.id}
+          )}
+          {!!sRefund.cardAmountRefunded && (
+            <Text
               style={{
-                padding: 5,
-                backgroundColor: C.listItemWhite,
-                width: "99%",
-                backgroundColor: C.listItemWhite,
-                borderRadius: 10,
-                marginBottom: 5,
+                fontSize: 18,
+                fontWeight: 500,
+                color: C.green,
               }}
             >
-              <Text style={{ color: C.green }}>
-                {refund.cardPaymentID ? "CARD REFUND" : "CASH REFUND"}
-              </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text>Amount refunded: </Text>
-                <Text>{formatCurrencyDisp(refund.amountRefunded)}</Text>
-              </View>
-              {cardDetails ? (
+              {"CARD AMOUNT REFUNDED:   $" +
+                formatCurrencyDisp(sRefund.cardAmountRefunded)}
+            </Text>
+          )}
+          {sSale?.total - sSale?.amountCaptured > 0 && (
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: 500,
+                color: sSale?.paymentComplete ? C.green : C.red,
+              }}
+            >
+              {"AMOUNT LEFT TO PAY:   $" +
+                formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
+            </Text>
+          )}
+          {!sIsRefund && sSale?.paymentComplete && (
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: 500,
+                color: sSale?.paymentComplete ? C.green : C.red,
+              }}
+            >
+              {"PAYMENT COMPLETE!"}
+            </Text>
+          )}
+        </View>
+
+        {/*******************************************refund list ********************************************************/}
+        {sSale?.refunds?.length > 0 ? (
+          <View
+            style={{
+              marginTop: sIsRefund ? 5 : 15,
+              alignItems: "flex-end",
+              paddingRight: 10,
+            }}
+          >
+            <Text style={{ color: C.red }}>REFUNDS</Text>
+          </View>
+        ) : null}
+        <View
+          style={{
+            maxHeight: "25%",
+            width: "100%",
+          }}
+        >
+          <ScrollView style={{}}>
+            {sSale?.refunds?.map((refund) => {
+              let cardDetails = sSale.payments.find(
+                (o) => o.id === refund.cardPaymentID
+              );
+              return (
                 <View
+                  key={refund.id}
                   style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
+                    padding: 5,
+                    backgroundColor: C.listItemWhite,
+                    width: "99%",
+                    backgroundColor: C.listItemWhite,
+                    borderRadius: 10,
+                    marginBottom: 5,
                   }}
                 >
-                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                    {formatMillisForDisplay(cardDetails.millis)}
+                  <Text style={{ color: C.green }}>
+                    {refund.cardPaymentID ? "CARD REFUND" : "CASH REFUND"}
                   </Text>
-                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                    {cardDetails.cardType}
-                  </Text>
-                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                    {"***" + cardDetails.last4}
-                  </Text>
-                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                    {cardDetails.expMonth + "/" + cardDetails.expYear}
-                  </Text>
-                </View>
-              ) : null}
-              {!refund.cardPaymentID ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text>Amount Tendered: </Text>
-                  <Text>{formatCurrencyDisp(refund.amountTendered)}</Text>
-                </View>
-              ) : null}
-              {/* {paymentObj.cash ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text>Amount refunded: </Text>
+                    <Text>{formatCurrencyDisp(refund.amountRefunded)}</Text>
+                  </View>
+                  {cardDetails ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                        {formatMillisForDisplay(cardDetails.millis)}
+                      </Text>
+                      <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                        {cardDetails.cardType}
+                      </Text>
+                      <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                        {"***" + cardDetails.last4}
+                      </Text>
+                      <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                        {cardDetails.expMonth + "/" + cardDetails.expYear}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {!refund.cardPaymentID ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Text>Amount Tendered: </Text>
+                      <Text>{formatCurrencyDisp(refund.amountTendered)}</Text>
+                    </View>
+                  ) : null}
+                  {/* {paymentObj.cash ? (
                 <View
                   style={{
                     justifyContent: "space-between",
@@ -905,20 +1003,21 @@ export const MiddleItemComponent = ({
                   </Text>
                 </View>
               ) : null} */}
-              {refund.isRefund ? <Text>{"REFUND"}</Text> : null}
-            </View>
-          );
-        })}
-      </ScrollView>
-
+                  {refund.isRefund ? <Text>{"REFUND"}</Text> : null}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
       <View
         style={{
           width: "100%",
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-around",
-          marginTop: 25,
-          // justifySelf: "flex-end",
+          // backgroundColor: 'green'
+          // marginTop: sIsRefund ? 10 : 35,
         }}
       >
         {/* {payments?.length > 0 && !sSale?.paymentComplete ? (
@@ -996,15 +1095,15 @@ export const MiddleItemComponent = ({
 };
 
 const VertListSpacer = () => (
-
-          <View
-            style={{
-              width: "100%",
-                height: 1,
-                marginVertical: 10,
-              backgroundColor: C.buttonLightGreenOutline,
-            }}
-          />)
+  <View
+    style={{
+      width: "100%",
+      height: 1,
+      marginVertical: 10,
+      backgroundColor: C.buttonLightGreenOutline,
+    }}
+  />
+);
 
 const checkoutScreenStyle = {
   base: {
@@ -1042,7 +1141,7 @@ const checkoutScreenStyle = {
   },
   mainButtonStyle: {},
   boxStyle: {
-    marginTop: 5,
+    // marginTop: 5,
     borderColor: C.buttonLightGreenOutline,
     borderRadius: 10,
     borderWidth: 2,
@@ -1055,24 +1154,24 @@ const checkoutScreenStyle = {
     flexDirection: "row",
   },
   totalTextStyle: {
-    marginTop: 15,
+    // marginTop: 15,
     color: gray(0.75),
   },
   titleStyle: {
-    marginTop: 20,
+    // marginTop: 20,
   },
   buttonRowStyle: {
-    marginTop: 20,
+    // marginTop: 20,
   },
   statusText: {
     width: "80%",
     textAlign: "center",
-    marginTop: 15,
+    // marginTop: 15,
     color: "green",
     fontSize: 15,
     fontWeight: 600,
   },
   loadingIndicatorStyle: {
-    marginTop: 10,
+    // marginTop: 10,
   },
 };

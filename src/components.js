@@ -46,6 +46,7 @@ import {
   SETTINGS_OBJ,
   PRIVILEDGE_LEVELS,
   COLORS,
+  CONTACT_RESTRICTIONS,
 } from "./data";
 import { cloneDeep } from "lodash";
 import { CUSTOMER_PROTO } from "./data";
@@ -1428,31 +1429,37 @@ export const CustomerInfoScreenModalComponent = ({
             />
             <CheckBox_
               text={"Call Only"}
-              isChecked={ssCustomerInfoObj.contactRestriction === "CALL"}
+              isChecked={
+                ssCustomerInfoObj.contactRestriction ===
+                CONTACT_RESTRICTIONS.call
+              }
               onCheck={() => {
                 let obj = cloneDeep(ssCustomerInfoObj);
                 __setInfoTextFocus(null);
-                if (obj.contactRestriction === "CALL") {
+                if (obj.contactRestriction === CONTACT_RESTRICTIONS.call) {
                   obj.contactRestriction = "";
                 } else {
-                  obj.contactRestriction = "CALL";
+                  obj.contactRestriction = CONTACT_RESTRICTIONS.call;
                 }
                 __setCustomerInfoObj(obj);
               }}
             />
             <CheckBox_
               text={"Email Only"}
-              isChecked={ssCustomerInfoObj.contactRestriction === "EMAIL"}
+              isChecked={
+                ssCustomerInfoObj.contactRestriction ===
+                CONTACT_RESTRICTIONS.email
+              }
               onCheck={() => {
                 let obj = cloneDeep(ssCustomerInfoObj);
                 __setInfoTextFocus(null);
                 // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
                 // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
                 //   sCustomerInfo.callOnlyOption = false;
-                if (obj.contactRestriction === "EMAIL") {
+                if (obj.contactRestriction === CONTACT_RESTRICTIONS.email) {
                   obj.contactRestriction = "";
                 } else {
-                  obj.contactRestriction = "EMAIL";
+                  obj.contactRestriction = CONTACT_RESTRICTIONS.email;
                 }
                 __setCustomerInfoObj(obj);
               }}

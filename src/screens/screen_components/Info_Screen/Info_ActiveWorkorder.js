@@ -35,6 +35,7 @@ import {
   TAB_NAMES,
   COLORS,
   NONREMOVABLE_STATUSES,
+  CONTACT_RESTRICTIONS,
 } from "../../../data";
 import React, { useRef } from "react";
 import { cloneDeep } from "lodash";
@@ -305,10 +306,11 @@ export const ActiveWorkorderComponent = ({}) => {
                   </Text>
                 </View>
               ) : null}
-              {zCustomerObj.contactRestriction === "CALL" ? (
+              {zCustomerObj.contactRestriction === CONTACT_RESTRICTIONS.call ? (
                 <Text style={{ color: Colors.darkText }}>CALL ONLY</Text>
               ) : null}
-              {zCustomerObj.contactRestriction === "EMAIL" ? (
+              {zCustomerObj.contactRestriction ===
+              CONTACT_RESTRICTIONS.email ? (
                 <Text style={{ color: Colors.darkText }}>EMAIL ONLY</Text>
               ) : null}
             </View>

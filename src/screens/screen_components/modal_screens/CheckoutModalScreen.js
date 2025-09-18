@@ -92,18 +92,23 @@ import { CashSaleComponent } from "./CashSaleComponent";
 import { MiddleItemComponent } from "./MiddleItemComponent";
 
 export function CheckoutModalScreen({ openWorkorder }) {
-  // store setters
-
+  // store setters ////////////////////////////////////////////////
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
+  const _zSetReceiptScan = useCheckoutStore((state) => state.setReceiptScan);
 
   const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
 
   const _zSetCustomerField = useCurrentCustomerStore(
     (state) => state.setCustomerField
   );
-  // store getters
+  const _zSetReceiptScanOnly = useCheckoutStore((state) => state.setStringOnly);
+  // store getters /////////////////////////////////////////////////////////
+  const zReceiptScanMessage = useCheckoutStore((state) => state.getMessage());
+  const zReceiptLoading = useCheckoutStore((state) => state.getLoading());
+  const zReceiptScan = useCheckoutStore((state) => state.getReceiptScan());
+
   const zOpenWorkorder = useOpenWorkordersStore((state) =>
     state.getOpenWorkorderObj()
   );
@@ -118,11 +123,14 @@ export function CheckoutModalScreen({ openWorkorder }) {
   );
   const zSettings = useSettingsStore((state) => state.getSettingsObj());
   const zSale = useCheckoutStore((state) => state.saleObj);
+
   //////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////
+
   const [sRefundScan, _setRefundScan] = useState();
   const [sIsRefund, _setIsRefund] = useState(false);
   const [sRefundPaymentOverride, _setRefundPaymentOverride] = useState(false);
-  const [sRefundScanMessage, _setRefundScanMessage] = useState("");
+  // const [sRefundScanMessage, _setRefundScanMessage] = useState("");
   const [sRefund, _setRefund] = useState({
     refundedLines: [],
     requestedRefundLines: [],
@@ -158,7 +166,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
   // watch the combined workorders array and adjust accordingly
 
   // 730921185148
-  let scan = "670957054494"; // test
+  let refundScan = "670957054494"; // test
 
   // all startup stuff here
   useEffect(() => {
@@ -191,9 +199,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
     }
 
     // testing /////////////////////////
-    // _setRefundScan(scan);
+    _zSetReceiptScanOnly(refundScan);
     // if (sCombinedWorkorders.length > 0) return;
-    // handleRefundScan(scan);
+    // handleRefundScan(refundScan);
   }, [zOpenWorkorder, sCombinedWorkorders, zSettings, sSale, sIsRefund]);
 
   // run the totals on combined workorders change
@@ -223,6 +231,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
     }
   }, [sCombinedWorkorders, sIsRefund, sSale]);
 
+  ///////////////////  SALES /////////////////////////////////////
   function handlePaymentCapture(payment = PAYMENT_OBJECT_PROTO) {
     // log(paymentObj);
     let sale = cloneDeep(sSale);
@@ -243,7 +252,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
       sale.workorderIDs = workorderIDs;
       cloneDeep(sCombinedWorkorders).forEach((wo) => {
         wo.saleID = sale.id;
-        // _zSetWorkorder(wo); // db
+        _zSetWorkorder(wo); // db
         sale.workorderIDs = replaceOrAddToArr(sale.workorderIDs, wo.id);
         if (sale.amountCaptured === sTotalAmount) {
           wo.paymentComplete = true;
@@ -267,16 +276,15 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
     // printReceipt(payment);
     _setSale(sale);
-    // dbSetSalesObj(removeUnusedFields(sale)); // db
-    // _zSetCustomerField("deposits", deposits); // db
-    // _zSetCustomerField("saleIDs", saleIDs); // db
+    dbSetSalesObj(removeUnusedFields(sale)); // db
+    _zSetCustomerField("deposits", deposits); // db
+    _zSetCustomerField("saleIDs", saleIDs); // db
 
     if (!sale.payments[sale.payments.length - 1].cash) {
       if (sIsDeposit || sale.paymentComplete) closeCheckoutScreenModal();
     }
   }
 
-  ///////////////////  SALES /////////////////////////////////////
   function searchInventory(searchStr) {
     let split = searchStr.split(" ");
     if (searchStr.length < 3) return;
@@ -351,58 +359,17 @@ export function CheckoutModalScreen({ openWorkorder }) {
   ////////////// REFUNDS ///////////////////////////////////////
 
   function handleRefundScan(refundScan) {
-    _setRefundScan(refundScan);
-    if (refundScan?.length === 12) {
-      _setIsRefund(false);
-      _setCombinedWorkorders([]);
-      _setRefundScanMessage("Searching for transaction...");
-      _setSale(null);
-
-      dbGetSaleItem(refundScan)
-        .then((sale) => {
-          if (sale) {
-            _setRefundScanMessage("Transaction Found! Gathering details...");
-            _setIsRefund(true);
-            let count = 0;
-            let workorders = [];
-            sale.workorderIDs.forEach((workorderID) => {
-              dbGetOpenWorkorderItem(workorderID).then((workorder) => {
-                count++;
-                // if (workorder) addToCombinedArr(workorder);
-                if (workorder) workorders.push(workorder);
-                if (count === sale.workorderIDs.length) {
-                  splitIncomingRefundWorkorderLines(workorders, sale);
-                  // _setCombinedWorkorders(workorders);
-                }
-                // addToCombinedArr(workorders, sale);
-              });
-
-              dbGetClosedWorkorderItem(workorderID).then((workorder) => {
-                count++;
-                // if (res) addToCombinedArr(res);
-                if (workorder) workorders.push(workorder);
-                if (count === sale.workorderIDs.length)
-                  splitIncomingRefundWorkorderLines(workorders, sale);
-              });
-            });
-          } else {
-            // todo message does not exist
-            _setRefundScanMessage("This sale ID does not exist");
-          }
-        })
-        .catch((e) => log("refund error", e));
-    } else if (refundScan.length > 0 && refundScan.length < 12) {
-      _setRefundScanMessage(refundScan.length + "/12   ");
-    } else {
-      // _setRefundScanMessage("");
-    }
+    _zSetReceiptScan(refundScan, (workorders, sale) => {
+      splitIncomingRefundWorkorderLines(workorders, sale);
+    });
   }
 
-  function splitIncomingRefundWorkorderLines(combinedWorkorders, sale) {
-    let refund = cloneDeep(sRefund);
+  function splitIncomingRefundWorkorderLines(workordersInSale, sale) {
+    _setIsRefund(true);
     // split the incoming refund sale workorders by default so we can select one at a time for refunding
     let newArr = [];
-    combinedWorkorders.forEach((wo) => {
+    // log(workordersInSale);
+    workordersInSale.forEach((wo) => {
       let newWO = cloneDeep(wo);
       let workorderLines = [];
       wo.workorderLines.forEach((line) => {
@@ -588,9 +555,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
               zCustomer={zCustomer}
               sIsRefund={sIsRefund}
               handleRefundScan={handleRefundScan}
-              sRefundScan={sRefundScan}
+              sRefundScan={zReceiptScan}
               // _setRefundScan={_setRefundScan}
-              sRefundScanMessage={sRefundScanMessage}
+              sRefundScanMessage={zReceiptScanMessage}
               _zSetIsCheckingOut={_zSetIsCheckingOut}
               handleCancelPress={closeCheckoutScreenModal}
               payments={sSale?.payments}
@@ -598,7 +565,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sFocusedItem={sFocusedItem}
               _setFocusedItem={_setFocusedItem}
               _setIsRefund={_setIsRefund}
-              _setScanFailureMessage={_setRefundScanMessage}
               sCardRefundFee={sCardRefundFee}
               sShouldChargeCardRefundFee={sShouldChargeCardRefundFee}
               sCardRefundFeePercentage={zSettings.cardRefundFeePercent}
@@ -832,16 +798,11 @@ const WorkorderListComponent = ({
             style={{
               width: "100%",
               borderColor: C.buttonLightGreenOutline,
-              // backgroundColor: C.backgroundListWhite,
-              // backgroundColor: sCombinedWorkorders.find(
-              //   (o) => o.id === workorder.id
-              // )
-              //   ? C.backgroundListWhite
-              //   : gray(0.03),
               borderWidth: 1,
-              borderRadius: 10,
+              borderRadius: 8,
               padding: 10,
               marginBottom: 7,
+              backgroundColor: lightenRGBByPercent(C.backgroundWhite, 60),
             }}
           >
             {!sIsRefund && idx !== 0 ? (
@@ -888,7 +849,7 @@ const WorkorderListComponent = ({
                   marginBottom: 10,
                 }}
               >
-                <View style={{}}>
+                <View style={{ flexDirection: "row" }}>
                   <Text
                     style={{
                       color: C.textMain,
@@ -904,9 +865,19 @@ const WorkorderListComponent = ({
                       fontSize: 16,
                       fontWeight: "500",
                       fontStyle: "italic",
+                      marginRight: 10,
                     }}
                   >
-                    {workorder.model || ""}
+                    {workorder.model ? "     " + workorder.mod : ""}
+                  </Text>
+                  <Text
+                    style={{
+                      color: C.textMain,
+                      fontSize: 16,
+                      fontWeight: "500",
+                    }}
+                  >
+                    {workorder.description ? "   " + workorder.description : ""}
                   </Text>
                 </View>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -923,7 +894,6 @@ const WorkorderListComponent = ({
                   </Text>
                   <Text
                     style={{
-                      marginLeft: 5,
                       paddingHorizontal: 10,
                       paddingVertical: 5,
                       borderRadius: 100,
@@ -934,15 +904,6 @@ const WorkorderListComponent = ({
                     {workorder.color2?.label || ""}
                   </Text>
                 </View>
-                <Text
-                  style={{
-                    color: C.textMain,
-                    fontSize: 16,
-                    fontWeight: "500",
-                  }}
-                >
-                  {workorder.description || ""}
-                </Text>
               </View>
               <FlatList
                 data={workorder.workorderLines}
@@ -966,12 +927,12 @@ const WorkorderListComponent = ({
                           ? C.listItemWhite
                           : lightenRGBByPercent(C.blue, 60),
                         paddingVertical: 2,
-                        marginBottom: 3,
+                        marginBottom: 5,
                         borderColor: "transparent",
                         borderLeftColor: lightenRGBByPercent(C.green, 60),
                         borderLeftWidth: sIsRefund ? 0 : 2,
                         paddingLeft: 10,
-                        borderRadius: 15,
+                        borderRadius: 5,
                         paddingRight: 10,
                       }}
                     >
@@ -1048,27 +1009,21 @@ const WorkorderListComponent = ({
                         }}
                       >
                         {!sIsRefund ? (
-                          <GradientView
-                            colorArr={COLOR_GRADIENTS.grey}
+                          <TextInput
+                            disabled={true}
                             style={{
-                              borderRadius: 10,
+                              padding: 2,
+                              fontSize: 16,
+                              fontWeight: "500",
+                              textAlign: "center",
+                              color: C.textMain,
+                              // backgroundColor: C.red,
+                              outlineWidth: 0,
                               width: 30,
-                              height: 20,
+                              // width: "100%",
                             }}
-                          >
-                            <TextInput
-                              disabled={true}
-                              style={{
-                                fontSize: 16,
-                                fontWeight: 700,
-                                textAlign: "center",
-                                color: C.textWhite,
-                                outlineWidth: 0,
-                                width: "100%",
-                              }}
-                              value={workorderLine.qty}
-                            />
-                          </GradientView>
+                            value={workorderLine.qty}
+                          />
                         ) : null}
                         <View
                           style={{
@@ -1099,7 +1054,7 @@ const WorkorderListComponent = ({
                               >
                                 {"$ -" +
                                   formatCurrencyDisp(
-                                    workorderLine.discountSavings
+                                    workorderLine.discountObj.savings
                                   )}
                               </Text>
                               <Text
@@ -1112,8 +1067,7 @@ const WorkorderListComponent = ({
                                 }}
                               >
                                 {formatCurrencyDisp(
-                                  workorderLine.inventoryItem.price -
-                                    workorderLine.discountSavings
+                                  workorderLine.discountObj.newPrice
                                 )}
                               </Text>
                             </View>

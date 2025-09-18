@@ -923,20 +923,46 @@ export function generateRandomID(collectionPath) {
   return ref.id;
 }
 
-export function generateUPCBarcode() {
+
+/**
+ * Create a barcode record for a specific type.
+ * @param {'workorder'|'sale'|'customer'} barcodeType - The barcode category.
+ * @returns {string}
+ */
+export function generateUPCBarcode(barcodeType) {
   // Get current millis since epoch
+  let begins = '0';
+  switch (barcodeType) {
+    case 'workorder':
+      begins = '1'
+      break;
+    case 'sale':
+      begins = '2'
+      break;
+    case 'customer':
+      begins = '3'
+  }
   const millis = Date.now().toString();
-
-  // Take the last 8 digits of millis
   const timePart = millis.slice(-8);
-
-  // Add a 4-digit random number
   const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-
-  // Combine → 12 digits
-  const upc = timePart + randomPart;
-
+  let upc = timePart + randomPart;
+  upc = upc.replace(/^./,begins)
   return upc;
+}
+
+/**
+ * @param {string} upcBarcode 
+ * @returns {'workorder'|'sale'|'customer'}
+ */
+export function getReceiptType(upcBarcode) {
+  switch (upcBarcode) {
+      case upcBarcode.beginsWith('1'):
+        return 'workorder'
+      case upcBarcode.beginsWith('2'):
+return 'sale'
+    case upcBarcode.beginsWith('3'):
+      return 'customer'
+    }
 }
 
 export async function randomWordGenerator() {

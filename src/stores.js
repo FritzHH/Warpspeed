@@ -27,6 +27,9 @@ import {
   dbSetWorkorder,
   dbSetCustomerField,
   dbSetCustomerObj,
+  dbGetOpenWorkorderItem,
+  dbGetClosedWorkorderItem,
+  dbGetSaleItem,
 } from "./db_call_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
@@ -125,13 +128,79 @@ export const useCustomerSearchStore = create((set, get) => ({
 export const useCheckoutStore = create((set, get) => ({
   isCheckingOut: false,
   saleObj: null,
+  receiptScan: "",
+  message: "",
+  loading: false,
 
+  getMessage: () => get().message,
+  getLoading: () => get().loading,
   getSaleObj: () => get().saleObj,
   getIsCheckingOut: () => get().isCheckingOut,
+  getReceiptScan: () => get().receiptScan,
 
-  setSaleObj: (saleObj) => set({ saleObj }),
+  setStringOnly: (receiptScan) => set({ receiptScan }),
+  setLoading: (loading) => set({ loading }),
+  // setSaleObj: (saleObj) => set({ saleObj }),
   setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),
+  setReceiptScan: (receiptScan, callback) => {
+    set({ receiptScan });
+    if (receiptScan?.length === 12) {
+      set({
+        message: "Searching for transaction...",
+      });
+
+      dbGetSaleItem(receiptScan)
+        .then((sale) => {
+          if (sale) {
+            set({
+              message: "Transaction Found! Gathering details...",
+            });
+
+            let count = 0;
+            let workorders = [];
+            sale.workorderIDs.forEach((workorderID) => {
+              dbGetOpenWorkorderItem(workorderID).then((workorder) => {
+                count++;
+                // if (workorder) addToCombinedArr(workorder);
+                if (workorder) workorders.push(workorder);
+                // log(workorder);
+                if (count === sale.workorderIDs.length) {
+                  callback ? callback(workorders, sale) : null;
+                  set({
+                    message: "Sale found!",
+                  });
+                  // splitIncomingRefundWorkorderLines(workorders, sale);
+                  // _setCombinedWorkorders(workorders);
+                }
+                // addToCombinedArr(workorders, sale);
+              });
+
+              dbGetClosedWorkorderItem(workorderID).then((workorder) => {
+                count++;
+                // if (res) addToCombinedArr(res);
+                if (workorder) workorders.push(workorder);
+                if (count === sale.workorderIDs.length)
+                  callback ? callback(workorders, sale) : null;
+                set({
+                  message: "Sale found!",
+                });
+                // splitIncomingRefundWorkorderLines(workorders, sale);
+              });
+            });
+          } else {
+            // todo message does not exist
+            set({ message: "This 12-digit sale ID does not exist" });
+          }
+        })
+        .catch((e) => log("refund error", e));
+    } else if (receiptScan.length > 0 && receiptScan.length < 12) {
+      set({ message: receiptScan.length + "/12   " });
+    } else {
+      // _setRefundScanMessage("");
+    }
+  },
 }));
+
 
 export const useAlertScreenStore = create((set, get) => ({
   showAlert: false,

@@ -660,8 +660,8 @@ export const StripeCreditCardComponent = ({
             fontSize: 15,
             color: sStatusTextColor,
             marginTop: 5,
-            maxHeight: 100,
-            backgroundColor: "blue",
+            // maxHeight: 100,
+            // backgroundColor: "blue",
           }}
         >
           {sStatusMessage}

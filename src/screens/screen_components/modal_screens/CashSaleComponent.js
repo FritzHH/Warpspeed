@@ -462,11 +462,9 @@ export const CashSaleComponent = ({
       >
         <View
           style={{
-            marginLeft: 20,
             ...checkoutScreenStyle.boxStyle,
             width: "35%",
             paddingBottom: 6,
-            paddingRight: 7,
           }}
         >
           <Text
@@ -526,7 +524,7 @@ export const CashSaleComponent = ({
           </View>
         </View>
       </View>
-      <View
+      {/* <View
         style={{
           flexDirection: "row",
           justifyContent: "space-around",
@@ -534,20 +532,20 @@ export const CashSaleComponent = ({
           alignItems: "center",
           marginTop: 10,
         }}
-      >
-        <Button_
-          colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ color: C.textWhite, fontSize: 16 }}
-          enabled={sProcessButtonEnabled}
-          onPress={handleProcessPaymentPress}
-          text={sIsRefund ? "PROCESS REFUND" : "COMPLETE PAYMENT"}
-          buttonStyle={{
-            cursor: sProcessButtonEnabled ? "inherit" : "default",
-            // width: 120,
-          }}
-        />
+      > */}
+      <Button_
+        colorGradientArr={COLOR_GRADIENTS.green}
+        textStyle={{ color: C.textWhite, fontSize: 16 }}
+        enabled={sProcessButtonEnabled}
+        onPress={handleProcessPaymentPress}
+        text={sIsRefund ? "PROCESS REFUND" : "COMPLETE PAYMENT"}
+        buttonStyle={{
+          cursor: sProcessButtonEnabled ? "inherit" : "default",
+          // width: 120,
+        }}
+      />
 
-        {/* {!sIsRefund && (
+      {/* {!sIsRefund && (
           <Button_
             buttonStyle={
               {
@@ -562,7 +560,7 @@ export const CashSaleComponent = ({
             text={"CANCEL"}
           />
         )} */}
-        {/* <View
+      {/* <View
           style={{
             ...checkoutScreenStyle.boxStyle,
             width: "30%",
@@ -614,7 +612,7 @@ export const CashSaleComponent = ({
             {sCashChangeNeeded}
           </Text>
         </View> */}
-      </View>
+      {/* </View> */}
     </View>
   );
 };

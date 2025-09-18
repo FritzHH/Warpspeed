@@ -60,6 +60,7 @@ import {
   dollarsToCents,
   addOrRemoveFromArr,
   findInMultipleArrs,
+  resetObject,
 } from "../../../utils";
 import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
@@ -192,7 +193,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
     // testing
     _sSetRefundScan(scan);
     if (sCombinedWorkorders.length > 0) return;
-    handleRefundScan(scan);
+    // handleRefundScan(scan);
   }, [zOpenWorkorder, sCombinedWorkorders, zSettings, sSale, sIsRefund]);
 
   // run the totals on combined workorders change
@@ -423,8 +424,11 @@ export function CheckoutModalScreen({ openWorkorder }) {
   }
 
   function setRefundRunningTotals(sale) {
+    // dev spoofing an extra card payment here
     // look at previous refunds and calculate what has been done, what we can do still
     let refund = cloneDeep(sRefund);
+    refund = resetObject(refund);
+    sale.paymentComplete = false;
     // refund.sale = sale;
     sale.payments.forEach((payment) => {
       let cardRefundAllowedTotal = 0;
@@ -568,7 +572,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
               handlePaymentCapture={handlePaymentCapture}
               onCancel={() => {}}
               sRefundPaymentOverride={sRefundPaymentOverride}
-              zSettingsObj={zSettings}
+              zSettings={zSettings}
               sRefund={sRefund}
               sIsDeposit={sIsDeposit}
               _setIsDeposit={_setIsDeposit}

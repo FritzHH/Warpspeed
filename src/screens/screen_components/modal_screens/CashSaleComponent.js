@@ -85,6 +85,7 @@ import {
 } from "../../../private_user_constants";
 import { FIRESTORE_COLLECTION_NAMES } from "../../../constants";
 import { isArray } from "lodash";
+import { PricingV1MessagingMessagingCountryInstanceInboundSmsPrices } from "twilio/lib/rest/pricing/v1/messaging/country";
 
 export const CashSaleComponent = ({
   sSale,
@@ -168,6 +169,17 @@ export const CashSaleComponent = ({
   const [sFocusedItem, _setFocusedItem] = useState("");
 
   useEffect(() => {
+    if (sIsRefund) {
+      if (
+        sRequestedAmount <= sRefund.cashRefundRequested &&
+        sRequestedAmount >= 100
+      ) {
+        _setProcessButtonEnabled(true);
+      } else {
+        _setProcessButtonEnabled(false);
+      }
+      return;
+    }
     if (
       sTenderAmount < sRequestedAmount ||
       sRequestedAmount === 0 ||
@@ -178,7 +190,7 @@ export const CashSaleComponent = ({
     } else {
       _setProcessButtonEnabled(true);
     }
-  }, [sTenderAmount, sRequestedAmount]);
+  }, [sTenderAmount, sRequestedAmount, sIsRefund]);
 
   function handleCancelPress() {
     _setTenderAmount(sSale?.total - sSale?.amountCaptured);
@@ -257,6 +269,31 @@ export const CashSaleComponent = ({
     }
   }
 
+  function handleRequestedAmountTextChange(val) {
+    // log("val", val);
+    let dollars = usdTypeMask(val).display;
+    let cents = dollarsToCents(dollars);
+    if (!cents) cents = 0;
+    if (dollars === "0.00") dollars = "";
+    _setStatusMessage("");
+    _setRequestedAmount(cents);
+    _setRequestedAmountDisp(dollars);
+
+    // log("dollars", formatCurrencyDisp(cents));
+    // log("refund", formatCurrencyDisp(sRefund.totalCashRefundAllowed));
+    if (sIsRefund) {
+      _setTenderAmount(cents);
+      _setTenderAmountDisp(dollars);
+      // if (cents <= sRefund.totalCashRefundAllowed && cents >= 100) {
+      // log("here1");
+      // _setProcessButtonEnabled(true);
+    } else {
+      // log("here2");
+      // _setProcessButtonEnabled(false);
+    }
+    // }
+  }
+
   function handleKeyPress(event) {
     if (event.nativeEvent.key == "Enter")
       sIsRefund ? handleProcessRefundPress() : handleProcessPaymentPress();
@@ -268,7 +305,10 @@ export const CashSaleComponent = ({
       style={{
         ...checkoutScreenStyle.base,
         opacity:
-          sSale?.paymentComplete && !sRefund.cashRefundRequested ? 0.2 : 1,
+          sSale?.paymentComplete ||
+          (sIsRefund && !sRefund.cashRefundRequested > 0)
+            ? 0.2
+            : 1,
       }}
     >
       {acceptsChecks ? (
@@ -324,7 +364,11 @@ export const CashSaleComponent = ({
             paddingRight: 5,
           }}
         >
-          <Text style={{ color: C.textMain, marginTop: 4 }}>Balance</Text>
+          <Text
+            style={{ color: sIsRefund ? gray(0.2) : C.textMain, marginTop: 4 }}
+          >
+            Balance
+          </Text>
           <Text
             style={{
               marginBottom: 15,
@@ -338,8 +382,6 @@ export const CashSaleComponent = ({
           style={{
             alignItems: "flex-end",
             marginLeft: 10,
-            color: C.textMain,
-            // width: "60%",
           }}
         >
           <Text
@@ -347,7 +389,7 @@ export const CashSaleComponent = ({
               fontSize: 15,
               padding: 5,
               paddingRight: 1,
-              color: C.textMain,
+              color: sIsRefund ? gray(0.2) : C.textMain,
             }}
           >
             {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
@@ -398,15 +440,7 @@ export const CashSaleComponent = ({
                 placeholder="0.00"
                 placeholderTextColor={gray(0.3)}
                 value={sRequestedAmountDisp}
-                onChangeText={(val) => {
-                  val = usdTypeMask(val).display;
-                  let cents = dollarsToCents(val);
-                  if (!cents) cents = 0;
-                  if (val === "0.00") val = "";
-                  _setStatusMessage("");
-                  _setRequestedAmount(cents);
-                  _setRequestedAmountDisp(val);
-                }}
+                onChangeText={handleRequestedAmountTextChange}
               />
             </View>
           </View>
@@ -506,27 +540,30 @@ export const CashSaleComponent = ({
         <Button_
           colorGradientArr={COLOR_GRADIENTS.green}
           textStyle={{ color: C.textWhite, fontSize: 16 }}
-          enabled={
-            sProcessButtonEnabled && !sSale?.paymentComplete && sCashSaleActive
-          }
-          onPress={() => handleProcessPaymentPress()}
+          enabled={sProcessButtonEnabled}
+          onPress={handleProcessPaymentPress}
           text={sIsRefund ? "PROCESS REFUND" : "COMPLETE"}
-          buttonStyle={{
-            cursor: sProcessButtonEnabled ? "inherit" : "default",
-            width: 120,
-          }}
-        />
-        <Button_
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",
             // width: 120,
           }}
-          textStyle={{ fontSize: 15, color: C.textMain }}
-          colorGradientArr={COLOR_GRADIENTS.grey}
-          enabled={!sSale?.paymentComplete && sCashSaleActive}
-          onPress={handleCancelPress}
-          text={"CANCEL"}
         />
+
+        {!sIsRefund && (
+          <Button_
+            buttonStyle={
+              {
+                // cursor: sProcessButtonEnabled ? "inherit" : "default",
+                // width: 120,
+              }
+            }
+            textStyle={{ fontSize: 15, color: C.textMain }}
+            colorGradientArr={COLOR_GRADIENTS.grey}
+            enabled={!sSale?.paymentComplete && sCashSaleActive}
+            onPress={handleCancelPress}
+            text={"CANCEL"}
+          />
+        )}
         {/* <View
           style={{
             ...checkoutScreenStyle.boxStyle,

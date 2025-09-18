@@ -7,7 +7,7 @@ import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
 import { useAlertScreenStore } from "./stores";
-import { DISCOUNT_TYPES } from "./constants";
+import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
 
 // const fs = require("node:fs");
 export const dim = {
@@ -411,11 +411,9 @@ export function checkInputForNumbersOnly(valString, includeDecimal = true) {
   return isGood;
 }
 
-export function formatCurrencyDisp(
-  value,
-  withCurrency = false
-) {
-  let locale = "en-US"; let currency = "USD"
+export function formatCurrencyDisp(value, withCurrency = false) {
+  let locale = "en-US";
+  let currency = "USD";
   const cents = typeof value === "string" ? Number(value) : value;
   if (!Number.isFinite(cents)) return "";
   const amount = cents / 100;
@@ -965,6 +963,28 @@ export function removeUnusedFields(obj) {
   return newObj;
 }
 
+export function resetObject(obj) {
+  const result = {};
+  for (const key in obj) {
+    if (Object.hasOwn(obj, key)) {
+      const val = obj[key];
+      if (typeof val === "string") {
+        result[key] = "";
+      } else if (typeof val === "number") {
+        result[key] = 0;
+      } else if (typeof val === "boolean") {
+        result[key] = false;
+      } else if (Array.isArray(val)) {
+        result[key] = [];
+      } else if (val && typeof val === "object") {
+        result[key] = resetObject(val); // recurse for nested objects
+      } else {
+        result[key] = null;
+      }
+    }
+  }
+  return result;
+}
 export function removeFieldFromObj(obj, key) {
   if (obj == null) return obj;
   const out = {};
@@ -1049,7 +1069,7 @@ export function removeArrItem(arr, item, fieldID = "id") {
 }
 
 export function addOrRemoveFromArr(arr, input, fieldName = "id") {
-  if (!arr) arr = []
+  if (!arr) arr = [];
   if (!input) return arr;
   let found = arr.find((o) => o[fieldName] === input[fieldName]);
   // log("found", found);
@@ -1058,7 +1078,7 @@ export function addOrRemoveFromArr(arr, input, fieldName = "id") {
 }
 
 export function replaceOrAddToArr(arr, input, fieldName = "id") {
-  if (!arr) arr = []
+  if (!arr) arr = [];
   if (!input) return arr;
   let isObj = isObject(input);
   let copy = cloneDeep(arr);
@@ -1388,4 +1408,32 @@ export function showAlert({
     alertBoxStyle,
     showAlert,
   });
+}
+
+export function startTimer(
+  duration = MILLIS_IN_MINUTE,
+  intervalMs = 500,
+  onTick,
+  onComplete = () => {}
+) {
+  let remaining = duration;
+  const interval = setInterval(() => {
+    if (duration !== Infinity) {
+      remaining -= intervalMs / 1000; // decrease in seconds
+      if (typeof onTick === "function") {
+        onTick(remaining);
+      }
+      if (remaining <= 0) {
+        clearInterval(interval);
+        if (typeof onComplete === "function") {
+          onComplete();
+        }
+      }
+    } else {
+      if (typeof onTick === "function") {
+        onTick(Infinity);
+      }
+    }
+  }, intervalMs);
+  return () => clearInterval(interval); // cancel function
 }

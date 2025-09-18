@@ -59,6 +59,7 @@ import {
   dollarsToCents,
   addOrRemoveFromArr,
   findInMultipleArrs,
+  startTimer,
 } from "../../../utils";
 import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
@@ -83,7 +84,11 @@ import {
   STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
   STRIPE_INITIATE_PAYMENT_INTENT_URL,
 } from "../../../private_user_constants";
-import { FIRESTORE_COLLECTION_NAMES } from "../../../constants";
+import {
+  FIRESTORE_COLLECTION_NAMES,
+  MILLIS_IN_HOUR,
+  MILLIS_IN_MINUTE,
+} from "../../../constants";
 import { isArray } from "lodash";
 export const StripeCreditCardComponent = ({
   sSale,
@@ -134,24 +139,31 @@ export const StripeCreditCardComponent = ({
   );
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(
     formatCurrencyDisp(
-      sRefund.cashRefundRequested
-        ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
-        : sSale?.total - sSale?.amountCaptured
+      sRefund.cardRefundRequested || sSale?.total - sSale?.amountCaptured
     )
   );
   // const [sRefundAmountDisp, _setRefundAmountDisp] = useState(forma);
   const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(true);
+  const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
   const [sFocusedItem, _setFocusedItem] = useState("");
   const [sCardReader, _setCardReader] = useState("");
   const [sCardReaders, _setCardReaders] = useState([]);
   const [sListeners, _setListeners] = useState([]);
   const [sPaymentIntentID, _setPaymentIntentID] = useState("");
   const [sStatusTextColor, _setStatusTextColor] = useState(C.green);
-  const [sPartialPaymentAlert, _setPartialPaymentAlert] = useState(false);
+  const [sCancelCardReaderTimer, _setCancelCardReaderTimer] = useState();
 
   /////////////////////////////////////////////////////////////////////////
   useEffect(() => {
+    if (sIsRefund) {
+      if (
+        sRequestedAmount <= sRefund.totalCardRefundAllowed &&
+        sRequestedAmount >= 50
+      )
+        _setProcessButtonEnabled(true);
+      return;
+    }
+
     if (
       sRequestedAmount > sSale?.total - sSale?.amountCaptured ||
       sRequestedAmount < 50
@@ -160,10 +172,11 @@ export const StripeCreditCardComponent = ({
     } else {
       _setProcessButtonEnabled(true);
     }
-  }, [sRequestedAmount]);
+  }, [sRequestedAmount, sIsRefund]);
 
   useEffect(() => {
     // log(sRequestedAmount);
+    // if (zSettings.)
     getAvailableStripeReaders();
 
     return () => {
@@ -175,23 +188,66 @@ export const StripeCreditCardComponent = ({
     };
   }, [sRefund, zSettings]);
 
+  function handleRequestedAmountTextChange(val) {
+    let dollars = usdTypeMask(val).display;
+    let cents = dollarsToCents(dollars);
+    if (!cents) cents = 0;
+    if (dollars === "0.00") dollars = "";
+    _setStatusMessage("");
+    _setRequestedAmount(cents);
+    _setRequestedAmountDisp(dollars);
+  }
+
   async function getAvailableStripeReaders() {
-    // log("getting available Stripe readers");
+    log("getting available Stripe readers");
     const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
     const data = await res.json();
     let readerArr = data.data;
-    let arr = [];
-    readerArr.forEach((connectedReader) => {
-      arr.push(connectedReader);
-    });
-    _setCardReaders(arr);
-    if (arrHasItem(arr, zSettings?.selectedCardReaderObj)) {
-      _setCardReader(zSettings?.selectedCardReaderObj);
+    // log("data", data.data);
+
+    if (readerArr.length === 0) {
+      _setStatusMessage(
+        "No card readers found on this account!\nSee network admin"
+      );
+      return;
     } else {
-      _setCardReader(arr[0]);
+      _setCardReaders(readerArr);
+    }
+    log("arr", readerArr);
+    _setStatusTextColor(C.red);
+    _setCardReaders(readerArr.filter((o) => o.status !== "offline"));
+    let timer;
+    if (!sCancelCardReaderTimer) {
+      timer = startTimer(MILLIS_IN_MINUTE * 10, 2000, () => {
+        getAvailableStripeReaders();
+      });
+      _setCancelCardReaderTimer(timer);
+    }
+    if (readerArr.find((o) => o.id === zSettings?.selectedCardReaderObj.id)) {
+      let reader = readerArr.find(
+        (o) => o.id === zSettings?.selectedCardReaderObj.id
+      );
+      if (reader.status === "offline") {
+        _setStatusMessage(
+          "Selected card reader is offline!\nCheck power and network connections"
+        );
+      } else {
+        _setStatusTextColor(C.green);
+        _setCardReader(zSettings?.selectedCardReaderObj);
+        if (timer || sCancelCardReaderTimer) {
+          if (timer) timer();
+          if (sCancelCardReaderTimer) sCancelCardReaderTimer();
+        }
+      }
+    } else if (readerArr.find((o) => o.status != "offline")) {
+      _setCardReader(readerArr.find((o) => o.status != "offline"));
+    } else {
+      _setStatusMessage(
+        "No online card readers found!\nCheck power and network connections"
+      );
     }
   }
 
@@ -215,9 +271,14 @@ export const StripeCreditCardComponent = ({
         sPaymentIntentID
       );
     }
-
-    if (!readerResult) {
-      _setStatusMessage("No reader found\n(check connections/start/restart)");
+    log("reader result", readerResult);
+    if (!readerResult || readerResult.code) {
+      _setStatusMessage(
+        "Error code: " +
+          readerResult.code +
+          "\n(check connections/start/restart)"
+      );
+      _setStatusTextColor(C.red);
       log("no result from start Stripe payment");
       return;
     }
@@ -367,6 +428,7 @@ export const StripeCreditCardComponent = ({
 
   // log(sProcessButtonEnabled.toString());
   let refundReady = true;
+  // log(sRefund.totalCardRefundAllowed);
   // if (sIsRefund && !sRefundAmount) refundReady = false;
   // log("stripe sale", sSale?.paymentComplete.toString());
   return (
@@ -374,7 +436,11 @@ export const StripeCreditCardComponent = ({
       pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
       style={{
         ...checkoutScreenStyle.base,
-        opacity: sSale?.paymentComplete || !refundReady ? 0.2 : 1,
+        opacity:
+          sSale?.paymentComplete ||
+          (sIsRefund && !sRefund.cardRefundRequested > 0)
+            ? 0.2
+            : 1,
       }}
     >
       <View
@@ -471,7 +537,11 @@ export const StripeCreditCardComponent = ({
             paddingRight: 5,
           }}
         >
-          <Text style={{ color: C.textMain, marginTop: 10 }}>Balance</Text>
+          <Text
+            style={{ color: sIsRefund ? gray(0.2) : C.textMain, marginTop: 10 }}
+          >
+            Balance
+          </Text>
           <Text
             style={{
               marginBottom: 15,
@@ -494,7 +564,7 @@ export const StripeCreditCardComponent = ({
               fontSize: 15,
               padding: 5,
               paddingRight: 1,
-              color: C.textMain,
+              color: sIsRefund ? gray(0.2) : C.textMain,
             }}
           >
             {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
@@ -536,15 +606,7 @@ export const StripeCreditCardComponent = ({
                 placeholder="0.00"
                 placeholderTextColor={gray(0.3)}
                 value={sRequestedAmountDisp}
-                onChangeText={(val) => {
-                  val = usdTypeMask(val).display;
-                  let cents = dollarsToCents(val);
-                  if (!cents) cents = 0;
-                  if (val === "0.00") val = "";
-                  _setStatusMessage("");
-                  _setRequestedAmount(cents);
-                  _setRequestedAmountDisp(val);
-                }}
+                onChangeText={handleRequestedAmountTextChange}
               />
             </View>
           </View>

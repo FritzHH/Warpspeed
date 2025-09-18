@@ -647,12 +647,106 @@ export const MiddleItemComponent = ({
         </View>
       </View>
 
+      {/******************** END REFUNDS ********************************************/}
+
+      {/** ************************************payments list *****************************************************/}
+      {!!sSale?.payments.length > 0 && (
+        <View
+          style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
+        >
+          <Text style={{ color: gray(0.4) }}>PAYMENTS</Text>
+        </View>
+      )}
+
+      <View style={{ maxHeight: "20%" }}>
+        <ScrollView
+          style={{
+            width: "100%",
+          }}
+          contentContainerStyle={{ alignItems: "center" }}
+        >
+          {sSale?.payments.map((paymentObj) => {
+            return (
+              <View
+                key={paymentObj.id}
+                style={{
+                  padding: 5,
+                  backgroundColor: C.listItemWhite,
+                  width: "99%",
+                  backgroundColor: C.listItemWhite,
+                  borderRadius: 10,
+                  marginBottom: 5,
+                }}
+              >
+                <Text style={{ color: C.green }}>
+                  {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Text>Amount received: </Text>
+                  <Text>
+                    {formatCurrencyDisp(paymentObj.amountCaptured, true)}
+                  </Text>
+                </View>
+                {paymentObj.last4 ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                      Last 4 Digits:{" "}
+                    </Text>
+                    <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                      {"***" + paymentObj.last4}
+                    </Text>
+                  </View>
+                ) : null}
+                {paymentObj.cash ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text>Amount Tendered: </Text>
+                    <Text>
+                      {formatCurrencyDisp(paymentObj.amountTendered, true)}
+                    </Text>
+                  </View>
+                ) : null}
+                {/* {paymentObj.cash ? (
+                <View
+                  style={{
+                    justifyContent: "space-between",
+                    flexDirection: "row",
+                  }}
+                >
+                  <Text>Change needed: </Text>
+                  <Text>
+                    {formatCurrencyDisp(
+                      paymentObj.amountTendered - paymentObj.amountCaptured
+                    )}
+                  </Text>
+                </View>
+              ) : null} */}
+                {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
       <View
         style={{
           width: "100%",
           alignItems: "flex-end",
           marginTop: 10,
-          paddingRight: 7,
+          // paddingRight: 7,
         }}
       >
         {!!sRefund.cashRefundRequested && (
@@ -703,7 +797,7 @@ export const MiddleItemComponent = ({
               formatCurrencyDisp(sRefund.cardAmountRefunded)}
           </Text>
         )}
-        {!sIsRefund && !sSale?.paymentComplete && (
+        {sSale?.total - sSale?.amountCaptured > 0 && (
           <Text
             style={{
               fontSize: 18,
@@ -727,94 +821,6 @@ export const MiddleItemComponent = ({
           </Text>
         )}
       </View>
-
-      {/******************** END REFUNDS ********************************************/}
-
-      {/** ************************************payments list *****************************************************/}
-      {!!sSale?.payments.length > 0 && (
-        <View
-          style={{ marginTop: 30, alignItems: "flex-end", paddingRight: 10 }}
-        >
-          <Text style={{ color: gray(0.4) }}>PAYMENTS</Text>
-        </View>
-      )}
-      <ScrollView style={{ maxHeight: "30%", width: "100%" }}>
-        {sSale?.payments.map((paymentObj) => {
-          return (
-            <View
-              key={paymentObj.id}
-              style={{
-                padding: 5,
-                backgroundColor: C.listItemWhite,
-                width: "99%",
-                backgroundColor: C.listItemWhite,
-                borderRadius: 10,
-                marginBottom: 5,
-              }}
-            >
-              <Text style={{ color: C.green }}>
-                {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
-              </Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Text>Amount received: </Text>
-                <Text>
-                  {formatCurrencyDisp(paymentObj.amountCaptured, true)}
-                </Text>
-              </View>
-              {paymentObj.last4 ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                    Last 4 Digits:{" "}
-                  </Text>
-                  <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                    {"***" + paymentObj.last4}
-                  </Text>
-                </View>
-              ) : null}
-              {paymentObj.cash ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text>Amount Tendered: </Text>
-                  <Text>
-                    {formatCurrencyDisp(paymentObj.amountTendered, true)}
-                  </Text>
-                </View>
-              ) : null}
-              {/* {paymentObj.cash ? (
-                <View
-                  style={{
-                    justifyContent: "space-between",
-                    flexDirection: "row",
-                  }}
-                >
-                  <Text>Change needed: </Text>
-                  <Text>
-                    {formatCurrencyDisp(
-                      paymentObj.amountTendered - paymentObj.amountCaptured
-                    )}
-                  </Text>
-                </View>
-              ) : null} */}
-              {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
-            </View>
-          );
-        })}
-      </ScrollView>
-
       {/*******************************************refund list ********************************************************/}
       {sSale?.refunds?.length > 0 ? (
         <View

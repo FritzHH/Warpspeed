@@ -287,11 +287,7 @@ export const CashSaleComponent = ({
       // if (cents <= sRefund.totalCashRefundAllowed && cents >= 100) {
       // log("here1");
       // _setProcessButtonEnabled(true);
-    } else {
-      // log("here2");
-      // _setProcessButtonEnabled(false);
     }
-    // }
   }
 
   function handleKeyPress(event) {
@@ -489,7 +485,7 @@ export const CashSaleComponent = ({
               disabled={
                 !sCashSaleActive ||
                 sSale?.paymentComplete ||
-                !sRefund.cashRefundRequested
+                (sRefund && sRefund.cashRefundRequested)
               }
               style={{
                 ...checkoutScreenStyle.boxText,

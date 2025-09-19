@@ -136,6 +136,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
     requestedRefundLines: [],
     cashRefundRequested: 0,
     cardRefundRequested: 0,
+    cardRefundPayment: null,
     totalRefundRequested: 0,
     totalCashRefundAllowed: 0,
     totalCardRefundAllowed: 0,
@@ -144,6 +145,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
     cardTransactions: [],
     cashTransactions: [],
     sale: {},
+    selectedCardPayment: null,
   });
   const [sAmountRefunded, _setAmountRefunded] = useState(0);
   const [sTotalAmount, _setTotalAmount] = useState(0);
@@ -212,24 +214,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
   }, [sCombinedWorkorders, sIsRefund]);
 
   // watch incoming refund Sale from db. check to see which lines have already been refunded in past transactions
-  useEffect(() => {
-    if (sIsRefund) {
-      // log(sCombinedWorkorders);
-      let alreadyRefundedLines = [];
-      sCombinedWorkorders.forEach((combinedWorkorder) => {
-        // log("comb", combinedWorkorder);
-        combinedWorkorder.workorderLines.forEach((line) => {
-          let found = sSale?.refundedWorkorderLines?.find(
-            (lineID) => lineID === line.id
-          );
-          if (found) alreadyRefundedLines.push(found);
-        });
-      });
-      let refund = cloneDeep(sRefund);
-      refund.refundedLines = alreadyRefundedLines;
-      _setRefund(refund);
-    }
-  }, [sCombinedWorkorders, sIsRefund, sSale]);
+  useEffect(() => {}, [sRefund, sIsRefund]);
 
   ///////////////////  SALES /////////////////////////////////////
   function handlePaymentCapture(payment = PAYMENT_OBJECT_PROTO) {
@@ -387,34 +372,52 @@ export function CheckoutModalScreen({ openWorkorder }) {
     });
     // log(newArr);
     _setCombinedWorkorders(newArr);
-    setRefundRunningTotals(sale);
+    setRefundRunningTotals(sale, workordersInSale);
   }
 
-  function setRefundRunningTotals(sale) {
-    // dev spoofing an extra card payment here
+  function setRefundRunningTotals(sale, workordersInSale) {
     // look at previous refunds and calculate what has been done, what we can do still
     let refund = cloneDeep(sRefund);
     refund = resetObject(refund);
-    sale.paymentComplete = false;
-    // refund.sale = sale;
+    refund.totalCardRefundAllowed = 0;
+
+    // first find any previous refunds made on this sale
+    let alreadyRefundedLines = [];
+    workordersInSale.forEach((workorder) => {
+      // log("comb", combinedWorkorder);
+      workorder.workorderLines.forEach((line) => {
+        let found = sSale?.refundedWorkorderLines?.find(
+          (lineID) => lineID === line.id
+        );
+        if (found) alreadyRefundedLines.push(found);
+      });
+    });
+    refund.refundedLines = alreadyRefundedLines;
+
+    // split payments - now accumulate the card and cash transactions made on the sale
+    sale.paymentComplete = false; // set this flag for other components
     sale.payments.forEach((payment) => {
       let cardRefundAllowedTotal = 0;
       let cashRefundAllowedTotal = 0;
       payment = cloneDeep(payment);
+
       if (payment.last4) {
-        // this is a credit card, add to credit card payment transactions arr
+        // CREDIT CARD
+
+        // add to transaction arr
         refund.cardTransactions = replaceOrAddToArr(
           refund.cardTransactions,
           payment
         );
 
         // add the total card refund allowed, subtract what has already been refunded. card payments have individual refunds at the Payment object level, cash payments we keep track of at the Sale object level in the Refund object
-        cardRefundAllowedTotal =
-          cardRefundAllowedTotal + payment.amountCaptured;
-        -payment.amountRefunded ? payment.amountRefunded : 0;
-        refund.totalCardRefundAllowed = cardRefundAllowedTotal;
+        refund.totalCardRefundAllowed =
+          refund.totalCardRefundAllowed + payment.amountCaptured;
+        -payment.amountRefunded > 0 ? payment.amountRefunded : 0;
+
+        // examine each card payment
       } else {
-        // add cash transactions to cash transactions arr
+        // CASH PAYMENT
         refund.cashTransactions = replaceOrAddToArr(
           refund.cashTransactions,
           payment
@@ -425,6 +428,19 @@ export function CheckoutModalScreen({ openWorkorder }) {
           cardRefundAllowedTotal + payment.amountCaptured;
       }
       refund.totalCashRefundAllowed = cashRefundAllowedTotal;
+    });
+
+    // auto-select the first card payment that still has a balance remaining to refund
+    refund.cardTransactions.forEach((cardTransaction) => {
+      if (refund.selectedCardPayment) return;
+      // log(Number(cardTransaction.amountRefunded));
+
+      let compare = cardTransaction.amountRefunded;
+      if (!compare) compare = 0;
+      if (cardTransaction.amountCaptured > compare) {
+        log(cardTransaction);
+        refund.selectedCardPayment = cardTransaction;
+      }
     });
 
     // now look throught the previous refunds and see if there are any cash refunds, subtract them from the cash refund allowed
@@ -453,8 +469,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
     // calculate the running total refund requested
     let runningRefund = 0;
-    let runningCardRefund = 0;
-    let runningCashRefund = 0;
     refund.requestedRefundLines.forEach(
       (line) =>
         (runningRefund +=
@@ -477,11 +491,20 @@ export function CheckoutModalScreen({ openWorkorder }) {
       refund.cardRefundRequested = runningRefund;
     }
 
-    // log("cash", refund.cashRefundRequested);
-    // log("card", refund.cardRefundRequested);
-    // log("total", refund.totalRefundRequested);
     _setRefund(refund);
   }
+
+  function handleRefundPaymentCheck(payment) {
+    let refund = cloneDeep(sRefund);
+
+    refund.selectedCardPayment =
+      refund.selectedCardPayment?.id === payment.id ? null : payment;
+
+    // setRefundRunningTotals(sSale, sCombinedWorkorders, refund);
+    _setRefund(refund);
+  }
+
+  ////////////// END REFUNDS ///////////////////////////////////////
 
   function closeCheckoutScreenModal() {
     _zSetIsCheckingOut(false);
@@ -556,7 +579,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sIsRefund={sIsRefund}
               handleRefundScan={handleRefundScan}
               sRefundScan={zReceiptScan}
-              // _setRefundScan={_setRefundScan}
               sRefundScanMessage={zReceiptScanMessage}
               _zSetIsCheckingOut={_zSetIsCheckingOut}
               handleCancelPress={closeCheckoutScreenModal}
@@ -573,6 +595,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sApplyDeposit={sApplyDeposit}
               sSale={sSale}
               sCashChangeNeeded={sCashChangeNeeded}
+              handleRefundPaymentCheck={handleRefundPaymentCheck}
             />
           </View>
 

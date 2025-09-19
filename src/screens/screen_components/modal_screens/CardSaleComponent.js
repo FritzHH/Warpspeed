@@ -175,8 +175,6 @@ export const StripeCreditCardComponent = ({
   }, [sRequestedAmount, sIsRefund]);
 
   useEffect(() => {
-    // log(sRequestedAmount);
-    // if (zSettings.)
     getAvailableStripeReaders();
 
     return () => {
@@ -193,17 +191,35 @@ export const StripeCreditCardComponent = ({
     let cents = dollarsToCents(dollars);
     if (!cents) cents = 0;
     if (dollars === "0.00") dollars = "";
-    _setStatusMessage("");
+
+    let balance =
+      sRefund.selectedCardPayment.amountCaptured -
+      sRefund.selectedCardPayment.amountRefunded;
+
+    if (balance < cents) {
+      _setStatusMessage("Amount too large for remaining card charge balance");
+      _setRequestedAmountDisp(dollars);
+    }
+
     _setRequestedAmount(cents);
     _setRequestedAmountDisp(dollars);
   }
 
   async function getAvailableStripeReaders() {
     // log("getting available Stripe readers");
-    const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
+    let res;
+    try {
+      await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      _setStatusMessage("Error fetching card readers\nContact support!");
+      log("Error fetching Stripe readers from URL", e);
+    }
+    if (!res) {
+      return;
+    }
     const data = await res.json();
     let readerArr = data.data;
     // log("data", data.data);

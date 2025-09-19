@@ -90,10 +90,10 @@ import { FIRESTORE_COLLECTION_NAMES } from "../../../constants";
 import { isArray } from "lodash";
 
 export const MiddleItemComponent = ({
+  handleRefundPaymentCheck,
   zCustomer,
   sIsRefund,
   sRefundScan,
-  _setRefundScan,
   handleRefundScan,
   sRefundScanMessage,
   handleCancelPress,
@@ -596,7 +596,9 @@ export const MiddleItemComponent = ({
                   justifyContent: "space-between",
                 }}
               >
-                <Text>{"CARD REFUND (MANDATORY)"}</Text>
+                <Text style={{ color: C.textMain, fontWeight: "500" }}>
+                  {"CARD REFUND (MANDATORY)"}
+                </Text>
                 <View style={{ flexDirection: "row" }}>
                   <Text
                     style={{
@@ -607,7 +609,7 @@ export const MiddleItemComponent = ({
                   >
                     $
                   </Text>
-                  <Text>
+                  <Text style={{ color: C.textMain, fontWeight: "500" }}>
                     {formatCurrencyDisp(sRefund.totalCardRefundAllowed)}
                   </Text>
                 </View>
@@ -644,7 +646,10 @@ export const MiddleItemComponent = ({
                     color: gray(0.5),
                   }}
                 >
-                  {formatCurrencyDisp(sCardRefundFee)}
+                  {formatCurrencyDisp(
+                    sRefund.totalCardRefundAllowed *
+                      (sCardRefundFeePercentage / 100)
+                  )}
                 </Text>
               </View>
             </View>
@@ -660,7 +665,9 @@ export const MiddleItemComponent = ({
                 justifyContent: "space-between",
               }}
             >
-              <Text>{"CASH REFUND ALLOWED"}</Text>
+              <Text style={{ color: C.textMain, fontWeight: "500" }}>
+                {"CASH REFUND ALLOWED"}
+              </Text>
               <View style={{ flexDirection: "row" }}>
                 <Text
                   style={{
@@ -671,7 +678,7 @@ export const MiddleItemComponent = ({
                 >
                   $
                 </Text>
-                <Text>
+                <Text style={{ color: C.textMain, fontWeight: "500" }}>
                   {formatCurrencyDisp(sRefund.totalCashRefundAllowed)}
                 </Text>
               </View>
@@ -806,77 +813,107 @@ export const MiddleItemComponent = ({
         )}
         <View style={{ maxHeight: "18%", width: "100%" }}>
           <ScrollView contentContainerStyle={{ alignItems: "center" }}>
-            {sSale?.payments.map((paymentObj) => {
+            {sSale?.payments.map((payment) => {
               return (
                 <View
-                  key={paymentObj.id}
+                  key={payment.id}
                   style={{
                     padding: 5,
                     backgroundColor: C.listItemWhite,
-                    width: "99%",
-                    backgroundColor: C.listItemWhite,
+                    width: "100%",
                     borderRadius: 8,
                     marginBottom: 5,
                   }}
                 >
-                  <Text style={{ color: C.green }}>
-                    {paymentObj.last4 ? "CARD SALE" : "CASH SALE"}
-                  </Text>
                   <View
                     style={{
                       flexDirection: "row",
+                      alignItems: "center",
                       justifyContent: "space-between",
                     }}
                   >
-                    <Text>Amount received: </Text>
-                    <Text>
-                      {formatCurrencyDisp(paymentObj.amountCaptured, true)}
-                    </Text>
-                  </View>
-                  {paymentObj.last4 ? (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                        {"Last 4 Digits:  "}
-                      </Text>
-                      <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                        {"***" + paymentObj.last4}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {paymentObj.cash ? (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <Text>Amount Tendered: </Text>
-                      <Text>
-                        {formatCurrencyDisp(paymentObj.amountTendered, true)}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {/* {paymentObj.cash ? (
-                <View
-                  style={{
-                    justifyContent: "space-between",
-                    flexDirection: "row",
-                  }}
-                >
-                  <Text>Change needed: </Text>
-                  <Text>
-                    {formatCurrencyDisp(
-                      paymentObj.amountTendered - paymentObj.amountCaptured
+                    {!!sIsRefund && !payment.cash && (
+                      <CheckBox_
+                        enabled={payment.amountRefunded}
+                        buttonStyle={{
+                          opacity:
+                            payment.amountRefunded >= payment.amountCaptured
+                              ? 0.2
+                              : 1,
+                        }}
+                        isChecked={
+                          sRefund.selectedCardPayment?.id === payment.id
+                        }
+                        onCheck={() => handleRefundPaymentCheck(payment)}
+                      />
                     )}
-                  </Text>
-                </View>
-              ) : null} */}
-                  {paymentObj.isRefund ? <Text>{"REFUND"}</Text> : null}
+                    <View
+                      style={{
+                        justifyContent: "space-between",
+                        width: sIsRefund ? "90%" : "100%",
+                      }}
+                    >
+                      <Text style={{ color: C.green }}>
+                        {payment.last4 ? "CARD SALE" : "CASH SALE"}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Text style={{ color: C.textMain }}>
+                          Amount received
+                        </Text>
+                        <Text>
+                          {formatCurrencyDisp(payment.amountCaptured, true)}
+                        </Text>
+                      </View>
+                      {!!payment.amountRefunded && (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Text style={{ color: C.red, fontSize: 13 }}>
+                            Previous Refund amount
+                          </Text>
+                          <Text style={{ color: C.red, fontSize: 13 }}>
+                            {formatCurrencyDisp(payment.amountRefunded, true)}
+                          </Text>
+                        </View>
+                      )}
+                      {payment.last4 ? (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                            {"Last 4 Digits:  "}
+                          </Text>
+                          <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                            {"***" + payment.last4}
+                          </Text>
+                        </View>
+                      ) : null}
+                      {!!payment.cash && (
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Text>Amount Tendered </Text>
+                          <Text>
+                            {formatCurrencyDisp(payment.amountTendered, true)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
                 </View>
               );
             })}

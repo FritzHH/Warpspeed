@@ -28,7 +28,7 @@ import {
   // useDatabaseStore,
   useLoginStore,
   useSettingsStore,
-} from "../../../../stores";
+} from "../../../../storesOld";
 import {
   Button,
   Button_,

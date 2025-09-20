@@ -34,8 +34,9 @@ import {
   getFirestoreDoc,
   subscribeToNodeAddition,
   subscribeToNodeChange,
+  processServerDrivenStripeRefund,
 } from "./db";
-import { useDatabaseBatchStore } from "./stores";
+import { useDatabaseBatchStore } from "./storesOld";
 import { clog, generateRandomID, log } from "./utils";
 
 // new shi+++++++++++++++++++++++++++++++++++++++++++++++++
@@ -306,16 +307,18 @@ export function dbSubscribeToStripePaymentProcess(paymentIntentID, callback) {
   );
 }
 
+export async function dbProcessStripeRefund(paymentAmount, paymentIntentID) {
+  return processServerDrivenStripeRefund(paymentAmount, paymentIntentID);
+}
+
 export async function dbProcessServerDrivenStripePayment(
   saleAmount,
   terminalID,
-  warmUp,
   paymentIntentID
 ) {
-  return await processServerDrivenStripePayment(
+  return processServerDrivenStripePayment(
     saleAmount,
     terminalID,
-    warmUp,
     paymentIntentID
   );
 }

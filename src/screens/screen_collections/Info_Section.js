@@ -12,7 +12,7 @@ import {
   useOpenWorkordersStore,
   useTabNamesStore,
   useCheckoutStore,
-} from "../../stores";
+} from "../../storesOld";
 import { clog } from "../../utils";
 
 export const Info_Section = ({}) => {

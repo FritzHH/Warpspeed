@@ -17,7 +17,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../../stores";
+} from "../../../storesOld";
 import * as XLSX from "xlsx";
 
 import {
@@ -435,10 +435,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
       if (refund.selectedCardPayment) return;
       // log(Number(cardTransaction.amountRefunded));
 
-      let compare = cardTransaction.amountRefunded;
-      if (!compare) compare = 0;
-      if (cardTransaction.amountCaptured > compare) {
-        log(cardTransaction);
+      let amountAlreadyRefunded = cardTransaction.amountRefunded;
+      if (!amountAlreadyRefunded) amountAlreadyRefunded = 0;
+      if (cardTransaction.amountCaptured > amountAlreadyRefunded) {
         refund.selectedCardPayment = cardTransaction;
       }
     });
@@ -499,7 +498,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
     refund.selectedCardPayment =
       refund.selectedCardPayment?.id === payment.id ? null : payment;
-
+    // log(refund.selectedCardPayment);
     // setRefundRunningTotals(sSale, sCombinedWorkorders, refund);
     _setRefund(refund);
   }

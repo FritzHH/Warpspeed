@@ -1,7 +1,7 @@
 /*eslint-disable*/
 
 import { Modal, TouchableWithoutFeedback, View } from "react-native-web";
-import { useLoginStore, useSettingsStore } from "../../../stores";
+import { useLoginStore, useSettingsStore } from "../../../storesOld";
 import { Button_, ScreenModal } from "../../../components";
 import { FaceDetectionClientComponent } from "../../../faceDetectionClient";
 import { log } from "../../../utils";

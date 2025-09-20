@@ -6,7 +6,7 @@ import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
-import { useAlertScreenStore } from "./stores";
+import { useAlertScreenStore } from "./storesOld";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
 
 // const fs = require("node:fs");
@@ -45,8 +45,10 @@ export function clog(one, two) {
 }
 
 export function log(one, two) {
-  console.log(one);
-  if (two) console.log(two);
+  if (!two) two = "";
+  let spacer = "";
+  if (two) spacer = "  ---------->  ";
+  console.log(one + spacer + two);
 }
 
 export function applyLineItemDiscounts(wo, zInventoryArr) {

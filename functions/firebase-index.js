@@ -92,48 +92,118 @@ exports.getAvailableStripeReaders = onRequest(
   }
 );
 
-exports.initiatePaymentIntent = onRequest(
+
+exports.initiateRefund = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "http://localhost:3000");
 
-    log("Incoming process Stripe server-driven payment", req.body);
-    let readerResult = await stripe.terminal.readers.retrieve(
-      req.body.readerID
-    );
-    log("Requested card reader object", readerResult);
+    const paymentIntentId = req.body.paymentIntentId;
+    const amount = req.body.amount; // Optional: refund a specific amount (in cents)
 
-    if (req.body.warmUp) {
-      log("warming up!");
-      try {
-        sendSuccessfulResult(res, readerResult);
-      } catch (e) {
-        log("Error warming up card reader", e);
-      }
-      return;
-    }
-
-    // check to see if reader is in use
-    if (readerResult?.action?.status) {
-      log(
-        "Card reader is currently in progress with another payment intent",
-        readerResult
-      );
-      sendSuccessfulResult(res, {
-        error: { code: readerResult.action.status },
+    if (!paymentIntentId || typeof paymentIntentId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "PaymentIntent ID must be provided and must be a string.",
       });
-      return;
     }
-    try {
-      let paymentIntent;
-      let paymentIntentID;
 
-      // check to see if we are reusing an old payment attempt
+    if (amount !== undefined && typeof amount !== "number") {
+      return res.status(400).json({
+        success: false,
+        message: "If provided, refund amount must be a valid number in cents.",
+      });
+    }
+
+    try {
+      // Step 1: Retrieve the PaymentIntent to get its latest charge
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentId
+      );
+
+      const chargeId = paymentIntent.charges?.data?.[0]?.id;
+      if (!chargeId) {
+        return res.status(400).json({
+          success: false,
+          message: "No charge found for the given PaymentIntent.",
+        });
+      }
+
+      // Step 2: Create the refund
+      const refund = await stripe.refunds.create({
+        charge: chargeId,
+        ...(amount ? { amount } : {}), // Optional partial refund
+      });
+
+      // Step 3: Return success response
+      return res.status(200).json({
+        success: true,
+        message: `✅ Refund ${
+          amount ? `$${(amount / 100).toFixed(2)}` : "for full amount"
+        } processed successfully.`,
+        refundId: refund.id,
+        status: refund.status,
+      });
+    } catch (error) {
+      let message;
+
+      switch (error.type) {
+        case "StripeInvalidRequestError":
+          message = `⚠️ Invalid request: ${error.message}`;
+          break;
+        case "StripeAPIError":
+          message = `⚠️ Stripe API error: ${error.message}`;
+          break;
+        case "StripeConnectionError":
+          message = `📡 Network error: Could not connect to Stripe.`;
+          break;
+        case "StripeAuthenticationError":
+          message = `🔐 Authentication error: Please check your Stripe credentials.`;
+          break;
+        case "StripePermissionError":
+          message = `🔒 Permission error: Not allowed to issue this refund.`;
+          break;
+        default:
+          message = `❗ Unexpected error: ${error.message}`;
+          break;
+      }
+
+      return res.status(500).json({ success: false, message });
+    }
+  }
+);
+
+
+
+exports.initiatePaymentIntent = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    let amount = req.body.amount;
+    let readerId = req.body.readerID;
+
+    if (!amount || typeof amount !== "number") {
+      return res.status(400).json({
+        success: false,
+        message: "Amount must be a valid number in cents.",
+      });
+    }
+
+    if (!readerId || typeof readerId !== "string") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Reader ID must be provided." });
+    }
+
+    try {
+      // 1. Create the PaymentIntent
+            let paymentIntent;
+            let paymentIntentID;
+            // check to see if we are reusing an old payment attempt
       if (!req.body.paymentIntentID) {
         // we are not
         log("Getting a new payment intent");
         paymentIntent = await stripe.paymentIntents.create({
-          amount: req.body.amount,
+          amount,
           payment_method_types: ["card_present", "card", "link", "cashapp"],
           capture_method: req.body.captureMethod || "automatic",
           currency: "usd",
@@ -148,45 +218,157 @@ exports.initiatePaymentIntent = onRequest(
         log("Recycling the previous payment intent");
         paymentIntentID = req.body.paymentIntentID;
       }
-      var attempt = 0;
-      const tries = 3;
-      log("Payment intent ID being used", paymentIntentID);
-      while (true) {
-        attempt++;
-        try {
-          readerResult = await stripe.terminal.readers.processPaymentIntent(
-            req.body.readerID,
-            {
-              payment_intent: paymentIntentID,
-            }
-          );
-          log("Stripe server-driven payment process complete!", readerResult);
-          if (!req.body.paymentIntentID) {
-            let ref = RDB.ref("PAYMENT-PROCESSING/" + paymentIntentID);
-            ref.set({ paymentIntent: paymentIntent, updates: [] });
-          }
-          return sendSuccessfulResult(res, {
-            readerResult,
-            paymentIntentID,
-          });
-        } catch (error) {
-          log("Stripe server-driven payment process ERROR ERROR ERROR!", error);
-          if (attempt == tries) {
-            sendSuccessfulResult(res, { error, paymentIntentID });
-            return;
-          }
-          if (error.code != "terminal_reader_timeout") {
-            sendSuccessfulResult(res, { error, paymentIntentID });
-            return;
-          }
-        }
-      }
+
+      // 2. Process the PaymentIntent with the reader
+      const processedIntent =
+        await stripe.terminal.readers.processPaymentIntent(readerId, {
+          payment_intent: paymentIntent.id,
+        });
+
+      // 3. Return success
+      return res.status(200).send(
+        JSON.stringify({
+          success: true,
+          message: `✅ Payment of $${(amount / 100).toFixed(
+            2
+          )} processed successfully.`,
+          paymentIntentId: processedIntent.id,
+          status: processedIntent.status,
+        })
+      );
     } catch (error) {
-      log("stripe server driven payment attempt error", error.message);
-      return sendUnsuccessfulResult(res, error);
+      let message;
+
+      switch (error.type) {
+        case "StripeCardError":
+          message = `❌ Card error: ${error.message}`;
+          break;
+        case "StripeInvalidRequestError":
+          message = `⚠️ Invalid request: ${error.message}`;
+          break;
+        case "StripeAPIError":
+          message = `⚠️ Stripe API error: ${error.message}`;
+          break;
+        case "StripeConnectionError":
+          message = `📡 Network error: Could not connect to Stripe.`;
+          break;
+        case "StripeAuthenticationError":
+          message = `🔐 Authentication error: Please check your Stripe credentials.`;
+          break;
+        case "StripePermissionError":
+          message = `🔒 Permission error: Not allowed to process this payment.`;
+          break;
+        case "StripeTerminalReaderBusyError":
+          message = `⏳ Reader is busy. Try again in a moment.`;
+          break;
+        case "StripeTerminalOfflineError":
+          message = `📴 Terminal is offline or unreachable.`;
+          break;
+        default:
+          message = `❗ Unexpected error: ${error.message}`;
+          break;
+      }
+      res.status(500).send(JSON.stringify({ success: false, message }));
     }
   }
 );
+
+// exports.initiatePaymentIntent1 = onRequest(
+//   { cors: true, secrets: [stripeSecretKey] },
+//   async (req, res) => {
+//     res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+
+//     log("Incoming process Stripe server-driven payment", req.body);
+//     // let readerResult = await stripe.terminal.readers.retrieve(
+//     //   req.body.readerID
+//     // );
+//     // log("Requested card reader object", readerResult);
+
+//     // if (req.body.warmUp) {
+//     //   log("warming up!");
+//     //   try {
+//     //     sendSuccessfulResult(res, readerResult);
+//     //   } catch (e) {
+//     //     log("Error warming up card reader", e);
+//     //   }
+//     //   return;
+//     // }
+
+//     // // check to see if reader is in use
+//     // if (readerResult?.action?.status) {
+//     //   log(
+//     //     "Card reader is currently in progress with another payment intent",
+//     //     readerResult
+//     //   );
+//     //   sendSuccessfulResult(res, {
+//     //     error: { code: readerResult.action.status },
+//     //   });
+//     //   return;
+//     // }
+
+//     try {
+//       let paymentIntent;
+//       let paymentIntentID;
+
+//       // check to see if we are reusing an old payment attempt
+//       if (!req.body.paymentIntentID) {
+//         // we are not
+//         log("Getting a new payment intent");
+//         paymentIntent = await stripe.paymentIntents.create({
+//           amount: req.body.amount,
+//           payment_method_types: ["card_present", "card", "link", "cashapp"],
+//           capture_method: req.body.captureMethod || "automatic",
+//           currency: "usd",
+//         });
+//         paymentIntentID = paymentIntent.id;
+//         log(
+//           "Payment intent gathered, processing Stripe server-driven payment intent",
+//           paymentIntent
+//         );
+//       } else {
+//         // we are reusing
+//         log("Recycling the previous payment intent");
+//         paymentIntentID = req.body.paymentIntentID;
+//       }
+//       var attempt = 0;
+//       const tries = 3;
+//       log("Payment intent ID being used", paymentIntentID);
+//       while (true) {
+//         attempt++;
+//         try {
+//           readerResult = await stripe.terminal.readers.processPaymentIntent(
+//             req.body.readerID,
+//             {
+//               payment_intent: paymentIntentID,
+//             }
+//           );
+//           log("Stripe server-driven payment process complete!", readerResult);
+//           if (!req.body.paymentIntentID) {
+//             let ref = RDB.ref("PAYMENT-PROCESSING/" + paymentIntentID);
+//             ref.set({ paymentIntent: paymentIntent, updates: [] });
+//           }
+//           return sendSuccessfulResult(res, {
+//             readerResult,
+//             paymentIntentID,
+//           });
+//         } catch (error) {
+//           log("Stripe server-driven payment process ERROR ERROR ERROR!", error);
+//           if (attempt == tries) {
+//             sendSuccessfulResult(res, { error, paymentIntentID });
+//             return;
+//           }
+//           if (error.code != "terminal_reader_timeout") {
+//             sendSuccessfulResult(res, { error, paymentIntentID });
+//             return;
+//           }
+//         }
+//       }
+//     } catch (error) {
+//       log("stripe server driven payment attempt error", error.message);
+//       return sendUnsuccessfulResult(res, error);
+//     }
+//   }
+// );
 
 exports.stripeEventWebhook = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
@@ -244,19 +426,23 @@ exports.cancelServerDrivenStripePayment = onRequest(
   }
 );
 
-exports.refundStripePayment = onRequest(
-  { cors: true, secrets: [stripeSecretKey] },
-  async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+// exports.refundStripePayment = onRequest(
+//   { cors: true, secrets: [stripeSecretKey] },
+//   async (req, res) => {
+//     res.set("Access-Control-Allow-Origin", "http://localhost:3000");
 
-    log("Incoming REFUND**** Stripe payment", req.body);
-    const refund = await stripe.refunds.create({
-      payment_intent: req.body.paymentIntentID,
-      amount: req.body.amount,
-    });
-    sendSuccessfulResult(res, readerResult);
-  }
-);
+//     log("Incoming REFUND**** Stripe payment", req.body);
+//     try {
+//       const refund = await stripe.refunds.create({
+//         payment_intent: req.body.paymentIntentID,
+//         amount: req.body.amount,
+//       });
+//       sendSuccessfulResult(res, readerResult);
+//     } catch (e) {
+//       sendUnsuccessfulResult(res, e);
+//     }
+//   }
+// );
 
 /////////////////////////////////////////////////////////////////////////////////
 // messaging

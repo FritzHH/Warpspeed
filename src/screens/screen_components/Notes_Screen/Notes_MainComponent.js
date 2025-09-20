@@ -18,7 +18,7 @@ import { Image_ } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
-import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
+import { useOpenWorkordersStore, useLoginStore } from "../../../storesOld";
 import { dbSetWorkorder } from "../../../db_call_wrapper";
 
 /// Notes Tab Component

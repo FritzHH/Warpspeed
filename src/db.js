@@ -548,22 +548,21 @@ export function processServerDrivenStripePayment(
       warmUp,
       paymentIntentID,
     }),
-  })
-    .then((res) => {
-      if (!res.ok) {
-        return null;
-        // log("res not ok", res);
-      } else {
-        // log("res ok");
-        return res.json();
-      }
-    })
-    .catch((e) => {
-      log("error in Stripe processServerDrivenStripePayment() call", e);
-      return e;
-    });
+  });
 }
 
+export function processServerDrivenStripeRefund(amount, paymentIntentID) {
+  return fetch(STRIPE_INITIATE_PAYMENT_INTENT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount,
+      paymentIntentID,
+    }),
+  });
+}
 export function cancelServerDrivenStripePayment(readerID, paymentIntentID) {
   return fetch(STRIPE_CANCEL_PAYMENT_INTENT_URL, {
     method: "POST",
@@ -574,17 +573,7 @@ export function cancelServerDrivenStripePayment(readerID, paymentIntentID) {
       readerID,
       paymentIntentID,
     }),
-  })
-    .then((res) => {
-      if (!res.ok) {
-        return null;
-      } else {
-        return res.json();
-      }
-    })
-    .catch((e) => {
-      log("error in Stripe cancelServerDrivenStripePayment() call", e);
-    });
+  });
 }
 
 // export function retrieveAvailableStripeReaders(readerID) {
@@ -600,15 +589,5 @@ export function retrieveAvailableStripeReaders(readerID) {
     body: JSON.stringify({
       readerID,
     }),
-  })
-    .then((res) => {
-      if (!res.ok) {
-        return null;
-      } else {
-        return res.json();
-      }
-    })
-    .catch((e) => {
-      log("error in Stripe retrieveAvailableStripeReaders() call", e);
-    });
+  });
 }

@@ -29,7 +29,7 @@ import {
   useSettingsStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
-} from "../../../stores";
+} from "../../../storesOld";
 import { dbGetCustomerObj } from "../../../db_call_wrapper";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { getDatabase } from "firebase/database";

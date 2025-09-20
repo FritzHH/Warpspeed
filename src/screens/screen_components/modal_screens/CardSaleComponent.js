@@ -16,7 +16,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../../stores";
+} from "../../../storesOld";
 import * as XLSX from "xlsx";
 
 import {
@@ -74,6 +74,7 @@ import {
   dbGetOpenWorkorderItem,
   dbGetSaleItem,
   dbProcessServerDrivenStripePayment,
+  dbProcessStripeRefund,
   dbRetrieveAvailableStripeReaders,
   dbSetCustomerField,
   dbSetSalesObj,
@@ -90,6 +91,7 @@ import {
   MILLIS_IN_MINUTE,
 } from "../../../constants";
 import { isArray } from "lodash";
+import { DevSettings } from "react-native";
 export const StripeCreditCardComponent = ({
   sSale,
   sIsDeposit,
@@ -137,11 +139,7 @@ export const StripeCreditCardComponent = ({
   const [sRequestedAmount, _setRequestedAmount] = useState(
     sSale?.total - sSale?.amountCaptured
   );
-  const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(
-    formatCurrencyDisp(
-      sRefund.cardRefundRequested || sSale?.total - sSale?.amountCaptured
-    )
-  );
+  const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(0);
   // const [sRefundAmountDisp, _setRefundAmountDisp] = useState(forma);
   const [sStatusMessage, _setStatusMessage] = useState("");
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
@@ -154,16 +152,36 @@ export const StripeCreditCardComponent = ({
   const [sCancelCardReaderTimer, _setCancelCardReaderTimer] = useState();
 
   /////////////////////////////////////////////////////////////////////////
+
+  // check incoming REFUND an populate fields
   useEffect(() => {
+    // REFUNDS
     if (sIsRefund) {
-      if (
-        sRequestedAmount <= sRefund.totalCardRefundAllowed &&
-        sRequestedAmount >= 50
-      )
+      let amountAlreadyRefunded = sRefund?.selectedCardPayment?.amountRefunded;
+      if (!amountAlreadyRefunded) amountAlreadyRefunded = 0;
+      let refundAmountLeft =
+        sRefund?.selectedCardPayment?.amountCaptured - amountAlreadyRefunded;
+      if (!sRequestedAmount) {
+        _setRequestedAmount(refundAmountLeft);
+        _setRequestedAmountDisp(formatCurrencyDisp(refundAmountLeft));
+      }
+      if (sRequestedAmount >= 50 && sRequestedAmount <= refundAmountLeft) {
         _setProcessButtonEnabled(true);
+        _setStatusMessage("");
+      }
+      if (sRequestedAmount > refundAmountLeft) {
+        _setStatusMessage("Amount too large for remaining card charge balance");
+        _setStatusTextColor(C.red);
+        _setProcessButtonEnabled(false);
+      }
+      if (sRequestedAmount < 50) {
+        _setStatusMessage("");
+        _setProcessButtonEnabled(false);
+      }
       return;
     }
 
+    // SALES
     if (
       sRequestedAmount > sSale?.total - sSale?.amountCaptured ||
       sRequestedAmount < 50
@@ -172,8 +190,9 @@ export const StripeCreditCardComponent = ({
     } else {
       _setProcessButtonEnabled(true);
     }
-  }, [sRequestedAmount, sIsRefund]);
+  }, [sRequestedAmount, sIsRefund, sRefund]);
 
+  // find all Stripe card readers on account
   useEffect(() => {
     getAvailableStripeReaders();
 
@@ -191,16 +210,6 @@ export const StripeCreditCardComponent = ({
     let cents = dollarsToCents(dollars);
     if (!cents) cents = 0;
     if (dollars === "0.00") dollars = "";
-
-    let balance =
-      sRefund.selectedCardPayment.amountCaptured -
-      sRefund.selectedCardPayment.amountRefunded;
-
-    if (balance < cents) {
-      _setStatusMessage("Amount too large for remaining card charge balance");
-      _setRequestedAmountDisp(dollars);
-    }
-
     _setRequestedAmount(cents);
     _setRequestedAmountDisp(dollars);
   }
@@ -267,54 +276,150 @@ export const StripeCreditCardComponent = ({
     }
   }
 
-  async function startPayment(paymentAmount, reader) {
-    let readerID = reader.id;
-    if (!(paymentAmount > 0)) return;
-    _setStatusTextColor("green");
-    _setStatusMessage("Retrieving card reader activation...");
+  function extractStripeErrorMessage(data, response = null) {
+    const type = data?.type;
+    const code = data?.code;
+    const apiMsg = data?.message;
 
-    let readerResult;
-    if (sIsRefund) {
-      readerResult = await dbCancelServerDrivenStripePayment(
-        readerID || sCardReader.id,
-        refundPaymentIntentID
-      );
-    } else {
-      readerResult = await dbProcessServerDrivenStripePayment(
-        paymentAmount,
-        readerID || sCardReader.id,
-        false,
-        sPaymentIntentID
-      );
-    }
-    // log("reader result", readerResult);
-    if (!readerResult || readerResult.code) {
-      _setStatusMessage(
-        "Error code: " +
-          readerResult.code +
-          "\n(check connections/start/restart)"
-      );
-      _setStatusTextColor(C.red);
-      log("no result from start Stripe payment");
-      return;
-    }
-
-    if (readerResult.error && readerResult.error.code) {
-      handleStripeReaderActivationError(readerResult.error.code);
-    } else {
-      _setStatusTextColor("green");
-      _setStatusMessage("Waiting for customer...");
-      // log("readerkdfjkdjf", readerResult.paymentIntentID);
-      _setPaymentIntentID(readerResult.paymentIntentID);
-      let listenerArr = cloneDeep(sListeners);
-      let listener = dbSubscribeToStripePaymentProcess(
-        readerResult.paymentIntentID,
-        handleStripeCardPaymentDBSubscriptionUpdate
-      );
-      listenerArr.push(listener);
-      _setListeners(listenerArr);
+    switch (type) {
+      case "StripeCardError":
+        return apiMsg || "Card error during refund.";
+      case "StripeInvalidRequestError":
+        return apiMsg || "Invalid request to Stripe.";
+      case "StripeAPIError":
+        return apiMsg || "Stripe API error.";
+      case "StripeConnectionError":
+        return "Network error communicating with Stripe.";
+      case "StripeAuthenticationError":
+        return "Authentication with Stripe API failed.";
+      case "StripePermissionError":
+        return apiMsg || "Permission denied by Stripe.";
+      case "StripeRateLimitError":
+        return "Rate limit exceeded. Please try again later.";
+      default:
+        if (apiMsg) return apiMsg;
+        if (response) {
+          return (
+            `HTTP ${response.status} ${response.statusText}` ||
+            "Refund request failed."
+          );
+        }
+        return `Unexpected error${code ? ` (${code})` : ""}.`;
     }
   }
+
+  async function startRefund(paymentAmount, payment) {
+    let message = "";
+
+    try {
+      const res = await dbProcessStripeRefund(
+        paymentAmount,
+        payment.paymentIntentID
+      );
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+
+      // HTTP/network-level error
+      if (!res.ok) {
+        message = extractStripeErrorMessage(data, res);
+      } else if (data?.success) {
+        return { success: true, refund: data.refund ?? null, message: "" };
+      } else {
+        // Server responded with success = false
+        message = extractStripeErrorMessage(data);
+      }
+    } catch (err) {
+      message =
+        err instanceof Error
+          ? `Client error: ${err.message}`
+          : "Client error: An unknown error occurred.";
+    }
+    _setStatusMessage(message);
+  }
+
+  async function startPayment(paymentAmount, readerID) {
+    let message = "";
+
+    try {
+      const res = await dbProcessServerDrivenStripePayment(
+        paymentAmount,
+        readerID,
+        sPaymentIntentID
+      );
+
+      let readerResult;
+      try {
+        readerResult = await res.json();
+      } catch {
+        readerResult = null;
+      }
+
+      if (!res.ok) {
+        message = extractStripeErrorMessage(readerResult, res);
+        _setStatusMessage(message);
+      } else if (readerResult?.success) {
+        // Payment succeeded
+        message = "✅ Payment processed successfully.";
+        _setStatusTextColor("green");
+        _setStatusMessage("Waiting for customer...");
+        // log("readerkdfjkdjf", readerResult.paymentIntentID);
+        _setPaymentIntentID(readerResult.paymentIntentID);
+        let listenerArr = cloneDeep(sListeners);
+        let listener = dbSubscribeToStripePaymentProcess(
+          readerResult.paymentIntentID,
+          handleStripeCardPaymentDBSubscriptionUpdate
+        );
+        listenerArr.push(listener);
+        _setListeners(listenerArr);
+      } else {
+        // Server returned success: false with Stripe-style error
+        message = extractStripeErrorMessage(readerResult);
+      }
+    } catch (err) {
+      message =
+        err instanceof Error
+          ? `Client error: ${err.message}`
+          : "Client error: An unknown error occurred.";
+      _setStatusMessage(message);
+    }
+  }
+
+  // async function startPaymen1t(paymentAmount, reader, update) {
+  //   let readerID = reader.id;
+  //   if (!(paymentAmount > 0)) return;
+  //   _setStatusTextColor("green");
+  //   _setStatusMessage("Retrieving card reader activation...");
+
+  //   try {
+  //     let readerResult;
+  //     readerResult = await dbProcessServerDrivenStripePayment(
+  //       paymentAmount,
+  //       readerID,
+  //       sPaymentIntentID
+  //     );
+  //   } catch (e) {}
+
+  //   if (readerResult?.error?.code) {
+  //     handleStripeReaderActivationError(readerResult.error.code);
+  //   } else {
+  //     _setStatusTextColor("green");
+  //     _setStatusMessage("Waiting for customer...");
+  //     // log("readerkdfjkdjf", readerResult.paymentIntentID);
+  //     _setPaymentIntentID(readerResult.paymentIntentID);
+  //     let listenerArr = cloneDeep(sListeners);
+  //     let listener = dbSubscribeToStripePaymentProcess(
+  //       readerResult.paymentIntentID,
+  //       handleStripeCardPaymentDBSubscriptionUpdate
+  //     );
+  //     listenerArr.push(listener);
+  //     _setListeners(listenerArr);
+  //   }
+  // }
 
   async function handleStripeReaderActivationError(error) {
     _setStatusTextColor(C.red);
@@ -442,11 +547,6 @@ export const StripeCreditCardComponent = ({
     // setClientSecret(data.clientSecret);
   }
 
-  // log(sProcessButtonEnabled.toString());
-  let refundReady = true;
-  // log(sRefund.totalCardRefundAllowed);
-  // if (sIsRefund && !sRefundAmount) refundReady = false;
-  // log("stripe sale", sSale?.paymentComplete.toString());
   return (
     <View
       pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
@@ -454,11 +554,7 @@ export const StripeCreditCardComponent = ({
         ...checkoutScreenStyle.base,
         justifyContent: "space-between",
         paddingBottom: 20,
-        opacity:
-          sSale?.paymentComplete ||
-          (sIsRefund && !sRefund.cardRefundRequested > 0)
-            ? 0.2
-            : 1,
+        opacity: sSale || sRefund ? 1 : 0.2,
       }}
     >
       <View
@@ -481,9 +577,7 @@ export const StripeCreditCardComponent = ({
           <View style={{}}>
             <Text style={{ color: gray(0.6), fontSize: 11 }}>Card Readers</Text>
             <DropdownMenu
-              enabled={
-                sCardSaleActive && !sSale?.paymentComplete && refundReady
-              }
+              enabled={sCardSaleActive && !sSale?.paymentComplete}
               buttonIcon={ICONS.menu2}
               buttonIconSize={15}
               buttonTextStyle={{ fontSize: 13 }}
@@ -503,7 +597,7 @@ export const StripeCreditCardComponent = ({
           </View>
           <Button_
             text={"Reset Card Reader"}
-            enabled={sCardSaleActive && !sSale?.paymentComplete && refundReady}
+            enabled={sCardSaleActive && !sSale?.paymentComplete}
             buttonStyle={{
               cursor: sProcessButtonEnabled ? "inherit" : "default",
               backgroundColor: gray(0.2),
@@ -611,9 +705,7 @@ export const StripeCreditCardComponent = ({
                   _setRequestedAmount(0);
                 }}
                 autoFocus={sFocusedItem === "amount"}
-                disabled={
-                  !sCardSaleActive || sSale?.paymentComplete || !refundReady
-                }
+                disabled={!sCardSaleActive || sSale?.paymentComplete}
                 style={{
                   fontSize: 20,
                   outlineWidth: 0,
@@ -664,7 +756,11 @@ export const StripeCreditCardComponent = ({
           enabled={
             sProcessButtonEnabled && !sSale?.paymentComplete && sCardSaleActive
           }
-          onPress={() => startPayment(sRequestedAmount, sCardReader)}
+          onPress={() =>
+            sIsRefund
+              ? startRefund(sRequestedAmount, sRefund.selectedCardPayment)
+              : startPayment(sRequestedAmount, sCardReader)
+          }
           text={sIsRefund ? "PROCESS REFUND" : "START CARD SALE"}
           buttonStyle={{
             cursor: sProcessButtonEnabled ? "inherit" : "default",

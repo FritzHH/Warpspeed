@@ -11,7 +11,7 @@ import { Button_, ScreenModal } from "../../../components";
 import { Dashboard_Admin } from "./dashboard_screen/Dashboard_Admin";
 import { useState } from "react";
 import { APP_USER, SETTINGS_OBJ } from "../../../data";
-import { useLoginStore, useSettingsStore } from "../../../stores";
+import { useLoginStore, useSettingsStore } from "../../../storesOld";
 // import FaceLogin from "../../../faceDetectionClient";
 
 export function Items_Dashboard({}) {

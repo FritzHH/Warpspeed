@@ -15,7 +15,7 @@ import {
   useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
-} from "./stores";
+} from "./storesOld";
 import { SETTINGS_OBJ } from "./data";
 import { intersection } from "lodash";
 import { cloneDeep } from "lodash";

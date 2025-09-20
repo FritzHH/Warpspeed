@@ -3,7 +3,7 @@ import React from "react";
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import { log } from "../../../utils";
 import { WORKORDER_PROTO } from "../../../data";
-import { useWorkorderPreviewStore } from "../../../stores";
+import { useWorkorderPreviewStore } from "../../../storesOld";
 
 export function WorkorderPreview() {
   let zWorkorderPreview = WORKORDER_PROTO;

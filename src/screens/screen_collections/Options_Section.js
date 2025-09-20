@@ -30,7 +30,7 @@ import {
   useTabNamesStore,
   useLoginStore,
   useAlertScreenStore,
-} from "../../stores";
+} from "../../storesOld";
 import { dbCreateUserPunchAction } from "../../db_call_wrapper";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
 import { UserClockHistoryModal } from "../screen_components/modal_screens/UserClockHistoryModalScreen";

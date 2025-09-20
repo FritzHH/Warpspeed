@@ -17,7 +17,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../../stores";
+} from "../../../storesOld";
 import * as XLSX from "xlsx";
 
 import {

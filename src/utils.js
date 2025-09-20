@@ -48,7 +48,8 @@ export function log(one, two) {
   if (!two) two = "";
   let spacer = "";
   if (two) spacer = "  ---------->  ";
-  console.log(one + spacer + two);
+  console.log(one + spacer);
+  if (two) console.log(two);
 }
 
 export function applyLineItemDiscounts(wo, zInventoryArr) {
@@ -925,7 +926,6 @@ export function generateRandomID(collectionPath) {
   return ref.id;
 }
 
-
 /**
  * Create a barcode record for a specific type.
  * @param {'workorder'|'sale'|'customer'} barcodeType - The barcode category.
@@ -933,38 +933,38 @@ export function generateRandomID(collectionPath) {
  */
 export function generateUPCBarcode(barcodeType) {
   // Get current millis since epoch
-  let begins = '0';
+  let begins = "0";
   switch (barcodeType) {
-    case 'workorder':
-      begins = '1'
+    case "workorder":
+      begins = "1";
       break;
-    case 'sale':
-      begins = '2'
+    case "sale":
+      begins = "2";
       break;
-    case 'customer':
-      begins = '3'
+    case "customer":
+      begins = "3";
   }
   const millis = Date.now().toString();
   const timePart = millis.slice(-8);
   const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
   let upc = timePart + randomPart;
-  upc = upc.replace(/^./,begins)
+  upc = upc.replace(/^./, begins);
   return upc;
 }
 
 /**
- * @param {string} upcBarcode 
+ * @param {string} upcBarcode
  * @returns {'workorder'|'sale'|'customer'}
  */
 export function getReceiptType(upcBarcode) {
   switch (upcBarcode) {
-      case upcBarcode.beginsWith('1'):
-        return 'workorder'
-      case upcBarcode.beginsWith('2'):
-return 'sale'
-    case upcBarcode.beginsWith('3'):
-      return 'customer'
-    }
+    case upcBarcode.beginsWith("1"):
+      return "workorder";
+    case upcBarcode.beginsWith("2"):
+      return "sale";
+    case upcBarcode.beginsWith("3"):
+      return "customer";
+  }
 }
 
 export async function randomWordGenerator() {
@@ -1464,4 +1464,36 @@ export function startTimer(
     }
   }, intervalMs);
   return () => clearInterval(interval); // cancel function
+}
+
+export function extractStripeErrorMessage(data, response = null) {
+  const type = data?.type;
+  const code = data?.code;
+  const apiMsg = data?.message;
+
+  switch (type) {
+    case "StripeCardError":
+      return apiMsg || "Card error during refund.";
+    case "StripeInvalidRequestError":
+      return apiMsg || "Invalid request to Stripe.";
+    case "StripeAPIError":
+      return apiMsg || "Stripe API error.";
+    case "StripeConnectionError":
+      return "Network error communicating with Stripe.";
+    case "StripeAuthenticationError":
+      return "Authentication with Stripe API failed.";
+    case "StripePermissionError":
+      return apiMsg || "Permission denied by Stripe.";
+    case "StripeRateLimitError":
+      return "Rate limit exceeded. Please try again later.";
+    default:
+      if (apiMsg) return apiMsg;
+      if (response) {
+        return (
+          `HTTP ${response.status} ${response.statusText}` ||
+          "Refund request failed."
+        );
+      }
+      return `Unexpected error${code ? ` (${code})` : ""}.`;
+  }
 }

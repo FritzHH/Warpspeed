@@ -61,6 +61,8 @@ import {
   addOrRemoveFromArr,
   findInMultipleArrs,
   resetObject,
+  extractStripeErrorMessage,
+  startTimer,
 } from "../../../utils";
 import React, { useCallback, useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
@@ -85,7 +87,10 @@ import {
   STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
   STRIPE_INITIATE_PAYMENT_INTENT_URL,
 } from "../../../private_user_constants";
-import { FIRESTORE_COLLECTION_NAMES } from "../../../constants";
+import {
+  FIRESTORE_COLLECTION_NAMES,
+  MILLIS_IN_MINUTE,
+} from "../../../constants";
 import { isArray } from "lodash";
 import { StripeCreditCardComponent } from "./CardSaleComponent";
 import { CashSaleComponent } from "./CashSaleComponent";
@@ -164,6 +169,12 @@ export function CheckoutModalScreen({ openWorkorder }) {
   const [sShouldChargeCardRefundFee, _setShouldChargeCardRefundFee] =
     useState(true);
   const [sCashChangeNeeded, _setCashChangeNeeded] = useState(null);
+  const [sStripeCardReaders, _setStripeCardReaders] = useState([]);
+  const [sStripeCardReaderErrorMessage, _setStripeCardReaderErrorMessage] =
+    useState("");
+  const [sStripeCardReaderSuccessMessage, _setStripeCardReaderSuccessMessage] =
+    useState("");
+  const [sCancelCardReaderTimer, _setCancelCardReaderTimer] = useState();
 
   // watch the combined workorders array and adjust accordingly
 
@@ -214,7 +225,97 @@ export function CheckoutModalScreen({ openWorkorder }) {
   }, [sCombinedWorkorders, sIsRefund]);
 
   // watch incoming refund Sale from db. check to see which lines have already been refunded in past transactions
-  useEffect(() => {}, [sRefund, sIsRefund]);
+  useEffect(() => {
+    fetchStripeReaders();
+  }, []);
+
+  async function fetchStripeReaders() {
+    let message = "";
+    try {
+      const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      let data, readerArr;
+      try {
+        data = await res.json();
+        readerArr = data.data;
+      } catch (jsonErr) {
+        log("[fetchStripeReaders] Failed to parse JSON:", jsonErr);
+        data = null;
+        return;
+      }
+
+      if (!res.ok) {
+        message = extractStripeErrorMessage(data, res);
+        log("[fetchStripeReaders] HTTP error:", message);
+        // _setStatusMessage(message);
+      }
+
+      if (readerArr?.length > 0) {
+        log("[fetchStripeReaders] Readers retrieved successfully:", readerArr);
+        message = "Card readers found!";
+        _setStripeCardReaders(readerArr.filter((o) => o.status !== "offline"));
+        let timer;
+        if (!sCancelCardReaderTimer) {
+          timer = startTimer(MILLIS_IN_MINUTE * 10, 2000, () => {
+            getAvailableStripeReaders();
+          });
+          _setCancelCardReaderTimer(timer);
+        }
+
+        if (
+          readerArr.find((o) => o.id === zSettings?.selectedCardReaderObj.id)
+        ) {
+          let reader = readerArr.find(
+            (o) => o.id === zSettings?.selectedCardReaderObj.id
+          );
+
+          if (reader.status === "offline") {
+            _setStripeCardReaderErrorMessage(
+              "Selected card reader is offline!\nCheck power and network connections"
+            );
+            _setStripeCardReaderSuccessMessage("");
+          } else {
+            // _setCardReader(zSettings?.selectedCardReaderObj);
+            if (timer || sCancelCardReaderTimer) {
+              if (timer) timer();
+              if (sCancelCardReaderTimer) sCancelCardReaderTimer();
+            }
+          }
+        } else if (readerArr.find((o) => o.status != "offline")) {
+          _setStripeCardReaders(readerArr.find((o) => o.status != "offline"));
+        } else {
+          _setStripeCardReaderErrorMessage(
+            "No online card readers found!\nCheck power and network connections"
+          );
+          _setStripeCardReaderSuccessMessage("");
+        }
+        return;
+      } else if (data?.readerArr?.length === 0) {
+        _setStripeCardReaderErrorMessage(
+          "No card readers found on this account!\nSee network admin"
+        );
+        _setStripeCardReaderSuccessMessage("");
+
+        return;
+      }
+
+      // message = extractStripeErrorMessage(data);
+      // log(
+      //   "[fetchStripeReaders] Server responded with success = false:",
+      //   message
+      // );
+    } catch (err) {
+      message =
+        err instanceof Error
+          ? `Client error: ${err.message}`
+          : "Client error: An unknown error occurred.";
+      log("[fetchStripeReaders] Exception caught:", err);
+    }
+    _setStripeCardReaderErrorMessage(message);
+  }
 
   ///////////////////  SALES /////////////////////////////////////
   function handlePaymentCapture(payment = PAYMENT_OBJECT_PROTO) {
@@ -563,6 +664,15 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sIsDeposit={sIsDeposit}
               _setIsDeposit={_setIsDeposit}
               sSale={sSale}
+              sStripeCardReaders={sStripeCardReaders}
+              sStripeCardReaderErrorMessage={sStripeCardReaderErrorMessage}
+              sStripeCardReaderSuccessMessage={sStripeCardReaderSuccessMessage}
+              _setStripeCardReaderSuccessMessage={
+                _setStripeCardReaderSuccessMessage
+              }
+              _setStripeCardReaderErrorMessage={
+                _setStripeCardReaderErrorMessage
+              }
             />
           </View>
 

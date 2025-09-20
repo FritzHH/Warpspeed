@@ -534,9 +534,9 @@ export function sendSMS(messageBody) {
 export function processServerDrivenStripePayment(
   saleAmount,
   readerID,
-  warmUp,
   paymentIntentID
 ) {
+  log(readerID);
   return fetch(STRIPE_INITIATE_PAYMENT_INTENT_URL, {
     method: "POST",
     headers: {
@@ -545,7 +545,6 @@ export function processServerDrivenStripePayment(
     body: JSON.stringify({
       amount: Number(saleAmount),
       readerID,
-      warmUp,
       paymentIntentID,
     }),
   });

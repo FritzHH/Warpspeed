@@ -92,7 +92,6 @@ exports.getAvailableStripeReaders = onRequest(
   }
 );
 
-
 exports.initiateRefund = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
@@ -172,8 +171,6 @@ exports.initiateRefund = onRequest(
     }
   }
 );
-
-
 
 exports.initiatePaymentIntent = onRequest(
   { cors: true, secrets: [stripeSecretKey] },

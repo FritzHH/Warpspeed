@@ -206,14 +206,17 @@ export const StripeCreditCardComponent = ({
   useEffect(() => {
     if (sStripeCardReaders.length > 0 && !sCardReader) {
       let userSelectedReader = sStripeCardReaders.find(
-        (o) => o.id === zSettings.selectedCardReader
+        (o) => o.id === zSettings.selectedCardReaderObj.id
       );
+      // log(zSettings.selectedCardReader);
       if (!userSelectedReader || userSelectedReader.status === "offline") {
         _setStripeCardReaderErrorMessage(
           "Your selected reader is offline!\nCheck power and network connections"
         );
+        log("Selected card reader offline");
         _setStripeCardReaderSuccessMessage("");
       } else {
+        log("here");
         _setCardReader(userSelectedReader);
         _setStripeCardReaderErrorMessage("");
         _setStripeCardReaderSuccessMessage("");

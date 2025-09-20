@@ -114,12 +114,19 @@ export const StripeCreditCardComponent = ({
   sIsCheckingForReaders = false,
   sRefund = {
     refundedLines: [],
+    requestedRefundLines: [],
     cashRefundRequested: 0,
     cardRefundRequested: 0,
+    cardRefundPayment: null,
+    totalRefundRequested: 0,
     totalCashRefundAllowed: 0,
     totalCardRefundAllowed: 0,
-    cardTransactionArr: [],
-    cashTransactionArr: [],
+    cashAmountRefunded: 0,
+    cardAmountRefunded: 0,
+    cardTransactions: [],
+    cashTransactions: [],
+    sale: {},
+    selectedCardPayment: null,
   },
 }) => {
   const getRefundAmountLeft = () => {
@@ -589,14 +596,32 @@ export const StripeCreditCardComponent = ({
 
     // setClientSecret(data.clientSecret);
   }
+
+  const LOW_OPACITY = 0.2;
+  function boxEventsEnabled() {
+    if (sIsRefund) {
+      if (sRefund?.selectedCardPayment?.last4) {
+        return true;
+      } else {
+        return false;
+      }
+    } else {
+      if (sSale?.paymentComplete) return true;
+      return false;
+    }
+  }
+
+  let boxEnabled = boxEventsEnabled();
+
   return (
     <View
-      pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
+      // pointerEvents={"none"}
+      pointerEvents={boxEnabled ? "auto" : "none"}
       style={{
         ...checkoutScreenStyle.base,
         justifyContent: "space-between",
         paddingBottom: 20,
-        opacity: sSale || sRefund ? 1 : 0.2,
+        opacity: boxEnabled ? 1 : LOW_OPACITY,
       }}
     >
       <View
@@ -605,7 +630,6 @@ export const StripeCreditCardComponent = ({
           alignItems: "flex-start",
           paddingBottom: 10,
           paddingHorizontal: 10,
-          // marginLeft: 20,
         }}
       >
         <View
@@ -619,7 +643,7 @@ export const StripeCreditCardComponent = ({
           <View style={{}}>
             <Text style={{ color: gray(0.6), fontSize: 11 }}>Card Readers</Text>
             <DropdownMenu
-              enabled={sCardSaleActive && !sSale?.paymentComplete}
+              enabled={boxEnabled}
               buttonIcon={ICONS.menu2}
               buttonIconSize={15}
               buttonTextStyle={{ fontSize: 13 }}
@@ -639,9 +663,9 @@ export const StripeCreditCardComponent = ({
           </View>
           <Button_
             text={"Reset Card Reader"}
-            enabled={sCardSaleActive && !sSale?.paymentComplete}
+            enabled={boxEnabled}
             buttonStyle={{
-              cursor: sProcessButtonEnabled ? "inherit" : "default",
+              cursor: boxEnabled ? "inherit" : "none",
               backgroundColor: gray(0.2),
               paddingHorizontal: 5,
               paddingVertical: 2,
@@ -750,7 +774,7 @@ export const StripeCreditCardComponent = ({
                   _setRequestedAmount(0);
                 }}
                 autoFocus={sFocusedItem === "amount"}
-                disabled={!sCardSaleActive || sSale?.paymentComplete}
+                disabled={!boxEnabled}
                 style={{
                   fontSize: 20,
                   outlineWidth: 0,
@@ -775,7 +799,7 @@ export const StripeCreditCardComponent = ({
         isChecked={sIsDeposit}
         onCheck={() => _setIsDeposit(!sIsDeposit)}
       />
-      {sIsRefund ? (
+      {!!sRefund?.selectedCardPayment?.cardType ? (
         <View
           style={{
             width: "100%",

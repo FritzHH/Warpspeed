@@ -314,6 +314,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
     };
   }, []);
 
+  /////////////////// CARD READERS ////////////////////////////////////
   async function fetchStripeReaders() {
     let message = "";
     let error = false;
@@ -729,18 +730,6 @@ export function CheckoutModalScreen({ openWorkorder }) {
       refund.totalCashRefundAllowed = cashRefundAllowedTotal;
     });
 
-    // auto-select the first card payment that still has a balance remaining to refund
-    refund.cardTransactions.forEach((cardTransaction) => {
-      if (refund.selectedCardPayment) return;
-      // log(Number(cardTransaction.amountRefunded));
-
-      let amountAlreadyRefunded = cardTransaction.amountRefunded;
-      if (!amountAlreadyRefunded) amountAlreadyRefunded = 0;
-      if (cardTransaction.amountCaptured > amountAlreadyRefunded) {
-        refund.selectedCardPayment = cardTransaction;
-      }
-    });
-
     // now look throught the previous refunds and see if there are any cash refunds, subtract them from the cash refund allowed
     let cashRefunded = 0;
     sale.refunds?.forEach(
@@ -749,6 +738,18 @@ export function CheckoutModalScreen({ openWorkorder }) {
     );
     refund.totalCashRefundAllowed =
       refund.totalCashRefundAllowed - cashRefunded;
+
+    // auto-select the first card payment that still has a balance remaining to refund
+    // refund.cardTransactions.forEach((cardTransaction) => {
+    //   if (refund.selectedCardPayment) return;
+    //   // log(Number(cardTransaction.amountRefunded));
+
+    //   let amountAlreadyRefunded = cardTransaction.amountRefunded;
+    //   if (!amountAlreadyRefunded) amountAlreadyRefunded = 0;
+    //   if (cardTransaction.amountCaptured > amountAlreadyRefunded) {
+    //     refund.selectedCardPayment = cardTransaction;
+    //   }
+    // });
 
     _setRefund(refund);
     _setSale(sale);
@@ -789,6 +790,21 @@ export function CheckoutModalScreen({ openWorkorder }) {
       refund.cardRefundRequested = runningRefund;
     }
 
+    // now grab a previous credit card payment, make sure there's enough refund left and activate the CC box. This is default activity they can select a different card payment to use if more are available
+
+    refund.cardTransactions.forEach((cardPayment) => {
+      if (refund.selectedCardPayment || !refund.totalCardRefundAllowed > 0)
+        return;
+
+      let amountRefunded = cardPayment.amountRefunded
+        ? cardPayment.amountRefunded
+        : 0;
+      let remainder = cardPayment.amountCaptured - amountRefunded;
+      log("rem", remainder);
+      if (remainder > 0) refund.selectedCardPayment = cardPayment;
+    });
+
+    log(refund.selectedCardPayment);
     _setRefund(refund);
   }
 

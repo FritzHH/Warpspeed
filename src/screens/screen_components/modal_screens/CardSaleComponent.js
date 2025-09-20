@@ -62,7 +62,7 @@ import {
   startTimer,
   extractStripeErrorMessage,
 } from "../../../utils";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
 import {
   sendFCMMessage,
@@ -142,21 +142,13 @@ export const StripeCreditCardComponent = ({
     (state) => state.getInventoryItem
   );
   const zSale = useCheckoutStore((state) => state.saleObj);
-  const [sRequestedAmount, _setRequestedAmount] = useState(
-    sSale?.total - sSale?.amountCaptured
-  );
+  const [sRequestedAmount, _setRequestedAmount] = useState(null);
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(0);
-  // const [sRefundAmountDisp, _setRefundAmountDisp] = useState(forma);
-  // const [sStatusMessage, _setStatusMessage] = useState("");
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
   const [sFocusedItem, _setFocusedItem] = useState("");
   const [sCardReader, _setCardReader] = useState("");
-  // const [sStripeCardReaders, _setStripeCardReaders] = useState([]);
   const [sListeners, _setListeners] = useState([]);
   const [sPaymentIntentID, _setPaymentIntentID] = useState("");
-  const [sStatusTextColor, _setStatusTextColor] = useState(C.green);
-  const [sCancelCardReaderTimer, _setCancelCardReaderTimer] = useState();
-
   /////////////////////////////////////////////////////////////////////////
 
   // check incoming REFUND an populate fields
@@ -167,7 +159,8 @@ export const StripeCreditCardComponent = ({
       if (!amountAlreadyRefunded) amountAlreadyRefunded = 0;
       let refundAmountLeft =
         sRefund?.selectedCardPayment?.amountCaptured - amountAlreadyRefunded;
-      if (!sRequestedAmount) {
+      if (sRequestedAmount == null) {
+        log("here");
         _setRequestedAmount(refundAmountLeft);
         _setRequestedAmountDisp(formatCurrencyDisp(refundAmountLeft));
       }
@@ -205,20 +198,22 @@ export const StripeCreditCardComponent = ({
   // find all Stripe card readers on account
   useEffect(() => {
     if (sStripeCardReaders.length > 0 && !sCardReader) {
+      let message;
+      let error = false;
       let userSelectedReader = sStripeCardReaders.find(
         (o) => o.id === zSettings.selectedCardReaderObj.id
       );
       // log(zSettings.selectedCardReader);
       if (!userSelectedReader || userSelectedReader.status === "offline") {
-        _setStripeCardReaderErrorMessage(
-          "Your selected reader is offline!\nCheck power and network connections"
-        );
+        error = true;
+        message =
+          "Your selected reader is offline!\nCheck power and network connections";
         log("Selected card reader offline");
-        _setStripeCardReaderSuccessMessage("");
       } else {
-        log("here");
         _setCardReader(userSelectedReader);
-        _setStripeCardReaderErrorMessage("");
+      }
+      if (error && message) {
+        _setStripeCardReaderErrorMessage(message);
         _setStripeCardReaderSuccessMessage("");
       }
     }
@@ -305,73 +300,9 @@ export const StripeCreditCardComponent = ({
   //   _setStatusMessage(message);
   // }
 
-  // async function getAvailableStripeReaders() {
-  //   log("getting available Stripe readers");
-  //   let res;
-  //   try {
-  //     await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //     });
-  //   } catch (e) {
-  //     _setStatusMessage("Error fetching card readers\nContact support!");
-  //     log("Error fetching Stripe readers from URL", e);
-  //   }
-  //   log("res", res);
-  //   if (!res) {
-  //     return;
-  //   }
-  //   const data = await res.json();
-  //   let readerArr = data.data;
-  //   log("data", data.data);
-
-  //   if (readerArr.length === 0) {
-  //     _setStatusMessage(
-  //       "No card readers found on this account!\nSee network admin"
-  //     );
-  //     return;
-  //   } else {
-  //     _setStripeCardReaders(readerArr);
-  //     // log(readerArr);
-  //   }
-  //   // log("arr", readerArr);
-  //   _setStatusTextColor(C.red);
-  //   _setStripeCardReaders(readerArr.filter((o) => o.status !== "offline"));
-  //   let timer;
-  //   if (!sCancelCardReaderTimer) {
-  //     timer = startTimer(MILLIS_IN_MINUTE * 10, 2000, () => {
-  //       getAvailableStripeReaders();
-  //     });
-  //     _setCancelCardReaderTimer(timer);
-  //   }
-  //   if (readerArr.find((o) => o.id === zSettings?.selectedCardReaderObj.id)) {
-  //     let reader = readerArr.find(
-  //       (o) => o.id === zSettings?.selectedCardReaderObj.id
-  //     );
-  //     if (reader.status === "offline") {
-  //       _setStatusMessage(
-  //         "Selected card reader is offline!\nCheck power and network connections"
-  //       );
-  //     } else {
-  //       _setStatusTextColor(C.green);
-  //       _setCardReader(zSettings?.selectedCardReaderObj);
-  //       if (timer || sCancelCardReaderTimer) {
-  //         if (timer) timer();
-  //         if (sCancelCardReaderTimer) sCancelCardReaderTimer();
-  //       }
-  //     }
-  //   } else if (readerArr.find((o) => o.status != "offline")) {
-  //     _setCardReader(readerArr.find((o) => o.status != "offline"));
-  //   } else {
-  //     _setStatusMessage(
-  //       "No online card readers found!\nCheck power and network connections"
-  //     );
-  //   }
-  // }
-
   async function startRefund(paymentAmount, payment) {
     let message = "";
-
+    let error = false;
     try {
       const res = await dbProcessStripeRefund(
         paymentAmount,
@@ -388,25 +319,34 @@ export const StripeCreditCardComponent = ({
       // HTTP/network-level error
       if (!res.ok) {
         message = extractStripeErrorMessage(data, res);
+        error = true;
       } else if (data?.success) {
-        _setStripeCardReaderErrorMessage("");
-        _setStripeCardReaderSuccessMessage("Success!");
+        message = "Refund success!";
       } else {
         // Server responded with success = false
+        error = true;
         message = extractStripeErrorMessage(data);
       }
     } catch (err) {
+      error = true;
       message =
         err instanceof Error
           ? `Client error: ${err.message}`
           : "Client error: An unknown error occurred.";
     }
-    _setStripeCardReaderErrorMessage(message);
-    _setStripeCardReaderSuccessMessage("");
+    if (error && message) {
+      _setStripeCardReaderErrorMessage(message);
+      _setStripeCardReaderSuccessMessage("");
+    } else if (message) {
+      _setStripeCardReaderSuccessMessage(message);
+      _setStripeCardReaderErrorMessage("");
+    }
   }
 
   async function startPayment(paymentAmount, readerID) {
-    let message = "Starting payment process";
+    paymentAmount = 50;
+    let message = "";
+    let error = false;
     try {
       const res = await dbProcessServerDrivenStripePayment(
         paymentAmount,
@@ -422,16 +362,11 @@ export const StripeCreditCardComponent = ({
       }
 
       if (!res.ok) {
+        error = true;
         message = extractStripeErrorMessage(readerResult, res);
-        _setStripeCardReaderErrorMessage(message);
-        _setStripeCardReaderSuccessMessage("");
       } else if (readerResult?.success) {
         // Payment succeeded
-        message = "✅ Payment processed successfully.";
-        _setStatusTextColor("green");
-        _setStripeCardReaderSuccessMessage("Waiting for customer...");
-        _setStripeCardReaderErrorMessage("");
-        // log("readerkdfjkdjf", readerResult.paymentIntentID);
+        message = "Waiting for customer...";
         _setPaymentIntentID(readerResult.paymentIntentID);
         let listenerArr = cloneDeep(sListeners);
         let listener = dbSubscribeToStripePaymentProcess(
@@ -442,15 +377,22 @@ export const StripeCreditCardComponent = ({
         _setListeners(listenerArr);
       } else {
         // Server returned success: false with Stripe-style error
+        error = true;
         message = extractStripeErrorMessage(readerResult);
       }
     } catch (err) {
+      error = true;
       message =
         err instanceof Error
           ? `Client error: ${err.message}`
           : "Client error: An unknown error occurred.";
+    }
+    if (error && message) {
       _setStripeCardReaderErrorMessage(message);
       _setStripeCardReaderSuccessMessage("");
+    } else if (message) {
+      _setStripeCardReaderSuccessMessage(message);
+      _setStripeCardReaderErrorMessage("");
     }
   }
 
@@ -486,66 +428,27 @@ export const StripeCreditCardComponent = ({
   //   }
   // }
 
-  // async function handleStripeReaderActivationError(error) {
-  //   _setStatusTextColor(C.red);
-  //   // log("Handling Stripe reader activation error", error);
-  //   let message = "";
-  //   if (error == "in_progress") {
-  //     message =
-  //       "error code: in_progress\n\nCard Reader in use. Please wait, use a different reader, or reset this reader";
-  //   } else {
-  //     switch (error.code) {
-  //       case "terminal_reader_timeout":
-  //         message =
-  //           "error code: terminal_reader_timeout\n\nCould not connect to reader, possible network issue\n" +
-  //           error.code;
-  //         break;
-  //       case "terminal_reader_offline":
-  //         message =
-  //           "error code: terminal_reader_offline\n\n Please check power and internet connection\n" +
-  //           error.code;
-  //         break;
-  //       case "terminal_reader_busy":
-  //         message =
-  //           "error code: terminal_reader_busy\n\nPlease try a different reader or reset this reader\n" +
-  //           error.code;
-  //         break;
-  //       case "intent_invalid_state":
-  //         message =
-  //           "error code: intent_invalid_state\n\nPlease clear the reader, refresh the page and try again";
-  //         break;
-  //       default:
-  //       // message = "Unknown processing error: \n" + error.code;
-  //     }
-  //   }
-  //   _setStatusMessage(message);
-  // }
-
   function handleStripeCardPaymentDBSubscriptionUpdate(
     key,
     val,
     paymentIntentID
   ) {
-    // clog("Stripe webhook update Obj", val);
-
     let failureCode = val?.failure_code;
+    let message;
+    let error = false;
     if (
       failureCode &&
       val?.process_payment_intent?.payment_intent == paymentIntentID
     ) {
       log("card failure code", failureCode);
-      _setStatusTextColor(C.red);
-      _setStripeCardReaderErrorMessage(
-        "Failure code:  " + val.failure_code + "\n\nPayment Rejected by Stripe"
-      );
-      _setStripeCardReaderSuccessMessage("");
+      error = true;
+      message =
+        "Failure code:  " + val.failure_code + "\n\nPayment Rejected by Stripe";
     } else if (
       val.status === "succeeded" &&
       val.payment_intent === paymentIntentID
     ) {
-      _setStatusTextColor("green");
-      _setStripeCardReaderSuccessMessage("Payment Complete!");
-      _setStripeCardReaderErrorMessage("");
+      message = "Payment complete!";
       log("Stripe payment complete!");
       // clog("Payment complete object", val);
       let paymentMethodDetails = val.payment_method_details.card_present;
@@ -569,29 +472,66 @@ export const StripeCreditCardComponent = ({
       payment.networkTransactionID =
         val.payment_method_details.card_present.network_transaction_id;
       payment.amountRefunded = val.amount_refunded;
-
       // clog("Successful Payment details obj", paymentDetailsObj);
       handlePaymentCapture(payment);
     }
+
+    if (error && message) {
+      _setStripeCardReaderErrorMessage(message);
+      _setStripeCardReaderSuccessMessage("");
+    } else if (message) {
+      _setStripeCardReaderSuccessMessage(message);
+      _setStripeCardReaderErrorMessage("");
+    }
   }
 
-  function handleProcessButtonPress() {}
-
   async function resetCardReader() {
-    // _s(C.red);
-    _setStripeCardReaderErrorMessage("\nCard reader reset in progress...");
+    _setStripeCardReaderErrorMessage("Card reader reset in progress...");
     _setStripeCardReaderSuccessMessage("");
     _setPaymentIntentID(null);
     sListeners.forEach((listener) => listener());
     _setProcessButtonEnabled(true);
-    let readerResult = await dbCancelServerDrivenStripePayment(
-      sCardReader.id,
-      sPaymentIntentID
-    );
-    _setStatusTextColor("green");
-    _setStripeCardReaderSuccessMessage("\nReset complete!");
-    _setStripeCardReaderErrorMessage("");
-    clog("cancelation results", readerResult);
+
+    let message = "";
+    let error = false;
+    try {
+      const res = await dbCancelServerDrivenStripePayment(sCardReader.id);
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok) {
+        error = true;
+        message = extractStripeErrorMessage(data, res);
+        _setStripeCardReaderErrorMessage(message);
+        _setStripeCardReaderSuccessMessage("");
+      }
+
+      if (data?.success) {
+        message = data.message || "✅ Reader reset complete.";
+      } else {
+        message = extractStripeErrorMessage(data);
+        error = true;
+      }
+    } catch (err) {
+      error = true;
+      message =
+        err instanceof Error
+          ? `Client error: ${err.message}`
+          : "Client error: An unknown error occurred.";
+    }
+
+    if (error && message) {
+      _setStripeCardReaderErrorMessage(message);
+      _setStripeCardReaderSuccessMessage("");
+    } else if (message) {
+      _setStripeCardReaderSuccessMessage(message);
+      _setStripeCardReaderErrorMessage("");
+    }
   }
 
   // unnecessary, DB will create it for us
@@ -800,16 +740,25 @@ export const StripeCreditCardComponent = ({
         onCheck={() => _setIsDeposit(!sIsDeposit)}
       />
       {sIsRefund ? (
-        <View style={{ width: "100%", alignItems: "center", marginTop: 10 }}>
-          <Text style={{ fontSize: 12 }}>
-            {"**" +
-              sRefund.last4 +
-              "exp: " +
-              sRefund.cardExpMonth +
-              " / " +
-              sRefund.cardExpYear}
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "center",
+            marginTop: 10,
+            flexDirection: "row",
+          }}
+        >
+          <Text style={{ fontSize: 12, color: gray(0.4), marginHorizontal: 5 }}>
+            {sRefund.selectedCardPayment?.cardType}
           </Text>
-          <Text style={{ fontSize: 12 }}>{sRefund.cardType}</Text>
+          <Text style={{ fontSize: 12, color: gray(0.4), marginHorizontal: 5 }}>
+            {"**" + sRefund.selectedCardPayment?.last4}
+          </Text>
+          <Text style={{ fontSize: 12, color: gray(0.4), marginHorizontal: 5 }}>
+            {sRefund.selectedCardPayment.expMonth +
+              "/" +
+              sRefund.selectedCardPayment?.expYear}
+          </Text>
         </View>
       ) : null}
       <View
@@ -818,7 +767,6 @@ export const StripeCreditCardComponent = ({
           alignItems: "center",
         }}
       >
-        {/* {!sPartialPaymentAlert ? ( */}
         <Button_
           colorGradientArr={COLOR_GRADIENTS.green}
           textStyle={{ color: C.textWhite, fontSize: 16 }}
@@ -836,16 +784,16 @@ export const StripeCreditCardComponent = ({
           }}
         />
         <Text
+          numberOfLines={2}
           style={{
             ...checkoutScreenStyle.statusText,
             fontSize: 15,
-            color: sStatusTextColor,
+            color: sStripeCardReaderErrorMessage ? C.red : C.green,
             marginTop: 5,
-            // maxHeight: 100,
-            // backgroundColor: "blue",
+            width: "80%",
           }}
         >
-          {sStripeCardReaderErrorMessage}
+          {sStripeCardReaderErrorMessage || sStripeCardReaderSuccessMessage}
         </Text>
       </View>
     </View>

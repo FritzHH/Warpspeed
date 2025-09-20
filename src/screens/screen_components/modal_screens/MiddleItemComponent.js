@@ -797,8 +797,7 @@ export const MiddleItemComponent = ({
             </View>
           )}
         </View>
-        {/******************** END REFUNDS ********************************************/}
-        {/** ************************************payments list *****************************************************/}
+
         {!!sSale?.payments.length > 0 && (
           <View
             style={{
@@ -892,10 +891,13 @@ export const MiddleItemComponent = ({
                           }}
                         >
                           <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                            {"Last 4 Digits:  "}
+                            {payment.cardType}
                           </Text>
                           <Text style={{ color: gray(0.4), fontSize: 13 }}>
                             {"***" + payment.last4}
+                          </Text>
+                          <Text style={{ color: gray(0.4), fontSize: 13 }}>
+                            {payment.expMonth + "/" + payment.expYear}
                           </Text>
                         </View>
                       ) : null}
@@ -918,6 +920,8 @@ export const MiddleItemComponent = ({
               );
             })}
           </ScrollView>
+          {/******************** END REFUNDS ********************************************/}
+          {/** ************************************payments list *****************************************************/}
         </View>
         <View
           style={{

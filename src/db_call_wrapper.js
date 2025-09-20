@@ -323,8 +323,8 @@ export async function dbProcessServerDrivenStripePayment(
   );
 }
 
-export function dbCancelServerDrivenStripePayment(readerID, paymentIntentID) {
-  return cancelServerDrivenStripePayment(readerID, paymentIntentID);
+export function dbCancelServerDrivenStripePayment(readerID) {
+  return cancelServerDrivenStripePayment(readerID);
 }
 
 export function dbRetrieveAvailableStripeReaders() {

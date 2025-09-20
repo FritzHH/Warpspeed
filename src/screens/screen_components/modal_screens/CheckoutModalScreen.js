@@ -224,13 +224,14 @@ export function CheckoutModalScreen({ openWorkorder }) {
     // log("running");
   }, [sCombinedWorkorders, sIsRefund]);
 
-  // watch incoming refund Sale from db. check to see which lines have already been refunded in past transactions
+
   useEffect(() => {
     fetchStripeReaders();
   }, []);
 
   async function fetchStripeReaders() {
     let message = "";
+    let error = false;
     try {
       const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
         method: "POST",
@@ -249,13 +250,13 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
       if (!res.ok) {
         message = extractStripeErrorMessage(data, res);
+        error = true;
         log("[fetchStripeReaders] HTTP error:", message);
-        // _setStatusMessage(message);
       }
 
       if (readerArr?.length > 0) {
         log("[fetchStripeReaders] Readers retrieved successfully:", readerArr);
-        message = "Card readers found!";
+        message = "Payment terminal ready";
         _setStripeCardReaders(readerArr.filter((o) => o.status !== "offline"));
         let timer;
         if (!sCancelCardReaderTimer) {
@@ -273,10 +274,9 @@ export function CheckoutModalScreen({ openWorkorder }) {
           );
 
           if (reader.status === "offline") {
-            _setStripeCardReaderErrorMessage(
-              "Selected card reader is offline!\nCheck power and network connections"
-            );
-            _setStripeCardReaderSuccessMessage("");
+            error = true;
+            message =
+              "Selected card reader is offline!\nCheck power and network connections";
           } else {
             // _setCardReader(zSettings?.selectedCardReaderObj);
             if (timer || sCancelCardReaderTimer) {
@@ -287,34 +287,29 @@ export function CheckoutModalScreen({ openWorkorder }) {
         } else if (readerArr.find((o) => o.status != "offline")) {
           _setStripeCardReaders(readerArr.find((o) => o.status != "offline"));
         } else {
-          _setStripeCardReaderErrorMessage(
-            "No online card readers found!\nCheck power and network connections"
-          );
-          _setStripeCardReaderSuccessMessage("");
+          error = true;
+          message =
+            "No online card readers found!\nCheck power and network connections";
         }
-        return;
       } else if (data?.readerArr?.length === 0) {
-        _setStripeCardReaderErrorMessage(
-          "No card readers found on this account!\nSee network admin"
-        );
-        _setStripeCardReaderSuccessMessage("");
-
-        return;
+        error = true;
+        message = "No card readers found on this account!\nSee network admin";
       }
-
-      // message = extractStripeErrorMessage(data);
-      // log(
-      //   "[fetchStripeReaders] Server responded with success = false:",
-      //   message
-      // );
     } catch (err) {
+      error = true;
       message =
         err instanceof Error
           ? `Client error: ${err.message}`
           : "Client error: An unknown error occurred.";
       log("[fetchStripeReaders] Exception caught:", err);
     }
-    _setStripeCardReaderErrorMessage(message);
+    if (error) {
+      _setStripeCardReaderErrorMessage(message);
+      _setStripeCardReaderSuccessMessage("");
+    } else {
+      _setStripeCardReaderSuccessMessage(message);
+      _setStripeCardReaderErrorMessage("");
+    }
   }
 
   ///////////////////  SALES /////////////////////////////////////

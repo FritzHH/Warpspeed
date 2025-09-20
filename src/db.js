@@ -562,7 +562,7 @@ export function processServerDrivenStripeRefund(amount, paymentIntentID) {
     }),
   });
 }
-export function cancelServerDrivenStripePayment(readerID, paymentIntentID) {
+export function cancelServerDrivenStripePayment(readerID) {
   return fetch(STRIPE_CANCEL_PAYMENT_INTENT_URL, {
     method: "POST",
     headers: {
@@ -570,7 +570,6 @@ export function cancelServerDrivenStripePayment(readerID, paymentIntentID) {
     },
     body: JSON.stringify({
       readerID,
-      paymentIntentID,
     }),
   });
 }

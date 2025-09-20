@@ -64,7 +64,7 @@ import {
   extractStripeErrorMessage,
   startTimer,
 } from "../../../utils";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
 import {
   sendFCMMessage,
@@ -174,7 +174,82 @@ export function CheckoutModalScreen({ openWorkorder }) {
     useState("");
   const [sStripeCardReaderSuccessMessage, _setStripeCardReaderSuccessMessage] =
     useState("");
-  const [sCancelCardReaderTimer, _setCancelCardReaderTimer] = useState();
+  const [sIsCheckingForReaders, _setIsCheckingForReaders] = useState(false);
+
+  // Use refs to track timer state to avoid closure issues
+  const readerCheckIntervalRef = useRef(null);
+  const readerCheckStartTimeRef = useRef(null);
+
+  /**
+   * Determines if a Stripe Terminal reader is truly ready for payment processing
+   * @param {Object} reader - Stripe Terminal reader object
+   * @returns {Object} - { isReady: boolean, reason: string, details: Object }
+   */
+  const isReaderReadyForPayment = (reader) => {
+    if (!reader) {
+      return { isReady: false, reason: "Reader not found", details: {} };
+    }
+
+    // Check basic connectivity
+    if (reader.status !== "online") {
+      return {
+        isReady: false,
+        reason: `Reader is ${reader.status}`,
+        details: { status: reader.status },
+      };
+    }
+
+    // Check if reader is busy with an action
+    if (reader.action && reader.action.type) {
+      return {
+        isReady: false,
+        reason: `Reader is busy (${reader.action.type})`,
+        details: {
+          actionType: reader.action.type,
+          actionStatus: reader.action.status,
+          isProcessingPayment: reader.action.type === "process_payment_intent",
+        },
+      };
+    }
+
+    // Check if reader has been seen recently (within last 5 minutes)
+    const now = Date.now();
+    const lastSeen = reader.last_seen_at;
+    const fiveMinutesAgo = now - 5 * 60 * 1000;
+
+    if (lastSeen && lastSeen < fiveMinutesAgo) {
+      return {
+        isReady: false,
+        reason: "Reader hasn't been seen recently",
+        details: {
+          lastSeen: new Date(lastSeen).toISOString(),
+          minutesAgo: Math.round((now - lastSeen) / (1000 * 60)),
+        },
+      };
+    }
+
+    // Check if reader has required properties
+    if (!reader.device_sw_version) {
+      return {
+        isReady: false,
+        reason: "Reader software version unknown",
+        details: { device_sw_version: reader.device_sw_version },
+      };
+    }
+
+    // Reader appears ready
+    return {
+      isReady: true,
+      reason: "Reader is ready for payments",
+      details: {
+        status: reader.status,
+        lastSeen: lastSeen ? new Date(lastSeen).toISOString() : "unknown",
+        deviceType: reader.device_type,
+        softwareVersion: reader.device_sw_version,
+        ipAddress: reader.ip_address,
+      },
+    };
+  };
 
   // watch the combined workorders array and adjust accordingly
 
@@ -224,14 +299,26 @@ export function CheckoutModalScreen({ openWorkorder }) {
     // log("running");
   }, [sCombinedWorkorders, sIsRefund]);
 
-
   useEffect(() => {
     fetchStripeReaders();
+
+    // Cleanup timer on unmount
+    return () => {
+      if (readerCheckIntervalRef.current) {
+        log("Cleaning up card reader timer on unmount");
+        clearInterval(readerCheckIntervalRef.current);
+        readerCheckIntervalRef.current = null;
+        _setIsCheckingForReaders(false);
+        readerCheckStartTimeRef.current = null;
+      }
+    };
   }, []);
 
   async function fetchStripeReaders() {
     let message = "";
     let error = false;
+    let hasOfflineReader = false;
+
     try {
       const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
         method: "POST",
@@ -256,37 +343,126 @@ export function CheckoutModalScreen({ openWorkorder }) {
 
       if (readerArr?.length > 0) {
         log("[fetchStripeReaders] Readers retrieved successfully:", readerArr);
-        message = "Payment terminal ready";
-        _setStripeCardReaders(readerArr.filter((o) => o.status !== "offline"));
-        let timer;
-        if (!sCancelCardReaderTimer) {
-          timer = startTimer(MILLIS_IN_MINUTE * 10, 2000, () => {
-            getAvailableStripeReaders();
-          });
-          _setCancelCardReaderTimer(timer);
-        }
 
-        if (
-          readerArr.find((o) => o.id === zSettings?.selectedCardReaderObj.id)
-        ) {
-          let reader = readerArr.find(
-            (o) => o.id === zSettings?.selectedCardReaderObj.id
-          );
+        // Filter out offline readers for display
+        const onlineReaders = readerArr.filter((o) => o.status !== "offline");
+        _setStripeCardReaders(onlineReaders);
 
-          if (reader.status === "offline") {
+        // Check if selected reader exists and its status
+        const selectedReader = readerArr.find(
+          (o) => o.id === zSettings?.selectedCardReaderObj?.id
+        );
+
+        // Check if we have a selected reader configured
+        if (zSettings?.selectedCardReaderObj?.id) {
+          if (selectedReader) {
+            // Use comprehensive readiness check
+            const readinessCheck = isReaderReadyForPayment(selectedReader);
+            log("[fetchStripeReaders] Reader readiness check:", readinessCheck);
+
+            if (readinessCheck.isReady) {
+              // Reader is truly ready, clear any existing timer
+              if (readerCheckIntervalRef.current) {
+                log("Reader is ready for payments, clearing timer");
+                clearInterval(readerCheckIntervalRef.current);
+                readerCheckIntervalRef.current = null;
+                _setIsCheckingForReaders(false);
+                readerCheckStartTimeRef.current = null;
+              }
+              message = "Payment terminal ready";
+              error = false;
+            } else {
+              // Reader is not ready, show specific reason and start timer
+              hasOfflineReader = true;
+              error = true;
+              message = `Selected card reader is not ready!\n${readinessCheck.reason}`;
+
+              // Start timer to check for reader becoming ready
+              if (!readerCheckIntervalRef.current) {
+                log(
+                  `Starting timer to check for reader becoming ready: ${readinessCheck.reason}`
+                );
+                _setIsCheckingForReaders(true);
+                readerCheckStartTimeRef.current = Date.now();
+
+                // Use setInterval for continuous polling
+                readerCheckIntervalRef.current = setInterval(() => {
+                  // Check if we've been checking for too long (10 minutes)
+                  const now = Date.now();
+                  const timeSinceStart = now - readerCheckStartTimeRef.current;
+                  const maxCheckTime = MILLIS_IN_MINUTE * 10;
+
+                  if (timeSinceStart > maxCheckTime) {
+                    log("Reader check timeout reached, stopping timer");
+                    clearInterval(readerCheckIntervalRef.current);
+                    readerCheckIntervalRef.current = null;
+                    _setIsCheckingForReaders(false);
+                    readerCheckStartTimeRef.current = null;
+                    return;
+                  }
+
+                  log("Timer tick: checking if reader is ready");
+                  fetchStripeReaders();
+                }, 2000);
+              }
+            }
+          } else {
+            // Selected reader is not found in response (powered down/disconnected)
+            hasOfflineReader = true;
             error = true;
             message =
-              "Selected card reader is offline!\nCheck power and network connections";
-          } else {
-            // _setCardReader(zSettings?.selectedCardReaderObj);
-            if (timer || sCancelCardReaderTimer) {
-              if (timer) timer();
-              if (sCancelCardReaderTimer) sCancelCardReaderTimer();
+              "Selected card reader is not responding!\nCheck power and network connections";
+
+            // Start timer to check for reader coming back online
+            if (!readerCheckIntervalRef.current) {
+              log(
+                "Starting timer to check for missing reader coming back online"
+              );
+              _setIsCheckingForReaders(true);
+              readerCheckStartTimeRef.current = Date.now();
+
+              // Use setInterval for continuous polling
+              readerCheckIntervalRef.current = setInterval(() => {
+                // Check if we've been checking for too long (10 minutes)
+                const now = Date.now();
+                const timeSinceStart = now - readerCheckStartTimeRef.current;
+                const maxCheckTime = MILLIS_IN_MINUTE * 10;
+
+                if (timeSinceStart > maxCheckTime) {
+                  log("Reader check timeout reached, stopping timer");
+                  clearInterval(readerCheckIntervalRef.current);
+                  readerCheckIntervalRef.current = null;
+                  _setIsCheckingForReaders(false);
+                  readerCheckStartTimeRef.current = null;
+                  return;
+                }
+
+                log("Timer tick: checking if missing reader is back online");
+                fetchStripeReaders();
+              }, 2000);
             }
           }
-        } else if (readerArr.find((o) => o.status != "offline")) {
-          _setStripeCardReaders(readerArr.find((o) => o.status != "offline"));
+        } else if (onlineReaders.length > 0) {
+          // No selected reader configured, but we have online readers
+          // Check if any of them are actually ready for payments
+          const readyReaders = onlineReaders.filter((reader) => {
+            const readinessCheck = isReaderReadyForPayment(reader);
+            return readinessCheck.isReady;
+          });
+
+          if (readyReaders.length > 0) {
+            message = "Payment terminal ready";
+            error = false;
+          } else {
+            // All online readers are not ready for payments
+            hasOfflineReader = true;
+            error = true;
+            message =
+              "Card readers are online but not ready for payments!\nCheck reader status";
+          }
         } else {
+          // All readers are offline
+          hasOfflineReader = true;
           error = true;
           message =
             "No online card readers found!\nCheck power and network connections";
@@ -303,12 +479,39 @@ export function CheckoutModalScreen({ openWorkorder }) {
           : "Client error: An unknown error occurred.";
       log("[fetchStripeReaders] Exception caught:", err);
     }
+
+    // Update UI messages
     if (error) {
       _setStripeCardReaderErrorMessage(message);
       _setStripeCardReaderSuccessMessage("");
     } else {
       _setStripeCardReaderSuccessMessage(message);
       _setStripeCardReaderErrorMessage("");
+    }
+  }
+
+  // Manual function to stop the reader checking timer
+  function stopReaderCheckingTimer() {
+    if (readerCheckIntervalRef.current) {
+      log("Manually stopping card reader timer");
+      clearInterval(readerCheckIntervalRef.current);
+      readerCheckIntervalRef.current = null;
+      _setIsCheckingForReaders(false);
+      readerCheckStartTimeRef.current = null;
+    }
+  }
+
+  // Manual function to start checking for readers
+  function startCheckingForReaders() {
+    if (!readerCheckIntervalRef.current) {
+      log("Manually starting reader check timer");
+      _setIsCheckingForReaders(true);
+      readerCheckStartTimeRef.current = Date.now();
+
+      readerCheckIntervalRef.current = setInterval(() => {
+        log("Manual timer tick: checking for readers");
+        fetchStripeReaders();
+      }, 2000);
     }
   }
 
@@ -662,6 +865,7 @@ export function CheckoutModalScreen({ openWorkorder }) {
               sStripeCardReaders={sStripeCardReaders}
               sStripeCardReaderErrorMessage={sStripeCardReaderErrorMessage}
               sStripeCardReaderSuccessMessage={sStripeCardReaderSuccessMessage}
+              sIsCheckingForReaders={sIsCheckingForReaders}
               _setStripeCardReaderSuccessMessage={
                 _setStripeCardReaderSuccessMessage
               }

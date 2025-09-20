@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Text, View } from "react-native-web";
 import { Image_ } from "../../../components";
 import { ICONS } from "../../../styles";

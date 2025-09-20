@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
 import {
   PAYMENT_OBJECT_PROTO,

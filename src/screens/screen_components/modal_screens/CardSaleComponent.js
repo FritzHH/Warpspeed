@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
 import {
   PAYMENT_OBJECT_PROTO,
@@ -80,6 +81,7 @@ import {
   dbSetCustomerField,
   dbSetSalesObj,
   dbSubscribeToStripePaymentProcess,
+  createPaymentPollingFallback,
 } from "../../../db_call_wrapper";
 import { TouchableOpacity } from "react-native";
 import {
@@ -109,6 +111,7 @@ export const StripeCreditCardComponent = ({
   _setStripeCardReaderSuccessMessage,
   sStripeCardReaderErrorMessage,
   sStripeCardReaderSuccessMessage,
+  sIsCheckingForReaders = false,
   sRefund = {
     refundedLines: [],
     cashRefundRequested: 0,
@@ -119,6 +122,15 @@ export const StripeCreditCardComponent = ({
     cashTransactionArr: [],
   },
 }) => {
+  const getRefundAmountLeft = () => {
+    let amountAlreadyRefunded = sRefund?.selectedCardPayment?.amountRefunded;
+    if (!amountAlreadyRefunded) amountAlreadyRefunded = 0;
+    let refundAmountLeft =
+      sRefund?.selectedCardPayment?.amountCaptured - amountAlreadyRefunded;
+    // log("left", refundAmountLeft);
+    return refundAmountLeft;
+  };
+
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
@@ -142,13 +154,18 @@ export const StripeCreditCardComponent = ({
     (state) => state.getInventoryItem
   );
   const zSale = useCheckoutStore((state) => state.saleObj);
-  const [sRequestedAmount, _setRequestedAmount] = useState(null);
-  const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(0);
+  const [sRequestedAmount, _setRequestedAmount] = useState(
+    sIsRefund ? getRefundAmountLeft() : ""
+  );
+  const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState(
+    sIsRefund ? formatCurrencyDisp(getRefundAmountLeft()) : ""
+  );
   const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
   const [sFocusedItem, _setFocusedItem] = useState("");
   const [sCardReader, _setCardReader] = useState("");
   const [sListeners, _setListeners] = useState([]);
   const [sPaymentIntentID, _setPaymentIntentID] = useState("");
+  const [sPollingFallback, _setPollingFallback] = useState(null);
   /////////////////////////////////////////////////////////////////////////
 
   // check incoming REFUND an populate fields
@@ -159,11 +176,6 @@ export const StripeCreditCardComponent = ({
       if (!amountAlreadyRefunded) amountAlreadyRefunded = 0;
       let refundAmountLeft =
         sRefund?.selectedCardPayment?.amountCaptured - amountAlreadyRefunded;
-      if (sRequestedAmount == null) {
-        log("here");
-        _setRequestedAmount(refundAmountLeft);
-        _setRequestedAmountDisp(formatCurrencyDisp(refundAmountLeft));
-      }
       if (sRequestedAmount >= 50 && sRequestedAmount <= refundAmountLeft) {
         _setProcessButtonEnabled(true);
         _setStripeCardReaderSuccessMessage("");
@@ -224,6 +236,12 @@ export const StripeCreditCardComponent = ({
       } catch (e) {
         log("error canceling listener", e);
       }
+
+      // Clean up polling fallback
+      if (sPollingFallback) {
+        sPollingFallback.stop();
+        log("Cleaned up polling fallback");
+      }
     };
   }, [sStripeCardReaders, zSettings, sCardReader]);
 
@@ -235,70 +253,6 @@ export const StripeCreditCardComponent = ({
     _setRequestedAmount(cents);
     _setRequestedAmountDisp(dollars);
   }
-
-  // async function fetchStripeReaders() {
-  //   let message = "";
-  //   try {
-  //     const res = await fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //     });
-
-  //     // const data = await res.json();
-  //     // let readerArr = data.data;
-  //     // log("data", data.data);
-
-  //     // if (readerArr.length === 0) {
-  //     //   _setStatusMessage(
-  //     //     "No card readers found on this account!\nSee network admin"
-  //     //   );
-  //     //   return;
-  //     // } else {
-  //     //   _setCardReaders(readerArr);
-  //     //   // log(readerArr);
-  //     // }
-
-  //     let data, readerArr;
-  //     try {
-  //       data = await res.json();
-  //       readerArr = data.data;
-  //       if (data.data) {
-  //         log("reader arr", data.data);
-  //       }
-  //     } catch (jsonErr) {
-  //       console.error("[fetchStripeReaders] Failed to parse JSON:", jsonErr);
-  //       data = null;
-  //     }
-
-  //     if (!res.ok) {
-  //       message = extractStripeErrorMessage(data, res);
-  //       log("[fetchStripeReaders] HTTP error:", message);
-  //       _setStatusMessage(message);
-  //     }
-
-  //     if (data?.readerArr?.length > 0) {
-  //       log(
-  //         "[fetchStripeReaders] Readers retrieved successfully:",
-  //         data.readers
-  //       );
-  //       message = "Card readers found!";
-  //       return;
-  //     }
-
-  //     message = extractStripeErrorMessage(data);
-  //     log(
-  //       "[fetchStripeReaders] Server responded with success = false:",
-  //       message
-  //     );
-  //   } catch (err) {
-  //     message =
-  //       err instanceof Error
-  //         ? `Client error: ${err.message}`
-  //         : "Client error: An unknown error occurred.";
-  //     log("[fetchStripeReaders] Exception caught:", err);
-  //   }
-  //   _setStatusMessage(message);
-  // }
 
   async function startRefund(paymentAmount, payment) {
     let message = "";
@@ -368,13 +322,59 @@ export const StripeCreditCardComponent = ({
         // Payment succeeded
         message = "Waiting for customer...";
         _setPaymentIntentID(readerResult.paymentIntentID);
+
+        // Set up realtime database listener
         let listenerArr = cloneDeep(sListeners);
         let listener = dbSubscribeToStripePaymentProcess(
+          sCardReader.id,
           readerResult.paymentIntentID,
           handleStripeCardPaymentDBSubscriptionUpdate
         );
         listenerArr.push(listener);
         _setListeners(listenerArr);
+
+        // Set up polling fallback if configured
+        if (readerResult.pollingConfig?.enabled) {
+          const pollingFallback = createPaymentPollingFallback(
+            readerResult.pollingConfig,
+            // onUpdate callback
+            (updateData) => {
+              log("Polling fallback received update:", updateData);
+              handleStripeCardPaymentDBSubscriptionUpdate(
+                "update",
+                updateData,
+                readerResult.paymentIntentID
+              );
+            },
+            // onComplete callback
+            (completeData) => {
+              log("Polling fallback received completion:", completeData);
+              handleStripeCardPaymentDBSubscriptionUpdate(
+                "complete",
+                completeData,
+                readerResult.paymentIntentID
+              );
+            },
+            // onError callback
+            (errorMessage) => {
+              log("Polling fallback error:", errorMessage);
+              _setStripeCardReaderErrorMessage(
+                `Polling error: ${errorMessage}`
+              );
+              _setStripeCardReaderSuccessMessage("");
+            },
+            // onTimeout callback
+            (timeoutMessage) => {
+              log("Polling fallback timeout:", timeoutMessage);
+              _setStripeCardReaderErrorMessage(timeoutMessage);
+              _setStripeCardReaderSuccessMessage("");
+            }
+          );
+
+          _setPollingFallback(pollingFallback);
+          pollingFallback.start();
+          log("Started polling fallback for payment processing");
+        }
       } else {
         // Server returned success: false with Stripe-style error
         error = true;
@@ -396,86 +396,112 @@ export const StripeCreditCardComponent = ({
     }
   }
 
-  // async function startPaymen1t(paymentAmount, reader, update) {
-  //   let readerID = reader.id;
-  //   if (!(paymentAmount > 0)) return;
-  //   _setStatusTextColor("green");
-  //   _setStatusMessage("Retrieving card reader activation...");
-
-  //   try {
-  //     let readerResult;
-  //     readerResult = await dbProcessServerDrivenStripePayment(
-  //       paymentAmount,
-  //       readerID,
-  //       sPaymentIntentID
-  //     );
-  //   } catch (e) {}
-
-  //   if (readerResult?.error?.code) {
-  //     handleStripeReaderActivationError(readerResult.error.code);
-  //   } else {
-  //     _setStatusTextColor("green");
-  //     _setStatusMessage("Waiting for customer...");
-  //     // log("readerkdfjkdjf", readerResult.paymentIntentID);
-  //     _setPaymentIntentID(readerResult.paymentIntentID);
-  //     let listenerArr = cloneDeep(sListeners);
-  //     let listener = dbSubscribeToStripePaymentProcess(
-  //       readerResult.paymentIntentID,
-  //       handleStripeCardPaymentDBSubscriptionUpdate
-  //     );
-  //     listenerArr.push(listener);
-  //     _setListeners(listenerArr);
-  //   }
-  // }
-
   function handleStripeCardPaymentDBSubscriptionUpdate(
     key,
     val,
     paymentIntentID
   ) {
-    let failureCode = val?.failure_code;
-    let message;
+    let message = "";
     let error = false;
-    if (
-      failureCode &&
-      val?.process_payment_intent?.payment_intent == paymentIntentID
-    ) {
-      log("card failure code", failureCode);
+
+    try {
+      // Input validation
+      if (!val || typeof val !== "object") {
+        log("Invalid payment update data received", val);
+        return;
+      }
+
+      if (!paymentIntentID || typeof paymentIntentID !== "string") {
+        log("Invalid payment intent ID received", paymentIntentID);
+        return;
+      }
+
+      let failureCode = val?.failure_code;
+
+      // Handle payment failure
+      if (
+        failureCode &&
+        val?.process_payment_intent?.payment_intent === paymentIntentID
+      ) {
+        log("card failure code", failureCode);
+        error = true;
+        message = `Failure code: ${val.failure_code}`;
+      }
+      // Handle successful payment
+      else if (
+        val.status === "succeeded" &&
+        val.payment_intent === paymentIntentID
+      ) {
+        message = "Payment complete!";
+        log("Stripe payment complete!");
+
+        // Stop polling fallback since payment completed
+        if (sPollingFallback) {
+          sPollingFallback.stop();
+          _setPollingFallback(null);
+          log("Stopped polling fallback - payment completed");
+        }
+
+        try {
+          // Validate payment method details structure
+          if (
+            !val.payment_method_details ||
+            !val.payment_method_details.card_present
+          ) {
+            throw new Error("Invalid payment method details structure");
+          }
+
+          let paymentMethodDetails = val.payment_method_details.card_present;
+          let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
+
+          // Safely extract payment details with fallbacks
+          payment.amountCaptured = val.amount_captured || 0;
+          payment.cardIssuer =
+            paymentMethodDetails?.receipt?.application_preferred_name ||
+            "Unknown";
+          payment.cardType =
+            paymentMethodDetails?.description || "Unknown Card";
+          payment.id = generateUPCBarcode();
+          payment.isRefund = sIsRefund;
+          payment.millis = new Date().getTime();
+          payment.authorizationCode =
+            paymentMethodDetails?.receipt?.authorization_code || "";
+          payment.paymentIntentID = val.payment_intent;
+          payment.chargeID = val.id;
+          payment.paymentProcessor = "stripe";
+          payment.receiptURL = val.receipt_url || "";
+          payment.last4 = paymentMethodDetails?.last4 || "";
+          payment.expMonth = paymentMethodDetails?.exp_month || "";
+          payment.expYear = paymentMethodDetails?.exp_year || "";
+          payment.networkTransactionID =
+            paymentMethodDetails?.network_transaction_id || "";
+          payment.amountRefunded = val.amount_refunded || 0;
+
+          log("Successful Payment details obj", payment);
+          handlePaymentCapture(payment);
+        } catch (paymentError) {
+          log("Error processing successful payment", paymentError);
+          error = true;
+          message =
+            "Payment succeeded but failed to process details. Please check transaction.";
+        }
+      }
+      // Handle other status updates (e.g., "requires_payment_method", "requires_confirmation")
+      else if (val.status && val.payment_intent === paymentIntentID) {
+        log("Payment status update", val.status);
+        // Don't set error for status updates that aren't success/failure
+        message = `Payment status: ${val.status}`;
+      }
+    } catch (err) {
       error = true;
       message =
-        "Failure code:  " + val.failure_code + "\n\nPayment Rejected by Stripe";
-    } else if (
-      val.status === "succeeded" &&
-      val.payment_intent === paymentIntentID
-    ) {
-      message = "Payment complete!";
-      log("Stripe payment complete!");
-      // clog("Payment complete object", val);
-      let paymentMethodDetails = val.payment_method_details.card_present;
-      let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
-      payment.amountCaptured = val.amount_captured;
-      payment.cardIssuer =
-        paymentMethodDetails.receipt.application_preferred_name;
-      payment.cardType = paymentMethodDetails.description;
-      payment.id = generateUPCBarcode();
-      payment.isRefund = sIsRefund;
-      payment.millis = new Date().getTime();
-      payment.authorizationCode =
-        paymentMethodDetails.receipt.authorization_code;
-      payment.paymentIntentID = val.payment_intent;
-      payment.chargeID = val.id;
-      payment.paymentProcessor = "stripe";
-      payment.receiptURL = val.receipt_url;
-      payment.last4 = val.payment_method_details.card_present.last4;
-      payment.expMonth = val.payment_method_details.card_present.exp_month;
-      payment.expYear = val.payment_method_details.card_present.exp_year;
-      payment.networkTransactionID =
-        val.payment_method_details.card_present.network_transaction_id;
-      payment.amountRefunded = val.amount_refunded;
-      // clog("Successful Payment details obj", paymentDetailsObj);
-      handlePaymentCapture(payment);
+        err instanceof Error
+          ? `Payment processing error: ${err.message}`
+          : "Payment processing error: An unknown error occurred.";
+      log("Error in handleStripeCardPaymentDBSubscriptionUpdate", err);
     }
 
+    // Update UI state based on error/success
     if (error && message) {
       _setStripeCardReaderErrorMessage(message);
       _setStripeCardReaderSuccessMessage("");
@@ -490,6 +516,14 @@ export const StripeCreditCardComponent = ({
     _setStripeCardReaderSuccessMessage("");
     _setPaymentIntentID(null);
     sListeners.forEach((listener) => listener());
+
+    // Clean up polling fallback
+    if (sPollingFallback) {
+      sPollingFallback.stop();
+      _setPollingFallback(null);
+      log("Stopped polling fallback during reset");
+    }
+
     _setProcessButtonEnabled(true);
 
     let message = "";
@@ -555,7 +589,6 @@ export const StripeCreditCardComponent = ({
 
     // setClientSecret(data.clientSecret);
   }
-  // log("readers", sStripeCardReaders);
   return (
     <View
       pointerEvents={sSale?.paymentComplete ? "none" : "auto"}
@@ -659,7 +692,10 @@ export const StripeCreditCardComponent = ({
           }}
         >
           <Text
-            style={{ color: sIsRefund ? gray(0.2) : C.textMain, marginTop: 10 }}
+            style={{
+              color: sIsRefund ? gray(0.2) : C.textMain,
+              marginTop: 10,
+            }}
           >
             Balance
           </Text>
@@ -752,7 +788,7 @@ export const StripeCreditCardComponent = ({
             {sRefund.selectedCardPayment?.cardType}
           </Text>
           <Text style={{ fontSize: 12, color: gray(0.4), marginHorizontal: 5 }}>
-            {"**" + sRefund.selectedCardPayment?.last4}
+            {"***" + sRefund.selectedCardPayment?.last4}
           </Text>
           <Text style={{ fontSize: 12, color: gray(0.4), marginHorizontal: 5 }}>
             {sRefund.selectedCardPayment.expMonth +
@@ -795,6 +831,18 @@ export const StripeCreditCardComponent = ({
         >
           {sStripeCardReaderErrorMessage || sStripeCardReaderSuccessMessage}
         </Text>
+        {sIsCheckingForReaders && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: gray(0.6),
+              marginTop: 3,
+              fontStyle: "italic",
+            }}
+          >
+            🔄 Checking for card readers...
+          </Text>
+        )}
       </View>
     </View>
   );

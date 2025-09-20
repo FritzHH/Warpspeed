@@ -36,6 +36,8 @@ import {
   subscribeToNodeChange,
   processServerDrivenStripeRefund,
 } from "./db";
+import { get, ref } from "firebase/database";
+import { RDB } from "./db";
 import { useDatabaseBatchStore } from "./storesOld";
 import { clog, generateRandomID, log } from "./utils";
 
@@ -299,8 +301,12 @@ export function dbSendMessageToCustomer(messageObj) {
 
 // server driven Stripe payment processing (new)
 
-export function dbSubscribeToStripePaymentProcess(paymentIntentID, callback) {
-  let path = build_db_path.cardPaymentFlow(paymentIntentID);
+export function dbSubscribeToStripePaymentProcess(
+  readerID,
+  paymentIntentID,
+  callback
+) {
+  let path = build_db_path.cardPaymentFlow(readerID, paymentIntentID);
   // subscribeToNodeChange(path, (key, val) => callback(key, val, paymentIntentID));
   return subscribeToNodeAddition(path, (key, val) =>
     callback(key, val, paymentIntentID)
@@ -309,6 +315,127 @@ export function dbSubscribeToStripePaymentProcess(paymentIntentID, callback) {
 
 export async function dbProcessStripeRefund(paymentAmount, paymentIntentID) {
   return processServerDrivenStripeRefund(paymentAmount, paymentIntentID);
+}
+
+// Client-side polling fallback for payment processing
+export function createPaymentPollingFallback(
+  pollingConfig,
+  onUpdate,
+  onComplete,
+  onError,
+  onTimeout
+) {
+  const {
+    databasePath,
+    pollingInterval = 3000,
+    maxPollingTime = MILLIS_IN_MINUTE * 2,
+    timeoutMessage = "Payment processing timeout",
+  } = pollingConfig;
+
+  let pollingTimer = null;
+  let timeoutTimer = null;
+  let isPolling = false;
+  let lastUpdateTime = Date.now();
+
+  const startPolling = () => {
+    if (isPolling) return;
+
+    isPolling = true;
+    log(`Starting payment polling fallback for path: ${databasePath}`);
+
+    // Set up timeout timer
+    timeoutTimer = setTimeout(() => {
+      stopPolling();
+      onTimeout && onTimeout(timeoutMessage);
+      log(`Payment polling timeout reached for ${databasePath}`);
+    }, maxPollingTime);
+
+    // Start polling
+    pollingTimer = setInterval(async () => {
+      try {
+        // Check for updates in the database
+        const updateRef = ref(RDB, `${databasePath}/update`);
+        const completeRef = ref(RDB, `${databasePath}/complete`);
+
+        const [updateSnapshot, completeSnapshot] = await Promise.all([
+          get(updateRef),
+          get(completeRef),
+        ]);
+
+        const updateData = updateSnapshot.val();
+        const completeData = completeSnapshot.val();
+
+        // Check for completion
+        if (completeData) {
+          log("Payment completed via polling fallback", completeData);
+          stopPolling();
+          onComplete && onComplete(completeData);
+          return;
+        }
+
+        // Check for updates
+        if (updateData) {
+          const updateTime = updateData.timestamp || Date.now();
+
+          // Only process if this is a new update
+          if (updateTime > lastUpdateTime) {
+            lastUpdateTime = updateTime;
+            log("Payment update received via polling fallback", updateData);
+            onUpdate && onUpdate(updateData);
+
+            // Check if this is a final status (success/failure)
+            if (
+              updateData.status === "succeeded" ||
+              updateData.status === "failed" ||
+              updateData.status === "canceled"
+            ) {
+              stopPolling();
+            }
+          }
+        }
+
+        // Check for stale data (no updates for too long)
+        const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+        if (timeSinceLastUpdate > 60000) {
+          // 1 minute without updates
+          log(
+            `Stale data detected for ${databasePath}, no updates for ${timeSinceLastUpdate}ms`
+          );
+          onError &&
+            onError("Payment processing appears stalled - no updates received");
+        }
+      } catch (error) {
+        log("Error in payment polling fallback:", error);
+        onError && onError(`Polling error: ${error.message}`);
+      }
+    }, pollingInterval);
+  };
+
+  const stopPolling = () => {
+    if (!isPolling) return;
+
+    isPolling = false;
+
+    if (pollingTimer) {
+      clearInterval(pollingTimer);
+      pollingTimer = null;
+    }
+
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer);
+      timeoutTimer = null;
+    }
+
+    log(`Stopped payment polling fallback for ${databasePath}`);
+  };
+
+  const isActive = () => isPolling;
+
+  return {
+    start: startPolling,
+    stop: stopPolling,
+    isActive,
+  };
 }
 
 export async function dbProcessServerDrivenStripePayment(

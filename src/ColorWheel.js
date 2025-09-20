@@ -1,3 +1,4 @@
+/* eslint-disable */
 // ColorWheel.js
 import React, { useMemo, useRef, useState, useCallback } from "react";
 import { View, PanResponder } from "react-native";

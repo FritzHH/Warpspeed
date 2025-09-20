@@ -1,3 +1,4 @@
+/* eslint-disable */
 // various constants from the world
 export const MILLIS_IN_MINUTE = 60000;
 export const MILLIS_IN_HOUR = MILLIS_IN_MINUTE * 60;
@@ -102,7 +103,13 @@ export const build_db_path = {
   sales: (salesObjID) => {
     return FIRESTORE_COLLECTION_NAMES.sales + salesObjID + "/";
   },
-  cardPaymentFlow: (id) => {
-    return REALTIME_DATABASE_NODE_NAMES.paymentProcessing + id + "/";
+  cardPaymentFlow: (readerID, paymentIntentID) => {
+    return (
+      REALTIME_DATABASE_NODE_NAMES.paymentProcessing +
+      readerID +
+      "/" +
+      paymentIntentID +
+      "/"
+    );
   },
 };

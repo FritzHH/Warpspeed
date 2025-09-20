@@ -246,7 +246,6 @@ exports.initiatePaymentIntent = onRequest(
 
       // 1. Create the PaymentIntent
       let paymentIntent;
-      let paymentIntentID;
       // check to see if we are reusing an old payment attempt
       if (!req.body.paymentIntentID) {
         // we are not
@@ -274,15 +273,36 @@ exports.initiatePaymentIntent = onRequest(
           payment_intent: paymentIntent.id,
         });
 
-      // 3. Return success
+      // 3. Return success with client-side polling configuration
+      const paymentIntentID =
+        processedIntent.action.process_payment_intent.payment_intent;
+      log("Stripe payment successfully started", processedIntent);
+
       return res.status(200).send(
         JSON.stringify({
           success: true,
           message: `✅ Payment of $${(amount / 100).toFixed(
             2
           )} processed successfully.`,
-          paymentIntentId: processedIntent.id,
+          paymentIntentID: paymentIntentID,
+          readerID: processedIntent.id,
           status: processedIntent.status,
+          // Client-side polling configuration
+          pollingConfig: {
+            enabled: true,
+            databasePath: `PAYMENT-PROCESSING/${readerID}/${paymentIntentID}`,
+            pollingInterval: 3000, // 3 seconds
+            maxPollingTime: 300000, // 5 minutes
+            timeoutMessage:
+              "Payment processing timeout - please check reader status",
+            fallbackEnabled: true,
+            // Expected database structure for monitoring
+            expectedNodes: {
+              update: "PAYMENT-PROCESSING/{readerID}/{paymentIntentID}/update/",
+              complete:
+                "PAYMENT-PROCESSING/{readerID}/{paymentIntentID}/complete/",
+            },
+          },
         })
       );
     } catch (error) {
@@ -325,39 +345,107 @@ exports.initiatePaymentIntent = onRequest(
 exports.stripeEventWebhook = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
     log("Incoming Stripe webhook event body", req.body);
-    let paymentIntentID =
-      req.body.data.object.action.process_payment_intent.payment_intent;
-    log("payment intent id", paymentIntentID);
 
-    let action = req.body.data.object.action;
-    action.randomVal = Math.random();
+    let message = "";
+    let error = false;
 
-    let dbRef = RDB.ref("PAYMENT-PROCESSING/" + paymentIntentID + "/update/");
-    dbRef.set(action);
-
-    log("data package to show reader ID", req.body.data);
-    if (action.status == "succeeded") {
-      log("Payment attempt succeeded");
-      const paymentIntentComplete = await stripe.paymentIntents.retrieve(
-        paymentIntentID
-      );
-      let chargeID = paymentIntentComplete.latest_charge;
-      log("Payment Intent complete obj", paymentIntentComplete);
-      log("Charge ID", chargeID);
-      const charge = await stripe.charges.retrieve(chargeID);
-      dbRef = RDB.ref("PAYMENT-PROCESSING/" + paymentIntentID + "/complete/");
-      dbRef.set(charge);
-      log("Card charge object", charge);
+    // Input validation
+    if (!req.body || !req.body.data || !req.body.data.object) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid webhook payload structure.",
+      });
     }
 
-    const readerResult = await stripe.terminal.readers.cancelAction(
-      req.body.data.object.id
-    );
-    log(
-      "Result of canceling reader after a card was declined or payment approved or any other update just to be safe",
-      readerResult
-    );
+    let paymentIntentID;
+    let action;
+    let readerID;
+
+    try {
+      // Extract payment intent ID and action from webhook payload
+      action = req.body.data.object.action;
+      if (!action || !action.process_payment_intent) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid webhook action structure.",
+        });
+      }
+
+      paymentIntentID = action.process_payment_intent.payment_intent;
+      readerID = req.body.data.object.id;
+
+      if (!paymentIntentID || typeof paymentIntentID !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Payment intent ID must be provided and must be a string.",
+        });
+      }
+
+      if (!readerID || typeof readerID !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Reader ID must be provided and must be a string.",
+        });
+      }
+
+      // Update database with action data
+      let dbRef = RDB.ref(
+        "PAYMENT-PROCESSING/" + readerID + "/" + paymentIntentID + "/update/"
+      );
+      await dbRef.set(action);
+
+      log("data package to show reader ID", req.body.data);
+
+      // Handle successful payment
+      if (action.status === "succeeded") {
+        log("Payment attempt succeeded");
+
+        try {
+          const paymentIntentComplete = await stripe.paymentIntents.retrieve(
+            paymentIntentID
+          );
+
+          if (!paymentIntentComplete.latest_charge) {
+            throw new Error("No charge found for successful payment intent");
+          }
+
+          let chargeID = paymentIntentComplete.latest_charge;
+          log("Payment Intent complete obj", paymentIntentComplete);
+          log("Charge ID", chargeID);
+
+          const charge = await stripe.charges.retrieve(chargeID);
+          dbRef = RDB.ref(
+            "PAYMENT-PROCESSING/" + paymentIntentID + "/complete/"
+          );
+          await dbRef.set(charge);
+          log("Card charge object", charge);
+        } catch (stripeError) {
+          log("Error retrieving payment details", stripeError);
+          // Continue execution - don't fail the webhook for this
+        }
+      }
+
+      // Cancel reader action to clean up
+      try {
+        const readerResult = await stripe.terminal.readers.cancelAction(
+          readerID
+        );
+        log("Result of canceling reader after payment update", readerResult);
+      } catch (cancelError) {
+        log("Error canceling reader action", cancelError);
+        // Continue execution - don't fail the webhook for this
+      }
+    } catch (err) {
+      error = true;
+      message =
+        err instanceof Error
+          ? `Webhook processing error: ${err.message}`
+          : "Webhook processing error: An unknown error occurred.";
+
+      log("Stripe Webhook processing error", err.message);
+    }
   }
 );
 

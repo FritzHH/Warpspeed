@@ -1,3 +1,4 @@
+/* eslint-disable */
 export const firebaseConfig = {
   apiKey: "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM",
   authDomain: "warpspeed-bonitabikes.firebaseapp.com",

@@ -92,6 +92,7 @@ export function BaseScreen() {
   const [screenWidth, _setScreenWidth] = useState(window.innerWidth);
   const [screenHeight, _setScreenHeight] = useState(window.innerHeight);
 
+  // auto window resizing
   useEffect(() => {
     const handleResize = () => {
       _setScreenWidth(window.innerWidth);

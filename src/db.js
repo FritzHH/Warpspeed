@@ -70,7 +70,7 @@ const FIRESTORE = getFirestore(firebaseApp);
 //   localCache: persistentLocalCache(/*settings*/ {}),
 // });
 // disableNetwork(FIRESTORE);
-const RDB = getDatabase();
+export const RDB = getDatabase();
 
 ///**************************************************************
 // NEW *////////////////////////////////////////////////////////////
@@ -136,9 +136,10 @@ export function subscribeToNodeRemoval(nodePath, callback) {
 
 export function subscribeToNodeAddition(path, callback) {
   // log("path", path);
+  // log(callback);
   let dbRef = ref(RDB, path);
   return onChildAdded(dbRef, (snap) => {
-    // log("snap", snap);
+    // log("raw db snap", snap);
     if (snap.val()) {
       // clog("node addition", snap.val());
       callback(snap.key, snap.val());
@@ -562,6 +563,7 @@ export function processServerDrivenStripeRefund(amount, paymentIntentID) {
     }),
   });
 }
+
 export function cancelServerDrivenStripePayment(readerID) {
   return fetch(STRIPE_CANCEL_PAYMENT_INTENT_URL, {
     method: "POST",
@@ -573,10 +575,6 @@ export function cancelServerDrivenStripePayment(readerID) {
     }),
   });
 }
-
-// export function retrieveAvailableStripeReaders(readerID) {
-//   const functions = getFunctions(firebaseApp);
-// }
 
 export function retrieveAvailableStripeReaders(readerID) {
   return fetch(STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL, {

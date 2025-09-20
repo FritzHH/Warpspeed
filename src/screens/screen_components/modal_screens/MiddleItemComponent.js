@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
 import {
   CONTACT_RESTRICTIONS,
@@ -36,6 +37,7 @@ import {
   SliderButton_,
   GradientView,
   AlertBox_,
+  Image_,
 } from "../../../components";
 import { cloneDeep, initial } from "lodash";
 import {
@@ -736,9 +738,16 @@ export const MiddleItemComponent = ({
                 width: "100%",
               }}
             >
-              <Text style={{ fontSize: 16, color: C.red }}>
-                {"CASH REFUND REQUESTED"}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Image_
+                  size={23}
+                  style={{ marginRight: 10 }}
+                  icon={ICONS.greenDollar}
+                />
+                <Text style={{ fontSize: 16, color: C.red }}>
+                  {"REFUND REQUESTED"}
+                </Text>
+              </View>
               <View style={{ flexDirection: "row" }}>
                 <Text
                   style={{
@@ -771,9 +780,16 @@ export const MiddleItemComponent = ({
                 width: "100%",
               }}
             >
-              <Text style={{ fontSize: 16, color: C.red }}>
-                {"CARD REFUND REQUESTED"}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Image_
+                  size={25}
+                  style={{ marginRight: 10 }}
+                  icon={ICONS.creditCard}
+                />
+                <Text style={{ fontSize: 16, color: C.red }}>
+                  {"REFUND REQUESTED"}
+                </Text>
+              </View>
               <View style={{ flexDirection: "row" }}>
                 <Text
                   style={{

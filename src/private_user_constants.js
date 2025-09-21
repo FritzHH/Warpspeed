@@ -20,6 +20,9 @@ export const STRIPE_CONNECTION_TOKEN_FIREBASE_URL =
 export const STRIPE_INITIATE_PAYMENT_INTENT_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/initiatePaymentIntent";
 
+export const STRIPE_INITIATE_REFUND_URL =
+  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/initiateRefund";
+
 export const STRIPE_CANCEL_PAYMENT_INTENT_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/cancelServerDrivenStripePayment";
 

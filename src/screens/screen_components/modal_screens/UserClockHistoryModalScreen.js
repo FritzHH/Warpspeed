@@ -388,7 +388,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
           }}
         >
           <View style={{ width: "35%" }}>
-            {zCurrentUserObj?.permissions?.level >= 3 ? (
+            {!!zCurrentUserObj?.permissions?.level >= 3 && (
               <View
                 style={{
                   marginBottom: 30,
@@ -422,7 +422,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                   }}
                 />
               </View>
-            ) : null}
+            )}
             <DateTimePicker range={sRange} handleDateRangeChange={_setRange} />
             <View
               style={{
@@ -493,7 +493,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
           >
             {/* "Flat list component" ////////////////////////////////////////*/}
             {/* "Flat list component" ////////////////////////////////////////*/}
-            {sHistoryDisplay.length > 0 ? (
+            {!!sHistoryDisplay.length > 0 && (
               <FlatList
                 // style={{ width: "100%" }}
                 data={sHistoryDisplay}
@@ -535,7 +535,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           {item.in?.year || item.out?.year}
                         </Text>
                       </View>
-                      {item.in ? (
+                      {!!item.in && (
                         <View
                           style={{
                             flexDirection: "row",
@@ -580,7 +580,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 alignItems: "center",
                               }}
                             >
-                              {editable ? (
+                              {!!editable && (
                                 <Button_
                                   icon={ICONS.upChevron}
                                   iconSize={iconSize}
@@ -592,7 +592,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                     paddingHorizontal: 0,
                                   }}
                                 />
-                              ) : null}
+                              )}
                               <Text
                                 style={{
                                   width: 20,
@@ -601,7 +601,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               >
                                 {item.in.dayOfMonth}
                               </Text>
-                              {editable ? (
+                              {!!editable && (
                                 <Button_
                                   buttonStyle={{
                                     paddingVertical: 0,
@@ -613,11 +613,11 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                     handleTimeEdit(item, "in-date-down")
                                   }
                                 />
-                              ) : null}
+                              )}
                             </View>
                           </View>
                           <View style={{ alignItems: "center" }}>
-                            {editable ? (
+                            {!!editable && (
                               <Button_
                                 buttonStyle={{
                                   paddingVertical: 0,
@@ -629,7 +629,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                   handleTimeEdit(item, "in-hour-up")
                                 }
                               />
-                            ) : null}
+                            )}
                             <Text
                               style={{
                                 width: iconSize,
@@ -644,7 +644,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             >
                               {item.in.hour}
                             </Text>
-                            {editable ? (
+                            {!!editable && (
                               <Button_
                                 buttonStyle={{
                                   paddingVertical: 0,
@@ -656,11 +656,11 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                   handleTimeEdit(item, "in-hour-down")
                                 }
                               />
-                            ) : null}
+                            )}
                           </View>
                           <Text style={{ paddingHorizontal: 1 }}>:</Text>
                           <View style={{ alignItems: "center" }}>
-                            {editable ? (
+                            {!!editable && (
                               <Button_
                                 icon={ICONS.upChevron}
                                 iconSize={iconSize}
@@ -672,7 +672,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                   paddingHorizontal: 0,
                                 }}
                               />
-                            ) : null}
+                            )}
                             <Text
                               style={{
                                 width: iconSize,
@@ -685,7 +685,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             >
                               {item.in.minutes}
                             </Text>
-                            {editable ? (
+                            {!!editable && (
                               <Button_
                                 buttonStyle={{
                                   paddingVertical: 0,
@@ -697,7 +697,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                   handleTimeEdit(item, "in-minutes-down")
                                 }
                               />
-                            ) : null}
+                            )}
                           </View>
                           <View
                             ref={(el) => (amPMINDropdownRef.current[idx] = el)}
@@ -724,10 +724,8 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             />
                           </View>
                         </View>
-                      ) : (
-                        <View style={{ width: "32%" }} />
                       )}
-                      {item.out ? (
+                      {!!item.out && (
                         <View
                           style={{
                             flexDirection: "row",
@@ -777,7 +775,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             <View
                               style={{ alignItems: "center", marginLeft: 3 }}
                             >
-                              {editable ? (
+                              {!!editable && (
                                 <Button_
                                   icon={ICONS.upChevron}
                                   iconSize={iconSize}
@@ -789,11 +787,11 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                     paddingHorizontal: 0,
                                   }}
                                 />
-                              ) : null}
+                              )}
                               <Text style={{ width: 20, textAlign: "center" }}>
                                 {item.out.dayOfMonth}
                               </Text>
-                              {editable ? (
+                              {!!editable && (
                                 <Button_
                                   buttonStyle={{
                                     paddingVertical: 0,
@@ -805,7 +803,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                     handleTimeEdit(item, "out-date-down")
                                   }
                                 />
-                              ) : null}
+                              )}
                             </View>
                           </View>
 
@@ -817,7 +815,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             }}
                           >
                             <View>
-                              {editable ? (
+                              {!!editable && (
                                 <Button_
                                   icon={ICONS.upChevron}
                                   iconSize={iconSize}
@@ -829,7 +827,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                     paddingHorizontal: 0,
                                   }}
                                 />
-                              ) : null}
+                              )}
                               <Text
                                 style={{
                                   // marginLeft: 10,
@@ -844,7 +842,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 {item.out.hour}
                               </Text>
 
-                              {editable ? (
+                              {!!editable && (
                                 <Button_
                                   buttonStyle={{
                                     paddingVertical: 0,
@@ -856,11 +854,11 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                     handleTimeEdit(item, "out-hour-down")
                                   }
                                 />
-                              ) : null}
+                              )}
                             </View>
                             <Text style={{ paddingHorizontal: 1 }}>:</Text>
                             <View>
-                              {editable ? (
+                              {!!editable && (
                                 <Button_
                                   icon={ICONS.upChevron}
                                   iconSize={iconSize}
@@ -872,7 +870,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                     paddingHorizontal: 0,
                                   }}
                                 />
-                              ) : null}
+                              )}
                               <Text
                                 style={{
                                   width: iconSize,
@@ -885,7 +883,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               >
                                 {item.out.minutes}
                               </Text>
-                              {editable ? (
+                              {!!editable && (
                                 <Button_
                                   buttonStyle={{
                                     paddingVertical: 0,
@@ -897,7 +895,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                     handleTimeEdit(item, "out-minutes-down")
                                   }
                                 />
-                              ) : null}
+                              )}
                             </View>
                           </View>
                           <View
@@ -925,8 +923,6 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             />
                           </View>
                         </View>
-                      ) : (
-                        <View style={{ width: "35%" }} />
                       )}
                       <View
                         style={{
@@ -936,7 +932,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                           alignItems: "center",
                         }}
                       >
-                        {item.hoursDiff || item.minutesDiff ? (
+                        {!!(item.hoursDiff || item.minutesDiff) && (
                           <View
                             style={{
                               flexDirection: "row",
@@ -953,8 +949,6 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 item.minutesDiff}
                             </Text>
                           </View>
-                        ) : (
-                          <View style={{ width: "45%" }} />
                         )}
 
                         <View
@@ -975,7 +969,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             iconSize={20}
                             icon={ICONS.editPencil}
                           />
-                          {editable ? (
+                          {!!editable && (
                             <Button_
                               onPress={() => {
                                 handleDeletePunchPress(item.in || item.out);
@@ -988,32 +982,13 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               iconSize={16}
                               icon={ICONS.close1}
                             />
-                          ) : null}
+                          )}
                         </View>
                       </View>
                     </View>
                   );
                 }}
               />
-            ) : (
-              <View
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    color: gray(0.4),
-                    fontSize: 17,
-                    paddingVertical: 10,
-                  }}
-                >
-                  No punches for this date range
-                </Text>
-              </View>
             )}
           </View>
         </View>

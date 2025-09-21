@@ -74,30 +74,11 @@ import {
   dbSetInventoryItem,
   dbSetSettings,
 } from "./db_call_wrapper";
-import {
-  paymentIntentSubscribe,
-  removePaymentIntentSub,
-} from "./db_subscription_wrapper";
-import Dropzone from "react-dropzone";
-import { CheckBox_ as RNCheckBox_ } from "react-native-web";
 import LinearGradient from "react-native-web-linear-gradient";
-import { TextComponent } from "react-native";
 // import DateTimePicker from "@react-native-community/datetimepicker";
-import CalendarPicker, {
-  DateType,
-  useDefaultStyles,
-} from "react-native-ui-datepicker";
-import dayjs from "dayjs"; // Recommended for date manipulation
+import CalendarPicker, { useDefaultStyles } from "react-native-ui-datepicker";
 import { PanResponder } from "react-native";
-import Svg, {
-  Circle,
-  ClipPath,
-  Defs,
-  G,
-  Path,
-  Rect,
-  Stop,
-} from "react-native-svg";
+
 import { StyleSheet } from "react-native";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
@@ -303,7 +284,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
               ...zAlertBoxStyle,
             }}
           >
-            {zTitle ? (
+            {!!zTitle && (
               <Text
                 numberOfLines={3}
                 style={{
@@ -316,9 +297,9 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
               >
                 {zTitle || "Alert:"}
               </Text>
-            ) : null}
+            )}
 
-            {zMessage ? (
+            {!!zMessage && (
               <Text
                 style={{
                   textAlign: "center",
@@ -330,8 +311,8 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
               >
                 {zMessage}
               </Text>
-            ) : null}
-            {zSubMessage ? (
+            )}
+            {!!zSubMessage && (
               <Text
                 style={{
                   marginTop: 20,
@@ -343,7 +324,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
               >
                 {zSubMessage}
               </Text>
-            ) : null}
+            )}
             <View
               style={{
                 marginTop: 25,
@@ -362,7 +343,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                 iconSize={zIcon1Size || 60}
                 icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
               />
-              {zButton2Handler ? (
+              {!!zButton2Handler && (
                 <Button_
                   colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
                   text={zButton2Text}
@@ -372,8 +353,8 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                   iconSize={zIcon2Size || 60}
                   icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
                 />
-              ) : null}
-              {zButton3Handler ? (
+              )}
+              {!!zButton3Handler && (
                 <Button_
                   colorGradientArr={zButton3Text ? COLOR_GRADIENTS.purple : []}
                   text={zButton3Text}
@@ -383,7 +364,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                   iconSize={zIcon3Size || 60}
                   icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
                 />
-              ) : null}
+              )}
             </View>
           </View>
         </View>
@@ -513,7 +494,7 @@ export const ScreenModal = ({
       }}
     >
       <View style={{}}>
-        {buttonVisible ? (
+        {!!buttonVisible && (
           <Button_
             enabled={enabled}
             handleMouseExit={handleMouseExit}
@@ -542,7 +523,7 @@ export const ScreenModal = ({
               ...buttonStyle,
             }}
           />
-        ) : null}
+        )}
 
         <Modal
           visible={
@@ -1467,7 +1448,7 @@ export const CustomerInfoScreenModalComponent = ({
             <View
               style={{ flexDirection: "row", justifyContent: "space-between" }}
             >
-              {button1Text ? (
+              {!!button1Text && (
                 <Button
                   onPress={handleButton1Press}
                   viewStyle={{
@@ -1480,8 +1461,8 @@ export const CustomerInfoScreenModalComponent = ({
                   textStyle={{ color: "dimgray" }}
                   text={button1Text}
                 />
-              ) : null}
-              {button2Text ? (
+              )}
+              {!!button2Text && (
                 <Button
                   onPress={handleButton2Press}
                   viewStyle={{
@@ -1494,7 +1475,7 @@ export const CustomerInfoScreenModalComponent = ({
                   textStyle={{ color: "dimgray" }}
                   text={button2Text}
                 />
-              ) : null}
+              )}
             </View>
           </View>
 
@@ -1981,7 +1962,7 @@ export const Button_ = ({
           }}
           {...gradientViewProps}
         >
-          {icon ? (
+          {!!icon && (
             <Image_
               icon={icon}
               size={iconSize}
@@ -1993,7 +1974,7 @@ export const Button_ = ({
                   : buttonStyle.opacity,
               }}
             />
-          ) : null}
+          )}
           {/* {text ? <Text style={{ ...textStyle }}>{text}</Text> : null} */}
           {TextComponent ? (
             <TextComponent />
@@ -2349,11 +2330,11 @@ export function SliderButton_({
 
   return (
     <View style={styles2.container}>
-      {showLabel ? (
+      {!!showLabel && (
         <Text style={styles2.label}>
           {confirmed ? confirmLabel : toConfirmLabel}
         </Text>
-      ) : null}
+      )}
       <View style={styles2.slider}>
         <Animated.View
           {...panResponder.panHandlers}

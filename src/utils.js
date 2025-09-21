@@ -48,7 +48,7 @@ export function log(one, two) {
   if (!two) two = "";
   let spacer = "";
   if (two) spacer = "  ---------->  ";
-  console.log(one + spacer);
+  console.log(one, spacer);
   if (two) console.log(two);
 }
 
@@ -971,9 +971,6 @@ export async function randomWordGenerator() {
   return generate({ minLength: 4, maxLength: 8 });
 }
 
-export function checkArr(arr, obj) {
-  return arr.find((o) => o.id === obj.id);
-}
 
 // OBJECT operations /////////////////////////////////////////////////
 export function removeUnusedFields(obj) {
@@ -1028,6 +1025,9 @@ function isObject(v) {
   return v != null && Object.prototype.toString.call(v) === "[object Object]";
 }
 // ARRAY operations ///////////////////////////////////////////////////
+export function checkArr(arr, obj) {
+  return arr.find((o) => o.id === obj.id);
+}
 
 export function moveItemInArr(arr, index, direction) {
   const newArr = cloneDeep(arr); // copy so original isn’t mutated

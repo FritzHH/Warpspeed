@@ -209,14 +209,14 @@ export function BaseScreen() {
         style={{ width: "100%", height: 0 }}
       />
 
-      {zIsCheckingOut ? (
+      {!!zIsCheckingOut && (
         <CheckoutModalScreen openWorkorder={zOpenWorkorderObj} />
-      ) : null}
+      )}
       <LoginModalScreen
         modalVisible={zShowLoginScreen && !zLoginModalVisible}
       />
-      {zRunBackgroundRecognition ? <FaceDetectionClientComponent /> : null}
-      {!zPauseAlertOnBaseComponent && zShowAlert ? <AlertBox_ /> : null}
+      {!!zRunBackgroundRecognition && <FaceDetectionClientComponent />}
+      {!!(!zPauseAlertOnBaseComponent && zShowAlert) && <AlertBox_ />}
       <View
         style={{
           width: "65%",

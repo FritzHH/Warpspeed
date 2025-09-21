@@ -302,13 +302,13 @@ export function QuickItemComponent({}) {
                           }}
                         >
                           {item.informalName || item.formalName}
-                          {item.informalName ? (
+                          {!!item.informalName && (
                             <Text style={{ fontSize: 12, color: "gray" }}>
                               {"\n" + item.formalName}
                             </Text>
-                          ) : null}
+                          )}
                         </Text>
-                        {zWorkorderObj?.id ? (
+                        {!!zWorkorderObj?.id && (
                           <Button_
                             icon={ICONS.infoGear}
                             iconSize={22}
@@ -318,7 +318,7 @@ export function QuickItemComponent({}) {
                               inventoryItemSelected(item, "info");
                             }}
                           />
-                        ) : null}
+                        )}
                         <View
                           style={{
                             // borderLeftWidth: 1,

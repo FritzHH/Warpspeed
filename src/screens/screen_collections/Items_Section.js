@@ -92,7 +92,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
           flexDirection: "row",
         }}
       >
-        {zWorkorderObj?.id ? (
+        {!!zWorkorderObj?.id && (
           <View>
             <TabMenuButton
               buttonStyle={{
@@ -114,8 +114,8 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
             />
             {/* <View style={{ width: 20 }} /> */}
           </View>
-        ) : null}
-        {zWorkorderObj?.id && !zWorkorderObj.isStandaloneSale ? (
+        )}
+        {zWorkorderObj?.id && !zWorkorderObj.isStandaloneSale && (
           <TabMenuButton
             onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}
@@ -123,7 +123,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
               zItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
             }
           />
-        ) : null}
+        )}
       </View>
 
       <View

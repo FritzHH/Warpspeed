@@ -336,7 +336,7 @@ export function WorkordersComponent({}) {
                     >
                       {workorder.brand || "Brand"}
                     </Text>
-                    {workorder.description ? (
+                    {!!workorder.description && (
                       <View
                         style={{
                           width: 7,
@@ -345,7 +345,7 @@ export function WorkordersComponent({}) {
                           backgroundColor: "lightgray",
                         }}
                       />
-                    ) : null}
+                    )}
                     <Text
                       style={{
                         color: C.textMain,
@@ -435,7 +435,7 @@ export function WorkordersComponent({}) {
                             {workorder.waitTime.label}
                           </Text>
                         </Text>
-                        {sItemOptions[workorder.id]?.waitEndDay ? (
+                        {!!sItemOptions[workorder.id]?.waitEndDay && (
                           <Text
                             style={{
                               paddingLeft: 10,
@@ -451,7 +451,7 @@ export function WorkordersComponent({}) {
                               )}
                             </Text>
                           </Text>
-                        ) : null}
+                        )}
                       </View>
                       <View
                         style={{

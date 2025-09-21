@@ -294,7 +294,7 @@ export const StandaloneSaleComponent = ({}) => {
               sTotalAmountCaptured ? null : _setIsRefund(!sIsRefund);
             }}
           />
-          {sIsRefund ? (
+          {!!sIsRefund && (
             <TextInput
               style={{
                 outlineWidth: 0,
@@ -311,7 +311,7 @@ export const StandaloneSaleComponent = ({}) => {
               value={sRefundScan}
               onChangeText={(val) => handleRefundScan(val)}
             />
-          ) : null}
+          )}
         </View>
         <CheckBox_
           text={"Split Payment"}
@@ -379,10 +379,8 @@ export const StandaloneSaleComponent = ({}) => {
             alignItems: "center",
           }}
         >
-          {sTotalAmountCaptured == sTotalAmount ? (
-            <Text>Sale Complete!</Text>
-          ) : null}
-          {sSplitPayment ? (
+          {sTotalAmountCaptured == sTotalAmount && <Text>Sale Complete!</Text>}
+          {!!sSplitPayment && (
             <View>
               {zPaymentsArr.map((item) => (
                 <View
@@ -416,10 +414,10 @@ export const StandaloneSaleComponent = ({}) => {
                 </Text>
               </View>
             </View>
-          ) : null}
+          )}
         </View>
 
-        {sPaymentComplete ? (
+        {!!sPaymentComplete && (
           <View
             style={{
               flexDirection: "row",
@@ -465,8 +463,8 @@ export const StandaloneSaleComponent = ({}) => {
               onPress={() => {}}
             />
           </View>
-        ) : null}
-        {sCashChangeNeeded ? (
+        )}
+        {!!sCashChangeNeeded && (
           <View
             style={{
               width: "100%",
@@ -482,7 +480,7 @@ export const StandaloneSaleComponent = ({}) => {
               {trimToTwoDecimals(sCashChangeNeeded)}
             </Text>
           </View>
-        ) : null}
+        )}
       </View>
       <View
         style={{
@@ -584,7 +582,7 @@ const SaleComponent = ({}) => {
         height: "80%",
       }}
     >
-      {acceptsChecks ? (
+      {!!acceptsChecks && (
         <View style={{ width: "100%" }}>
           <CheckBox_
             textStyle={{ fontSize: 12 }}
@@ -595,7 +593,7 @@ const SaleComponent = ({}) => {
             viewStyle={{ alignSelf: "flex-end", marginRight: 20 }}
           />
         </View>
-      ) : null}
+      )}
       <Text
         style={{
           ...checkoutScreenStyle.titleText,
@@ -607,7 +605,7 @@ const SaleComponent = ({}) => {
       <Text style={{ ...checkoutScreenStyle.totalTextStyle }}>
         {"Total: $ " + totalAmount}
       </Text>
-      {splitPayment ? (
+      {!!splitPayment && (
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <View style={{ alignItems: "flex-end", marginRight: 10 }}>
             <Text
@@ -651,9 +649,9 @@ const SaleComponent = ({}) => {
             </Text>
           </View>
         </View>
-      ) : null}
+      )}
       <View style={{ flexDirection: "row" }}>
-        {splitPayment ? (
+        {!!splitPayment && (
           <View
             style={{
               ...checkoutScreenStyle.boxStyle,
@@ -700,7 +698,7 @@ const SaleComponent = ({}) => {
               </Text>
             </View>
           </View>
-        ) : null}
+        )}
         <View
           style={{
             marginLeft: 20,
@@ -895,7 +893,7 @@ const CashSaleComponent = ({
         ...checkoutScreenStyle.base,
       }}
     >
-      {acceptsChecks ? (
+      {!!acceptsChecks && (
         <View style={{ width: "100%" }}>
           <CheckBox_
             textStyle={{ fontSize: 12 }}
@@ -906,7 +904,7 @@ const CashSaleComponent = ({
             viewStyle={{ alignSelf: "flex-end", marginRight: 20 }}
           />
         </View>
-      ) : null}
+      )}
       <Text
         style={{
           ...checkoutScreenStyle.titleText,
@@ -918,7 +916,7 @@ const CashSaleComponent = ({
       <Text style={{ ...checkoutScreenStyle.totalTextStyle }}>
         {"Total: $ " + totalAmount}
       </Text>
-      {splitPayment ? (
+      {!!splitPayment && (
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <View style={{ alignItems: "flex-end", marginRight: 10 }}>
             <Text
@@ -962,9 +960,9 @@ const CashSaleComponent = ({
             </Text>
           </View>
         </View>
-      ) : null}
+      )}
       <View style={{ flexDirection: "row" }}>
-        {splitPayment ? (
+        {!!splitPayment && (
           <View
             style={{
               ...checkoutScreenStyle.boxStyle,
@@ -1011,7 +1009,7 @@ const CashSaleComponent = ({
               </Text>
             </View>
           </View>
-        ) : null}
+        )}
         <View
           style={{
             marginLeft: 20,
@@ -1377,7 +1375,7 @@ const StripeCreditCardComponent = ({
       <Text style={{ ...checkoutScreenStyle.totalTextStyle }}>
         {"Total: $ " + totalAmount}
       </Text>
-      {splitPayment ? (
+      {!!splitPayment && (
         <View style={{ alignItems: "center" }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <View style={{ alignItems: "flex-end", marginRight: 10 }}>
@@ -1445,7 +1443,7 @@ const StripeCreditCardComponent = ({
             />
           </View>
         </View>
-      ) : null}
+      )}
       <View
         style={{
           flexDirection: "row",
@@ -1454,7 +1452,7 @@ const StripeCreditCardComponent = ({
           marginTop: checkoutScreenStyle.buttonRowStyle.marginTop,
         }}
       >
-        {splitPayment ? (
+        {!!splitPayment && (
           <Button
             onPress={() => startServerDrivenStripePaymentIntent(sPaymentAmount)}
             text={isRefund ? "Process Refund" : "Process Amount"}
@@ -1462,7 +1460,7 @@ const StripeCreditCardComponent = ({
             buttonStyle={{ backgroundColor: "green" }}
             visible={sProcessButtonLabel}
           />
-        ) : null}
+        )}
         <Button
           onPress={cancelServerDrivenStripePaymentIntent}
           text={"Cancel"}

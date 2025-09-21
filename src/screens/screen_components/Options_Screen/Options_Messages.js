@@ -167,13 +167,13 @@ export function MessagesComponent({}) {
           value={sNewMessage}
         />
         <View style={{ width: "14%" }}>
-          {sNewMessage.length > 5 ? (
+          {sNewMessage.length > 5 && (
             <Button
               onPress={() => endMessage(sNewMessage)}
               text={"Send"}
               buttonStyle={{ width: "100%" }}
             />
-          ) : null}
+          )}
           <CheckBox_
             checkedColor={"red"}
             buttonStyle={{ borderWidth: 1, borderColor: "gray" }}

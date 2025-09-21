@@ -49,6 +49,7 @@ import {
   FCM_MESSAGING_URL,
   firebaseConfig,
   STRIPE_EVENT_WEBHOOK_URL,
+  STRIPE_INITIATE_REFUND_URL,
 } from "./private_user_constants";
 import { firebaseApp } from "./init";
 import { isArray } from "lodash";
@@ -552,7 +553,7 @@ export function processServerDrivenStripePayment(
 }
 
 export function processServerDrivenStripeRefund(amount, paymentIntentID) {
-  return fetch(STRIPE_INITIATE_PAYMENT_INTENT_URL, {
+  return fetch(STRIPE_INITIATE_REFUND_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

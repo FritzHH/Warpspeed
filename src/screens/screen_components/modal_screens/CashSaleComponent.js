@@ -87,6 +87,7 @@ import {
 import { FIRESTORE_COLLECTION_NAMES } from "../../../constants";
 import { isArray } from "lodash";
 import { PricingV1MessagingMessagingCountryInstanceInboundSmsPrices } from "twilio/lib/rest/pricing/v1/messaging/country";
+import { ref } from "firebase/database";
 
 export const CashSaleComponent = ({
   sSale,
@@ -101,6 +102,7 @@ export const CashSaleComponent = ({
   // sCashChangeNeeded,
   _setCashChangeNeeded,
   sRefundPaymentOverride,
+  handleRefund,
   sRefund = {
     refundedLines: [],
     requestedRefundLines: [],
@@ -163,14 +165,27 @@ export const CashSaleComponent = ({
     )
   ); // dev sAmountLeftToPay
   const [sRequestedAmount, _setRequestedAmount] = useState(
-    sSale?.total - sSale?.amountCaptured
+    sIsRefund
+      ? sIsRefund
+        ? sRefund.cashRefundRequested - sRefund.cashAmountRefunded
+        : sSale?.total - sSale?.amountCaptured
+      : sSale?.total - sSale?.amountCaptured
   );
   const [sStatusMessage, _setStatusMessage] = useState("");
-  const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(false);
+  const [sProcessButtonEnabled, _setProcessButtonEnabled] = useState(
+    sRequestedAmount > 0
+  );
   const [sIsCheck, _setIsCheck] = useState(false);
   const [sInputBoxFocus, _setInputBoxFocus] = useState(null);
   // const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
   const [sFocusedItem, _setFocusedItem] = useState("");
+
+  // testing
+
+  useEffect(() => {
+    _setRequestedAmount(500);
+    _setRequestedAmountDisp(formatCurrencyDisp(500));
+  }, []);
 
   useEffect(() => {
     if (sIsRefund) {
@@ -210,7 +225,7 @@ export const CashSaleComponent = ({
     _setProcessButtonEnabled(false);
   }
 
-  function handleProcessRefundPress() {
+  function handleProcessRefundPress1() {
     let paymentObject = { ...PAYMENT_OBJECT_PROTO };
 
     let availableCashRefundObjArr = [];
@@ -251,16 +266,26 @@ export const CashSaleComponent = ({
     handleRefundCapture(arr1);
   }
 
+  function handleProcessRefundPress() {
+    let refund = { ...PAYMENT_OBJECT_PROTO };
+    refund.amountRefunded = sRequestedAmount;
+    refund.millis = new Date().getTime();
+    refund.cash = !sIsCheck;
+    refund.check = sIsCheck;
+    refund.id = generateUPCBarcode();
+    handleRefundCapture(refund);
+  }
+
   function handleProcessPaymentPress() {
     // log("process payment pressed");
-    let paymentObject = { ...PAYMENT_OBJECT_PROTO };
-    paymentObject.amountTendered = sTenderAmount;
-    paymentObject.amountCaptured = sRequestedAmount;
-    paymentObject.cash = !sIsCheck;
-    paymentObject.check = sIsCheck;
-    paymentObject.millis = new Date().getTime();
-    paymentObject.id = generateUPCBarcode();
-    handlePaymentCapture(paymentObject);
+    let payment = { ...PAYMENT_OBJECT_PROTO };
+    payment.amountTendered = sTenderAmount;
+    payment.amountCaptured = sRequestedAmount;
+    payment.cash = !sIsCheck;
+    payment.check = sIsCheck;
+    payment.millis = new Date().getTime();
+    payment.id = generateUPCBarcode();
+    handlePaymentCapture(payment);
 
     let diff = sTenderAmount - sRequestedAmount;
     // log(diff);
@@ -313,11 +338,11 @@ export const CashSaleComponent = ({
             : 1,
       }}
     >
-      {acceptsChecks ? (
+      {!!acceptsChecks && (
         <View
           style={{ width: "100%", alignItems: "flex-start", paddingLeft: 10 }}
         >
-          {!sIsRefund ? (
+          {!sIsRefund && (
             <CheckBox_
               enabled={!sSale?.payments.length > 0}
               textStyle={{ fontSize: 12 }}
@@ -331,9 +356,9 @@ export const CashSaleComponent = ({
               }}
               isChecked={sIsCheck}
             />
-          ) : null}
+          )}
         </View>
-      ) : null}
+      )}
       <Text
         style={{
           ...checkoutScreenStyle.titleText,
@@ -541,7 +566,9 @@ export const CashSaleComponent = ({
         colorGradientArr={COLOR_GRADIENTS.green}
         textStyle={{ color: C.textWhite, fontSize: 16 }}
         enabled={sProcessButtonEnabled}
-        onPress={handleProcessPaymentPress}
+        onPress={
+          sIsRefund ? handleProcessRefundPress : handleProcessPaymentPress
+        }
         text={sIsRefund ? "PROCESS REFUND" : "COMPLETE PAYMENT"}
         buttonStyle={{
           cursor: sProcessButtonEnabled ? "inherit" : "default",

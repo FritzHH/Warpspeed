@@ -210,7 +210,7 @@ export const TabBar = ({
       />
     </View>
     <View style={{ flexDirection: "row", alignItems: "center" }}>
-      {userObj ? (
+      {!!userObj && (
         <Button_
           onPress={() => handleUserPress(userObj)}
           icon={isClockedIn ? ICONS.check : ICONS.redx}
@@ -232,11 +232,11 @@ export const TabBar = ({
             borderRadius: 15,
           }}
         />
-      ) : null}
+      )}
 
-      {webcamDetected ? (
+      {!!webcamDetected && (
         <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
-      ) : null}
+      )}
       <View style={{ width: 5 }} />
       <Image_
         style={{ width: 28, height: 28 }}

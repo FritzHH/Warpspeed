@@ -362,7 +362,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               backgroundColor: C.buttonLightGreenOutline,
             }}
           />
-          {sTotalDiscount > 0 ? (
+          {sTotalDiscount > 0 && (
             <View>
               <Text style={{ fontSize: 13, color: "gray" }}>
                 {"DISCOUNT: "}
@@ -385,7 +385,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                 }}
               />
             </View>
-          ) : null}
+          )}
           <Text style={{ fontSize: 13, color: "gray" }}>
             {"TAX: "}
             <Text
@@ -524,11 +524,11 @@ export const LineItemComponent = ({
             }}
           >
             <View>
-              {workorderLine.discountObj.name ? (
+              {!!workorderLine.discountObj.name && (
                 <Text style={{ color: C.lightred }}>
                   {workorderLine.discountObj.name || "discount goes here"}
                 </Text>
-              ) : null}
+              )}
               <Text
                 style={{
                   fontSize: 15,
@@ -636,16 +636,22 @@ export const LineItemComponent = ({
                 marginRight: 1,
               }}
             >
-              {workorderLine.qty > 1 || workorderLine.discountObj.newPrice ? (
+              {(workorderLine.qty > 1 ||
+                workorderLine.discountObj.newPrice) && (
                 <Text
                   style={{
                     paddingHorizontal: 0,
                   }}
                 >
-                  {"$ " + trimToTwoDecimals(inventoryItem.price)}
+                  {"$ " +
+                    trimToTwoDecimals(
+                      workorderLine.useSalePrice
+                        ? inventoryItem.salePrice
+                        : inventoryItem.price
+                    )}
                 </Text>
-              ) : null}
-              {workorderLine.discountObj.savings ? (
+              )}
+              {!!workorderLine.discountObj.savings && (
                 <Text
                   style={{
                     paddingHorizontal: 0,
@@ -655,7 +661,7 @@ export const LineItemComponent = ({
                 >
                   {"$ -" + workorderLine.discountObj.savings}
                 </Text>
-              ) : null}
+              )}
               <Text
                 style={{
                   fontWeight: "500",
@@ -668,7 +674,11 @@ export const LineItemComponent = ({
                 {workorderLine.discountObj.newPrice
                   ? "$ " + workorderLine.discountObj.newPrice
                   : "$" +
-                    trimToTwoDecimals(inventoryItem.price * workorderLine.qty)}
+                    trimToTwoDecimals(
+                      workorderLine.useSalePrice
+                        ? inventoryItem.salePrice
+                        : inventoryItem.price * workorderLine.qty
+                    )}
               </Text>
             </View>
             <View
@@ -696,7 +706,7 @@ export const LineItemComponent = ({
             </View>
           </View>
         </View>
-        {ssButtonsRowID === workorderLine.id ? (
+        {ssButtonsRowID === workorderLine.id && (
           <View
             style={{
               flexDirection: "row",
@@ -706,7 +716,7 @@ export const LineItemComponent = ({
               width: "100%",
             }}
           >
-            {workorderLine.qty > 1 ? (
+            {workorderLine.qty > 1 && (
               <Button
                 textStyle={{ fontSize: 13 }}
                 onPress={() => {
@@ -723,7 +733,7 @@ export const LineItemComponent = ({
                   paddingHorizontal: 4,
                 }}
               />
-            ) : null}
+            )}
             <ScreenModal
               buttonStyle={{
                 backgroundColor: Colors.mainBackground,
@@ -786,7 +796,7 @@ export const LineItemComponent = ({
               }}
             />
           </View>
-        ) : null}
+        )}
       </View>
     );
   }

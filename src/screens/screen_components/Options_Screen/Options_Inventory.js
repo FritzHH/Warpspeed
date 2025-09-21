@@ -293,11 +293,11 @@ export function InventoryComponent({}) {
                           style={{ width: "85%", fontSize: 14, marginLeft: 20 }}
                         >
                           {item.informalName || item.formalName}
-                          {item.informalName ? (
+                          {!!item.informalName && (
                             <Text style={{ fontSize: 12, color: "gray" }}>
                               {"\n" + item.formalName}
                             </Text>
-                          ) : null}
+                          )}
                         </Text>
                         <View
                           style={{

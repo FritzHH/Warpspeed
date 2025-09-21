@@ -101,6 +101,7 @@ export const MiddleItemComponent = ({
   handleCancelPress,
   sFocusedItem,
   _setFocusedItem,
+  handleRefund,
   sRefund = {
     refundedLines: [],
     requestedRefundLines: [],
@@ -205,24 +206,24 @@ export const MiddleItemComponent = ({
                 </Text>
               </View>
               <View>
-                {zCustomer?.cell ? (
+                {!!zCustomer?.cell && (
                   <Text style={{ color: C.textMain }}>
                     <Text>{"cell: "}</Text>
                     {addDashesToPhone(zCustomer?.cell)}
                   </Text>
-                ) : null}
-                {zCustomer?.land ? (
+                )}
+                {!!zCustomer?.land && (
                   <Text style={{ color: C.textMain, fontSize: 13 }}>
                     <Text>{"land: "}</Text>
                     {addDashesToPhone(zCustomer?.land)}
                   </Text>
-                ) : null}
+                )}
               </View>
             </View>
 
             {!sIsRefund && (
               <View>
-                {zCustomer?.streetAddress ? (
+                {!!zCustomer?.streetAddress && (
                   <Text style={{ color: C.textMain, fontSize: 13 }}>
                     {zCustomer.streetAddress}
                     {!!zCustomer.unit && (
@@ -236,7 +237,7 @@ export const MiddleItemComponent = ({
                       </Text>
                     )}
                   </Text>
-                ) : null}
+                )}
                 <View
                   style={{
                     width: "100%",
@@ -426,7 +427,7 @@ export const MiddleItemComponent = ({
               </View>
             </View>
           )}
-          {sSale?.discount || sRefund.sale?.discount ? (
+          {!!(sSale?.discount || sRefund.sale?.discount) && (
             <View
               style={{
                 alignItems: "center",
@@ -466,7 +467,7 @@ export const MiddleItemComponent = ({
                 </Text>
               </View>
             </View>
-          ) : null}
+          )}
           {!!sSale?.discount && (
             <View
               style={{
@@ -540,10 +541,8 @@ export const MiddleItemComponent = ({
             </View>
           </View>
           {sShouldChargeCardRefundFee &&
-          sIsRefund &&
-          sRefund.totalCardRefundAllowed > 0 ? (
-            <VertListSpacer />
-          ) : null}
+            sIsRefund &&
+            sRefund.totalCardRefundAllowed > 0 && <VertListSpacer />}
 
           {/******************** REFUNDS ********************************************/}
 
@@ -603,7 +602,7 @@ export const MiddleItemComponent = ({
                 }}
               >
                 <Text style={{ color: C.textMain, fontWeight: "500" }}>
-                  {"CARD REFUND (MANDATORY)"}
+                  {"TOTAL (MANDATORY) CARD REFUND"}
                 </Text>
                 <View style={{ flexDirection: "row" }}>
                   <Text
@@ -903,7 +902,7 @@ export const MiddleItemComponent = ({
                           </Text>
                         </View>
                       )}
-                      {payment.last4 ? (
+                      {!!payment.last4 && (
                         <View
                           style={{
                             flexDirection: "row",
@@ -911,7 +910,7 @@ export const MiddleItemComponent = ({
                           }}
                         >
                           <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                            {payment.cardType}
+                            {payment.cardType.split(" ")[0]}
                           </Text>
                           <Text style={{ color: gray(0.4), fontSize: 13 }}>
                             {"***" + payment.last4}
@@ -920,7 +919,7 @@ export const MiddleItemComponent = ({
                             {payment.expMonth + "/" + payment.expYear}
                           </Text>
                         </View>
-                      ) : null}
+                      )}
                       {!!payment.cash && (
                         <View
                           style={{
@@ -1001,7 +1000,7 @@ export const MiddleItemComponent = ({
         </View>
 
         {/*******************************************refund list ********************************************************/}
-        {sSale?.refunds?.length > 0 ? (
+        {!!sSale?.refunds?.length && (
           <View
             style={{
               marginTop: sIsRefund ? 5 : 15,
@@ -1011,7 +1010,7 @@ export const MiddleItemComponent = ({
           >
             <Text style={{ color: C.red }}>REFUNDS</Text>
           </View>
-        ) : null}
+        )}
         <View
           style={{
             maxHeight: "25%",
@@ -1047,7 +1046,7 @@ export const MiddleItemComponent = ({
                     <Text>Amount refunded: </Text>
                     <Text>{formatCurrencyDisp(refund.amountRefunded)}</Text>
                   </View>
-                  {cardDetails ? (
+                  {!!cardDetails && (
                     <View
                       style={{
                         flexDirection: "row",
@@ -1058,7 +1057,7 @@ export const MiddleItemComponent = ({
                         {formatMillisForDisplay(cardDetails.millis)}
                       </Text>
                       <Text style={{ color: gray(0.4), fontSize: 13 }}>
-                        {cardDetails.cardType}
+                        {payment.cardType.split(" ")[0]}
                       </Text>
                       <Text style={{ color: gray(0.4), fontSize: 13 }}>
                         {"***" + cardDetails.last4}
@@ -1067,8 +1066,8 @@ export const MiddleItemComponent = ({
                         {cardDetails.expMonth + "/" + cardDetails.expYear}
                       </Text>
                     </View>
-                  ) : null}
-                  {!refund.cardPaymentID ? (
+                  )}
+                  {!refund.cardPaymentID && (
                     <View
                       style={{
                         flexDirection: "row",
@@ -1078,7 +1077,7 @@ export const MiddleItemComponent = ({
                       <Text>Amount Tendered: </Text>
                       <Text>{formatCurrencyDisp(refund.amountTendered)}</Text>
                     </View>
-                  ) : null}
+                  )}
                   {/* {paymentObj.cash ? (
                 <View
                   style={{
@@ -1094,7 +1093,7 @@ export const MiddleItemComponent = ({
                   </Text>
                 </View>
               ) : null} */}
-                  {refund.isRefund ? <Text>{"REFUND"}</Text> : null}
+                  {!!refund.isRefund && <Text>{"REFUND"}</Text>}
                 </View>
               );
             })}
@@ -1127,7 +1126,7 @@ export const MiddleItemComponent = ({
           textStyle={{ color: C.textWhite }}
           buttonStyle={{ width: 150 }}
         />
-        {sCashChangeNeeded ? (
+        {!!sCashChangeNeeded && (
           <View
             style={{
               ...checkoutScreenStyle.boxStyle,
@@ -1170,7 +1169,7 @@ export const MiddleItemComponent = ({
               {sCashChangeNeeded}
             </Text>
           </View>
-        ) : null}
+        )}
         {sSale?.payments?.length > 0 && sSale?.paymentComplete ? (
           <Button_
             buttonStyle={{ width: 150, color: C.textWhite }}

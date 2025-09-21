@@ -96,6 +96,7 @@ exports.initiateRefund = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    log("Incoming refund", req.body);
 
     const paymentIntentId = req.body.paymentIntentId;
     const amount = req.body.amount; // Optional: refund a specific amount (in cents)
@@ -543,7 +544,6 @@ exports.cancelServerDrivenStripePayment = onRequest(
     }
   }
 );
-
 
 
 /////////////////////////////////////////////////////////////////////////////////

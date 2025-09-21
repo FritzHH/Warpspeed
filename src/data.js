@@ -342,6 +342,7 @@ export const WORKORDER_ITEM_PROTO = {
   inventoryItem: null,
   discountObj: { ...DISCOUNT_OBJ_PROTO },
   id: "",
+  useSalePrice: false,
   // priceOverride: "",
 };
 

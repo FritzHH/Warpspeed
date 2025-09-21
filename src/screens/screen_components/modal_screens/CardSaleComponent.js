@@ -264,6 +264,7 @@ export const StripeCreditCardComponent = ({
   async function startRefund(paymentAmount, payment) {
     let message = "";
     let error = false;
+    log("starting refund  " + paymentAmount, payment);
     try {
       const res = await dbProcessStripeRefund(
         paymentAmount,
@@ -799,7 +800,7 @@ export const StripeCreditCardComponent = ({
         isChecked={sIsDeposit}
         onCheck={() => _setIsDeposit(!sIsDeposit)}
       />
-      {!!sRefund?.selectedCardPayment?.cardType ? (
+      {!!sRefund?.selectedCardPayment?.cardType && (
         <View
           style={{
             width: "100%",
@@ -809,7 +810,7 @@ export const StripeCreditCardComponent = ({
           }}
         >
           <Text style={{ fontSize: 12, color: gray(0.4), marginHorizontal: 5 }}>
-            {sRefund.selectedCardPayment?.cardType}
+            {sRefund.selectedCardPayment?.cardType.split(" ")[0]}
           </Text>
           <Text style={{ fontSize: 12, color: gray(0.4), marginHorizontal: 5 }}>
             {"***" + sRefund.selectedCardPayment?.last4}
@@ -820,7 +821,7 @@ export const StripeCreditCardComponent = ({
               sRefund.selectedCardPayment?.expYear}
           </Text>
         </View>
-      ) : null}
+      )}
       <View
         style={{
           width: "100%",

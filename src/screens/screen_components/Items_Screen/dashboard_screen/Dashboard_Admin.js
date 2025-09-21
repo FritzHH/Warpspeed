@@ -145,9 +145,9 @@ export function Dashboard_Admin({}) {
           userObj={sPunchClockUserObj}
         />
       ) : null}
-      {sShowSalesReportModal ? (
+      {!!sShowSalesReportModal && (
         <SalesReportsModal handleExit={() => _setShowSalesReportModal(false)} />
-      ) : null}
+      )}
 
       <View
         style={{
@@ -335,13 +335,13 @@ export function Dashboard_Admin({}) {
           >
             {sExpand?.toUpperCase()}
           </Text>
-          {sExpand === TAB_NAMES.payments ? (
+          {sExpand === TAB_NAMES.payments && (
             <PaymentProcessingComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
-          ) : null}
-          {sExpand === TAB_NAMES.users ? (
+          )}
+          {sExpand === TAB_NAMES.users && (
             <AppUserListComponent
               handleRemoveUserPress={handleRemoveUserPress}
               zSettingsObj={zSettingsObj}
@@ -352,31 +352,31 @@ export function Dashboard_Admin({}) {
               _setPunchClockUserObj={_setPunchClockUserObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
-          ) : null}
-          {sExpand === TAB_NAMES.statuses ? (
+          )}
+          {sExpand === TAB_NAMES.statuses && (
             <WorkorderStatusesComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
-          ) : null}
-          {sExpand === TAB_NAMES.lists ? (
+          )}
+          {sExpand === TAB_NAMES.lists && (
             <ListOptionsComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
-          ) : null}
-          {sExpand === TAB_NAMES.storeInfo ? (
+          )}
+          {sExpand === TAB_NAMES.storeInfo && (
             <StoreInfoComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
-          ) : null}
-          {sExpand === TAB_NAMES.quickItems ? (
+          )}
+          {sExpand === TAB_NAMES.quickItems && (
             <QuickItemButtonsComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
-          ) : null}
+          )}
         </View>
       </View>
     </ScrollView>
@@ -442,7 +442,7 @@ function MenuListLabelComponent({
         opacity: sOpacity,
       }}
     >
-      {!dropdownDataArr ? (
+      {!dropdownDataArr && (
         <Text
           style={{
             fontSize: 16,
@@ -452,8 +452,8 @@ function MenuListLabelComponent({
         >
           {text.toUpperCase()}
         </Text>
-      ) : null}
-      {dropdownDataArr ? (
+      )}
+      {!!dropdownDataArr && (
         <DropdownMenu
           buttonStyle={{
             backgroundColor: "transparent",
@@ -473,7 +473,7 @@ function MenuListLabelComponent({
             fontWeight: "500",
           }}
         />
-      ) : null}
+      )}
       <Image_ size={iconSize || ICON_SIZE} icon={icon || ICONS.expandGreen} />
     </TouchableOpacity>
   );

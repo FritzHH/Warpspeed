@@ -1,5 +1,11 @@
 /*eslint-disable*/
-import React, { useRef, useEffect, useState } from "react";
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import { View, Button, Text } from "react-native";
 import * as faceapi from "face-api.js";
 import { clog, localStorageWrapper, log } from "./utils";
@@ -13,13 +19,9 @@ import {
 import {
   useAlertScreenStore,
   useLoginStore,
-  useOpenWorkordersStore,
   useSettingsStore,
 } from "./storesOld";
-import { SETTINGS_OBJ } from "./data";
-import { intersection } from "lodash";
 import { cloneDeep } from "lodash";
-import { StaticRouter } from "react-router-dom";
 // import { dbSetAppUserObj, dbCreateUserPunchAction } from "./db_call_wrapper";
 import { Button_ } from "./components";
 import { C, COLOR_GRADIENTS } from "./styles";
@@ -38,16 +40,44 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
 
   // store getters ///////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  const zPunchClockArr = useLoginStore((state) => state.getPunchClockArr());
-  const zRunBackgroundRecognition = useLoginStore((state) =>
-    state.getRunBackgroundRecognition()
+  // Solution 1 & 2: Memoized selectors and optimized subscriptions
+  const zUsers = useSettingsStore(
+    useCallback((state) => state.settingsObj?.users, [])
+  );
+  const zPunchClockArr = useLoginStore(
+    useCallback((state) => state.punchClockArr, [])
+  );
+  const zRunBackgroundRecognition = useLoginStore(
+    useCallback((state) => state.runBackgroundRecognition, [])
+  );
+
+  // Get settings object with memoized selector to prevent unnecessary re-renders
+  const zSettingsObj = useSettingsStore(
+    useCallback((state) => state.settingsObj, [])
   );
 
   /////////////////////////////////////////////////////////////////////////
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
+
+  // Use refs to store stable references and prevent unnecessary effect re-runs
+  const usersRef = useRef(zUsers);
+  const punchClockRef = useRef(zPunchClockArr);
+  const settingsRef = useRef(zSettingsObj);
+
+  // Update refs when values change
+  useEffect(() => {
+    usersRef.current = zUsers;
+  }, [zUsers]);
+
+  useEffect(() => {
+    punchClockRef.current = zPunchClockArr;
+  }, [zPunchClockArr]);
+
+  useEffect(() => {
+    settingsRef.current = zSettingsObj;
+  }, [zSettingsObj]);
   const [status, setStatus] = useState("Loading models and finding webcam...");
   const [sBackgroundRecognitionRunning, _setBackgroundRecognitionRunning] =
     useState(false);
@@ -109,7 +139,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       const currentDesc = await getFaceDescriptor();
       if (currentDesc) {
         // log("cur desc", currentDesc);
-        let userObj = zSettingsObj?.users?.find((userObj) => {
+        let userObj = usersRef.current?.find((userObj) => {
           if (!userObj.faceDescriptor) {
             // log("here");
             return null;
@@ -146,7 +176,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
           // check to see if user asked to not clock in within period of time
           // log("punch clock arr in facedetectionclient", zPunchClockArr);
-          let clockedInUser = zPunchClockArr.find(
+          let clockedInUser = punchClockRef.current.find(
             (o) => o.userID === userObj.id
           );
           if (!clockedInUser) {
@@ -209,13 +239,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         _zSetCurrentUserObj(null);
       }
     }, FACIAL_RECOGNITION_INTERVAL_MILLIS);
-  }, [
-    sSetupComplete,
-    intervalRef,
-    zSettingsObj,
-    sPauseBackgroundRecognition,
-    zPunchClockArr,
-  ]);
+  }, [sSetupComplete, sPauseBackgroundRecognition]);
 
   //////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
@@ -286,7 +310,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         onLoadedMetadata={handleLoadedMetadata}
         style={{}}
       />
-      {!zRunBackgroundRecognition ? (
+      {!zRunBackgroundRecognition && (
         <View style={{ alignItems: "center" }}>
           <Text
             style={{
@@ -298,7 +322,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
           >
             {status}
           </Text>
-          {sSetupComplete ? (
+          {!!sSetupComplete && (
             <Button_
               buttonStyle={{ marginBottom: 20 }}
               colorGradientArr={COLOR_GRADIENTS.blue}
@@ -306,9 +330,9 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
               text="Enroll Face"
               onPress={handleEnroll}
             />
-          ) : null}
+          )}
         </View>
-      ) : null}
+      )}
     </View>
   );
 }

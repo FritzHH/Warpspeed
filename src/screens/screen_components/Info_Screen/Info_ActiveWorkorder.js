@@ -282,7 +282,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 width: "95%",
               }}
             >
-              {zCustomerObj.cell.length > 0 ? (
+              {zCustomerObj.cell.length > 0 && (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Image_
                     icon={ICONS.cellPhone}
@@ -293,8 +293,8 @@ export const ActiveWorkorderComponent = ({}) => {
                     {addDashesToPhone(zCustomerObj.cell)}
                   </Text>
                 </View>
-              ) : null}
-              {zCustomerObj.landline.length > 0 ? (
+              )}
+              {zCustomerObj.landline.length > 0 && (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Image_
                     icon={ICONS.home}
@@ -305,14 +305,15 @@ export const ActiveWorkorderComponent = ({}) => {
                     {addDashesToPhone(zCustomerObj.landline)}
                   </Text>
                 </View>
-              ) : null}
-              {zCustomerObj.contactRestriction === CONTACT_RESTRICTIONS.call ? (
-                <Text style={{ color: Colors.darkText }}>CALL ONLY</Text>
-              ) : null}
+              )}
               {zCustomerObj.contactRestriction ===
-              CONTACT_RESTRICTIONS.email ? (
+                CONTACT_RESTRICTIONS.call && (
+                <Text style={{ color: Colors.darkText }}>CALL ONLY</Text>
+              )}
+              {zCustomerObj.contactRestriction ===
+                CONTACT_RESTRICTIONS.email && (
                 <Text style={{ color: Colors.darkText }}>EMAIL ONLY</Text>
-              ) : null}
+              )}
             </View>
           </View>
 

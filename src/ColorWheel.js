@@ -12,7 +12,6 @@ import Svg, {
   Stop,
   ClipPath,
 } from "react-native-svg";
-import { log } from "./utils";
 import { processColor } from "react-native";
 
 // ---------- Color utils ----------

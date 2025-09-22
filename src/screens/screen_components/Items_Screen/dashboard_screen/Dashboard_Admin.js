@@ -132,19 +132,19 @@ export function Dashboard_Admin({}) {
       }}
     >
       {/**Modals that will appear when user takes an action */}
-      {sFacialRecognitionModalUserObj ? (
+      {!!sFacialRecognitionModalUserObj && (
         <FaceEnrollModalScreen
           userObj={sFacialRecognitionModalUserObj}
           handleDescriptorCapture={handleDescriptorCapture}
           handleExitPress={() => _setFacialRecognitionModalUserObj(null)}
         />
-      ) : null}
-      {sPunchClockUserObj ? (
+      )}
+      {!!sPunchClockUserObj && (
         <UserClockHistoryModal
           handleExit={() => _setPunchClockUserObj()}
           userObj={sPunchClockUserObj}
         />
-      ) : null}
+      )}
       {!!sShowSalesReportModal && (
         <SalesReportsModal handleExit={() => _setShowSalesReportModal(false)} />
       )}
@@ -2789,13 +2789,13 @@ const WorkorderStatusesComponent = ({
                           idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
                       }}
                     >
-                      {!item.removable ? (
+                      {!!!item.removable && (
                         <View
                           style={{
                             width: "10%",
                           }}
                         />
-                      ) : null}
+                      )}
                       <TextInput
                         style={{
                           width: "100%",
@@ -2821,7 +2821,7 @@ const WorkorderStatusesComponent = ({
                         autoFocus={sEditableInputIdx === idx}
                         value={item.label}
                       />
-                      {!item.removable ? (
+                      {!!!item.removable && (
                         <View
                           style={{
                             width: "10%",
@@ -2833,7 +2833,7 @@ const WorkorderStatusesComponent = ({
                         >
                           <Image_ icon={ICONS.blocked} size={15} />
                         </View>
-                      ) : null}
+                      )}
                     </View>
                     <View
                       style={{
@@ -2883,7 +2883,7 @@ const WorkorderStatusesComponent = ({
                       paddingRight: "21%",
                     }}
                   >
-                    {sBackgroundColorWheelItem?.id === item.id ? (
+                    {!!sBackgroundColorWheelItem?.id === item.id && (
                       <ColorWheel
                         initialColor={item.backgroundColor}
                         style={{ marginVertical: 7 }}
@@ -2902,8 +2902,8 @@ const WorkorderStatusesComponent = ({
                           handleSettingsFieldChange("statuses", statuses);
                         }}
                       />
-                    ) : null}
-                    {sTextColorWheelItem?.id === item.id ? (
+                    )}
+                    {!!sTextColorWheelItem?.id === item.id && (
                       <ColorWheel
                         initialColor={item.textColor}
                         style={{ marginVertical: 7 }}
@@ -2919,7 +2919,7 @@ const WorkorderStatusesComponent = ({
                           handleSettingsFieldChange("statuses", statuses);
                         }}
                       />
-                    ) : null}
+                    )}
                   </View>
                 </View>
               );

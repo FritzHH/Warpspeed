@@ -1170,7 +1170,7 @@ export const MiddleItemComponent = ({
             </Text>
           </View>
         )}
-        {sSale?.payments?.length > 0 && sSale?.paymentComplete ? (
+        {!!(sSale?.payments?.length > 0 && sSale?.paymentComplete) && (
           <Button_
             buttonStyle={{ width: 150, color: C.textWhite }}
             colorGradientArr={COLOR_GRADIENTS.greenblue}
@@ -1178,7 +1178,7 @@ export const MiddleItemComponent = ({
             textStyle={{ color: C.textWhite }}
             onPress={() => log("reprint receipt method needed")}
           />
-        ) : null}
+        )}
       </View>
     </View>
   );

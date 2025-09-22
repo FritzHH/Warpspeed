@@ -336,14 +336,12 @@ export const WORKORDER_PROTO = {
 };
 
 export const WORKORDER_ITEM_PROTO = {
-  // itemName: "",
   qty: 1,
   notes: "",
   inventoryItem: null,
   discountObj: { ...DISCOUNT_OBJ_PROTO },
   id: "",
   useSalePrice: false,
-  // priceOverride: "",
 };
 
 export const CUSTOMER_PREVIOUS_BIKE_PROTO = {

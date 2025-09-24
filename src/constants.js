@@ -70,41 +70,59 @@ export const PERMISSION_LEVELS = {
 
 // database path builder /////////////////////////////////////////////////
 export const build_db_path = {
-  punchHistory: (punchID) => {
-    let str = FIRESTORE_COLLECTION_NAMES.punchHistory;
+  punchHistory: (punchID, tenantID, storeID) => {
+    let str =
+      `${tenantID}/${storeID}/` + FIRESTORE_COLLECTION_NAMES.punchHistory;
     if (punchID) str += "/" + punchID + "/";
     return str;
   },
-  settings: (fieldName) => {
-    let path = REALTIME_DATABASE_NODE_NAMES.settings;
+  settings: (fieldName, tenantID, storeID) => {
+    let path =
+      `${tenantID}/${storeID}/` + REALTIME_DATABASE_NODE_NAMES.settings;
     if (fieldName) path += fieldName + "/";
     return path;
   },
-  punchClock: () => REALTIME_DATABASE_NODE_NAMES.punchClock,
-  inventory: (fieldID) => {
-    let str = REALTIME_DATABASE_NODE_NAMES.inventory;
-    if (fieldID) str += fieldID + "/";
-    return str;
-  },
-  openWorkorders: (fieldID) => {
-    let str = REALTIME_DATABASE_NODE_NAMES.openWorkorders;
-    if (fieldID) str += fieldID + "/";
-    return str;
-  },
-  closedWorkorders: (fieldID) => {
+  punchClock: (tenantID, storeID) =>
+    `${tenantID}/${storeID}/` + REALTIME_DATABASE_NODE_NAMES.punchClock,
+  inventory: (fieldID, tenantID, storeID) => {
     let str =
-      FIRESTORE_COLLECTION_NAMES.closedWorkorders + "closed-workorders-obj/";
+      `${tenantID}/${storeID}/` + REALTIME_DATABASE_NODE_NAMES.inventory;
     if (fieldID) str += fieldID + "/";
     return str;
   },
-  customer: (customerID) => {
-    return FIRESTORE_COLLECTION_NAMES.customers + customerID + "/";
+  openWorkorders: (fieldID, tenantID, storeID) => {
+    let str =
+      `${tenantID}/${storeID}/` + REALTIME_DATABASE_NODE_NAMES.openWorkorders;
+    if (fieldID) str += fieldID + "/";
+    return str;
   },
-  sales: (salesObjID) => {
-    return FIRESTORE_COLLECTION_NAMES.sales + salesObjID + "/";
+  closedWorkorders: (fieldID, tenantID, storeID) => {
+    let str =
+      `${tenantID}/${storeID}/` +
+      FIRESTORE_COLLECTION_NAMES.closedWorkorders +
+      "closed-workorders-obj/";
+    if (fieldID) str += fieldID + "/";
+    return str;
   },
-  cardPaymentFlow: (readerID, paymentIntentID) => {
+  customer: (customerID, tenantID, storeID) => {
     return (
+      `${tenantID}/${storeID}/` +
+      FIRESTORE_COLLECTION_NAMES.customers +
+      customerID +
+      "/"
+    );
+  },
+  sales: (salesObjID, tenantID, storeID) => {
+    return (
+      `${tenantID}/${storeID}/` +
+      FIRESTORE_COLLECTION_NAMES.sales +
+      salesObjID +
+      "/"
+    );
+  },
+  cardPaymentFlow: (readerID, paymentIntentID, tenantID, storeID) => {
+    return (
+      `${tenantID}/${storeID}/` +
       REALTIME_DATABASE_NODE_NAMES.paymentProcessing +
       readerID +
       "/" +

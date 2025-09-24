@@ -65,7 +65,7 @@
     "fun": "firebase deploy --only functions:initiatePaymentIntent",
     "dfun": "firebase deploy --only functions",
     "dprocess": "firebase deploy --only functions:processServerDrivenStripePayment",
-    "dhook": "firebase deploy --only functions:initiatePaymentIntent",
+    "dhook": "firebase deploy --only functions:createTenant",
     "login": "firebase login --reauth"
   },
   "eslintConfig": {

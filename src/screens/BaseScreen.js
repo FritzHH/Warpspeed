@@ -26,7 +26,7 @@ import {
   useAlertScreenStore,
 } from "../stores";
 import { executeDBBatch } from "../db_call_wrapper";
-import { signOutUser } from "../db";
+import { createStore, createTenant, signOutUser } from "../db";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { DB_BATCH_INTERVAL_MILLIS } from "../constants";
 import { fillInventory, fillOpenWorkorders, fillSettings } from "../testing";
@@ -190,7 +190,16 @@ export function BaseScreen() {
 
   // testing, build db items
   useEffect(() => {
-    fillSettings();
+    // fillSettings();
+    // createStore("123456", "9999", "Bonita Bikes", "Fritzy Boy");
+    createTenant(
+      "Bonita Bikes LLC",
+      "fritz@bonitabikes.com",
+      "hieb.fritz@gmail.com",
+      "2393369177",
+      "Fritz",
+      "Hieb"
+    );
     // fillReceipt();
     // fillPrinterNames();
     // fillPunchHistory()

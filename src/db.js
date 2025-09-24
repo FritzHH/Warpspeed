@@ -558,6 +558,9 @@ const retrieveAvailableStripeReadersCallable = httpsCallable(
   functions,
   "getAvailableStripeReaders"
 );
+const loginAppUserCallable = httpsCallable(functions, "loginAppUser");
+const createStoreCallable = httpsCallable(functions, "createStore");
+const createTenantCallable = httpsCallable(functions, "createTenant");
 
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)
@@ -577,7 +580,7 @@ export function processServerDrivenStripePayment(
   readerID,
   paymentIntentID
 ) {
-  log(readerID);
+  // log(readerID);
   return processServerDrivenStripePaymentCallable({
     amount: Number(saleAmount),
     readerID,
@@ -632,6 +635,62 @@ export function retrieveAvailableStripeReaders(readerID) {
     })
     .catch((error) => {
       log("Error retrieving Stripe readers:", error);
+      throw error;
+    });
+}
+
+export function loginAppUser(email, password) {
+  return loginAppUserCallable({ email, password })
+    .then((result) => {
+      log("User login successful:", result.data);
+      return result.data;
+    })
+    .catch((error) => {
+      log("Error during user login:", error);
+      throw error;
+    });
+}
+
+export function createStore(tenantID, storeID, storeName, createdBy) {
+  return createStoreCallable({ tenantID, storeID, storeName, createdBy })
+    .then((result) => {
+      log("Store created successfully:", result.data);
+      return result.data;
+    })
+    .catch((error) => {
+      log("Error creating store:", error);
+      throw error;
+    });
+}
+
+export function createTenant(
+  tenantDisplayName,
+  primaryEmail,
+  secondaryEmail,
+  phoneNumber,
+  contactFirstName,
+  contactLastName
+) {
+  return createTenantCallable({
+    tenantDisplayName,
+    primaryEmail,
+    secondaryEmail,
+    phoneNumber,
+    contactFirstName,
+    contactLastName,
+  })
+    .then((result) => {
+      log("Tenant created successfully:", result.data);
+      return result.data;
+    })
+    .catch((error) => {
+      log("Error creating tenant:", error);
+      // Handle Firebase Functions errors
+      if (error.code) {
+        throw new Error(
+          error.message || `Firebase Function error: ${error.code}`
+        );
+      }
       throw error;
     });
 }

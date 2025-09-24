@@ -119,7 +119,16 @@ function setDBField(path, item, remove) {
 // setters /////////////////////////////////////////////////////////////////////
 
 export function dbGetSettings() {
-  let path = build_db_path.settings();
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.settings(null, tenantID, storeID);
   try {
     return get_firestore_field(path);
   } catch (e) {
@@ -128,7 +137,16 @@ export function dbGetSettings() {
 }
 
 export function dbSetSettings(settingsObj, batch) {
-  let path = build_db_path.settings();
+  // Get tenantID and storeID from settings store
+  const currentSettingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = currentSettingsObj?.tenantID;
+  const storeID = currentSettingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.settings(null, tenantID, storeID);
   if (batch) return batchDBCall(path, settingsObj);
   return newSetDatabaseField(path, settingsObj);
 }
@@ -155,7 +173,16 @@ export function dbSetCustomerField(
   fieldObj = { fieldName: "fieldValue" },
   batch = true
 ) {
-  let path = build_db_path.customer(customerID);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.customer(customerID, tenantID, storeID);
   // log("path", path);
   log("need to fix batch for Firestore, its only written for Realtime");
   // if (batch) batch
@@ -163,19 +190,47 @@ export function dbSetCustomerField(
 }
 
 export function dbSetWorkorder(item, batch = true, remove = false) {
-  let path = build_db_path.openWorkorders(item.id);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.openWorkorders(item.id, tenantID, storeID);
   if (batch) return batchDBCall(path, item, remove);
   return setRealtimeNodeItem(path, item);
 }
 
 export function dbSetClosedWorkorderItem(item, removeOption = false) {
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
   let id = item.id;
   if (removeOption) item = null;
-  return setFirestoreCollectionItem("CLOSED-WORKORDERS", id, item);
+  let path = build_db_path.closedWorkorders(id, tenantID, storeID);
+  return setFirestoreCollectionItem(path, id, item);
 }
 
 export function dbSetInventoryItem(item, batch = true, remove = false) {
-  let path = build_db_path.inventory(item.id);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.inventory(item.id, tenantID, storeID);
   if (batch) return batchDBCall(path, item, remove);
   return newSetDatabaseField(path, item, remove);
 }
@@ -187,54 +242,150 @@ export function dbSetInventoryItem(item, batch = true, remove = false) {
 // }
 
 export function dbSetPunchClockObj(obj, remove = false) {
-  let path = build_db_path.punchClock(obj.id);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.punchClock(tenantID, storeID);
   return newSetDatabaseField(path, obj, remove);
 }
 
 export function dbSetOrUpdateUserPunchObj(punchObj, remove = false) {
-  let punchClockPath = build_db_path.punchHistory(punchObj.id);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let punchClockPath = build_db_path.punchHistory(
+    punchObj.id,
+    tenantID,
+    storeID
+  );
   setDBField(punchClockPath, punchObj, remove);
 }
 
 export function dbSetSalesObj(salesObj, updatedCustomerObj) {
-  let path = build_db_path.sales(salesObj.id);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.sales(salesObj.id, tenantID, storeID);
   newSetDatabaseField(path, salesObj);
 }
 
 export function dbSetPunchClockArr(arr) {
-  let clockArrPath = build_db_path.punchClock();
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let clockArrPath = build_db_path.punchClock(tenantID, storeID);
   // log("setting arr", arr);
   newSetDatabaseField(clockArrPath, arr);
 }
 
 export function dbSetAppUserObj(userObj, remove = false) {
-  let path = "SETTINGS/" + userObj.id;
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = `${tenantID}/${storeID}/SETTINGS/` + userObj.id;
   if (remove) userObj = null;
   return setRealtimeNodeItem(path, userObj);
 }
 
 // database getters ///////////////////////////////////////////////////////////
 export function dbGetClosedWorkorderItem(id) {
-  return getDocument("CLOSED-WORKORDERS", id);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.closedWorkorders(id, tenantID, storeID);
+  return getDocument(path, id);
 }
 
 export function dbGetOpenWorkorderItem(id) {
-  return getRealtimeNodeItem("OPEN-WORKORDERS/" + id);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.openWorkorders(id, tenantID, storeID);
+  return getRealtimeNodeItem(path);
 }
 
 export function dbGetSaleItem(id) {
-  let path = build_db_path.sales(id);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.sales(id, tenantID, storeID);
   return getFirestoreDoc(path);
 }
 
 export function dbGetCustomerObj(customerID) {
-  let path = build_db_path.customer(customerID);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.customer(customerID, tenantID, storeID);
   return getFirestoreDoc(path);
 }
 
 // database filters //////////////////////////////////////////////////
 export function _dbFindPunchHistoryByMillisRange(userID, start, end) {
-  let path = build_db_path.punchHistory(userID);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.punchHistory(userID, tenantID, storeID);
   // log(path);
   // return getCollection(path);
   return filterFirestoreCollectionByNumber(path, "millis", start, end);
@@ -245,18 +396,29 @@ export function dbFindPreviousEntryByTimestamp() {}
 // database searchers /////////////////////////////////////////////////
 
 export function dbSearchForPhoneNumber(searchTerm) {
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  const customersPath = `${tenantID}/${storeID}/CUSTOMERS`;
+
   return new Promise((resolve, reject) => {
     let resObj = {};
     let cellQueryRes = null;
     let landlineQueryRes = null;
-    searchCollection("CUSTOMERS", "cell", searchTerm).then((res) => {
+    searchCollection(customersPath, "cell", searchTerm).then((res) => {
       cellQueryRes = true;
       res.forEach((obj) => {
         resObj[obj.id] = obj;
       });
       if (landlineQueryRes) resolve(Object.values(resObj));
     });
-    searchCollection("CUSTOMERS", "landline", searchTerm).then((res) => {
+    searchCollection(customersPath, "landline", searchTerm).then((res) => {
       landlineQueryRes = true;
       res.forEach((obj) => {
         // log("obj", obj);
@@ -268,12 +430,23 @@ export function dbSearchForPhoneNumber(searchTerm) {
 }
 
 export function dbSearchForName(searchTerm) {
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  const customersPath = `${tenantID}/${storeID}/CUSTOMERS`;
+
   // log("db search term", searchTerm);
   return new Promise((resolve, reject) => {
     let resObj = {};
     let firstNameQueryRes = null;
     let lastNameQueryRes = null;
-    searchCollection("CUSTOMERS", "first", searchTerm).then((res) => {
+    searchCollection(customersPath, "first", searchTerm).then((res) => {
       firstNameQueryRes = true;
       res.forEach((obj) => {
         // log("obj", obj);
@@ -282,7 +455,7 @@ export function dbSearchForName(searchTerm) {
       if (lastNameQueryRes) resolve(Object.values(resObj));
     });
 
-    searchCollection("CUSTOMERS", "last", searchTerm).then((res) => {
+    searchCollection(customersPath, "last", searchTerm).then((res) => {
       lastNameQueryRes = true;
       res.forEach((obj) => {
         // log("obj", obj);
@@ -306,7 +479,21 @@ export function dbSubscribeToStripePaymentProcess(
   paymentIntentID,
   callback
 ) {
-  let path = build_db_path.cardPaymentFlow(readerID, paymentIntentID);
+  // Get tenantID and storeID from settings store
+  const settingsObj = useSettingsStore.getState().settingsObj;
+  const tenantID = settingsObj?.tenantID;
+  const storeID = settingsObj?.storeID;
+
+  if (!tenantID || !storeID) {
+    throw new Error("tenantID and storeID must be configured in settings");
+  }
+
+  let path = build_db_path.cardPaymentFlow(
+    readerID,
+    paymentIntentID,
+    tenantID,
+    storeID
+  );
   // subscribeToNodeChange(path, (key, val) => callback(key, val, paymentIntentID));
   return subscribeToNodeAddition(path, (key, val) =>
     callback(key, val, paymentIntentID)
@@ -1875,6 +2062,60 @@ export async function dbRetrievePunchHistoryByTimeRange(fromMillis, toMillis) {
     };
   } catch (error) {
     log("Error retrieving punch history by time range:", error);
+    throw error;
+  }
+}
+
+/**
+ * Login app user and set up settings with tenantID and storeID
+ * @param {string} email - User email
+ * @param {string} password - User password
+ * @returns {Promise<Object>} - Returns login result with user, tenant, and settings
+ */
+export async function dbLoginAppUser(email, password) {
+  try {
+    const { loginAppUser } = await import("./db");
+    const result = await loginAppUser(email, password);
+
+    if (result.success) {
+      // Extract tenantID and storeID from the login response
+      const { tenantID, storeID } = result.user;
+
+      // Get settings using the retrieved tenantID and storeID
+      const settings = await dbGetSettings();
+
+      // Update the settings with tenantID and storeID
+      const updatedSettings = {
+        ...settings,
+        tenantID,
+        storeID,
+        user: result.user,
+        tenant: result.tenant,
+        auth: result.auth,
+      };
+
+      // Set the updated settings in the Zustand store
+      const { setSettingsObj } = useSettingsStore.getState();
+      setSettingsObj(updatedSettings);
+
+      log("Login successful and settings updated", {
+        tenantID,
+        storeID,
+        user: result.user,
+      });
+
+      return {
+        success: true,
+        user: result.user,
+        tenant: result.tenant,
+        auth: result.auth,
+        settings: updatedSettings,
+      };
+    } else {
+      throw new Error(result.message || "Login failed");
+    }
+  } catch (error) {
+    log("Error during login process:", error);
     throw error;
   }
 }

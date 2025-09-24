@@ -2,17 +2,14 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native-web";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
-import { 
-  signInWithEmail, 
-  sendPasswordReset
-} from "../db";
+import { sendPasswordReset } from "../db";
+import { dbLoginAppUser } from "../db_call_wrapper";
 
 export function LoginScreen({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -24,17 +21,18 @@ export function LoginScreen({ onLoginSuccess }) {
     setError("");
 
     try {
-      const result = await signInWithEmail(email, password);
+      const result = await dbLoginAppUser(email, password);
       if (result.success) {
+        // The settings have already been set in the Zustand store
+        // Pass the user data to the success callback
         onLoginSuccess(result.user);
       }
     } catch (error) {
-      setError(getErrorMessage(error.code));
+      setError(getErrorMessage(error.message || error.code));
     } finally {
       setIsLoading(false);
     }
   };
-
 
   const handleForgotPassword = async () => {
     if (!email) {
@@ -54,7 +52,6 @@ export function LoginScreen({ onLoginSuccess }) {
     }
   };
 
-
   const getErrorMessage = (errorCode) => {
     switch (errorCode) {
       case "auth/user-not-found":
@@ -67,17 +64,22 @@ export function LoginScreen({ onLoginSuccess }) {
         return "This account has been disabled";
       case "auth/too-many-requests":
         return "Too many failed attempts. Please try again later";
+      case "❌ User is not associated with any tenant.":
+        return "User account is not properly configured";
+      case "❌ User is not associated with any store.":
+        return "User account is not associated with any store";
+      case "❌ User not found in system.":
+        return "User account not found in system";
       default:
-        return "An error occurred. Please try again";
+        return errorCode || "An error occurred. Please try again";
     }
   };
-
 
   return (
     <View style={styles.container}>
       <View style={styles.formContainer}>
         <Text style={styles.title}>Sign In</Text>
-        
+
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -87,7 +89,7 @@ export function LoginScreen({ onLoginSuccess }) {
           autoCapitalize="none"
           autoCorrect={false}
         />
-        
+
         <TextInput
           style={styles.input}
           placeholder="Password"
@@ -95,9 +97,9 @@ export function LoginScreen({ onLoginSuccess }) {
           onChangeText={setPassword}
           secureTextEntry
         />
-        
+
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        
+
         <TouchableOpacity
           style={[styles.button, isLoading && styles.buttonDisabled]}
           onPress={handleSignIn}
@@ -107,7 +109,7 @@ export function LoginScreen({ onLoginSuccess }) {
             {isLoading ? "Signing In..." : "Sign In"}
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.linkButton}
           onPress={handleForgotPassword}

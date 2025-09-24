@@ -38,7 +38,7 @@ import {
 } from "./db";
 import { get, ref } from "firebase/database";
 import { RDB } from "./db";
-import { useDatabaseBatchStore } from "./stores";
+import { useDatabaseBatchStore, useSettingsStore } from "./stores";
 import { clog, generateRandomID, log } from "./utils";
 
 // new shi+++++++++++++++++++++++++++++++++++++++++++++++++
@@ -457,3 +457,1425 @@ export function dbCancelServerDrivenStripePayment(readerID) {
 export function dbRetrieveAvailableStripeReaders() {
   return retrieveAvailableStripeReaders();
 }
+
+//////////////////////////////////////////////////////////////////////
+////// Completed Workorder Wrapper Functions ///////////////////////
+//////////////////////////////////////////////////////////////////////
+
+/**
+ * Save a completed workorder object to Google Cloud Storage
+ * @param {Object} workorderObj - The workorder object to save
+ * @param {string} workorderID - The workorder ID
+ * @param {string} status - The completion status (e.g., 'completed', 'cancelled', 'archived')
+ * @returns {Promise<Object>} - Returns save result with workorder-specific path
+ */
+export async function dbSaveCompletedWorkorder(
+  workorderObj,
+  workorderID,
+  status = "completed"
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Generate path using path generator with tenantID/storeID
+    const path = build_db_path.cloudStorage.completedWorkorder(
+      workorderID,
+      tenantID,
+      storeID,
+      status
+    );
+
+    // Add metadata to the workorder object
+    const workorderWithMetadata = {
+      ...workorderObj,
+      _storageMetadata: {
+        workorderID,
+        tenantID,
+        storeID,
+        status,
+        savedAt: Date.now(),
+        savedDate: new Date().toISOString(),
+        year: new Date().getFullYear(),
+        month: String(new Date().getMonth() + 1).padStart(2, "0"),
+        version: "1.0",
+      },
+    };
+
+    // Convert workorder object to JSON string
+    const workorderJSON = JSON.stringify(workorderWithMetadata, null, 2);
+
+    // Upload as string to storage using the generated path
+    const result = await uploadStringToStorage(workorderJSON, path, "raw");
+
+    log(`Completed workorder saved: ${path}`);
+    return {
+      ...result,
+      workorderID,
+      tenantID,
+      storeID,
+      status,
+      timestamp: workorderWithMetadata._storageMetadata.savedAt,
+      year: workorderWithMetadata._storageMetadata.year,
+      month: workorderWithMetadata._storageMetadata.month,
+      metadata: workorderWithMetadata._storageMetadata,
+    };
+  } catch (error) {
+    log("Error saving completed workorder:", error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve a completed workorder from Google Cloud Storage
+ * @param {string} workorderID - The workorder ID
+ * @param {string} status - The completion status (e.g., 'completed', 'cancelled', 'archived')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Object>} - Returns the workorder object with metadata
+ */
+export async function dbRetrieveCompletedWorkorder(
+  workorderID,
+  status = "completed",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/completed-workorders/${status}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Find the workorder file by ID
+    const workorderFile = folderContents.files.find(
+      (file) =>
+        file.name.startsWith(`${workorderID}_`) && file.name.endsWith(".json")
+    );
+
+    if (!workorderFile) {
+      throw new Error(
+        `Workorder ${workorderID} not found in ${status} workorders for tenant ${tenantID}, store ${storeID}, ${targetYear}/${targetMonth}`
+      );
+    }
+
+    // Get the download URL and fetch the content
+    const downloadURL = await getFileDownloadURL(workorderFile.fullPath);
+
+    // Fetch the JSON content
+    const response = await fetch(downloadURL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch workorder: ${response.statusText}`);
+    }
+
+    const workorderData = await response.json();
+
+    log(`Completed workorder retrieved: ${workorderFile.fullPath}`);
+    return {
+      success: true,
+      workorder: workorderData,
+      workorderID,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      downloadURL,
+      filePath: workorderFile.fullPath,
+      metadata: workorderData._storageMetadata,
+    };
+  } catch (error) {
+    log("Error retrieving completed workorder:", error);
+    throw error;
+  }
+}
+
+/**
+ * List all completed workorders for a specific status and time period
+ * @param {string} status - The completion status (e.g., 'completed', 'cancelled', 'archived')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Array>} - Returns array of workorder file information
+ */
+export async function dbListCompletedWorkorders(
+  status = "completed",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/completed-workorders/${status}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Filter for workorder JSON files and extract workorder IDs
+    const workorderFiles = folderContents.files
+      .filter((file) => file.name.endsWith(".json"))
+      .map((file) => {
+        // Extract workorder ID from filename (format: workorderID_timestamp.json)
+        const workorderID = file.name.split("_")[0];
+        return {
+          workorderID,
+          fileName: file.name,
+          fullPath: file.fullPath,
+          tenantID,
+          storeID,
+          status,
+          year: targetYear,
+          month: targetMonth,
+        };
+      });
+
+    log(
+      `Listed ${workorderFiles.length} completed workorders for tenant ${tenantID}, store ${storeID}, ${status}/${targetYear}/${targetMonth}`
+    );
+    return {
+      success: true,
+      workorders: workorderFiles,
+      totalCount: workorderFiles.length,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      folderPath,
+    };
+  } catch (error) {
+    log("Error listing completed workorders:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a completed workorder from Google Cloud Storage
+ * @param {string} workorderID - The workorder ID
+ * @param {string} status - The completion status (e.g., 'completed', 'cancelled', 'archived')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Object>} - Returns deletion result
+ */
+export async function dbDeleteCompletedWorkorder(
+  workorderID,
+  status = "completed",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/completed-workorders/${status}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Find the workorder file by ID
+    const workorderFile = folderContents.files.find(
+      (file) =>
+        file.name.startsWith(`${workorderID}_`) && file.name.endsWith(".json")
+    );
+
+    if (!workorderFile) {
+      throw new Error(
+        `Workorder ${workorderID} not found in ${status} workorders for tenant ${tenantID}, store ${storeID}, ${targetYear}/${targetMonth}`
+      );
+    }
+
+    // Delete the file using the full path
+    const result = await deleteFileFromStorage(workorderFile.fullPath);
+
+    log(`Completed workorder deleted: ${workorderFile.fullPath}`);
+    return {
+      ...result,
+      workorderID,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      deletedFilePath: workorderFile.fullPath,
+    };
+  } catch (error) {
+    log("Error deleting completed workorder:", error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve all completed workorders within a specific time range
+ * @param {number} fromMillis - Start time in milliseconds
+ * @param {number} toMillis - End time in milliseconds
+ * @returns {Promise<Object>} - Returns all workorder records within the time range
+ */
+export async function dbRetrieveCompletedWorkordersByTimeRange(
+  fromMillis,
+  toMillis
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    const { listFilesInStorage, getFileDownloadURL } = await import("./db");
+
+    // Convert milliseconds to date objects for folder structure
+    const fromDate = new Date(fromMillis);
+    const toDate = new Date(toMillis);
+
+    const fromYear = fromDate.getFullYear();
+    const fromMonth = String(fromDate.getMonth() + 1).padStart(2, "0");
+    const toYear = toDate.getFullYear();
+    const toMonth = String(toDate.getMonth() + 1).padStart(2, "0");
+
+    log(
+      `Searching completed workorders for tenant ${tenantID}, store ${storeID} from ${fromYear}/${fromMonth} to ${toYear}/${toMonth}`
+    );
+
+    const allWorkorderRecords = [];
+    const statuses = ["completed", "cancelled", "archived"];
+
+    // Helper function to check if a file was created within the time range
+    const isWithinTimeRange = (timestamp) => {
+      return timestamp >= fromMillis && timestamp <= toMillis;
+    };
+
+    // Search through all status folders
+    for (const status of statuses) {
+      const statusPath = `${tenantID}/${storeID}/completed-workorders/${status}/`;
+
+      try {
+        // List all years in this status folder
+        const statusContents = await listFilesInStorage(statusPath);
+
+        // Get all year folders (prefixes)
+        const yearFolders = statusContents.folders || [];
+
+        for (const yearFolder of yearFolders) {
+          const year = yearFolder.name;
+
+          // Check if this year is within our range
+          if (year < fromYear || year > toYear) {
+            continue;
+          }
+
+          log(
+            `Searching year ${year} in status ${status} for tenant ${tenantID}, store ${storeID}`
+          );
+
+          // Search through months in this year
+          const currentDate = new Date(fromDate);
+          while (currentDate <= toDate) {
+            const currentYear = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+
+            // Only search this year's months
+            if (currentYear.toString() !== year) {
+              currentDate.setMonth(currentDate.getMonth() + 1);
+              continue;
+            }
+
+            const yearMonthPath = `${tenantID}/${storeID}/completed-workorders/${status}/${year}/${month}/`;
+
+            try {
+              const yearMonthContents = await listFilesInStorage(yearMonthPath);
+
+              // Process all JSON files in this folder
+              for (const file of yearMonthContents.files) {
+                if (file.name.endsWith(".json")) {
+                  try {
+                    // Extract timestamp from filename (format: workorderID_timestamp.json)
+                    const timestampMatch = file.name.match(/_(\d+)\.json$/);
+                    if (timestampMatch) {
+                      const fileTimestamp = parseInt(timestampMatch[1]);
+
+                      // Check if this file was created within our time range
+                      if (isWithinTimeRange(fileTimestamp)) {
+                        // Get the download URL and fetch the content
+                        const downloadURL = await getFileDownloadURL(
+                          file.fullPath
+                        );
+                        const response = await fetch(downloadURL);
+
+                        if (response.ok) {
+                          const workorderData = await response.json();
+
+                          // Add file metadata
+                          const recordWithMetadata = {
+                            ...workorderData,
+                            _fileMetadata: {
+                              fileName: file.name,
+                              fullPath: file.fullPath,
+                              downloadURL,
+                              tenantID,
+                              storeID,
+                              status,
+                              year,
+                              month,
+                              fileTimestamp,
+                              retrievedAt: Date.now(),
+                            },
+                          };
+
+                          allWorkorderRecords.push(recordWithMetadata);
+                        }
+                      }
+                    }
+                  } catch (fileError) {
+                    log(`Error processing file ${file.name}:`, fileError);
+                  }
+                }
+              }
+            } catch (pathError) {
+              log(`Path ${yearMonthPath} not found, continuing...`);
+            }
+
+            // Move to next month
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          }
+        }
+      } catch (statusError) {
+        log(
+          `Error searching status ${status} for tenant ${tenantID}, store ${storeID}:`,
+          statusError
+        );
+      }
+    }
+
+    // Sort by timestamp (most recent first)
+    allWorkorderRecords.sort((a, b) => {
+      const aTime = a._fileMetadata?.fileTimestamp || 0;
+      const bTime = b._fileMetadata?.fileTimestamp || 0;
+      return bTime - aTime;
+    });
+
+    log(
+      `Found ${
+        allWorkorderRecords.length
+      } completed workorders for tenant ${tenantID}, store ${storeID} between ${new Date(
+        fromMillis
+      ).toISOString()} and ${new Date(toMillis).toISOString()}`
+    );
+
+    return {
+      success: true,
+      workorderRecords: allWorkorderRecords,
+      totalCount: allWorkorderRecords.length,
+      tenantID,
+      storeID,
+      timeRange: {
+        from: fromMillis,
+        to: toMillis,
+        fromDate: new Date(fromMillis).toISOString(),
+        toDate: new Date(toMillis).toISOString(),
+      },
+      searchCriteria: {
+        fromYear,
+        fromMonth,
+        toYear,
+        toMonth,
+      },
+    };
+  } catch (error) {
+    log("Error retrieving completed workorders by time range:", error);
+    throw error;
+  }
+}
+
+//////////////////////////////////////////////////////////////////////
+////// Completed Sale Wrapper Functions /////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+/**
+ * Save a completed sale object to Google Cloud Storage
+ * @param {Object} saleObj - The sale object to save
+ * @param {string} saleID - The sale ID
+ * @param {string} status - The completion status (e.g., 'completed', 'cancelled', 'refunded')
+ * @returns {Promise<Object>} - Returns save result with sale-specific path
+ */
+export async function dbSaveCompletedSale(
+  saleObj,
+  saleID,
+  status = "completed"
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Generate path using path generator with tenantID/storeID
+    const path = build_db_path.cloudStorage.completedSale(
+      saleID,
+      tenantID,
+      storeID,
+      status
+    );
+
+    // Add metadata to the sale object
+    const saleWithMetadata = {
+      ...saleObj,
+      _storageMetadata: {
+        saleID,
+        tenantID,
+        storeID,
+        status,
+        savedAt: Date.now(),
+        savedDate: new Date().toISOString(),
+        year: new Date().getFullYear(),
+        month: String(new Date().getMonth() + 1).padStart(2, "0"),
+        version: "1.0",
+      },
+    };
+
+    // Convert sale object to JSON string
+    const saleJSON = JSON.stringify(saleWithMetadata, null, 2);
+
+    // Upload as string to storage using the generated path
+    const result = await uploadStringToStorage(saleJSON, path, "raw");
+
+    log(`Completed sale saved: ${path}`);
+    return {
+      ...result,
+      saleID,
+      tenantID,
+      storeID,
+      status,
+      timestamp: saleWithMetadata._storageMetadata.savedAt,
+      year: saleWithMetadata._storageMetadata.year,
+      month: saleWithMetadata._storageMetadata.month,
+      metadata: saleWithMetadata._storageMetadata,
+    };
+  } catch (error) {
+    log("Error saving completed sale:", error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve a completed sale from Google Cloud Storage
+ * @param {string} saleID - The sale ID
+ * @param {string} status - The completion status (e.g., 'completed', 'cancelled', 'refunded')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Object>} - Returns the sale object with metadata
+ */
+export async function dbRetrieveCompletedSale(
+  saleID,
+  status = "completed",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/completed-sales/${status}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Find the sale file by ID
+    const saleFile = folderContents.files.find(
+      (file) =>
+        file.name.startsWith(`${saleID}_`) && file.name.endsWith(".json")
+    );
+
+    if (!saleFile) {
+      throw new Error(
+        `Sale ${saleID} not found in ${status} sales for tenant ${tenantID}, store ${storeID}, ${targetYear}/${targetMonth}`
+      );
+    }
+
+    // Get the download URL and fetch the content
+    const downloadURL = await getFileDownloadURL(saleFile.fullPath);
+
+    // Fetch the JSON content
+    const response = await fetch(downloadURL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sale: ${response.statusText}`);
+    }
+
+    const saleData = await response.json();
+
+    log(`Completed sale retrieved: ${saleFile.fullPath}`);
+    return {
+      success: true,
+      sale: saleData,
+      saleID,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      downloadURL,
+      filePath: saleFile.fullPath,
+      metadata: saleData._storageMetadata,
+    };
+  } catch (error) {
+    log("Error retrieving completed sale:", error);
+    throw error;
+  }
+}
+
+/**
+ * List all completed sales for a specific status and time period
+ * @param {string} status - The completion status (e.g., 'completed', 'cancelled', 'refunded')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Array>} - Returns array of sale file information
+ */
+export async function dbListCompletedSales(
+  status = "completed",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/completed-sales/${status}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Filter for sale JSON files and extract sale IDs
+    const saleFiles = folderContents.files
+      .filter((file) => file.name.endsWith(".json"))
+      .map((file) => {
+        // Extract sale ID from filename (format: saleID_timestamp.json)
+        const saleID = file.name.split("_")[0];
+        return {
+          saleID,
+          fileName: file.name,
+          fullPath: file.fullPath,
+          tenantID,
+          storeID,
+          status,
+          year: targetYear,
+          month: targetMonth,
+        };
+      });
+
+    log(
+      `Listed ${saleFiles.length} completed sales for tenant ${tenantID}, store ${storeID}, ${status}/${targetYear}/${targetMonth}`
+    );
+    return {
+      success: true,
+      sales: saleFiles,
+      totalCount: saleFiles.length,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      folderPath,
+    };
+  } catch (error) {
+    log("Error listing completed sales:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a completed sale from Google Cloud Storage
+ * @param {string} saleID - The sale ID
+ * @param {string} status - The completion status (e.g., 'completed', 'cancelled', 'refunded')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Object>} - Returns deletion result
+ */
+export async function dbDeleteCompletedSale(
+  saleID,
+  status = "completed",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/completed-sales/${status}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Find the sale file by ID
+    const saleFile = folderContents.files.find(
+      (file) =>
+        file.name.startsWith(`${saleID}_`) && file.name.endsWith(".json")
+    );
+
+    if (!saleFile) {
+      throw new Error(
+        `Sale ${saleID} not found in ${status} sales for tenant ${tenantID}, store ${storeID}, ${targetYear}/${targetMonth}`
+      );
+    }
+
+    // Delete the file using the full path
+    const result = await deleteFileFromStorage(saleFile.fullPath);
+
+    log(`Completed sale deleted: ${saleFile.fullPath}`);
+    return {
+      ...result,
+      saleID,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      deletedFilePath: saleFile.fullPath,
+    };
+  } catch (error) {
+    log("Error deleting completed sale:", error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve all completed sales within a specific time range
+ * @param {number} fromMillis - Start time in milliseconds
+ * @param {number} toMillis - End time in milliseconds
+ * @returns {Promise<Object>} - Returns all sale records within the time range
+ */
+export async function dbRetrieveCompletedSalesByTimeRange(
+  fromMillis,
+  toMillis
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    const { listFilesInStorage, getFileDownloadURL } = await import("./db");
+
+    // Convert milliseconds to date objects for folder structure
+    const fromDate = new Date(fromMillis);
+    const toDate = new Date(toMillis);
+
+    const fromYear = fromDate.getFullYear();
+    const fromMonth = String(fromDate.getMonth() + 1).padStart(2, "0");
+    const toYear = toDate.getFullYear();
+    const toMonth = String(toDate.getMonth() + 1).padStart(2, "0");
+
+    log(
+      `Searching completed sales for tenant ${tenantID}, store ${storeID} from ${fromYear}/${fromMonth} to ${toYear}/${toMonth}`
+    );
+
+    const allSaleRecords = [];
+    const statuses = ["completed", "cancelled", "refunded"];
+
+    // Helper function to check if a file was created within the time range
+    const isWithinTimeRange = (timestamp) => {
+      return timestamp >= fromMillis && timestamp <= toMillis;
+    };
+
+    // Search through all status folders
+    for (const status of statuses) {
+      const statusPath = `${tenantID}/${storeID}/completed-sales/${status}/`;
+
+      try {
+        // List all years in this status folder
+        const statusContents = await listFilesInStorage(statusPath);
+
+        // Get all year folders (prefixes)
+        const yearFolders = statusContents.folders || [];
+
+        for (const yearFolder of yearFolders) {
+          const year = yearFolder.name;
+
+          // Check if this year is within our range
+          if (year < fromYear || year > toYear) {
+            continue;
+          }
+
+          log(
+            `Searching year ${year} in status ${status} for tenant ${tenantID}, store ${storeID}`
+          );
+
+          // Search through months in this year
+          const currentDate = new Date(fromDate);
+          while (currentDate <= toDate) {
+            const currentYear = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+
+            // Only search this year's months
+            if (currentYear.toString() !== year) {
+              currentDate.setMonth(currentDate.getMonth() + 1);
+              continue;
+            }
+
+            const yearMonthPath = `${tenantID}/${storeID}/completed-sales/${status}/${year}/${month}/`;
+
+            try {
+              const yearMonthContents = await listFilesInStorage(yearMonthPath);
+
+              // Process all JSON files in this folder
+              for (const file of yearMonthContents.files) {
+                if (file.name.endsWith(".json")) {
+                  try {
+                    // Extract timestamp from filename (format: saleID_timestamp.json)
+                    const timestampMatch = file.name.match(/_(\d+)\.json$/);
+                    if (timestampMatch) {
+                      const fileTimestamp = parseInt(timestampMatch[1]);
+
+                      // Check if this file was created within our time range
+                      if (isWithinTimeRange(fileTimestamp)) {
+                        // Get the download URL and fetch the content
+                        const downloadURL = await getFileDownloadURL(
+                          file.fullPath
+                        );
+                        const response = await fetch(downloadURL);
+
+                        if (response.ok) {
+                          const saleData = await response.json();
+
+                          // Add file metadata
+                          const recordWithMetadata = {
+                            ...saleData,
+                            _fileMetadata: {
+                              fileName: file.name,
+                              fullPath: file.fullPath,
+                              downloadURL,
+                              tenantID,
+                              storeID,
+                              status,
+                              year,
+                              month,
+                              fileTimestamp,
+                              retrievedAt: Date.now(),
+                            },
+                          };
+
+                          allSaleRecords.push(recordWithMetadata);
+                        }
+                      }
+                    }
+                  } catch (fileError) {
+                    log(`Error processing file ${file.name}:`, fileError);
+                  }
+                }
+              }
+            } catch (pathError) {
+              log(`Path ${yearMonthPath} not found, continuing...`);
+            }
+
+            // Move to next month
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          }
+        }
+      } catch (statusError) {
+        log(
+          `Error searching status ${status} for tenant ${tenantID}, store ${storeID}:`,
+          statusError
+        );
+      }
+    }
+
+    // Sort by timestamp (most recent first)
+    allSaleRecords.sort((a, b) => {
+      const aTime = a._fileMetadata?.fileTimestamp || 0;
+      const bTime = b._fileMetadata?.fileTimestamp || 0;
+      return bTime - aTime;
+    });
+
+    log(
+      `Found ${
+        allSaleRecords.length
+      } completed sales for tenant ${tenantID}, store ${storeID} between ${new Date(
+        fromMillis
+      ).toISOString()} and ${new Date(toMillis).toISOString()}`
+    );
+
+    return {
+      success: true,
+      saleRecords: allSaleRecords,
+      totalCount: allSaleRecords.length,
+      tenantID,
+      storeID,
+      timeRange: {
+        from: fromMillis,
+        to: toMillis,
+        fromDate: new Date(fromMillis).toISOString(),
+        toDate: new Date(toMillis).toISOString(),
+      },
+      searchCriteria: {
+        fromYear,
+        fromMonth,
+        toYear,
+        toMonth,
+      },
+    };
+  } catch (error) {
+    log("Error retrieving completed sales by time range:", error);
+    throw error;
+  }
+}
+
+//////////////////////////////////////////////////////////////////////
+////// Punch History Wrapper Functions //////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+/**
+ * Save a punch history object to Google Cloud Storage
+ * @param {Object} punchHistoryObj - The punch history object to save
+ * @param {string} punchHistoryID - The punch history ID
+ * @param {string} userID - The user ID to group by
+ * @param {string} status - The status (e.g., 'active', 'archived', 'deleted')
+ * @returns {Promise<Object>} - Returns save result with punch history-specific path
+ */
+export async function dbSavePunchHistory(
+  punchHistoryObj,
+  punchHistoryID,
+  userID,
+  status = "active"
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Generate path using path generator with tenantID/storeID
+    const path = build_db_path.cloudStorage.punchHistory(
+      punchHistoryID,
+      userID,
+      tenantID,
+      storeID,
+      status
+    );
+
+    // Add metadata to the punch history object
+    const punchHistoryWithMetadata = {
+      ...punchHistoryObj,
+      _storageMetadata: {
+        punchHistoryID,
+        userID,
+        tenantID,
+        storeID,
+        status,
+        savedAt: Date.now(),
+        savedDate: new Date().toISOString(),
+        year: new Date().getFullYear(),
+        month: String(new Date().getMonth() + 1).padStart(2, "0"),
+        version: "1.0",
+      },
+    };
+
+    // Convert punch history object to JSON string
+    const punchHistoryJSON = JSON.stringify(punchHistoryWithMetadata, null, 2);
+
+    // Upload as string to storage using the generated path
+    const result = await uploadStringToStorage(punchHistoryJSON, path, "raw");
+
+    log(`Punch history saved: ${path}`);
+    return {
+      ...result,
+      punchHistoryID,
+      userID,
+      tenantID,
+      storeID,
+      status,
+      timestamp: punchHistoryWithMetadata._storageMetadata.savedAt,
+      year: punchHistoryWithMetadata._storageMetadata.year,
+      month: punchHistoryWithMetadata._storageMetadata.month,
+      metadata: punchHistoryWithMetadata._storageMetadata,
+    };
+  } catch (error) {
+    log("Error saving punch history:", error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve a punch history from Google Cloud Storage
+ * @param {string} punchHistoryID - The punch history ID
+ * @param {string} userID - The user ID to search within
+ * @param {string} status - The status (e.g., 'active', 'archived', 'deleted')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Object>} - Returns the punch history object with metadata
+ */
+export async function dbRetrievePunchHistory(
+  punchHistoryID,
+  userID,
+  status = "active",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/punch-history/${status}/${userID}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Find the punch history file by ID
+    const punchHistoryFile = folderContents.files.find(
+      (file) =>
+        file.name.startsWith(`${punchHistoryID}_`) &&
+        file.name.endsWith(".json")
+    );
+
+    if (!punchHistoryFile) {
+      throw new Error(
+        `Punch history ${punchHistoryID} not found for user ${userID} in ${status} punch history for tenant ${tenantID}, store ${storeID}, ${targetYear}/${targetMonth}`
+      );
+    }
+
+    // Get the download URL and fetch the content
+    const downloadURL = await getFileDownloadURL(punchHistoryFile.fullPath);
+
+    // Fetch the JSON content
+    const response = await fetch(downloadURL);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch punch history: ${response.statusText}`);
+    }
+
+    const punchHistoryData = await response.json();
+
+    log(`Punch history retrieved: ${punchHistoryFile.fullPath}`);
+    return {
+      success: true,
+      punchHistory: punchHistoryData,
+      punchHistoryID,
+      userID,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      downloadURL,
+      filePath: punchHistoryFile.fullPath,
+      metadata: punchHistoryData._storageMetadata,
+    };
+  } catch (error) {
+    log("Error retrieving punch history:", error);
+    throw error;
+  }
+}
+
+/**
+ * List all punch history records for a specific user, status and time period
+ * @param {string} userID - The user ID to list punch history for
+ * @param {string} status - The status (e.g., 'active', 'archived', 'deleted')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Array>} - Returns array of punch history file information
+ */
+export async function dbListPunchHistory(
+  userID,
+  status = "active",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/punch-history/${status}/${userID}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Filter for punch history JSON files and extract punch history IDs
+    const punchHistoryFiles = folderContents.files
+      .filter((file) => file.name.endsWith(".json"))
+      .map((file) => {
+        // Extract punch history ID from filename (format: punchHistoryID_timestamp.json)
+        const punchHistoryID = file.name.split("_")[0];
+        return {
+          punchHistoryID,
+          fileName: file.name,
+          fullPath: file.fullPath,
+          userID,
+          tenantID,
+          storeID,
+          status,
+          year: targetYear,
+          month: targetMonth,
+        };
+      });
+
+    log(
+      `Listed ${punchHistoryFiles.length} punch history records for user ${userID} in tenant ${tenantID}, store ${storeID}, ${status}/${targetYear}/${targetMonth}`
+    );
+    return {
+      success: true,
+      punchHistoryRecords: punchHistoryFiles,
+      totalCount: punchHistoryFiles.length,
+      userID,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      folderPath,
+    };
+  } catch (error) {
+    log("Error listing punch history:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a punch history from Google Cloud Storage
+ * @param {string} punchHistoryID - The punch history ID
+ * @param {string} userID - The user ID to search within
+ * @param {string} status - The status (e.g., 'active', 'archived', 'deleted')
+ * @param {string} year - The year (optional, defaults to current year)
+ * @param {string} month - The month (optional, defaults to current month)
+ * @returns {Promise<Object>} - Returns deletion result
+ */
+export async function dbDeletePunchHistory(
+  punchHistoryID,
+  userID,
+  status = "active",
+  year = null,
+  month = null
+) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    // Use current date if not provided
+    const currentDate = new Date();
+    const targetYear = year || currentDate.getFullYear();
+    const targetMonth =
+      month || String(currentDate.getMonth() + 1).padStart(2, "0");
+
+    // Create the folder path for listing files with tenantID/storeID
+    const folderPath = `${tenantID}/${storeID}/punch-history/${status}/${userID}/${targetYear}/${targetMonth}/`;
+    const folderContents = await listFilesInStorage(folderPath);
+
+    // Find the punch history file by ID
+    const punchHistoryFile = folderContents.files.find(
+      (file) =>
+        file.name.startsWith(`${punchHistoryID}_`) &&
+        file.name.endsWith(".json")
+    );
+
+    if (!punchHistoryFile) {
+      throw new Error(
+        `Punch history ${punchHistoryID} not found for user ${userID} in ${status} punch history for tenant ${tenantID}, store ${storeID}, ${targetYear}/${targetMonth}`
+      );
+    }
+
+    // Delete the file using the full path
+    const result = await deleteFileFromStorage(punchHistoryFile.fullPath);
+
+    log(`Punch history deleted: ${punchHistoryFile.fullPath}`);
+    return {
+      ...result,
+      punchHistoryID,
+      userID,
+      tenantID,
+      storeID,
+      status,
+      year: targetYear,
+      month: targetMonth,
+      deletedFilePath: punchHistoryFile.fullPath,
+    };
+  } catch (error) {
+    log("Error deleting punch history:", error);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve all punch history records within a specific time range
+ * @param {number} fromMillis - Start time in milliseconds
+ * @param {number} toMillis - End time in milliseconds
+ * @returns {Promise<Object>} - Returns all punch history records within the time range
+ */
+export async function dbRetrievePunchHistoryByTimeRange(fromMillis, toMillis) {
+  try {
+    // Get tenantID and storeID from settings store
+    const settingsObj = useSettingsStore.getState().settingsObj;
+    const tenantID = settingsObj?.tenantID;
+    const storeID = settingsObj?.storeID;
+
+    if (!tenantID || !storeID) {
+      throw new Error("tenantID and storeID must be configured in settings");
+    }
+
+    const { listFilesInStorage, getFileDownloadURL } = await import("./db");
+
+    // Convert milliseconds to date objects for folder structure
+    const fromDate = new Date(fromMillis);
+    const toDate = new Date(toMillis);
+
+    const fromYear = fromDate.getFullYear();
+    const fromMonth = String(fromDate.getMonth() + 1).padStart(2, "0");
+    const toYear = toDate.getFullYear();
+    const toMonth = String(toDate.getMonth() + 1).padStart(2, "0");
+
+    log(
+      `Searching punch history for tenant ${tenantID}, store ${storeID} from ${fromYear}/${fromMonth} to ${toYear}/${toMonth}`
+    );
+
+    const allPunchHistoryRecords = [];
+    const statuses = ["active", "archived", "deleted"];
+
+    // Helper function to check if a file was created within the time range
+    const isWithinTimeRange = (timestamp) => {
+      return timestamp >= fromMillis && timestamp <= toMillis;
+    };
+
+    // Search through all status folders
+    for (const status of statuses) {
+      const statusPath = `${tenantID}/${storeID}/punch-history/${status}/`;
+
+      try {
+        // List all users in this status folder
+        const statusContents = await listFilesInStorage(statusPath);
+
+        // Get all user folders (prefixes)
+        const userFolders = statusContents.folders || [];
+
+        for (const userFolder of userFolders) {
+          const userID = userFolder.name;
+          log(
+            `Searching user ${userID} in status ${status} for tenant ${tenantID}, store ${storeID}`
+          );
+
+          // Search through years and months
+          const currentDate = new Date(fromDate);
+          while (currentDate <= toDate) {
+            const year = currentDate.getFullYear();
+            const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+
+            const userYearMonthPath = `${tenantID}/${storeID}/punch-history/${status}/${userID}/${year}/${month}/`;
+
+            try {
+              const userYearMonthContents = await listFilesInStorage(
+                userYearMonthPath
+              );
+
+              // Process all JSON files in this folder
+              for (const file of userYearMonthContents.files) {
+                if (file.name.endsWith(".json")) {
+                  try {
+                    // Extract timestamp from filename (format: punchHistoryID_timestamp.json)
+                    const timestampMatch = file.name.match(/_(\d+)\.json$/);
+                    if (timestampMatch) {
+                      const fileTimestamp = parseInt(timestampMatch[1]);
+
+                      // Check if this file was created within our time range
+                      if (isWithinTimeRange(fileTimestamp)) {
+                        // Get the download URL and fetch the content
+                        const downloadURL = await getFileDownloadURL(
+                          file.fullPath
+                        );
+                        const response = await fetch(downloadURL);
+
+                        if (response.ok) {
+                          const punchHistoryData = await response.json();
+
+                          // Add file metadata
+                          const recordWithMetadata = {
+                            ...punchHistoryData,
+                            _fileMetadata: {
+                              fileName: file.name,
+                              fullPath: file.fullPath,
+                              downloadURL,
+                              userID,
+                              tenantID,
+                              storeID,
+                              status,
+                              year,
+                              month,
+                              fileTimestamp,
+                              retrievedAt: Date.now(),
+                            },
+                          };
+
+                          allPunchHistoryRecords.push(recordWithMetadata);
+                        }
+                      }
+                    }
+                  } catch (fileError) {
+                    log(`Error processing file ${file.name}:`, fileError);
+                  }
+                }
+              }
+            } catch (pathError) {
+              log(`Path ${userYearMonthPath} not found, continuing...`);
+            }
+
+            // Move to next month
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          }
+        }
+      } catch (statusError) {
+        log(
+          `Error searching status ${status} for tenant ${tenantID}, store ${storeID}:`,
+          statusError
+        );
+      }
+    }
+
+    // Sort by timestamp (most recent first)
+    allPunchHistoryRecords.sort((a, b) => {
+      const aTime = a._fileMetadata?.fileTimestamp || 0;
+      const bTime = b._fileMetadata?.fileTimestamp || 0;
+      return bTime - aTime;
+    });
+
+    log(
+      `Found ${
+        allPunchHistoryRecords.length
+      } punch history records for tenant ${tenantID}, store ${storeID} between ${new Date(
+        fromMillis
+      ).toISOString()} and ${new Date(toMillis).toISOString()}`
+    );
+
+    return {
+      success: true,
+      punchHistoryRecords: allPunchHistoryRecords,
+      totalCount: allPunchHistoryRecords.length,
+      tenantID,
+      storeID,
+      timeRange: {
+        from: fromMillis,
+        to: toMillis,
+        fromDate: new Date(fromMillis).toISOString(),
+        toDate: new Date(toMillis).toISOString(),
+      },
+      searchCriteria: {
+        fromYear,
+        fromMonth,
+        toYear,
+        toMonth,
+      },
+    };
+  } catch (error) {
+    log("Error retrieving punch history by time range:", error);
+    throw error;
+  }
+}
+

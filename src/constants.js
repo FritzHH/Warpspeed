@@ -112,4 +112,85 @@ export const build_db_path = {
       "/"
     );
   },
+  // Cloud Storage path generators
+  cloudStorage: {
+    // Basic file paths
+    file: (path) => path,
+    folder: (folderPath) => folderPath,
+
+    // Completed workorder paths with tenantID/storeID structure
+    completedWorkorder: (
+      workorderID,
+      tenantID,
+      storeID,
+      status = "completed",
+      year = null,
+      month = null
+    ) => {
+      const date = new Date();
+      const targetYear = year || date.getFullYear();
+      const targetMonth = month || String(date.getMonth() + 1).padStart(2, "0");
+      const timestamp = Date.now();
+      return `${tenantID}/${storeID}/completed-workorders/${status}/${targetYear}/${targetMonth}/${workorderID}_${timestamp}.json`;
+    },
+
+    // Completed sale paths with tenantID/storeID structure
+    completedSale: (
+      saleID,
+      tenantID,
+      storeID,
+      status = "completed",
+      year = null,
+      month = null
+    ) => {
+      const date = new Date();
+      const targetYear = year || date.getFullYear();
+      const targetMonth = month || String(date.getMonth() + 1).padStart(2, "0");
+      const timestamp = Date.now();
+      return `${tenantID}/${storeID}/completed-sales/${status}/${targetYear}/${targetMonth}/${saleID}_${timestamp}.json`;
+    },
+
+    // Punch history paths with tenantID/storeID structure
+    punchHistory: (
+      punchHistoryID,
+      userID,
+      tenantID,
+      storeID,
+      status = "active",
+      year = null,
+      month = null
+    ) => {
+      const date = new Date();
+      const targetYear = year || date.getFullYear();
+      const targetMonth = month || String(date.getMonth() + 1).padStart(2, "0");
+      const timestamp = Date.now();
+      return `${tenantID}/${storeID}/punch-history/${status}/${userID}/${targetYear}/${targetMonth}/${punchHistoryID}_${timestamp}.json`;
+    },
+
+    // Customer document paths with tenantID/storeID structure
+    customerDocument: (
+      customerID,
+      documentType,
+      tenantID,
+      storeID,
+      fileName = null
+    ) => {
+      const timestamp = Date.now();
+      const finalFileName = fileName || `${documentType}_${timestamp}`;
+      return `${tenantID}/${storeID}/customers/${customerID}/documents/${documentType}/${timestamp}_${finalFileName}`;
+    },
+
+    // Workorder attachment paths with tenantID/storeID structure
+    workorderAttachment: (
+      workorderID,
+      attachmentType,
+      tenantID,
+      storeID,
+      fileName = null
+    ) => {
+      const timestamp = Date.now();
+      const finalFileName = fileName || `${attachmentType}_${timestamp}`;
+      return `${tenantID}/${storeID}/workorders/${workorderID}/attachments/${attachmentType}/${timestamp}_${finalFileName}`;
+    },
+  },
 };

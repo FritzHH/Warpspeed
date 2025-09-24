@@ -26,6 +26,7 @@ import {
   useAlertScreenStore,
 } from "../stores";
 import { executeDBBatch } from "../db_call_wrapper";
+import { signOutUser } from "../db";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { DB_BATCH_INTERVAL_MILLIS } from "../constants";
 import { fillInventory, fillOpenWorkorders, fillSettings } from "../testing";
@@ -49,6 +50,16 @@ export function BaseScreen() {
   const _zSetLastDatabaseBatchMillis = useDatabaseBatchStore(
     (state) => state.setLastBatchMillis
   );
+
+  // Sign out function
+  const handleSignOut = async () => {
+    try {
+      await signOutUser();
+      // The auth state change will automatically redirect to login screen
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
   const _zSetLastDatabaseWriteMillis = useDatabaseBatchStore(
     (state) => state.setLastWriteMillis
   );
@@ -179,7 +190,7 @@ export function BaseScreen() {
 
   // testing, build db items
   useEffect(() => {
-    // fillSettings();
+    fillSettings();
     // fillReceipt();
     // fillPrinterNames();
     // fillPunchHistory()
@@ -197,6 +208,7 @@ export function BaseScreen() {
         flexDirection: "row",
         justifyContent: "space-around",
         alignItems: "center",
+        position: "relative",
       }}
     >
       <div

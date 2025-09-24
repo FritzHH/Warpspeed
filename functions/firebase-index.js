@@ -11,6 +11,9 @@ const Stripe = require("stripe");
 const { isArray } = require("lodash");
 const { onInit } = require("firebase-functions/v2/core");
 const creds = require("./creds.json");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const db = getFirestore();
 
 var stripe;
 var twilioClient;
@@ -544,6 +547,9 @@ exports.cancelServerDrivenStripePayment = onRequest(
     }
   }
 );
+
+// users /////////////////////////////////////////////////////////////////////
+
 
 
 /////////////////////////////////////////////////////////////////////////////////

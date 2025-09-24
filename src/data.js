@@ -222,7 +222,7 @@ export const TIME_PUNCH_PROTO = {
 //   showBox: false,
 //   onModalDismiss: () => {},
 //   canExitOnOuterClick: true,
-// };
+// }; 
 
 export const ALERT_SCREEN_PROTO = {
   showAlert: true,
@@ -837,6 +837,8 @@ export const SETTINGS_OBJ = {
   userPinStrength: 2,
   cardRefundFeePercent: 3,
   lockScreenWhenUserLogsOut: false,
+  tenantID: "123456789",
+  storeID: "999999",
   users: [
     FRITZ_USER_OBJ,
     {

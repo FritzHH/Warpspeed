@@ -33,7 +33,7 @@ import {
   useInventoryStore,
   useLoginStore,
   useTabNamesStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import { dbSetSettings } from "../../../db_call_wrapper";
 
 const SEARCH_STRING_TIMER = 45 * 1000;

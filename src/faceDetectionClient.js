@@ -16,11 +16,7 @@ import {
   MILLIS_IN_MINUTE,
   PAUSE_USER_CLOCK_IN_CHECK_MILLIS,
 } from "./constants";
-import {
-  useAlertScreenStore,
-  useLoginStore,
-  useSettingsStore,
-} from "./storesOld";
+import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
 import { cloneDeep } from "lodash";
 // import { dbSetAppUserObj, dbCreateUserPunchAction } from "./db_call_wrapper";
 import { Button_ } from "./components";

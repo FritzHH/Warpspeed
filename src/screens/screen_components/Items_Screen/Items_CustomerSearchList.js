@@ -25,7 +25,7 @@ import {
   useLoginStore,
   useOpenWorkordersStore,
   useTabNamesStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { dbGetCustomerObj } from "../../../db_call_wrapper";
 

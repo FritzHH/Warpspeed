@@ -3,13 +3,13 @@ import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
 import {
   PAYMENT_OBJECT_PROTO,
   REFUND_PROTO,
-  SALE_OBJECT_PROTO,
+  SALE_PROTO,
   TAB_NAMES,
   WORKORDER_ITEM_PROTO,
+  ALERT_SCREEN_PROTO,
   WORKORDER_PROTO,
 } from "../../../data";
 import {
-  ALERT_SCREEN_PROTO,
   useAlertScreenStore,
   useCheckoutStore,
   useCurrentCustomerStore,
@@ -18,7 +18,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import * as XLSX from "xlsx";
 
 import {
@@ -266,7 +266,7 @@ export function CheckoutModalScreen({}) {
         _setSale(cloneDeep(zSale));
       } else if (!sSale) {
         // create new sale object to work with
-        let sale = cloneDeep(SALE_OBJECT_PROTO);
+        let sale = cloneDeep(SALE_PROTO);
         sale.id = generateUPCBarcode(); //////// dev
         sale.salesTaxPercent = zSettings.salesTax;
         sale.millis = new Date().getTime();
@@ -640,27 +640,43 @@ export function CheckoutModalScreen({}) {
 
   function splitIncomingRefundWorkorderLines(workordersInSale, sale) {
     _setIsRefund(true);
-    // split the incoming refund sale workorders by default so we can select one at a time for refunding
-    let newArr = [];
+
+    // split the incoming refund sale workorders by default so we can select one at a time for refunding. if a refund has already occurred, then these lines will already be split. once a refund occurs the workorder is stored in the DB as 1 qty per item in order to keep track of refunds
+    let singleQtyWorkorders = [];
     // log(workordersInSale);
     workordersInSale.forEach((wo) => {
       let newWO = cloneDeep(wo);
       let workorderLines = [];
       wo.workorderLines.forEach((line) => {
         for (let i = 1; i <= line.qty; i++) {
-          // add on a random string to end of workorder line ID so they all have unique ID's
           workorderLines.push({
             ...line,
-            discountSavings: line.discountObj.savings / line.qty || 0,
-            id: line.id + generateRandomID(),
+            // discountSavings: line.discountObj.savings / line.qty || 0,
+            // id: line.id + generateRandomID()
           });
         }
       });
       newWO.workorderLines = workorderLines;
-      newArr.push(newWO);
+      singleQtyWorkorders.push(newWO);
     });
-    // log(newArr);
-    _setCombinedWorkorders(newArr);
+
+    workordersInSale.forEach((workorderInSale) => {
+      workorderInSale.workorderLines.forEach((workorderLine) => {
+        // find previously refunded item if applicable
+        let refundedItems = sSale.refunds.filter(
+          (o) => o.id === workorderLine.id
+        );
+        if (!refundedItems.length > 0) return;
+        refundedItems.forEach((refundedItem) => {
+          // let pricePaid = item.discountObj.newPrice
+          //         ? item.discountObj.newPrice
+          //         : item.inventoryItem.salePrice
+          //         ? item.inventoryItem.salePrice
+          //     : item.inventoryItem.price
+        });
+      });
+    });
+    _setCombinedWorkorders(singleQtyWorkorders);
     setRefundRunningTotals(sale, workordersInSale);
   }
 
@@ -779,7 +795,7 @@ export function CheckoutModalScreen({}) {
       refund.cardRefundRequested = runningRefund;
     }
 
-    // now grab a previous credit card payment, make sure there's enough refund left and activate the CC box. This is default activity they can select a different card payment to use if more are available (if the last item was unchecked, skip this step and remove the CC )
+    // now grab a previous credit card payment, make sure there's enough refund left and activate the CC box. This is default activity, they can select a different card payment to use if more are available (if the last item was unchecked, skip this step and remove the CC )
 
     refund.cardTransactions.forEach((cardPayment) => {
       if (refund.selectedCardPayment || !refund.totalCardRefundAllowed > 0)
@@ -810,25 +826,43 @@ export function CheckoutModalScreen({}) {
     _setRefund(refund);
   }
 
-  function handleRefund(incomingRefund = REFUND_PROTO, cardInfo) {
-    let refund = cloneDeep(sRefund);
-    log(incomingRefund);
-    log(cardInfo);
+  function handleRefund(incomingRefund = REFUND_PROTO) {
+    // first go through the checked items in the refund list and add in the associated refund amount. we will take part of the total refund and apply it to each item individually until the total refund runs out. these items will therefore be marked as paid or partially paid, depending on the difference between refund paid and amount paid
 
-    let amountLeft = refund.totalCashRefundAllowed;
-    refund.refundedLines = refund.requestedRefundLines.map(
-      (requestedRefundWorkorderLine) => {
-        log("amount left", amountLeft);
-        log(requestedRefundWorkorderLine);
-        if (amountLeft === 0) return;
-        amountLeft = amountLeft - incomingRefund.amountRefunded;
-        if (
-          requestedRefundWorkorderLine.discountObj?.newPrice ||
-          requestedRefundWorkorderLine.inventoryItem.price > 0
-        ) {
-        }
+    let amountOfRefundUsed = 0;
+    sRefund.workorderLines.forEach((workorderLine) => {
+      let pricePaid = workorderLine.discountObj.newPrice
+        ? workorderLine.discountObj.newPrice
+        : workorderLine.inventoryItem.salePrice
+        ? workorderLine.inventoryItem.salePrice
+        : workorderLine.inventoryItem.price;
+      let amountRemainingToRefundOnItem =
+        pricePaid - workorderLine.amountRefunded || 0;
+      if (amountRemainingToRefundOnItem <= 0) return; // already refunded fully
+
+      let amountAvailableFromThisRefund =
+        incomingRefund.amountRefunded - amountOfRefundUsed;
+      if (amountAvailableFromThisRefund <= 0) return; // incoming refund used up
+      let diff = amountAvailableFromThisRefund - amountRemainingToRefundOnItem;
+      let refundAmountToPostToLineItem;
+      if (diff < 0) {
+        // not enough incoming refund left; this is partial refund territory
+        refundAmountToPostToLineItem = amountAvailableFromThisRefund;
+      } else if (diff === 0) {
+        refundAmountToPostToLineItem = pricePaid;
+        // amount of incoming refund left exactly matches the item; full refund of item with nothing left over. the loop will just continue with no action from hereon
+      } else {
+        refundAmountToPostToLineItem = amountAvailableFromThisRefund;
+        // amount of incoming refund exceeds item price. the loop will continue back to this if/then to refund more selected item until it runs out
       }
-    );
+      // now set the new amount that has been used on this incoming refund
+      amountOfRefundUsed += refundAmountToPostToLineItem;
+      // set amount refunded on the workorder line
+      workorderLine.amountRefunded = refundAmountToPostToLineItem;
+      incomingRefund.workorderLines.push({ ...workorderLine });
+    });
+
+    log("refunded lines", incomingRefund);
   }
 
   ////////////// END REFUNDS ///////////////////////////////////////
@@ -928,7 +962,7 @@ export function CheckoutModalScreen({}) {
               _setIsRefund={_setIsRefund}
               sCardRefundFee={sCardRefundFee}
               sShouldChargeCardRefundFee={sShouldChargeCardRefundFee}
-              sCardRefundFeePercentage={zSettings.cardRefundFeePercent}
+              _setShouldChargeCardRefundFee={_setShouldChargeCardRefundFee}
               sAmountRefunded={sAmountRefunded}
               sRefund={sRefund}
               sApplyDeposit={sApplyDeposit}
@@ -939,7 +973,7 @@ export function CheckoutModalScreen({}) {
           </View>
 
           <View style={{ width: "39%" }}>
-            {!sIsRefund && (
+            {!sIsRefund ? (
               <View
                 style={{
                   flexDirection: "row",
@@ -969,7 +1003,7 @@ export function CheckoutModalScreen({}) {
                   placeholderTextColor={gray(0.3)}
                 />
               </View>
-            )}
+            ) : null}
 
             {/** workorders scrollview list element  ////////// */}
             {sSearchString.length > 1 ? (
@@ -1073,14 +1107,16 @@ const InventoryListComponent = ({
                     </Text>
                     {item.price}
                   </Text>
-                  {!!item.salePrice && (
-                    <Text style={{ color: C.lightred }}>
-                      <Text style={{ color: C.lightred, fontSize: 13 }}>
-                        {"SALE PRICE $  "}
+                  {
+                    !!item.salePrice(
+                      <Text style={{ color: C.lightred }}>
+                        <Text style={{ color: C.lightred, fontSize: 13 }}>
+                          {"SALE PRICE $  "}
+                        </Text>
+                        {item.salePrice}
                       </Text>
-                      {item.price}
-                    </Text>
-                  )}
+                    )
+                  }
                 </View>
               </View>
             </TouchableOpacity>
@@ -1167,7 +1203,7 @@ const WorkorderListComponent = ({
               backgroundColor: lightenRGBByPercent(C.backgroundWhite, 60),
             }}
           >
-            {!sIsRefund && idx !== 0 && (
+            {!sIsRefund && idx !== 0 ? (
               <CheckBox_
                 enabled={!sSale?.payments.length > 0}
                 // enabled={!sSale?.paymentComplete && !sSale?.payments.length > 0}
@@ -1189,7 +1225,7 @@ const WorkorderListComponent = ({
                     : handleCombineWorkorderCheck(workorder)
                 }
               />
-            )}
+            ) : null}
             <View
               style={{
                 opacity:
@@ -1269,6 +1305,7 @@ const WorkorderListComponent = ({
               </View>
               <FlatList
                 data={workorder.workorderLines}
+                // keyExtractor={(o) => o.id + generateRandomID()}
                 renderItem={(obj) => {
                   let index = obj.index;
                   let workorderLine = obj.item;
@@ -1307,7 +1344,7 @@ const WorkorderListComponent = ({
                           // backgroundColor: "green",
                         }}
                       >
-                        {!!sIsRefund && (
+                        {sIsRefund ? (
                           <CheckBox_
                             onCheck={() =>
                               handleRefundItemCheck(workorder, workorderLine)
@@ -1324,7 +1361,7 @@ const WorkorderListComponent = ({
                               marginRight: 15,
                             }}
                           />
-                        )}
+                        ) : null}
 
                         <View>
                           <Text style={{ color: C.lightred, fontSize: 12 }}>
@@ -1370,7 +1407,7 @@ const WorkorderListComponent = ({
                           // backgroundColor: C.red,
                         }}
                       >
-                        {!sIsRefund && (
+                        {!sIsRefund ? (
                           <TextInput
                             disabled={true}
                             style={{
@@ -1386,7 +1423,7 @@ const WorkorderListComponent = ({
                             }}
                             value={workorderLine.qty}
                           />
-                        )}
+                        ) : null}
                         <View
                           style={{
                             alignItems: "flex-end",
@@ -1405,7 +1442,7 @@ const WorkorderListComponent = ({
                                 workorderLine.inventoryItem.price
                               )}
                           </Text>
-                          {!!workorderLine.discountObj.savings && (
+                          {workorderLine.discountObj.savings ? (
                             <View style={{ alignItems: "flex-end" }}>
                               <Text
                                 style={{
@@ -1433,7 +1470,7 @@ const WorkorderListComponent = ({
                                 )}
                               </Text>
                             </View>
-                          )}
+                          ) : null}
                         </View>
                       </View>
                     </View>
@@ -1476,7 +1513,7 @@ const WorkorderListComponent = ({
                     backgroundColor: C.buttonLightGreenOutline,
                   }}
                 />
-                {calculateRunningTotals(workorder).runningDiscount > 0 && (
+                {calculateRunningTotals(workorder).runningDiscount > 0 ? (
                   <View>
                     <Text style={{ fontSize: 13, color: C.lightred }}>
                       {"DISCOUNT: "}
@@ -1502,7 +1539,7 @@ const WorkorderListComponent = ({
                       }}
                     />
                   </View>
-                )}
+                ) : null}
                 <Text style={{ fontSize: 13, color: "gray" }}>
                   {"TAX: "}
                   <Text

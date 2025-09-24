@@ -2,13 +2,13 @@
 import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
 import {
   PAYMENT_OBJECT_PROTO,
-  SALE_OBJECT_PROTO,
+  SALE_PROTO,
   TAB_NAMES,
   WORKORDER_ITEM_PROTO,
+  ALERT_SCREEN_PROTO,
   WORKORDER_PROTO,
 } from "../../../data";
 import {
-  ALERT_SCREEN_PROTO,
   useAlertScreenStore,
   useCheckoutStore,
   useCurrentCustomerStore,
@@ -17,7 +17,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import * as XLSX from "xlsx";
 
 import {
@@ -283,7 +283,9 @@ export const StripeCreditCardComponent = ({
         message = extractStripeErrorMessage(data, res);
         error = true;
       } else if (data?.success) {
-        message = "Refund success!";
+        log("refund data", data);
+        message = data.message;
+        let refundID = data.refundID;
       } else {
         // Server responded with success = false
         error = true;
@@ -296,6 +298,7 @@ export const StripeCreditCardComponent = ({
           ? `Client error: ${err.message}`
           : "Client error: An unknown error occurred.";
     }
+
     if (error && message) {
       _setStripeCardReaderErrorMessage(message);
       _setStripeCardReaderSuccessMessage("");

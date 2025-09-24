@@ -47,7 +47,7 @@ import {
   useLoginStore,
   useSettingsStore,
   useCurrentCustomerStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import {
   dbGetCustomerObj,
   dbSetClosedWorkorderItem,

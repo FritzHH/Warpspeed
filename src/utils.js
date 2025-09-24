@@ -6,7 +6,7 @@ import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
-import { useAlertScreenStore } from "./storesOld";
+import { useAlertScreenStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
 
 // const fs = require("node:fs");

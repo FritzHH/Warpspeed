@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getPreviousMondayDayJS, log } from "../../../utils";
 import dayjs from "dayjs";
 import { _dbFindPunchHistoryByMillisRange } from "../../../db_call_wrapper";
-import { useLoginStore, useSettingsStore } from "../../../storesOld";
+import { useLoginStore, useSettingsStore } from "../../../stores";
 
 export const SalesReportsModal = ({ handleExit }) => {
   // store getters //////////////////////////////////////////////////////

@@ -42,7 +42,7 @@ import sr from "dayjs/locale/sr";
 import { cloneDeep, range, sortBy } from "lodash";
 import { loadBundle } from "firebase/firestore";
 import { isEven } from "face-api.js/build/commonjs/utils";
-import { useLoginStore, useSettingsStore } from "../../../storesOld";
+import { useLoginStore, useSettingsStore } from "../../../stores";
 import {
   MILLIS_IN_DAY,
   MILLIS_IN_HOUR,

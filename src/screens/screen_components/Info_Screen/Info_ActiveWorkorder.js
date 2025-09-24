@@ -46,7 +46,7 @@ import {
   useLoginStore,
   useSettingsStore,
   useTabNamesStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import { dbSetCustomerObj, dbSetWorkorder } from "../../../db_call_wrapper";
 
 export const ActiveWorkorderComponent = ({}) => {

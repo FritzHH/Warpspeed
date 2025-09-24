@@ -24,7 +24,7 @@ import {
   useDatabaseBatchStore,
   useCheckoutStore,
   useAlertScreenStore,
-} from "../storesOld";
+} from "../stores";
 import { executeDBBatch } from "../db_call_wrapper";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { DB_BATCH_INTERVAL_MILLIS } from "../constants";

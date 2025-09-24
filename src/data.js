@@ -193,7 +193,6 @@ export const FOCUS_NAMES = {
   notes: "notes",
 };
 
-/////////// object prototypes ///////////////////////////////////////////////////
 export const APP_USER = {
   first: "",
   last: "",
@@ -212,17 +211,39 @@ export const TIME_PUNCH_PROTO = {
   option: "",
 };
 
-export const ALERT_BOX_PROTO = {
+// export const ALERT_BOX_PROTO = {
+//   message: "",
+//   btnText1: "",
+//   btnText2: "",
+//   btnText3: "",
+//   handleBtn1Press: () => {},
+//   handleBtn2Press: () => {},
+//   handleBtn3Press: () => {},
+//   showBox: false,
+//   onModalDismiss: () => {},
+//   canExitOnOuterClick: true,
+// };
+
+export const ALERT_SCREEN_PROTO = {
+  showAlert: true,
+  title: "Alert",
   message: "",
-  btnText1: "",
-  btnText2: "",
-  btnText3: "",
-  handleBtn1Press: () => {},
-  handleBtn2Press: () => {},
-  handleBtn3Press: () => {},
-  showBox: false,
-  onModalDismiss: () => {},
-  canExitOnOuterClick: true,
+  alertBoxStyle: {},
+  subMessage: "",
+  btn1Text: "",
+  btn2Text: "",
+  btn3Text: "",
+  btn1Icon: null,
+  btn2Icon: null,
+  btn3Icon: null,
+  icon1Size: null,
+  icon2Size: null,
+  icon3Size: null,
+  handleBtn1Press: null,
+  handleBtn2Press: null,
+  handleBtn3Press: null,
+  canExitOnOuterClick: false,
+  pauseOnBaseComponent: false,
 };
 
 export const SMS_PROTO = {
@@ -240,6 +261,7 @@ export const SMS_PROTO = {
   senderUserObj: "",
 };
 
+// payments stuff ///////////////////////////////////////////////////////////
 export const DISCOUNT_OBJ_PROTO = {
   discountName: "",
   discountValue: 0,
@@ -275,16 +297,25 @@ export const PAYMENT_OBJECT_PROTO = {
   depositUsed: false,
 };
 
+// export const REFUNDED_WORKORDER_LINE_PROTO = {
+//   inventoryItem: null,
+//   discountObj: null,
+//   id: "",
+//   useSalePrice: false,
+//   amountRefunded: 0,
+//   refundNotes: "",
+// };
+
 export const REFUND_PROTO = {
   id: "",
   workorderLines: [],
-  millis: "",
   amountRefunded: 0,
-  cardPaymentID: "",
-  workorderLines: [],
+  millis: "",
+  cardRefundID: "",
+  notes: "",
 };
 
-export const SALE_OBJECT_PROTO = {
+export const SALE_PROTO = {
   id: "",
   millis: "",
   subtotal: 0,
@@ -299,6 +330,7 @@ export const SALE_OBJECT_PROTO = {
   refunds: [],
 };
 
+// workorder stuff ////////////////////////////////////////////////////
 export const WORKORDER_PROTO = {
   paymentComplete: false,
   saleID: "",
@@ -339,7 +371,7 @@ export const WORKORDER_ITEM_PROTO = {
   qty: 1,
   notes: "",
   inventoryItem: null,
-  discountObj: { ...DISCOUNT_OBJ_PROTO },
+  discountObj: null,
   id: "",
   useSalePrice: false,
 };

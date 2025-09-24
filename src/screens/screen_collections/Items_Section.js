@@ -20,7 +20,7 @@ import {
   useCustomerSearchStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
-} from "../../storesOld";
+} from "../../stores";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 
 export function Items_Section({}) {

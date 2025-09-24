@@ -17,7 +17,7 @@ import {
 } from "./db";
 import { arrayAddObjCheckForDupes, clog, log } from "./utils";
 import { build_db_path, REALTIME_DATABASE_NODE_NAMES } from "./constants";
-import { useOpenWorkordersStore } from "./storesOld";
+import { useOpenWorkordersStore } from "./stores";
 
 let inventoryChangeSub, inventoryAddSub, inventoryRemoveSub;
 let workorderChangeSub, workorderAddSub, workorderRemoveSub;

@@ -12,7 +12,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import * as XLSX from "xlsx";
 
 import {

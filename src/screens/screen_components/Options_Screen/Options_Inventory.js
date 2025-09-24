@@ -41,7 +41,7 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import { dbSetInventoryItem, dbSetSettings } from "../../../db_call_wrapper";
 
 const tabMargin = 20;

@@ -2,13 +2,14 @@
 import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
 import {
   PAYMENT_OBJECT_PROTO,
-  SALE_OBJECT_PROTO,
+  REFUND_PROTO,
+  SALE_PROTO,
   TAB_NAMES,
   WORKORDER_ITEM_PROTO,
+  ALERT_SCREEN_PROTO,
   WORKORDER_PROTO,
 } from "../../../data";
 import {
-  ALERT_SCREEN_PROTO,
   useAlertScreenStore,
   useCheckoutStore,
   useCurrentCustomerStore,
@@ -17,7 +18,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../../storesOld";
+} from "../../../stores";
 import * as XLSX from "xlsx";
 
 import {
@@ -225,54 +226,11 @@ export const CashSaleComponent = ({
     _setProcessButtonEnabled(false);
   }
 
-  function handleProcessRefundPress1() {
-    let paymentObject = { ...PAYMENT_OBJECT_PROTO };
-
-    let availableCashRefundObjArr = [];
-    sRefund.cashTransactionArr.forEach((cashPaymentObj) => {
-      availableCashRefundObjArr.push({
-        id: cashPaymentObj.id,
-        amount: cashPaymentObj.amountCaptured,
-      });
-    });
-
-    let total = 0;
-    let remain = 0;
-    let arr = [];
-    availableCashRefundObjArr.forEach((availableAmountObj) => {
-      if (total >= sTenderAmount) return;
-      let amountToUse = remain > 0 ? remain : sTenderAmount;
-      let diff = availableAmountObj.amount - amountToUse;
-      if (diff >= 0) {
-        total += sTenderAmount;
-        availableAmountObj.amountRefunded = amountToUse;
-        arr.push({ ...availableAmountObj });
-        return;
-      }
-
-      availableAmountObj.amountRefunded = availableAmountObj.amount;
-      remain = diff * -1;
-      arr.push(...availableAmountObj);
-    });
-
-    let arr1 = sRefund.cashTransactionArr.map((cashPaymentObj) => {
-      cashPaymentObj = cloneDeep(cashPaymentObj);
-      let amountObj = arr.find((o) => o.id === cashPaymentObj.id);
-      cashPaymentObj.amountRefunded = amountObj?.amountRefunded;
-      return cashPaymentObj;
-    });
-
-    // log("final arr", arr1);
-    handleRefundCapture(arr1);
-  }
-
   function handleProcessRefundPress() {
-    let refund = { ...PAYMENT_OBJECT_PROTO };
+    let refund = cloneDeep(REFUND_PROTO);
     refund.amountRefunded = sRequestedAmount;
-    refund.millis = new Date().getTime();
-    refund.cash = !sIsCheck;
-    refund.check = sIsCheck;
     refund.id = generateUPCBarcode();
+    refund.millis = new Date().getTime();
     handleRefundCapture(refund);
   }
 

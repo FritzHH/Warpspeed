@@ -4,6 +4,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
 import { onAuthStateChange } from "./db";
+import { dbAutoLoginForDevelopment } from "./db_call_wrapper";
+import { log } from "./utils";
 
 export const ROUTES = {
   init: "/",
@@ -19,9 +21,23 @@ function App() {
 
   useEffect(() => {
     if (BYPASS_LOGIN_FOR_DEVELOPMENT) {
-      // Bypass authentication for development
-      setUser({ uid: "dev-user", email: "dev@example.com" });
-      setIsLoading(false);
+      // Automatic login for development
+      const performAutoLogin = async () => {
+        try {
+          const result = await dbAutoLoginForDevelopment();
+          if (result.success) {
+            setUser(result.user);
+            log("Development auto-login successful", result.user);
+          }
+        } catch (error) {
+          log("Development auto-login failed:", error);
+          // Fallback to mock user if auto-login fails
+          setUser({ uid: "dev-user", email: "dev@example.com" });
+        }
+        setIsLoading(false);
+      };
+
+      performAutoLogin();
       return;
     }
 

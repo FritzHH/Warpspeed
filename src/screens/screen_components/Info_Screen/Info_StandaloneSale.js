@@ -58,15 +58,15 @@ export const StandaloneSaleComponent = ({}) => {
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
 
   // store getters
-  let zOpenWorkorderObj = WORKORDER_PROTO;
-  zOpenWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
+  let zOpenWorkorder = WORKORDER_PROTO;
+  zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorder()
   );
   const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
-    state.getWorkorderArr()
+    state.getWorkorders()
   );
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zSettingsObj = useSettingsStore((state) => state.getSettings());
   const [sCardReader, _setCardReader] = useState();
   //////////////////////////////////////////////////////////////////////
 
@@ -103,19 +103,19 @@ export const StandaloneSaleComponent = ({}) => {
   // TODO need to add in combined workorders after completed the next effect
   useEffect(() => {
     // log("z", zWorkorderObj);
-    if (!zOpenWorkorderObj?.workorderLines || !zInventoryArr?.length > 0)
+    if (!zOpenWorkorder?.workorderLines || !zInventoryArr?.length > 0)
       return;
     const { runningQty, runningTotal, runningDiscount } =
-      calculateRunningTotals(zOpenWorkorderObj, zInventoryArr);
+      calculateRunningTotals(zOpenWorkorder, zInventoryArr);
     _sSetTotalsObj({ total: runningTotal, discount: runningDiscount });
-  }, [zOpenWorkorderObj]);
+  }, [zOpenWorkorder]);
 
   // TODO check for other open workorders and add them in a checklist to combine
   useEffect(() => {
-    if (!zOpenWorkorderObj || zOpenWorkorderObj.isStandaloneSale) return;
+    if (!zOpenWorkorder || zOpenWorkorder.isStandaloneSale) return;
 
     let otherWorkorders = zOpenWorkordersArr.find(
-      (o) => o.customerID == zOpenWorkorderObj.customerID
+      (o) => o.customerID == zOpenWorkorder.customerID
     );
     // log("others", otherWorkorders);
   }, []);
@@ -155,8 +155,8 @@ export const StandaloneSaleComponent = ({}) => {
     let workorders = [];
     zOpenWorkordersArr.forEach((openWO) => {
       if (
-        openWO?.customerID == zOpenWorkorderObj?.customerID &&
-        openWO.id != zOpenWorkorderObj?.id
+        openWO?.customerID == zOpenWorkorder?.customerID &&
+        openWO.id != zOpenWorkorder?.id
       )
         workorders.push(openWO);
     });
@@ -231,7 +231,7 @@ export const StandaloneSaleComponent = ({}) => {
 
   function actionButtonPressed() {
     // _zSetIsCheckingOut(!zIsCheckingOut);
-    if (zOpenWorkorderObj?.isStandaloneSale) {
+    if (zOpenWorkorder?.isStandaloneSale) {
       _zSetOpenWorkorderObj(null);
       _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders);
       _zSetInfoTabName(TAB_NAMES.infoTab.customer);

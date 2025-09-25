@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef, setInventoryItem } from "./db";
-import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO } from "./data";
+import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO, SETTINGS_OBJ, WORKORDER_PROTO } from "./data";
 import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
@@ -114,8 +114,8 @@ export function calculateRunningTotals(
         return;
       let qty = line.qty;
       // clog("line", line.discountObj);
-      let discountPrice = line.discountObj.newPrice;
-      let discountSavings = line.discountObj.savings;
+      let discountPrice = line.discountObj?.newPrice;
+      let discountSavings = line.discountObj?.savings;
       runningSubtotal =
         runningSubtotal + Number(line.inventoryItem.price) * qty;
       if (discountPrice) {
@@ -1496,4 +1496,18 @@ export function extractStripeErrorMessage(data, response = null) {
       }
       return `Unexpected error${code ? ` (${code})` : ""}.`;
   }
+}
+
+export function createNewWorkorder({ customerID, customerFirst, customerLast, customerPhone, startedByFirst, startedByLast }) {
+      let wo = cloneDeep(WORKORDER_PROTO);
+      wo.id = generateUPCBarcode();
+      wo.status = SETTINGS_OBJ.statuses[0];
+      wo.customerFirst = customerFirst
+      wo.customerLast = customerLast
+      wo.customerPhone = customerPhone
+      wo.customerID = customerID
+      wo.startedBy = startedByFirst + ' ' + startedByLast,
+      wo.changeLog.push("Started by: " + startedByFirst + " " + startedByLast);
+  wo.startedOnMillis = new Date().getTime();
+  return wo;
 }

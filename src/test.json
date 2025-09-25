@@ -1,41 +1,4 @@
-// {
-//   "id": "evt_1RrHGBG8PZMnVdxFWgd88QGS",
-//   "object": "event",
-//   "api_version": "2025-04-30.basil",
-//   "created": 1754048187,
-//   "data": {
-//     "object": {
-//       "id": "tmr_GFPsvwVUtvBZsJ",
-//       "object": "terminal.reader",
-//       "action": {
-//         "failure_code": null,
-//         "failure_message": null,
-//         "process_payment_intent": {
-//           "payment_intent": "pi_3RrHG7G8PZMnVdxF1SuRfLY3"
-//         },
-//         "status": "succeeded",
-//         "type": "process_payment_intent"
-//       },
-//       "device_sw_version": "2.33.3.0",
-//       "device_type": "bbpos_wisepos_e",
-//       "ip_address": "192.168.1.121",
-//       "label": "Front Right Desk",
-//       "last_seen_at": 1754048178678,
-//       "livemode": true,
-//       "location": "tml_GCsldAwakkr9vM",
-//       "metadata": {},
-//       "serial_number": "WSC513208058026",
-//       "status": "online"
-//     }
-//   },
-//   "livemode": true,
-//   "pending_webhooks": 1,
-//   "request": {
-//     "id": null,
-//     "idempotency_key": "1754048184600WSC513208058026rb39fBme"
-//   },
-//   "type": "terminal.reader.action_succeeded"
-// }
+
 {
   "id": "ch_3RrHzHG8PZMnVdxF17ZEoQ7h",
   "object": "charge",
@@ -44,7 +7,6 @@
   "amount_refunded": 0,
   "application": null,
   "application_fee": null,
-  "application_fee_amount": null,
   "authorization_code": "09228P",
   "balance_transaction": "txn_3RrHzHG8PZMnVdxF1KamPgej",
   "billing_details": {

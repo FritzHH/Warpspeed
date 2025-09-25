@@ -20,8 +20,8 @@ export function Items_Dashboard({}) {
   // getters
   let zSettingsObj = SETTINGS_OBJ;
   let zUserObj = APP_USER;
-  zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  zUserObj = useLoginStore((state) => state.getCurrentUserObj());
+  zSettingsObj = useSettingsStore((state) => state.getSettings());
+  zUserObj = useLoginStore((state) => state.getCurrentUser());
 
   //////////////////////////////////////////////////////////////
   const [sShowAdminModal, _setShowAdminModal] = useState(false);

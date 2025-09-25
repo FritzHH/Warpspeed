@@ -15,7 +15,7 @@ export const DISCOUNT_TYPES = {
 
 // timing
 export const INTERNET_CHECK_DELAY = 1000;
-export const FACIAL_RECOGNITION_INTERVAL_MILLIS = 500;
+export const FACIAL_RECOGNITION_INTERVAL_MILLIS = 1500;
 export const PAUSE_USER_CLOCK_IN_CHECK_MILLIS = MILLIS_IN_MINUTE * 10;
 
 // keys
@@ -211,4 +211,32 @@ export const build_db_path = {
       return `${tenantID}/${storeID}/workorders/${workorderID}/attachments/${attachmentType}/${timestamp}_${finalFileName}`;
     },
   },
+};
+
+// ============================================================================
+// NEW DATABASE SYSTEM CONSTANTS (to replace old system)
+// ============================================================================
+
+// Database node/folder names for the new wrapper system
+export const DB_NODES = {
+  // Firestore collections
+  FIRESTORE: {
+    TENANTS: "tenants",
+    STORES: "stores", 
+    SETTINGS: "settings",
+    CUSTOMERS: "customers",
+    OPEN_WORKORDERS: "open-workorders",
+    INVENTORY: "inventory",
+    EMAIL_USERS: "email_users",
+    PUNCHES: "punches",
+    PUNCH_CLOCK: 'punch_clock'
+  },
+  
+  // Realtime Database nodes
+  REALTIME: {
+  },
+
+  STORAGE: {
+    CLOSED_WORKORDERS: 'closed-workorders'
+  }
 };

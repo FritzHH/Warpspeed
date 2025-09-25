@@ -106,18 +106,18 @@ export function CheckoutModalScreen({}) {
   const zReceiptScan = useCheckoutStore((state) => state.getReceiptScan());
 
   const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
+    state.getOpenWorkorder()
   );
   const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-  const zCustomer = useCurrentCustomerStore((state) => state.getCustomerObj());
+  const zCustomer = useCurrentCustomerStore((state) => state.getCustomer());
   const zOpenWorkorders = useOpenWorkordersStore((state) =>
-    state.getWorkorderArr()
+    state.getWorkorders()
   );
   const zInventory = useInventoryStore((state) => state.getInventoryArr());
   const zGetInventoryItem = useInventoryStore(
     (state) => state.getInventoryItem
   );
-  const zSettings = useSettingsStore((state) => state.getSettingsObj());
+  const zSettings = useSettingsStore((state) => state.getSettings());
   const zSale = useCheckoutStore((state) => state.saleObj);
 
   //////////////////////////////////////////////////////////////////////

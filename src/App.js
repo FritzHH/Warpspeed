@@ -4,15 +4,20 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
 import { onAuthStateChange } from "./db";
-import { dbAutoLoginForDevelopment } from "./db_call_wrapper";
+import { dbAutoLogin, dbGetSettings, dbGetTenantById } from "./db_calls_wrapper";
 import { log } from "./utils";
+import { useSettingsStore } from "./stores";
 
 export const ROUTES = {
   init: "/",
 };
 
-// Development bypass option - set to true to skip login screen
-const BYPASS_LOGIN_FOR_DEVELOPMENT = true;
+// Development auto-login credentials
+const DEVELOPMENT_AUTO_LOGIN = {
+  enabled: true,
+  email: "fritz@bonitabikes.com",
+  password: "BonitaBikes.1236"
+};
 
 /////////////////////////////////////
 function App() {
@@ -20,34 +25,53 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (BYPASS_LOGIN_FOR_DEVELOPMENT) {
-      // Automatic login for development
-      const performAutoLogin = async () => {
-        try {
-          const result = await dbAutoLoginForDevelopment();
-          if (result.success) {
-            setUser(result.user);
-            log("Development auto-login successful", result.user);
+    const initializeApp = async () => {
+      try {
+        if (DEVELOPMENT_AUTO_LOGIN.enabled) {
+          // Auto-login for development
+          // console.log("Auto-logging in for development...");
+          const loginResult = await dbAutoLogin(
+            DEVELOPMENT_AUTO_LOGIN.email,
+            DEVELOPMENT_AUTO_LOGIN.password
+          );
+          
+          if (loginResult.success) {
+            console.log("Auto-login successful, loading initial data:", loginResult.user.email);
+            dbGetTenantById(loginResult.user.uid).then(res => {
+              dbGetSettings(res.tenantID, res.storeID).then(settings => {
+                useSettingsStore.getState().setSettings(settings, false, false)
+                log('initial data loaded, heading to Main')
+                setUser(loginResult.user);
+              })
+            })
+
+          } else {
+            throw new Error("Auto-login failed");
           }
-        } catch (error) {
-          log("Development auto-login failed:", error);
-          // Fallback to mock user if auto-login fails
-          setUser({ uid: "dev-user", email: "dev@example.com" });
+        } else {
+          // Listen for authentication state changes
+          const unsubscribe = onAuthStateChange((user) => {
+            setUser(user);
+            setIsLoading(false);
+          });
+          
+          return () => unsubscribe();
         }
+      } catch (error) {
+        console.error("Auto-login error:", error);
+        // Fall back to normal auth flow on error
+        const unsubscribe = onAuthStateChange((user) => {
+          setUser(user);
+          setIsLoading(false);
+        });
+        
+        return () => unsubscribe();
+      } finally {
         setIsLoading(false);
-      };
+      }
+    };
 
-      performAutoLogin();
-      return;
-    }
-
-    // Listen for authentication state changes
-    const unsubscribe = onAuthStateChange((user) => {
-      setUser(user);
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
+    initializeApp();
   }, []);
 
   const handleLoginSuccess = (user) => {

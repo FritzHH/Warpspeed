@@ -71,11 +71,10 @@ const DROPDOWN_ORDERING_SELECTION_NAMES = {
 
 export function Dashboard_Admin({}) {
   // store setters ///////////////////////////////////////////////////////////
-  const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
   const _zSetSettingsField = useSettingsStore((state) => state.setField);
 
   // store getters ///////////////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zSettingsObj = useSettingsStore((state) => state.getSettings());
 
   // local state ///////////////////////////////////////////////////////////
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =

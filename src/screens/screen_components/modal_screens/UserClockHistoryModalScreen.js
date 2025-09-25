@@ -59,8 +59,8 @@ import { TIME_PUNCH_PROTO } from "../../../data";
 
 export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   // store getters //////////////////////////////////////////////////////
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUser());
+  const zSettingsObj = useSettingsStore((state) => state.getSettings());
   const zUserHasAdminRole = useLoginStore((state) =>
     state.getUserHasAdminRole()
   );

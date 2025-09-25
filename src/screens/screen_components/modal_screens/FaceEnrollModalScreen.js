@@ -14,13 +14,12 @@ export function FaceEnrollModalScreen({
   userObj,
 }) {
   // store setters ///////////////////////////////////////////////////////////
-  const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
   const _zSetRunBackgroundFacialRecognition = useLoginStore(
     (state) => state.setRunBackgroundRecognition
   );
 
   // store getters ///////////////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zSettingsObj = useSettingsStore((state) => state.getSettings());
 
   // local state ///////////////////////////////////////////////////////////
   useEffect(() => {

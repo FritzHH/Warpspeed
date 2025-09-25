@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native-web";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
 import { sendPasswordReset } from "../db";
-import { dbLoginAppUser } from "../db_call_wrapper";
+import { dbLoginUser } from "../db_calls_wrapper";
 
 export function LoginScreen({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
@@ -21,7 +21,7 @@ export function LoginScreen({ onLoginSuccess }) {
     setError("");
 
     try {
-      const result = await dbLoginAppUser(email, password);
+      const result = await dbLoginUser(email, password);
       if (result.success) {
         // The settings have already been set in the Zustand store
         // Pass the user data to the success callback

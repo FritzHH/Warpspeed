@@ -45,6 +45,7 @@ import {
 import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "./constants";
 import { LogBox } from "react-native";
 import { useOpenWorkordersStore } from "./stores";
+import { dbSaveInventoryItem } from "./db_calls_wrapper";
 
 export function testPayment() {}
 
@@ -95,7 +96,8 @@ export async function fillInventory() {
     // clog(inv);
     // clog(inv);
     // return;
-    dbSetInventoryItem(inv, false);
+    dbSaveInventoryItem(inv, inv.id, '1234', '999')
+    // dbSetInventoryItem(inv, false);
   }
 }
 

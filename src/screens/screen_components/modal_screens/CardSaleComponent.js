@@ -148,13 +148,10 @@ export const StripeCreditCardComponent = ({
     (state) => state.setCustomerField
   );
   // store getters
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
-  );
+
   const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-  const zCustomer = useCurrentCustomerStore((state) => state.getCustomerObj());
   const zOpenWorkorders = useOpenWorkordersStore((state) =>
-    state.getWorkorderArr()
+    state.getWorkorders()
   );
   const zInventory = useInventoryStore((state) => state.getInventoryArr());
   const zGetInventoryItem = useInventoryStore(

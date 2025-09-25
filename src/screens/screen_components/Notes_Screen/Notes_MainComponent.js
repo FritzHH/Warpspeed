@@ -27,12 +27,12 @@ export function Notes_MainComponent() {
   const _zSetWorkorderObj = useOpenWorkordersStore(
     (state) => state.setWorkorder
   );
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
   const _zExecute = useLoginStore((state) => state.execute);
 
   // getters /////////////////////////////////////////////////////////////////////
-  const zWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorder()
   );
 
   /////////////////////////////////////////////////////////////////////////////////
@@ -43,15 +43,15 @@ export function Notes_MainComponent() {
   function formatUserShowName() {
     return (
       "(" +
-      zCurrentUserObj.first.toString() +
+      zCurrentUser.first.toString() +
       " " +
-      zCurrentUserObj.last[0] +
+      zCurrentUser.last[0] +
       ")  "
     );
   }
 
   function outsideClicked(option) {
-    let wo = cloneDeep(zWorkorderObj);
+    let wo = cloneDeep(zOpenWorkorder);
     let notesArr;
     if (option == "customer") {
       notesArr = wo.customerNotes || [];
@@ -61,7 +61,7 @@ export function Notes_MainComponent() {
 
     notesArr.unshift({
       name: formatUserShowName(),
-      userID: zCurrentUserObj.id,
+      userID: zCurrentUser.id,
       value: "",
       id: generateRandomID(),
     });
@@ -77,12 +77,12 @@ export function Notes_MainComponent() {
   }
 
   function deleteItem(item, index, option) {
-    let newObj = cloneDeep(zWorkorderObj);
+    let newObj = cloneDeep(zOpenWorkorder);
     let arr;
     if (option == "customer") {
-      arr = zWorkorderObj.customerNotes;
+      arr = zOpenWorkorder.customerNotes;
     } else {
-      arr = zWorkorderObj.internalNotes;
+      arr = zOpenWorkorder.internalNotes;
     }
     arr = arr.filter((o) => o.id != item.id);
     if (option == "customer") {
@@ -95,7 +95,7 @@ export function Notes_MainComponent() {
   }
 
   function textChanged(value, index, option) {
-    let wo = cloneDeep(zWorkorderObj);
+    let wo = cloneDeep(zOpenWorkorder);
     let item;
     if (option === "customer") {
       item = wo.customerNotes;
@@ -148,7 +148,7 @@ export function Notes_MainComponent() {
   };
 
   // clog(zWorkorderObj);
-  if (!zWorkorderObj) return null;
+  if (!zOpenWorkorder) return null;
 
   return (
     <View
@@ -230,7 +230,7 @@ export function Notes_MainComponent() {
             >
               <FlatList
                 keyExtractor={(i, idx) => idx}
-                data={zWorkorderObj.customerNotes}
+                data={zOpenWorkorder.customerNotes}
                 renderItem={(item) => {
                   let index = item.index;
                   item = item.item;
@@ -334,7 +334,7 @@ export function Notes_MainComponent() {
             >
               <FlatList
                 keyExtractor={(i, idx) => idx}
-                data={zWorkorderObj.internalNotes}
+                data={zOpenWorkorder.internalNotes}
                 renderItem={(item) => {
                   let index = item.index;
                   item = item.item;

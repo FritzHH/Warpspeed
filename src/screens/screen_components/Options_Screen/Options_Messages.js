@@ -44,9 +44,9 @@ export function MessagesComponent({}) {
 
   const _zExecute = useLoginStore((state) => state.execute);
   // getters ///////////////////////////////////////////////////////////////
-  let zCustomerObj = CUSTOMER_PROTO;
+  let zCustomer = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
-  zCustomerObj = useCurrentCustomerStore((state) => state.getCustomerObj());
+  zCustomer = useCurrentCustomerStore((state) => state.getCustomer());
   zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
   const zIncomingMessagesArr = useCustMessagesStore((state) =>
     state.getIncomingMessagesArr()
@@ -54,7 +54,7 @@ export function MessagesComponent({}) {
   const zOutgoingMessagesArr = useCustMessagesStore((state) =>
     state.getOutgoingMessagesArr()
   );
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
+  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUser());
   //////////////////////////////////////////////////////////////////////////
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);
@@ -64,12 +64,12 @@ export function MessagesComponent({}) {
   function sendMessage(text, canRespond) {
     let msg = { ...SMS_PROTO };
     msg.message = text;
-    msg.phoneNumber = zCustomerObj.cell; // || "2393369177";
-    msg.firstName = zCustomerObj.first; // || "Fritz";
-    msg.lastName = zCustomerObj.last; // || "Hieb";
+    msg.phoneNumber = zCustomer.cell; // || "2393369177";
+    msg.firstName = zCustomer.first; // || "Fritz";
+    msg.lastName = zCustomer.last; // || "Hieb";
     msg.canRespond = canRespond || sCanRespond;
     msg.millis = new Date().getTime();
-    msg.customerID = zCustomerObj.id; // || "3d2E63TXCY2bzmOdeQc8";
+    msg.customerID = zCustomer.id; // || "3d2E63TXCY2bzmOdeQc8";
     msg.id = generateRandomID();
     msg.type = "outgoing";
     msg.senderUserObj = zCurrentUserObj;

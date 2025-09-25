@@ -25,59 +25,28 @@ import {
   useCheckoutStore,
   useAlertScreenStore,
 } from "../stores";
-import { executeDBBatch } from "../db_call_wrapper";
 import { createStore, createTenant, signOutUser } from "../db";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { DB_BATCH_INTERVAL_MILLIS } from "../constants";
 import { fillInventory, fillOpenWorkorders, fillSettings } from "../testing";
 import { CheckoutModalScreen } from "./screen_components/modal_screens/CheckoutModalScreen";
+import { dbLogout, dbSaveSettings, dbGetSettings, dbGetOpenWorkorders, dbGetInventoryItems, dbListenToSettings, dbListenToOpenWorkorders, dbListenToCurrentPunchClock, dbListenToInventory } from "../db_calls_wrapper";
+import { SETTINGS_OBJ } from "../data";
+import { clog, log } from "../utils";
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
 
-  const _zSetInventoryItem = useInventoryStore((state) => state.setItem);
-  const _zRemoveInventoryItem = useInventoryStore((state) => state.removeItem);
-  const _zSetSettingsItem = useSettingsStore((state) => state.setField);
-  const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
   const _zSetLastActionMillis = useLoginStore(
     (state) => state.setLastActionMillis
   );
-  const _zSetLoginTimeout = useLoginStore((state) => state.setLoginTimeout);
-  const _zSetPunchClockArr = useLoginStore((state) => state.setPunchClockArr);
-  const _zSetPunchClockItem = useLoginStore(
-    (state) => state.setSinglePunchObjInPunchArr
-  );
-  const _zSetLastDatabaseBatchMillis = useDatabaseBatchStore(
-    (state) => state.setLastBatchMillis
-  );
 
-  // Sign out function
-  const handleSignOut = async () => {
-    try {
-      await signOutUser();
-      // The auth state change will automatically redirect to login screen
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
-  };
-  const _zSetLastDatabaseWriteMillis = useDatabaseBatchStore(
-    (state) => state.setLastWriteMillis
-  );
-  const _zSetWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setWorkorder
-  );
-  const _zRemoveWorkorderObj = useOpenWorkordersStore(
-    (state) => state.removeWorkorder
-  );
-  const _zSetIsCheckingOut = useCheckoutStore(
-    (state) => state.setIsCheckingOut
-  );
   // testing
   // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
   // store getters /////////////////////////////////////////////////////////////////
-  const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorder()
   );
   const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
   const zLastDatabaseBatchMillis = useDatabaseBatchStore((state) =>
@@ -86,7 +55,7 @@ export function BaseScreen() {
   const zLastDatabaseWriteMillis = useDatabaseBatchStore((state) =>
     state.getLastWriteMillis()
   );
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zSettings = useSettingsStore((state) => state.getSettings());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
   const zLoginModalVisible = useLoginStore((state) => state.getModalVisible());
   const zRunBackgroundRecognition = useLoginStore((state) =>
@@ -122,93 +91,104 @@ export function BaseScreen() {
 
   // subscribe to database listeners
   useEffect(() => {
-    subscribeToDBNodeChanges({
-      option: "settings",
-      addCallback: (key, val) => _zSetSettingsItem(key, val, false),
-      changeCallback: (key, val) => _zSetSettingsItem(key, val, false),
+
+    // tested!!
+    dbListenToSettings('1234', '999', (data) => {
+      // log('settings', data.users[0].faceDescriptor)
+      useSettingsStore.getState().setSettings(data)
+    })
+
+    dbListenToCurrentPunchClock('1234', '999', (data) => {
+      // log('punch', data)
+      useLoginStore.getState().setPunchClock(data)
+      // log('punch clock data', data)
+    })
+
+    dbListenToInventory("1234", "999", (data) => {
+      useInventoryStore.getState().setItems(data);
+      // log('inventory', data)
     });
 
-    subscribeToDBNodeChanges({
-      option: "punch clock",
-      addCallback: (key, val) => {
-        _zSetPunchClockItem(val, "add");
-      },
-      removeCallback: (key, val) => {
-        _zSetPunchClockItem(val, "remove");
-      },
+    /// not tested :(
+
+    dbListenToOpenWorkorders("1234", "999", (data) => {
+      // log('incoming workorder listen', data)
+      useOpenWorkordersStore.getState().setOpenWorkorders(data)
     });
 
-    subscribeToDBNodeChanges({
-      option: "open workorders",
-      addCallback: (key, val) => {
-        _zSetWorkorderObj(val, false);
-      },
-      removeCallback: (key, val) => {
-        _zRemoveWorkorderObj(val, false);
-      },
-      changeCallback: (key, val) => {
-        _zSetWorkorderObj(val, false);
-      },
-    });
-    subscribeToDBNodeChanges({
-      option: "inventory",
-      addCallback: (key, val) => {
-        _zSetInventoryItem(val, false);
-      },
-      removeCallback: (key, val) => {
-        _zRemoveInventoryItem(val, false);
-      },
-      changeCallback: (key, val) => {
-        _zSetInventoryItem(val, false);
-      },
-    });
+    // subscribeToDBNodeChanges({
+    //   option: "open workorders",
+    //   addCallback: (key, val) => {
+    //     _zSetWorkorderObj(val, false);
+    //   },
+    //   removeCallback: (key, val) => {
+    //     _zRemoveWorkorderObj(val, false);
+    //   },
+    //   changeCallback: (key, val) => {
+    //     _zSetWorkorderObj(val, false);
+    //   },
+    // });
+    // subscribeToDBNodeChanges({
+    //   option: "inventory",
+    //   addCallback: (key, val) => {
+    //     _zSetInventoryItem(val, false);
+    //   },
+    //   removeCallback: (key, val) => {
+    //     _zRemoveInventoryItem(val, false);
+    //   },
+    //   changeCallback: (key, val) => {
+    //     _zSetInventoryItem(val, false);
+    //   },
+    // });
   }, []);
 
-  useEffect(() => {
-    try {
-      _zSetLoginTimeout(zSettingsObj?.loginTimeout);
-      // testing take out this is your user obj
-      // _zSetCurrentUserObj(zSettingsObj?.users[0]);
-    } catch (e) {}
-  }, [zSettingsObj]);
+  // useEffect(() => {
+  //   try {
+  //     _zSetLoginTimeout(zSettingsObj?.loginTimeout);
+  //     // testing take out this is your user obj
+  //     // _zSetCurrentUserObj(zSettingsObj?.users[0]);
+  //   } catch (e) {}
+  // }, [zSettingsObj]);
 
-  // database batching
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      let curMillis = new Date().getTime();
-      let diff = curMillis - zLastDatabaseWriteMillis;
-      // let batchDiff = curMillis - batchDiff
-      // log("diff", diff);
-      if (diff > DB_BATCH_INTERVAL_MILLIS) executeDBBatch();
-    }, 100);
+  // // database batching
+  // useEffect(() => {
+  //   const intervalId = setInterval(() => {
+  //     let curMillis = new Date().getTime();
+  //     let diff = curMillis - zLastDatabaseWriteMillis;
+  //     // let batchDiff = curMillis - batchDiff
+  //     // log("diff", diff);
+  //     if (diff > DB_BATCH_INTERVAL_MILLIS) executeDBBatch();
+  //   }, 100);
 
-    // Cleanup function to clear the interval
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [zLastDatabaseBatchMillis, zLastDatabaseWriteMillis]);
+  //   // Cleanup function to clear the interval
+  //   return () => {
+  //     clearInterval(intervalId);
+  //   };
+  // }, [zLastDatabaseBatchMillis, zLastDatabaseWriteMillis]);
 
   // testing, build db items
   useEffect(() => {
-    // fillSettings();
-    // createStore("123456", "9999", "Bonita Bikes", "Fritzy Boy");
-    createTenant(
-      "Bonita Bikes LLC",
-      "fritz@bonitabikes.com",
-      "hieb.fritz@gmail.com",
-      "2393369177",
-      "Fritz",
-      "Hieb"
-    );
-    // fillReceipt();
-    // fillPrinterNames();
-    // fillPunchHistory()
-    // fillInventory(); // BE VERY CAREFUL BUDDY
-    // if (zInventoryArr.length > 0) fillOpenWorkorders(zInventoryArr);
-  }, [zInventoryArr]);
+    // dbSaveSettings(SETTINGS_OBJ, '1234', '999')
+    // dbGetSettings('1234', '999').then(res => {
+    //   useSettingsStore.getState().setSettings(res)
+
+      // dbGetOpenWorkorders('1234', '999').then(res => {
+      //   useOpenWorkordersStore.getState().setEntireArr(res)
+      //   // log('res', res)
+      // })
+
+      //   dbGetInventoryItems('1234', '999').then(res => {
+      //     // log('inventory', res)
+      //     useInventoryStore.getState().setItems(res)
+      //   })
+      // log('res', res)
+      // fillInventory()
+    // })
+  }, []);
   // }, []);
 
   // log(zSettingsObj);
+  // return null;
   return (
     <View
       style={{
@@ -231,7 +211,7 @@ export function BaseScreen() {
       />
 
       {!!zIsCheckingOut && (
-        <CheckoutModalScreen openWorkorder={zOpenWorkorderObj} />
+        <CheckoutModalScreen openWorkorder={zOpenWorkorder} />
       )}
       <LoginModalScreen
         modalVisible={zShowLoginScreen && !zLoginModalVisible}

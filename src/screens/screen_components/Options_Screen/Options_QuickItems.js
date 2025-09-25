@@ -40,17 +40,16 @@ const SEARCH_STRING_TIMER = 45 * 1000;
 
 export function QuickItemComponent({}) {
   // store setters ///////////////////////////////////////////////////////////////
-  const _zSetWorkorderObj = useOpenWorkordersStore(
+  const _zSetWorkorder = useOpenWorkordersStore(
     (state) => state.setWorkorder
   );
-  const _zSetSettings = useSettingsStore((state) => state.setSettingsObj);
 
   // store getters //////////////////////////////////////////////////////////////
-  let zWorkorderObj = WORKORDER_PROTO;
-  let zSettingsObj = SETTINGS_OBJ;
-  zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  zWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
+  let zOpenWorkorder = WORKORDER_PROTO;
+  let zSettings = SETTINGS_OBJ;
+  zSettings = useSettingsStore((state) => state.getSettings());
+  zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorder()
   );
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
 
@@ -58,7 +57,6 @@ export function QuickItemComponent({}) {
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
-
   useEffect(() => {
     let arr = [];
     if (sSearchResults.length > 20) return;
@@ -114,20 +112,21 @@ export function QuickItemComponent({}) {
     let idx = zInventoryArr.findIndex((o) => o.id == item.id);
 
     // return;
-    if (!zWorkorderObj?.id || buttonName == "info") {
+    if (!zOpenWorkorder?.id || buttonName == "info") {
       _setModalInventoryObjIdx(idx);
       // _setModalInventoryObjIdx(null);
       return;
     }
 
-    let wo = cloneDeep(zWorkorderObj);
+    let wo = cloneDeep(zOpenWorkorder);
     if (!wo.workorderLines) wo.workorderLines = [];
     // log("item", item);
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
     lineItem.inventoryItem = item;
     lineItem.id = generateUPCBarcode();
     wo.workorderLines.push(lineItem);
-    _zSetWorkorderObj(wo);
+    // log(wo)
+    _zSetWorkorder(wo);
   }
 
   function clearSearch() {
@@ -210,7 +209,7 @@ export function QuickItemComponent({}) {
             paddingHorizontal: 2,
           }}
         >
-          {zSettingsObj?.quickItemButtons?.map((item) => (
+          {zSettings?.quickItemButtons?.map((item) => (
             <Button_
               key={item.id}
               onPress={() => handleQuickButtonPress(item)}
@@ -308,7 +307,7 @@ export function QuickItemComponent({}) {
                             </Text>
                           )}
                         </Text>
-                        {!!zWorkorderObj?.id && (
+                        {!!zOpenWorkorder?.id && (
                           <Button_
                             icon={ICONS.infoGear}
                             iconSize={22}

@@ -10,8 +10,8 @@ import { useLoginStore, useSettingsStore } from "../../../stores";
 
 export const SalesReportsModal = ({ handleExit }) => {
   // store getters //////////////////////////////////////////////////////
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUser());
+  const zSettingsObj = useSettingsStore((state) => state.getSettings());
   const zUserHasAdminRole = useLoginStore((state) =>
     state.getUserHasAdminRole()
   );

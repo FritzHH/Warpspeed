@@ -50,10 +50,10 @@ export function Options_Section({}) {
   const zOptionsTabName = useTabNamesStore((state) =>
     state.getOptionsTabName()
   );
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
 
   const zWebcamDetected = useLoginStore((state) => state.getWebcamDetected());
-  const zPunchClockArr = useLoginStore((state) => state.getPunchClockArr());
+  const zPunchClock = useLoginStore((state) => state.getPunchClock());
 
   // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
@@ -81,15 +81,16 @@ export function Options_Section({}) {
   //////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
 
-  function handleUserClockPress(userObj) {
+  function handleUserClockPress(user) {
     let millis = new Date().getTime();
-    let option = zPunchClockArr.find((o) => o.userID === userObj.id)
+    let option = zPunchClock[user.id]
       ? "out"
       : "in";
 
     // log("clocked in arr", zClockedInUsersArr);
     let clockinFun = () => {
-      _zCreateUserClockPunch(userObj.id, millis, option);
+      // _zCreateUserClockPunch(userObj.id, millis, option);
+      useLoginStore.getState().setCreateUserClock(user.id, millis, option);
 
       // now we will pause the app asking if the user wants to clock in if they say "no". this is to let them use the app even if they aren't clocked in.
 
@@ -99,7 +100,7 @@ export function Options_Section({}) {
           LOCAL_DB_KEYS.userClockCheckPauseObj
         );
         if (!clockPauseObj) clockPauseObj = {};
-        clockPauseObj[userObj.id] = new Date().getTime();
+        clockPauseObj[user.id] = new Date().getTime();
         localStorageWrapper.setItem(
           LOCAL_DB_KEYS.userClockCheckPauseObj,
           clockPauseObj
@@ -144,10 +145,8 @@ export function Options_Section({}) {
   return (
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
       <TabBar
-        userObj={zCurrentUserObj}
-        isClockedIn={zPunchClockArr?.find(
-          (o) => o.userID === zCurrentUserObj?.id
-        )}
+        userObj={zCurrentUser}
+        isClockedIn={zPunchClock[zCurrentUser?.id]}
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}
         // __tabMenuHeight={}

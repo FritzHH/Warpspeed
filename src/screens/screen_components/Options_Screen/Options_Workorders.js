@@ -30,38 +30,28 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../../stores";
-import { dbGetCustomerObj } from "../../../db_call_wrapper";
+// import { dbGetCustomerObj } from "../../../db_call_wrapper";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { getDatabase } from "firebase/database";
 import LinearGradient from "react-native-web-linear-gradient";
 import Svg, { Path } from "react-native-svg";
+import { dbGetCustomer } from "../../../db_calls_wrapper";
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
-  const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
-    state.getWorkorderArr()
+  const zOpenWorkorders = useOpenWorkordersStore((state) =>
+    state.getWorkorders()
   );
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
-  const zOpenWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
-  );
+  const zSettings = useSettingsStore((state) => state.getSettings());
+
 
   // setters ////////////////////////////////////////////////////////
-  const _zSetIncomingMessage = useCustMessagesStore(
-    (state) => state.setIncomingMessage
-  );
-  const _zSetOutgoingMessage = useCustMessagesStore(
-    (state) => state.setOutgoingMessage
-  );
-  const _zSetCurrentWorkorderIdx = useOpenWorkordersStore(
-    (state) => state.setOpenWorkorderIdx
-  );
   const _zSetPreviewObj = useWorkorderPreviewStore(
     (state) => state.setPreviewObj
   );
   const _zSetCurrentCustomer = useCurrentCustomerStore(
-    (state) => state.setCustomerObj
+    (state) => state.setCustomer
   );
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
   const _zSetOptionsTabName = useTabNamesStore(
@@ -71,14 +61,14 @@ export function WorkordersComponent({}) {
   const _zModOpenWorkorderArrItem = useOpenWorkordersStore(
     (state) => state.modItem
   );
-  const _zSetInitialOpenWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setInitialOpenWorkorderObj
+  const _zSetInitialOpenWorkorder = useOpenWorkordersStore(
+    (state) => state.setInitialOpenWorkorder
   );
 
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
   const [sItemOptions, _setItemOptions] = useState({});
-
+// log('here', zOpenWorkorders)
   useEffect(() => {
     // log(zSettingsObj);
     let hour = 3600000;
@@ -91,7 +81,7 @@ export function WorkordersComponent({}) {
         let nextDayWord = getWordDayOfWeek(nowMillis + NUM_MILLIS_IN_DAY * 2);
 
         /////////////////////////////////////////////////////
-        zOpenWorkordersArr.forEach((wo) => {
+        zOpenWorkorders.forEach((wo) => {
           const startedOnMillis = Number(wo.startedOnMillis);
           let maxWaitMillis = Number(
             wo.waitTime?.maxWaitTimeDays * NUM_MILLIS_IN_DAY
@@ -101,8 +91,8 @@ export function WorkordersComponent({}) {
           // check to see if any shop closed days exist in the quoted wait time
           // first get all day names that the shop is closed
           let closedDayNamesArr = [];
-          Object.keys(zSettingsObj?.storeHours).forEach((dayName) => {
-            if (!zSettingsObj.storeHours[dayName]?.isOpen)
+          Object.keys(zSettings?.storeHours).forEach((dayName) => {
+            if (!zSettings.storeHours[dayName]?.isOpen)
               closedDayNamesArr.push(dayName);
           });
 
@@ -196,7 +186,7 @@ export function WorkordersComponent({}) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [zOpenWorkordersArr, sItemOptions, zSettingsObj]);
+  }, [zOpenWorkorders, sItemOptions, zSettings]);
 
   ///////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////
@@ -204,12 +194,15 @@ export function WorkordersComponent({}) {
   function workorderSelected(obj) {
     // log("obj", obj);
     obj = cloneDeep(obj);
-    dbGetCustomerObj(obj.customerID).then((custObj) => {
+    
+    dbGetCustomer(obj.customerID, 
+      '1234', '999'
+    ).then((custObj) => {
       // clog("cust obj", custObj);
       _zSetCurrentCustomer(custObj);
     });
 
-    _zSetInitialOpenWorkorderObj(obj);
+    _zSetInitialOpenWorkorder(obj);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
@@ -217,9 +210,12 @@ export function WorkordersComponent({}) {
   }
 
   function sortWorkorders(inputArr) {
+    return inputArr
+    // log('input arr', inputArr)
     let finalArr = [];
     let nowMillis = new Date().getTime();
-    zSettingsObj?.statuses?.forEach((status) => {
+    zSettings?.statuses?.forEach((status) => {
+      // log(status)
       let arr = [];
       inputArr.forEach((wo) => {
         const startedOnMillis = Number(wo.startedOnMillis);
@@ -240,6 +236,7 @@ export function WorkordersComponent({}) {
 
       finalArr = [...finalArr, ...arr];
     });
+    log('final', finalArr)
     return finalArr;
   }
 
@@ -281,7 +278,7 @@ export function WorkordersComponent({}) {
           height: "96%",
           backgroundColor: null,
         }}
-        data={sortWorkorders(zOpenWorkordersArr)}
+        data={sortWorkorders(zOpenWorkorders)}
         keyExtractor={(item, index) => index}
         renderItem={(item) => {
           let workorder = item.item;

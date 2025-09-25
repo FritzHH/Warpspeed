@@ -80,6 +80,7 @@ import CalendarPicker, { useDefaultStyles } from "react-native-ui-datepicker";
 import { PanResponder } from "react-native";
 
 import { StyleSheet } from "react-native";
+import { dbSaveCustomer } from "./db_calls_wrapper";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -865,7 +866,7 @@ export const InventoryItemScreeenModalComponent = ({
   // store setters ////////////////////////////////////////////////////////
   const _zSetFocus = useInvModalStore((state) => state.setFocus);
   const _zModInventoryItem = useInventoryStore((state) => state.modItem);
-  const _zSetSettingsObj = useSettingsStore((state) => state.setSettingsObj);
+  const _zSetSettings = useSettingsStore((state) => state.setSettings);
   const _zSetLoginFunctionCallback = useLoginStore(
     (state) => state.setLoginFunctionCallback
   );
@@ -876,7 +877,7 @@ export const InventoryItemScreeenModalComponent = ({
   // const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
 
   // store getters ///////////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  const zSettingsObj = useSettingsStore((state) => state.getSettings());
   const zFocus = useInvModalStore((state) => state.getFocus());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
@@ -922,7 +923,7 @@ export const InventoryItemScreeenModalComponent = ({
     let newAssignmentsArr = assignments.filter((id) => id != obj.id);
     let newSettingsObj = { ...zSettingsObj };
     newSettingsObj.quickItemButtonNames[idx] = newAssignmentsArr;
-    _zSetSettingsObj(newSettingsObj);
+    _zSetSettings(newSettingsObj);
     dbSetSettings(newSettingsObj);
   }
 
@@ -946,7 +947,7 @@ export const InventoryItemScreeenModalComponent = ({
     }
     // log(obj.assignments);
     settingsObj.quickItemButtonNames[idx] = obj;
-    _zSetSettingsObj(settingsObj);
+    _zSetSettings(settingsObj);
     dbSetSettings(settingsObj);
   }
 
@@ -1196,19 +1197,6 @@ export const CustomerInfoScreenModalComponent = ({
   const _zSetCurrentCustomer = useCurrentCustomerStore(
     (state) => state.setCustomerObj
   );
-  const _zSetNewWorkorderInArr = useOpenWorkordersStore(
-    (state) => state.modItem
-  );
-  const _zSetOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
-  );
-  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
-  const _zSetOptionsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
-  const _zExecute = useLoginStore((state) => state.execute);
-
   // store getters
 
   /////////////////////////////////////////////////////////////////////
@@ -1216,10 +1204,10 @@ export const CustomerInfoScreenModalComponent = ({
 
   // automatically save customer changes if it is NOT a new customer creation
   useEffect(() => {
-    if (ssCustomerInfoObj?.id)
+    // if (ssCustomerInfoObj?.id)
       // _zExecute(() => {
-      _zSetCurrentCustomer(ssCustomerInfoObj);
-    dbSetCustomerObj(ssCustomerInfoObj);
+      // _zSetCurrentCustomer(ssCustomerInfoObj);
+    // dbSaveCustomer(ssCustomerInfoObj, ssCustomerInfoObj.id, '1234', '999');
     // });
   }, [ssCustomerInfoObj]);
 
@@ -1499,7 +1487,6 @@ export const CustomerInfoScreenModalComponent = ({
 
 export const LoginModalScreen = ({ modalVisible }) => {
   // setters /////////////////////////////////////////////////////////////
-  const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
   const _zSetShowLoginScreen = useLoginStore(
     (state) => state.setShowLoginScreen
   );
@@ -1510,7 +1497,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
   );
   const zAdminPrivilege = useLoginStore((state) => state.getAdminPrivilege());
   let zSettingsObj = SETTINGS_OBJ;
-  zSettingsObj = useSettingsStore((state) => state.getSettingsObj());
+  zSettingsObj = useSettingsStore((state) => state.getSettings());
   /////////////////////////////////////////////////////////////////////
   const [sBackgroundColor, _setBackgroundColor] = useState("green");
   const [sInput, _setInput] = useState("");
@@ -1551,7 +1538,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
     // log("user", userObj);
     // log("check", failedAccessCheck.toString());
     if (userObj && zAdminPrivilege && failedAccessCheck) {
-      _zSetCurrentUserObj(userObj);
+              useLoginStore.getState().setCurrentUser(userObj);
       _setInput("");
       _setBackgroundColor("red");
       setTimeout(() => {
@@ -1562,7 +1549,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
     }
 
     if (userObj && !failedAccessCheck) {
-      _zSetCurrentUserObj(userObj);
+              useLoginStore.getState().setCurrentUser(userObj);
       _zSetShowLoginScreen(false);
       _setInput("");
       zRunPostLoginCallback();

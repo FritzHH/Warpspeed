@@ -28,16 +28,10 @@ export function Items_Section({}) {
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
 
   // getters ///////////////////////////////////////////////////////////////////
-  const zWorkorderPreview = useWorkorderPreviewStore((state) =>
-    state.getPreviewObj()
-  );
 
-  let zWorkorderObj = WORKORDER_PROTO;
-  zWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
-  );
-  const zCustomerSearchArr = useCustomerSearchStore((state) =>
-    state.getSearchResultsArr()
+  let zOpenWorkorder = WORKORDER_PROTO;
+  zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorder()
   );
   const zItemsTabName = useTabNamesStore((state) => state.getItemsTabName());
 
@@ -69,7 +63,7 @@ export function Items_Section({}) {
       <TabBar
         _zSetItemsTabName={_zSetItemsTabName}
         zItemsTabName={zItemsTabName}
-        zWorkorderObj={zWorkorderObj}
+        zWorkorderObj={zOpenWorkorder}
       />
       {ScreenComponent(zItemsTabName)}
     </View>

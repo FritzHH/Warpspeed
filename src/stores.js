@@ -16,6 +16,7 @@ import {
   generateRandomID,
   generateUPCBarcode,
   log,
+  removeFieldFromObj,
 } from "./utils";
 import { cloneDeep } from "lodash";
 import {
@@ -31,6 +32,9 @@ import {
   dbGetClosedWorkorderItem,
   dbGetSaleItem,
 } from "./db_call_wrapper";
+import { dbGetCustomer, dbSaveCurrentPunchClock, dbSaveCustomer, dbSaveOpenWorkorder, dbSavePunchObject } from "./db_calls_wrapper";
+import { punchClockSubscribe } from "./db_subscription_wrapper";
+import { setOpenWorkorder } from "./db";
 
 // internal use  /////////////////////////////////////////////////////
 
@@ -388,9 +392,9 @@ export const useLoginStore = create((set, get) => ({
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
-  currentUserObj: cloneDeep(FRITZ_USER_OBJ), //testing
-  // currentUserObj: null,
-  punchClockArr: [],
+  // currentUser: cloneDeep(FRITZ_USER_OBJ), //testing
+  currentUser: null,
+  punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
   lastActionMillis: 0,
   postLoginFunctionCallback: () => {},
@@ -399,13 +403,13 @@ export const useLoginStore = create((set, get) => ({
   // face login
   runBackgroundRecognition: true,
 
-  getPunchClockArr: () => get().punchClockArr,
+  getPunchClock: () => get().punchClock,
   getWebcamDetected: () => get().webcamDetected,
   getRunBackgroundRecognition: () => get().runBackgroundRecognition,
   getLoginFunctionCallback: () => get().loginFunctionCallback,
   getShowLoginScreen: () => get().showLoginScreen,
   getLastActionMillis: () => get().lastActionMillis,
-  getCurrentUserObj: () => get().currentUserObj,
+  getCurrentUser: () => get().currentUser,
   getAdminPrivilege: () => get().adminPrivilege,
   getModalVisible: () => get().modalVisible,
   getUserHasEditRole: () => {},
@@ -415,50 +419,35 @@ export const useLoginStore = create((set, get) => ({
   },
 
   // local app user
-  setCurrentUserObj: (currentUserObj) => {
-    set({ currentUserObj });
+  setCurrentUser: (currentUser) => {
+    set({ currentUser });
   },
 
   // create new punch obj, log user in locally and send punch obj to DB
-  setCreateUserClockObj: (userID, millis, option) =>
-    set(() => {
-      let punchObj = { ...TIME_PUNCH_PROTO };
-      punchObj.id = generateUPCBarcode();
-      punchObj.userID = userID;
-      punchObj.option = option;
-      punchObj.millis = millis;
-      // dbSetOrUpdateUserPunchObj(punchObj);
+  setCreateUserClock: (userID, millis, option) => {
+      let punch = { ...TIME_PUNCH_PROTO };
+      punch.id = generateUPCBarcode();
+      punch.userID = userID;
+      punch.option = option;
+      punch.millis = millis;
 
-      let punchClockArr = cloneDeep(get().punchClockArr);
-      if (option === "out") {
-        punchClockArr = punchClockArr.filter((o) => o.userID != userID);
-        return dbSetOrUpdateUserPunchObj(punchObj, true);
-      } else {
-        if (!punchClockArr.find((o) => o.userID === userID)) {
-          punchClockArr.push(punchObj);
-          return dbSetOrUpdateUserPunchObj(punchObj);
-        }
-      }
-    }),
+    let punchClock = get().punchClock;
 
-  setSinglePunchObjInPunchArr: (punchObj, option, sendToDB = false) => {
-    let punchClockArr = cloneDeep(get().punchClockArr);
-    if (option === "add") {
-      if (!punchClockArr.find((obj) => obj.id === punchObj.id))
-        punchClockArr.push(punchObj);
-    } else if (option === "change") {
-      punchClockArr = punchClockArr.map((obj) => {
-        if (obj.id === punchObj.id) return punchObj;
-        return obj;
-      });
+    if (option === 'in') {
+    punchClock[userID] = punch;
     } else {
-      punchClockArr = punchClockArr.filter((obj) => obj.id != punchObj.id);
+      punchClock = removeFieldFromObj(punchClock, userID)
     }
-    // clog(punchClockArr);
-    set({ punchClockArr });
-    // if (sendToDB)
+
+    set({
+      punchClock
+        })
+    dbSaveCurrentPunchClock(punchClock, '1234', '999')
+    dbSavePunchObject(punch, punch.id, '1234', '999')
   },
-  setPunchClockArr: (punchClockArr) => set({ punchClockArr }),
+
+
+  setPunchClock: (punchClock) => set({ punchClock }),
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
   setRunBackgroundRecognition: (runBackgroundRecognition) =>
     set(() => ({ runBackgroundRecognition })),
@@ -534,19 +523,21 @@ export const useCustomerPreviewStore = create((set, get) => ({
 }));
 
 export const useCurrentCustomerStore = create((set, get) => ({
-  customerObj: { ...CUSTOMER_PROTO },
-  getCustomerObj: () => get().customerObj,
-
+  customer: { ...CUSTOMER_PROTO },
+  getCustomer: () => get().customer,
+  
   setCustomerField: (fieldName, value) => {
     let customerObj = cloneDeep(get().customerObj);
     if (fieldName && value) customerObj[fieldName] = value;
     set({ customerObj });
     dbSetCustomerField(customerObj.id, { [fieldName]: value });
   },
-  setCustomerObj: (obj, sendToDB = false) => {
-    set({ customerObj: obj });
+  setCustomer: (customer, sendToDB = false) => {
+    set({ customer });
 
-    if (sendToDB) dbSetCustomerObj(obj);
+    if (sendToDB) dbSaveCustomer(customer, customer.id, '1234', '999')
+
+    // if (sendToDB) dbSetCustomerObj(obj);
   },
 }));
 
@@ -590,7 +581,7 @@ export const useInventoryStore = create((set, get) => ({
     set({ inventoryArr });
     if (sendToDB) dbSetInventoryItem(item, batch);
   },
-  // setEntireArr: ()
+  setItems: (inventoryArr) => set({inventoryArr})
 }));
 
 export const useCustMessagesStore = create((set, get) => ({
@@ -616,21 +607,27 @@ export const useCustMessagesStore = create((set, get) => ({
 }));
 
 export const useOpenWorkordersStore = create((set, get) => ({
-  workorderArr: [],
-  openWorkorderObj: null,
+  workorders: [],
+  openWorkorder: null,
 
-  getOpenWorkorderObj: () => get().openWorkorderObj,
-  getWorkorderArr: () => get().workorderArr,
+  getOpenWorkorder: () => get().openWorkorder,
+  getWorkorders: () => get().workorders,
 
   // setters
-  setInitialOpenWorkorderObj: (openWorkorderObj) => {
+  setInitialOpenWorkorder: (openWorkorder) => {
     // log(openWorkorderObj);
-    set({ openWorkorderObj });
+    set({ openWorkorder });
   },
-
+  // setOpenWorkorders: (workorders) => {
+  //   log('workorders', workorders[0])
+  //   let custID = workorders[0].id;
+  //   dbGetCustomer(custID, '1236', '999').then(cust => useCurrentCustomerStore.getState().setCustomer(cust))
+  //   set({openWorkorderObj: workorders[0], workorders })
+  // }, // testing
+  setOpenWorkorders: (workorders) => set({ workorders }), // real one
   setWorkorder: (wo, saveToDB = true, batch = true) => {
     if (wo.isStandaloneSale) {
-      set({ openWorkorderObj: wo });
+      set({ openWorkorder: wo });
       return;
     }
 
@@ -642,40 +639,37 @@ export const useOpenWorkordersStore = create((set, get) => ({
 
     // ****************************************************
 
-    let workorderArr = cloneDeep(get().workorderArr);
-    let foundWOIdx = workorderArr.findIndex((o) => o.id === wo.id) >= 0;
+    let workorders = cloneDeep(get().workorders);
+    let foundWOIdx = workorders.findIndex((o) => o.id === wo.id) >= 0;
     if (foundWOIdx) {
-      workorderArr[foundWOIdx] = wo;
+      workorders[foundWOIdx] = wo;
     } else {
-      workorderArr.push(wo);
+      workorders.push(wo);
     }
-    set({ workorderArr });
+    set({ workorderArr: workorders });
 
     // not set it as open workorder if it is such
-    if (get().openWorkorderObj?.id === wo.id) {
-      set({ openWorkorderObj: wo });
+    if (get().openWorkorder?.id === wo.id) {
+      set({ openWorkorder: wo });
     }
 
     if (saveToDB) {
-      // log("dbb");
-      // clog(wo);
-      dbSetWorkorder(wo, batch, false);
+      dbSaveOpenWorkorder(wo, "1234", "999");
+      // dbSetWorkorder(wo, batch, false);
     } // need db fun
   },
 
   removeWorkorder: (wo, saveToDB = true, batch = true) => {
-    let workorderArr = cloneDeep(get().workorderArr);
-    workorderArr = workorderArr.filter((o) => o.id != wo.id);
-    set({ workorderArr });
+    let workorders = cloneDeep(get().workorders);
+    workorders = workorders.filter((o) => o.id != wo.id);
+    set({ workorderArr: workorders });
 
-    if (get().openWorkorderObj?.id === wo.id) set({ openWorkorderObj: null });
+    if (get().openWorkorder?.id === wo.id) set({ openWorkorder: null });
 
     if (saveToDB) {
-      dbSetWorkorder(wo, batch, true);
+      dbSaveOpenWorkorder(wo, '1234', '999')
     }
   },
-
-  setEntireArr: (arr) => set((state) => ({ workorderArr: arr })),
 
   // handles live DB subscription changes
   // modItem: (item, option) => {
@@ -703,24 +697,35 @@ export const useWorkorderPreviewStore = create((set, get) => ({
 
 export const useSettingsStore = create((set, get) => ({
   settingsObj: null,
+  settings: null,
 
   getSettingsObj: () => get().settingsObj,
+  getSettings: () => get().settings,
 
-  setSettingsObj: (settingsObj, batch = true, sendToDB = true) => {
+  // setSettingsObj: (settingsObj, batch = true, sendToDB = true) => {
+  //   // clog(settingsObj);
+  //   set({ settingsObj });
+  //   if (sendToDB) {
+  //     dbSetSettings(settingsObj, batch);
+  //   }
+  // },
+  setSettings: (settings, batch = true, sendToDB = true) => {
     // clog(settingsObj);
-    set({ settingsObj });
+    set({ settingsObj: settings });
+    set({ settings })
+    
     if (sendToDB) {
-      dbSetSettings(settingsObj, batch);
+      dbSetSettings(settings, batch);
     }
   },
 
   setField: (fieldName, fieldVal, sendToDB = true, batch = true) => {
-    let settingsObj = get().settingsObj || {};
-    settingsObj = cloneDeep(settingsObj);
-    settingsObj[fieldName] = fieldVal;
+    let settings = get().settings || {};
+    settings = cloneDeep(settings);
+    settings[fieldName] = fieldVal;
     // log(fieldName, fieldVal);
-    set({ settingsObj });
-    if (sendToDB) dbSetSettings(settingsObj, batch);
+    set({ settings: settings });
+    // if (sendToDB) dbSetSettings(settings, batch);
   },
 }));
 

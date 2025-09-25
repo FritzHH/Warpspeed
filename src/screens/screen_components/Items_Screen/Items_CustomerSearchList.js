@@ -54,7 +54,7 @@ export function CustomerSearchListComponent({}) {
   const zSearchResultsArr = useCustomerSearchStore((state) =>
     state.getSearchResultsArr()
   );
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUserObj());
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
 
   ////////////////////////////////////////////////////////////////////////////////////////
   const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);

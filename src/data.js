@@ -841,17 +841,6 @@ export const SETTINGS_OBJ = {
   storeID: "999999",
   users: [
     FRITZ_USER_OBJ,
-    {
-      first: "Ricky",
-      last: "Bobby",
-      id: "1234dkfjd5",
-      permissions: PERMISSION_LEVELS.user,
-      phone: "2393369177",
-      pin: "00",
-      hourlyWage: 20,
-      faceDescriptor: {},
-      // role: PERMISSION_LEVELS.user,
-    },
   ],
   cardReaders: [{ label: "Front Right Desk", id: "tmr_GFKNEgYkwcsIFF" }],
   selectedCardReaderObj: {

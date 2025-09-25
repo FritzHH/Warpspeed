@@ -134,18 +134,16 @@ export const MiddleItemComponent = ({
     (state) => state.setCustomerField
   );
   // store getters
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
-  );
+
   const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
   const zOpenWorkorders = useOpenWorkordersStore((state) =>
-    state.getWorkorderArr()
+    state.getWorkorders()
   );
   const zInventory = useInventoryStore((state) => state.getInventoryArr());
   const zGetInventoryItem = useInventoryStore(
     (state) => state.getInventoryItem
   );
-  const zSettings = useSettingsStore((state) => state.getSettingsObj());
+  const zSettings = useSettingsStore((state) => state.getSettings());
   const zSale = useCheckoutStore((state) => state.saleObj);
 
   /////////////////////////////////////////////////////////////////////////

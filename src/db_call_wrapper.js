@@ -2094,9 +2094,7 @@ export async function dbLoginAppUser(email, password) {
         auth: result.auth,
       };
 
-      // Set the updated settings in the Zustand store
-      const { setSettingsObj } = useSettingsStore.getState();
-      setSettingsObj(updatedSettings);
+
 
       log("Login successful and settings updated", {
         tenantID,
@@ -2116,36 +2114,6 @@ export async function dbLoginAppUser(email, password) {
     }
   } catch (error) {
     log("Error during login process:", error);
-    throw error;
-  }
-}
-
-/**
- * Automatic login for development purposes
- * @param {string} email - Development user email
- * @param {string} password - Development user password
- * @returns {Promise<Object>} - Returns login result with user, tenant, and settings
- */
-export async function dbAutoLoginForDevelopment(email = "fritz@bonitabikes.com", password = "BonitaBikes.1236") {
-  try {
-    log("Starting automatic development login...");
-    
-    // Use the existing login function
-    const result = await dbLoginAppUser(email, password);
-    
-    if (result.success) {
-      log("Automatic development login successful", {
-        email: result.user.email,
-        tenantID: result.user.tenantID,
-        storeID: result.user.storeID,
-      });
-      
-      return result;
-    } else {
-      throw new Error("Development login failed");
-    }
-  } catch (error) {
-    log("Error during automatic development login:", error);
     throw error;
   }
 }

@@ -27,10 +27,7 @@ const MODEL_URL = "./models"; // Place models in public/models
 
 export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // store setters ////////////////////////////////////////////////////
-  const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
-  const _zCreateUserClockPunch = useLoginStore(
-    (state) => state.setCreateUserClockObj
-  );
+
   const _zSetWebcamDetected = useLoginStore((state) => state.setWebcamDetected);
   const _zSetShowAlert = useAlertScreenStore((state) => state.setShowAlert);
   const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
@@ -38,10 +35,10 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // store getters ///////////////////////////////////////////////////
   // Solution 1 & 2: Memoized selectors and optimized subscriptions
   const zUsers = useSettingsStore(
-    useCallback((state) => state.settingsObj?.users, [])
+    useCallback((state) => state.settings?.users, [])
   );
-  const zPunchClockArr = useLoginStore(
-    useCallback((state) => state.punchClockArr, [])
+  const zPunchClock = useLoginStore(
+    useCallback((state) => state.punchClock, [])
   );
   const zRunBackgroundRecognition = useLoginStore(
     useCallback((state) => state.runBackgroundRecognition, [])
@@ -49,7 +46,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
   // Get settings object with memoized selector to prevent unnecessary re-renders
   const zSettingsObj = useSettingsStore(
-    useCallback((state) => state.settingsObj, [])
+    useCallback((state) => state.settings, [])
   );
 
   /////////////////////////////////////////////////////////////////////////
@@ -59,17 +56,18 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
   // Use refs to store stable references and prevent unnecessary effect re-runs
   const usersRef = useRef(zUsers);
-  const punchClockRef = useRef(zPunchClockArr);
+  const punchClockRef = useRef(zPunchClock);
   const settingsRef = useRef(zSettingsObj);
 
   // Update refs when values change
   useEffect(() => {
     usersRef.current = zUsers;
+    // log('users', zUsers)
   }, [zUsers]);
 
   useEffect(() => {
-    punchClockRef.current = zPunchClockArr;
-  }, [zPunchClockArr]);
+    punchClockRef.current = zPunchClock;
+  }, [zPunchClock]);
 
   useEffect(() => {
     settingsRef.current = zSettingsObj;
@@ -128,24 +126,27 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   useEffect(() => {
     // log("setup", sSetupComplete);
     setStatus("Setup ready, enroll face now");
-    // log("starting background facial recognition");
+    log("starting background facial recognition");
     _setBackgroundRecognitionRunning(true);
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(async () => {
       const currentDesc = await getFaceDescriptor();
+
       if (currentDesc) {
         // log("cur desc", currentDesc);
-        let userObj = usersRef.current?.find((userObj) => {
+        let user = usersRef.current?.find((userObj) => {
           if (!userObj.faceDescriptor) {
-            // log("here");
             return null;
           }
+          // log('user length', Object.values(userObj.faceDescriptor).length)
+          // log('current length', currentDesc.length)
+
           try {
             // log(userObj.faceDescriptor);
             // clog(userObj);
             const distance = faceapi.euclideanDistance(
               // userObj.faceDescriptor,
-              userObj.faceDescriptor,
+              Object.values(userObj.faceDescriptor),
               currentDesc
             );
             // log("dist", distance);
@@ -167,14 +168,13 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         });
 
         // log(userObj);
-        if (userObj) {
-          _zSetCurrentUserObj(userObj); // set app user on face recognition
+        if (user) {
+          useLoginStore.getState().setCurrentUser(user) // set app user on recognition
 
           // check to see if user asked to not clock in within period of time
           // log("punch clock arr in facedetectionclient", zPunchClockArr);
-          let clockedInUser = punchClockRef.current.find(
-            (o) => o.userID === userObj.id
-          );
+          let clockedInUser = punchClockRef.current[user.id]
+          // log('punc clock ref', punchClockRef.current)
           if (!clockedInUser) {
             let clockPauseObj = localStorageWrapper.getItem(
               LOCAL_DB_KEYS.userClockCheckPauseObj
@@ -186,7 +186,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
             );
 
             let userKey = Object.keys(clockPauseObj).find(
-              (id) => id === userObj.id
+              (id) => id === user.id
             );
             if (userKey) {
               let lastCheckMillis = clockPauseObj[userKey];
@@ -208,10 +208,10 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
               title: "PUNCH CLOCK",
               message:
                 "Hi " +
-                userObj.first +
+                user.first +
                 ", you are not clocked in. Would you like to punch in now?",
               handleBtn1Press: () => {
-                _zCreateUserClockPunch(userObj.id, millis, "in");
+                useLoginStore.getState().setCreateUserClock(user.id, millis, 'in')
                 // dbCreateUserPunchAction({
                 //   userID: userObj.id,
                 //   millisIn: millis,
@@ -219,7 +219,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
                 _setPauseBackgroundRecognition(false);
               },
               handleBtn2Press: () => {
-                clockPauseObj[userObj.id] = new Date().getTime();
+                clockPauseObj[user.id] = new Date().getTime();
                 localStorageWrapper.setItem(
                   LOCAL_DB_KEYS.userClockCheckPauseObj,
                   clockPauseObj
@@ -229,10 +229,10 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
             });
           }
         } else {
-          _zSetCurrentUserObj(null);
+         useLoginStore.getState().setCurrentUser(null);
         }
       } else {
-        _zSetCurrentUserObj(null);
+        useLoginStore.getState().setCurrentUser(null);
       }
     }, FACIAL_RECOGNITION_INTERVAL_MILLIS);
   }, [sSetupComplete, sPauseBackgroundRecognition]);

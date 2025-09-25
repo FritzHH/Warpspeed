@@ -5,6 +5,7 @@ import {
   addDashesToPhone,
   capitalizeFirstLetterOfString,
   clog,
+  createNewWorkorder,
   dim,
   generateRandomID,
   generateUPCBarcode,
@@ -28,6 +29,7 @@ import {
 import {
   CUSTOMER_PROTO,
   FOCUS_NAMES,
+  SETTINGS_OBJ,
   TAB_NAMES,
   WORKORDER_PROTO,
 } from "../../../data";
@@ -48,6 +50,7 @@ import {
   dbSearchForName,
   dbSearchForPhoneNumber,
 } from "../../../db_call_wrapper";
+import { dbSaveCustomer } from "../../../db_calls_wrapper";
 export function NewWorkorderComponent({}) {
   // store setters ////////////////////////////////////////////////////////////////
   const _zSetIncomingMessage = useCustMessagesStore(
@@ -85,7 +88,7 @@ export function NewWorkorderComponent({}) {
     state.getCustPreviewArr()
   );
   const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUserObj());
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
   const zSearchResults = useCustomerSearchStore((state) =>
     state.getSearchResultsArr()
   );
@@ -157,23 +160,23 @@ export function NewWorkorderComponent({}) {
       return;
     }
 
-    // run searches
-    ///////////////////////
-    let searchResults = [];
-    // log("arr", zCustPreviewArr);
-    if (sSearchingByName) {
-      searchResults = await dbSearchForName(formattedText);
-    } else {
-      searchResults = await dbSearchForPhoneNumber(formattedText);
-    }
-    // log("results", searchResults);
+    // // run searches
+    // ///////////////////////
+    // let searchResults = [];
+    // // log("arr", zCustPreviewArr);
+    // if (sSearchingByName) {
+    //   searchResults = await dbSearchForName(formattedText);
+    // } else {
+    //   searchResults = await dbSearchForPhoneNumber(formattedText);
+    // }
+    // // log("results", searchResults);
 
-    _zSetSearchResults(searchResults);
-    if (searchResults.length > 0) {
-      _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
-    } else {
-      _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
-    }
+    // _zSetSearchResults(searchResults);
+    // if (searchResults.length > 0) {
+    //   _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
+    // } else {
+    //   _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
+    // }
 
     // show the create customer button if input conditions are met
   }
@@ -214,7 +217,7 @@ export function NewWorkorderComponent({}) {
   function handleStartStandaloneSalePress() {
     // log(zCurrentUserObj);
     // return;
-    if (!zCurrentUserObj) {
+    if (!zCurrentUser) {
       showAlert({
         message: "No user logged in. Please log in and try again",
       });
@@ -225,7 +228,7 @@ export function NewWorkorderComponent({}) {
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateUPCBarcode();
-    wo.startedBy = zCurrentUserObj.id;
+    wo.startedBy = zCurrentUser.id;
     wo.startedOnMillis = new Date().getTime();
 
     _zSetOpenWorkorder(wo, false);
@@ -244,42 +247,39 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleCreateNewCustomerPressed() {
-    // log("create new customer pressed", log(zCurrentUser));
     // first create new customer
     let newCustomerObj = cloneDeep(sCustomerInfoObj);
     newCustomerObj.id = generateUPCBarcode();
     newCustomerObj.dateCreated = new Date().getTime();
-    newCustomerObj.workorders.push(newWorkorder.id);
 
     // next create new empty workorder for automatic population of next screen
-    let newWorkorder = cloneDeep(WORKORDER_PROTO);
-    newWorkorder.id = generateUPCBarcode();
-    newWorkorder.startedOnMillis = new Date().getTime();
-    newWorkorder.customerFirst = sCustomerInfoObj.first;
-    newWorkorder.customerLast = sCustomerInfoObj.last;
-    newWorkorder.customerPhone =
-      sCustomerInfoObj.cell || sCustomerInfoObj.landline;
-    newWorkorder.customerID = sCustomerInfoObj.id;
-    newWorkorder.startedBy = zCurrentUserObj.first;
-    newWorkorder.status = "Service";
-    newWorkorder.changeLog.push(
-      "Started by: " + zCurrentUserObj.first + " " + zCurrentUserObj.last
-    );
+    let newWorkorder = createNewWorkorder({
+      customerID: newCustomerObj.id,
+      customerFirst: newCustomerObj.first,
+      customerLast: newCustomerObj.last,
+      customerPhone: newCustomerObj.cell || newCustomerObj.landline,
+      startedByFirst: zCurrentUser.first,
+      startedByLast: zCurrentUser.last,
+    });
 
-    _zSetCurrentCustomer(newCustomerObj);
-    // dbSetCustomerObj(newCustomerObj);
-    // ''(newWorkorder);
-    _zSetNewWorkorderInArr(newWorkorder, "add");
-    _zSetOpenWorkorder(newWorkorder);
-    // _zResetSearch();
+    // add in the newly created workorder to the customer's file
+    newCustomerObj.workorders.push(newWorkorder.id);
+
+    useCurrentCustomerStore.getState().setCustomer(newCustomerObj, true);
+    useOpenWorkordersStore.getState().setWorkorder(newWorkorder, true, true);
+    useOpenWorkordersStore.getState().setOpenWorkorder(newWorkorder)
+    useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.workorder);
+    useTabNamesStore
+      .getState()
+      .setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    useTabNamesStore
+      .getState()
+      .setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    messagesSubscribe(
-      newCustomerObj.id,
-      _zSetIncomingMessage,
-      _zSetOutgoingMessage
-    );
+
+    // _zResetSearch();
   }
 
   //////////////////////////////////////////////////////////////////////

@@ -18,9 +18,7 @@ import { clog } from "../../utils";
 export const Info_Section = ({}) => {
   // store getters
   const zInfoTabName = useTabNamesStore((state) => state.getInfoTabName());
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorderObj()
-  );
+
 
   function ScreenComponent(tabName) {
     switch (tabName) {

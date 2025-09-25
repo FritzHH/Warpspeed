@@ -42,7 +42,6 @@ import {
   useSettingsStore,
   useTabNamesStore,
 } from "../../../stores";
-import { dbSetInventoryItem, dbSetSettings } from "../../../db_call_wrapper";
 
 const tabMargin = 20;
 export function InventoryComponent({}) {

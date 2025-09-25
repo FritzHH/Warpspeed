@@ -10,7 +10,7 @@ import {
   Modal,
 } from "react-native-web";
 import {
-  addDashesToPhone,
+  formatPhoneWithDashes,
   bestForegroundHex,
   checkInputForNumbersOnly,
   clog,
@@ -41,7 +41,6 @@ import {
   TimeSpinner,
 } from "../../../../components";
 import { cloneDeep, set } from "lodash";
-import { dbSetSettings } from "../../../../db_call_wrapper";
 import { Children, useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
@@ -926,7 +925,7 @@ const AppUserListComponent = ({
                       }}
                     >
                       <TextInput
-                        value={addDashesToPhone(userObj.phone)}
+                        value={formatPhoneWithDashes(userObj.phone)}
                         onChangeText={(value) => {
                           let val = removeDashesFromPhone(value);
                           userObj.phone = val;
@@ -1918,7 +1917,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               textAlign: "right",
               outlineWidth: 0,
             }}
-            value={addDashesToPhone(zSettingsObj?.storeInfo.phone)}
+            value={formatPhoneWithDashes(zSettingsObj?.storeInfo.phone)}
             onChangeText={(unit) => {
               handleSettingsFieldChange("phone", {
                 ...zSettingsObj?.phone,

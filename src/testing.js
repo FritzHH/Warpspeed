@@ -35,17 +35,13 @@ import {
 } from "./utils";
 import {
   dbSetCustomerObj,
-  dbSetSettings,
   // dbCreateUserPunchAction,
-  setDBItem,
-  build_db_path,
-  dbSetInventoryItem,
   dbSetWorkorder,
 } from "./db_call_wrapper";
 import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "./constants";
 import { LogBox } from "react-native";
 import { useOpenWorkordersStore } from "./stores";
-import { dbSaveInventoryItem } from "./db_calls_wrapper";
+import { dbSaveInventoryItem, dbSaveSettings } from "./db_calls_wrapper";
 
 export function testPayment() {}
 
@@ -96,7 +92,7 @@ export async function fillInventory() {
     // clog(inv);
     // clog(inv);
     // return;
-    dbSaveInventoryItem(inv, inv.id, '1234', '999')
+    dbSaveInventoryItem(inv, inv.id, "1234", "999");
     // dbSetInventoryItem(inv, false);
   }
 }
@@ -156,7 +152,7 @@ export function fillCustomers() {
 
 export function fillSettings() {
   // log(SETTINGS_PROTO);
-  dbSetSettings(SETTINGS_OBJ, false);
+  dbSaveSettings(SETTINGS_OBJ);
 }
 
 export function fillReceipt() {

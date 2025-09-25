@@ -19,7 +19,7 @@ import React, {
 } from "react";
 import { Animated, Easing, Image } from "react-native-web";
 import {
-  addDashesToPhone,
+  formatPhoneWithDashes,
   capitalizeAllWordsInSentence,
   capitalizeFirstLetterOfString,
   clog,
@@ -62,25 +62,14 @@ import {
   useTabNamesStore,
   useAlertScreenStore,
 } from "./stores";
-import {
-  dbCancelPaymentIntents,
-  dbCancelServerDrivenStripePayment,
-  dbGetStripeActivePaymentIntents,
-  dbGetStripeConnectionToken,
-  dbGetStripePaymentIntent,
-  dbProcessServerDrivenStripePayment,
-  dbRetrieveAvailableStripeReaders,
-  dbSetCustomerObj,
-  dbSetInventoryItem,
-  dbSetSettings,
-} from "./db_call_wrapper";
+import { dbSetInventoryItem } from "./db_call_wrapper";
 import LinearGradient from "react-native-web-linear-gradient";
 // import DateTimePicker from "@react-native-community/datetimepicker";
 import CalendarPicker, { useDefaultStyles } from "react-native-ui-datepicker";
 import { PanResponder } from "react-native";
 
 import { StyleSheet } from "react-native";
-import { dbSaveCustomer } from "./db_calls_wrapper";
+import { dbSaveCustomer, dbSaveSettings } from "./db_calls_wrapper";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -607,7 +596,8 @@ export const DropdownMenu = ({
       <View
         style={{
           borderColor: menuBorderColor || C.buttonLightGreenOutline,
-          borderRadius: 25,
+          // borderRadius: 25,
+          backgroundColor: "white",
         }}
       >
         <FlatList
@@ -924,7 +914,7 @@ export const InventoryItemScreeenModalComponent = ({
     let newSettingsObj = { ...zSettingsObj };
     newSettingsObj.quickItemButtonNames[idx] = newAssignmentsArr;
     _zSetSettings(newSettingsObj);
-    dbSetSettings(newSettingsObj);
+    // dbSaveSettings(newSettingsObj);
   }
 
   // log(zSettingsObj);
@@ -948,7 +938,7 @@ export const InventoryItemScreeenModalComponent = ({
     // log(obj.assignments);
     settingsObj.quickItemButtonNames[idx] = obj;
     _zSetSettings(settingsObj);
-    dbSetSettings(settingsObj);
+    // dbSaveSettings(settingsObj);
   }
 
   function handleNewItemPress() {
@@ -1205,8 +1195,8 @@ export const CustomerInfoScreenModalComponent = ({
   // automatically save customer changes if it is NOT a new customer creation
   useEffect(() => {
     // if (ssCustomerInfoObj?.id)
-      // _zExecute(() => {
-      // _zSetCurrentCustomer(ssCustomerInfoObj);
+    // _zExecute(() => {
+    // _zSetCurrentCustomer(ssCustomerInfoObj);
     // dbSaveCustomer(ssCustomerInfoObj, ssCustomerInfoObj.id, '1234', '999');
     // });
   }, [ssCustomerInfoObj]);
@@ -1251,7 +1241,7 @@ export const CustomerInfoScreenModalComponent = ({
               placeholderTextColor="darkgray"
               placeholder="Cell phone"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={addDashesToPhone(ssCustomerInfoObj.cell)}
+              value={formatPhoneWithDashes(ssCustomerInfoObj.cell)}
               autoComplete="none"
               autoFocus={ssInfoTextFocus === FOCUS_NAMES.cell}
               onFocus={() => __setInfoTextFocus(FOCUS_NAMES.cell)}
@@ -1265,7 +1255,7 @@ export const CustomerInfoScreenModalComponent = ({
               placeholderTextColor="darkgray"
               placeholder="Landline"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={addDashesToPhone(ssCustomerInfoObj.landline)}
+              value={formatPhoneWithDashes(ssCustomerInfoObj.landline)}
               autoComplete="none"
               autoFocus={ssInfoTextFocus === FOCUS_NAMES.land}
               onFocus={() => __setInfoTextFocus(FOCUS_NAMES.land)}
@@ -1538,7 +1528,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
     // log("user", userObj);
     // log("check", failedAccessCheck.toString());
     if (userObj && zAdminPrivilege && failedAccessCheck) {
-              useLoginStore.getState().setCurrentUser(userObj);
+      useLoginStore.getState().setCurrentUser(userObj);
       _setInput("");
       _setBackgroundColor("red");
       setTimeout(() => {
@@ -1549,7 +1539,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
     }
 
     if (userObj && !failedAccessCheck) {
-              useLoginStore.getState().setCurrentUser(userObj);
+      useLoginStore.getState().setCurrentUser(userObj);
       _zSetShowLoginScreen(false);
       _setInput("");
       zRunPostLoginCallback();
@@ -1897,6 +1887,7 @@ export const Button_ = ({
       return C.buttonLightGreen;
     }
   }
+
   function getOpacity() {
     if (sMouseOver && enabled) {
       return mouseOverOptions.opacity;
@@ -1972,7 +1963,7 @@ export const Button_ = ({
                 textAlign: "center",
                 textAlignVertical: "center",
                 fontSize: 17,
-                color: C.textMain,
+                color: C.textWhite,
                 ...textStyle,
               }}
             >

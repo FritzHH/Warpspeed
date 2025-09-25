@@ -3,41 +3,29 @@
 import { create } from "zustand";
 import {
   CUSTOMER_PROTO,
-  FRITZ_USER_OBJ,
   INVENTORY_ITEM_PROTO,
   PRIVILEDGE_LEVELS,
   TAB_NAMES,
   TIME_PUNCH_PROTO,
-  WORKORDER_PROTO,
 } from "./data";
-import {
-  checkArr,
-  clog,
-  generateRandomID,
-  generateUPCBarcode,
-  log,
-  removeFieldFromObj,
-} from "./utils";
+import { checkArr, generateUPCBarcode, log, removeFieldFromObj } from "./utils";
 import { cloneDeep } from "lodash";
 import {
-  batchDBCall,
-  dbSetPunchClockArr,
-  dbSetOrUpdateUserPunchObj,
-  dbSetSettings,
   dbSetInventoryItem,
-  dbSetWorkorder,
   dbSetCustomerField,
-  dbSetCustomerObj,
   dbGetOpenWorkorderItem,
   dbGetClosedWorkorderItem,
   dbGetSaleItem,
 } from "./db_call_wrapper";
-import { dbGetCustomer, dbSaveCurrentPunchClock, dbSaveCustomer, dbSaveOpenWorkorder, dbSavePunchObject } from "./db_calls_wrapper";
-import { punchClockSubscribe } from "./db_subscription_wrapper";
-import { setOpenWorkorder } from "./db";
+import {
+  dbSaveCurrentPunchClock,
+  dbSaveCustomer,
+  dbSaveOpenWorkorder,
+  dbSavePunchObject,
+  dbSaveSettings,
+} from "./db_calls_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
-
 
 export const useTabNamesStore = create((set, get) => ({
   infoTabName: TAB_NAMES.infoTab.customer,
@@ -92,19 +80,22 @@ export const useInvModalStore = create((set, get) => ({
 
 export const useCustomerSearchStore = create((set, get) => ({
   selectedItem: null,
-  searchResultsArr: [],
-  getSearchResultsArr: () => get().searchResultsArr,
+  searchResults: [],
+  getSearchResults: () => get().searchResults,
   getSelectedItem: () => get().selectedItem,
   setSelectedItem: (item) => {
     set((state) => ({
       selectedItem: item,
     }));
   },
-  setSearchResultsArr: (arr) => {
-    set((state) => ({ searchResultsArr: arr }));
-  },
+  setSearchResults: (searchResults) => ({ searchResults }),
+  // addToSearchResults: (result) => {
+  //   if (searchResults.find(o => o.id === result.id)) return;
+  //   set({...get().searchResults, result})
+  // },
+
   reset: () => {
-    set((state) => ({ searchResultsArr: [] }));
+    set((state) => ({ searchResults: [] }));
     set((state) => ({ selectedItem: null }));
   },
 }));
@@ -425,27 +416,26 @@ export const useLoginStore = create((set, get) => ({
 
   // create new punch obj, log user in locally and send punch obj to DB
   setCreateUserClock: (userID, millis, option) => {
-      let punch = { ...TIME_PUNCH_PROTO };
-      punch.id = generateUPCBarcode();
-      punch.userID = userID;
-      punch.option = option;
-      punch.millis = millis;
+    let punch = { ...TIME_PUNCH_PROTO };
+    punch.id = generateUPCBarcode();
+    punch.userID = userID;
+    punch.option = option;
+    punch.millis = millis;
 
     let punchClock = get().punchClock;
 
-    if (option === 'in') {
-    punchClock[userID] = punch;
+    if (option === "in") {
+      punchClock[userID] = punch;
     } else {
-      punchClock = removeFieldFromObj(punchClock, userID)
+      punchClock = removeFieldFromObj(punchClock, userID);
     }
 
     set({
-      punchClock
-        })
-    dbSaveCurrentPunchClock(punchClock, '1234', '999')
-    dbSavePunchObject(punch, punch.id, '1234', '999')
+      punchClock,
+    });
+    dbSaveCurrentPunchClock(punchClock, "1234", "999");
+    dbSavePunchObject(punch, punch.id, "1234", "999");
   },
-
 
   setPunchClock: (punchClock) => set({ punchClock }),
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
@@ -503,29 +493,10 @@ export const useLoginStore = create((set, get) => ({
   runPostLoginFunction: () => get().postLoginFunctionCallback(),
 }));
 
-export const useCustomerPreviewStore = create((set, get) => ({
-  previewArr: [],
-  getCustPreviewArr: () => get().previewArr,
-  modItem: (item, option) => {
-    if (option === "change")
-      return set((state) => ({
-        previewArr: changeItem(get().previewArr, item),
-      }));
-    if (option === "add")
-      return set((state) => ({
-        previewArr: addItem(get().previewArr, item),
-      }));
-    if (option === "remove")
-      return set((state) => ({
-        previewArr: removeItem(get().previewArr, item),
-      }));
-  },
-}));
-
 export const useCurrentCustomerStore = create((set, get) => ({
   customer: { ...CUSTOMER_PROTO },
   getCustomer: () => get().customer,
-  
+
   setCustomerField: (fieldName, value) => {
     let customerObj = cloneDeep(get().customerObj);
     if (fieldName && value) customerObj[fieldName] = value;
@@ -535,7 +506,7 @@ export const useCurrentCustomerStore = create((set, get) => ({
   setCustomer: (customer, sendToDB = false) => {
     set({ customer });
 
-    if (sendToDB) dbSaveCustomer(customer, customer.id, '1234', '999')
+    if (sendToDB) dbSaveCustomer(customer, customer.id);
 
     // if (sendToDB) dbSetCustomerObj(obj);
   },
@@ -581,7 +552,7 @@ export const useInventoryStore = create((set, get) => ({
     set({ inventoryArr });
     if (sendToDB) dbSetInventoryItem(item, batch);
   },
-  setItems: (inventoryArr) => set({inventoryArr})
+  setItems: (inventoryArr) => set({ inventoryArr }),
 }));
 
 export const useCustMessagesStore = create((set, get) => ({
@@ -667,7 +638,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     if (get().openWorkorder?.id === wo.id) set({ openWorkorder: null });
 
     if (saveToDB) {
-      dbSaveOpenWorkorder(wo, '1234', '999')
+      dbSaveOpenWorkorder(wo, "1234", "999");
     }
   },
 
@@ -696,26 +667,20 @@ export const useWorkorderPreviewStore = create((set, get) => ({
 }));
 
 export const useSettingsStore = create((set, get) => ({
-  settingsObj: null,
+  // settingsObj: null,
   settings: null,
 
-  getSettingsObj: () => get().settingsObj,
+  // getSettingsObj: () => get().settingsObj,
   getSettings: () => get().settings,
 
-  // setSettingsObj: (settingsObj, batch = true, sendToDB = true) => {
-  //   // clog(settingsObj);
-  //   set({ settingsObj });
-  //   if (sendToDB) {
-  //     dbSetSettings(settingsObj, batch);
-  //   }
-  // },
   setSettings: (settings, batch = true, sendToDB = true) => {
     // clog(settingsObj);
-    set({ settingsObj: settings });
-    set({ settings })
-    
+    // set({ settingsObj: settings });
+    set({ settings });
+
     if (sendToDB) {
-      dbSetSettings(settings, batch);
+      // log("savingsetting");
+      dbSaveSettings(settings);
     }
   },
 

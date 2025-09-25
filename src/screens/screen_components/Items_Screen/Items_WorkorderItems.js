@@ -261,7 +261,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // clog("wo", zWorkorderObj);
   function setComponent() {
-  log('here', zOpenWorkorder);
+    // log('here', zOpenWorkorder);
 
     return (
       <View

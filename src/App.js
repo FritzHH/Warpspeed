@@ -39,8 +39,9 @@ function App() {
             console.log("Auto-login successful, loading initial data:", loginResult.user.email);
             dbGetTenantById(loginResult.user.uid).then(res => {
               dbGetSettings(res.tenantID, res.storeID).then(settings => {
-                useSettingsStore.getState().setSettings(settings, false, false)
-                log('initial data loaded, heading to Main')
+                // log("settings", settings);
+                useSettingsStore.getState().setSettings(settings, false, false);
+                log("initial data loaded, heading to Main");
                 setUser(loginResult.user);
               })
             })

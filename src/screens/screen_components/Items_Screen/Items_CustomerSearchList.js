@@ -41,18 +41,19 @@ export function CustomerSearchListComponent({}) {
     (state) => state.setOutgoingMessage
   );
   const _zSetCurrentCustomer = useCurrentCustomerStore(
-    (state) => state.setCustomerObj
+    (state) => state.setCustomer
   );
   const _zSetOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
+    (state) => state.setWorkorder
   );
+
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
   const _zExecute = useLoginStore((state) => state.execute);
 
   // store getters //////////////////////////////////////////////////////////////////////
-  const zSearchResultsArr = useCustomerSearchStore((state) =>
-    state.getSearchResultsArr()
+  const zSearchResults = useCustomerSearchStore((state) =>
+    state.getSearchResults()
   );
   const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
 
@@ -105,7 +106,7 @@ export function CustomerSearchListComponent({}) {
       }}
     >
       <FlatList
-        data={zSearchResultsArr}
+        data={zSearchResults}
         key={(item) => item.id}
         ItemSeparatorComponent={() => (
           <View
@@ -145,7 +146,7 @@ export function CustomerSearchListComponent({}) {
                 buttonVisible={true}
                 buttonTextStyle={{ fontSize: 13, color: "black" }}
                 handleButtonPress={() =>
-                  _setCustomerInfoObj(zSearchResultsArr[idx])
+                  _setCustomerInfoObj(zSearchResults[idx])
                 }
                 buttonLabel={"View/Edit"}
                 modalVisible={sCustomerInfoObj}

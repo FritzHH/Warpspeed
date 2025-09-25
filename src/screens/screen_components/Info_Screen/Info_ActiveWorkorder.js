@@ -2,7 +2,7 @@
 
 import { View, Text, TextInput } from "react-native-web";
 import {
-  addDashesToPhone,
+  formatPhoneWithDashes,
   clog,
   dim,
   generateRandomID,
@@ -54,12 +54,8 @@ export const ActiveWorkorderComponent = ({}) => {
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
-  const _zSetWorkorder = useOpenWorkordersStore(
-    (state) => state.setWorkorder
-  );
-  const _zSetCustomer = useCurrentCustomerStore(
-    (state) => state.setCustomer
-  );
+  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
+  const _zSetCustomer = useCurrentCustomerStore((state) => state.setCustomer);
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
@@ -70,12 +66,9 @@ export const ActiveWorkorderComponent = ({}) => {
   );
   const _zExecute = useLoginStore((state) => state.execute);
 
-
   // store getters ///////////////////////////////////////////////////////////////////
   let zOpenWorkorder = WORKORDER_PROTO;
-  zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
-  );
+  zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
   let zCustomer = CUSTOMER_PROTO;
   zCustomer = useCurrentCustomerStore((state) => state.getCustomer());
   var zSettings = SETTINGS_OBJ;
@@ -125,26 +118,6 @@ export const ActiveWorkorderComponent = ({}) => {
     _zSetWorkorder(wo);
   }
 
-  function getBackgroundColor() {
-    let backgroundColor;
-    let textColor;
-    let altTextColor;
-
-    zSettings.statusGroups.find((o) => {
-      let members = o.members;
-
-      members.forEach((member) => {
-        if (member === zOpenWorkorder.status) {
-          textColor = o.textColor;
-          backgroundColor = o.color;
-        }
-      });
-      return backgroundColor;
-    });
-    // log(backgroundColor, textColor);
-    return { backgroundColor, textColor };
-  }
-
   function handleStartStandaloneSalePress() {
     // log(zCurrentUser);
     // return;
@@ -159,6 +132,7 @@ export const ActiveWorkorderComponent = ({}) => {
     _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
+
   function handleNewWorkorderPress() {
     null;
     _zSetCustomer(null);
@@ -197,26 +171,14 @@ export const ActiveWorkorderComponent = ({}) => {
           paddingTop: 5,
           paddingHorizontal: 5,
           backgroundColor: C.lightred,
-          // borderRadius: 15,
-          // shadowColor: APP_BASE_COLORS.green,
           backgroundColor: C.backgroundWhite,
           borderRadius: 15,
-          // borderColor: APP_BASE_COLORS.buttonLightGreen,
-
-          // shadowOffset: {
-          //   width: 2,
-          //   height: 2,
-          // },
-          // shadowOpacity: 0.5,
-          // shadowRadius: 15,
         }}
       >
         <View
           style={{
             width: "100%",
             alignItems: "center",
-            // backgroundColor: "blue",
-            // paddingHorizontal: 5,
           }}
         >
           <LoginModalScreen modalVisible={zShowLoginScreen} />
@@ -288,7 +250,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     style={{ marginRight: 5 }}
                   />
                   <Text style={{ color: C.textMain }}>
-                    {addDashesToPhone(zCustomer.cell)}
+                    {formatPhoneWithDashes(zCustomer.cell)}
                   </Text>
                 </View>
               )}
@@ -300,16 +262,14 @@ export const ActiveWorkorderComponent = ({}) => {
                     style={{ marginRight: 5 }}
                   />
                   <Text style={{ color: C.textMain }}>
-                    {addDashesToPhone(zCustomer.landline)}
+                    {formatPhoneWithDashes(zCustomer.landline)}
                   </Text>
                 </View>
               )}
-              {zCustomer.contactRestriction ===
-                CONTACT_RESTRICTIONS.call && (
+              {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.call && (
                 <Text style={{ color: Colors.darkText }}>CALL ONLY</Text>
               )}
-              {zCustomer.contactRestriction ===
-                CONTACT_RESTRICTIONS.email && (
+              {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.email && (
                 <Text style={{ color: Colors.darkText }}>EMAIL ONLY</Text>
               )}
             </View>

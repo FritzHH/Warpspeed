@@ -138,17 +138,15 @@ export function dbGetSettings() {
 
 export function dbSetSettings(settingsObj, batch) {
   // Get tenantID and storeID from settings store
-  const currentSettingsObj = useSettingsStore.getState().settingsObj;
-  const tenantID = currentSettingsObj?.tenantID;
-  const storeID = currentSettingsObj?.storeID;
-
-  if (!tenantID || !storeID) {
-    throw new Error("tenantID and storeID must be configured in settings");
-  }
-
-  let path = build_db_path.settings(null, tenantID, storeID);
-  if (batch) return batchDBCall(path, settingsObj);
-  return newSetDatabaseField(path, settingsObj);
+  // const currentSettingsObj = useSettingsStore.getState().settingsObj;
+  // // const tenantID = currentSettingsObj?.tenantID;
+  // // const storeID = currentSettingsObj?.storeID;
+  // if (!tenantID || !storeID) {
+  //   throw new Error("tenantID and storeID must be configured in settings");
+  // }
+  // let path = build_db_path.settings(null, tenantID, storeID);
+  // if (batch) return batchDBCall(path, settingsObj);
+  // return newSetDatabaseField(path, settingsObj);
 }
 
 export function dbSetCustomerObj(customerObj, removeOption = false) {

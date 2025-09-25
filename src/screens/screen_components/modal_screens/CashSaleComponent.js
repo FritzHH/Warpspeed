@@ -40,7 +40,7 @@ import {
 } from "../../../components";
 import { cloneDeep, initial } from "lodash";
 import {
-  addDashesToPhone,
+  formatPhoneWithDashes,
   arrHasItem,
   calculateRunningTotals,
   clog,

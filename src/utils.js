@@ -50,6 +50,7 @@ export function log(one, two) {
   if (two) spacer = "  ---------->  ";
   console.log(one, spacer);
   if (two) console.log(two);
+  // console.trace("stack");
 }
 
 export function applyLineItemDiscounts(wo, zInventoryArr) {
@@ -401,6 +402,10 @@ export function getRgbFromNamedColor(colorName) {
 }
 
 // numbers /////////////////////////////////////////////////////////
+export function stringIsNumeric(str) {
+  return /^\d+$/.test(str);
+}
+
 export function checkInputForNumbersOnly(valString, includeDecimal = true) {
   let isGood = true;
   let nums = NUMS;
@@ -516,21 +521,32 @@ export function convertMillisToHoursMins(millis) {
   return { hours, minutes, totalMinutes, formattedHoursMin };
 }
 
-export function removeDashesFromPhone(num = "") {
-  let split = num.split("-");
-  let newVal = "";
-  split.forEach((s) => (newVal += s));
-  return newVal;
+export function removeDashesFromPhone(str) {
+  return str.replaceAll("-", "");
 }
 
-export function addDashesToPhone(num) {
+export function formatPhoneWithDashes(num) {
   if (!num) return "";
   let phone = num.toString();
   const digits = phone.replace(/\D/g, "");
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+
+  // 1-2 digits: return as-is
+  if (digits.length <= 2) return digits;
+
+  // 3 digits: return with dash
+  if (digits.length === 3) return `${digits.slice(0, 3)}-`;
+
+  // 4-5 digits: format as XXX-XXXX
+  if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+
+  // 6 digits: return with second dash
+  if (digits.length === 6)
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-`;
+
+  // 7-10 digits: format as XXX-XXX-XXXX
   if (digits.length <= 10)
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+
   // If longer than 10 digits, format first 10, append rest
   return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(
     6,
@@ -712,6 +728,118 @@ export function searchCustomerNames(first, last, searchArr = [CUSTOMER_PROTO]) {
       res[customerObj.id] = customerObj;
   });
   return Object.values(res);
+}
+
+/**
+ * Comprehensive customer search function that uses input type detection
+ * to determine the appropriate search method
+ * @param {string} searchInput - The user's search input
+ * @param {string} tenantID - Tenant ID for database queries
+ * @param {string} storeID - Store ID for database queries
+ * @param {Object} options - Optional parameters for search
+ * @returns {Promise<Object>} Search results with metadata
+ */
+export async function searchCustomers(
+  searchInput,
+  tenantID,
+  storeID,
+  options = {}
+) {
+  try {
+    // First determine what type of input this is
+    const inputAnalysis = determineSearchInputType(searchInput);
+
+    // If input is too short, return early
+    if (inputAnalysis.type === "unknown") {
+      return {
+        success: false,
+        error: "Input too short",
+        message: "Please enter at least 4 characters to search",
+        inputAnalysis,
+      };
+    }
+
+    let searchResults = [];
+    let searchMethod = "";
+
+    // Import the database search functions
+    const {
+      dbSearchCustomersByPhone,
+      dbSearchCustomersByEmail,
+      dbSearchCustomersByName,
+    } = await import("./db_calls_wrapper.js");
+
+    // Perform search based on detected input type
+    switch (inputAnalysis.type) {
+      case "phone":
+        searchMethod = "phone";
+        const phoneResults = await dbSearchCustomersByPhone(
+          searchInput,
+          tenantID,
+          storeID,
+          options
+        );
+        searchResults = phoneResults.customers || [];
+        break;
+
+      case "email":
+        searchMethod = "email";
+        const emailResults = await dbSearchCustomersByEmail(
+          searchInput,
+          tenantID,
+          storeID,
+          options
+        );
+        searchResults = emailResults.customers || [];
+        break;
+
+      case "name":
+        searchMethod = "name";
+        const nameResults = await dbSearchCustomersByName(
+          searchInput,
+          tenantID,
+          storeID,
+          options
+        );
+        searchResults = nameResults.customers || [];
+        break;
+
+      default:
+        // Fallback to name search if type is unclear
+        searchMethod = "name_fallback";
+        const fallbackResults = await dbSearchCustomersByName(
+          searchInput,
+          tenantID,
+          storeID,
+          options
+        );
+        searchResults = fallbackResults.customers || [];
+    }
+
+    return {
+      success: true,
+      customers: searchResults,
+      count: searchResults.length,
+      searchMethod,
+      inputAnalysis,
+      searchInput,
+      tenantID,
+      storeID,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error("Error in searchCustomers:", error);
+    return {
+      success: false,
+      error: error.message,
+      customers: [],
+      count: 0,
+      inputAnalysis: determineSearchInputType(searchInput),
+      searchInput,
+      tenantID,
+      storeID,
+    };
+  }
 }
 
 export function isChromiumBased() {

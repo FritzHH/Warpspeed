@@ -41,7 +41,6 @@ import {
 } from "../../../components";
 import { cloneDeep, initial } from "lodash";
 import {
-  addDashesToPhone,
   arrHasItem,
   calculateRunningTotals,
   clog,
@@ -207,13 +206,13 @@ export const MiddleItemComponent = ({
                 {!!zCustomer?.cell && (
                   <Text style={{ color: C.textMain }}>
                     <Text>{"cell: "}</Text>
-                    {addDashesToPhone(zCustomer?.cell)}
+                    {formatPhoneWithDashes(zCustomer?.cell)}
                   </Text>
                 )}
                 {!!zCustomer?.land && (
                   <Text style={{ color: C.textMain, fontSize: 13 }}>
                     <Text>{"land: "}</Text>
-                    {addDashesToPhone(zCustomer?.land)}
+                    {formatPhoneWithDashes(zCustomer?.land)}
                   </Text>
                 )}
               </View>

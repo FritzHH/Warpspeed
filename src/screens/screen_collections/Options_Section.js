@@ -40,9 +40,7 @@ export function Options_Section({}) {
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
   );
-  const _zCreateUserClockPunch = useLoginStore(
-    (state) => state.setCreateUserClockObj
-  );
+
   const _zSetShowAlert = useAlertScreenStore((state) => state.setShowAlert);
   const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
 
@@ -50,42 +48,15 @@ export function Options_Section({}) {
   const zOptionsTabName = useTabNamesStore((state) =>
     state.getOptionsTabName()
   );
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
 
   const zWebcamDetected = useLoginStore((state) => state.getWebcamDetected());
-  const zPunchClock = useLoginStore((state) => state.getPunchClock());
-
-  // local state /////////////////////////////////////////////////////////////////////////
-  const [sIsOnline, _setIsOnline] = useState(true);
-  const [sCurrentUserObj, _setCurrentUserObj] = useState({
-    first: "",
-    last: "",
-    isClockedIn: false,
-  });
-
-  // run constant checks to check if interent is connected
-  useEffect(() => {
-    // log("here");
-    async function tick() {
-      let isOnline = false;
-      try {
-        isOnline = await checkInternetConnection();
-      } catch (e) {}
-      // log(isOnline.toString());
-      _setIsOnline(isOnline);
-    }
-    let id = setInterval(tick, INTERNET_CHECK_DELAY);
-    return () => clearInterval(id);
-  }, []);
 
   //////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
 
   function handleUserClockPress(user) {
     let millis = new Date().getTime();
-    let option = zPunchClock[user.id]
-      ? "out"
-      : "in";
+    let option = zPunchClock[user.id] ? "out" : "in";
 
     // log("clocked in arr", zClockedInUsersArr);
     let clockinFun = () => {
@@ -145,12 +116,12 @@ export function Options_Section({}) {
   return (
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
       <TabBar
-        userObj={zCurrentUser}
-        isClockedIn={zPunchClock[zCurrentUser?.id]}
+        // userObj={zCurrentUser}
+        // isClockedIn={zPunchClock[zCurrentUser?.id]}
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}
         // __tabMenuHeight={}
-        __isOnline={sIsOnline}
+        // __isOnline={sIsOnline}
         webcamDetected={zWebcamDetected}
         handleUserPress={handleUserClockPress}
       />
@@ -163,84 +134,106 @@ export function Options_Section({}) {
 }
 
 export const TabBar = ({
-  userObj,
-  isClockedIn,
   webcamDetected,
-  __isOnline,
+  // sIsOnline,
   zOptionsTabName,
   _zSetOptionsTabName,
   handleUserPress,
-}) => (
-  <View
-    style={{
-      flexDirection: "row",
-      width: "100%",
-      // width: "100%",
-      justifyContent: "space-between",
-      paddingRight: 5,
-    }}
-  >
-    <View style={{ flexDirection: "row", justifyContent: "flex-start" }}>
-      <TabMenuButton
-        // height={height}
-        buttonStyle={{ borderTopLeftRadius: 15 }}
-        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
-        text={TAB_NAMES.optionsTab.quickItems}
-        isSelected={
-          zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
-        }
-      />
-      {/* <Divider /> */}
-      <TabMenuButton
-        // height={height}
-        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
-        text={TAB_NAMES.optionsTab.workorders}
-        isSelected={
-          zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
-        }
-      />
-      <TabMenuButton
-        // height={height}
-        onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}
-        text={TAB_NAMES.optionsTab.messages}
-        isSelected={
-          zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
-        }
-      />
-    </View>
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      {!!userObj && (
-        <Button_
-          onPress={() => handleUserPress(userObj)}
-          icon={isClockedIn ? ICONS.check : ICONS.redx}
-          text={
-            userObj.first +
-            " " +
-            (userObj?.last?.length >= 0 ? userObj.last[0] : "") +
-            "."
-          }
-          textStyle={{ fontSize: 13 }}
-          iconSize={13}
-          buttonStyle={{
-            paddingHorizontal: 7,
-            paddingVertical: 2,
-            marginRight: 5,
-            borderWidth: 1,
-            borderColor: C.buttonLightGreenOutline,
-            backgroundColor: C.buttonLightGreen,
-            borderRadius: 15,
-          }}
-        />
-      )}
+}) => {
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
+  const zPunchClock = useLoginStore((state) => state.getPunchClock());
+  // local state /////////////////////////////////////////////////////////////////////////
+  const [sIsOnline, _setIsOnline] = useState(true);
 
-      {!!webcamDetected && (
-        <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
-      )}
-      <View style={{ width: 5 }} />
-      <Image_
-        style={{ width: 28, height: 28 }}
-        icon={__isOnline ? ICONS.wifi : ICONS.internetOfflineGIF}
-      />
+  // run constant checks to check if interent is connected
+  useEffect(() => {
+    // log("here");
+    async function tick() {
+      let isOnline = false;
+      try {
+        isOnline = await checkInternetConnection();
+      } catch (e) {}
+      // log(isOnline.toString());
+      _setIsOnline(isOnline);
+    }
+    let id = setInterval(tick, INTERNET_CHECK_DELAY);
+    return () => clearInterval(id);
+  }, []);
+
+  let isClockedIn = zPunchClock[zCurrentUser?.id];
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        width: "100%",
+        // width: "100%",
+        justifyContent: "space-between",
+        paddingRight: 5,
+      }}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "flex-start" }}>
+        <TabMenuButton
+          // height={height}
+          buttonStyle={{ borderTopLeftRadius: 15 }}
+          onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
+          text={TAB_NAMES.optionsTab.quickItems}
+          isSelected={
+            zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
+          }
+        />
+        {/* <Divider /> */}
+        <TabMenuButton
+          // height={height}
+          onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
+          text={TAB_NAMES.optionsTab.workorders}
+          isSelected={
+            zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
+          }
+        />
+        <TabMenuButton
+          // height={height}
+          onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}
+          text={TAB_NAMES.optionsTab.messages}
+          isSelected={
+            zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
+          }
+        />
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {!!zCurrentUser && (
+          <Button_
+            onPress={() => handleUserPress(zCurrentUser)}
+            icon={isClockedIn ? ICONS.check : ICONS.redx}
+            text={
+              zCurrentUser.first +
+              " " +
+              (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
+              "."
+            }
+            textStyle={{ fontSize: 13, color: C.textMain }}
+            iconSize={13}
+            buttonStyle={{
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+              marginRight: 5,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.buttonLightGreen,
+              borderRadius: 15,
+            }}
+          />
+        )}
+
+        {!!webcamDetected && (
+          <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
+        )}
+        <View style={{ width: 5 }} />
+        <Image_
+          style={{ width: 28, height: 28 }}
+          icon={sIsOnline ? ICONS.wifi : ICONS.internetOfflineGIF}
+        />
+      </View>
     </View>
-  </View>
-);
+  );
+};

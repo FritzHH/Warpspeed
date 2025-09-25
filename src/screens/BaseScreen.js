@@ -93,27 +93,27 @@ export function BaseScreen() {
   useEffect(() => {
 
     // tested!!
-    dbListenToSettings('1234', '999', (data) => {
+    dbListenToSettings((data) => {
       // log('settings', data.users[0].faceDescriptor)
-      useSettingsStore.getState().setSettings(data)
-    })
+      useSettingsStore.getState().setSettings(data, false, false);
+    });
 
-    dbListenToCurrentPunchClock('1234', '999', (data) => {
+    dbListenToCurrentPunchClock((data) => {
       // log('punch', data)
-      useLoginStore.getState().setPunchClock(data)
+      useLoginStore.getState().setPunchClock(data);
       // log('punch clock data', data)
-    })
+    });
 
-    dbListenToInventory("1234", "999", (data) => {
+    dbListenToInventory((data) => {
       useInventoryStore.getState().setItems(data);
       // log('inventory', data)
     });
 
     /// not tested :(
 
-    dbListenToOpenWorkorders("1234", "999", (data) => {
+    dbListenToOpenWorkorders((data) => {
       // log('incoming workorder listen', data)
-      useOpenWorkordersStore.getState().setOpenWorkorders(data)
+      useOpenWorkordersStore.getState().setOpenWorkorders(data);
     });
 
     // subscribeToDBNodeChanges({

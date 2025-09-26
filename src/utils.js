@@ -50,7 +50,6 @@ export function log(one, two) {
   if (two) spacer = "  ---------->  ";
   console.log(one, spacer);
   if (two) console.log(two);
-  // console.trace("stack");
 }
 
 export function applyLineItemDiscounts(wo, zInventoryArr) {
@@ -85,7 +84,7 @@ export function applyLineItemDiscounts(wo, zInventoryArr) {
 }
 
 export function calculateRunningTotals(
-  workorderArr,
+  workorders,
   salesTaxRatePercent,
   workorderlinesArr = [],
   isRefund
@@ -98,8 +97,8 @@ export function calculateRunningTotals(
 
   // log(workorderlinesArr);
 
-  if (!Array.isArray(workorderArr)) workorderArr = [workorderArr];
-  workorderArr.forEach((workorderObj) => {
+  if (!Array.isArray(workorders)) workorders = [workorders];
+  workorders.forEach((workorderObj) => {
     // log(workorderObj)
     let arrToIterate = isRefund
       ? workorderlinesArr
@@ -117,8 +116,7 @@ export function calculateRunningTotals(
       // clog("line", line.discountObj);
       let discountPrice = line.discountObj?.newPrice;
       let discountSavings = line.discountObj?.savings;
-      runningSubtotal =
-        runningSubtotal + Number(line.inventoryItem.price) * qty;
+      runningSubtotal = runningSubtotal + line.inventoryItem.price * qty;
       if (discountPrice) {
         runningTotal = runningTotal + Number(discountPrice);
         runningDiscount = runningDiscount + Number(discountSavings);
@@ -128,12 +126,13 @@ export function calculateRunningTotals(
       runningQty += qty;
     });
   });
-
+  // log(salesTaxRatePercent);
   let obj = {
-    runningTotal: runningTotal,
-    runningSubtotal: runningSubtotal,
-    runningDiscount: runningDiscount,
-    runningTax: (runningTotal * salesTaxRatePercent) / 100,
+    finalTotal: runningTotal + runningTotal * (salesTaxRatePercent / 100),
+    runningTotal,
+    runningSubtotal, // total before discounts, so can be more than running total
+    runningDiscount,
+    runningTax: runningTotal * (salesTaxRatePercent / 100),
     runningQty,
   };
   // clog(obj);
@@ -529,24 +528,10 @@ export function formatPhoneWithDashes(num) {
   if (!num) return "";
   let phone = num.toString();
   const digits = phone.replace(/\D/g, "");
-
-  // 1-2 digits: return as-is
-  if (digits.length <= 2) return digits;
-
-  // 3 digits: return with dash
-  if (digits.length === 3) return `${digits.slice(0, 3)}-`;
-
-  // 4-5 digits: format as XXX-XXXX
-  if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-
-  // 6 digits: return with second dash
-  if (digits.length === 6)
-    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-`;
-
-  // 7-10 digits: format as XXX-XXX-XXXX
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
   if (digits.length <= 10)
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-
   // If longer than 10 digits, format first 10, append rest
   return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(
     6,

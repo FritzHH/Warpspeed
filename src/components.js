@@ -8,6 +8,7 @@ import {
   FlatList,
   TextInput,
   TouchableWithoutFeedback,
+  ActivityIndicator,
   ScrollView,
 } from "react-native-web";
 import React, {
@@ -36,6 +37,9 @@ import {
   readAsBinaryString,
   removeDashesFromPhone,
   trimToTwoDecimals,
+  calculateRunningTotals,
+  formatMillisForDisplay,
+  formatCurrencyDisp,
 } from "./utils";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
 import { useState } from "react";
@@ -436,6 +440,7 @@ export const ScreenModal = ({
   buttonStyle = {},
   buttonTextStyle = {},
   Component,
+  ButtonComponent,
   outerModalStyle = {},
   modalVisible = false,
   setModalVisibility = () => {},
@@ -484,36 +489,38 @@ export const ScreenModal = ({
       }}
     >
       <View style={{}}>
-        {!!buttonVisible && (
-          <Button_
-            enabled={enabled}
-            handleMouseExit={handleMouseExit}
-            handleMouseOver={handleMouseOver}
-            icon={buttonIcon}
-            iconSize={buttonIconSize}
-            text={buttonLabel}
-            onPress={() => {
-              handleButtonPress();
-              setModalVisibility(!modalVisible);
-              _setInternalModalShow(!sInternalModalShow);
-            }}
-            onMouseOver={() =>
-              mouseOverOptions.enable ? _setMouseOver(true) : null
-            }
-            onMouseLeave={() => {
-              _setMouseOver(false);
-            }}
-            textStyle={{ ...buttonTextStyle }}
-            buttonStyle={{
-              alignItems: "center",
-              justifyContent: "center",
-              width: !buttonVisible ? 0 : null,
-              height: !buttonVisible ? 0 : null,
-              ...shadowStyle,
-              ...buttonStyle,
-            }}
-          />
-        )}
+        {!!ButtonComponent && <ButtonComponent />}
+        {!!buttonVisible &&
+          !ButtonComponent(
+            <Button_
+              enabled={enabled}
+              handleMouseExit={handleMouseExit}
+              handleMouseOver={handleMouseOver}
+              icon={buttonIcon}
+              iconSize={buttonIconSize}
+              text={buttonLabel}
+              onPress={() => {
+                handleButtonPress();
+                setModalVisibility(!modalVisible);
+                _setInternalModalShow(!sInternalModalShow);
+              }}
+              onMouseOver={() =>
+                mouseOverOptions.enable ? _setMouseOver(true) : null
+              }
+              onMouseLeave={() => {
+                _setMouseOver(false);
+              }}
+              textStyle={{ ...buttonTextStyle }}
+              buttonStyle={{
+                alignItems: "center",
+                justifyContent: "center",
+                width: !buttonVisible ? 0 : null,
+                height: !buttonVisible ? 0 : null,
+                ...shadowStyle,
+                ...buttonStyle,
+              }}
+            />
+          )}
 
         <Modal
           visible={
@@ -1174,55 +1181,56 @@ export const InventoryItemScreeenModalComponent = ({
 };
 
 export const CustomerInfoScreenModalComponent = ({
-  ssCustomerInfoObj = CUSTOMER_PROTO,
-  __setCustomerInfoObj,
+  incomingCustomer = CUSTOMER_PROTO,
+  isNewCustomer = false,
   button1Text,
   button2Text,
   handleButton1Press,
   handleButton2Press,
-  ssInfoTextFocus,
-  __setInfoTextFocus,
+  // ssInfoTextFocus,
+  // __setInfoTextFocus,
 }) => {
-  // store setters
-  const _zSetCurrentCustomer = useCurrentCustomerStore(
-    (state) => state.setCustomerObj
-  );
-  // store getters
+  const [sCustomerInfo, _setCustomerInfo] = useState(incomingCustomer);
+  const { salesLoading, workordersLoading, workorders, sales } =
+    useCurrentCustomerStore();
 
-  /////////////////////////////////////////////////////////////////////
-  ////////////////////////////////////////////////////////////////////
-
-  // automatically save customer changes if it is NOT a new customer creation
   useEffect(() => {
-    // if (ssCustomerInfoObj?.id)
-    // _zExecute(() => {
-    // _zSetCurrentCustomer(ssCustomerInfoObj);
-    // dbSaveCustomer(ssCustomerInfoObj, ssCustomerInfoObj.id, '1234', '999');
-    // });
-  }, [ssCustomerInfoObj]);
+    useCurrentCustomerStore.getState().loadWorkorders();
+  }, []);
+
+  function setCustomerInfo(customerInfo) {
+    useCurrentCustomerStore.getState().salesLoading = !salesLoading;
+    if (isNewCustomer) {
+      // this is a new customer
+      _setCustomerInfo(customerInfo);
+    } else {
+      useCurrentCustomerStore.getState().setCustomer(customerInfo);
+    }
+  }
 
   const TEXT_INPUT_STYLE = {
-    width: 200,
+    width: "100%",
     height: 40,
-    borderColor: "gray",
+    borderColor: gray(0.4),
     borderWidth: 1,
-    marginLeft: 20,
     marginTop: 10,
-    paddingHorizontal: 3,
+    paddingHorizontal: 5,
     outlineWidth: 0,
+    borderRadius: 7,
+    color: C.textMain,
   };
 
-  // clog(sCustomerInfoObj);
-
+  // log("workorder", workorders);
   function setComponent() {
     return (
       <TouchableWithoutFeedback>
         <View
           style={{
-            width: "60%",
-            backgroundColor: "whitesmoke",
+            // width: "60%",
+            backgroundColor: C.backgroundWhite,
             height: "70%",
             flexDirection: "row",
+            borderRadius: 15,
             shadowProps: {
               shadowColor: "black",
               shadowOffset: { width: 2, height: 2 },
@@ -1231,208 +1239,214 @@ export const CustomerInfoScreenModalComponent = ({
             },
           }}
         >
-          <View>
+          <View style={{ width: 250, padding: 10 }}>
+            <View
+              style={{
+                width: "100%",
+                flexDirection: "row",
+                justifyContent: "space-between",
+              }}
+            >
+              <CheckBox_
+                text={"Call Only"}
+                isChecked={
+                  sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call
+                }
+                onCheck={() => {
+                  let obj = cloneDeep(sCustomerInfo);
+                  // __setInfoTextFocus(null);
+                  if (obj.contactRestriction === CONTACT_RESTRICTIONS.call) {
+                    obj.contactRestriction = "";
+                  } else {
+                    obj.contactRestriction = CONTACT_RESTRICTIONS.call;
+                  }
+                  setCustomerInfo(obj);
+                }}
+              />
+              <CheckBox_
+                text={"Email Only"}
+                isChecked={
+                  sCustomerInfo.contactRestriction ===
+                  CONTACT_RESTRICTIONS.email
+                }
+                onCheck={() => {
+                  let obj = cloneDeep(sCustomerInfo);
+                  // __setInfoTextFocus(null);
+                  // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
+                  // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
+                  //   sCustomerInfo.callOnlyOption = false;
+                  if (obj.contactRestriction === CONTACT_RESTRICTIONS.email) {
+                    obj.contactRestriction = "";
+                  } else {
+                    obj.contactRestriction = CONTACT_RESTRICTIONS.email;
+                  }
+                  setCustomerInfo(obj);
+                }}
+              />
+            </View>
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.cell = removeDashesFromPhone(val);
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="Cell phone"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={formatPhoneWithDashes(ssCustomerInfoObj.cell)}
+              value={formatPhoneWithDashes(sCustomerInfo.cell)}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.cell}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.cell)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.cell}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.cell)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.landline = removeDashesFromPhone(val);
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="Landline"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={formatPhoneWithDashes(ssCustomerInfoObj.landline)}
+              value={formatPhoneWithDashes(sCustomerInfo.landline)}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.land}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.land)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.land}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.land)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.first = capitalizeFirstLetterOfString(val);
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="First name"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.first}
+              value={sCustomerInfo.first}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.first}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.first)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.first}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.first)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.last = capitalizeFirstLetterOfString(val);
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="Last name"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.last}
+              value={sCustomerInfo.last}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.last}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.last)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.last}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.last)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.email = val.toLowerCase();
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="Email address"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.email}
+              value={sCustomerInfo.email}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.email}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.email)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.email}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.email)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.streetAddress = capitalizeAllWordsInSentence(val);
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="Street address"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.streetAddress}
+              value={sCustomerInfo.streetAddress}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.street}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.street)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.street}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.street)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.unit = val;
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="Unit"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.unit}
+              value={sCustomerInfo.unit}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.unit}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.unit)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.unit}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.unit)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.city = capitalizeAllWordsInSentence(val);
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="City"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.city}
+              value={sCustomerInfo.city}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.city}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.city)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.city}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.city)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.state = val.toUpperCase();
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="State"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.state}
+              value={sCustomerInfo.state}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.state}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.state)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.state}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.state)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.zip = val;
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="Zip code"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.zip}
+              value={sCustomerInfo.zip}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.zip}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.zip)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.zip}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.zip)}
             />
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(ssCustomerInfoObj);
+                let obj = cloneDeep(sCustomerInfo);
                 obj.notes = capitalizeFirstLetterOfString(val);
-                __setCustomerInfoObj(obj);
+                setCustomerInfo(obj);
               }}
               placeholderTextColor="darkgray"
               placeholder="Address notes"
               style={{ ...TEXT_INPUT_STYLE }}
-              value={ssCustomerInfoObj.notes}
+              value={sCustomerInfo.notes}
               autoComplete="none"
-              autoFocus={ssInfoTextFocus === FOCUS_NAMES.notes}
-              onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
+              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.notes}
+              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
             />
-            <CheckBox_
-              text={"Call Only"}
-              isChecked={
-                ssCustomerInfoObj.contactRestriction ===
-                CONTACT_RESTRICTIONS.call
-              }
-              onCheck={() => {
-                let obj = cloneDeep(ssCustomerInfoObj);
-                __setInfoTextFocus(null);
-                if (obj.contactRestriction === CONTACT_RESTRICTIONS.call) {
-                  obj.contactRestriction = "";
-                } else {
-                  obj.contactRestriction = CONTACT_RESTRICTIONS.call;
-                }
-                __setCustomerInfoObj(obj);
-              }}
-            />
-            <CheckBox_
-              text={"Email Only"}
-              isChecked={
-                ssCustomerInfoObj.contactRestriction ===
-                CONTACT_RESTRICTIONS.email
-              }
-              onCheck={() => {
-                let obj = cloneDeep(ssCustomerInfoObj);
-                __setInfoTextFocus(null);
-                // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
-                // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
-                //   sCustomerInfo.callOnlyOption = false;
-                if (obj.contactRestriction === CONTACT_RESTRICTIONS.email) {
-                  obj.contactRestriction = "";
-                } else {
-                  obj.contactRestriction = CONTACT_RESTRICTIONS.email;
-                }
-                __setCustomerInfoObj(obj);
-              }}
-            />
-            <View
-              style={{ flexDirection: "row", justifyContent: "space-between" }}
-            >
+
+            <View style={{ flexDirection: "column" }}>
               {!!button1Text && (
-                <Button
-                  onPress={handleButton1Press}
-                  viewStyle={{
+                <Button_
+                  onPress={() => handleButton1Press(sCustomerInfo)}
+                  colorGradientArr={COLOR_GRADIENTS.lightBlue}
+                  buttonStyle={{
                     marginTop: 30,
                     marginLeft: 20,
-                    backgroundColor: "lightgray",
                     height: 40,
                     width: 200,
                   }}
@@ -1441,12 +1455,12 @@ export const CustomerInfoScreenModalComponent = ({
                 />
               )}
               {!!button2Text && (
-                <Button
+                <Button_
+                  colorGradientArr={COLOR_GRADIENTS.red}
                   onPress={handleButton2Press}
-                  viewStyle={{
+                  buttonStyle={{
                     marginTop: 30,
                     marginLeft: 20,
-                    backgroundColor: "lightgray",
                     height: 40,
                     width: 200,
                   }}
@@ -1456,13 +1470,126 @@ export const CustomerInfoScreenModalComponent = ({
               )}
             </View>
           </View>
+          {isNewCustomer && (
+            <View style={{ width: 400, height: "100%", padding: 20 }}>
+              <View
+                style={{ height: "50%", width: "100%", alignItems: "center" }}
+              >
+                <Button_
+                  colorGradientArr={COLOR_GRADIENTS.bluegreen}
+                  icon={salesLoading ? ICONS.wheelGIF : ICONS.add}
+                  // buttonStyle={{ width: null, width: null }}
+                  text={"LOAD WORKORDERS"}
+                  onPress={() =>
+                    useCurrentCustomerStore.getState().loadWorkorders()
+                  }
+                />
 
-          <View>
-            <View style={{ borderWidth: 1, width: 300, height: 300 }} />
-            <Text>Workorder list</Text>
-            <View style={{ borderWidth: 1, width: 300, height: 300 }} />
-            <Text>Payments</Text>
-          </View>
+                <View
+                  style={{
+                    height: "100%",
+                    backgroundColor: "transparent",
+                    width: "100%",
+                  }}
+                >
+                  <FlatList
+                    data={workorders}
+                    renderItem={(obj) => {
+                      let wo = obj.item;
+                      // log("work", wo);
+                      const totals = calculateRunningTotals(
+                        wo,
+                        useSettingsStore.getState().settings.salesTax
+                      );
+                      // log("totals", totals);
+                      log(wo);
+                      return (
+                        <View
+                          style={{
+                            borderRadius: 10,
+                            borderLeftWidth: 2,
+                            borderColor: C.green,
+                            padding: 7,
+                            marginBottom: 6,
+                            width: "100%",
+                            backgroundColor: C.listItemWhite,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: "100%",
+                              alignItems: "center",
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <Text style={{ color: C.textMain }}>
+                              {wo.brand + "     " + wo.model
+                                ? wo.model + "     "
+                                : "" + wo.description
+                                ? wo.description + "     "
+                                : ""}
+                              {!!wo.color1.label && (
+                                <Text
+                                  style={{
+                                    paddingHorizontal: 5,
+                                    color: wo.color1.textColor,
+                                    backgroundColor: wo.color1.backgroundColor,
+                                    borderRadius: 10,
+                                  }}
+                                >
+                                  {wo.color1.label}
+                                </Text>
+                              )}
+                              {!!wo.color2.label && (
+                                <Text
+                                  style={{
+                                    paddingHorizontal: 5,
+                                    color: wo.color2.textColor,
+                                    backgroundColor: wo.color2.backgroundColor,
+                                    borderRadius: 10,
+                                  }}
+                                >
+                                  {wo.color2.label}
+                                </Text>
+                              )}
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              width: "100%",
+                              alignItems: "center",
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <Text style={{ color: C.textMain, fontSize: 12 }}>
+                              {formatMillisForDisplay(wo.startedOnMillis)}
+                              {!!wo.endedOnMillis && (
+                                <Text>
+                                  {" ➟ " +
+                                    "Finished on: " +
+                                    formatMillisForDisplay(wo.endedOnMillis)}
+                                </Text>
+                              )}
+                            </Text>
+                            {wo.paymentComplete ? (
+                              <Text style={{ color: C.green }}>
+                                {"Paid in Full: $" + wo.amountPaid}
+                              </Text>
+                            ) : (
+                              <Text style={{ color: C.red }}>{"$"}</Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    }}
+                  />
+                </View>
+              </View>
+              <View></View>
+            </View>
+          )}
         </View>
       </TouchableWithoutFeedback>
     );
@@ -1471,7 +1598,7 @@ export const CustomerInfoScreenModalComponent = ({
     let comp = setComponent();
     return comp;
   } catch (e) {
-    // log("Error setting component CustomerInfoScreenModal", e);
+    log("Error setting component CustomerInfoScreenModal", e);
   }
 };
 
@@ -1577,6 +1704,84 @@ export const LoginModalScreen = ({ modalVisible }) => {
 };
 
 export const SaleModalComponent = ({}) => {};
+
+// Loading Indicator Components
+export const LoadingIndicator = ({
+  size = "medium",
+  color = "#007bff",
+  text = "",
+  textStyle = {},
+  containerStyle = {},
+  centered = true,
+  message = "Loading...",
+  ...props
+}) => {
+  // Convert size to appropriate value
+  const getSizeValue = () => {
+    switch (size) {
+      case "small":
+        return 20;
+      case "medium":
+        return 40;
+      case "large":
+        return 60;
+      default:
+        return typeof size === "number" ? size : 40;
+    }
+  };
+
+  const sizeValue = getSizeValue();
+
+  const defaultContainerStyle = {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    ...(centered && {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(255, 255, 255, 0.8)",
+      zIndex: 1000,
+    }),
+    ...containerStyle,
+  };
+
+  const defaultTextStyle = {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    ...textStyle,
+  };
+
+  return (
+    <View style={defaultContainerStyle} {...props}>
+      <ActivityIndicator size={sizeValue} color={color} />
+      {(text || message) && (
+        <Text style={defaultTextStyle}>{text || message}</Text>
+      )}
+    </View>
+  );
+};
+
+export const InlineLoadingIndicator = (props) => (
+  <LoadingIndicator centered={false} {...props} />
+);
+
+export const FullScreenLoadingIndicator = (props) => (
+  <LoadingIndicator centered={true} {...props} />
+);
+
+export const SmallLoadingIndicator = (props) => (
+  <LoadingIndicator size="small" centered={false} {...props} />
+);
+
+export const LargeLoadingIndicator = (props) => (
+  <LoadingIndicator size="large" {...props} />
+);
 
 export const Button = ({
   visible = true,
@@ -1709,16 +1914,6 @@ export const TabMenuButton = ({
       }}
     />
   );
-};
-
-export const LoadingIndicator = ({
-  width = 100,
-  height = 100,
-  type = "bicycle",
-  visible = false,
-}) => {
-  if (!visible) return <View style={{ width, height }} />;
-  if (type == "bicycle") return BicycleSpinner({ width, height });
 };
 
 const BicycleSpinner = ({ width = 100, height = 100 }) => {
@@ -1928,11 +2123,10 @@ export const Button_ = ({
             alignItems: "center",
             justifyContent: "center",
             flexDirection: "row",
-            paddingHorizontal: 5,
             borderRadius: 15,
             paddingVertical: 5,
-            paddingHorizontal: icon ? 5 : 15,
-            paddingLeft: icon ? 2 : 15,
+            paddingHorizontal: 15,
+            paddingLeft: icon ? 10 : 15,
             ...shadowStyle,
             ...buttonStyle,
             backgroundColor: icon && !text ? null : getBackgroundColor(),
@@ -1961,8 +2155,7 @@ export const Button_ = ({
               numberOfLines={numLines}
               style={{
                 textAlign: "center",
-                textAlignVertical: "center",
-                fontSize: 17,
+                fontSize: 15,
                 color: C.textWhite,
                 ...textStyle,
               }}

@@ -525,7 +525,7 @@ export function CheckoutModalScreen({}) {
       let workorderIDs = sCombinedWorkorders.map((o) => o.id);
       sale.workorderIDs = workorderIDs;
       cloneDeep(sCombinedWorkorders).forEach((wo) => {
-        wo.saleID = sale.id;
+        wo.sales.push(sale.id);
         _zSetWorkorder(wo); // db
         sale.workorderIDs = replaceOrAddToArr(sale.workorderIDs, wo.id);
         if (sale.amountCaptured === sTotalAmount) {
@@ -539,9 +539,9 @@ export function CheckoutModalScreen({}) {
       deposits.push(sale);
     }
 
-    let saleIDs = cloneDeep(zCustomer.salesID);
-    if (!isArray(saleIDs)) saleIDs = [];
-    saleIDs = replaceOrAddToArr(saleIDs, sale.id);
+    let sales = cloneDeep(zCustomer.sales);
+    if (!isArray(sales)) sales = [];
+    sales = replaceOrAddToArr(sales, sale.id);
 
     // remove unused fields
     sale.payments = sale.payments.map((payment) => removeUnusedFields(payment));
@@ -552,7 +552,7 @@ export function CheckoutModalScreen({}) {
     _setSale(sale);
     dbSetSalesObj(removeUnusedFields(sale)); // db
     _zSetCustomerField("deposits", deposits); // db
-    _zSetCustomerField("saleIDs", saleIDs); // db
+    _zSetCustomerField("sales", sales); // db
 
     if (!sale.payments[sale.payments.length - 1].cash) {
       if (sIsDeposit || sale.paymentComplete) closeCheckoutScreenModal();

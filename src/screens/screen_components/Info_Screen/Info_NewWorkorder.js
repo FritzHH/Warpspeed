@@ -12,6 +12,7 @@ import {
   removeDashesFromPhone,
   showAlert,
   stringIsNumeric,
+  gray,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -49,45 +50,20 @@ export function NewWorkorderComponent({}) {
   );
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
-  const _zSetSearchResults = useCustomerSearchStore(
-    (state) => state.setSearchResultsArr
-  );
-  const _zResetSearch = useCustomerSearchStore((state) => state.reset);
   const _zSetOpenWorkorder = useOpenWorkordersStore(
     (state) => state.setWorkorder
   );
 
   // store getters ///////////////////////////////////////////////////////////////
 
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
-  const zSearchResults = useCustomerSearchStore((state) =>
-    state.getSearchResults()
-  );
+  // const zSearchResults = useCustomerSearchStore((state) =>
+  //   state.getSearchResults()
+  // );
 
   //////////////////////////////////////////////////////////////////////
-  const [sBox1Val, _setBox1Val] = React.useState("");
-  // const [sBox1Val, _setBox1Val] = React.useState("222-222-2222");
-
-  const [sBox2Val, _setBox2Val] = React.useState("");
+  const [sTextInput, _setTextInput] = React.useState("");
   const [sSearchFieldName, _setSearchFieldName] = React.useState(false);
-
   const [sCustomerInfoObj, _setCustomerInfoObj] = React.useState(null);
-  const [sShowCreateCustomerButton, _setShowCreateCustomerBtn] =
-    useState(false);
-  const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
-
-  // watch inputs to see if we need to show Create Customer button (show button after 10 digits phone or 2 digits first name)
-  useEffect(() => {
-    let showButton = false;
-    if (sSearchFieldName) {
-      if (sBox1Val.length > 1 || sBox2Val.length > 1) showButton = true;
-    } else {
-      let noDashes = removeDashesFromPhone(sBox1Val);
-      if (noDashes.length == 10 && zSearchResults.length == 0)
-        showButton = true;
-    }
-    _setShowCreateCustomerBtn(showButton);
-  }, [sBox1Val, sBox2Val, zSearchResults]);
 
   async function handleBox1TextChange(incomingText = "") {
     let isEmail;
@@ -99,49 +75,43 @@ export function NewWorkorderComponent({}) {
     }
     // let searchStr = "";
 
-    const searchFun = async (searchStr, options) => {
+    const searchFun = async (searchStrings, options) => {
       let funs = [];
       options.forEach((option) => {
-        if (option === "email")
-          funs.push(() => dbSearchCustomersByEmail(searchStr));
-        if (option === "name")
-          funs.push(() => dbSearchCustomersByName(searchStr));
-        if (option === "phone")
-          funs.push(() => dbSearchCustomersByPhone(searchStr));
-      });
-
-      let searchResults = [];
-      let count = 0;
-      funs.forEach((fun) => {
-        fun().then((res) => {
-          log(res);
-          searchResults = [...searchResults, ...res];
-          count++;
-          if (count === options.length) {
-            log("search results", searchResults);
-          }
+        searchStrings.forEach((searchString) => {
+          if (option === "email")
+            funs.push(() => dbSearchCustomersByEmail(searchString));
+          if (option === "name")
+            funs.push(() => dbSearchCustomersByName(searchString));
+          if (option === "phone")
+            funs.push(() => dbSearchCustomersByPhone(searchString));
         });
       });
 
-      // let res = await fun(searchStr);
-      // log("search res", res);
+      let count = 0;
+      funs.forEach((fun) => {
+        fun().then((res) => {
+          useCustomerSearchStore.getState().addToSearchResults(res, count);
+          count++;
+        });
+      });
     };
 
     if (rawText.length <= 2) {
       // do nothing, string too short to search
-      _setBox1Val(rawText);
+      _setTextInput(rawText);
       return;
     } else if (isNumeric && rawText.length <= 3) {
       // check to see if the last character is a '-' in the string before user edit
-      let searchStr;
-      if (sBox1Val.length === 4) {
+      let searchStr = [];
+      if (sTextInput.length === 4) {
         searchStr = rawText.substring(0, 2);
-        _setBox1Val(searchStr);
+        _setTextInput(searchStr);
       } else {
         searchStr = rawText;
-        _setBox1Val(formatPhoneWithDashes(searchStr));
+        _setTextInput(formatPhoneWithDashes(searchStr));
       }
-      searchFun(searchStr, ["phone", "email"]);
+      searchFun([searchStr], ["phone", "email"]);
       // searchFun(searchStr, "phone");
       // searchFun(searchStr, "email"); // email search in case begins with numbers
       return;
@@ -152,13 +122,13 @@ export function NewWorkorderComponent({}) {
     ) {
       // log(Math.random());
       let searchStr = rawText;
-      if (sBox1Val.length === 8) {
+      if (sTextInput.length === 8) {
         // there was a dash, user deleted it so remove the number preceding the dash
         searchStr = rawText.substring(0, 5);
       }
-      _setBox1Val(formatPhoneWithDashes(searchStr));
+      _setTextInput(formatPhoneWithDashes(searchStr));
       // run search here on phone numbers
-      searchFun(searchStr, ["phone"]);
+      searchFun([searchStr], ["phone"]);
       return;
     } else if (isNumeric && rawText.length > 10) {
       // do nothing, search ran on the last round and do not enter the new
@@ -166,10 +136,10 @@ export function NewWorkorderComponent({}) {
     }
 
     // now we know the user has entered a name or email
-    _setBox1Val(incomingText);
+    _setTextInput(incomingText);
     if (isEmail) {
       // run email search
-      searchFun(incomingText, ["email"]);
+      searchFun([incomingText], ["email"]);
     } else {
       // name search
       let split;
@@ -178,105 +148,17 @@ export function NewWorkorderComponent({}) {
       } else {
         split = incomingText.split(" ");
       }
-      split.forEach((searchStr) => {
-        // run search for each name
-        searchFun(searchStr, ["name"]);
-      });
-    }
-  }
-
-  async function handleBox1TextChangeOLD(incomingText = "") {
-    // log("incoming box 1", incomingText);
-    // if all input erased
-    if (incomingText === "" || !incomingText) {
-      _setBox1Val("");
-      _zSetSearchResults([]);
-      _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
-      return;
-    }
-
-    let formattedText = incomingText;
-    if (!sSearchFieldName) formattedText = removeDashesFromPhone(incomingText);
-    if (sSearchFieldName) {
-      // make first letter uppercase
-      // formattedText = formattedText.toLowerCase();
-      // let char1 = formattedText[0].toUpperCase();
-      // log("char", char1);
-      // let substr = formattedText.substring(1, formattedText.length);
-      // formattedText = char1 + substr;
-      formattedText = capitalizeFirstLetterOfString(formattedText);
-    }
-
-    // check for valid inputs for each box
-    if (sSearchFieldName) {
-      if (
-        LETTERS.includes(formattedText[formattedText.length - 1]) ||
-        LETTERS.toUpperCase().includes(formattedText[formattedText.length - 1])
-      ) {
-        _setBox1Val(formattedText);
-      } else {
-        return;
-      }
-    } else if (
-      NUMS.includes(formattedText[formattedText.length - 1]) &&
-      formattedText.length <= 10
-    ) {
-      let dashed = formatPhoneWithDashes(formattedText);
-      // log("dash", dashed);
-      _setBox1Val(dashed);
-    } else {
-      return;
-    }
-
-    // run searches
-    ///////////////////////
-    let searchResults = [];
-    // log("arr", zCustPreviewArr);
-    // if (sSearchFieldName) {
-    //   searchResults = await dbSearchCustomersByName(formattedText);
-    // } else {
-    //   searchResults = await dbSearchCustomersByPhone(formattedText);
-    // }
-
-    // log("results", searchResults);
-
-    _zSetSearchResults(searchResults);
-    if (searchResults.length > 0) {
-      _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
-    } else {
-      _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
-    }
-
-    // show the create customer button if input conditions are met
-  }
-
-  function handleBox2TextChange(incomingText = "") {
-    if (incomingText === "") {
-      _setBox2Val("");
-      // _zSetSearchResults([]);
-      return;
-    }
-    let formattedText = incomingText;
-    formattedText = capitalizeFirstLetterOfString(formattedText);
-    if (
-      LETTERS.includes(formattedText[formattedText.length - 1]) ||
-      LETTERS.toUpperCase().includes(formattedText[formattedText.length - 1])
-    ) {
-      _setBox2Val(formattedText);
-    } else {
-      return;
+      searchFun(split, ["name"]);
     }
   }
 
   function handleCreateCustomerBtnPressed() {
     let custInfo = cloneDeep(CUSTOMER_PROTO);
     if (sSearchFieldName) {
-      custInfo.first = sBox1Val;
+      custInfo.first = sTextInput;
       custInfo.last = sBox2Val;
-      _setInfoTextFocus(FOCUS_NAMES.cell);
     } else {
-      _setInfoTextFocus(FOCUS_NAMES.first);
-      custInfo.cell = sBox1Val;
+      custInfo.cell = sTextInput;
     }
     // log(custInfo);
     // do not set the customer id this is how the next screen knows it is a new customer. we will set the id in the modal automatically on creation
@@ -284,20 +166,10 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleStartStandaloneSalePress() {
-    // log(zCurrentUserObj);
-    // return;
-    if (!zCurrentUser) {
-      showAlert({
-        message: "No user logged in. Please log in and try again",
-      });
-      log("no user logged in yet");
-      return;
-    }
-
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateUPCBarcode();
-    wo.startedBy = zCurrentUser.id;
+    wo.startedBy = useLoginStore.getCurrentUser().id;
     wo.startedOnMillis = new Date().getTime();
 
     _zSetOpenWorkorder(wo, false);
@@ -307,8 +179,7 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleCancelCreateNewCustomerPress() {
-    _setBox1Val("");
-    _setBox2Val("");
+    _setTextInput("");
     _setSearchFieldName("phone");
     _zResetSearch();
     _setShowCreateCustomerBtn(false);
@@ -327,8 +198,8 @@ export function NewWorkorderComponent({}) {
       customerFirst: newCustomerObj.first,
       customerLast: newCustomerObj.last,
       customerPhone: newCustomerObj.cell || newCustomerObj.landline,
-      startedByFirst: zCurrentUser.first,
-      startedByLast: zCurrentUser.last,
+      startedByFirst: useLoginStore.getCurrentUser().first,
+      startedByLast: useLoginStore.getCurrentUser().last,
     });
 
     // add in the newly created workorder to the customer's file
@@ -364,124 +235,62 @@ export function NewWorkorderComponent({}) {
         }}
       >
         {/* <LoginModalScreen modalVisible={zShowLoginScreen} /> */}
-
-        <View
-          style={{
-            justifyContent: "space-between",
-            flexDirection: "row",
-            width: "100%",
-            alignItems: "center",
-            paddingHorizontal: 10,
-            paddingTop: 5,
-          }}
-        >
-          <Button_
-            colorGradientArr={COLOR_GRADIENTS.lightBlue}
-            text={"SEARCH NAME"}
-            textStyle={{ fontSize: 14 }}
-            onPress={() => _setSearchFieldName("name")}
-          />
-          <Button_
-            colorGradientArr={COLOR_GRADIENTS.lightBlue}
-            text={"SEARCH EMAIL"}
-            textStyle={{ fontSize: 14 }}
-            onPress={() => _setSearchFieldName("email")}
-          />
-        </View>
-        <View style={{ alignItems: "center" }}>
-          <TextInput
-            style={{
-              // marginTop: 100,
-              borderBottomWidth: 1,
-              width: 200,
-              height: 40,
-              paddingHorizontal: 3,
-              outlineStyle: "none",
-              borderColor: "gray",
-              fontSize: 16,
-              color: sBox1Val.length < 0 ? "gray" : "dimgray",
-            }}
-            autoFocus={true}
-            placeholder={sSearchFieldName ? "First Name" : "Phone number"}
-            placeholderTextColor={"gray"}
-            value={sBox1Val}
-            onChangeText={(val) => handleBox1TextChange(val)}
-          />
-          <View style={{ width: 10 }} />
-          {sSearchFieldName && (
-            <TextInput
-              placeholder={"Last name"}
-              placeholderTextColor={"gray"}
-              style={{
-                marginTop: 20,
-                padding: 3,
-                borderBottomWidth: 1,
-                fontSize: 16,
-                width: 200,
-                height: 40,
-                outlineStyle: "none",
-                borderColor: "gray",
-              }}
-              value={sBox2Val}
-              onChangeText={(val) => handleBox2TextChange(val)}
-            />
-          )}
-          <Button_
-            text={sSearchFieldName ? "Search Phone" : "Search Name"}
-            onPress={() => {
-              _setBox1Val("");
-              _setBox2Val("");
-              _setSearchFieldName(!sSearchFieldName);
-              _zSetSearchResults([]);
-              _setShowCreateCustomerBtn(false);
-            }}
-            icon={ICONS.search}
-            iconSize={25}
-            colorGradientArr={COLOR_GRADIENTS.blue}
-            buttonStyle={{
-              paddingHorizontal: 25,
-              paddingVertical: 5,
-              marginTop: 20,
-              width: 220,
-            }}
-          />
-        </View>
-        <View style={{ height: "45%" }} />
-        {/** customer info modal */}
-        <Button_
-          buttonStyle={{}}
-          onPress={handleStartStandaloneSalePress}
-          icon={ICONS.cashRegister}
-          iconSize={80}
-        />
         <ScreenModal
           showOuterModal={true}
           outerModalStyle={{}}
-          buttonStyle={{
-            height: 50,
-            marginVertical: 10,
-            marginTop: 50,
-            width: null,
-          }}
-          buttonVisible={sShowCreateCustomerButton}
-          buttonTextStyle={{ color: "dimgray" }}
-          handleButtonPress={() => handleCreateCustomerBtnPressed()}
           buttonLabel={"Create New Customer"}
           modalVisible={sCustomerInfoObj}
           canExitOnOuterClick={false}
+          ButtonComponent={() => (
+            <Button_
+              text={"CUSTOMER"}
+              buttonStyle={{ marginTop: 10, paddingHorizontal: 25 }}
+              textStyle={{ fontSize: 13 }}
+              colorGradientArr={COLOR_GRADIENTS.blue}
+              icon={ICONS.new}
+              onPress={handleCreateCustomerBtnPressed}
+            />
+          )}
           Component={() => (
             <CustomerInfoScreenModalComponent
+              isNewCustomer={true}
               ssCustomerInfoObj={sCustomerInfoObj}
               __setCustomerInfoObj={_setCustomerInfoObj}
               button1Text={"Create Customer"}
               button2Text={"Cancel"}
-              ssInfoTextFocus={sInfoTextFocus}
-              __setInfoTextFocus={_setInfoTextFocus}
               handleButton1Press={handleCreateNewCustomerPressed}
               handleButton2Press={handleCancelCreateNewCustomerPress}
             />
           )}
         />
+
+        <TextInput
+          style={{
+            // marginTop: 100,
+            borderBottomWidth: 1,
+            width: 300,
+            height: 40,
+            paddingHorizontal: 3,
+            outlineStyle: "none",
+            borderColor: gray(0.4),
+            fontSize: 16,
+            color: C.textMain,
+          }}
+          autoFocus={true}
+          placeholder={"Phone (best), first, last, email..."}
+          placeholderTextColor={gray(0.4)}
+          value={sTextInput}
+          onChangeText={(val) => handleBox1TextChange(val)}
+        />
+        <View style={{ width: "100%", alignItems: "flex-end" }}>
+          <Button_
+            buttonStyle={{ margin: 20 }}
+            onPress={handleStartStandaloneSalePress}
+            icon={ICONS.cashRegister}
+            iconSize={55}
+          />
+        </View>
+        {/** customer info modal */}
       </View>
     );
   }

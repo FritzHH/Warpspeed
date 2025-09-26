@@ -164,56 +164,6 @@ export const StandaloneSaleComponent = ({}) => {
     return workorders;
   }
 
-  const handlePaymentSuccess = async (
-    incomingPayment = { amountTendered, amount, isCheck }
-  ) => {
-    log("incoming payment success obj in Checkout Component", paymentObj);
-    let paymentObj = cloneDeep(PAYMENT_OBJECT_PROTO);
-    paymentObj.last4 = incomingPayment.last4; // check this, add more cc details below
-
-    paymentObj.amountCaptured = incomingPayment.amount;
-    paymentObj.amountTendered = incomingPayment.amountTendered;
-    paymentObj.saleID = generateUPCBarcode();
-    paymentObj.cash = !incomingPayment.isCheck;
-    paymentObj.check = incomingPayment.isCheck;
-    let millis = new Date().getTime;
-    paymentObj.millis = millis;
-
-    // if (sSpli)
-
-    // paymentObj.customerID = zCustomerObj.get // import this zustand object
-
-    let paymentsArr = cloneDeep(zPaymentsArr);
-
-    // move everthing to an un-cancelable modal for the duration of the sale
-
-    paymentsArr.push(paymentObj);
-    let totalCaptured = 0;
-    paymentsArr.forEach(
-      (paymentObj) => (totalCaptured += Number(paymentObj.amount))
-    );
-    // log("total captured", totalCaptured);
-
-    let changeNeeded;
-    if (!cardSale) {
-      changeNeeded = trimToTwoDecimals(
-        Number(paymentObj.amountTendered) - Number(paymentObj.amount)
-      );
-    }
-
-    // log("total caputured", totalCaptured);
-    if (Number(sTotalAmount) == totalCaptured) {
-      _setPaymentComplete(true);
-      log("Payment complete!");
-    }
-
-    let saleObj = _setCashChangeNeeded(changeNeeded);
-
-    _setTotalAmountCaptured(totalCaptured);
-    _zSetPaymentArr(paymentsArr);
-  };
-
-  const handleRefundSuccess = async (paymentObj) => {};
 
   const handleRefundScan = async (text) => {
     log("incoming refund text", text);

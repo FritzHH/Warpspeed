@@ -3,7 +3,6 @@
 
 import { log } from "./utils";
 import { DB_NODES } from "./constants";
-import { useSettingsStore } from "./stores";
 import {
   firestoreWrite,
   firestoreRead,
@@ -12,25 +11,34 @@ import {
   firestoreSubscribeCollection,
   firestoreDelete,
   storageUploadString,
+  storageGetDownloadURL,
   authSignIn,
   authSignOut,
+  getServerTimestamp,
 } from "./db_calls";
+import { useSettingsStore } from "./stores";
 
 // ============================================================================
-// STORE UTILITIES
+// UTILITY FUNCTIONS
 // ============================================================================
 
 /**
- * Get tenantID and storeID from settings store
+ * Get tenantID and storeID from Zustand store
  * @returns {Object} Object with tenantID and storeID
  */
 function getTenantAndStore() {
-  const settings = useSettingsStore.getState().settings;
-  // log("settings", settings);
+  const state = useSettingsStore.getState();
+  // log("Full settings state:", state);
+
+  const settings = state.settings;
+  // log("Settings object:", settings);
+
   const tenantID = settings?.tenantID;
   const storeID = settings?.storeID;
-  // log("tenantID", tenantID);
-  // log("storeID", storeID);
+
+  // log("tenantID:", tenantID);
+  // log("storeID:", storeID);
+
   return { tenantID, storeID };
 }
 
@@ -121,21 +129,111 @@ function buildCurrentPunchClockPath(tenantID, storeID) {
 // setters /////////////////////////////////////////////////////////////////////
 
 /**
+ * Save a single field to the settings object in the database
+ * @param {string} fieldName - Name of the field to update
+ * @param {*} value - Value to set for the field
+ * @returns {Promise<Object>} Save result
+ */
+export async function dbSaveSettingsField(fieldName, value) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log(
+        "Error: tenantID and storeID are not configured for dbSaveSettingsField"
+      );
+      return {
+        success: false,
+        error: "Configuration Error",
+        message:
+          "tenantID and storeID are not configured. Please check your settings.",
+        fieldName,
+        value,
+        tenantID,
+        storeID,
+      };
+    }
+
+    if (!fieldName || typeof fieldName !== "string") {
+      log(
+        "Error: fieldName must be a non-empty string for dbSaveSettingsField"
+      );
+      return {
+        success: false,
+        error: "Invalid Parameter",
+        message: "fieldName must be a non-empty string",
+        fieldName,
+        value,
+        tenantID,
+        storeID,
+      };
+    }
+
+    // Get current settings
+    const currentSettings = await firestoreRead(
+      buildSettingsPath(tenantID, storeID)
+    );
+
+    if (!currentSettings) {
+      log("Error: Settings not found for dbSaveSettingsField");
+      return {
+        success: false,
+        error: "Not Found",
+        message: "Settings not found in database",
+        fieldName,
+        value,
+        tenantID,
+        storeID,
+      };
+    }
+
+    // Update the specific field
+    const updatedSettings = {
+      ...currentSettings,
+      [fieldName]: value,
+    };
+
+    // Save the updated settings
+    await firestoreWrite(buildSettingsPath(tenantID, storeID), updatedSettings);
+
+    log("Settings field saved", {
+      fieldName,
+      value,
+      tenantID,
+      storeID,
+    });
+
+    return {
+      success: true,
+      fieldName,
+      value,
+      settings: updatedSettings,
+      tenantID,
+      storeID,
+    };
+  } catch (error) {
+    log("Error saving settings field:", error);
+    return {
+      success: false,
+      error: "Database Error",
+      message: error.message,
+      fieldName,
+      value,
+      tenantID: null,
+      storeID: null,
+    };
+  }
+}
+
+/**
  * Save settings object
  * @param {Object} settings - Settings object to save
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.addMetadata - Whether to add metadata (default: true)
- * @param {string} options.updatedBy - Who is updating the settings (default: "system")
  * @returns {Promise<Object>} Save result
  */
 export async function dbSaveSettings(settings) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log("Error: tenantID and storeID are not configured for dbSaveSettings");
       return {
@@ -149,13 +247,26 @@ export async function dbSaveSettings(settings) {
       };
     }
 
-    await firestoreWrite(buildSettingsPath(tenantID, storeID), settings);
+    if (!settings || typeof settings !== "object") {
+      log("Error: settings object is required for dbSaveSettings");
+      return {
+        success: false,
+        error: "Invalid Parameter",
+        message: "settings object is required",
+        settings: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    let settingsToSave = settings;
+    await firestoreWrite(buildSettingsPath(tenantID, storeID), settingsToSave);
 
     log("Settings saved", { tenantID, storeID });
 
     return {
       success: true,
-      settings,
+      settings: settingsToSave,
       tenantID,
       storeID,
     };
@@ -175,19 +286,13 @@ export async function dbSaveSettings(settings) {
 /**
  * Save open workorder object to Firestore
  * @param {Object} workorder - Workorder object to save
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.addMetadata - Whether to add metadata (default: true)
- * @param {string} options.updatedBy - Who is updating the workorder (default: "system")
+ * @param {string} workorderID - Workorder ID (optional, will use workorder.id if not provided)
  * @returns {Promise<Object>} Save result
  */
-export async function dbSaveOpenWorkorder(workorder) {
+export async function dbSaveOpenWorkorder(workorder, workorderID = null) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbSaveOpenWorkorder"
@@ -204,7 +309,7 @@ export async function dbSaveOpenWorkorder(workorder) {
       };
     }
 
-    if (!workorder) {
+    if (!workorder || typeof workorder !== "object") {
       log("Error: workorder object is required for dbSaveOpenWorkorder");
       return {
         success: false,
@@ -217,17 +322,17 @@ export async function dbSaveOpenWorkorder(workorder) {
       };
     }
 
-    // Get workorder ID from workorder object or workorder['id']
-    const id = workorder.id || workorder["id"];
+    // Get workorder ID from parameter or workorder object
+    const id = workorderID || workorder.id || workorder["id"];
     if (!id) {
       log(
-        "Error: workorderID must be provided in workorder.id or workorder['id'] for dbSaveOpenWorkorder"
+        "Error: workorderID must be provided either as parameter, workorder.id, or workorder['id'] for dbSaveOpenWorkorder"
       );
       return {
         success: false,
         error: "Invalid Parameter",
         message:
-          "workorderID must be provided in workorder.id or workorder['id']",
+          "workorderID must be provided either as parameter, workorder.id, or workorder['id']",
         workorder: null,
         workorderID: null,
         tenantID,
@@ -235,10 +340,12 @@ export async function dbSaveOpenWorkorder(workorder) {
       };
     }
 
+    let workorderToSave = workorder;
+
     // Build path: tenants/{tenantID}/stores/{storeID}/open-workorders/{workorderID}
     const path = buildWorkorderPath(tenantID, storeID, id);
 
-    await firestoreWrite(path, workorder);
+    await firestoreWrite(path, workorderToSave);
 
     log("Open workorder saved", {
       workorderID: id,
@@ -249,7 +356,7 @@ export async function dbSaveOpenWorkorder(workorder) {
 
     return {
       success: true,
-      workorder,
+      workorder: workorderToSave,
       workorderID: id,
       tenantID,
       storeID,
@@ -270,29 +377,242 @@ export async function dbSaveOpenWorkorder(workorder) {
 }
 
 /**
- * Complete a workorder by moving it from Realtime Database to Cloud Storage
- * @param {Object} workorder - Workorder object to complete
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.addMetadata - Whether to add metadata (default: true)
- * @param {string} options.completedBy - Who completed the workorder (default: "system")
+ * Get completed workorder from Cloud Storage by ID
+ * @param {string} id - Workorder ID (required)
+ * @returns {Promise<Object>} Completed workorder object or null
+ */
+export async function dbGetCompletedWorkorder(id) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log(
+        "Error: tenantID and storeID are not configured for dbGetCompletedWorkorder"
+      );
+      return null;
+    }
+
+    if (!id) {
+      log("Error: id is required for dbGetCompletedWorkorder");
+      return null;
+    }
+
+    // Build storage path: closed-workorders/{tenantID}/{storeID}/{workorderID}.json
+    const storagePath = `${DB_NODES.STORAGE.CLOSED_WORKORDERS}/${tenantID}/${storeID}/${id}.json`;
+
+    // Get the download URL for the file
+    const downloadURL = await storageGetDownloadURL(storagePath);
+
+    if (!downloadURL) {
+      log("Error: Completed workorder not found for dbGetCompletedWorkorder");
+      return null;
+    }
+
+    // Fetch the JSON content from the download URL
+    const response = await fetch(downloadURL);
+
+    if (!response.ok) {
+      log("Error: Failed to fetch completed workorder content");
+      return null;
+    }
+
+    // Parse the JSON string back to an object
+    const workorder = await response.json();
+
+    return workorder;
+  } catch (error) {
+    log("Error retrieving completed workorder:", error);
+    return null;
+  }
+}
+
+/**
+ * Get completed sale from Cloud Storage by ID
+ * @param {string} id - Sale ID (required)
+ * @returns {Promise<Object>} Completed sale object or null
+ */
+export async function dbGetCompletedSale(id) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log(
+        "Error: tenantID and storeID are not configured for dbGetCompletedSale"
+      );
+      return null;
+    }
+
+    if (!id) {
+      log("Error: id is required for dbGetCompletedSale");
+      return null;
+    }
+
+    // Build storage path: closed-sales/{tenantID}/{storeID}/{saleID}.json
+    const storagePath = `${DB_NODES.STORAGE.CLOSED_SALES}/${tenantID}/${storeID}/${id}.json`;
+
+    // Get the download URL for the file
+    const downloadURL = await storageGetDownloadURL(storagePath);
+
+    if (!downloadURL) {
+      log("Error: Completed sale not found for dbGetCompletedSale");
+      return null;
+    }
+
+    // Fetch the JSON content from the download URL
+    const response = await fetch(downloadURL);
+
+    if (!response.ok) {
+      log("Error: Failed to fetch completed sale content");
+      return null;
+    }
+
+    // Parse the JSON string back to an object
+    const sale = await response.json();
+
+    return sale;
+  } catch (error) {
+    log("Error retrieving completed sale:", error);
+    return null;
+  }
+}
+
+/**
+ * Complete a sale by saving it to Cloud Storage
+ * @param {Object} sale - Sale object to complete
+ * @param {string} saleID - Sale ID (optional, will use sale.id if not provided)
  * @returns {Promise<Object>} Completion result
  */
-export async function dbCompleteWorkorder(workorder, tenantID, storeID) {
+export async function dbCompleteSale(sale, saleID = null) {
   try {
-    // Validate required parameters
+    const { tenantID, storeID } = getTenantAndStore();
+
     if (!tenantID || !storeID) {
-      throw new Error("tenantID and storeID are required parameters");
+      log("Error: tenantID and storeID are not configured for dbCompleteSale");
+      return {
+        success: false,
+        error: "Configuration Error",
+        message:
+          "tenantID and storeID are not configured. Please check your settings.",
+        sale: null,
+        saleID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    if (!sale || typeof sale !== "object") {
+      log("Error: sale object is required for dbCompleteSale");
+      return {
+        success: false,
+        error: "Invalid Parameter",
+        message: "sale object is required",
+        sale: null,
+        saleID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    // Get sale ID from parameter or sale object
+    const id = saleID || sale.id || sale["id"];
+    if (!id) {
+      log(
+        "Error: saleID must be provided either as parameter, sale.id, or sale['id'] for dbCompleteSale"
+      );
+      return {
+        success: false,
+        error: "Invalid Parameter",
+        message:
+          "saleID must be provided either as parameter, sale.id, or sale['id']",
+        sale: null,
+        saleID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    let saleToComplete = sale;
+
+    // 1. Save to Cloud Storage as JSON
+    const storagePath = `${DB_NODES.STORAGE.CLOSED_SALES}/${tenantID}/${storeID}/${id}.json`;
+    const saleJson = JSON.stringify(saleToComplete, null, 2);
+
+    await storageUploadString(storagePath, saleJson, "application/json");
+
+    log("Sale completed", {
+      saleID: id,
+      tenantID,
+      storeID,
+      storagePath,
+    });
+
+    return {
+      success: true,
+      sale: saleToComplete,
+      saleID: id,
+      tenantID,
+      storeID,
+      storagePath,
+    };
+  } catch (error) {
+    log("Error completing sale:", error);
+    return {
+      success: false,
+      error: "Database Error",
+      message: error.message,
+      sale: null,
+      saleID: null,
+      tenantID: null,
+      storeID: null,
+    };
+  }
+}
+
+/**
+ * Complete a workorder by moving it from Realtime Database to Cloud Storage
+ * @param {Object} workorder - Workorder object to complete
+ * @returns {Promise<Object>} Completion result
+ */
+export async function dbCompleteWorkorder(workorder) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log(
+        "Error: tenantID and storeID are not configured for dbCompleteWorkorder"
+      );
+      return {
+        success: false,
+        error: "Configuration Error",
+        message:
+          "tenantID and storeID are not configured. Please check your settings.",
+        workorder: null,
+        workorderID: null,
+        tenantID,
+        storeID,
+      };
     }
 
     if (!workorder || !workorder.id) {
-      throw new Error("workorder object with id is required");
+      log(
+        "Error: workorder object with id is required for dbCompleteWorkorder"
+      );
+      return {
+        success: false,
+        error: "Invalid Parameter",
+        message: "workorder object with id is required",
+        workorder: null,
+        workorderID: null,
+        tenantID,
+        storeID,
+      };
     }
+
+    let workorderToComplete = workorder;
 
     // 1. Save to Cloud Storage as JSON
     const storagePath = `${DB_NODES.STORAGE.CLOSED_WORKORDERS}/${tenantID}/${storeID}/${workorder.id}.json`;
-    const workorderJson = JSON.stringify(workorder, null, 2);
+    const workorderJson = JSON.stringify(workorderToComplete, null, 2);
 
     await storageUploadString(storagePath, workorderJson, "application/json");
 
@@ -310,7 +630,7 @@ export async function dbCompleteWorkorder(workorder, tenantID, storeID) {
 
     return {
       success: true,
-      workorder,
+      workorder: workorderToComplete,
       workorderID: workorder.id,
       tenantID,
       storeID,
@@ -319,27 +639,28 @@ export async function dbCompleteWorkorder(workorder, tenantID, storeID) {
     };
   } catch (error) {
     log("Error completing workorder:", error);
-    throw error;
+    return {
+      success: false,
+      error: "Database Error",
+      message: error.message,
+      workorder: null,
+      workorderID: null,
+      tenantID: null,
+      storeID: null,
+    };
   }
 }
 
 /**
  * Save customer object to Firestore
  * @param {Object} customer - Customer object to save
- * @param {string} customerID - Customer ID (required)
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.addMetadata - Whether to add metadata (default: true)
- * @param {string} options.updatedBy - Who is updating the customer (default: "system")
+ * @param {string} customerID - Customer ID (optional, will use customer.id if not provided)
  * @returns {Promise<Object>} Save result
  */
 export async function dbSaveCustomer(customer, customerID = null) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log("Error: tenantID and storeID are not configured for dbSaveCustomer");
       return {
@@ -367,7 +688,7 @@ export async function dbSaveCustomer(customer, customerID = null) {
       };
     }
 
-    // Get customer ID from parameter, customer object, or customer['id']
+    // Get customer ID from parameter or customer object
     const id = customerID || customer.id || customer["id"];
     if (!id) {
       log(
@@ -422,7 +743,7 @@ export async function dbSaveCustomer(customer, customerID = null) {
       error: "Database Error",
       message: error.message,
       customer: null,
-      customerID,
+      customerID: null,
       tenantID: null,
       storeID: null,
     };
@@ -432,20 +753,13 @@ export async function dbSaveCustomer(customer, customerID = null) {
 /**
  * Save inventory item to Firestore
  * @param {Object} item - Inventory item object to save
- * @param {string} itemID - Item ID (required)
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.addMetadata - Whether to add metadata (default: true)
- * @param {string} options.updatedBy - Who is updating the item (default: "system")
+ * @param {string} itemID - Item ID (optional, will use item.id if not provided)
  * @returns {Promise<Object>} Save result
  */
 export async function dbSaveInventoryItem(item, itemID = null) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbSaveInventoryItem"
@@ -475,7 +789,7 @@ export async function dbSaveInventoryItem(item, itemID = null) {
       };
     }
 
-    // Get item ID from parameter, item object, or item['id']
+    // Get item ID from parameter or item object
     const id = itemID || item.id || item["id"];
     if (!id) {
       log(
@@ -493,10 +807,12 @@ export async function dbSaveInventoryItem(item, itemID = null) {
       };
     }
 
+    let itemToSave = item;
+
     // Build path: tenants/{tenantID}/stores/{storeID}/inventory/{itemID}
     const path = buildInventoryPath(tenantID, storeID, id);
 
-    await firestoreWrite(path, item);
+    await firestoreWrite(path, itemToSave);
 
     log("Inventory item saved", {
       itemID: id,
@@ -507,7 +823,7 @@ export async function dbSaveInventoryItem(item, itemID = null) {
 
     return {
       success: true,
-      item,
+      item: itemToSave,
       itemID: id,
       tenantID,
       storeID,
@@ -520,7 +836,7 @@ export async function dbSaveInventoryItem(item, itemID = null) {
       error: "Database Error",
       message: error.message,
       item: null,
-      itemID,
+      itemID: null,
       tenantID: null,
       storeID: null,
     };
@@ -530,20 +846,13 @@ export async function dbSaveInventoryItem(item, itemID = null) {
 /**
  * Save punch clock object to Firestore
  * @param {Object} punch - Punch clock object to save
- * @param {string} punchID - Punch ID (required)
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.addMetadata - Whether to add metadata (default: true)
- * @param {string} options.updatedBy - Who is updating the punch (default: "system")
+ * @param {string} punchID - Punch ID (optional, will use punch.id if not provided)
  * @returns {Promise<Object>} Save result
  */
 export async function dbSavePunchObject(punch, punchID = null) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbSavePunchObject"
@@ -573,7 +882,7 @@ export async function dbSavePunchObject(punch, punchID = null) {
       };
     }
 
-    // Get punch ID from parameter, punch object, or punch['id']
+    // Get punch ID from parameter or punch object
     const id = punchID || punch.id || punch["id"];
     if (!id) {
       log(
@@ -612,7 +921,7 @@ export async function dbSavePunchObject(punch, punchID = null) {
       error: "Database Error",
       message: error.message,
       punch: null,
-      punchID,
+      punchID: null,
       tenantID: null,
       storeID: null,
     };
@@ -622,19 +931,12 @@ export async function dbSavePunchObject(punch, punchID = null) {
 /**
  * Save current punch clock object to Firestore (overwrites entire punch_clock node)
  * @param {Object} punchClockData - Current punch clock object to save (required)
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.addMetadata - Whether to add metadata (default: true)
- * @param {string} options.updatedBy - Who is updating the punch clock (default: "system")
  * @returns {Promise<Object>} Save result
  */
 export async function dbSaveCurrentPunchClock(punchClockData) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbSaveCurrentPunchClock"
@@ -695,38 +997,20 @@ export async function dbSaveCurrentPunchClock(punchClockData) {
 
 /**
  * Get settings object
- * @param {Object} options - Optional parameters
- * @param {boolean} options.includeMetadata - Whether to include metadata in response (default: true)
- * @returns {Promise<Object>} Settings object
+ * @returns {Promise<Object>} Settings object or null
  */
 export async function dbGetSettings(tenantID, storeID) {
   try {
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log("Error: tenantID and storeID are not configured for dbGetSettings");
-      return {
-        success: false,
-        error: "Configuration Error",
-        message:
-          "tenantID and storeID are not configured. Please check your settings.",
-        settings: null,
-        tenantID,
-        storeID,
-      };
+      return null;
     }
 
     const settings = await firestoreRead(buildSettingsPath(tenantID, storeID));
 
     if (!settings) {
       log("Error: Settings not found for dbGetSettings");
-      return {
-        success: false,
-        error: "Not Found",
-        message: "Settings not found",
-        settings: null,
-        tenantID,
-        storeID,
-      };
+      return null;
     }
 
     return settings;
@@ -739,18 +1023,12 @@ export async function dbGetSettings(tenantID, storeID) {
 /**
  * Get customer object from Firestore
  * @param {string} customerID - Customer ID (required)
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.includeMetadata - Whether to include metadata in response (default: true)
- * @returns {Promise<Object>} Customer object
+ * @returns {Promise<Object>} Customer object or null
  */
 export async function dbGetCustomer(customerID) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters
     if (!tenantID || !storeID) {
       log("Error: tenantID and storeID are not configured for dbGetCustomer");
       return null;
@@ -765,6 +1043,11 @@ export async function dbGetCustomer(customerID) {
       buildCustomerPath(tenantID, storeID, customerID)
     );
 
+    if (!customer) {
+      log("Error: Customer not found for dbGetCustomer");
+      return null;
+    }
+
     return customer;
   } catch (error) {
     log("Error retrieving customer:", error);
@@ -774,18 +1057,12 @@ export async function dbGetCustomer(customerID) {
 
 /**
  * Get open workorders from Firestore
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.includeMetadata - Whether to include metadata in response (default: true)
- * @returns {Promise<Object>} Open workorders data
+ * @returns {Promise<Array>} Open workorders array or null
  */
 export async function dbGetOpenWorkorders() {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbGetOpenWorkorders"
@@ -797,7 +1074,8 @@ export async function dbGetOpenWorkorders() {
     const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}`;
 
     const workorders = await firestoreQuery(collectionPath, []);
-    return workorders;
+
+    return workorders || [];
   } catch (error) {
     log("Error retrieving open workorders:", error);
     return null;
@@ -806,18 +1084,12 @@ export async function dbGetOpenWorkorders() {
 
 /**
  * Get all inventory items from Firestore
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
- * @param {boolean} options.includeMetadata - Whether to include metadata in response (default: true)
- * @returns {Promise<Object>} Inventory items data
+ * @returns {Promise<Array>} Inventory items array or null
  */
 export async function dbGetInventoryItems() {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbGetInventoryItems"
@@ -829,7 +1101,8 @@ export async function dbGetInventoryItems() {
     const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INVENTORY}`;
 
     const items = await firestoreQuery(collectionPath, []);
-    return items;
+
+    return items || [];
   } catch (error) {
     log("Error retrieving inventory items:", error);
     return null;
@@ -839,14 +1112,13 @@ export async function dbGetInventoryItems() {
 /**
  * Get tenant info from email_users collection by id field
  * @param {string} id - Tenant ID to search for
- * @param {Object} options - Optional parameters
- * @returns {Promise<Object>} Tenant info data
+ * @returns {Promise<Object>} Tenant info data or null
  */
 export async function dbGetTenantById(id) {
   try {
-    // Validate required parameters
     if (!id) {
-      throw new Error("id is required parameter");
+      log("Error: id is required for dbGetTenantById");
+      return null;
     }
 
     // Build collection path: email_users
@@ -860,16 +1132,10 @@ export async function dbGetTenantById(id) {
     // Should return exactly one result
     const tenant = results && results.length > 0 ? results[0] : null;
 
-    // log("Tenant retrieved by id", {
-    //   id,
-    //   path: collectionPath,
-    //   found: !!tenant
-    // });
-
     return tenant;
   } catch (error) {
     log("Error retrieving tenant by id:", error);
-    throw error;
+    return null;
   }
 }
 
@@ -877,38 +1143,42 @@ export async function dbGetTenantById(id) {
 
 /**
  * Get punch objects by time frame with optional userID filtering
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
  * @param {number} startTimeMillis - Start time in milliseconds (required)
  * @param {number} endTimeMillis - End time in milliseconds (required)
  * @param {Object} options - Optional parameters
  * @param {string} options.userID - User ID to filter by (optional)
  * @param {string} options.timestampField - Field name for timestamp (default: "timestamp")
- * @returns {Promise<Array>} Array of punch objects
+ * @returns {Promise<Array>} Array of punch objects or null
  */
 export async function dbGetPunchesByTimeFrame(
-  tenantID,
-  storeID,
   startTimeMillis,
-  endTimeMillis
+  endTimeMillis,
+  options = {}
 ) {
-  const userID = null;
-  const timestampField = "timestamp";
+  const { userID, timestampField = "timestamp" } = options;
 
   try {
-    // Validate required parameters
+    const { tenantID, storeID } = getTenantAndStore();
+
     if (!tenantID || !storeID) {
-      throw new Error("tenantID and storeID are required parameters");
+      log(
+        "Error: tenantID and storeID are not configured for dbGetPunchesByTimeFrame"
+      );
+      return null;
     }
 
     if (!startTimeMillis || !endTimeMillis) {
-      throw new Error(
-        "startTimeMillis and endTimeMillis are required parameters"
+      log(
+        "Error: startTimeMillis and endTimeMillis are required for dbGetPunchesByTimeFrame"
       );
+      return null;
     }
 
     if (startTimeMillis >= endTimeMillis) {
-      throw new Error("startTimeMillis must be less than endTimeMillis");
+      log(
+        "Error: startTimeMillis must be less than endTimeMillis for dbGetPunchesByTimeFrame"
+      );
+      return null;
     }
 
     // Build collection path: tenants/{tenantID}/stores/{storeID}/punches
@@ -933,7 +1203,7 @@ export async function dbGetPunchesByTimeFrame(
     return punches || [];
   } catch (error) {
     log("Error retrieving punches by time frame:", error);
-    throw error;
+    return null;
   }
 }
 
@@ -941,15 +1211,12 @@ export async function dbGetPunchesByTimeFrame(
  * Search customers by phone number in Firestore (supports partial matching for real-time search)
  * Searches in "cell" and "landline" phone number fields
  * @param {string} phoneNumber - Phone number (up to 10 digits, supports partial matches)
- * @param {Object} options - Optional parameters
  * @returns {Promise<Object>} Object with success status and array of matching customers
  */
 export async function dbSearchCustomersByPhone(phoneNumber) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbSearchCustomersByPhone"
@@ -968,14 +1235,38 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
     }
 
     if (!phoneNumber || typeof phoneNumber !== "string") {
-      throw new Error("phoneNumber is required and must be a string");
+      log(
+        "Error: phoneNumber is required and must be a string for dbSearchCustomersByPhone"
+      );
+      return {
+        success: false,
+        error: "Invalid Parameter",
+        message: "phoneNumber is required and must be a string",
+        customers: [],
+        count: 0,
+        phoneNumber: phoneNumber || "",
+        tenantID,
+        storeID,
+      };
     }
 
     // Clean and validate phone number (remove non-digits, limit to 10 digits)
     const cleanPhone = phoneNumber.replace(/\D/g, "").substring(0, 10);
 
     if (cleanPhone.length === 0) {
-      throw new Error("Phone number must contain at least one digit");
+      log(
+        "Error: Phone number must contain at least one digit for dbSearchCustomersByPhone"
+      );
+      return {
+        success: false,
+        error: "Invalid Parameter",
+        message: "Phone number must contain at least one digit",
+        customers: [],
+        count: 0,
+        phoneNumber: cleanPhone,
+        tenantID,
+        storeID,
+      };
     }
 
     // Build collection path for customers
@@ -1023,34 +1314,38 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
       }
     }
 
-    // log("Customer search completed", {
-    //   phoneNumber: cleanPhone,
-    //   tenantID,
-    //   storeID,
-    //   resultsCount: allResults.length,
-    // });
-
-    return  allResults
+    return {
+      success: true,
+      customers: allResults,
+      phoneNumber: cleanPhone,
+      tenantID,
+      storeID,
+      count: allResults.length,
+    };
   } catch (error) {
     log("Error searching customers by phone:", error);
-    throw error;
+    return {
+      success: false,
+      error: "Database Error",
+      message: error.message,
+      customers: [],
+      count: 0,
+      phoneNumber: phoneNumber || "",
+      tenantID: null,
+      storeID: null,
+    };
   }
 }
 
 /**
  * Search customers by email in Firestore (supports partial matching for real-time search)
  * @param {string} email - Email address (supports partial matches)
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
  * @returns {Promise<Object>} Object with success status and array of matching customers
  */
 export async function dbSearchCustomersByEmail(email) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbSearchCustomersByEmail"
@@ -1123,7 +1418,14 @@ export async function dbSearchCustomersByEmail(email) {
       );
     });
 
-return filteredResults
+    return {
+      success: true,
+      customers: filteredResults,
+      email: cleanEmail,
+      tenantID,
+      storeID,
+      count: filteredResults.length,
+    };
   } catch (error) {
     log("Error searching customers by email:", error);
     return {
@@ -1143,17 +1445,12 @@ return filteredResults
  * Search customers by first and last name in Firestore (supports partial matching for real-time search)
  * Searches in "first" and "last" name fields
  * @param {string} name - Name to search for (supports partial matches)
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
- * @param {Object} options - Optional parameters
  * @returns {Promise<Object>} Object with success status and array of matching customers
  */
 export async function dbSearchCustomersByName(name) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
       log(
         "Error: tenantID and storeID are not configured for dbSearchCustomersByName"
@@ -1254,8 +1551,14 @@ export async function dbSearchCustomersByName(name) {
       }
     }
 
-    return allResults
-
+    return {
+      success: true,
+      customers: allResults,
+      name: cleanName,
+      tenantID,
+      storeID,
+      count: allResults.length,
+    };
   } catch (error) {
     log("Error searching customers by name:", error);
     return {
@@ -1275,31 +1578,29 @@ export async function dbSearchCustomersByName(name) {
 
 /**
  * Listen to changes in open workorders collection for a tenant/store
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
  * @param {Function} onSnapshot - Callback function called when workorders change
  * @returns {Function} Unsubscribe function to stop listening
  */
 export function dbListenToOpenWorkorders(onSnapshot) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
-      log("Error: tenantID and storeID are not configured");
+      log(
+        "Error: tenantID and storeID are not configured for dbListenToOpenWorkorders"
+      );
       return null;
     }
 
     if (!onSnapshot || typeof onSnapshot !== "function") {
-      log("Error: onSnapshot callback function is required");
+      log(
+        "Error: onSnapshot callback function is required for dbListenToOpenWorkorders"
+      );
       return null;
     }
 
     // Build collection path: tenants/{tenantID}/stores/{storeID}/open-workorders
     const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}`;
-
-    // log("Starting workorder listener", { tenantID, storeID, path: collectionPath });
 
     // Subscribe to collection changes
     const unsubscribe = firestoreSubscribeCollection(
@@ -1310,7 +1611,6 @@ export function dbListenToOpenWorkorders(onSnapshot) {
           return;
         }
 
-        // log("Workorders changed", { tenantID, storeID, count: workordersData ? workordersData.length : 0 });
         onSnapshot(workordersData);
       }
     );
@@ -1324,31 +1624,29 @@ export function dbListenToOpenWorkorders(onSnapshot) {
 
 /**
  * Listen to changes in settings document for a tenant/store
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
  * @param {Function} onChange - Callback function called when settings change
  * @returns {Function} Unsubscribe function to stop listening
  */
 export function dbListenToSettings(onChange) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
-      log("Error: tenantID and storeID are not configured");
+      log(
+        "Error: tenantID and storeID are not configured for dbListenToSettings"
+      );
       return null;
     }
 
     if (!onChange || typeof onChange !== "function") {
-      log("Error: onChange callback function is required");
+      log(
+        "Error: onChange callback function is required for dbListenToSettings"
+      );
       return null;
     }
 
     // Build path: tenants/{tenantID}/stores/{storeID}/settings/settings
     const path = buildSettingsPath(tenantID, storeID);
-
-    // log("Starting settings listener", { tenantID, storeID, path });
 
     // Subscribe to document changes
     const unsubscribe = firestoreSubscribe(path, (settingsData, error) => {
@@ -1357,7 +1655,6 @@ export function dbListenToSettings(onChange) {
         return; // Don't call onChange on error
       }
 
-      // log("Settings changed", { tenantID, storeID });
       onChange(settingsData, tenantID, storeID);
     });
 
@@ -1370,31 +1667,29 @@ export function dbListenToSettings(onChange) {
 
 /**
  * Listen to changes in current punch clock document for a tenant/store
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
  * @param {Function} onChange - Callback function called when punch clock changes
  * @returns {Function} Unsubscribe function to stop listening
  */
 export function dbListenToCurrentPunchClock(onChange) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
-      log("Error: tenantID and storeID are not configured");
+      log(
+        "Error: tenantID and storeID are not configured for dbListenToCurrentPunchClock"
+      );
       return null;
     }
 
     if (!onChange || typeof onChange !== "function") {
-      log("Error: onChange callback function is required");
+      log(
+        "Error: onChange callback function is required for dbListenToCurrentPunchClock"
+      );
       return null;
     }
 
     // Build path: tenants/{tenantID}/stores/{storeID}/punch_clock/current
     const path = buildCurrentPunchClockPath(tenantID, storeID);
-
-    // log("Starting current punch clock listener", { tenantID, storeID, path });
 
     // Subscribe to document changes
     const unsubscribe = firestoreSubscribe(path, (punchClockData, error) => {
@@ -1403,7 +1698,6 @@ export function dbListenToCurrentPunchClock(onChange) {
         return; // Don't call onChange on error
       }
       if (!punchClockData) punchClockData = {};
-      // log("Current punch clock changed", { tenantID, storeID });
       onChange(punchClockData);
     });
 
@@ -1416,31 +1710,29 @@ export function dbListenToCurrentPunchClock(onChange) {
 
 /**
  * Listen to changes in inventory collection for a tenant/store
- * @param {string} tenantID - Tenant ID (required)
- * @param {string} storeID - Store ID (required)
  * @param {Function} onSnapshot - Callback function called when inventory changes
  * @returns {Function} Unsubscribe function to stop listening
  */
 export function dbListenToInventory(onSnapshot) {
   try {
-    // Get tenantID and storeID from settings store
     const { tenantID, storeID } = getTenantAndStore();
 
-    // Validate required parameters - return error response instead of throwing
     if (!tenantID || !storeID) {
-      log("Error: tenantID and storeID are not configured");
+      log(
+        "Error: tenantID and storeID are not configured for dbListenToInventory"
+      );
       return null;
     }
 
     if (!onSnapshot || typeof onSnapshot !== "function") {
-      log("Error: onSnapshot callback function is required");
+      log(
+        "Error: onSnapshot callback function is required for dbListenToInventory"
+      );
       return null;
     }
 
     // Build collection path: tenants/{tenantID}/stores/{storeID}/inventory
     const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INVENTORY}`;
-
-    // log("Starting inventory listener", { tenantID, storeID, path: collectionPath });
 
     // Subscribe to collection changes
     const unsubscribe = firestoreSubscribeCollection(
@@ -1451,7 +1743,6 @@ export function dbListenToInventory(onSnapshot) {
           return;
         }
 
-        // log("Inventory changed", { tenantID, storeID, count: inventoryData ? inventoryData.length : 0 });
         onSnapshot(inventoryData);
       }
     );
@@ -1472,23 +1763,16 @@ export function dbListenToInventory(onSnapshot) {
  * @param {boolean} options.isAutoLogin - Whether this is an auto-login (for logging purposes)
  * @returns {Promise<Object>} Login result with authentication data only
  */
-export async function dbLoginUser(email, password) {
+export async function dbLoginUser(email, password, options = {}) {
   const isAutoLogin = false;
 
   try {
-    // log(`Starting ${isAutoLogin ? "auto-login" : "login"} process`, { email });
-
     // Use the existing authSignIn function from db_calls.js
     const authResult = await authSignIn(email, password);
 
     if (!authResult.user) {
       throw new Error("Authentication failed - no user returned");
     }
-
-    // log(`${isAutoLogin ? "auto-login" : "login"} successful`, {
-    //   userID: authResult.user.uid,
-    //   email: authResult.user.email,
-    // });
 
     return {
       success: true,
@@ -1518,7 +1802,7 @@ export async function dbAutoLogin(email, password) {
  * @param {boolean} options.signOutFromAuth - Whether to sign out from Firebase Auth (default: true)
  * @returns {Promise<Object>} Sign out result
  */
-export async function dbLogout() {
+export async function dbLogout(options = {}) {
   const signOutFromAuth = true;
 
   try {

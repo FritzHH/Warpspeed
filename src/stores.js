@@ -8,7 +8,14 @@ import {
   TAB_NAMES,
   TIME_PUNCH_PROTO,
 } from "./data";
-import { checkArr, generateUPCBarcode, log, removeFieldFromObj } from "./utils";
+import {
+  arrHasItem,
+  checkArr,
+  generateUPCBarcode,
+  log,
+  removeFieldFromObj,
+  replaceOrAddToArr,
+} from "./utils";
 import { cloneDeep } from "lodash";
 import {
   dbSetInventoryItem,
@@ -18,11 +25,14 @@ import {
   dbGetSaleItem,
 } from "./db_call_wrapper";
 import {
+  dbGetCompletedSale,
+  dbGetCompletedWorkorder,
   dbSaveCurrentPunchClock,
   dbSaveCustomer,
   dbSaveOpenWorkorder,
   dbSavePunchObject,
   dbSaveSettings,
+  dbSaveSettingsField,
 } from "./db_calls_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
@@ -89,14 +99,23 @@ export const useCustomerSearchStore = create((set, get) => ({
     }));
   },
   setSearchResults: (searchResults) => ({ searchResults }),
-  // addToSearchResults: (result) => {
-  //   if (searchResults.find(o => o.id === result.id)) return;
-  //   set({...get().searchResults, result})
-  // },
+  addToSearchResults: (searchResults, count) => {
+    let storeSearchResults = get().searchResults;
+    if (count === 0) {
+      set({ searchResults });
+      return;
+    }
+
+    searchResults.forEach((searchResult) => {
+      if (arrHasItem(storeSearchResults, searchResult)) return;
+      storeSearchResults = [...storeSearchResults, searchResult];
+    });
+    set({ searchResults: storeSearchResults });
+  },
 
   reset: () => {
-    set((state) => ({ searchResults: [] }));
-    set((state) => ({ selectedItem: null }));
+    set({ searchResults: [] });
+    set({ selectedItem: null });
   },
 }));
 
@@ -493,25 +512,6 @@ export const useLoginStore = create((set, get) => ({
   runPostLoginFunction: () => get().postLoginFunctionCallback(),
 }));
 
-export const useCurrentCustomerStore = create((set, get) => ({
-  customer: { ...CUSTOMER_PROTO },
-  getCustomer: () => get().customer,
-
-  setCustomerField: (fieldName, value) => {
-    let customerObj = cloneDeep(get().customerObj);
-    if (fieldName && value) customerObj[fieldName] = value;
-    set({ customerObj });
-    dbSetCustomerField(customerObj.id, { [fieldName]: value });
-  },
-  setCustomer: (customer, sendToDB = false) => {
-    set({ customer });
-
-    if (sendToDB) dbSaveCustomer(customer, customer.id);
-
-    // if (sendToDB) dbSetCustomerObj(obj);
-  },
-}));
-
 export const useInventoryStore = create((set, get) => ({
   inventoryArr: [],
   getInventoryArr: () => get().inventoryArr,
@@ -553,6 +553,73 @@ export const useInventoryStore = create((set, get) => ({
     if (sendToDB) dbSetInventoryItem(item, batch);
   },
   setItems: (inventoryArr) => set({ inventoryArr }),
+}));
+
+export const useCurrentCustomerStore = create((set, get) => ({
+  customer: { ...CUSTOMER_PROTO },
+  sales: [],
+  workorders: [],
+  salesLoading: false,
+  workordersLoading: false,
+  getCustomer: () => get().customer,
+  getWorkorders: () => get().workorders,
+  getSales: () => get().sales,
+  getSalesLoading: () => get().salesLoading,
+  getWorkordersLoading: () => get().workordersLoading,
+
+  setCustomerField: (fieldName, value, saveToDB = true) => {
+    set({ customer: { ...get().customer, [fieldName]: value } });
+    if (saveToDB) dbSaveSettingsField(fieldName, value);
+  },
+  setCustomer: (customer, sendToDB = true) => {
+    set({ customer });
+    if (sendToDB) dbSaveCustomer(customer);
+  },
+
+  loadWorkorders: () => {
+    // testing
+    // log(useOpenWorkordersStore.getState().getWorkorders());
+    set({
+      workorders: [...useOpenWorkordersStore.getState().getWorkorders()],
+    });
+
+    return;
+
+    set({ workordersLoading: true });
+    let target = get().customer.workorders?.length;
+    let count = 0;
+    let workorders = useOpenWorkordersStore.getState().getWorkorders();
+    get().customer.workorders?.forEach((workorderID) => {
+      if (workorders.find((wo) => wo.id === workorderID)) {
+        count++;
+        set({
+          workorders: replaceOrAddToArr(
+            get().workorders,
+            workorders.find((wo) => wo.id === workorderID)
+          ),
+        });
+      } else {
+        dbGetCompletedWorkorder(workorderID).then((workorder) => {
+          count++;
+          set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
+          if (count === target) set({ workordersLoading: false });
+        });
+      }
+    });
+  },
+
+  loadSales: () => {
+    set({ salesLoading: true });
+    let target = get().customer.sales?.length;
+    let count = 0;
+    get().customer.sales?.forEach((salesID) => {
+      dbGetCompletedSale(salesID).then((sale) => {
+        count++;
+        set({ sales: replaceOrAddToArr(get().sales, sale) });
+        if (count === target) set({ salesLoading: false });
+      });
+    });
+  },
 }));
 
 export const useCustMessagesStore = create((set, get) => ({

@@ -333,6 +333,9 @@ export const SALE_PROTO = {
 // workorder stuff ////////////////////////////////////////////////////
 export const WORKORDER_PROTO = {
   paymentComplete: false,
+  amountPaid: 0,
+  sales: [],
+  endedOnMillis: "",
   saleID: "",
   isStandaloneSale: false,
   id: "",
@@ -401,7 +404,7 @@ export const CUSTOMER_PROTO = {
   interactionRating: "",
   workorders: [],
   previousBikes: [],
-  saleIDs: [],
+  sales: [],
   dateCreated: "",
 };
 

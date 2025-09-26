@@ -1230,6 +1230,7 @@ export const CustomerInfoScreenModalComponent = ({
             padding: 20,
             backgroundColor: C.backgroundWhite,
             height: "90%",
+            // width: "60%",
             flexDirection: "row",
             borderRadius: 15,
             shadowProps: {

@@ -1195,7 +1195,7 @@ export const CustomerInfoScreenModalComponent = ({
     useCurrentCustomerStore();
 
   useEffect(() => {
-    useCurrentCustomerStore.getState().loadWorkorders();
+    // useCurrentCustomerStore.getState().loadWorkorders();
   }, []);
 
   function setCustomerInfo(customerInfo) {
@@ -1213,7 +1213,7 @@ export const CustomerInfoScreenModalComponent = ({
     height: 40,
     borderColor: gray(0.4),
     borderWidth: 1,
-    marginTop: 10,
+    marginTop: 20,
     paddingHorizontal: 5,
     outlineWidth: 0,
     borderRadius: 7,
@@ -1227,8 +1227,9 @@ export const CustomerInfoScreenModalComponent = ({
         <View
           style={{
             // width: "60%",
+            padding: 20,
             backgroundColor: C.backgroundWhite,
-            height: "70%",
+            height: "90%",
             flexDirection: "row",
             borderRadius: 15,
             shadowProps: {
@@ -1471,9 +1472,21 @@ export const CustomerInfoScreenModalComponent = ({
             </View>
           </View>
           {isNewCustomer && (
-            <View style={{ width: 400, height: "100%", padding: 20 }}>
+            <View
+              style={{
+                width: 450,
+                height: "100%",
+                paddingHorizontal: 15,
+                paddingVertical: 5,
+              }}
+            >
               <View
-                style={{ height: "50%", width: "100%", alignItems: "center" }}
+                style={{
+                  maxHeight: "45%",
+                  width: "100%",
+                  alignItems: "center",
+                  width: "100%",
+                }}
               >
                 <Button_
                   colorGradientArr={COLOR_GRADIENTS.bluegreen}
@@ -1487,13 +1500,19 @@ export const CustomerInfoScreenModalComponent = ({
 
                 <View
                   style={{
+                    marginTop: 10,
                     height: "100%",
                     backgroundColor: "transparent",
                     width: "100%",
                   }}
                 >
                   <FlatList
-                    data={workorders}
+                    data={[
+                      ...workorders,
+                      ...workorders,
+                      ...workorders,
+                      ...workorders,
+                    ]}
                     renderItem={(obj) => {
                       let wo = obj.item;
                       // log("work", wo);
@@ -1502,15 +1521,15 @@ export const CustomerInfoScreenModalComponent = ({
                         useSettingsStore.getState().settings.salesTax
                       );
                       // log("totals", totals);
-                      log(wo);
+                      // log(wo);
                       return (
                         <View
                           style={{
                             borderRadius: 10,
                             borderLeftWidth: 2,
                             borderColor: C.green,
-                            padding: 7,
-                            marginBottom: 6,
+                            padding: 5,
+                            marginBottom: 4,
                             width: "100%",
                             backgroundColor: C.listItemWhite,
                           }}
@@ -1524,18 +1543,28 @@ export const CustomerInfoScreenModalComponent = ({
                             }}
                           >
                             <Text style={{ color: C.textMain }}>
-                              {wo.brand + "     " + wo.model
-                                ? wo.model + "     "
-                                : "" + wo.description
-                                ? wo.description + "     "
-                                : ""}
+                              {wo.brand +
+                                "     " +
+                                (wo.model ? wo.model + "     " : "") +
+                                (wo.description
+                                  ? wo.description + "     "
+                                  : "")}
+                            </Text>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                              }}
+                            >
                               {!!wo.color1.label && (
                                 <Text
                                   style={{
-                                    paddingHorizontal: 5,
+                                    padding: 5,
                                     color: wo.color1.textColor,
                                     backgroundColor: wo.color1.backgroundColor,
                                     borderRadius: 10,
+                                    fontSize: 11,
+                                    paddingVertical: 1,
                                   }}
                                 >
                                   {wo.color1.label}
@@ -1544,16 +1573,19 @@ export const CustomerInfoScreenModalComponent = ({
                               {!!wo.color2.label && (
                                 <Text
                                   style={{
+                                    marginLeft: 5,
                                     paddingHorizontal: 5,
+                                    paddingVertical: 1,
                                     color: wo.color2.textColor,
                                     backgroundColor: wo.color2.backgroundColor,
                                     borderRadius: 10,
+                                    fontSize: 11,
                                   }}
                                 >
                                   {wo.color2.label}
                                 </Text>
                               )}
-                            </Text>
+                            </View>
                           </View>
                           <View
                             style={{
@@ -1563,27 +1595,50 @@ export const CustomerInfoScreenModalComponent = ({
                               justifyContent: "space-between",
                             }}
                           >
-                            <Text style={{ color: C.textMain, fontSize: 12 }}>
+                            <Text style={{ color: gray(0.4), fontSize: 12 }}>
                               {formatMillisForDisplay(wo.startedOnMillis)}
                               {!!wo.endedOnMillis && (
                                 <Text>
                                   {" ➟ " +
-                                    "Finished on: " +
                                     formatMillisForDisplay(wo.endedOnMillis)}
                                 </Text>
                               )}
                             </Text>
                             {wo.paymentComplete ? (
-                              <Text style={{ color: C.green }}>
+                              <Text style={{ fontSize: 12, color: C.green }}>
                                 {"Paid in Full: $" + wo.amountPaid}
                               </Text>
                             ) : (
-                              <Text style={{ color: C.red }}>{"$"}</Text>
+                              <Text style={{ fontSize: 12, color: C.red }}>
+                                {"$" +
+                                  (formatCurrencyDisp(wo.amountPaid) || 0) +
+                                  " / $" +
+                                  formatCurrencyDisp(totals.finalTotal)}
+                              </Text>
                             )}
                           </View>
                         </View>
                       );
                     }}
+                  />
+                </View>
+                <View
+                  style={{
+                    maxHeight: "45%",
+                    width: "100%",
+                    alignItems: "center",
+                    marginTop: 10,
+                    // backgroundColor: "green",
+                  }}
+                >
+                  <Button_
+                    colorGradientArr={COLOR_GRADIENTS.bluegreen}
+                    icon={salesLoading ? ICONS.wheelGIF : ICONS.add}
+                    // buttonStyle={{ width: null, width: null }}
+                    text={"LOAD SALES"}
+                    onPress={() =>
+                      useCurrentCustomerStore.getState().loadSales()
+                    }
                   />
                 </View>
               </View>

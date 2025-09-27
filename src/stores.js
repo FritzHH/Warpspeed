@@ -613,7 +613,7 @@ export const useCurrentCustomerStore = create((set, get) => ({
       amountCaptured: "45654",
       id: 125425652125,
       millis: new Date().getTime(),
-      workorderIDs: ["123652145236", "123265212565"],
+      workorderIDs: ["018609309556", "068688807311"],
       payments: [
         {
           amountCaptured: "45434",
@@ -628,6 +628,8 @@ export const useCurrentCustomerStore = create((set, get) => ({
         },
       ],
     };
+
+    return [sale, sale, sale, sale];
 
 
     set({ salesLoading: true });

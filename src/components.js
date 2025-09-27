@@ -1381,24 +1381,24 @@ export const PhoneNumberInput = ({
       const isCursorPosition = isFocused && cursorPosition === i;
 
       // Debug logging
-      if (i === 0) {
-        console.log("Box rendering debug:", {
-          isFocused,
-          cursorPosition,
-          digits: digits,
-          digitsLength: digits.length,
-        });
-      }
+      // if (i === 0) {
+      //   console.log("Box rendering debug:", {
+      //     isFocused,
+      //     cursorPosition,
+      //     digits: digits,
+      //     digitsLength: digits.length,
+      //   });
+      // }
 
       // Additional debug for cursor position
-      if (isCursorPosition) {
-        console.log(`Box ${i} is cursor position!`, {
-          isFocused,
-          cursorPosition,
-          i,
-          digit,
-        });
-      }
+      // if (isCursorPosition) {
+      //   console.log(`Box ${i} is cursor position!`, {
+      //     isFocused,
+      //     cursorPosition,
+      //     i,
+      //     digit,
+      //   });
+      // }
 
       elements.push(
         <View

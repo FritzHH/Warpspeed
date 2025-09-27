@@ -49,7 +49,7 @@ export const C = {
   buttonLightGreen: "rgb(232, 239, 245)",
   buttonLightGreenOutline: "rgb(200, 228, 220)",
 
-  text: lightenRGBByPercent("rgb(45, 55, 72)", 30),
+  text: lightenRGBByPercent("rgb(45, 55, 72)", 25),
   textWhite: "rgb(255, 255, 255)",
 };
 

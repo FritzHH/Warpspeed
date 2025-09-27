@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import { C } from "./styles";
 import { useAlertScreenStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
+import { arrayRemove } from "firebase/firestore";
 
 // const fs = require("node:fs");
 export const dim = {
@@ -1102,7 +1103,6 @@ export async function randomWordGenerator() {
   return generate({ minLength: 4, maxLength: 8 });
 }
 
-
 // OBJECT operations /////////////////////////////////////////////////
 export function removeUnusedFields(obj) {
   if (!isObject(obj)) return obj;
@@ -1227,12 +1227,61 @@ export function removeArrItem(arr, item, fieldID = "id") {
   return arr.filter((o) => o[fieldID] !== item[fieldID]);
 }
 
+// takes an array of objects or strings or numbers. optional input fieldName defaulted to "id"
 export function addOrRemoveFromArr(arr, input, fieldName = "id") {
-  if (!arr) arr = [];
+  if (!arr) return [];
   if (!input) return arr;
-  let found = arr.find((o) => o[fieldName] === input[fieldName]);
-  // log("found", found);
-  if (found) return arr.filter((o) => o[fieldName] !== input[fieldName]);
+
+  // Handle empty array
+  if (arr.length === 0) return [input];
+
+  // Determine the type of input
+  const inputType = typeof input;
+
+  if (inputType === "string" || inputType === "number") {
+    // Handle primitive values (string or number)
+    const found = arr.find((item) => item === input);
+    if (found) {
+      return arr.filter((item) => item !== input);
+    }
+    return [...arr, input];
+  }
+
+  if (inputType === "object" && input !== null) {
+    // Handle objects - search by the specified field
+    const found = arr.find(
+      (item) =>
+        typeof item === "object" &&
+        item !== null &&
+        item[fieldName] === input[fieldName]
+    );
+
+    if (found) {
+      return arr.filter(
+        (item) =>
+          typeof item !== "object" ||
+          item === null ||
+          item[fieldName] !== input[fieldName]
+      );
+    }
+    return [...arr, input];
+  }
+
+  // Fallback for other types
+  return [...arr, input];
+}
+
+export function addOrRemoveFromArrOLD(arr, input, fieldName = "id") {
+  if (!arr) return [];
+  if (!input) return arr;
+  if (!(arr.length > 0)) return [input];
+  if (!arr[0][fieldName]) {
+    let found = arr.find((o) => o == input);
+    if (found) return arr.filter((o) => o != input);
+  } else {
+    let found = arr.find((o) => o[fieldName] === input[fieldName]);
+    if (found) return arr.filter((o) => o[fieldName] !== input[fieldName]);
+  }
   return [...arr, input];
 }
 

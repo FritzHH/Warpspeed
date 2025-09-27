@@ -1230,7 +1230,7 @@ export function removeArrItem(arr, item, fieldID = "id") {
 // takes an array of objects or strings or numbers. optional input fieldName defaulted to "id"
 export function addOrRemoveFromArr(arr, input, fieldName = "id") {
   if (!arr) return [];
-  if (!input) return arr;
+  if (input == null) return arr;
 
   // Handle empty array
   if (arr.length === 0) return [input];
@@ -1241,7 +1241,7 @@ export function addOrRemoveFromArr(arr, input, fieldName = "id") {
   if (inputType === "string" || inputType === "number") {
     // Handle primitive values (string or number)
     const found = arr.find((item) => item === input);
-    if (found) {
+    if (found !== undefined) {
       return arr.filter((item) => item !== input);
     }
     return [...arr, input];
@@ -1256,7 +1256,7 @@ export function addOrRemoveFromArr(arr, input, fieldName = "id") {
         item[fieldName] === input[fieldName]
     );
 
-    if (found) {
+    if (found !== undefined) {
       return arr.filter(
         (item) =>
           typeof item !== "object" ||

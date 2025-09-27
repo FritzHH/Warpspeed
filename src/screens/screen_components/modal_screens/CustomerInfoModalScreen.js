@@ -428,7 +428,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
         data={workorders}
         renderItem={(obj) => {
           let workorder = obj.item;
-          let workorderIdx = obj.index;
+          let workorderIdx = Number(obj.index);
           const totals = calculateRunningTotals(
             workorder,
             useSettingsStore.getState().settings.salesTax
@@ -698,7 +698,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                   );
                 }}
               />
-              {sCustomerNotesIdxs.find((idx) => idx === workorderIdx) && (
+              {sCustomerNotesIdxs.includes(workorderIdx) && (
                 <Text
                   style={{
                     fontSize: 11,
@@ -720,7 +720,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                   </Text>
                 </Text>
               )}
-              {sInternalNotesIdxs.find((idx) => idx === workorderIdx) && (
+              {sInternalNotesIdxs.includes(workorderIdx) && (
                 <Text
                   style={{
                     marginTop: 5,

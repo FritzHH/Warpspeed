@@ -598,7 +598,7 @@ const AppUserListComponent = ({
           <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
             <Text
               style={{
-                color: C.textMain,
+                color: C.text,
               }}
             >
               {"Seconds to log user out: "}
@@ -615,7 +615,7 @@ const AppUserListComponent = ({
                 borderRadius: 5,
                 paddingLeft: 3,
                 outlineWidth: 0,
-                color: C.textMain,
+                color: C.text,
               }}
               value={zSettingsObj?.activeLoginTimeoutSeconds}
             />
@@ -632,7 +632,7 @@ const AppUserListComponent = ({
             <Text
               style={{
                 // width: "40%",
-                color: C.textMain,
+                color: C.text,
               }}
             >
               {"Hours to lock app: "}
@@ -648,7 +648,7 @@ const AppUserListComponent = ({
                 borderWidth: 1,
                 borderRadius: 5,
                 paddingLeft: 3,
-                color: C.textMain,
+                color: C.text,
                 outlineWidth: 0,
               }}
               value={Math.round(zSettingsObj?.idleLoginTimeoutHours)}
@@ -659,7 +659,7 @@ const AppUserListComponent = ({
               <Text
                 style={{
                   // width: "40%",
-                  color: C.textMain,
+                  color: C.text,
                 }}
               >
                 {"User login PIN length: "}
@@ -676,7 +676,7 @@ const AppUserListComponent = ({
                   borderRadius: 5,
                   paddingLeft: 3,
                   outlineWidth: 0,
-                  color: C.textMain,
+                  color: C.text,
                 }}
                 value={zSettingsObj?.userPinStrength}
               />
@@ -801,7 +801,7 @@ const AppUserListComponent = ({
                       }}
                       mouseOverOptions={{ opacity: 0.7 }}
                       textStyle={{
-                        color: editable ? C.textWhite : C.textMain,
+                        color: editable ? C.textWhite : C.text,
                         fontSize: 12,
                       }}
                     />
@@ -986,7 +986,7 @@ const AppUserListComponent = ({
                           }}
                           buttonText={userObj.permissions.name}
                           buttonTextStyle={{
-                            color: C.textMain,
+                            color: C.text,
                             fontSize: 14,
                           }}
                         />
@@ -1162,7 +1162,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             width: "95%",
           }}
         >
-          <Text style={{ color: C.textMain }}>Category Name:</Text>
+          <Text style={{ color: C.text }}>Category Name:</Text>
           <TextInput
             style={{
               width: "50%",
@@ -1172,7 +1172,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               borderRadius: 5,
               borderColor: C.buttonLightGreenOutline,
               outlineWidth: 0,
-              color: C.textMain,
+              color: C.text,
               marginRight: 10,
             }}
             value={zSettingsObj?.bikeBrandsName}
@@ -1217,7 +1217,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       padding: 5,
                       width: "80%",
                       textAlign: "center",
-                      color: C.textMain,
+                      color: C.text,
                       outlineWidth: 0,
                     }}
                     value={brandName}
@@ -1256,7 +1256,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             width: "95%",
           }}
         >
-          <Text style={{ color: C.textMain }}>Category Name:</Text>
+          <Text style={{ color: C.text }}>Category Name:</Text>
           <TextInput
             style={{
               width: "50%",
@@ -1266,7 +1266,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               borderRadius: 5,
               borderColor: C.buttonLightGreenOutline,
               outlineWidth: 0,
-              color: C.textMain,
+              color: C.text,
               marginRight: 10,
             }}
             value={zSettingsObj?.bikeOptionalBrandsName}
@@ -1314,7 +1314,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       padding: 5,
                       width: "80%",
                       textAlign: "center",
-                      color: C.textMain,
+                      color: C.text,
                       outlineWidth: 0,
                     }}
                     value={brandName}
@@ -1353,7 +1353,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             width: "95%",
           }}
         >
-          <Text style={{ color: C.textMain, marginRight: 20 }}>
+          <Text style={{ color: C.text, marginRight: 20 }}>
             Bike Descriptions
           </Text>
           <BoxButton1
@@ -1396,7 +1396,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       padding: 5,
                       width: "80%",
                       textAlign: "center",
-                      color: C.textMain,
+                      color: C.text,
                       outlineWidth: 0,
                     }}
                     value={brandName}
@@ -1458,9 +1458,7 @@ const DiscountsComponent = ({
               width: "100%",
             }}
           >
-            <Text style={{ color: C.textMain, marginRight: 20 }}>
-              Discounts
-            </Text>
+            <Text style={{ color: C.text, marginRight: 20 }}>Discounts</Text>
             <BoxButton1
               onPress={() => {
                 let discountsArr = zSettingsObj.discounts;
@@ -1510,7 +1508,7 @@ const DiscountsComponent = ({
                       padding: 5,
                       width: "80%",
                       textAlign: "center",
-                      color: C.textMain,
+                      color: C.text,
                       outlineWidth: 0,
                       fontSize: 14,
                       marginRight: 20,
@@ -1596,7 +1594,7 @@ const WaitTimesComponent = ({
               width: "100%",
             }}
           >
-            <Text style={{ color: C.textMain, marginRight: 20 }}>
+            <Text style={{ color: C.text, marginRight: 20 }}>
               Wait Estimates
             </Text>
             <BoxButton1
@@ -1626,7 +1624,7 @@ const WaitTimesComponent = ({
               backgroundColor: "transparent",
             }}
           >
-            <Text style={{ fontColor: C.textMain }}>Label</Text>
+            <Text style={{ fontColor: C.text }}>Label</Text>
           </View>
           <View
             style={{
@@ -1638,7 +1636,7 @@ const WaitTimesComponent = ({
             <Text
               style={{
                 // width: "100%",
-                fontColor: C.textMain,
+                fontColor: C.text,
                 textAlign: "center",
                 fontSize: 12,
               }}
@@ -1682,7 +1680,7 @@ const WaitTimesComponent = ({
                       padding: 5,
                       width: "70%",
                       textAlign: "center",
-                      color: C.textMain,
+                      color: C.text,
                       outlineWidth: 0,
                       fontSize: 13,
                       marginRight: 20,
@@ -1708,7 +1706,7 @@ const WaitTimesComponent = ({
                       padding: 5,
                       width: "20%",
                       textAlign: "center",
-                      color: C.textMain,
+                      color: C.text,
                       outlineWidth: 0,
                       fontSize: 13,
                       marginRight: 20,
@@ -1763,9 +1761,7 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             width: "95%",
           }}
         >
-          <Text style={{ color: C.textMain, marginRight: 20 }}>
-            Part Sources
-          </Text>
+          <Text style={{ color: C.text, marginRight: 20 }}>Part Sources</Text>
           <BoxButton1
             onPress={() => {
               let partSourcesArr = zSettingsObj?.partSources;
@@ -1803,7 +1799,7 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       padding: 5,
                       width: "80%",
                       textAlign: "center",
-                      color: C.textMain,
+                      color: C.text,
                       outlineWidth: 0,
                     }}
                     value={partSourceName}
@@ -1851,7 +1847,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <Text
             style={{
               textAlign: "right",
-              fontColor: C.textMain,
+              fontColor: C.text,
               width: "30%",
             }}
           >
@@ -1900,7 +1896,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <Text
             style={{
               textAlign: "right",
-              fontColor: C.textMain,
+              fontColor: C.text,
               width: "30%",
             }}
           >
@@ -1949,7 +1945,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <Text
             style={{
               textAlign: "right",
-              fontColor: C.textMain,
+              fontColor: C.text,
               width: "30%",
             }}
           >
@@ -1997,7 +1993,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <Text
             style={{
               textAlign: "right",
-              fontColor: C.textMain,
+              fontColor: C.text,
               width: "30%",
             }}
           >
@@ -2045,7 +2041,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <Text
             style={{
               textAlign: "right",
-              fontColor: C.textMain,
+              fontColor: C.text,
               width: "30%",
             }}
           >
@@ -2093,7 +2089,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <Text
             style={{
               textAlign: "right",
-              fontColor: C.textMain,
+              fontColor: C.text,
               width: "30%",
             }}
           >
@@ -2141,7 +2137,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <Text
             style={{
               textAlign: "right",
-              fontColor: C.textMain,
+              fontColor: C.text,
               width: "30%",
             }}
           >
@@ -2680,7 +2676,7 @@ const WorkorderStatusesComponent = ({
                 proto.label = "New Status";
                 proto.id = generateRandomID();
                 proto.backgroundColor = gray(0.3);
-                proto.textColor = C.textMain;
+                proto.textColor = C.text;
                 proto.removable = true;
                 let statuses = [proto, ...zSettingsObj.statuses];
                 handleSettingsFieldChange("statuses", statuses);
@@ -3017,7 +3013,7 @@ const QuickItemButtonsComponent = ({
                         padding: 5,
                         width: "35%",
                         textAlign: "center",
-                        color: C.textMain,
+                        color: C.text,
                         outlineWidth: 0,
                       }}
                       value={quickItemButtonObj.name}

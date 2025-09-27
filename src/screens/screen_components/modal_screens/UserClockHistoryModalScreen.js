@@ -565,13 +565,13 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             <View style={{ flexDirection: "row" }}>
                               <Text
                                 style={{
-                                  color: C.textMain,
+                                  color: C.text,
                                   marginRight: 1,
                                 }}
                               >
                                 {item.in?.wordDayOfWeek + ", "}
                               </Text>
-                              <Text style={{ color: C.textMain }}>
+                              <Text style={{ color: C.text }}>
                                 {item.in.wordDayOfMonth}
                               </Text>
                             </View>
@@ -761,13 +761,13 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                             >
                               <Text
                                 style={{
-                                  color: C.textMain,
+                                  color: C.text,
                                   marginRight: 1,
                                 }}
                               >
                                 {item.out?.wordDayOfWeek + ", "}
                               </Text>
-                              <Text style={{ color: C.textMain }}>
+                              <Text style={{ color: C.text }}>
                                 {item.out?.wordDayOfMonth}
                               </Text>
                             </View>

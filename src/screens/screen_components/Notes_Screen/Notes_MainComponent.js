@@ -211,7 +211,7 @@ export function Notes_MainComponent() {
                 <Text
                   style={{
                     fontSize: 15,
-                    color: C.textMain,
+                    color: C.text,
                     fontWeight: "bold",
                     // marginBottom: 5,
                     marginLeft: 10,
@@ -314,7 +314,7 @@ export function Notes_MainComponent() {
                 style={{
                   marginLeft: 10,
                   fontSize: 15,
-                  color: C.textMain,
+                  color: C.text,
                   fontWeight: "bold",
                 }}
               >

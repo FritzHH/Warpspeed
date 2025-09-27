@@ -211,7 +211,7 @@ export const TabBar = ({
               (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
               "."
             }
-            textStyle={{ fontSize: 13, color: C.textMain }}
+            textStyle={{ fontSize: 13, color: C.text }}
             iconSize={13}
             buttonStyle={{
               paddingHorizontal: 7,

@@ -36,6 +36,7 @@ export const C = {
   orange: "",
   blue: "rgb(53, 135, 210)",
   lightred: "rgb(227, 116, 112)",
+  cursorRed: "#ff6b6b",
   red: lightenRGBByPercent(getRgbFromNamedColor("red"), 10),
 
   backgroundWhite: lightenRGBByPercent("rgb(240, 241, 251)", 45),
@@ -43,11 +44,12 @@ export const C = {
   backgroundListWhite: "rgb(251, 251, 254)",
 
   listItemWhite: "rgb(254, 254, 255)",
+  listItemBorder: gray(0.05),
 
   buttonLightGreen: "rgb(232, 239, 245)",
   buttonLightGreenOutline: "rgb(200, 228, 220)",
 
-  textMain: "rgb(45, 55, 72)",
+  text: lightenRGBByPercent("rgb(45, 55, 72)", 30),
   textWhite: "rgb(255, 255, 255)",
 };
 
@@ -63,7 +65,7 @@ export const COLOR_GRADIENTS = {
     lightenRGBByPercent(C.blue, 10),
   ],
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
-  blue: [lightenRGBByPercent(C.blue, 28), lightenRGBByPercent(C.blue, 10)],
+  blue: [lightenRGBByPercent(C.blue, 30), lightenRGBByPercent(C.blue, 0)],
   lightBlue: [lightenRGBByPercent(C.blue, 60), lightenRGBByPercent(C.blue, 45)],
   grey: [gray(0.27), gray(0.4)],
 };

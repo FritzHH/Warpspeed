@@ -124,6 +124,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
   // background facial detection service
   useEffect(() => {
+    if (!sSetupComplete) return;
     // log("setup", sSetupComplete);
     setStatus("Setup ready, enroll face now");
     log("starting background facial recognition");

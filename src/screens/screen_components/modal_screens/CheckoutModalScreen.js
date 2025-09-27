@@ -831,8 +831,8 @@ export function CheckoutModalScreen({}) {
 
     let amountOfRefundUsed = 0;
     sRefund.workorderLines.forEach((workorderLine) => {
-      let pricePaid = workorderLine.discountObj.newPrice
-        ? workorderLine.discountObj.newPrice
+      let pricePaid = workorderLine.discountObj?.newPrice
+        ? workorderLine.discountObj?.newPrice
         : workorderLine.inventoryItem.salePrice
         ? workorderLine.inventoryItem.salePrice
         : workorderLine.inventoryItem.price;
@@ -991,7 +991,7 @@ export function CheckoutModalScreen({}) {
                     width: "100%",
                     marginBottom: 10,
                     fontSize: 16,
-                    color: C.textMain,
+                    color: C.text,
                     outlineWidth: 0,
                   }}
                   value={sSearchString}
@@ -1097,14 +1097,12 @@ const InventoryListComponent = ({
                 }}
               >
                 <View>
-                  <Text style={{ color: C.textMain }}>{item.formalName}</Text>
-                  <Text style={{ color: C.textMain }}>{item.informalName}</Text>
+                  <Text style={{ color: C.text }}>{item.formalName}</Text>
+                  <Text style={{ color: C.text }}>{item.informalName}</Text>
                 </View>
                 <View style={{ alignItems: "flex-end" }}>
-                  <Text style={{ color: C.textMain }}>
-                    <Text style={{ color: C.textMain, fontSize: 13 }}>
-                      {"$  "}
-                    </Text>
+                  <Text style={{ color: C.text }}>
+                    <Text style={{ color: C.text, fontSize: 13 }}>{"$  "}</Text>
                     {item.price}
                   </Text>
                   {
@@ -1215,7 +1213,7 @@ const WorkorderListComponent = ({
                 isChecked={sCombinedWorkorders.find(
                   (o) => o.id === workorder.id
                 )}
-                textStyle={{ color: C.textMain }}
+                textStyle={{ color: C.text }}
                 text={"ADD TO SALE"}
                 onCheck={() =>
                   zOpenWorkorder?.id === workorder.id ||
@@ -1250,7 +1248,7 @@ const WorkorderListComponent = ({
                 <View style={{ flexDirection: "row" }}>
                   <Text
                     style={{
-                      color: C.textMain,
+                      color: C.text,
                       fontSize: 16,
                       fontWeight: "500",
                     }}
@@ -1266,11 +1264,11 @@ const WorkorderListComponent = ({
                       marginRight: 10,
                     }}
                   >
-                    {workorder.model ? "     " + workorder.mod : ""}
+                    {workorder.model ? "     " + workorder.model : ""}
                   </Text>
                   <Text
                     style={{
-                      color: C.textMain,
+                      color: C.text,
                       fontSize: 16,
                       fontWeight: "500",
                     }}
@@ -1327,7 +1325,7 @@ const WorkorderListComponent = ({
                           : lightenRGBByPercent(C.blue, 60),
                         paddingVertical: 2,
                         marginBottom: 5,
-                        borderColor: "transparent",
+                        borderColor: C.listItemBorder,
                         borderLeftColor: lightenRGBByPercent(C.green, 60),
                         borderLeftWidth: sIsRefund ? 0 : 2,
                         paddingLeft: 10,
@@ -1365,7 +1363,7 @@ const WorkorderListComponent = ({
 
                         <View>
                           <Text style={{ color: C.lightred, fontSize: 12 }}>
-                            {workorderLine.discountObj.name}
+                            {workorderLine.discountObj?.name}
                           </Text>
 
                           <View
@@ -1377,7 +1375,7 @@ const WorkorderListComponent = ({
                             <Text
                               style={{
                                 fontSize: 14,
-                                color: C.textMain,
+                                color: C.text,
                                 fontWeight: "400",
                               }}
                             >
@@ -1415,7 +1413,7 @@ const WorkorderListComponent = ({
                               fontSize: 16,
                               fontWeight: "500",
                               textAlign: "center",
-                              color: C.textMain,
+                              color: C.text,
                               // backgroundColor: C.red,
                               outlineWidth: 0,
                               width: 30,
@@ -1442,7 +1440,7 @@ const WorkorderListComponent = ({
                                 workorderLine.inventoryItem.price
                               )}
                           </Text>
-                          {workorderLine.discountObj.savings ? (
+                          {workorderLine.discountObj?.savings ? (
                             <View style={{ alignItems: "flex-end" }}>
                               <Text
                                 style={{
@@ -1453,7 +1451,7 @@ const WorkorderListComponent = ({
                               >
                                 {"$ -" +
                                   formatCurrencyDisp(
-                                    workorderLine.discountObj.savings
+                                    workorderLine.discountObj?.savings
                                   )}
                               </Text>
                               <Text
@@ -1466,7 +1464,7 @@ const WorkorderListComponent = ({
                                 }}
                               >
                                 {formatCurrencyDisp(
-                                  workorderLine.discountObj.newPrice
+                                  workorderLine.discountObj?.newPrice
                                 )}
                               </Text>
                             </View>
@@ -1495,7 +1493,7 @@ const WorkorderListComponent = ({
                   <Text
                     style={{
                       marginRight: 10,
-                      color: C.textMain,
+                      color: C.text,
                       fontWeight: "500",
                       fontSize: 14,
                     }}
@@ -1546,7 +1544,7 @@ const WorkorderListComponent = ({
                     style={{
                       marginRight: 10,
                       fontWeight: "500",
-                      color: C.textMain,
+                      color: C.text,
                       fontSize: 14,
                     }}
                   >
@@ -1582,7 +1580,7 @@ const WorkorderListComponent = ({
                     style={{
                       marginRight: 10,
                       fontWeight: "700",
-                      color: C.textMain,
+                      color: C.text,
                       fontSize: 15,
                     }}
                   >
@@ -1630,7 +1628,7 @@ const checkoutScreenStyle = {
     textAlign: "right",
     // placeholderTextColor: makeGrey,
     // backgroundColor: "green",
-    color: C.textMain,
+    color: C.text,
     width: "90%",
   },
   buttonText: {

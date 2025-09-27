@@ -675,7 +675,7 @@ export const StripeCreditCardComponent = ({
               borderWidth: 1,
             }}
             textStyle={{
-              color: C.textMain,
+              color: C.text,
               fontSize: 11,
             }}
             onPress={resetCardReader}
@@ -718,7 +718,7 @@ export const StripeCreditCardComponent = ({
         >
           <Text
             style={{
-              color: sIsRefund ? gray(0.2) : C.textMain,
+              color: sIsRefund ? gray(0.2) : C.text,
               marginTop: 10,
             }}
           >
@@ -727,7 +727,7 @@ export const StripeCreditCardComponent = ({
           <Text
             style={{
               marginBottom: 15,
-              color: sIsRefund ? C.red : C.textMain,
+              color: sIsRefund ? C.red : C.text,
             }}
           >
             {sIsRefund ? "Refund Amount" : "Pay Amount"}
@@ -737,7 +737,7 @@ export const StripeCreditCardComponent = ({
           style={{
             alignItems: "flex-end",
             marginLeft: 10,
-            color: C.textMain,
+            color: C.text,
             // width: "60%",
           }}
         >
@@ -746,7 +746,7 @@ export const StripeCreditCardComponent = ({
               fontSize: 15,
               padding: 5,
               paddingRight: 1,
-              color: sIsRefund ? gray(0.2) : C.textMain,
+              color: sIsRefund ? gray(0.2) : C.text,
             }}
           >
             {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
@@ -779,7 +779,7 @@ export const StripeCreditCardComponent = ({
                 style={{
                   fontSize: 20,
                   outlineWidth: 0,
-                  color: sIsRefund ? C.red : C.textMain,
+                  color: sIsRefund ? C.red : C.text,
                   paddingRight: 2,
                   textAlign: "right",
                 }}
@@ -900,7 +900,7 @@ const checkoutScreenStyle = {
     textAlign: "right",
     // placeholderTextColor: makeGrey,
     // backgroundColor: "green",
-    color: C.textMain,
+    color: C.text,
     width: "90%",
   },
   buttonText: {

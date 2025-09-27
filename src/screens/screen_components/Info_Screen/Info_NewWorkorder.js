@@ -13,6 +13,7 @@ import {
   showAlert,
   stringIsNumeric,
   gray,
+  capitalizeAllWordsInSentence,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -26,7 +27,7 @@ import {
   TAB_NAMES,
   WORKORDER_PROTO,
 } from "../../../data";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
@@ -56,15 +57,24 @@ export function NewWorkorderComponent({}) {
   );
 
   // store getters ///////////////////////////////////////////////////////////////
-
-  // const zSearchResults = useCustomerSearchStore((state) =>
-  //   state.getSearchResults()
-  // );
+  const zSearchResults = useCustomerSearchStore((s) => s.getSearchResults());
 
   //////////////////////////////////////////////////////////////////////
-  const [sTextInput, _setTextInput] = React.useState("");
+  const [sTextInput, _setTextInput] = React.useState("2393369177");
   const [sSearchFieldName, _setSearchFieldName] = React.useState("phone");
   const [sCustomerInfoObj, _setCustomerInfoObj] = React.useState(null);
+  const [buttonVisible, setButtonVisible] = React.useState(false);
+
+  // Update button visibility when dependencies change
+  useEffect(() => {
+    const shouldShow =
+      (sSearchFieldName === "phone" &&
+        sTextInput.length === 10 &&
+        zSearchResults.length === 0) ||
+      (sSearchFieldName !== "phone" && sTextInput.length >= 3);
+
+    setButtonVisible(shouldShow);
+  }, [sSearchFieldName, sTextInput.length, zSearchResults.length]);
 
   async function handleBox1TextChange(incomingText = "") {
     let isEmail;
@@ -157,11 +167,16 @@ export function NewWorkorderComponent({}) {
 
   function handleCreateCustomerBtnPressed() {
     let custInfo = cloneDeep(CUSTOMER_PROTO);
-    if (sSearchFieldName) {
-      custInfo.first = sTextInput;
-      custInfo.last = sBox2Val;
-    } else {
+    if (sSearchFieldName === "phone") {
       custInfo.cell = sTextInput;
+    } else {
+      if (sTextInput.includes("@")) {
+        custInfo.email = sTextInput;
+      } else {
+        let split = sTextInput.split(" ");
+        custInfo.first = split[0];
+        if (split[1]) custInfo.last = split[1];
+      }
     }
     // log(custInfo);
     // do not set the customer id this is how the next screen knows it is a new customer. we will set the id in the modal automatically on creation
@@ -184,7 +199,6 @@ export function NewWorkorderComponent({}) {
   function handleCancelCreateNewCustomerPress() {
     _setTextInput("");
     _setSearchFieldName("phone");
-    _setShowCreateCustomerBtn(false);
     _setCustomerInfoObj(null);
   }
 
@@ -224,8 +238,8 @@ export function NewWorkorderComponent({}) {
 
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
-  log(sTextInput.length);
-  log(sSearchFieldName);
+  // log(sTextInput.length);
+  // log(sSearchFieldName);
   function setComponent() {
     return (
       <View
@@ -237,75 +251,110 @@ export function NewWorkorderComponent({}) {
         }}
       >
         {/* <LoginModalScreen modalVisible={zShowLoginScreen} /> */}
-        <ScreenModal
-          showOuterModal={true}
-          outerModalStyle={{}}
-          buttonLabel={"Create New Customer"}
-          // modalVisible={sCustomerInfoObj}
-          canExitOnOuterClick={false}
-          ButtonComponent={() => {
-            return (sSearchFieldName === "phone" && sTextInput.length === 10) ||
-              (sSearchFieldName !== "phone" && sTextInput.length >= 3) ? (
-              <Button_
-                text={"CUSTOMER"}
-                buttonStyle={{
-                  height: 30,
-                  marginTop: 10,
-                  paddingHorizontal: 25,
-                }}
-                textStyle={{ fontSize: 13 }}
-                colorGradientArr={COLOR_GRADIENTS.blue}
-                icon={ICONS.new}
-                onPress={handleCreateCustomerBtnPressed}
-              />
-            ) : (
-              // )
-              <View style={{ height: 30, marginTop: 10 }} />
-            );
+
+        <View
+          style={{
+            alignItems: "flex-end",
+            width: "100%",
+            padding: 20,
+            marginTop: "45%",
           }}
-          Component={() => (
-            <CustomerInfoScreenModalComponent
-              isNewCustomer={true}
-              ssCustomerInfoObj={sCustomerInfoObj}
-              __setCustomerInfoObj={_setCustomerInfoObj}
-              button1Text={"Create Customer"}
-              button2Text={"Cancel"}
-              handleButton1Press={handleCreateNewCustomerPressed}
-              handleButton2Press={handleCancelCreateNewCustomerPress}
+        >
+          {sSearchFieldName === "phone" ? (
+            <PhoneNumberInput
+              boxStyle={{
+                // marginTop: 100,
+                width: 30,
+                height: 37,
+                // paddingHorizontal: 3,
+                outlineStyle: "none",
+                borderColor: gray(0.08),
+                fontSize: 16,
+                color: C.text,
+              }}
+              autoFocus={true}
+              placeholder={"31234567890"}
+              placeholderTextColor={gray(0.2)}
+              value={sTextInput}
+              onChangeText={(val) => handleBox1TextChange(val)}
+              dashStyle={{ width: 10, marginHorizontal: 4 }}
+              dashColor={gray(0.2)}
+              textColor={C.text}
+            />
+          ) : (
+            <TextInput
+              value={capitalizeAllWordsInSentence(sTextInput)}
+              placeholder={"First, last or email"}
+              placeholderTextColor={gray(0.3)}
+              onChangeText={(val) => handleBox1TextChange(val)}
+              autoFocus={true}
+              style={{
+                caretColor: C.cursorRed,
+                color: C.text,
+                borderBottomWidth: 1,
+                borderColor: gray(0.2),
+                width: 300,
+                height: 37,
+                outlineWidth: 0,
+                fontSize: 18,
+                alignSelf: "center",
+              }}
             />
           )}
-        />
-        <View style={{ alignItems: "flex-end" }}>
-          <PhoneNumberInput
-            boxStyle={{
-              // marginTop: 100,
-              width: 30,
-              height: 37,
-              // paddingHorizontal: 3,
-              outlineStyle: "none",
-              borderColor: gray(0.08),
-              fontSize: 16,
-              color: C.textMain,
-            }}
-            autoFocus={true}
-            placeholder={"31234567890"}
-            placeholderTextColor={gray(0.2)}
-            value={sTextInput}
-            onChangeText={(val) => handleBox1TextChange(val)}
-            dashStyle={{ width: 10, marginHorizontal: 4 }}
-            dashColor={gray(0.2)}
-          />
-          <Button_
-            icon={ICONS.reset1}
-            buttonStyle={{ marginTop: 10, paddingHorizontal: 0 }}
-            onPress={() => {
-              if (sSearchFieldName === "phone") {
-                _setSearchFieldName("name");
-              } else {
-                _setSearchFieldName("phone");
-              }
-            }}
-          />
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {useMemo(
+              () => (
+                <ScreenModal
+                  showOuterModal={true}
+                  outerModalStyle={{}}
+                  buttonLabel={"Create New Customer"}
+                  modalVisible={sCustomerInfoObj}
+                  canExitOnOuterClick={false}
+                  ButtonComponent={() => (
+                    <Button_
+                      text={"CUSTOMER"}
+                      buttonStyle={{
+                        marginRight: 20,
+                        height: 37,
+                        marginTop: 10,
+                        paddingHorizontal: 25,
+                      }}
+                      textStyle={{ fontSize: 15 }}
+                      colorGradientArr={COLOR_GRADIENTS.blue}
+                      icon={ICONS.new}
+                      iconSize={25}
+                      onPress={handleCreateCustomerBtnPressed}
+                      visible={buttonVisible}
+                    />
+                  )}
+                  Component={() => (
+                    <CustomerInfoScreenModalComponent
+                      isNewCustomer={true}
+                      ssCustomerInfoObj={sCustomerInfoObj}
+                      __setCustomerInfoObj={_setCustomerInfoObj}
+                      button1Text={"Create Customer"}
+                      button2Text={"Cancel"}
+                      handleButton1Press={handleCreateNewCustomerPressed}
+                      handleButton2Press={handleCancelCreateNewCustomerPress}
+                    />
+                  )}
+                />
+              ),
+              [sCustomerInfoObj, buttonVisible]
+            )}
+            <Button_
+              icon={ICONS.reset1}
+              buttonStyle={{ marginTop: 10, paddingHorizontal: 0 }}
+              onPress={() => {
+                if (sSearchFieldName === "phone") {
+                  _setSearchFieldName("name");
+                } else {
+                  _setSearchFieldName("phone");
+                }
+                _setTextInput("");
+              }}
+            />
+          </View>
         </View>
         <View style={{ width: "100%", alignItems: "flex-end" }}>
           <Button_

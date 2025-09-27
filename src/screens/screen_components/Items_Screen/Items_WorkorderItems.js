@@ -322,7 +322,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
-                color: C.textMain,
+                color: C.text,
                 fontSize: 14,
               }}
             >
@@ -342,7 +342,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             <Text
               style={{
                 marginRight: 10,
-                color: C.textMain,
+                color: C.text,
                 fontWeight: "bold",
                 fontSize: 14,
               }}
@@ -365,7 +365,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                   style={{
                     marginRight: 10,
                     fontWeight: "bold",
-                    color: C.textMain,
+                    color: C.text,
                     fontSize: 14,
                   }}
                 >
@@ -387,7 +387,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
-                color: C.textMain,
+                color: C.text,
                 fontSize: 14,
               }}
             >
@@ -419,7 +419,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               style={{
                 marginRight: 10,
                 fontWeight: "bold",
-                color: C.textMain,
+                color: C.text,
                 fontSize: 15,
               }}
             >

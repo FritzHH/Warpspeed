@@ -907,9 +907,27 @@ export function capitalizeFirstLetterOfString(str) {
 
 export function capitalizeAllWordsInSentence(sentence) {
   if (!sentence) return "";
-  return sentence.replace(/\b\w/g, function (char) {
-    return char.toUpperCase();
-  });
+
+  // If string contains '@', uncapitalize the first letter (likely an email)
+  if (sentence.includes("." || sentence.includes("@"))) {
+    return sentence.charAt(0).toLowerCase() + sentence.slice(1);
+  }
+
+  // Split by periods to handle each sentence separately
+  return sentence
+    .split(".")
+    .map((part, index) => {
+      // Skip capitalization for parts after the first period
+      if (index > 0) {
+        return part; // Return as-is for parts after periods
+      }
+
+      // Capitalize only the first part (before any period)
+      return part.replace(/\b\w/g, function (char) {
+        return char.toUpperCase();
+      });
+    })
+    .join(".");
 }
 
 export function useInterval(callback, delay) {

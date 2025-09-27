@@ -187,7 +187,7 @@ export const MiddleItemComponent = ({
               }}
             >
               <View>
-                <Text style={{ color: C.textMain }}>
+                <Text style={{ color: C.text }}>
                   {zCustomer?.first + " " + zCustomer?.last}
                   {!!zCustomer?.contactRestriction && (
                     <Text style={{ color: C.red }}>
@@ -204,13 +204,13 @@ export const MiddleItemComponent = ({
               </View>
               <View>
                 {!!zCustomer?.cell && (
-                  <Text style={{ color: C.textMain }}>
+                  <Text style={{ color: C.text }}>
                     <Text>{"cell: "}</Text>
                     {formatPhoneWithDashes(zCustomer?.cell)}
                   </Text>
                 )}
                 {!!zCustomer?.land && (
-                  <Text style={{ color: C.textMain, fontSize: 13 }}>
+                  <Text style={{ color: C.text, fontSize: 13 }}>
                     <Text>{"land: "}</Text>
                     {formatPhoneWithDashes(zCustomer?.land)}
                   </Text>
@@ -221,15 +221,15 @@ export const MiddleItemComponent = ({
             {!sIsRefund && (
               <View>
                 {!!zCustomer?.streetAddress && (
-                  <Text style={{ color: C.textMain, fontSize: 13 }}>
+                  <Text style={{ color: C.text, fontSize: 13 }}>
                     {zCustomer.streetAddress}
                     {!!zCustomer.unit && (
-                      <Text style={{ color: C.textMain, fontSize: 13 }}>
+                      <Text style={{ color: C.text, fontSize: 13 }}>
                         {"  |  Unit " + zCustomer.unit}
                       </Text>
                     )}
                     {!!zCustomer.city && (
-                      <Text style={{ color: C.textMain, fontSize: 13 }}>
+                      <Text style={{ color: C.text, fontSize: 13 }}>
                         {"   |   " + zCustomer.city}
                       </Text>
                     )}
@@ -285,7 +285,7 @@ export const MiddleItemComponent = ({
                 borderWidth: 1,
                 outlineWidth: 0,
                 backgroundColor: C.backgroundListWhite,
-                color: sSale?.payments.length > 0 ? gray(0.3) : C.textMain,
+                color: sSale?.payments.length > 0 ? gray(0.3) : C.text,
               }}
             >
               <TextInput
@@ -296,7 +296,7 @@ export const MiddleItemComponent = ({
                 }
                 style={{
                   outlineWidth: 0,
-                  color: C.textMain,
+                  color: C.text,
                   maxWidth: "50%",
                   fontSize: 13,
                 }}
@@ -598,7 +598,7 @@ export const MiddleItemComponent = ({
                   justifyContent: "space-between",
                 }}
               >
-                <Text style={{ color: C.textMain, fontWeight: "500" }}>
+                <Text style={{ color: C.text, fontWeight: "500" }}>
                   {"TOTAL (MANDATORY) CARD REFUND"}
                 </Text>
                 <View style={{ flexDirection: "row" }}>
@@ -611,7 +611,7 @@ export const MiddleItemComponent = ({
                   >
                     $
                   </Text>
-                  <Text style={{ color: C.textMain, fontWeight: "500" }}>
+                  <Text style={{ color: C.text, fontWeight: "500" }}>
                     {formatCurrencyDisp(sRefund.totalCardRefundAllowed)}
                   </Text>
                 </View>
@@ -667,7 +667,7 @@ export const MiddleItemComponent = ({
                 justifyContent: "space-between",
               }}
             >
-              <Text style={{ color: C.textMain, fontWeight: "500" }}>
+              <Text style={{ color: C.text, fontWeight: "500" }}>
                 {"CASH REFUND ALLOWED"}
               </Text>
               <View style={{ flexDirection: "row" }}>
@@ -680,7 +680,7 @@ export const MiddleItemComponent = ({
                 >
                   $
                 </Text>
-                <Text style={{ color: C.textMain, fontWeight: "500" }}>
+                <Text style={{ color: C.text, fontWeight: "500" }}>
                   {formatCurrencyDisp(sRefund.totalCashRefundAllowed)}
                 </Text>
               </View>
@@ -877,9 +877,7 @@ export const MiddleItemComponent = ({
                           justifyContent: "space-between",
                         }}
                       >
-                        <Text style={{ color: C.textMain }}>
-                          Amount received
-                        </Text>
+                        <Text style={{ color: C.text }}>Amount received</Text>
                         <Text>
                           {formatCurrencyDisp(payment.amountCaptured, true)}
                         </Text>
@@ -1219,7 +1217,7 @@ const checkoutScreenStyle = {
     textAlign: "right",
     // placeholderTextColor: makeGrey,
     // backgroundColor: "green",
-    color: C.textMain,
+    color: C.text,
     width: "90%",
   },
   buttonText: {

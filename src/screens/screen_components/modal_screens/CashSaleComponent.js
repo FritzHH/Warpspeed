@@ -346,15 +346,13 @@ export const CashSaleComponent = ({
             paddingRight: 5,
           }}
         >
-          <Text
-            style={{ color: sIsRefund ? gray(0.2) : C.textMain, marginTop: 4 }}
-          >
+          <Text style={{ color: sIsRefund ? gray(0.2) : C.text, marginTop: 4 }}>
             Balance
           </Text>
           <Text
             style={{
               marginBottom: 15,
-              color: sIsRefund ? C.red : C.textMain,
+              color: sIsRefund ? C.red : C.text,
             }}
           >
             {sIsRefund ? "Refund Amount" : "Pay Amount"}
@@ -371,7 +369,7 @@ export const CashSaleComponent = ({
               fontSize: 15,
               padding: 5,
               paddingRight: 1,
-              color: sIsRefund ? gray(0.2) : C.textMain,
+              color: sIsRefund ? gray(0.2) : C.text,
             }}
           >
             {"$ " + formatCurrencyDisp(sSale?.total - sSale?.amountCaptured)}
@@ -415,7 +413,7 @@ export const CashSaleComponent = ({
                 style={{
                   fontSize: 20,
                   outlineWidth: 0,
-                  color: sIsRefund ? C.red : C.textMain,
+                  color: sIsRefund ? C.red : C.text,
                   paddingRight: 2,
                   textAlign: "right",
                 }}
@@ -630,7 +628,7 @@ const checkoutScreenStyle = {
     textAlign: "right",
     // placeholderTextColor: makeGrey,
     // backgroundColor: "green",
-    color: C.textMain,
+    color: C.text,
     width: "90%",
   },
   buttonText: {

@@ -153,7 +153,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
   const dropdownButtonTextStyle = {
     fontSize: 14,
-    color: C.textMain,
+    color: C.text,
     // width: "100%",
   };
 
@@ -249,7 +249,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     size={25}
                     style={{ marginRight: 5 }}
                   />
-                  <Text style={{ color: C.textMain }}>
+                  <Text style={{ color: C.text }}>
                     {formatPhoneWithDashes(zCustomer.cell)}
                   </Text>
                 </View>
@@ -261,7 +261,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     size={25}
                     style={{ marginRight: 5 }}
                   />
-                  <Text style={{ color: C.textMain }}>
+                  <Text style={{ color: C.text }}>
                     {formatPhoneWithDashes(zCustomer.landline)}
                   </Text>
                 </View>
@@ -782,7 +782,7 @@ const TextInputOnMainBackground = ({
       style={{
         borderWidth: 1,
         borderColor: C.buttonLightGreenOutline,
-        color: C.textMain,
+        color: C.text,
         paddingVertical: 3,
         paddingHorizontal: 4,
         fontSize: 16,

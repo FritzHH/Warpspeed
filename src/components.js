@@ -2,6 +2,7 @@
 import {
   View,
   Text,
+  Pressable,
   Modal,
   TouchableOpacity,
   FlatList,
@@ -604,7 +605,7 @@ export const DropdownMenu = ({
                 }}
                 textStyle={{
                   ...itemTextStyle,
-                  color: item.textColor || C.textMain,
+                  color: item.textColor || C.text,
                 }}
                 text={item.label || item}
                 onPress={() => {
@@ -1337,6 +1338,7 @@ export const PhoneNumberInput = ({
   autoFocus = false,
   editable = true,
   handleEnterPress = () => {},
+  highlightOnClick = true,
   onFocus,
   onBlur,
   textColor = gray(0.55),
@@ -1344,6 +1346,7 @@ export const PhoneNumberInput = ({
 }) => {
   const [cursorPosition, setCursorPosition] = React.useState(0);
   const [isFocused, setIsFocused] = React.useState(false);
+  const textInputRef = React.useRef(null);
 
   // Ensure we only have digits and limit to maxLength
   const digits = value.replace(/\D/g, "").slice(0, maxLength);
@@ -1377,6 +1380,26 @@ export const PhoneNumberInput = ({
       const isEmpty = !digit;
       const isCursorPosition = isFocused && cursorPosition === i;
 
+      // Debug logging
+      if (i === 0) {
+        console.log("Box rendering debug:", {
+          isFocused,
+          cursorPosition,
+          digits: digits,
+          digitsLength: digits.length,
+        });
+      }
+
+      // Additional debug for cursor position
+      if (isCursorPosition) {
+        console.log(`Box ${i} is cursor position!`, {
+          isFocused,
+          cursorPosition,
+          i,
+          digit,
+        });
+      }
+
       elements.push(
         <View
           key={`box-${i}`}
@@ -1386,7 +1409,7 @@ export const PhoneNumberInput = ({
               height: 40,
               borderWidth: 2,
               borderColor: isCursorPosition
-                ? "#ff6b6b"
+                ? C.cursorRed
                 : isEmpty
                 ? "#ddd"
                 : "#007bff",
@@ -1395,7 +1418,7 @@ export const PhoneNumberInput = ({
               justifyContent: "center",
               alignItems: "center",
               backgroundColor: isCursorPosition
-                ? "#ff6b6b"
+                ? C.cursorRed
                 : isEmpty
                 ? "#f8f9fa"
                 : "#fff",
@@ -1462,6 +1485,31 @@ export const PhoneNumberInput = ({
     }
   };
 
+  const handleClick = (e) => {
+    // When user clicks, highlight the last box to show cursor position
+    console.log(
+      "PhoneNumberInput clicked, highlightOnClick:",
+      highlightOnClick
+    );
+    if (highlightOnClick) {
+      e.preventDefault();
+      setIsFocused(true);
+      // Set cursor to the end of current text (last filled box or first empty box)
+      const newCursorPosition = Math.min(digits.length, 9);
+      setCursorPosition(newCursorPosition);
+      console.log(
+        "Setting cursor position to:",
+        newCursorPosition,
+        "digits.length:",
+        digits.length
+      );
+      // Focus the hidden TextInput
+      if (textInputRef.current) {
+        textInputRef.current.focus();
+      }
+    }
+  };
+
   const handleBlur = () => {
     setIsFocused(false);
     setCursorPosition(0);
@@ -1496,14 +1544,16 @@ export const PhoneNumberInput = ({
   };
 
   return (
-    <View
+    <Pressable
       style={[
         { flexDirection: "row", alignItems: "center", position: "relative" },
         style,
       ]}
+      onPress={handleClick}
     >
       {renderBoxes()}
       <TextInput
+        ref={textInputRef}
         value={digits}
         onChangeText={handleTextChange}
         onSelectionChange={handleSelectionChange}
@@ -1529,7 +1579,7 @@ export const PhoneNumberInput = ({
         maxLength={maxLength}
         {...props}
       />
-    </View>
+    </Pressable>
   );
 };
 
@@ -1726,7 +1776,7 @@ export const CheckBox_ = ({
         paddingVertical: 0,
         ...buttonStyle,
       }}
-      textStyle={{ color: C.textMain, fontSize: 15, ...textStyle }}
+      textStyle={{ color: C.text, fontSize: 15, ...textStyle }}
       onPress={onCheck}
       enableMouseOver={false}
     />
@@ -1807,7 +1857,6 @@ export const Button_ = ({
   //////////////////////////////////////////////////////
   const HEIGHT = buttonStyle.height;
   const WIDTH = buttonStyle.width;
-
   if (!visible) {
     return (
       <View

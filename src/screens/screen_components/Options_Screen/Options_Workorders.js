@@ -268,7 +268,7 @@ export function WorkordersComponent({}) {
             backgroundColor: "transparent",
           }}
           outerButtonStyle={{}}
-          textStyle={{ color: C.textMain, fontSize: 13 }}
+          textStyle={{ color: C.text, fontSize: 13 }}
         />
       </View>
 
@@ -328,7 +328,7 @@ export function WorkordersComponent({}) {
                     <Text
                       style={{
                         fontWeight: 500,
-                        color: C.textMain,
+                        color: C.text,
                       }}
                     >
                       {workorder.brand || "Brand"}
@@ -345,7 +345,7 @@ export function WorkordersComponent({}) {
                     )}
                     <Text
                       style={{
-                        color: C.textMain,
+                        color: C.text,
                         // fontStyle: "italic"
                       }}
                     >
@@ -424,7 +424,7 @@ export function WorkordersComponent({}) {
                           {"est: "}
                           <Text
                             style={{
-                              color: C.textMain,
+                              color: C.text,
                               fontSize: 14,
                               fontStyle: "italic",
                             }}
@@ -442,7 +442,7 @@ export function WorkordersComponent({}) {
                             }}
                           >
                             {"due: "}{" "}
-                            <Text style={{ color: C.textMain }}>
+                            <Text style={{ color: C.text }}>
                               {capitalizeFirstLetterOfString(
                                 sItemOptions[workorder.id].waitEndDay
                               )}

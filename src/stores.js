@@ -609,6 +609,27 @@ export const useCurrentCustomerStore = create((set, get) => ({
   },
 
   loadSales: () => {
+    let sale = {
+      amountCaptured: "45654",
+      id: 125425652125,
+      millis: new Date().getTime(),
+      workorderIDs: ["123652145236", "123265212565"],
+      payments: [
+        {
+          amountCaptured: "45434",
+          last4: "3454",
+          cardType: "Visa (traditional)",
+          expMonth: 10,
+          expYear: 28,
+          millis: new Date().getTime(),
+          isRefund: false,
+          amountRefunded: 0,
+          id: "123652145256",
+        },
+      ],
+    };
+
+
     set({ salesLoading: true });
     let target = get().customer.sales?.length;
     let count = 0;

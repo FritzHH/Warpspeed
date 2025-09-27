@@ -3,12 +3,7 @@
 import React, { useState } from "react";
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import { generateRandomID, generateUPCBarcode, log } from "../../../utils";
-import {
-  Button,
-  CustomerInfoScreenModalComponent,
-  ScreenModal,
-  SHADOW_RADIUS_PROTO,
-} from "../../../components";
+import { Button, ScreenModal, SHADOW_RADIUS_PROTO } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
   APP_USER,
@@ -28,6 +23,7 @@ import {
 } from "../../../stores";
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { dbGetCustomerObj } from "../../../db_call_wrapper";
+import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 
 export function CustomerSearchListComponent({}) {
   // store setters //////////////////////////////////////////////////////////////////////

@@ -2,7 +2,6 @@
 import {
   View,
   Text,
-  Pressable,
   Modal,
   TouchableOpacity,
   FlatList,
@@ -11,59 +10,18 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native-web";
-import React, {
-  Component,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
-import { Animated, Easing, Image } from "react-native-web";
-import {
-  formatPhoneWithDashes,
-  capitalizeAllWordsInSentence,
-  capitalizeFirstLetterOfString,
-  clog,
-  formatDecimal,
-  generateRandomID,
-  getPreviousMondayDayJS,
-  ifNumIsOdd,
-  insertOpacityIntoRGBString,
-  LETTERS,
-  lightenRGBByPercent,
-  log,
-  gray,
-  NUMS,
-  readAsBinaryString,
-  removeDashesFromPhone,
-  trimToTwoDecimals,
-  calculateRunningTotals,
-  formatMillisForDisplay,
-  formatCurrencyDisp,
-} from "./utils";
+import React, { useEffect, useMemo, useRef } from "react";
+import { Image } from "react-native-web";
+import { gray, ifNumIsOdd, lightenRGBByPercent, log } from "./utils";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
 import { useState } from "react";
-import {
-  FOCUS_NAMES,
-  INVENTORY_ITEM_PROTO,
-  INVENTORY_CATEGORY_NAMES,
-  SETTINGS_OBJ,
-  PRIVILEDGE_LEVELS,
-  COLORS,
-  CONTACT_RESTRICTIONS,
-} from "./data";
+import { SETTINGS_OBJ, PRIVILEDGE_LEVELS } from "./data";
 import { cloneDeep } from "lodash";
-import { CUSTOMER_PROTO } from "./data";
 import {
   useInventoryStore,
   useInvModalStore,
   useSettingsStore,
   useLoginStore,
-  useStripePaymentStore,
-  useCheckoutStore,
-  useCurrentCustomerStore,
-  useOpenWorkordersStore,
-  useTabNamesStore,
   useAlertScreenStore,
 } from "./stores";
 import { dbSetInventoryItem } from "./db_call_wrapper";
@@ -73,7 +31,6 @@ import CalendarPicker, { useDefaultStyles } from "react-native-ui-datepicker";
 import { PanResponder } from "react-native";
 
 import { StyleSheet } from "react-native";
-import { dbSaveCustomer, dbSaveSettings } from "./db_calls_wrapper";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -1180,484 +1137,6 @@ export const InventoryItemScreeenModalComponent = ({
   }
 };
 
-export const CustomerInfoScreenModalComponent = ({
-  incomingCustomer = CUSTOMER_PROTO,
-  isNewCustomer = false,
-  button1Text,
-  button2Text,
-  handleButton1Press,
-  handleButton2Press,
-  // ssInfoTextFocus,
-  // __setInfoTextFocus,
-}) => {
-  const [sCustomerInfo, _setCustomerInfo] = useState(incomingCustomer);
-  const { salesLoading, workordersLoading, workorders, sales } =
-    useCurrentCustomerStore();
-
-  useEffect(() => {
-    // useCurrentCustomerStore.getState().loadWorkorders();
-  }, []);
-
-  function setCustomerInfo(customerInfo) {
-    useCurrentCustomerStore.getState().salesLoading = !salesLoading;
-    if (isNewCustomer) {
-      // this is a new customer
-      _setCustomerInfo(customerInfo);
-    } else {
-      useCurrentCustomerStore.getState().setCustomer(customerInfo);
-    }
-  }
-
-  const TEXT_INPUT_STYLE = {
-    width: "100%",
-    height: 40,
-    borderColor: gray(0.4),
-    borderWidth: 1,
-    marginTop: 20,
-    paddingHorizontal: 5,
-    outlineWidth: 0,
-    borderRadius: 7,
-    color: C.textMain,
-  };
-
-  // log("workorder", workorders);
-  function setComponent() {
-    return (
-      <TouchableWithoutFeedback>
-        <View
-          style={{
-            // width: "60%",
-            padding: 20,
-            backgroundColor: C.backgroundWhite,
-            height: "90%",
-            // width: "60%",
-            flexDirection: "row",
-            borderRadius: 15,
-            shadowProps: {
-              shadowColor: "black",
-              shadowOffset: { width: 2, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 5,
-            },
-          }}
-        >
-          <View style={{ width: 250, padding: 10 }}>
-            <View
-              style={{
-                width: "100%",
-                flexDirection: "row",
-                justifyContent: "space-between",
-              }}
-            >
-              <CheckBox_
-                text={"Call Only"}
-                isChecked={
-                  sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call
-                }
-                onCheck={() => {
-                  let obj = cloneDeep(sCustomerInfo);
-                  // __setInfoTextFocus(null);
-                  if (obj.contactRestriction === CONTACT_RESTRICTIONS.call) {
-                    obj.contactRestriction = "";
-                  } else {
-                    obj.contactRestriction = CONTACT_RESTRICTIONS.call;
-                  }
-                  setCustomerInfo(obj);
-                }}
-              />
-              <CheckBox_
-                text={"Email Only"}
-                isChecked={
-                  sCustomerInfo.contactRestriction ===
-                  CONTACT_RESTRICTIONS.email
-                }
-                onCheck={() => {
-                  let obj = cloneDeep(sCustomerInfo);
-                  // __setInfoTextFocus(null);
-                  // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
-                  // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
-                  //   sCustomerInfo.callOnlyOption = false;
-                  if (obj.contactRestriction === CONTACT_RESTRICTIONS.email) {
-                    obj.contactRestriction = "";
-                  } else {
-                    obj.contactRestriction = CONTACT_RESTRICTIONS.email;
-                  }
-                  setCustomerInfo(obj);
-                }}
-              />
-            </View>
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.cell = removeDashesFromPhone(val);
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="Cell phone"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={formatPhoneWithDashes(sCustomerInfo.cell)}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.cell}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.cell)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.landline = removeDashesFromPhone(val);
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="Landline"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={formatPhoneWithDashes(sCustomerInfo.landline)}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.land}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.land)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.first = capitalizeFirstLetterOfString(val);
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="First name"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.first}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.first}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.first)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.last = capitalizeFirstLetterOfString(val);
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="Last name"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.last}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.last}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.last)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.email = val.toLowerCase();
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="Email address"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.email}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.email}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.email)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.streetAddress = capitalizeAllWordsInSentence(val);
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="Street address"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.streetAddress}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.street}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.street)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.unit = val;
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="Unit"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.unit}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.unit}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.unit)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.city = capitalizeAllWordsInSentence(val);
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="City"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.city}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.city}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.city)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.state = val.toUpperCase();
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="State"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.state}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.state}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.state)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.zip = val;
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="Zip code"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.zip}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.zip}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.zip)}
-            />
-            <TextInput
-              onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.notes = capitalizeFirstLetterOfString(val);
-                setCustomerInfo(obj);
-              }}
-              placeholderTextColor="darkgray"
-              placeholder="Address notes"
-              style={{ ...TEXT_INPUT_STYLE }}
-              value={sCustomerInfo.notes}
-              autoComplete="none"
-              // autoFocus={ssInfoTextFocus === FOCUS_NAMES.notes}
-              // onFocus={() => __setInfoTextFocus(FOCUS_NAMES.notes)}
-            />
-
-            <View style={{ flexDirection: "column" }}>
-              {!!button1Text && (
-                <Button_
-                  onPress={() => handleButton1Press(sCustomerInfo)}
-                  colorGradientArr={COLOR_GRADIENTS.lightBlue}
-                  buttonStyle={{
-                    marginTop: 30,
-                    marginLeft: 20,
-                    height: 40,
-                    width: 200,
-                  }}
-                  textStyle={{ color: "dimgray" }}
-                  text={button1Text}
-                />
-              )}
-              {!!button2Text && (
-                <Button_
-                  colorGradientArr={COLOR_GRADIENTS.red}
-                  onPress={handleButton2Press}
-                  buttonStyle={{
-                    marginTop: 30,
-                    marginLeft: 20,
-                    height: 40,
-                    width: 200,
-                  }}
-                  textStyle={{ color: "dimgray" }}
-                  text={button2Text}
-                />
-              )}
-            </View>
-          </View>
-          {isNewCustomer && (
-            <View
-              style={{
-                width: 450,
-                height: "100%",
-                paddingHorizontal: 15,
-                paddingVertical: 5,
-              }}
-            >
-              <View
-                style={{
-                  maxHeight: "45%",
-                  width: "100%",
-                  alignItems: "center",
-                  width: "100%",
-                }}
-              >
-                <Button_
-                  colorGradientArr={COLOR_GRADIENTS.bluegreen}
-                  icon={salesLoading ? ICONS.wheelGIF : ICONS.add}
-                  // buttonStyle={{ width: null, width: null }}
-                  text={"LOAD WORKORDERS"}
-                  onPress={() =>
-                    useCurrentCustomerStore.getState().loadWorkorders()
-                  }
-                />
-
-                <View
-                  style={{
-                    marginTop: 10,
-                    height: "100%",
-                    backgroundColor: "transparent",
-                    width: "100%",
-                  }}
-                >
-                  <FlatList
-                    data={[
-                      ...workorders,
-                      ...workorders,
-                      ...workorders,
-                      ...workorders,
-                    ]}
-                    renderItem={(obj) => {
-                      let wo = obj.item;
-                      // log("work", wo);
-                      const totals = calculateRunningTotals(
-                        wo,
-                        useSettingsStore.getState().settings.salesTax
-                      );
-                      // log("totals", totals);
-                      // log(wo);
-                      return (
-                        <View
-                          style={{
-                            borderRadius: 10,
-                            borderLeftWidth: 2,
-                            borderColor: C.green,
-                            padding: 5,
-                            marginBottom: 4,
-                            width: "100%",
-                            backgroundColor: C.listItemWhite,
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: "100%",
-                              alignItems: "center",
-                              flexDirection: "row",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <Text style={{ color: C.textMain }}>
-                              {wo.brand +
-                                "     " +
-                                (wo.model ? wo.model + "     " : "") +
-                                (wo.description
-                                  ? wo.description + "     "
-                                  : "")}
-                            </Text>
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                              }}
-                            >
-                              {!!wo.color1.label && (
-                                <Text
-                                  style={{
-                                    padding: 5,
-                                    color: wo.color1.textColor,
-                                    backgroundColor: wo.color1.backgroundColor,
-                                    borderRadius: 10,
-                                    fontSize: 11,
-                                    paddingVertical: 1,
-                                  }}
-                                >
-                                  {wo.color1.label}
-                                </Text>
-                              )}
-                              {!!wo.color2.label && (
-                                <Text
-                                  style={{
-                                    marginLeft: 5,
-                                    paddingHorizontal: 5,
-                                    paddingVertical: 1,
-                                    color: wo.color2.textColor,
-                                    backgroundColor: wo.color2.backgroundColor,
-                                    borderRadius: 10,
-                                    fontSize: 11,
-                                  }}
-                                >
-                                  {wo.color2.label}
-                                </Text>
-                              )}
-                            </View>
-                          </View>
-                          <View
-                            style={{
-                              width: "100%",
-                              alignItems: "center",
-                              flexDirection: "row",
-                              justifyContent: "space-between",
-                            }}
-                          >
-                            <Text style={{ color: gray(0.4), fontSize: 12 }}>
-                              {formatMillisForDisplay(wo.startedOnMillis)}
-                              {!!wo.endedOnMillis && (
-                                <Text>
-                                  {" ➟ " +
-                                    formatMillisForDisplay(wo.endedOnMillis)}
-                                </Text>
-                              )}
-                            </Text>
-                            {wo.paymentComplete ? (
-                              <Text style={{ fontSize: 12, color: C.green }}>
-                                {"Paid in Full: $" + wo.amountPaid}
-                              </Text>
-                            ) : (
-                              <Text style={{ fontSize: 12, color: C.red }}>
-                                {"$" +
-                                  (formatCurrencyDisp(wo.amountPaid) || 0) +
-                                  " / $" +
-                                  formatCurrencyDisp(totals.finalTotal)}
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                      );
-                    }}
-                  />
-                </View>
-                <View
-                  style={{
-                    maxHeight: "45%",
-                    width: "100%",
-                    alignItems: "center",
-                    marginTop: 10,
-                    // backgroundColor: "green",
-                  }}
-                >
-                  <Button_
-                    colorGradientArr={COLOR_GRADIENTS.bluegreen}
-                    icon={salesLoading ? ICONS.wheelGIF : ICONS.add}
-                    // buttonStyle={{ width: null, width: null }}
-                    text={"LOAD SALES"}
-                    onPress={() =>
-                      useCurrentCustomerStore.getState().loadSales()
-                    }
-                  />
-                </View>
-              </View>
-              <View></View>
-            </View>
-          )}
-        </View>
-      </TouchableWithoutFeedback>
-    );
-  }
-  try {
-    let comp = setComponent();
-    return comp;
-  } catch (e) {
-    log("Error setting component CustomerInfoScreenModal", e);
-  }
-};
-
 export const LoginModalScreen = ({ modalVisible }) => {
   // setters /////////////////////////////////////////////////////////////
   const _zSetShowLoginScreen = useLoginStore(
@@ -1838,6 +1317,221 @@ export const SmallLoadingIndicator = (props) => (
 export const LargeLoadingIndicator = (props) => (
   <LoadingIndicator size="large" {...props} />
 );
+
+export const PhoneNumberInput = ({
+  value = "",
+  onChangeText,
+  placeholder = "",
+  style = {},
+  boxStyle = {},
+  filledBoxStyle = {},
+  placeholderBoxStyle = {},
+  cursorBoxStyle = {},
+  placeholderTextColor = "#999",
+  cursorTextColor = "#fff",
+  showDashes = true,
+  dashStyle = {},
+  dashColor = "#666",
+  dashSize = 16,
+  maxLength = 10,
+  autoFocus = false,
+  editable = true,
+  handleEnterPress = () => {},
+  onFocus,
+  onBlur,
+  textColor = gray(0.55),
+  ...props
+}) => {
+  const [cursorPosition, setCursorPosition] = React.useState(0);
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  // Ensure we only have digits and limit to maxLength
+  const digits = value.replace(/\D/g, "").slice(0, maxLength);
+
+  // Helper function to render a dash
+  const renderDash = (key) => (
+    <Text
+      key={key}
+      style={[
+        {
+          fontSize: dashSize,
+          color: dashColor,
+          fontWeight: "bold",
+          marginHorizontal: 8,
+          alignSelf: "center",
+        },
+        dashStyle,
+      ]}
+    >
+      -
+    </Text>
+  );
+
+  // Create array of 10 boxes with dashes
+  const renderBoxes = () => {
+    const elements = [];
+
+    for (let i = 0; i < 10; i++) {
+      // Add box
+      const digit = digits[i] || "";
+      const isEmpty = !digit;
+      const isCursorPosition = isFocused && cursorPosition === i;
+
+      elements.push(
+        <View
+          key={`box-${i}`}
+          style={[
+            {
+              width: 30,
+              height: 40,
+              borderWidth: 2,
+              borderColor: isCursorPosition
+                ? "#ff6b6b"
+                : isEmpty
+                ? "#ddd"
+                : "#007bff",
+              borderRadius: 8,
+              marginHorizontal: 2,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: isCursorPosition
+                ? "#ff6b6b"
+                : isEmpty
+                ? "#f8f9fa"
+                : "#fff",
+              boxShadow: isCursorPosition
+                ? "0 0 10px rgba(255, 107, 107, 0.5)"
+                : "none",
+            },
+            boxStyle,
+            isCursorPosition
+              ? cursorBoxStyle
+              : isEmpty
+              ? placeholderBoxStyle
+              : filledBoxStyle,
+          ]}
+        >
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "600",
+              color: isCursorPosition
+                ? cursorTextColor
+                : isEmpty
+                ? placeholderTextColor
+                : textColor,
+            }}
+          >
+            {digit}
+          </Text>
+        </View>
+      );
+
+      // Add dash after 3rd box (index 2) and 6th box (index 5)
+      if (showDashes && (i === 2 || i === 5)) {
+        elements.push(renderDash(`dash-${i}`));
+      }
+    }
+
+    return elements;
+  };
+
+  const handleTextChange = (text) => {
+    // Only allow digits and limit to maxLength
+    const cleanText = text.replace(/\D/g, "").slice(0, maxLength);
+
+    // Update cursor position to the end of the text
+    setCursorPosition(cleanText.length);
+
+    if (onChangeText) {
+      onChangeText(cleanText);
+    }
+  };
+
+  const handleSelectionChange = (event) => {
+    const { start } = event.nativeEvent.selection;
+    setCursorPosition(Math.min(start, digits.length));
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    // Set cursor to the end of current text or 0 if empty
+    setCursorPosition(digits.length);
+    if (onFocus) {
+      onFocus();
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    setCursorPosition(0);
+    if (onBlur) {
+      onBlur();
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    // Allow backspace, delete, arrow keys, and digits
+    const allowedKeys = [
+      "Backspace",
+      "Delete",
+      "ArrowLeft",
+      "ArrowRight",
+      // "ArrowUp",
+      // "ArrowDown",
+      // "Tab",
+      "Enter",
+    ];
+
+    if (e.key === "Enter") {
+      handleEnterPress();
+      return;
+    }
+
+    if (allowedKeys.includes(e.key) || /^\d$/.test(e.key)) {
+      return; // Allow the key
+    }
+
+    e.preventDefault(); // Block other keys
+  };
+
+  return (
+    <View
+      style={[
+        { flexDirection: "row", alignItems: "center", position: "relative" },
+        style,
+      ]}
+    >
+      {renderBoxes()}
+      <TextInput
+        value={digits}
+        onChangeText={handleTextChange}
+        onSelectionChange={handleSelectionChange}
+        onKeyPress={handleKeyPress}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        editable={editable}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          opacity: 0,
+          backgroundColor: "transparent",
+          color: "transparent",
+          borderWidth: 0,
+          outline: "none",
+        }}
+        keyboardType="numeric"
+        maxLength={maxLength}
+        {...props}
+      />
+    </View>
+  );
+};
 
 export const Button = ({
   visible = true,

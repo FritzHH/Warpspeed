@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { View, TextInput } from "react-native-web";
+import { View, TextInput, Button } from "react-native-web";
 import {
   formatPhoneWithDashes,
   capitalizeFirstLetterOfString,
@@ -16,9 +16,9 @@ import {
 } from "../../../utils";
 import {
   ScreenModal,
-  CustomerInfoScreenModalComponent,
   LoginModalScreen,
   Button_,
+  PhoneNumberInput,
 } from "../../../components";
 import {
   CUSTOMER_PROTO,
@@ -43,6 +43,7 @@ import {
   dbSearchCustomersByName,
   dbSearchCustomersByPhone,
 } from "../../../db_calls_wrapper";
+import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 export function NewWorkorderComponent({}) {
   // store setters ////////////////////////////////////////////////////////////////
   const _zSetOptionsTabName = useTabNamesStore(
@@ -62,7 +63,7 @@ export function NewWorkorderComponent({}) {
 
   //////////////////////////////////////////////////////////////////////
   const [sTextInput, _setTextInput] = React.useState("");
-  const [sSearchFieldName, _setSearchFieldName] = React.useState(false);
+  const [sSearchFieldName, _setSearchFieldName] = React.useState("phone");
   const [sCustomerInfoObj, _setCustomerInfoObj] = React.useState(null);
 
   async function handleBox1TextChange(incomingText = "") {
@@ -76,6 +77,8 @@ export function NewWorkorderComponent({}) {
     // let searchStr = "";
 
     const searchFun = async (searchStrings, options) => {
+      //dev
+      return;
       let funs = [];
       options.forEach((option) => {
         searchStrings.forEach((searchString) => {
@@ -181,7 +184,6 @@ export function NewWorkorderComponent({}) {
   function handleCancelCreateNewCustomerPress() {
     _setTextInput("");
     _setSearchFieldName("phone");
-    _zResetSearch();
     _setShowCreateCustomerBtn(false);
     _setCustomerInfoObj(null);
   }
@@ -218,12 +220,12 @@ export function NewWorkorderComponent({}) {
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-
-    // _zResetSearch();
   }
 
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
+  log(sTextInput.length);
+  log(sSearchFieldName);
   function setComponent() {
     return (
       <View
@@ -239,18 +241,28 @@ export function NewWorkorderComponent({}) {
           showOuterModal={true}
           outerModalStyle={{}}
           buttonLabel={"Create New Customer"}
-          modalVisible={sCustomerInfoObj}
+          // modalVisible={sCustomerInfoObj}
           canExitOnOuterClick={false}
-          ButtonComponent={() => (
-            <Button_
-              text={"CUSTOMER"}
-              buttonStyle={{ marginTop: 10, paddingHorizontal: 25 }}
-              textStyle={{ fontSize: 13 }}
-              colorGradientArr={COLOR_GRADIENTS.blue}
-              icon={ICONS.new}
-              onPress={handleCreateCustomerBtnPressed}
-            />
-          )}
+          ButtonComponent={() => {
+            return (sSearchFieldName === "phone" && sTextInput.length === 10) ||
+              (sSearchFieldName !== "phone" && sTextInput.length >= 3) ? (
+              <Button_
+                text={"CUSTOMER"}
+                buttonStyle={{
+                  height: 30,
+                  marginTop: 10,
+                  paddingHorizontal: 25,
+                }}
+                textStyle={{ fontSize: 13 }}
+                colorGradientArr={COLOR_GRADIENTS.blue}
+                icon={ICONS.new}
+                onPress={handleCreateCustomerBtnPressed}
+              />
+            ) : (
+              // )
+              <View style={{ height: 30, marginTop: 10 }} />
+            );
+          }}
           Component={() => (
             <CustomerInfoScreenModalComponent
               isNewCustomer={true}
@@ -263,25 +275,38 @@ export function NewWorkorderComponent({}) {
             />
           )}
         />
-
-        <TextInput
-          style={{
-            // marginTop: 100,
-            borderBottomWidth: 1,
-            width: 300,
-            height: 40,
-            paddingHorizontal: 3,
-            outlineStyle: "none",
-            borderColor: gray(0.4),
-            fontSize: 16,
-            color: C.textMain,
-          }}
-          autoFocus={true}
-          placeholder={"Phone (best), first, last, email..."}
-          placeholderTextColor={gray(0.4)}
-          value={sTextInput}
-          onChangeText={(val) => handleBox1TextChange(val)}
-        />
+        <View style={{ alignItems: "flex-end" }}>
+          <PhoneNumberInput
+            boxStyle={{
+              // marginTop: 100,
+              width: 30,
+              height: 37,
+              // paddingHorizontal: 3,
+              outlineStyle: "none",
+              borderColor: gray(0.08),
+              fontSize: 16,
+              color: C.textMain,
+            }}
+            autoFocus={true}
+            placeholder={"31234567890"}
+            placeholderTextColor={gray(0.2)}
+            value={sTextInput}
+            onChangeText={(val) => handleBox1TextChange(val)}
+            dashStyle={{ width: 10, marginHorizontal: 4 }}
+            dashColor={gray(0.2)}
+          />
+          <Button_
+            icon={ICONS.reset1}
+            buttonStyle={{ marginTop: 10, paddingHorizontal: 0 }}
+            onPress={() => {
+              if (sSearchFieldName === "phone") {
+                _setSearchFieldName("name");
+              } else {
+                _setSearchFieldName("phone");
+              }
+            }}
+          />
+        </View>
         <View style={{ width: "100%", alignItems: "flex-end" }}>
           <Button_
             buttonStyle={{ margin: 20 }}
@@ -290,6 +315,7 @@ export function NewWorkorderComponent({}) {
             iconSize={55}
           />
         </View>
+
         {/** customer info modal */}
       </View>
     );

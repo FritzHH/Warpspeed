@@ -38,7 +38,7 @@ export const C = {
   lightred: "rgb(227, 116, 112)",
   red: lightenRGBByPercent(getRgbFromNamedColor("red"), 10),
 
-  backgroundWhite: "rgb(240, 241, 251)",
+  backgroundWhite: lightenRGBByPercent("rgb(240, 241, 251)", 45),
   backgroundGreen: "rgb(232, 243, 239)",
   backgroundListWhite: "rgb(251, 251, 254)",
 

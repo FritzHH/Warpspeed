@@ -294,17 +294,7 @@ export const PAYMENT_OBJECT_PROTO = {
   networkTransactionID: "",
   amountRefunded: 0,
   isDeposit: false,
-  depositUsed: false,
 };
-
-// export const REFUNDED_WORKORDER_LINE_PROTO = {
-//   inventoryItem: null,
-//   discountObj: null,
-//   id: "",
-//   useSalePrice: false,
-//   amountRefunded: 0,
-//   refundNotes: "",
-// };
 
 export const REFUND_PROTO = {
   id: "",

@@ -16,7 +16,6 @@ import {
   // TextInputOnMainBackground,
   TextInputLabelOnMainBackground,
   ScreenModal,
-  CustomerInfoScreenModalComponent,
   Button,
   SHADOW_RADIUS_NOTHING,
   SHADOW_RADIUS_PROTO,
@@ -48,6 +47,7 @@ import {
   useTabNamesStore,
 } from "../../../stores";
 import { dbSetCustomerObj, dbSetWorkorder } from "../../../db_call_wrapper";
+import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 
 export const ActiveWorkorderComponent = ({}) => {
   // store setters /////////////////////////////////////////////////////////////////

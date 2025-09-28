@@ -41,7 +41,9 @@ export function NewWorkorderComponent({}) {
   );
 
   // store getters ///////////////////////////////////////////////////////////////
-  const zSearchResults = useCustomerSearchStore((s) => s.getSearchResults());
+  const zCustomerSearchResults = useCustomerSearchStore((s) =>
+    s.getSearchResults()
+  );
 
   //////////////////////////////////////////////////////////////////////
   const [sTextInput, _setTextInput] = React.useState("239");
@@ -53,17 +55,26 @@ export function NewWorkorderComponent({}) {
   useEffect(() => {
     handleTextChange(sTextInput);
   }, [sTextInput]);
+  // dev ///////////////////////////////////
+
+  useEffect(() => {
+    if (zCustomerSearchResults.length > 0) {
+      _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
+    } else {
+      _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
+    }
+  }, [zCustomerSearchResults]);
 
   // Update button visibility when dependencies change
   useEffect(() => {
     const shouldShow =
       (sSearchFieldName === "phone" &&
         sTextInput.length === 10 &&
-        zSearchResults.length === 0) ||
+        zCustomerSearchResults.length === 0) ||
       (sSearchFieldName !== "phone" && sTextInput.length >= 3);
 
     setButtonVisible(shouldShow);
-  }, [sSearchFieldName, sTextInput.length, zSearchResults.length]);
+  }, [sSearchFieldName, sTextInput.length, zCustomerSearchResults.length]);
 
   async function handleTextChange(incomingText = "") {
     let isEmail;
@@ -244,24 +255,20 @@ export function NewWorkorderComponent({}) {
             alignItems: "flex-end",
             width: "100%",
             padding: 20,
-            marginTop: "45%",
+            marginTop: "70%",
           }}
         >
           {sSearchFieldName === "phone" ? (
             <PhoneNumberInput
               boxStyle={{
-                // marginTop: 100,
-                width: 30,
+                width: "8%",
                 height: 37,
-                // paddingHorizontal: 3,
                 outlineStyle: "none",
                 borderColor: gray(0.08),
-                fontSize: 16,
+                fontSize: 25,
                 color: C.text,
               }}
               autoFocus={true}
-              placeholder={"31234567890"}
-              placeholderTextColor={gray(0.2)}
               value={sTextInput}
               onChangeText={(val) => handleTextChange(val)}
               dashStyle={{ width: 10, marginHorizontal: 4 }}

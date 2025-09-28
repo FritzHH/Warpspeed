@@ -1320,6 +1320,8 @@ export const LargeLoadingIndicator = (props) => (
 );
 
 export const PhoneNumberInput = ({
+  width,
+  height,
   value = "",
   onChangeText,
   placeholder = "",
@@ -1341,6 +1343,7 @@ export const PhoneNumberInput = ({
   highlightOnClick = true,
   onFocus,
   onBlur,
+  fontSize,
   textColor = gray(0.55),
   ...props
 }) => {
@@ -1405,8 +1408,9 @@ export const PhoneNumberInput = ({
           key={`box-${i}`}
           style={[
             {
-              width: 30,
-              height: 40,
+              // width: 30,
+              width: width || 30,
+              height: height || 40,
               borderWidth: 2,
               borderColor: isCursorPosition
                 ? C.cursorRed
@@ -1546,7 +1550,13 @@ export const PhoneNumberInput = ({
   return (
     <Pressable
       style={[
-        { flexDirection: "row", alignItems: "center", position: "relative" },
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          // position: "relative",
+          width: "100%",
+          // backgroundColor: "blue",
+        },
         style,
       ]}
       onPress={handleClick}
@@ -1580,6 +1590,80 @@ export const PhoneNumberInput = ({
         {...props}
       />
     </Pressable>
+  );
+};
+
+export const TouchableOpacity_ = ({
+  children,
+  onPress,
+  style = {},
+  hoverStyle = {},
+  activeOpacity = 0.7,
+  disabled = false,
+  disabledStyle = {},
+  ...props
+}) => {
+  const [isPressed, setIsPressed] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  const handlePressIn = () => {
+    if (!disabled) {
+      setIsPressed(true);
+    }
+  };
+
+  const handlePressOut = () => {
+    setIsPressed(false);
+  };
+
+  const handleMouseEnter = () => {
+    if (!disabled) {
+      setIsHovered(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+  };
+
+  const handlePress = () => {
+    if (!disabled && onPress) {
+      onPress();
+    }
+  };
+
+  const getOpacity = () => {
+    if (disabled) return 0.3;
+    if (isPressed) return Math.min(activeOpacity, 0.6); // Darker (lower opacity)
+    if (isHovered) return 0.8; // Lighter (higher opacity)
+    return 1;
+  };
+
+  const combinedStyle = [
+    {
+      opacity: getOpacity(),
+      cursor: disabled ? "not-allowed" : "pointer",
+      transition: "opacity 0.2s ease",
+    },
+    style,
+    isHovered && hoverStyle,
+    disabled && disabledStyle,
+  ];
+
+  return (
+    <TouchableOpacity
+      style={combinedStyle}
+      onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      disabled={disabled}
+      // activeOpacity={1} // We handle opacity manually
+      {...props}
+    >
+      {children}
+    </TouchableOpacity>
   );
 };
 
@@ -1713,40 +1797,6 @@ export const TabMenuButton = ({
         ...buttonStyle,
       }}
     />
-  );
-};
-
-const BicycleSpinner = ({ width = 100, height = 100 }) => {
-  const spinValue = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(spinValue, {
-        toValue: 1,
-        duration: 1000,
-        easing: Easing.linear,
-      })
-    ).start();
-  }, []);
-
-  const spin = spinValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-
-  return (
-    <View style={{}}>
-      {/* Assuming you have a local image of a bicycle wheel */}
-      <Animated.Image
-        style={{
-          resizeMode: "contain",
-          width,
-          height,
-          transform: [{ rotate: spin }],
-        }}
-        // source={require("./assets/")}
-      />
-    </View>
   );
 };
 

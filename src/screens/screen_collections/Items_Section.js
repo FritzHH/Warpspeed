@@ -29,8 +29,10 @@ export function Items_Section({}) {
 
   // getters ///////////////////////////////////////////////////////////////////
 
-  let zOpenWorkorder = WORKORDER_PROTO;
-  zOpenWorkorder = useOpenWorkordersStore((state) =>
+  const zCustomerSearchResults = useCustomerSearchStore((s) =>
+    s.getSearchResults()
+  );
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
     state.getOpenWorkorder()
   );
   const zItemsTabName = useTabNamesStore((state) => state.getItemsTabName());
@@ -42,9 +44,7 @@ export function Items_Section({}) {
       case TAB_NAMES.itemsTab.changeLog:
         return <Text>Change Log Tab</Text>;
       case TAB_NAMES.itemsTab.customerList:
-        // if (zCustomerSearchArr.length > 1)
         return <CustomerSearchListComponent />;
-        break;
       case TAB_NAMES.itemsTab.dashboard:
         return <Items_Dashboard />;
       case TAB_NAMES.itemsTab.preview:

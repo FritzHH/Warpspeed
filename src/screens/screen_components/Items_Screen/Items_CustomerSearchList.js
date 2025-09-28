@@ -2,8 +2,22 @@
 
 import React, { useState } from "react";
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
-import { generateRandomID, generateUPCBarcode, log } from "../../../utils";
-import { Button, ScreenModal, SHADOW_RADIUS_PROTO } from "../../../components";
+import {
+  formatPhoneForDisplay,
+  formatPhoneWithDashes,
+  generateRandomID,
+  generateUPCBarcode,
+  gray,
+  log,
+  unformatPhoneForDisplay,
+} from "../../../utils";
+import {
+  Button,
+  Button_,
+  ScreenModal,
+  SHADOW_RADIUS_PROTO,
+  TouchableOpacity_,
+} from "../../../components";
 import { cloneDeep } from "lodash";
 import {
   APP_USER,
@@ -24,18 +38,15 @@ import {
 import { messagesSubscribe } from "../../../db_subscription_wrapper";
 import { dbGetCustomerObj } from "../../../db_call_wrapper";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+import { C, ICONS } from "../../../styles";
+import { Pressable } from "react-native";
 
 export function CustomerSearchListComponent({}) {
   // store setters //////////////////////////////////////////////////////////////////////
   const _zSetSearchSelectedItem = useCustomerSearchStore(
     (state) => state.setSelectedItem
   );
-  const _zSetIncomingMessage = useCustMessagesStore(
-    (state) => state.setIncomingMessage
-  );
-  const _zSetOutgoingMessage = useCustMessagesStore(
-    (state) => state.setOutgoingMessage
-  );
+
   const _zSetCurrentCustomer = useCurrentCustomerStore(
     (state) => state.setCustomer
   );
@@ -45,7 +56,6 @@ export function CustomerSearchListComponent({}) {
 
   const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  const _zExecute = useLoginStore((state) => state.execute);
 
   // store getters //////////////////////////////////////////////////////////////////////
   const zSearchResults = useCustomerSearchStore((state) =>
@@ -74,11 +84,6 @@ export function CustomerSearchListComponent({}) {
     wo.status = SETTINGS_OBJ.statuses[0];
     _zSetOpenWorkorder(wo, false);
     _zSetCurrentCustomer(customerObj);
-    // messagesSubscribe(
-    //   customerObj.id,
-    //   _zSetIncomingMessage,
-    //   _zSetOutgoingMessage
-    // );
     _zSetSearchSelectedItem(null);
     _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
@@ -90,50 +95,112 @@ export function CustomerSearchListComponent({}) {
     _setCustomerInfoObj(null);
   }
 
-  // log("search res", zSearchResultsArr);
   return (
     <View
       style={{
-        flex: 1,
+        width: "100%",
+        height: "100%",
         justifyContent: "center",
-        // height: "100%",
-        // backgroundColor: "green",
-        justifySelf: "center",
+        paddingHorizontal: 10,
+        // alignItems: "center",
       }}
     >
       <FlatList
+        style={{
+          width: "100%",
+          flexGrow: 0,
+          maxHeight: "90%",
+        }}
+        contentContainerStyle={{
+          justifyContent: "center",
+          // alignItems: "center",
+          flexGrow: 1,
+          minHeight: "100%",
+        }}
         data={zSearchResults}
-        key={(item) => item.id}
-        ItemSeparatorComponent={() => (
-          <View
-            style={{ width: "100%", height: 1, backgroundColor: "lightgray" }}
-          />
-        )}
-        style={{ backgroundColor: null, marginTop: 20 }}
         renderItem={(item) => {
           let idx = item.index;
           item = item.item;
           return (
             <View
               style={{
-                paddingVertical: 5,
+                paddingVertical: 7,
                 flexDirection: "row",
-                // backgroundColor: "blue",
-                alignItems: "center",
                 width: "100%",
-                justifyContent: "space-between",
-                paddingHorizontal: 10,
+                paddingHorizontal: 7,
+                borderWidth: 1,
+                borderColor: C.listItemBorder,
+                backgroundColor: C.backgroundListWhite,
+                borderLeftWidth: 3,
+                borderLeftColor: C.buttonLightGreenOutline,
+                borderRadius: 10,
+                marginBottom: 5,
               }}
             >
-              <TouchableOpacity
-                style={{ width: "80%" }}
+              <TouchableOpacity_
+                style={{ width: "100%", height: "100%", flexDirection: "row" }}
                 onPress={() => handleCustomerSelected(item)}
               >
-                <Text style={{ marginLeft: 10, fontSize: 16, color: "black" }}>
-                  {item.first + " " + item.last}
-                </Text>
-              </TouchableOpacity>
-              <ScreenModal
+                <View style={{ width: "80%" }}>
+                  <Text style={{ fontSize: 16, color: C.text, width: "30%" }}>
+                    {item.first + " " + item.last}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginTop: 5,
+                    }}
+                  >
+                    <Text style={{ color: gray(0.35), fontSize: 12 }}>
+                      {"cell:  "}
+                    </Text>
+                    <Text style={{ color: C.text, fontSize: 14 }}>
+                      {formatPhoneForDisplay(item.cell)}
+                    </Text>
+                    {!!item.land && (
+                      <Text
+                        style={{ color: C.text, marginLeft: 30, fontSize: 14 }}
+                      >
+                        <Text style={{ color: gray(0.35), fontSize: 12 }}>
+                          {"landline:  "}
+                        </Text>
+                        {item.land}
+                      </Text>
+                    )}
+                    {!!item.email && (
+                      <Text
+                        style={{
+                          color: C.text,
+                          marginLeft: 30,
+                          fontSize: 14,
+                        }}
+                      >
+                        <Text style={{ color: gray(0.35), fontSize: 12 }}>
+                          {"email:  "}
+                        </Text>
+                        {item.email}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <View
+                  style={{
+                    width: "20%",
+                    flexDirection: "row",
+                    height: "100%",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <Button_ onPress={() => {}} iconSize={25} icon={ICONS.info} />
+                </View>
+              </TouchableOpacity_>
+            </View>
+          );
+        }}
+      />
+      {/* <ScreenModal
                 showOuterModal={true}
                 outerModalStyle={{}}
                 buttonStyle={{
@@ -159,11 +226,7 @@ export function CustomerSearchListComponent({}) {
                     // handleButton2Press={handleCancelCreateNewCustomerPress}
                   />
                 )}
-              />
-            </View>
-          );
-        }}
-      />
+              /> */}
     </View>
   );
 }

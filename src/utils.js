@@ -540,6 +540,28 @@ export function formatPhoneWithDashes(num) {
   )} ${digits.slice(10)}`;
 }
 
+export function formatPhoneForDisplay(num) {
+  if (!num) return "";
+  let phone = num.toString();
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  if (digits.length <= 10)
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  // If longer than 10 digits, format first 10, append rest
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(
+    6,
+    10
+  )} ${digits.slice(10)}`;
+}
+
+export function unformatPhoneForDisplay(formattedPhone) {
+  if (!formattedPhone) return "";
+  // Remove all non-digit characters and return first 10 digits
+  const digits = formattedPhone.replace(/\D/g, "");
+  return digits.slice(0, 10);
+}
+
 export function formatDecimal(value) {
   // log("incoming", val);
   // Remove all non-digit characters

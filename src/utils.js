@@ -1216,11 +1216,33 @@ export function getItemFromArr(value, arrKey, arr) {
   return arr.find((obj) => obj[arrKey] === value);
 }
 
-export function arrHasItem(arr, item) {
+export function arrHasItem(arr, item, fieldName = "id") {
   // log("arr", arr);
   // log("item", item);
-  if (!arr || !item) return false;
-  return arr.find((o) => o.id === item.id);
+  if (!arr || item == null) return false;
+
+  // Determine the type of item
+  const itemType = typeof item;
+
+  if (itemType === "string" || itemType === "number") {
+    // Handle primitive values (string or number)
+    return arr.find((arrItem) => arrItem === item) !== undefined;
+  }
+
+  if (itemType === "object" && item !== null) {
+    // Handle objects - search by the specified field
+    return (
+      arr.find(
+        (arrItem) =>
+          typeof arrItem === "object" &&
+          arrItem !== null &&
+          arrItem[fieldName] === item[fieldName]
+      ) !== undefined
+    );
+  }
+
+  // Fallback for other types
+  return false;
 }
 
 export function removeArrItem(arr, item, fieldID = "id") {

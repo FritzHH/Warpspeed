@@ -35,6 +35,7 @@ import {
   WORKORDER_PROTO,
 } from "../../../data";
 import { Button_, CheckBox_ } from "../../../components";
+import { ToastAndroid } from "react-native";
 
 export const CustomerInfoScreenModalComponent = ({
   incomingCustomer = CUSTOMER_PROTO,
@@ -396,12 +397,8 @@ const TOTALS_TEXT_SIZE = 11;
 const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
   const [sCustomerNotesIdxs, _setCustomerNotesIdxs] = useState([]);
   const [sInternalNotesIdxs, _setInternalNotesIdxs] = useState([]);
-  // const flatlistRef = useRef(null);
-
-  useEffect(() => {
-    log("cust", sCustomerNotesIdxs);
-    log("intern", sInternalNotesIdxs);
-  }, [sCustomerNotesIdxs, sInternalNotesIdxs]);
+  const [sWorkorderSalesToDisplayIdxs, _setWorkorderSalesToDisplayIdsx] =
+    useState([]);
 
   // Auto-scroll when currentIndex changes
   // useEffect(() => {
@@ -572,7 +569,8 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                         alignItems: "center",
                         backgroundColor: C.listItemWhite,
                         paddingVertical: 2,
-                        marginBottom: 5,
+                        marginBottom:
+                          index === workorder.workorderLines.length - 1 ? 0 : 5,
                         borderColor: C.listItemBorder,
                         borderLeftColor: lightenRGBByPercent(C.green, 60),
                         borderWidth: 1,
@@ -592,11 +590,9 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                         }}
                       >
                         <View>
-                          {/**dev                       ********************/}
-                          {!workorderLine.discountObj?.label && (
+                          {!!workorderLine.discountObj?.label && (
                             <Text style={{ fontSize: 11, color: C.red }}>
-                              {workorderLine.discountObj?.label ||
-                                "20% off item"}
+                              {workorderLine.discountObj?.label}
                             </Text>
                           )}
                           <View>
@@ -627,7 +623,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                               }}
                             >
                               {/**DEVVVVVVVVVVVVVVVVV */}
-                              {workorderLine.notes || "some notes go here bro"}
+                              {workorderLine.notes}
                             </Text>
                           </View>
                         </View>
@@ -654,6 +650,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                         >
                           <Text
                             style={{
+                              color: C.text,
                               paddingHorizontal: 0,
                             }}
                           >
@@ -682,7 +679,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                                   minWidth: 30,
                                   marginTop: 0,
                                   paddingHorizontal: 0,
-                                  color: Colors.darkText,
+                                  color: C.text,
                                 }}
                               >
                                 {formatCurrencyDisp(
@@ -698,12 +695,15 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                   );
                 }}
               />
+              {<View style={{ height: 5 }} />}
               {sCustomerNotesIdxs.includes(workorderIdx) && (
                 <Text
                   style={{
                     fontSize: 11,
+                    marginBottom: 5,
                     fontWeight: 500,
                     color: gray(0.5),
+                    // marginTop: 7,
                   }}
                 >
                   {"CUSTOMER NOTES:\n"}
@@ -714,19 +714,22 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                       color: gray(0.4),
                     }}
                   >
-                    {
-                      "ehhekrjekfjkdnfaklnddfkdasj/dnkdjfkdjfd\ndfjkdjfkd\nfdkfjkdfkadjfknd\n"
-                    }
+                    {workorder.customerNotes}
                   </Text>
                 </Text>
               )}
               {sInternalNotesIdxs.includes(workorderIdx) && (
                 <Text
                   style={{
-                    marginTop: 5,
+                    // marginVertical: 7,
+                    marginBottom: 5,
                     fontSize: 11,
                     fontWeight: 500,
                     color: gray(0.5),
+                    borderTopColor: C.listItemBorder,
+                    borderTopWidth: sCustomerNotesIdxs.includes(workorderIdx)
+                      ? 1
+                      : 0,
                   }}
                 >
                   {"INTERNAL NOTES:\n"}
@@ -737,9 +740,35 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                       color: gray(0.4),
                     }}
                   >
-                    {
-                      "ehhekrjekfjkdnfaklnddfkdasj/dnkdjfkdjfd\ndfjkdjfkd\nfdkfjkdfkadjfknd\n"
-                    }
+                    {workorder.internalNotes}
+                  </Text>
+                </Text>
+              )}
+              {sWorkorderSalesToDisplayIdxs.includes(workorderIdx) && (
+                <Text
+                  style={{
+                    // marginVertical: 7,
+                    marginBottom: 5,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: gray(0.5),
+                    borderTopColor: C.listItemBorder,
+                    borderTopWidth:
+                      sCustomerNotesIdxs.includes(workorderIdx) ||
+                      sInternalNotesIdxs.includes(workorderIdx)
+                        ? 1
+                        : 0,
+                  }}
+                >
+                  {"SALES ON WORKORDER:\n"}
+                  <Text
+                    style={{
+                      fontWeight: 400,
+                      fontSize: 12,
+                      color: gray(0.4),
+                    }}
+                  >
+                    {workorder.internalNotes}
                   </Text>
                 </Text>
               )}
@@ -747,56 +776,74 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                 style={{
                   width: "100%",
                   flexDirection: "row",
-                  justifyContent: "space-around",
+                  justifyContent: "space-between",
                   alignItems: "center",
-                  borderTopWidth: 1,
-                  borderTopColor: gray(0.1),
-                  marginTop: 5,
-                  paddingTop: 5,
+                  marginTop: 7,
+                  paddingVertical: 2,
+                  borderWidth: 1,
+                  borderColor: lightenRGBByPercent(
+                    C.buttonLightGreenOutline,
+                    65
+                  ),
+                  backgroundColor: lightenRGBByPercent(C.buttonLightGreen, 70),
+                  borderRadius: 15,
                 }}
               >
-                <View>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      // marginVertical: 3,
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <Button_
+                    onPress={() => {
+                      _setCustomerNotesIdxs(
+                        cloneDeep(
+                          addOrRemoveFromArr(sCustomerNotesIdxs, workorderIdx)
+                        )
+                      );
                     }}
-                  >
-                    <Button_
-                      onPress={() => {
-                        _setCustomerNotesIdxs(
-                          cloneDeep(
-                            addOrRemoveFromArr(sCustomerNotesIdxs, workorderIdx)
-                          )
-                        );
-                      }}
-                      icon={ICONS.notes}
-                      iconSize={18}
-                      buttonStyle={{
-                        paddingLeft: 0,
-                        paddingVertical: 5,
-                      }}
-                      textStyle={{ color: gray(0.4), fontSize: 11 }}
-                    />
-                    <Button_
-                      onPress={() => {
-                        _setInternalNotesIdxs(
-                          cloneDeep(
-                            addOrRemoveFromArr(sInternalNotesIdxs, workorderIdx)
-                          )
-                        );
-                      }}
-                      icon={ICONS.gears1}
-                      iconSize={18}
-                      buttonStyle={{
-                        marginLeft: 5,
-                        paddingVertical: 5,
-                        paddingLeft: 0,
-                      }}
-                      textStyle={{ color: gray(0.4), fontSize: 11 }}
-                    />
-                  </View>
+                    icon={ICONS.notes}
+                    iconSize={18}
+                    buttonStyle={{
+                      paddingHorizontal: 0,
+                      paddingVertical: 5,
+                    }}
+                    textStyle={{ color: gray(0.4), fontSize: 11 }}
+                  />
+                  <Button_
+                    onPress={() => {
+                      _setInternalNotesIdxs(
+                        addOrRemoveFromArr(sInternalNotesIdxs, workorderIdx)
+                      );
+                    }}
+                    icon={ICONS.gears1}
+                    iconSize={18}
+                    buttonStyle={{
+                      paddingVertical: 5,
+                      paddingHorizontal: 0,
+                    }}
+                    textStyle={{ color: gray(0.4), fontSize: 11 }}
+                  />
+
+                  <Button_
+                    onPress={() => {
+                      _setWorkorderSalesToDisplayIdsx(
+                        addOrRemoveFromArr(
+                          sWorkorderSalesToDisplayIdxs,
+                          workorderIdx
+                        )
+                      );
+                    }}
+                    icon={ICONS.dollarYellow}
+                    iconSize={22}
+                    buttonStyle={{
+                      paddingHorizontal: 0,
+                      paddingLeft: 3,
+                      paddingVertical: 5,
+                    }}
+                    textStyle={{ color: gray(0.4), fontSize: 11 }}
+                  />
                 </View>
                 <View
                   style={{
@@ -810,16 +857,12 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                   <Text
                     style={{
                       textAlign: "left",
-                      // marginHorizontal: 10,
                       color: C.text,
                       fontWeight: 500,
                       fontSize: TOTALS_TEXT_SIZE + 1,
                     }}
                   >
-                    {"$" +
-                      formatCurrencyDisp(
-                        calculateRunningTotals(workorder).runningSubtotal
-                      )}
+                    {"$" + formatCurrencyDisp(totals.runningSubtotal)}
                   </Text>
                 </Text>
                 <View
@@ -829,7 +872,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                     backgroundColor: C.buttonLightGreenOutline,
                   }}
                 />
-                {!calculateRunningTotals(workorder).runningDiscount > 0 && (
+                {!!totals.runningDiscount > 0 && (
                   <View
                     style={{
                       flexDirection: "row",
@@ -850,16 +893,12 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                           fontSize: TOTALS_TEXT_SIZE + 1,
                         }}
                       >
-                        {"$" + formatCurrencyDisp("23435")}
-                        {/* {"$" +
-                          formatCurrencyDisp(
-                            calculateRunningTotals(workorder).runningDiscount
-                          )} */}
+                        {totals.runningDiscount}
                       </Text>
                     </Text>
                   </View>
                 )}
-                {!calculateRunningTotals(workorder).runningDiscount > 0 && (
+                {!!totals.runningDiscount > 0 && (
                   <View
                     style={{
                       width: 1,
@@ -878,12 +917,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                       fontSize: TOTALS_TEXT_SIZE + 1,
                     }}
                   >
-                    {"$" +
-                      formatCurrencyDisp(
-                        (calculateRunningTotals(workorder).runningTotal *
-                          useSettingsStore.getState().settings.salesTax) /
-                          100
-                      )}
+                    {"$" + formatCurrencyDisp(totals.runningTax)}
                   </Text>
                 </Text>
                 <View
@@ -903,6 +937,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                     paddingHorizontal: 8,
                     paddingVertical: 3,
                     color: "gray",
+                    marginRight: 5,
                   }}
                 >
                   {"TOTAL: "}
@@ -914,13 +949,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                       fontSize: TOTALS_TEXT_SIZE + 3,
                     }}
                   >
-                    {"$" +
-                      formatCurrencyDisp(
-                        calculateRunningTotals(workorder).runningTotal *
-                          (useSettingsStore.getState().settings.salesTax /
-                            100) +
-                          calculateRunningTotals(workorder).runningTotal
-                      )}
+                    {"$" + formatCurrencyDisp(totals.finalTotal)}
                   </Text>
                 </Text>
               </View>

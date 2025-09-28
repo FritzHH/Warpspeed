@@ -4,88 +4,50 @@ import {
   PAYMENT_OBJECT_PROTO,
   REFUND_PROTO,
   SALE_PROTO,
-  TAB_NAMES,
   WORKORDER_ITEM_PROTO,
-  ALERT_SCREEN_PROTO,
-  WORKORDER_PROTO,
 } from "../../../data";
 import {
-  useAlertScreenStore,
   useCheckoutStore,
   useCurrentCustomerStore,
   useInventoryStore,
   useOpenWorkordersStore,
   useSettingsStore,
-  useStripePaymentStore,
-  useTabNamesStore,
 } from "../../../stores";
 import * as XLSX from "xlsx";
 
 import {
-  BicycleSpinner,
-  Button,
-  CashSaleModalComponent,
   CheckBox_,
-  StripeCreditCardModalComponent,
-  FileInput,
-  LoadingIndicator,
-  PaymentComponent,
   ScreenModal,
   SHADOW_RADIUS_PROTO,
   Button_,
-  DropdownMenu,
-  SliderButton_,
-  GradientView,
-  AlertBox_,
 } from "../../../components";
 import { cloneDeep, initial } from "lodash";
 import {
-  formatPhoneWithDashes,
   arrHasItem,
   calculateRunningTotals,
-  clog,
-  formatDecimal,
   formatCurrencyDisp,
   fuzzySearch,
-  generateRandomID,
   generateUPCBarcode,
-  getRgbFromNamedColor,
   lightenRGBByPercent,
   log,
   gray,
-  removeArrItem,
   removeUnusedFields,
   replaceOrAddToArr,
-  roundToTwoDecimals,
-  usdTypeMask,
-  dollarsToCents,
   addOrRemoveFromArr,
-  findInMultipleArrs,
   resetObject,
   extractStripeErrorMessage,
-  startTimer,
 } from "../../../utils";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
-import {
-  sendFCMMessage,
-  SET_FIRESTORE_FIELD,
-  setOpenWorkorder,
-} from "../../../db";
+import { useEffect, useRef, useState } from "react";
+import { C, Colors, Fonts, ICONS } from "../../../styles";
+
 import { dbSetSalesObj } from "../../../db_call_wrapper";
 import { TouchableOpacity } from "react-native";
-import {
-  STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
-  STRIPE_INITIATE_PAYMENT_INTENT_URL,
-} from "../../../private_user_constants";
-import {
-  FIRESTORE_COLLECTION_NAMES,
-  MILLIS_IN_MINUTE,
-} from "../../../constants";
+import { STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL } from "../../../private_user_constants";
+import { MILLIS_IN_MINUTE } from "../../../constants";
 import { isArray } from "lodash";
-import { StripeCreditCardComponent } from "./CardSaleComponent";
-import { CashSaleComponent } from "./CashSaleComponent";
-import { MiddleItemComponent } from "./MiddleItemComponent";
+import { StripeCreditCardComponent } from "./checkout_components/CardSaleComponent";
+import { CashSaleComponent } from "./checkout_components/CashSaleComponent";
+import { MiddleItemComponent } from "./checkout_components/MiddleItemComponent";
 
 export function CheckoutModalScreen({}) {
   // store setters ////////////////////////////////////////////////

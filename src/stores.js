@@ -99,13 +99,8 @@ export const useCustomerSearchStore = create((set, get) => ({
     }));
   },
   setSearchResults: (searchResults) => ({ searchResults }),
-  addToSearchResults: (searchResults, count) => {
+  addToSearchResults: (searchResults) => {
     let storeSearchResults = get().searchResults;
-    if (count === 0) {
-      set({ searchResults });
-      return;
-    }
-
     searchResults.forEach((searchResult) => {
       if (arrHasItem(storeSearchResults, searchResult)) return;
       storeSearchResults = [...storeSearchResults, searchResult];

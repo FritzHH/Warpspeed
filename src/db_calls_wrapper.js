@@ -1313,15 +1313,7 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
         log(`Query failed for field ${fieldQuery.field}:`, queryError);
       }
     }
-
-    return {
-      success: true,
-      customers: allResults,
-      phoneNumber: cleanPhone,
-      tenantID,
-      storeID,
-      count: allResults.length,
-    };
+return allResults;
   } catch (error) {
     log("Error searching customers by phone:", error);
     return {
@@ -1418,14 +1410,7 @@ export async function dbSearchCustomersByEmail(email) {
       );
     });
 
-    return {
-      success: true,
-      customers: filteredResults,
-      email: cleanEmail,
-      tenantID,
-      storeID,
-      count: filteredResults.length,
-    };
+    return filteredResults;
   } catch (error) {
     log("Error searching customers by email:", error);
     return {
@@ -1551,14 +1536,8 @@ export async function dbSearchCustomersByName(name) {
       }
     }
 
-    return {
-      success: true,
-      customers: allResults,
-      name: cleanName,
-      tenantID,
-      storeID,
-      count: allResults.length,
-    };
+    return allResults;
+    
   } catch (error) {
     log("Error searching customers by name:", error);
     return {

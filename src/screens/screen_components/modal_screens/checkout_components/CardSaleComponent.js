@@ -7,7 +7,7 @@ import {
   WORKORDER_ITEM_PROTO,
   ALERT_SCREEN_PROTO,
   WORKORDER_PROTO,
-} from "../../../data";
+} from "../../../../data";
 import {
   useAlertScreenStore,
   useCheckoutStore,
@@ -17,7 +17,7 @@ import {
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
-} from "../../../stores";
+} from "../../../../stores";
 import * as XLSX from "xlsx";
 
 import {
@@ -36,7 +36,7 @@ import {
   SliderButton_,
   GradientView,
   AlertBox_,
-} from "../../../components";
+} from "../../../../components";
 import { cloneDeep, initial } from "lodash";
 import {
   formatPhoneWithDashes,
@@ -62,14 +62,14 @@ import {
   findInMultipleArrs,
   startTimer,
   extractStripeErrorMessage,
-} from "../../../utils";
+} from "../../../../utils";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../../styles";
 import {
   sendFCMMessage,
   SET_FIRESTORE_FIELD,
   setOpenWorkorder,
-} from "../../../db";
+} from "../../../../db";
 import {
   dbCancelServerDrivenStripePayment,
   dbGetClosedWorkorderItem,
@@ -82,17 +82,17 @@ import {
   dbSetSalesObj,
   dbSubscribeToStripePaymentProcess,
   createPaymentPollingFallback,
-} from "../../../db_call_wrapper";
+} from "../../../../db_call_wrapper";
 import { TouchableOpacity } from "react-native";
 import {
   STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
   STRIPE_INITIATE_PAYMENT_INTENT_URL,
-} from "../../../private_user_constants";
+} from "../../../../private_user_constants";
 import {
   FIRESTORE_COLLECTION_NAMES,
   MILLIS_IN_HOUR,
   MILLIS_IN_MINUTE,
-} from "../../../constants";
+} from "../../../../constants";
 import { isArray } from "lodash";
 import { DevSettings } from "react-native";
 export const StripeCreditCardComponent = ({

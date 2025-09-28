@@ -1,21 +1,11 @@
 /* eslint-disable */
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Image,
-} from "react-native-web";
+import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
-  clog,
-  dim,
   formatMillisForDisplay,
   getWordDayOfWeek,
   getWordMonth,
   log,
-  trimToTwoDecimals,
-  useInterval,
 } from "../../../utils";
 import { TabMenuDivider as Divider, CheckBox_ } from "../../../components";
 import { C, Colors } from "../../../styles";
@@ -24,17 +14,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep, sortBy } from "lodash";
 import {
   useCurrentCustomerStore,
-  useCustMessagesStore,
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../../stores";
 // import { dbGetCustomerObj } from "../../../db_call_wrapper";
-import { messagesSubscribe } from "../../../db_subscription_wrapper";
-import { getDatabase } from "firebase/database";
-import LinearGradient from "react-native-web-linear-gradient";
-import Svg, { Path } from "react-native-svg";
+
 import { dbGetCustomer } from "../../../db_calls_wrapper";
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day

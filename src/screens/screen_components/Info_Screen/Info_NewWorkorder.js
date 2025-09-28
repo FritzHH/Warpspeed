@@ -3,30 +3,16 @@
 import { View, TextInput, Button } from "react-native-web";
 import {
   formatPhoneWithDashes,
-  capitalizeFirstLetterOfString,
   createNewWorkorder,
   generateUPCBarcode,
-  LETTERS,
   log,
-  NUMS,
   removeDashesFromPhone,
-  showAlert,
   stringIsNumeric,
   gray,
   capitalizeAllWordsInSentence,
 } from "../../../utils";
-import {
-  ScreenModal,
-  LoginModalScreen,
-  Button_,
-  PhoneNumberInput,
-} from "../../../components";
-import {
-  CUSTOMER_PROTO,
-  FOCUS_NAMES,
-  TAB_NAMES,
-  WORKORDER_PROTO,
-} from "../../../data";
+import { ScreenModal, Button_, PhoneNumberInput } from "../../../components";
+import { CUSTOMER_PROTO, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import React, { useEffect, useState, useMemo } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -34,9 +20,7 @@ import {
   useCustomerSearchStore,
   useTabNamesStore,
   useOpenWorkordersStore,
-  useCustMessagesStore,
   useLoginStore,
-  useSettingsStore,
 } from "../../../stores";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
@@ -60,10 +44,15 @@ export function NewWorkorderComponent({}) {
   const zSearchResults = useCustomerSearchStore((s) => s.getSearchResults());
 
   //////////////////////////////////////////////////////////////////////
-  const [sTextInput, _setTextInput] = React.useState("2393369177");
+  const [sTextInput, _setTextInput] = React.useState("239");
   const [sSearchFieldName, _setSearchFieldName] = React.useState("phone");
   const [sCustomerInfoObj, _setCustomerInfoObj] = React.useState(null);
   const [buttonVisible, setButtonVisible] = React.useState(false);
+
+  // dev ////////////////////////////////////
+  useEffect(() => {
+    handleTextChange(sTextInput);
+  }, [sTextInput]);
 
   // Update button visibility when dependencies change
   useEffect(() => {
@@ -76,7 +65,7 @@ export function NewWorkorderComponent({}) {
     setButtonVisible(shouldShow);
   }, [sSearchFieldName, sTextInput.length, zSearchResults.length]);
 
-  async function handleBox1TextChange(incomingText = "") {
+  async function handleTextChange(incomingText = "") {
     let isEmail;
     let rawText = removeDashesFromPhone(incomingText);
     let isNumeric = stringIsNumeric(incomingText.substring(0, 3));
@@ -88,7 +77,6 @@ export function NewWorkorderComponent({}) {
 
     const searchFun = async (searchStrings, options) => {
       //dev
-      return;
       let funs = [];
       options.forEach((option) => {
         searchStrings.forEach((searchString) => {
@@ -101,11 +89,10 @@ export function NewWorkorderComponent({}) {
         });
       });
 
-      let count = 0;
       funs.forEach((fun) => {
         fun().then((res) => {
-          useCustomerSearchStore.getState().addToSearchResults(res, count);
-          count++;
+          log("res", res);
+          useCustomerSearchStore.getState().addToSearchResults(res);
         });
       });
     };
@@ -276,7 +263,7 @@ export function NewWorkorderComponent({}) {
               placeholder={"31234567890"}
               placeholderTextColor={gray(0.2)}
               value={sTextInput}
-              onChangeText={(val) => handleBox1TextChange(val)}
+              onChangeText={(val) => handleTextChange(val)}
               dashStyle={{ width: 10, marginHorizontal: 4 }}
               dashColor={gray(0.2)}
               textColor={C.text}
@@ -286,7 +273,7 @@ export function NewWorkorderComponent({}) {
               value={capitalizeAllWordsInSentence(sTextInput)}
               placeholder={"First, last or email"}
               placeholderTextColor={gray(0.3)}
-              onChangeText={(val) => handleBox1TextChange(val)}
+              onChangeText={(val) => handleTextChange(val)}
               autoFocus={true}
               style={{
                 caretColor: C.cursorRed,
@@ -301,7 +288,9 @@ export function NewWorkorderComponent({}) {
               }}
             />
           )}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View
+            style={{ flexDirection: "row", alignItems: "center", marginTop: 5 }}
+          >
             {useMemo(
               () => (
                 <ScreenModal

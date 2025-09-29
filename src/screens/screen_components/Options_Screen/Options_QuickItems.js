@@ -16,6 +16,7 @@ import {
   generateRandomID,
   log,
   randomWordGenerator,
+  gray,
 } from "../../../utils";
 import {
   Button,
@@ -39,17 +40,13 @@ const SEARCH_STRING_TIMER = 45 * 1000;
 
 export function QuickItemComponent({}) {
   // store setters ///////////////////////////////////////////////////////////////
-  const _zSetWorkorder = useOpenWorkordersStore(
-    (state) => state.setWorkorder
-  );
+  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
 
   // store getters //////////////////////////////////////////////////////////////
   let zOpenWorkorder = WORKORDER_PROTO;
   let zSettings = SETTINGS_OBJ;
   zSettings = useSettingsStore((state) => state.getSettings());
-  zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
-  );
+  zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
   const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
 
   ///////////////////////////////////////////////////////////////////////
@@ -212,16 +209,16 @@ export function QuickItemComponent({}) {
             <Button_
               key={item.id}
               onPress={() => handleQuickButtonPress(item)}
-              colorGradientArr={COLOR_GRADIENTS.lightBlue}
+              colorGradientArr={COLOR_GRADIENTS.blue}
               buttonStyle={{
-                ...SHADOW_RADIUS_NOTHING,
+                // ...SHADOW_RADIUS_NOTHING,
                 borderWidth: 1,
                 borderRadius: 5,
                 borderColor: C.buttonLightGreen,
                 borderColor: C.buttonLightGreenOutline,
                 marginBottom: 10,
               }}
-              textStyle={{ fontSize: 14, fontWeight: 400 }}
+              textStyle={{ fontSize: 14, fontWeight: 400, color: C.textWhite }}
               text={item.name.toUpperCase()}
             />
           ))}

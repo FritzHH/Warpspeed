@@ -49,7 +49,7 @@ import {
 export const StandaloneSaleComponent = ({}) => {
   // store setters
   const _zSetOpenWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setInitialOpenWorkorderObj
+    (state) => state.setOpenWorkorderObj
   );
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName

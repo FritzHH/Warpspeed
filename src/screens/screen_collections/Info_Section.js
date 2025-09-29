@@ -19,7 +19,6 @@ export const Info_Section = ({}) => {
   // store getters
   const zInfoTabName = useTabNamesStore((state) => state.getInfoTabName());
 
-
   function ScreenComponent(tabName) {
     switch (tabName) {
       case TAB_NAMES.infoTab.workorder:

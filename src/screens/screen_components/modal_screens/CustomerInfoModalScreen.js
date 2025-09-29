@@ -53,12 +53,12 @@ export const CustomerInfoScreenModalComponent = ({
 
   // testings //////////////////////////////////////////////////////////////
   useEffect(() => {
-    useCurrentCustomerStore.getState().loadWorkorders();
-    useCurrentCustomerStore.getState().loadSales();
+    // useCurrentCustomerStore.getState().loadWorkorders();
+    // useCurrentCustomerStore.getState().loadSales();
   }, []);
 
   useEffect(() => {
-    if (!sWorkorderToDisplay) _setWorkorderToDisplay(workorders[0]);
+    // if (!sWorkorderToDisplay) _setWorkorderToDisplay(workorders[0]);
   }, [workorders]);
 
   // testings //////////////////////////////////////////////////////////////
@@ -114,6 +114,7 @@ export const CustomerInfoScreenModalComponent = ({
               width: "100%",
               flexDirection: "row",
               justifyContent: "space-between",
+              marginBottom: 10,
             }}
           >
             <CheckBox_
@@ -152,18 +153,28 @@ export const CustomerInfoScreenModalComponent = ({
               }}
             />
           </View>
-          <TextInput
-            onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.cell = removeDashesFromPhone(val);
-              setCustomerInfo(obj);
-            }}
-            placeholderTextColor="darkgray"
-            placeholder="Cell phone"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={formatPhoneWithDashes(sCustomerInfo.cell)}
-            autoComplete="none"
-          />
+          <View>
+            {!!sCustomerInfo.cell && (
+              <Text style={{ color: gray(0.3), fontSize: 11, marginLeft: 2 }}>
+                Cell
+              </Text>
+            )}
+            <TextInput
+              onChangeText={(val) => {
+                let obj = cloneDeep(sCustomerInfo);
+                obj.cell = removeDashesFromPhone(val);
+                setCustomerInfo(obj);
+              }}
+              placeholderTextColor="darkgray"
+              placeholder="Cell phone"
+              style={{
+                ...TEXT_INPUT_STYLE,
+                marginTop: sCustomerInfo.cell ? 1 : TEXT_INPUT_STYLE.marginTop,
+              }}
+              value={formatPhoneWithDashes(sCustomerInfo.cell)}
+              autoComplete="none"
+            />
+          </View>
 
           <TextInput
             onChangeText={(val) => {

@@ -49,7 +49,8 @@ export const C = {
   buttonLightGreen: "rgb(232, 239, 245)",
   buttonLightGreenOutline: "rgb(200, 228, 220)",
 
-  text: lightenRGBByPercent("rgb(45, 55, 72)", 25),
+  text: lightenRGBByPercent("rgb(0,0,0)", 28),
+  lightText: gray(0.42),
   textWhite: "rgb(255, 255, 255)",
 };
 
@@ -65,9 +66,9 @@ export const COLOR_GRADIENTS = {
     lightenRGBByPercent(C.blue, 10),
   ],
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
-  blue: [lightenRGBByPercent(C.blue, 30), lightenRGBByPercent(C.blue, 0)],
+  blue: [lightenRGBByPercent(C.blue, 15), lightenRGBByPercent(C.blue, 0)],
   lightBlue: [lightenRGBByPercent(C.blue, 60), lightenRGBByPercent(C.blue, 45)],
-  grey: [gray(0.27), gray(0.4)],
+  grey: [gray(0.35), gray(0.45)],
 };
 
 const ASSETS_PATH = "./assets/";
@@ -133,6 +134,7 @@ export const ICONS = {
   backRed: require(ASSETS_PATH + "backRed.png"),
   upChevron: require(ASSETS_PATH + "up-chevron.png"),
   downChevron: require(ASSETS_PATH + "down-chevron.png"),
+  trash: require(ASSETS_PATH + "trash.png"),
 };
 
 // rgb(64, 174, 113)

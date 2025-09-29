@@ -116,12 +116,8 @@ export function Options_Section({}) {
   return (
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
       <TabBar
-        // userObj={zCurrentUser}
-        // isClockedIn={zPunchClock[zCurrentUser?.id]}
         zOptionsTabName={zOptionsTabName}
         _zSetOptionsTabName={_zSetOptionsTabName}
-        // __tabMenuHeight={}
-        // __isOnline={sIsOnline}
         webcamDetected={zWebcamDetected}
         handleUserPress={handleUserClockPress}
       />

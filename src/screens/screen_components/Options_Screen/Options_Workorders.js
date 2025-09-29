@@ -48,7 +48,7 @@ export function WorkordersComponent({}) {
     (state) => state.modItem
   );
   const _zSetInitialOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setInitialOpenWorkorder
+    (state) => state.setOpenWorkorder
   );
 
   ///////////////////////////////////////////////////////////////////////////////////

@@ -48,7 +48,7 @@ export function NewWorkorderComponent({}) {
   //////////////////////////////////////////////////////////////////////
   const [sTextInput, _setTextInput] = React.useState("239");
   const [sSearchFieldName, _setSearchFieldName] = React.useState("phone");
-  const [sCustomerInfoObj, _setCustomerInfoObj] = React.useState(null);
+  const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
   const [buttonVisible, setButtonVisible] = React.useState(false);
 
   // dev ////////////////////////////////////
@@ -102,7 +102,7 @@ export function NewWorkorderComponent({}) {
 
       funs.forEach((fun) => {
         fun().then((res) => {
-          log("res", res);
+          // log("res", res);
           useCustomerSearchStore.getState().addToSearchResults(res);
         });
       });
@@ -178,7 +178,7 @@ export function NewWorkorderComponent({}) {
     }
     // log(custInfo);
     // do not set the customer id this is how the next screen knows it is a new customer. we will set the id in the modal automatically on creation
-    _setCustomerInfoObj(custInfo);
+    _setCustomerInfo(custInfo);
   }
 
   function handleStartStandaloneSalePress() {
@@ -197,41 +197,41 @@ export function NewWorkorderComponent({}) {
   function handleCancelCreateNewCustomerPress() {
     _setTextInput("");
     _setSearchFieldName("phone");
-    _setCustomerInfoObj(null);
+    _setCustomerInfo(null);
   }
 
   function handleCreateNewCustomerPressed() {
     // first create new customer
-    let newCustomerObj = cloneDeep(sCustomerInfoObj);
-    newCustomerObj.id = generateUPCBarcode();
-    newCustomerObj.dateCreated = new Date().getTime();
+    let newCustomer = cloneDeep(sCustomerInfo);
+    newCustomer.id = generateUPCBarcode();
+    newCustomer.dateCreated = new Date().getTime();
 
     // next create new empty workorder for automatic population of next screen
     let newWorkorder = createNewWorkorder({
-      customerID: newCustomerObj.id,
-      customerFirst: newCustomerObj.first,
-      customerLast: newCustomerObj.last,
-      customerPhone: newCustomerObj.cell || newCustomerObj.landline,
+      customerID: newCustomer.id,
+      customerFirst: newCustomer.first,
+      customerLast: newCustomer.last,
+      customerPhone: newCustomer.cell || newCustomer.landline,
       startedByFirst: useLoginStore.getCurrentUser().first,
       startedByLast: useLoginStore.getCurrentUser().last,
     });
 
     // add in the newly created workorder to the customer's file
-    newCustomerObj.workorders.push(newWorkorder.id);
-
-    useCurrentCustomerStore.getState().setCustomer(newCustomerObj, true);
-    useOpenWorkordersStore.getState().setWorkorder(newWorkorder, true, true);
-    useOpenWorkordersStore.getState().setOpenWorkorder(newWorkorder);
-    useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.workorder);
-    useTabNamesStore
-      .getState()
-      .setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    useTabNamesStore
-      .getState()
-      .setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    newCustomer.workorders.push(newWorkorder.id);
+    _setCustomerInfo(newCustomer);
+    // useCurrentCustomerStore.getState().setCustomer(newCustomerObj, true);
+    // useOpenWorkordersStore.getState().setWorkorder(newWorkorder, true, true);
+    // useOpenWorkordersStore.getState().setOpenWorkorder(newWorkorder);
+    // useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.workorder);
+    // useTabNamesStore
+    //   .getState()
+    //   .setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    // useTabNamesStore
+    //   .getState()
+    //   .setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    // _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
+    // _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+    // _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 
   //////////////////////////////////////////////////////////////////////
@@ -302,10 +302,7 @@ export function NewWorkorderComponent({}) {
               () => (
                 <ScreenModal
                   showOuterModal={true}
-                  outerModalStyle={{}}
-                  buttonLabel={"Create New Customer"}
-                  modalVisible={sCustomerInfoObj}
-                  canExitOnOuterClick={false}
+                  modalVisible={sCustomerInfo}
                   ButtonComponent={() => (
                     <Button_
                       text={"CUSTOMER"}
@@ -325,9 +322,8 @@ export function NewWorkorderComponent({}) {
                   )}
                   Component={() => (
                     <CustomerInfoScreenModalComponent
+                      incomingCustomer={sCustomerInfo}
                       isNewCustomer={true}
-                      ssCustomerInfoObj={sCustomerInfoObj}
-                      __setCustomerInfoObj={_setCustomerInfoObj}
                       button1Text={"Create Customer"}
                       button2Text={"Cancel"}
                       handleButton1Press={handleCreateNewCustomerPressed}
@@ -336,7 +332,7 @@ export function NewWorkorderComponent({}) {
                   )}
                 />
               ),
-              [sCustomerInfoObj, buttonVisible]
+              [sCustomerInfo, buttonVisible]
             )}
             <Button_
               icon={ICONS.reset1}

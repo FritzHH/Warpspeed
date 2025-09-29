@@ -32,6 +32,7 @@ import CalendarPicker, { useDefaultStyles } from "react-native-ui-datepicker";
 import { PanResponder } from "react-native";
 
 import { StyleSheet } from "react-native";
+import { Animated } from "react-native";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -390,7 +391,7 @@ export const ScreenModal = ({
   handleButtonPress = () => {},
   handleMouseOver,
   handleMouseExit,
-  buttonLabel = "Modal Button",
+  buttonLabel = "Modal Btn",
   buttonVisible = true,
   showOuterModal = false,
   buttonIconSize,
@@ -406,15 +407,24 @@ export const ScreenModal = ({
   buttonIcon,
   buttonIconStyle = {},
   handleModalActionInternally = false,
-  // canExitOnOuterModalClick = true,
   handleOuterClick = () => {},
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
-  const [sMouseOver, _setMouseOver] = React.useState(false);
   const [sInternalModalShow, _setInternalModalShow] = useState(false);
-  const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
+  const [sAnimation, _setAnimation] = useState("fade");
 
   //////////////////////////////////////////////////////////////
+  useEffect(() => {
+    const isVisible = handleModalActionInternally
+      ? sInternalModalShow
+      : modalVisible;
+    if (isVisible) {
+      _setAnimation("fade"); // Fade in when opening
+    } else {
+      _setAnimation("slide"); // Slide out when closing
+    }
+  }, [modalVisible, sInternalModalShow]);
+
   useEffect(() => {
     // _zSetModalVisible(true);
     // return () => {
@@ -434,10 +444,12 @@ export const ScreenModal = ({
   if (!showShadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   if (!showOuterModal)
     outerModalStyle = { ...outerModalStyle, width: null, height: null };
+
   // if (sMouseOver) shadowStyle = { ...SHADOW_RADIUS_PROTO };
   /////////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
   if (mouseOverOptions.highlightColor) mouseOverOptions.enable = true;
+  let animation = "fade";
   return (
     <TouchableWithoutFeedback
       ref={ref}
@@ -447,40 +459,34 @@ export const ScreenModal = ({
       }}
     >
       <View style={{}}>
-        {!!ButtonComponent && <ButtonComponent />}
-        {!!buttonVisible &&
-          !ButtonComponent(
-            <Button_
-              enabled={enabled}
-              handleMouseExit={handleMouseExit}
-              handleMouseOver={handleMouseOver}
-              icon={buttonIcon}
-              iconSize={buttonIconSize}
-              text={buttonLabel}
-              onPress={() => {
-                handleButtonPress();
-                setModalVisibility(!modalVisible);
-                _setInternalModalShow(!sInternalModalShow);
-              }}
-              onMouseOver={() =>
-                mouseOverOptions.enable ? _setMouseOver(true) : null
-              }
-              onMouseLeave={() => {
-                _setMouseOver(false);
-              }}
-              textStyle={{ ...buttonTextStyle }}
-              buttonStyle={{
-                alignItems: "center",
-                justifyContent: "center",
-                width: !buttonVisible ? 0 : null,
-                height: !buttonVisible ? 0 : null,
-                ...shadowStyle,
-                ...buttonStyle,
-              }}
-            />
-          )}
+        {buttonVisible && ButtonComponent && <ButtonComponent />}
+        {buttonVisible && !ButtonComponent && (
+          <Button_
+            enabled={enabled}
+            handleMouseExit={handleMouseExit}
+            handleMouseOver={handleMouseOver}
+            icon={buttonIcon}
+            iconSize={buttonIconSize}
+            text={buttonLabel}
+            onPress={() => {
+              handleButtonPress();
+              setModalVisibility(false);
+              _setInternalModalShow(!sInternalModalShow);
+            }}
+            textStyle={{ ...buttonTextStyle }}
+            buttonStyle={{
+              alignItems: "center",
+              justifyContent: "center",
+              width: !buttonVisible ? 0 : null,
+              height: !buttonVisible ? 0 : null,
+              ...shadowStyle,
+              ...buttonStyle,
+            }}
+          />
+        )}
 
         <Modal
+          animationType={sAnimation}
           visible={
             handleModalActionInternally ? sInternalModalShow : modalVisible
           }
@@ -518,18 +524,15 @@ export const DropdownMenu = ({
   itemTextStyle = {},
   itemStyle = {},
   buttonStyle = {},
-  menuButtonStyle = {},
+  menuButtonStyle = { borderRadius: 11 },
   buttonTextStyle = {},
   buttonText,
-  // ref,
   modalCoordinateVars = {
     x: -10,
     y: 40,
   },
   mouseOverOptions = {
     enable: true,
-    // opacity: 1,
-    // highlightColor: lightenRGBByPercent(C.lightred, 10),
     opacity: 0.6,
   },
   showButtonShadow,
@@ -539,7 +542,6 @@ export const DropdownMenu = ({
   selectedIdx = 0,
   useSelectedAsButtonTitle = false,
 }) => {
-  const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sModalVisible, _setModalVisible] = useState(false);
   const ref = useRef();
 
@@ -549,7 +551,7 @@ export const DropdownMenu = ({
     if (ifNumIsOdd(index) || !rgbString.includes("rgb")) {
       return rgbString;
     }
-    return lightenRGBByPercent(rgbString, 20);
+    return lightenRGBByPercent(rgbString, 40);
   }
 
   if (useSelectedAsButtonTitle) {
@@ -561,7 +563,9 @@ export const DropdownMenu = ({
       <View
         style={{
           borderColor: menuBorderColor || C.buttonLightGreenOutline,
-          // borderRadius: 25,
+          borderRadius: menuButtonStyle.borderRadius,
+          borderWidth: 2,
+          borderColor: gray(0.08),
           backgroundColor: "white",
         }}
       >
@@ -584,11 +588,11 @@ export const DropdownMenu = ({
                 buttonStyle={{
                   padding: 10,
                   height: 40,
-                  borderRadius: 0,
                   width: 130,
+                  borderRadius: 0,
                   backgroundColor:
                     getBackgroundColor(item.backgroundColor, idx) ||
-                    getBackgroundColor(C.buttonLightGreenOutline, idx),
+                    getBackgroundColor(gray(0.036), idx),
                   borderTopLeftRadius:
                     idx == 0 ? menuButtonStyle.borderRadius : null,
                   borderTopRightRadius:
@@ -608,9 +612,10 @@ export const DropdownMenu = ({
                   color: item.textColor || C.text,
                 }}
                 text={item.label || item}
-                onPress={() => {
-                  onSelect(item, idx);
+                onPress={(e) => {
+                  e?.stopPropagation?.();
                   _setModalVisible(false);
+                  onSelect(item, idx);
                 }}
               />
             );
@@ -623,6 +628,7 @@ export const DropdownMenu = ({
   return (
     <ScreenModal
       Component={() => <DropdownComponent />}
+      // handleModalActionInternally={true}
       modalVisible={sModalVisible}
       handleButtonPress={() => _setModalVisible(!sModalVisible)}
       buttonStyle={buttonStyle}
@@ -1774,25 +1780,24 @@ export const TabMenuButton = ({
 }) => {
   return (
     <Button_
-      // mouseOverOptions={{ opacity: 0.7, backgroundColor: "gray" }}
       onLongPress={onLongPress}
       onPress={onPress}
       text={text}
       textStyle={{
         // textColor: Colors.tabMenuButtonText,
-        color: C.textWhite,
+        color: isSelected ? C.textWhite : "white",
         fontSize: 15,
         ...textStyle,
       }}
-      colorGradientArr={COLOR_GRADIENTS.blue}
+      colorGradientArr={
+        isSelected ? COLOR_GRADIENTS.blue : COLOR_GRADIENTS.lightBlue
+      }
       buttonStyle={{
         height,
         // backgroundColor: ,
-        opacity: isSelected ? 1 : 0.5,
         paddingHorizontal: 15,
         width: null,
         paddingVertical: 5,
-        ...SHADOW_RADIUS_NOTHING,
         borderRadius: 0,
         ...buttonStyle,
       }}
@@ -2272,29 +2277,48 @@ export function SliderButton_({
   toConfirmLabel = "Slide to confirm",
   confirmLabel = "Confirmed!",
   showLabel = false,
+  style = {},
+  // Text styling parameters
+  textStyle = {},
+  labelStyle = {},
+  // Slider size parameters
+  sliderWidth = 280,
+  knobSize = 50,
+  // Slider color parameters
+  sliderBackgroundColor = "#eee",
+  sliderBackgroundOpacity = 1,
+  knobBackgroundColor = "#4CAF50",
+  knobTextColor = "white",
+  knobText = "➔",
+  // Knob image parameters
+  knobImage = "",
+  knobImageSize = 20,
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
 
-  const SLIDER_WIDTH = 280;
-  const KNOB_SIZE = 50;
+  const SLIDER_WIDTH = sliderWidth;
+  const KNOB_SIZE = knobSize;
 
   const styles2 = StyleSheet.create({
     container: {
       alignItems: "center",
       justifyContent: "center",
       padding: 20,
+      ...style,
     },
     label: {
       marginBottom: 10,
       fontSize: 16,
       fontWeight: "600",
+      ...labelStyle,
     },
     slider: {
       width: SLIDER_WIDTH,
       height: KNOB_SIZE,
       borderRadius: KNOB_SIZE / 2,
-      backgroundColor: "#eee",
+      backgroundColor: sliderBackgroundColor,
+      opacity: sliderBackgroundOpacity,
       justifyContent: "center",
       overflow: "hidden",
     },
@@ -2302,7 +2326,7 @@ export function SliderButton_({
       width: KNOB_SIZE,
       height: KNOB_SIZE,
       borderRadius: KNOB_SIZE / 2,
-      backgroundColor: "#4CAF50",
+      backgroundColor: knobBackgroundColor,
       justifyContent: "center",
       alignItems: "center",
       position: "absolute",
@@ -2311,9 +2335,10 @@ export function SliderButton_({
       cursor: "pointer",
     },
     knobText: {
-      color: "white",
+      color: knobTextColor,
       fontSize: 20,
       fontWeight: "bold",
+      ...textStyle,
     },
   });
 
@@ -2323,18 +2348,22 @@ export function SliderButton_({
       onMoveShouldSetPanResponder: () => !confirmed,
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dx > 0) {
-          translateX.setValue(
-            Math.min(gestureState.dx, SLIDER_WIDTH - KNOB_SIZE)
-          );
+          const maxDistance = SLIDER_WIDTH - KNOB_SIZE;
+          translateX.setValue(Math.min(gestureState.dx, maxDistance));
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > SLIDER_WIDTH - KNOB_SIZE - 10) {
+        const maxDistance = SLIDER_WIDTH - KNOB_SIZE;
+        const threshold = maxDistance - 10; // 10px tolerance
+
+        if (gestureState.dx > threshold) {
           // Trigger action if slid to end
           setConfirmed(true);
           onConfirm?.();
+          // Reset immediately after confirmation
+          setConfirmed(false);
           Animated.spring(translateX, {
-            toValue: SLIDER_WIDTH - KNOB_SIZE,
+            toValue: 0,
             useNativeDriver: true,
           }).start();
         } else {
@@ -2360,7 +2389,15 @@ export function SliderButton_({
           {...panResponder.panHandlers}
           style={[styles2.knob, { transform: [{ translateX }] }]}
         >
-          <Text style={styles2.knobText}>➔</Text>
+          {knobImage ? (
+            <Image_
+              icon={knobImage}
+              size={knobImageSize}
+              style={{ resizeMode: "contain" }}
+            />
+          ) : (
+            <Text style={styles2.knobText}>{knobText}</Text>
+          )}
         </Animated.View>
       </View>
     </View>

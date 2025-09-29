@@ -9,6 +9,7 @@ import {
   TIME_PUNCH_PROTO,
 } from "./data";
 import {
+  addOrRemoveFromArr,
   arrHasItem,
   checkArr,
   generateUPCBarcode,
@@ -46,6 +47,7 @@ export const useTabNamesStore = create((set, get) => ({
   getOptionsTabName: () => get().optionsTabName,
   getInfoTabName: () => get().infoTabName,
 
+  setItems: (obj) => set({ ...obj }),
   setInfoTabName: (name) => {
     set((state) => ({ infoTabName: name }));
   },
@@ -93,12 +95,11 @@ export const useCustomerSearchStore = create((set, get) => ({
   searchResults: [],
   getSearchResults: () => get().searchResults,
   getSelectedItem: () => get().selectedItem,
-  setSelectedItem: (item) => {
-    set((state) => ({
+  setSelectedItem: (item) =>
+    set({
       selectedItem: item,
-    }));
-  },
-  setSearchResults: (searchResults) => ({ searchResults }),
+    }),
+  setSearchResults: (searchResults) => set({ searchResults }),
   addToSearchResults: (searchResults) => {
     let storeSearchResults = get().searchResults;
     searchResults.forEach((searchResult) => {
@@ -107,11 +108,7 @@ export const useCustomerSearchStore = create((set, get) => ({
     });
     set({ searchResults: storeSearchResults });
   },
-
-  reset: () => {
-    set({ searchResults: [] });
-    set({ selectedItem: null });
-  },
+  reset: () => set({ searchResults: [], selectedItem: null }),
 }));
 
 export const useCheckoutStore = create((set, get) => ({
@@ -574,11 +571,11 @@ export const useCurrentCustomerStore = create((set, get) => ({
   loadWorkorders: () => {
     // testing
     // log(useOpenWorkordersStore.getState().getWorkorders());
-    set({
-      workorders: [...useOpenWorkordersStore.getState().getWorkorders()],
-    });
+    // set({
+    //   workorders: [...useOpenWorkordersStore.getState().getWorkorders()],
+    // });
 
-    return;
+    // return;
 
     set({ workordersLoading: true });
     let target = get().customer.workorders?.length;
@@ -604,28 +601,27 @@ export const useCurrentCustomerStore = create((set, get) => ({
   },
 
   loadSales: () => {
-    let sale = {
-      amountCaptured: "45654",
-      id: 125425652125,
-      millis: new Date().getTime(),
-      workorderIDs: ["018609309556", "068688807311"],
-      payments: [
-        {
-          amountCaptured: "45434",
-          last4: "3454",
-          cardType: "Visa (traditional)",
-          expMonth: 10,
-          expYear: 28,
-          millis: new Date().getTime(),
-          isRefund: false,
-          amountRefunded: 0,
-          id: "123652145256",
-        },
-      ],
-    };
+    // let sale = {
+    //   amountCaptured: "45654",
+    //   id: 125425652125,
+    //   millis: new Date().getTime(),
+    //   workorderIDs: ["018609309556", "068688807311"],
+    //   payments: [
+    //     {
+    //       amountCaptured: "45434",
+    //       last4: "3454",
+    //       cardType: "Visa (traditional)",
+    //       expMonth: 10,
+    //       expYear: 28,
+    //       millis: new Date().getTime(),
+    //       isRefund: false,
+    //       amountRefunded: 0,
+    //       id: "123652145256",
+    //     },
+    //   ],
+    // };
 
-    return [sale, sale, sale, sale];
-
+    // return [sale, sale, sale, sale];
 
     set({ salesLoading: true });
     let target = get().customer.sales?.length;
@@ -670,7 +666,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
   getWorkorders: () => get().workorders,
 
   // setters
-  setInitialOpenWorkorder: (openWorkorder) => {
+  setOpenWorkorder: (openWorkorder) => {
     // log(openWorkorderObj);
     set({ openWorkorder });
   },
@@ -702,7 +698,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     } else {
       workorders.push(wo);
     }
-    set({ workorderArr: workorders });
+    set({ workorderArr: addOrRemoveFromArr(wo) });
 
     // not set it as open workorder if it is such
     if (get().openWorkorder?.id === wo.id) {

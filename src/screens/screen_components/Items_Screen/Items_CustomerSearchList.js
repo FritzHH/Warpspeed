@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import {
   formatPhoneForDisplay,
@@ -42,21 +42,6 @@ import { C, ICONS } from "../../../styles";
 import { Pressable } from "react-native";
 
 export function CustomerSearchListComponent({}) {
-  // store setters //////////////////////////////////////////////////////////////////////
-  const _zSetSearchSelectedItem = useCustomerSearchStore(
-    (state) => state.setSelectedItem
-  );
-
-  const _zSetCurrentCustomer = useCurrentCustomerStore(
-    (state) => state.setCustomer
-  );
-  const _zSetOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setWorkorder
-  );
-
-  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
-  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-
   // store getters //////////////////////////////////////////////////////////////////////
   const zSearchResults = useCustomerSearchStore((state) =>
     state.getSearchResults()
@@ -64,35 +49,38 @@ export function CustomerSearchListComponent({}) {
   const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
 
   ////////////////////////////////////////////////////////////////////////////////////////
-  const [sInfoTextFocus, _setInfoTextFocus] = useState(FOCUS_NAMES.cell);
-  const [sCustomerInfoObj, _setCustomerInfoObj] = useState(null);
+  const [sCustomerInfo, _setCustomerInfo] = useState();
 
-  function handleCustomerSelected(customerObj) {
+  function handleCustomerSelected(customer) {
     // log("here");
-    // log("cust", customerObj);
-    _zSetCurrentCustomer(customerObj);
+    // log("cust", zCurrentUser);
+    // return;
     let wo = cloneDeep(WORKORDER_PROTO);
-    wo.customerID = customerObj.id;
+    wo.customerID = customer.id;
     wo.changeLog = wo.changeLog.push(
       "Started by: " + zCurrentUser.first + " " + zCurrentUser.last[0]
     );
-    wo.customerFirst = customerObj.first;
-    wo.customerLast = customerObj.last;
-    wo.customerPhone = customerObj.cell || customerObj.landline;
+    wo.customerFirst = customer.first;
+    wo.customerLast = customer.last;
+    wo.customerPhone = customer.cell || customer.landline;
     wo.id = generateUPCBarcode();
     wo.startedOnMillis = new Date().getTime();
     wo.status = SETTINGS_OBJ.statuses[0];
-    _zSetOpenWorkorder(wo, false);
-    _zSetCurrentCustomer(customerObj);
-    _zSetSearchSelectedItem(null);
-    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+
+    useOpenWorkordersStore.getState().setWorkorder(wo, false);
+    useOpenWorkordersStore.getState().setOpenWorkorder(wo);
+    useCurrentCustomerStore.getState().setCustomer(customer, false);
+    _setCustomerInfo();
+    useCustomerSearchStore.getState().reset();
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.quickItems,
+    });
   }
 
-  function handleViewEditCustomerSelected(customerObj) {}
-
-  function handleClosePress() {
-    _setCustomerInfoObj(null);
+  function handleCancelPress() {
+    _setCustomerInfo();
   }
 
   return (
@@ -118,9 +106,8 @@ export function CustomerSearchListComponent({}) {
           minHeight: "100%",
         }}
         data={zSearchResults}
-        renderItem={(item) => {
-          let idx = item.index;
-          item = item.item;
+        renderItem={(obj) => {
+          let customer = obj.item;
           return (
             <View
               style={{
@@ -139,11 +126,11 @@ export function CustomerSearchListComponent({}) {
             >
               <TouchableOpacity_
                 style={{ width: "100%", height: "100%", flexDirection: "row" }}
-                onPress={() => handleCustomerSelected(item)}
+                onPress={() => handleCustomerSelected(customer)}
               >
                 <View style={{ width: "80%" }}>
                   <Text style={{ fontSize: 16, color: C.text, width: "30%" }}>
-                    {item.first + " " + item.last}
+                    {customer?.first + " " + customer?.last}
                   </Text>
                   <View
                     style={{
@@ -156,19 +143,19 @@ export function CustomerSearchListComponent({}) {
                       {"cell:  "}
                     </Text>
                     <Text style={{ color: C.text, fontSize: 14 }}>
-                      {formatPhoneForDisplay(item.cell)}
+                      {formatPhoneForDisplay(customer?.cell)}
                     </Text>
-                    {!!item.land && (
+                    {!!customer?.land && (
                       <Text
                         style={{ color: C.text, marginLeft: 30, fontSize: 14 }}
                       >
                         <Text style={{ color: gray(0.35), fontSize: 12 }}>
                           {"landline:  "}
                         </Text>
-                        {item.land}
+                        {customer?.land}
                       </Text>
                     )}
-                    {!!item.email && (
+                    {!!customer?.email && (
                       <Text
                         style={{
                           color: C.text,
@@ -179,7 +166,7 @@ export function CustomerSearchListComponent({}) {
                         <Text style={{ color: gray(0.35), fontSize: 12 }}>
                           {"email:  "}
                         </Text>
-                        {item.email}
+                        {customer?.email}
                       </Text>
                     )}
                   </View>
@@ -193,40 +180,36 @@ export function CustomerSearchListComponent({}) {
                     justifyContent: "flex-end",
                   }}
                 >
-                  <Button_ onPress={() => {}} iconSize={25} icon={ICONS.info} />
+                  <Button_
+                    onPress={() => _setCustomerInfo(customer)}
+                    iconSize={25}
+                    icon={ICONS.info}
+                  />
                 </View>
               </TouchableOpacity_>
             </View>
           );
         }}
       />
-      {/* <ScreenModal
-                showOuterModal={true}
-                outerModalStyle={{}}
-                buttonStyle={{
-                  backgroundColor: "lightgray",
-                }}
-                buttonVisible={true}
-                buttonTextStyle={{ fontSize: 13, color: "black" }}
-                handleButtonPress={() =>
-                  _setCustomerInfoObj(zSearchResults[idx])
-                }
-                buttonLabel={"View/Edit"}
-                modalVisible={sCustomerInfoObj}
-                canExitOnOuterClick={false}
-                Component={() => (
-                  <CustomerInfoScreenModalComponent
-                    ssCustomerInfoObj={sCustomerInfoObj}
-                    __setCustomerInfoObj={_setCustomerInfoObj}
-                    button1Text={"Close"}
-                    // button2Text={""}
-                    ssInfoTextFocus={sInfoTextFocus}
-                    __setInfoTextFocus={_setInfoTextFocus}
-                    handleButton1Press={handleClosePress}
-                    // handleButton2Press={handleCancelCreateNewCustomerPress}
-                  />
-                )}
-              /> */}
+      {useMemo(
+        () => (
+          <ScreenModal
+            showOuterModal={true}
+            modalVisible={sCustomerInfo}
+            buttonVisible={false}
+            Component={() => (
+              <CustomerInfoScreenModalComponent
+                incomingCustomer={sCustomerInfo}
+                button1Text={"New Workorder"}
+                button2Text={"Close"}
+                handleButton1Press={() => handleCustomerSelected(sCustomerInfo)}
+                handleButton2Press={() => _setCustomerInfo()}
+              />
+            )}
+          />
+        ),
+        [sCustomerInfo]
+      )}
     </View>
   );
 }

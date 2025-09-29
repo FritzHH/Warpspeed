@@ -14,6 +14,7 @@ import {
   gray,
   lightenRGBByPercent,
   log,
+  replaceOrAddToArr,
   trimToTwoDecimals,
 } from "../../../utils";
 import {
@@ -163,11 +164,6 @@ export const Items_WorkorderItemsTab = ({}) => {
     // _zSetWorkorderObj(wo, false);
   }, [zOpenWorkorder]);
 
-  ///////////////////////////////////////////////////
-  // function checkoutPressed() {
-  //   // _zSetIsCheckingOut(!zIsCheckingOut);
-  // }
-
   function deleteWorkorderLineItem(index) {
     //     log("need to fix this method");
     // return;
@@ -181,7 +177,8 @@ export const Items_WorkorderItemsTab = ({}) => {
     fun();
   }
 
-  function modQtyPressed(workorderLine, option, idx) {
+  function modQtyPressed(workorderLine, option) {
+    // log("here");
     let newWOLine = cloneDeep(workorderLine);
     // let wo = cloneDeep(zOpenWorkorder);
     if (option === "up") {
@@ -197,16 +194,13 @@ export const Items_WorkorderItemsTab = ({}) => {
       if (newLine.discountObj?.newPrice > 0) newWOLine = newLine;
     }
 
-    let wo = {
-      ...zOpenWorkorder,
-      workorderLines: addOrRemoveFromArr(
-        zOpenWorkorder.workorderLines,
-        newWOLine
-      ),
-    };
-    // wo.workorderLines[idx] = newWOLine;
-    log(wo);
-    _zSetWorkorder(wo);
+    useOpenWorkordersStore
+      .getState()
+      .setWorkorderField(
+        "workorderLines",
+        replaceOrAddToArr(zOpenWorkorder.workorderLines, newWOLine),
+        zOpenWorkorder.id
+      );
   }
 
   function editWorkorderLine(workorderLine) {
@@ -302,7 +296,6 @@ export const Items_WorkorderItemsTab = ({}) => {
           return (
             <LineItemComponent
               __deleteWorkorderLine={deleteWorkorderLineItem}
-              // __setWorkorderObj={_zSetWorkorderObj}
               __setWorkorderLineItem={editWorkorderLine}
               inventoryItem={invItem}
               workorderLine={item}

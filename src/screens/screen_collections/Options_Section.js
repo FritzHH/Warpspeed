@@ -17,6 +17,7 @@ import {
   Button_,
   DateTimePicker,
 } from "../../components";
+import { AnimatedComponentSwitch } from "../../components/AnimatedComponentSwitch";
 import { C, Colors, ICONS } from "../../styles";
 import { WORKORDER_PROTO, TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
@@ -119,7 +120,9 @@ export const Options_Section = React.memo(({}) => {
         webcamDetected={zWebcamDetected}
         handleUserPress={handleUserClockPress}
       />
-      {ScreenComponent()}
+      <AnimatedComponentSwitch animationType="fade" duration={200}>
+        {ScreenComponent()}
+      </AnimatedComponentSwitch>
     </View>
   );
 

@@ -23,16 +23,31 @@ export function QuickItemComponent({}) {
   const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
 
   // store getters //////////////////////////////////////////////////////////////
-  const zSettings = useSettingsStore((state) => state.settings);
+  const zQuickItemButtons = useSettingsStore(
+    (state) => state.settings?.quickItemButtons
+  );
   const zOpenWorkorderID = useOpenWorkordersStore(
     (state) => state.openWorkorder?.id
   );
   const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
 
+  // Check if all required data is loaded
+  const isDataLoaded =
+    zQuickItemButtons && zInventoryArr && zInventoryArr.length > 0;
+
   ///////////////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
+
+  // Solution B: Delayed subscription to batch store updates
+  const [isReady, setIsReady] = useState(false);
+
+  // Timeout to batch all store updates and reduce re-renders
+  useEffect(() => {
+    const timer = setTimeout(() => setIsReady(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let arr = [];
@@ -104,6 +119,8 @@ export function QuickItemComponent({}) {
     _zSetWorkorder(wo);
   }
 
+  function handleInventoryItemViewPress(item) {}
+
   function clearSearch() {
     _setSearchResults([]);
     _setSearchTerm("");
@@ -111,14 +128,30 @@ export function QuickItemComponent({}) {
 
   //////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////
-  // log("render");
+
+  // Show loading state until all data is ready and component is ready
+  if (!isDataLoaded || !isReady) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: C.listItemWhite,
+        }}
+      >
+        <Text style={{ fontSize: 16, color: C.text, textAlign: "center" }}>
+          {/* Loading Quick Items... */}
+        </Text>
+      </View>
+    );
+  }
+  log("render");
+
   return (
     <View
       style={{
-        // width: "100%",
-        // backgroundColor: "blue",
         paddingRight: 3,
-        // height: __screenHeight,
         flex: 1,
       }}
     >
@@ -163,7 +196,6 @@ export function QuickItemComponent({}) {
           // text={"+"}
           onPress={() => {
             _setModalInventoryObjIdx(-1);
-            _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
           }}
         />
       </View>
@@ -185,7 +217,7 @@ export function QuickItemComponent({}) {
             paddingHorizontal: 2,
           }}
         >
-          {zSettings?.quickItemButtons?.map((item) => (
+          {zQuickItemButtons?.map((item) => (
             <Button_
               key={item.id}
               onPress={() => handleQuickButtonPress(item)}
@@ -289,7 +321,6 @@ export function QuickItemComponent({}) {
                             iconSize={22}
                             buttonStyle={{}}
                             onPress={() => {
-                              _setLineItemBackgroundColor("transparent");
                               inventoryItemSelected(item, "info");
                             }}
                           />
@@ -345,7 +376,6 @@ export function QuickItemComponent({}) {
           handleOuterClick={() => {
             // log("screen modal clicked");
             _setModalInventoryObjIdx(null);
-            _setNewItemObject(null);
           }}
           modalVisible={sModalInventoryObjIdx}
           textStyle={{ fontSize: 14 }}

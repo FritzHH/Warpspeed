@@ -5,6 +5,7 @@ import React from "react";
 
 import { TAB_NAMES } from "../../data";
 import { TabMenuButton } from "../../components";
+import { AnimatedComponentSwitch } from "../../components/AnimatedComponentSwitch";
 import { Items_Dashboard } from "../screen_components/Items_Screen/Items_Dashboard";
 import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
 import { WorkorderPreview } from "../screen_components/Items_Screen/Items_WorkorderPreview";
@@ -55,7 +56,9 @@ export const Items_Section = React.memo(({}) => {
         zWorkorderId={zOpenWorkorder?.id}
         zIsStandaloneSale={zOpenWorkorder?.isStandaloneSale}
       />
-      {ScreenComponent(zItemsTabName)}
+      <AnimatedComponentSwitch animationType="fade" duration={200}>
+        {ScreenComponent(zItemsTabName)}
+      </AnimatedComponentSwitch>
     </View>
   );
 });

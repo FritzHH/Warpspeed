@@ -24,6 +24,7 @@ import {
   dbGetOpenWorkorderItem,
   dbGetClosedWorkorderItem,
   dbGetSaleItem,
+  dbDeleteCompletedWorkorder,
 } from "./db_call_wrapper";
 import {
   dbGetCompletedSale,
@@ -695,23 +696,34 @@ export const useOpenWorkordersStore = create((set, get) => ({
       // dbSetWorkorder(wo, batch, false);
     } // need db fun
   },
-  setWorkorderField: (fieldName, fieldVal, workorderID) => {
+  setWorkorderField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
+    log(fieldName, fieldVal);
     let workorder = get().workorders.find((o) => o.id === workorderID);
     workorder[fieldName] = fieldVal;
+
     set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
+
     if (get().openWorkorder.id === workorderID)
       set({ openWorkorder: { ...get().openWorkorder, [fieldName]: fieldVal } });
+
+    if (saveToDB) dbSaveOpenWorkorder(workorder);
   },
 
-  removeWorkorder: (wo, saveToDB = true, batch = true) => {
-    let workorders = cloneDeep(get().workorders);
-    workorders = workorders.filter((o) => o.id != wo.id);
+  removeWorkorder: (workorderID, saveToDB = true, batch = true) => {
+    let workorders = get().workorders.filter((o) => o.id !== workorderID);
     set({ workorderArr: workorders });
 
-    if (get().openWorkorder?.id === wo.id) set({ openWorkorder: null });
+    if (get().openWorkorder?.id === workorderID) {
+      useTabNamesStore().getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.customer,
+        itemsTabName: TAB_NAMES.itemsTab.empty,
+        optionsTabName: TAB_NAMES.optionsTab.workorders,
+      });
+      set({ openWorkorder: null });
+    }
 
     if (saveToDB) {
-      dbSaveOpenWorkorder(wo, "1234", "999");
+      dbDeleteCompletedWorkorder(workorderID.id);
     }
   },
 }));

@@ -679,25 +679,10 @@ export const useOpenWorkordersStore = create((set, get) => ({
   setOpenWorkorders: (workorders) => set({ workorders }), // real one
   setWorkorder: (wo, saveToDB = true, batch = true) => {
     if (wo.isStandaloneSale) {
-      set({ openWorkorder: wo });
+      set({ openWorkorder: { ...wo } });
       return;
     }
 
-    // dev*************************************************
-    // if (wo.id === "812140743019") {
-    //   // clog("setting", wo);
-    //   set({ openWorkorderObj: wo });
-    // }
-
-    // ****************************************************
-
-    let workorders = cloneDeep(get().workorders);
-    let foundWOIdx = workorders.findIndex((o) => o.id === wo.id) >= 0;
-    if (foundWOIdx) {
-      workorders[foundWOIdx] = wo;
-    } else {
-      workorders.push(wo);
-    }
     set({ workorderArr: addOrRemoveFromArr(wo) });
 
     // not set it as open workorder if it is such
@@ -709,6 +694,13 @@ export const useOpenWorkordersStore = create((set, get) => ({
       dbSaveOpenWorkorder(wo, "1234", "999");
       // dbSetWorkorder(wo, batch, false);
     } // need db fun
+  },
+  setWorkorderField: (fieldName, fieldVal, workorderID) => {
+    let workorder = get().workorders.find((o) => o.id === workorderID);
+    workorder[fieldName] = fieldVal;
+    set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
+    if (get().openWorkorder.id === workorderID)
+      set({ openWorkorder: { ...get().openWorkorder, [fieldName]: fieldVal } });
   },
 
   removeWorkorder: (wo, saveToDB = true, batch = true) => {
@@ -722,23 +714,6 @@ export const useOpenWorkordersStore = create((set, get) => ({
       dbSaveOpenWorkorder(wo, "1234", "999");
     }
   },
-
-  // handles live DB subscription changes
-  // modItem: (item, option) => {
-  //   // log(item, option);
-  //   if (option === "change")
-  //     set((state) => ({
-  //       workorderArr: changeItem(get().workorderArr, item),
-  //     }));
-  //   if (option === "add")
-  //     set((state) => ({
-  //       workorderArr: addItem(get().workorderArr, item),
-  //     }));
-  //   if (option === "remove")
-  //     set((state) => ({
-  //       workorderArr: removeItem(get().workorderArr, item),
-  //     }));
-  // },
 }));
 
 export const useWorkorderPreviewStore = create((set, get) => ({

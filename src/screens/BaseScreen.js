@@ -45,33 +45,29 @@ export function BaseScreen() {
   // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
 
   // store getters /////////////////////////////////////////////////////////////////
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
+  const zIsCheckingOut = useCheckoutStore((state) => state.isCheckingOut);
+  const zLastDatabaseBatchMillis = useDatabaseBatchStore(
+    (state) => state.lastBatchMillis
   );
-  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-  const zLastDatabaseBatchMillis = useDatabaseBatchStore((state) =>
-    state.getLastBatchMillis()
+  const zLastDatabaseWriteMillis = useDatabaseBatchStore(
+    (state) => state.lastWriteMillis
   );
-  const zLastDatabaseWriteMillis = useDatabaseBatchStore((state) =>
-    state.getLastWriteMillis()
+  const zSettings = useSettingsStore((state) => state.settings);
+  const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
+  const zLoginModalVisible = useLoginStore((state) => state.modalVisible);
+  const zRunBackgroundRecognition = useLoginStore(
+    (state) => state.runBackgroundRecognition
   );
-  const zSettings = useSettingsStore((state) => state.getSettings());
-  const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
-  const zLoginModalVisible = useLoginStore((state) => state.getModalVisible());
-  const zRunBackgroundRecognition = useLoginStore((state) =>
-    state.getRunBackgroundRecognition()
+  const zPauseAlertOnBaseComponent = useAlertScreenStore(
+    (state) => state.pauseOnBaseComponent
   );
-  const zPauseAlertOnBaseComponent = useAlertScreenStore((state) =>
-    state.getPauseOnBaseComponent()
-  );
-  const zShowAlert = useAlertScreenStore((state) => state.getShowAlert());
+  const zShowAlert = useAlertScreenStore((state) => state.showAlert);
 
-  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
 
   // local state ////////////////////////////////////////////////////////////////////////
   const [screenWidth, _setScreenWidth] = useState(window.innerWidth);
   const [screenHeight, _setScreenHeight] = useState(window.innerHeight);
-
   // auto window resizing
   useEffect(() => {
     const handleResize = () => {
@@ -158,7 +154,7 @@ export function BaseScreen() {
     //   clearInterval(intervalId);
     // };
   }, [zLastDatabaseBatchMillis, zLastDatabaseWriteMillis]);
-
+  // log("BaseScreen render");
   return (
     <View
       style={{
@@ -180,9 +176,7 @@ export function BaseScreen() {
         style={{ width: "100%", height: 0 }}
       />
 
-      {!!zIsCheckingOut && (
-        <CheckoutModalScreen openWorkorder={zOpenWorkorder} />
-      )}
+      {!!zIsCheckingOut && <CheckoutModalScreen />}
       <LoginModalScreen
         modalVisible={zShowLoginScreen && !zLoginModalVisible}
       />

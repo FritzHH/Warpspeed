@@ -35,7 +35,7 @@ import { dbCreateUserPunchAction } from "../../db_call_wrapper";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
 import { UserClockHistoryModal } from "../screen_components/modal_screens/UserClockHistoryModalScreen";
 
-export function Options_Section({}) {
+export const Options_Section = React.memo(({}) => {
   // store setters ///////////////////////////////////////////////////////////
   const _zSetOptionsTabName = useTabNamesStore(
     (state) => state.setOptionsTabName
@@ -45,11 +45,9 @@ export function Options_Section({}) {
   const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
 
   // store getters ///////////////////////////////////////////////////////////////
-  const zOptionsTabName = useTabNamesStore((state) =>
-    state.getOptionsTabName()
-  );
+  const zOptionsTabName = useTabNamesStore((state) => state.optionsTabName);
 
-  const zWebcamDetected = useLoginStore((state) => state.getWebcamDetected());
+  const zWebcamDetected = useLoginStore((state) => state.webcamDetected);
 
   //////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
@@ -127,7 +125,7 @@ export function Options_Section({}) {
 
   /////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////
-}
+});
 
 export const TabBar = ({
   webcamDetected,
@@ -136,8 +134,8 @@ export const TabBar = ({
   _zSetOptionsTabName,
   handleUserPress,
 }) => {
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
-  const zPunchClock = useLoginStore((state) => state.getPunchClock());
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
+  const zPunchClock = useLoginStore((state) => state.punchClock);
   // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
 

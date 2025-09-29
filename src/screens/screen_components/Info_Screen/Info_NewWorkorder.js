@@ -41,9 +41,7 @@ export function NewWorkorderComponent({}) {
   );
 
   // store getters ///////////////////////////////////////////////////////////////
-  const zCustomerSearchResults = useCustomerSearchStore((s) =>
-    s.getSearchResults()
-  );
+  const zCustomerSearchResults = useCustomerSearchStore((s) => s.searchResults);
 
   //////////////////////////////////////////////////////////////////////
   const [sTextInput, _setTextInput] = React.useState("239");

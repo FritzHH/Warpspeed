@@ -59,14 +59,12 @@ export const StandaloneSaleComponent = ({}) => {
 
   // store getters
   let zOpenWorkorder = WORKORDER_PROTO;
-  zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
+  zOpenWorkorder = useOpenWorkordersStore((state) => state.openWorkorder);
+  const zOpenWorkordersArr = useOpenWorkordersStore(
+    (state) => state.workorders
   );
-  const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
-    state.getWorkorders()
-  );
-  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
-  const zSettingsObj = useSettingsStore((state) => state.getSettings());
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
+  const zSettingsObj = useSettingsStore((state) => state.settings);
   const [sCardReader, _setCardReader] = useState();
   //////////////////////////////////////////////////////////////////////
 

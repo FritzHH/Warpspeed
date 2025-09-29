@@ -1,15 +1,10 @@
 /* eslint-disable */
 
-import { on } from "events";
-import { Tab } from "react-tabs";
 import { View, Text } from "react-native-web";
 import React from "react";
 
-import { TAB_NAMES, WORKORDER_ITEM_PROTO, WORKORDER_PROTO } from "../../data";
+import { TAB_NAMES } from "../../data";
 import { TabMenuButton } from "../../components";
-import { TabMenuDivider as Divider } from "../../components";
-import { clog, log } from "../../utils";
-import { Colors } from "../../styles";
 import { Items_Dashboard } from "../screen_components/Items_Screen/Items_Dashboard";
 import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
 import { WorkorderPreview } from "../screen_components/Items_Screen/Items_WorkorderPreview";
@@ -19,26 +14,20 @@ import {
   useOpenWorkordersStore,
   useCustomerSearchStore,
   useTabNamesStore,
-  useWorkorderPreviewStore,
 } from "../../stores";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 
-export function Items_Section({}) {
+export const Items_Section = React.memo(({}) => {
   // setters ///////////////////////////////////////////////////////////////////
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
 
   // getters ///////////////////////////////////////////////////////////////////
 
-  const zCustomerSearchResults = useCustomerSearchStore((s) =>
-    s.getSearchResults()
-  );
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
-  );
-  const zItemsTabName = useTabNamesStore((state) => state.getItemsTabName());
-
-  /////////////////////////////////////////////////////////////////////////////
-
+  const zCustomerSearchResults = useCustomerSearchStore((s) => s.searchResults);
+  const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
+  const zOpenWorkorder = useOpenWorkordersStore((s) => s.zOpenWorkorder);
+  ///////////////////////////////////////////////////////////////////////////
+  // log("Items_Section render");
   function ScreenComponent() {
     switch (zItemsTabName) {
       case TAB_NAMES.itemsTab.changeLog:
@@ -63,14 +52,21 @@ export function Items_Section({}) {
       <TabBar
         _zSetItemsTabName={_zSetItemsTabName}
         zItemsTabName={zItemsTabName}
-        zWorkorderObj={zOpenWorkorder}
+        zWorkorderId={zOpenWorkorder?.id}
+        zIsStandaloneSale={zOpenWorkorder?.isStandaloneSale}
       />
       {ScreenComponent(zItemsTabName)}
     </View>
   );
-}
+});
 
-const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
+const TabBar = ({
+  _zSetItemsTabName,
+  zItemsTabName,
+  zWorkorderId,
+  zIsStandaloneSale,
+}) => {
+  // log("Items_Section TabBar render");
   return (
     <View
       style={{
@@ -86,7 +82,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
           flexDirection: "row",
         }}
       >
-        {!!zWorkorderObj?.id && (
+        {!!zWorkorderId && (
           <View>
             <TabMenuButton
               buttonStyle={{
@@ -96,7 +92,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
                 _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)
               }
               text={
-                zWorkorderObj.isStandaloneSale
+                zIsStandaloneSale
                   ? "Sale Items"
                   : TAB_NAMES.itemsTab.workorderItems
               }
@@ -109,7 +105,7 @@ const TabBar = ({ _zSetItemsTabName, zItemsTabName, zWorkorderObj }) => {
             {/* <View style={{ width: 20 }} /> */}
           </View>
         )}
-        {zWorkorderObj?.id && !zWorkorderObj.isStandaloneSale && (
+        {zWorkorderId && !zIsStandaloneSale && (
           <TabMenuButton
             onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}

@@ -1315,19 +1315,19 @@ export function addOrRemoveFromArr(arr, input, fieldName = "id") {
   return [...arr, input];
 }
 
-export function addOrRemoveFromArrOLD(arr, input, fieldName = "id") {
-  if (!arr) return [];
-  if (!input) return arr;
-  if (!(arr.length > 0)) return [input];
-  if (!arr[0][fieldName]) {
-    let found = arr.find((o) => o == input);
-    if (found) return arr.filter((o) => o != input);
-  } else {
-    let found = arr.find((o) => o[fieldName] === input[fieldName]);
-    if (found) return arr.filter((o) => o[fieldName] !== input[fieldName]);
-  }
-  return [...arr, input];
-}
+// export function addOrRemoveFromArrOLD(arr, input, fieldName = "id") {
+//   if (!arr) return [];
+//   if (!input) return arr;
+//   if (!(arr.length > 0)) return [input];
+//   if (!arr[0][fieldName]) {
+//     let found = arr.find((o) => o == input);
+//     if (found) return arr.filter((o) => o != input);
+//   } else {
+//     let found = arr.find((o) => o[fieldName] === input[fieldName]);
+//     if (found) return arr.filter((o) => o[fieldName] !== input[fieldName]);
+//   }
+//   return [...arr, input];
+// }
 
 export function replaceOrAddToArr(arr, input, fieldName = "id") {
   if (!arr) arr = [];

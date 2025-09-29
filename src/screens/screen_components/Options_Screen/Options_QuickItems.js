@@ -1,63 +1,43 @@
 /*eslint-disable*/
-import React, { useEffect, useRef, useState } from "react";
+import React, { use, useEffect, useRef, useState } from "react";
 import { View, FlatList, TextInput, Text } from "react-native-web";
-import {
-  WORKORDER_ITEM_PROTO,
-  INVENTORY_ITEM_PROTO,
-  WORKORDER_PROTO,
-  SETTINGS_OBJ,
-  TAB_NAMES,
-} from "../../../data";
+import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
-import {
-  dim,
-  generateUPCBarcode,
-  generateRandomID,
-  log,
-  randomWordGenerator,
-  gray,
-} from "../../../utils";
+import { generateUPCBarcode, log } from "../../../utils";
 import {
   Button,
   Button_,
   InventoryItemScreeenModalComponent,
   ScreenModal,
-  SHADOW_RADIUS_NOTHING,
-  TabMenuButton,
-  TabMenuDivider,
 } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
   useSettingsStore,
   useOpenWorkordersStore,
   useInventoryStore,
-  useLoginStore,
-  useTabNamesStore,
 } from "../../../stores";
-
-const SEARCH_STRING_TIMER = 45 * 1000;
 
 export function QuickItemComponent({}) {
   // store setters ///////////////////////////////////////////////////////////////
   const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
 
   // store getters //////////////////////////////////////////////////////////////
-  let zOpenWorkorder = WORKORDER_PROTO;
-  let zSettings = SETTINGS_OBJ;
-  zSettings = useSettingsStore((state) => state.getSettings());
-  zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
-  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zSettings = useSettingsStore((state) => state.settings);
+  const zOpenWorkorderID = useOpenWorkordersStore(
+    (state) => state.openWorkorder?.id
+  );
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
 
   ///////////////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
+
   useEffect(() => {
     let arr = [];
     if (sSearchResults.length > 20) return;
     for (let i = 0; i <= 10; i++) {
-      // log(zInventoryArr[i]);
       if (zInventoryArr[i]) arr.push(zInventoryArr[i]);
     }
     _setSearchResults(arr);
@@ -106,15 +86,14 @@ export function QuickItemComponent({}) {
 
   function inventoryItemSelected(item, buttonName) {
     let idx = zInventoryArr.findIndex((o) => o.id == item.id);
-
     // return;
-    if (!zOpenWorkorder?.id || buttonName == "info") {
+    if (!zOpenWorkorderID || buttonName == "info") {
       _setModalInventoryObjIdx(idx);
       // _setModalInventoryObjIdx(null);
       return;
     }
 
-    let wo = cloneDeep(zOpenWorkorder);
+    let wo = cloneDeep(useOpenWorkordersStore.getState().workorders);
     if (!wo.workorderLines) wo.workorderLines = [];
     // log("item", item);
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
@@ -132,6 +111,7 @@ export function QuickItemComponent({}) {
 
   //////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////
+  // log("render");
   return (
     <View
       style={{
@@ -303,7 +283,7 @@ export function QuickItemComponent({}) {
                             </Text>
                           )}
                         </Text>
-                        {!!zOpenWorkorder?.id && (
+                        {!!zOpenWorkorderID && (
                           <Button_
                             icon={ICONS.infoGear}
                             iconSize={22}

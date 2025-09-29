@@ -68,14 +68,12 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // store getters ///////////////////////////////////////////////////////////////
 
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
-  );
-  const zSettings = useSettingsStore((state) => state.getSettings());
-  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
+  const zOpenWorkorder = useOpenWorkordersStore((state) => state.openWorkorder);
+  const zSettings = useSettingsStore((state) => state.settings);
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
 
-  const zOpenWorkordersArr = useOpenWorkordersStore((state) =>
-    state.getWorkorders()
+  const zOpenWorkordersArr = useOpenWorkordersStore(
+    (state) => state.workorders
   );
   // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 

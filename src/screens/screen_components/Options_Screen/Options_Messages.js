@@ -46,15 +46,15 @@ export function MessagesComponent({}) {
   // getters ///////////////////////////////////////////////////////////////
   let zCustomer = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
-  zCustomer = useCurrentCustomerStore((state) => state.getCustomer());
-  zWorkorderObj = useOpenWorkordersStore((state) => state.getWorkorderObj());
-  const zIncomingMessagesArr = useCustMessagesStore((state) =>
-    state.getIncomingMessagesArr()
+  zCustomer = useCurrentCustomerStore((state) => state.customer);
+  zWorkorderObj = useOpenWorkordersStore((state) => state.openWorkorder);
+  const zIncomingMessagesArr = useCustMessagesStore(
+    (state) => state.incomingMessagesArr
   );
-  const zOutgoingMessagesArr = useCustMessagesStore((state) =>
-    state.getOutgoingMessagesArr()
+  const zOutgoingMessagesArr = useCustMessagesStore(
+    (state) => state.outgoingMessagesArr
   );
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUser());
+  const zCurrentUserObj = useLoginStore((state) => state.currentUser);
   //////////////////////////////////////////////////////////////////////////
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);

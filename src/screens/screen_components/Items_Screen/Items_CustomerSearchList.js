@@ -43,10 +43,8 @@ import { Pressable } from "react-native";
 
 export function CustomerSearchListComponent({}) {
   // store getters //////////////////////////////////////////////////////////////////////
-  const zSearchResults = useCustomerSearchStore((state) =>
-    state.getSearchResults()
-  );
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
+  const zSearchResults = useCustomerSearchStore((state) => state.searchResults);
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
 
   ////////////////////////////////////////////////////////////////////////////////////////
   const [sCustomerInfo, _setCustomerInfo] = useState();

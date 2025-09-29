@@ -50,6 +50,9 @@ import { CashSaleComponent } from "./checkout_components/CashSaleComponent";
 import { MiddleItemComponent } from "./checkout_components/MiddleItemComponent";
 
 export function CheckoutModalScreen({}) {
+  // store getters ////////////////////////////////////////////////
+  const openWorkorder = useOpenWorkordersStore((state) => state.openWorkorder);
+
   // store setters ////////////////////////////////////////////////
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut

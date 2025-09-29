@@ -63,15 +63,18 @@ export const ActiveWorkorderComponent = ({}) => {
   const _zSetInitialOpenWorkorder = useOpenWorkordersStore(
     (state) => state.setOpenWorkorder
   );
+  const _zSetWorkorderField = useOpenWorkordersStore(
+    (s) => s.setWorkorderField
+  );
 
   // store getters ///////////////////////////////////////////////////////////////////
   let zOpenWorkorder = WORKORDER_PROTO;
-  zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
+  zOpenWorkorder = useOpenWorkordersStore((state) => state.openWorkorder);
   let zCustomer = CUSTOMER_PROTO;
-  zCustomer = useCurrentCustomerStore((state) => state.getCustomer());
+  zCustomer = useCurrentCustomerStore((state) => state.customer);
   var zSettings = SETTINGS_OBJ;
-  zSettings = useSettingsStore((state) => state.getSettings());
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
+  zSettings = useSettingsStore((state) => state.settings);
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
 
   ///////////////////////////////////////////////////////////////////////////////
   const [sCustomerInfo, _setCustomerInfo] = React.useState(false);
@@ -100,16 +103,12 @@ export const ActiveWorkorderComponent = ({}) => {
       }
     });
     if (!foundColor) {
-      // log("not found", incomingColorVal);
       newColorObj.label = incomingColorVal;
       newColorObj.backgroundColor = null;
       newColorObj.textColor = null;
     }
 
-    // log("setting", newColorObj);
-    let wo = cloneDeep(zOpenWorkorder);
-    wo[fieldName] = newColorObj;
-    _zSetWorkorder(wo);
+    _zSetWorkorderField(fieldName, newColorObj, zOpenWorkorder.id);
   }
 
   function handleStartStandaloneSalePress() {
@@ -311,11 +310,9 @@ export const ActiveWorkorderComponent = ({}) => {
                   placeholderText={"Brand"}
                   style={{ width: "45%" }}
                   value={zOpenWorkorder.brand}
-                  onTextChange={(val) => {
-                    // log(val);
-                    wo.brand = val;
-                    _zSetWorkorder(wo);
-                  }}
+                  onTextChange={(val) =>
+                    _zSetWorkorderField("brand", val, zOpenWorkorder.id)
+                  }
                 />
                 {/* </View> */}
                 <View
@@ -343,9 +340,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       buttonIconSize={11}
                       dataArr={zSettings.bikeBrands}
                       onSelect={(item, idx) => {
-                        let wo = cloneDeep(zOpenWorkorder);
-                        wo.brand = item;
-                        _zSetWorkorder(wo);
+                        _zSetWorkorderField("brand", item, zOpenWorkorder.id);
                       }}
                       // itemViewStyle={{ backgroundColor: "gray" }}
                       // itemTextStyle={{ fontSize: 18, color: "black" }}
@@ -373,9 +368,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       buttonIconSize={11}
                       dataArr={zSettings.bikeOptionalBrands}
                       onSelect={(item, idx) => {
-                        let wo = cloneDeep(zOpenWorkorder);
-                        wo.brand = item;
-                        _zSetWorkorder(wo);
+                        _zSetWorkorderField("brand", item, zOpenWorkorder.id);
                       }}
                       buttonStyle={{
                         ...dropdownButtonStyle,
@@ -406,10 +399,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{ width: "45%" }}
                   value={zOpenWorkorder.description}
                   onTextChange={(val) => {
-                    let wo = cloneDeep(zOpenWorkorder);
-
-                    wo.description = val;
-                    _zSetWorkorder(wo);
+                    _zSetWorkorderField("description", val, zOpenWorkorder.id);
                   }}
                 />
                 <View
@@ -429,13 +419,13 @@ export const ActiveWorkorderComponent = ({}) => {
                       buttonIconSize={11}
                       dataArr={zSettings.bikeDescriptions}
                       onSelect={(item, idx) => {
-                        let wo = cloneDeep(zOpenWorkorder);
-                        wo.description = item;
-                        _zSetWorkorder(wo);
+                        _zSetWorkorderField(
+                          "description",
+                          item,
+                          zOpenWorkorder.id
+                        );
                       }}
                       modalCoordinateVars={{ x: 30, y: 30 }}
-                      // itemViewStyle={{ borderRadius: 0 }}
-                      // itemTextStyle={{ fontSize: 14, color: "black" }}
                       buttonStyle={{
                         ...dropdownButtonStyle,
                         opacity: zOpenWorkorder.description
@@ -514,6 +504,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         let wo = cloneDeep(zOpenWorkorder);
                         wo.color1 = item;
                         _zSetWorkorder(wo);
+                        _zSetWorkorderField("color1", item, zOpenWorkorder.id);
                       }}
                       buttonStyle={{
                         ...dropdownButtonStyle,
@@ -541,9 +532,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       itemSeparatorStyle={{ height: 0 }}
                       dataArr={COLORS}
                       onSelect={(item, idx) => {
-                        let wo = cloneDeep(zOpenWorkorder);
-                        wo.color2 = item;
-                        _zSetWorkorder(wo);
+                        _zSetWorkorderField("color2", item, zOpenWorkorder.id);
                         // ''(wo);
                       }}
                       buttonStyle={{
@@ -594,12 +583,11 @@ export const ActiveWorkorderComponent = ({}) => {
                       buttonIconSize={11}
                       dataArr={zSettings.waitTimes}
                       onSelect={(item, idx) => {
-                        let wo = cloneDeep(zOpenWorkorder);
-                        wo.waitTime = item;
-                        wo.status = NONREMOVABLE_STATUSES.find(
-                          (o) => o.label == "Service"
+                        _zSetWorkorderField(
+                          "waitTime",
+                          item,
+                          zOpenWorkorder.id
                         );
-                        _zSetWorkorder(wo);
                       }}
                       buttonStyle={{
                         ...dropdownButtonStyle,
@@ -620,12 +608,8 @@ export const ActiveWorkorderComponent = ({}) => {
                 buttonIconSize={11}
                 dataArr={zSettings.statuses}
                 onSelect={(val) => {
-                  let wo = cloneDeep(zOpenWorkorder);
-                  wo.status = val;
-                  _zSetWorkorder(wo);
+                  _zSetWorkorderField("status", val, zOpenWorkorder.id);
                 }}
-                // itemViewStyle={{ backgroundColor: "gray", width: null }}
-                // itemTextStyle={{ color }}
                 buttonStyle={{
                   width: "100%",
                   backgroundColor: zOpenWorkorder.status.backgroundColor,
@@ -672,12 +656,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     backgroundColor: C.backgroundWhite,
                   }}
                   value={zOpenWorkorder.partOrdered}
-                  onTextChange={(val) => {
-                    let wo = cloneDeep(zOpenWorkorder);
-
-                    wo.partOrdered = val;
-                    _zSetWorkorder(wo);
-                  }}
+                  onTextChange={(val) =>
+                    _zSetWorkorderField("partOrdered", val, zOpenWorkorder.id)
+                  }
                 />
               </View>
 
@@ -699,9 +680,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     backgroundColor: C.backgroundWhite,
                   }}
                   onTextChange={(val) => {
-                    let wo = cloneDeep(zOpenWorkorder);
-                    wo.partSource = val;
-                    _zSetWorkorder(wo);
+                    _zSetWorkorderField("partSource", val, zOpenWorkorder.id);
                   }}
                 />
                 <View
@@ -721,12 +700,12 @@ export const ActiveWorkorderComponent = ({}) => {
                     buttonIconSize={11}
                     dataArr={zSettings.partSources}
                     onSelect={(item, idx) => {
-                      let wo = cloneDeep(zOpenWorkorder);
-                      wo.partSource = item;
-                      _zSetWorkorder(wo);
+                      _zSetWorkorderField(
+                        "partSource",
+                        item,
+                        zOpenWorkorder.id
+                      );
                     }}
-                    // itemViewStyle={{ backgroundColor: "gray" }}
-                    // itemTextStyle={{ fontSize: 14, color: "black" }}
                     buttonStyle={{
                       ...dropdownButtonStyle,
                       opacity: zOpenWorkorder.brand

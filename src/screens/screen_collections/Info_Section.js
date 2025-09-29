@@ -15,9 +15,9 @@ import {
 } from "../../stores";
 import { clog } from "../../utils";
 
-export const Info_Section = ({}) => {
+export const Info_Section = React.memo(({}) => {
   // store getters
-  const zInfoTabName = useTabNamesStore((state) => state.getInfoTabName());
+  const zInfoTabName = useTabNamesStore((state) => state.infoTabName);
 
   function ScreenComponent(tabName) {
     switch (tabName) {
@@ -34,4 +34,4 @@ export const Info_Section = ({}) => {
   }
 
   return ScreenComponent(zInfoTabName);
-};
+});

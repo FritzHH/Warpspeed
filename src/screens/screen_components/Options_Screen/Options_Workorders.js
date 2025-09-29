@@ -26,10 +26,8 @@ import { dbGetCustomer } from "../../../db_calls_wrapper";
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
-  const zOpenWorkorders = useOpenWorkordersStore((state) =>
-    state.getWorkorders()
-  );
-  const zSettings = useSettingsStore((state) => state.getSettings());
+  const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
+  const zSettings = useSettingsStore((state) => state.settings);
 
 
   // setters ////////////////////////////////////////////////////////

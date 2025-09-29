@@ -56,13 +56,9 @@ export function InventoryComponent({}) {
   );
 
   /// store getters /////////////////////////////////////////////////////////////
-  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
-  const zWorkorderObj = useOpenWorkordersStore((state) =>
-    state.getWorkorderObj()
-  );
-  const zOptionsTabName = useTabNamesStore((state) =>
-    state.getOptionsTabName()
-  );
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
+  const zWorkorderObj = useOpenWorkordersStore((state) => state.openWorkorder);
+  const zOptionsTabName = useTabNamesStore((state) => state.optionsTabName);
 
   // local state ////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");

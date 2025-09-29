@@ -1864,14 +1864,25 @@ export const Image_ = ({
   resizeMode = "contain",
   icon = "",
 }) => {
+  // Create a new style object to avoid mutations
+  const imageStyle = {
+    ...style,
+    resizeMode,
+  };
+
+  // Handle size assignment without mutating original style
   if (size) {
-    style.width = size;
-    style.height = size;
-  } else if (!style.width || !style.height) {
-    style.width ? null : (style.width = 30);
-    style.height ? null : (style.height = 30);
+    imageStyle.width = size;
+    imageStyle.height = size;
+  } else {
+    // Only set defaults if neither width nor height is provided
+    if (!imageStyle.width && !imageStyle.height) {
+      imageStyle.width = 30;
+      imageStyle.height = 30;
+    }
   }
-  return <Image source={icon} style={{ ...style }} />;
+
+  return <Image source={icon} style={imageStyle} />;
 };
 
 export const Button_ = ({

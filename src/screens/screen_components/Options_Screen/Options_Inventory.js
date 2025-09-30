@@ -4,7 +4,12 @@ import { View, FlatList, TextInput, Text } from "react-native-web";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
-import { formatCurrencyDisp, generateUPCBarcode, log } from "../../../utils";
+import {
+  formatCurrencyDisp,
+  generateUPCBarcode,
+  gray,
+  log,
+} from "../../../utils";
 import {
   Button,
   Button_,
@@ -60,7 +65,6 @@ export function InventoryComponent({}) {
   ///////////////////////////////////////////////////////////////////////////
 
   function search(searchTerm) {
-    lastSearchMillis = new Date().getTime();
     _setSearchTerm(searchTerm);
     if (searchTerm.length == 0) {
       _setSearchResults([]);
@@ -152,7 +156,6 @@ export function InventoryComponent({}) {
         style={{
           width: "100%",
           height: "5%",
-          // marginTop: 20,
           flexDirection: "row",
           paddingHorizontal: 4,
           alignItems: "center",
@@ -161,32 +164,30 @@ export function InventoryComponent({}) {
       >
         <Button_
           icon={ICONS.reset1}
-          iconSize={30}
+          iconSize={20}
           onPress={() => clearSearch()}
           useColorGradient={false}
         />
         <TextInput
           style={{
             borderBottomWidth: 1,
-            borderBottomColor: sSearchTerm.length > 0 ? "dimgray" : "darkgray",
-            fontSize: 20,
-            color: Colors.darkTextOnMainBackground,
+            borderBottomColor: gray(0.2),
+            fontSize: 18,
+            color: C.text,
             outlineWidth: 0,
             width: "80%",
             marginLeft: 20,
             marginRight: 30,
           }}
           placeholder="Search inventory"
-          placeholderTextColor={"darkgray"}
+          placeholderTextColor={gray(0.2)}
           value={sSearchTerm}
           onChangeText={(val) => search(val)}
         />
         <Button_
           icon={ICONS.new}
-          iconSize={35}
+          iconSize={25}
           useColorGradient={false}
-          // buttonStyle={{ width: null }}
-          // text={"+"}
           onPress={() => {
             _setModalInventoryObjIdx(-1);
           }}
@@ -243,24 +244,23 @@ export function InventoryComponent({}) {
             style={{
               width: "100%",
               height: "100%",
-              // backgroundColor: "green",
             }}
             data={[...sSearchResults]}
             renderItem={(item) => {
-              // if (!item.item) return null;
-              let idx = item.index;
               item = item.item;
-              // log("item", item);
               return (
                 <View
                   style={{
-                    marginBottom: 2,
                     borderRadius: 7,
-                    borderLeftWidth: 3,
                     borderLeftColor: C.buttonLightGreenOutline,
-                    backgroundColor: C.listItemWhite,
+                    borderWidth: 1,
+                    borderLeftWidth: 2,
+                    borderColor: C.listItemBorder,
                     flexDirection: "row",
                     alignItems: "center",
+                    height: "100%",
+                    backgroundColor: C.backgroundListWhite,
+                    paddingRight: 3,
                   }}
                 >
                   {!!zOpenWorkorderID && (
@@ -277,6 +277,7 @@ export function InventoryComponent({}) {
                   )}
                   <TouchableOpacity_
                     style={{
+                      height: "100%",
                       width: zOpenWorkorderID ? "95%" : "100%",
                     }}
                     onPress={() => inventoryItemSelected(item)}
@@ -285,6 +286,7 @@ export function InventoryComponent({}) {
                       style={{
                         width: "100%",
                         flexDirection: "row",
+                        height: "100%",
                       }}
                     >
                       <Text
@@ -305,12 +307,15 @@ export function InventoryComponent({}) {
 
                       <View
                         style={{
-                          borderColor: C.buttonLightGreenOutline,
                           width: "15%",
                           height: "100%",
                           alignItems: "flex-end",
                           justifyContent: "center",
-                          borderRadius: 7,
+                          borderColor: "gray",
+                          borderLeftWidth: 1,
+                          borderColor: C.listItemBorder,
+                          paddingRight: 5,
+                          backgroundColor: C.backgroundListWhite,
                         }}
                       >
                         <Text
@@ -331,24 +336,26 @@ export function InventoryComponent({}) {
                             {formatCurrencyDisp(item.price)}
                           </Text>
                         </Text>
-                        <Text
-                          style={{
-                            textAlign: "right",
-                            fontSize: 10,
-                            color: C.red,
-                          }}
-                        >
-                          {"$ "}
+                        {!!item.salePrice && (
                           <Text
                             style={{
-                              textAlignVertical: "top",
-                              fontSize: 12,
+                              textAlign: "right",
+                              fontSize: 10,
                               color: C.red,
                             }}
                           >
-                            {formatCurrencyDisp(934893)}
+                            {"$ "}
+                            <Text
+                              style={{
+                                textAlignVertical: "top",
+                                fontSize: 12,
+                                color: C.red,
+                              }}
+                            >
+                              {formatCurrencyDisp(item.salePrice)}
+                            </Text>
                           </Text>
-                        </Text>
+                        )}
                       </View>
                     </View>
                   </TouchableOpacity_>

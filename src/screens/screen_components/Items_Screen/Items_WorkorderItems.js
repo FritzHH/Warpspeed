@@ -237,7 +237,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       </View>
     );
 
-  log("main");
+  // log("main");
   return (
     <View
       style={{
@@ -442,7 +442,7 @@ export const LineItemComponent = ({
     return discountArr;
   }
 
-  log("item component");
+  // log("item component");
   return (
     <View
       style={{

@@ -227,11 +227,13 @@ export const ActiveWorkorderComponent = ({}) => {
             style={{
               flexDirection: "row",
               justifyContent: "space-between",
+              alignItems: "center",
               borderColor: C.buttonLightGreenOutline,
               borderRadius: 15,
               borderWidth: 1,
               marginTop: 5,
               padding: 5,
+              paddingRight: 8,
               width: "95%",
             }}
           >
@@ -239,31 +241,38 @@ export const ActiveWorkorderComponent = ({}) => {
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Image_
                   icon={ICONS.cellPhone}
-                  size={25}
+                  size={20}
                   style={{ marginRight: 5 }}
                 />
-                <Text style={{ color: C.text }}>
+                <Text style={{ color: C.text, fontSize: 12 }}>
                   {formatPhoneWithDashes(zCustomer.cell)}
                 </Text>
               </View>
             )}
-            {zCustomer.landline.length > 0 && (
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {!zCustomer.landline.length > 0 && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  fontSize: 12,
+                }}
+              >
                 <Image_
                   icon={ICONS.home}
-                  size={25}
+                  size={20}
                   style={{ marginRight: 5 }}
                 />
-                <Text style={{ color: C.text }}>
-                  {formatPhoneWithDashes(zCustomer.landline)}
+                <Text style={{ color: C.text, fontSize: 12 }}>
+                  {/* {formatPhoneWithDashes(zCustomer.landline)} */}
+                  {formatPhoneWithDashes(2343234323)}
                 </Text>
               </View>
             )}
             {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.call && (
-              <Text style={{ color: Colors.darkText }}>CALL ONLY</Text>
+              <Text style={{ color: C.text, fontSize: 13 }}>CALL ONLY</Text>
             )}
             {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.email && (
-              <Text style={{ color: Colors.darkText }}>EMAIL ONLY</Text>
+              <Text style={{ color: C.text, fontSize: 13 }}>EMAIL ONLY</Text>
             )}
           </View>
         </View>
@@ -727,6 +736,7 @@ export const ActiveWorkorderComponent = ({}) => {
           icon={ICONS.cashRed}
           iconSize={35}
           buttonStyle={{
+            marginRight: 5,
             backgroundColor: "transparent",
           }}
           onPress={handleStartStandaloneSalePress}

@@ -155,6 +155,20 @@ export function BaseScreen() {
     // };
   }, [zLastDatabaseBatchMillis, zLastDatabaseWriteMillis]);
   // log("BaseScreen render");
+
+  // In BaseScreen
+  useEffect(() => {
+    if (zShowAlert) {
+      // Force a re-render or additional logic
+      // console.log("Alert should be showing");
+      // useAlertScreenStore.getState().setShowAlert(false);
+      // setTimeout(() => {
+      //   log("here");
+      //   useAlertScreenStore.getState().setShowAlert(true);
+      // }, 10);
+    }
+  }, [zShowAlert]);
+
   return (
     <View
       style={{
@@ -182,7 +196,8 @@ export function BaseScreen() {
       />
 
       {!!zRunBackgroundRecognition && <FaceDetectionClientComponent />}
-      {!!(!zPauseAlertOnBaseComponent && zShowAlert) && <AlertBox_ />}
+      {/* {!!(!zPauseAlertOnBaseComponent && zShowAlert) && <AlertBox_ />} */}
+      <AlertBox_ showAlert={zShowAlert} />
       <View
         style={{
           width: "65%",

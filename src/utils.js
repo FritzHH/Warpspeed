@@ -94,7 +94,7 @@ export function calculateRunningTotals(
   let runningDiscount = 0;
   let runningSubtotal = 0;
   let runningQty = 0;
-  // clog("input", input);
+  // log("input", workorders);
 
   // log(workorderlinesArr);
 
@@ -128,6 +128,7 @@ export function calculateRunningTotals(
     });
   });
   // log(salesTaxRatePercent);
+  // log("run", runningDiscount);
   let obj = {
     finalTotal: runningTotal + runningTotal * (salesTaxRatePercent / 100),
     runningTotal,
@@ -1017,7 +1018,6 @@ export function applyDiscountToWorkorderItem(
   workorderLineObj,
   returnAsDiscountObj
 ) {
-  workorderLineObj = cloneDeep(workorderLineObj);
   let discountObj = workorderLineObj.discountObj;
   if (!discountObj.value) return workorderLineObj;
 

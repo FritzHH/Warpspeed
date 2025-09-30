@@ -37,7 +37,7 @@ export const CustomerInfoScreenModalComponent = ({
   handleButton1Press,
   handleButton2Press,
   focus,
-  setFocus,
+  setFocus = () => {},
 }) => {
   // const zCustomerID = useCurrentCustomerStore(state => state.customer?.id)
 
@@ -122,7 +122,9 @@ export const CustomerInfoScreenModalComponent = ({
               }
               onCheck={() => {
                 let val;
-                if (obj.contactRestriction === CONTACT_RESTRICTIONS.call) {
+                if (
+                  sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call
+                ) {
                   val = "";
                 } else {
                   val = CONTACT_RESTRICTIONS.call;
@@ -132,7 +134,7 @@ export const CustomerInfoScreenModalComponent = ({
                 if (isCurrentCustomer) {
                   useCurrentCustomerStore
                     .getState()
-                    .setCustomerField("constactRestriction", val);
+                    .setCustomerField("contactRestriction", val);
                   return;
                 }
                 dbSaveCustomer({ ...sCustomerInfo, contactRestriction: val });
@@ -158,7 +160,7 @@ export const CustomerInfoScreenModalComponent = ({
                 if (isCurrentCustomer) {
                   useCurrentCustomerStore
                     .getState()
-                    .setCustomerField("constactRestriction", val);
+                    .setCustomerField("contactRestriction", val);
                   return;
                 }
                 dbSaveCustomer({ ...sCustomerInfo, contactRestriction: val });
@@ -541,7 +543,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
   //     });
   //   }
   // }, [sSelectedWorkorder]); // Triggers when currentIndex changes
-  log("render");
+  // log("render");
   return (
     <View
       style={{

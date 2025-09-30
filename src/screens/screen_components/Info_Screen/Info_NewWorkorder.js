@@ -41,7 +41,9 @@ export function NewWorkorderComponent({}) {
   );
 
   // store getters ///////////////////////////////////////////////////////////////
-  const zCustomerSearchResults = useCustomerSearchStore((s) => s.searchResults);
+  const zCustomerSearchResults = useCustomerSearchStore((s) =>
+    s.getSearchResults()
+  );
 
   //////////////////////////////////////////////////////////////////////
   const [sTextInput, _setTextInput] = React.useState("239");
@@ -183,13 +185,13 @@ export function NewWorkorderComponent({}) {
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateUPCBarcode();
-    wo.startedBy = useLoginStore.getCurrentUser().id;
+    wo.startedBy = useLoginStore.currentUser?.id;
     wo.startedOnMillis = new Date().getTime();
 
     _zSetOpenWorkorder(wo, false);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 
   function handleCancelCreateNewCustomerPress() {
@@ -333,12 +335,18 @@ export function NewWorkorderComponent({}) {
             />
           </View>
         </View>
-        <View style={{ width: "100%", alignItems: "flex-end" }}>
+        <View
+          style={{
+            width: "100%",
+            alignItems: "flex-end",
+            marginRight: 11,
+            marginBottom: 20,
+          }}
+        >
           <Button_
-            buttonStyle={{ margin: 20 }}
             onPress={handleStartStandaloneSalePress}
             icon={ICONS.cashRegister}
-            iconSize={55}
+            iconSize={35}
           />
         </View>
 

@@ -163,7 +163,6 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   const zCanExitOnOuterClick = useAlertScreenStore((state) =>
     state.getCanExitOnOuterClick()
   );
-  const zShowAlert = useAlertScreenStore((state) => state.getShowAlert());
   const zTitle = useAlertScreenStore((state) => state.getTitle());
   const zMessage = useAlertScreenStore((state) => state.getMessage());
   const zSubMessage = useAlertScreenStore((state) => state.getSubMessage());
@@ -214,7 +213,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
     <TouchableWithoutFeedback
       onPress={() => (zCanExitOnOuterClick ? _zResetAll() : null)}
     >
-      <Modal visible={true} transparent>
+      <Modal visible={showAlert} transparent>
         <View
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -523,7 +522,7 @@ export const DropdownMenu = ({
   buttonIconSize,
   itemTextStyle = {},
   itemStyle = {},
-  buttonStyle = {},
+  buttonStyle,
   menuButtonStyle = { borderRadius: 5 },
   buttonTextStyle = {},
   buttonText,
@@ -542,6 +541,38 @@ export const DropdownMenu = ({
 }) => {
   const [sModalVisible, _setModalVisible] = useState(false);
   const ref = useRef();
+
+  const BUTTON_STYLE = {
+    // width: "100%",
+    backgroundColor: C.buttonLightGreen,
+    borderColor: C.buttonLightGreenOutline,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    paddingVertical: 2,
+    borderRadius: 5,
+  };
+
+  if (buttonStyle) {
+    buttonStyle = { ...BUTTON_STYLE, ...buttonStyle };
+  } else {
+    buttonStyle = BUTTON_STYLE;
+  }
+
+  const TEXT_STYLE = {
+    fontSize: 13,
+    color: gray(0.55),
+    fontWeight: 500,
+  };
+
+  if (buttonTextStyle) {
+    buttonTextStyle = { ...TEXT_STYLE, ...buttonTextStyle };
+  } else {
+    buttonTextStyle = TEXT_STYLE;
+  }
+
+  if (!buttonIcon) buttonIcon = ICONS.menu2;
+  if (!buttonIconSize) buttonIconSize = 11;
 
   function getBackgroundColor(rgbString = "", index) {
     // log(rgbString);

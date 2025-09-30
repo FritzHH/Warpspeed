@@ -120,7 +120,7 @@ export function CustomerSearchListComponent({}) {
                 onPress={() => handleCustomerSelected(customer)}
               >
                 <View style={{ width: "92%" }}>
-                  <Text style={{ fontSize: 16, color: C.text, width: "30%" }}>
+                  <Text style={{ fontSize: 16, color: C.text }}>
                     {customer?.first + " " + customer?.last}
                   </Text>
                   <View

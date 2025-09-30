@@ -6,8 +6,8 @@ import {
   FlatList,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import { generateRandomID } from "../../../utils";
-import { Image_ } from "../../../components";
+import { generateRandomID, gray } from "../../../utils";
+import { Image_, TouchableOpacity_ } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
 import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
@@ -15,10 +15,6 @@ import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
 /// Notes Tab Component
 export function Notes_MainComponent() {
   // setters /////////////////////////////////////////////////////////////////////
-  const _zSetWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setWorkorder
-  );
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
 
   // getters /////////////////////////////////////////////////////////////////////
 
@@ -51,8 +47,8 @@ export function Notes_MainComponent() {
       return prev.every((note, i) => note === next[i]);
     }
   );
-
-  // const zInternalNotes = useOpenWorkordersStore(s => )
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
+  const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
 
   /////////////////////////////////////////////////////////////////////////////////
   const [customerNotesHeight, setCustomerNotesHeight] = useState([25]); // Initial height
@@ -155,25 +151,15 @@ export function Notes_MainComponent() {
 
   // clog(zWorkorderObj);
 
+  if (!zOpenWorkorderID) {
+    return <View style={{ flex: 1 }}></View>;
+  }
+
   return (
     <View
       style={{
-        // justifySelf: "center",
         height: "100%",
-        // borderRadius: 15,
-        // shadowColor: APP_BASE_COLORS.green,
-        // backgroundColor: APP_BASE_COLORS.backgroundWhite,
-        // borderColor: APP_BASE_COLORS.buttonLightGreen,
-        // borderWidth: 1,
         borderRadius: 15,
-        // shadowOffset: {
-        //   width: 2,
-        //   height: 2,
-        // },
-        // shadowOpacity: 0.5,
-        // shadowRadius: 15,
-        // flexDirection: "row",
-        // paddingTop: 5,
       }}
     >
       <View
@@ -181,116 +167,127 @@ export function Notes_MainComponent() {
           paddingTop: 5,
           paddingHorizontal: 5,
           flexDirection: "row",
-          // height: "100%",
-          // flex: 1,
-
-          // backgroundColor: "green",
         }}
       >
-        <TouchableWithoutFeedback onPress={() => outsideClicked("customer")}>
-          <View
+        <View
+          style={{
+            width: "50%",
+            height: "100%",
+            flexDirection: "column",
+            paddingRight: 10,
+          }}
+        >
+          <TouchableOpacity_
+            onPress={() => outsideClicked("customer")}
             style={{
-              width: "50%",
-              height: "100%",
-              flexDirection: "column",
-              paddingRight: 10,
+              flexDirection: "row",
+              width: "100%",
+              height: 35,
+              justifyContent: "space-between",
+              alignItems: "center",
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+              borderRadius: 15,
+              marginBottom: 5,
             }}
           >
-            <TouchableWithoutFeedback
-              onPress={() => outsideClicked("customer")}
-            >
-              <View
-                style={{
-                  flexDirection: "row",
-                  width: "100%",
-                  height: 40,
-                  justifyContent: "flex-start",
-                  alignItems: "center",
-                  borderColor: C.buttonLightGreenOutline,
-                  borderWidth: 1,
-                  borderRadius: 15,
-                  marginBottom: 5,
-                }}
-              >
-                <Image_ icon={ICONS.notes} />
-                <Text
-                  style={{
-                    fontSize: 15,
-                    color: C.text,
-                    fontWeight: "bold",
-                    // marginBottom: 5,
-                    marginLeft: 10,
-                  }}
-                >
-                  {"Customer Notes"}
-                </Text>
-              </View>
-            </TouchableWithoutFeedback>
-
             <View
               style={{
-                height: "100%",
-                width: "100%",
+                flexDirection: "row",
+                alignItems: "center",
+                width: "30%",
+                paddingLeft: 8,
               }}
             >
-              <FlatList
-                keyExtractor={(i, idx) => idx}
-                data={zCustomerNotes}
-                renderItem={(item) => {
-                  let index = item.index;
-                  item = item.item;
-                  return (
-                    <TouchableWithoutFeedback
-                      onPress={() => _setFocusIdx(index)}
-                      onLongPress={() => deleteItem(item, index, "customer")}
+              <Image_ icon={ICONS.notes} size={20} />
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: C.text,
+                  fontWeight: 500,
+                  marginLeft: 10,
+                }}
+              >
+                {"Customer Notes"}
+              </Text>
+            </View>
+            <Text
+              style={{
+                fontSize: 16,
+                color: gray(0.18),
+                width: "70%",
+                textAlign: "center",
+              }}
+            >
+              Click Here
+            </Text>
+          </TouchableOpacity_>
+
+          <View
+            style={{
+              height: "100%",
+              width: "100%",
+            }}
+          >
+            <FlatList
+              keyExtractor={(i, idx) => idx}
+              data={zCustomerNotes}
+              renderItem={(item) => {
+                let index = item.index;
+                item = item.item;
+                return (
+                  <TouchableWithoutFeedback
+                    onPress={() => _setFocusIdx(index)}
+                    onLongPress={() => deleteItem(item, index, "customer")}
+                  >
+                    <View
+                      style={{
+                        width: "100%",
+                        // paddingVertical: 3,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        borderRadius: 5,
+                        backgroundColor: C.backgroundWhite,
+                      }}
                     >
-                      <View
+                      <Text
                         style={{
-                          width: "100%",
-                          // paddingVertical: 3,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          borderRadius: 5,
-                          backgroundColor: C.backgroundWhite,
+                          padding: 2,
+                          height: customerNotesHeight[index] || null,
+                          outlineWidth: 0,
+                          // width: "100%",
                         }}
                       >
-                        <Text
-                          style={{
-                            padding: 2,
-                            height: customerNotesHeight[index] || null,
-                            outlineWidth: 0,
-                            // width: "100%",
-                          }}
-                        >
-                          {item.name}
-                        </Text>
-                        <TextInput
-                          onContentSizeChange={(ev) =>
-                            handleCustomerContentSizeChange(ev, index)
-                          }
-                          multiline={true}
-                          // numberOfLines={5}
-                          onChangeText={(val) =>
-                            textChanged(val, index, "customer")
-                          }
-                          style={{
-                            padding: 2,
-                            height: customerNotesHeight[index] || null,
-                            outlineWidth: 0,
-                            width: "100%",
-                          }}
-                          autoFocus={index === sFocusIdx}
-                          value={item.value}
-                        />
-                      </View>
-                    </TouchableWithoutFeedback>
-                  );
-                }}
-              />
-            </View>
+                        {item.name}
+                      </Text>
+                      <TextInput
+                        onContentSizeChange={(ev) =>
+                          handleCustomerContentSizeChange(ev, index)
+                        }
+                        multiline={true}
+                        // numberOfLines={5}
+                        onChangeText={(val) =>
+                          textChanged(val, index, "customer")
+                        }
+                        style={{
+                          padding: 2,
+                          height: customerNotesHeight[index] || null,
+                          outlineWidth: 0,
+                          width: "100%",
+                        }}
+                        autoFocus={index === sFocusIdx}
+                        value={item.value}
+                      />
+                    </View>
+                  </TouchableWithoutFeedback>
+                );
+              }}
+            />
           </View>
-        </TouchableWithoutFeedback>
-        {/* <View style={{ height: "100%", width: 1, backgroundColor: "gray" }} /> */}
+        </View>
+
+        {/* ///////////////INTERNAL NOTES /////////////////////////////////////*/}
+
         <View
           style={{
             width: "50%",
@@ -299,34 +296,51 @@ export function Notes_MainComponent() {
             // paddingLeft: 10,
           }}
         >
-          <TouchableWithoutFeedback onPress={() => outsideClicked("internal")}>
+          <TouchableOpacity_
+            onPress={() => outsideClicked("internal")}
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              height: 35,
+              justifyContent: "flex-start",
+              alignItems: "center",
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+              borderRadius: 15,
+              marginBottom: 5,
+              paddingHorizontal: 3,
+            }}
+          >
             <View
               style={{
+                width: "30%",
                 flexDirection: "row",
-                width: "100%",
-                height: 40,
-                justifyContent: "flex-start",
                 alignItems: "center",
-                borderColor: C.buttonLightGreenOutline,
-                borderWidth: 1,
-                borderRadius: 15,
-                marginBottom: 5,
-                paddingHorizontal: 3,
               }}
             >
-              <Image_ icon={ICONS.gears1} />
+              <Image_ icon={ICONS.gears1} size={20} />
               <Text
                 style={{
                   marginLeft: 10,
                   fontSize: 15,
                   color: C.text,
-                  fontWeight: "bold",
+                  fontWeight: 500,
                 }}
               >
                 {"Internal Notes"}
               </Text>
             </View>
-          </TouchableWithoutFeedback>
+            <Text
+              style={{
+                fontSize: 16,
+                color: gray(0.18),
+                width: "70%",
+                textAlign: "center",
+              }}
+            >
+              Click Here
+            </Text>
+          </TouchableOpacity_>
           <TouchableWithoutFeedback onPress={() => outsideClicked("internal")}>
             <View
               style={{

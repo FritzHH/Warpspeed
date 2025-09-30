@@ -10,19 +10,14 @@ import {
   lightenRGBByPercent,
   log,
   replaceOrAddToArr,
+  showAlert,
 } from "../../../utils";
-import {
-  Button,
-  ScreenModal,
-  GradientView,
-  Button_,
-} from "../../../components";
-import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
+import { GradientView, Button_, DropdownMenu } from "../../../components";
+import { C, ICONS } from "../../../styles";
 import {
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   SETTINGS_OBJ,
-  DISCOUNT_OBJ_PROTO,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
@@ -51,13 +46,21 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   ///////////////////////////////////////////////////////////////////////////
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
-  const [sTotalPrice, _setTotalPrice] = useState("");
   const [sTotalDiscount, _setTotalDiscount] = useState("");
+  const [sTotals, _setTotals] = useState({
+    runningQty: 0,
+    runningTotal: 0,
+    runningDiscount: 0,
+    runningSubtotal: 0,
+    runningTax: 0,
+    finalTotal: 0,
+  });
   const [sHasCheckedInventoryPrice, _setHasCheckedInventoryPrice] =
     useState(false);
 
   // dev
   const checkoutBtnRef = useRef();
+
   useEffect(() => {
     if (zOpenWorkorder?.workordersArr && zSettings.salesTax) {
       // log("here");
@@ -72,19 +75,19 @@ export const Items_WorkorderItemsTab = ({}) => {
   ///////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////
 
-  // update the workorder inventory items to the latest prices, also watching inventory array to keep current price. also update the discont object
+  //calculate running totals, update the workorder inventory items to the latest prices, also watching inventory array to keep current price. also update the discont object
   useEffect(() => {
     if (
-      !(zOpenWorkorder?.workorderLines.length > 0) ||
-      !(zInventoryArr.length > 0)
+      !(zOpenWorkorder?.workorderLines?.length > 0) ||
+      !(zInventoryArr?.length > 0)
     )
       return;
+
     if (sHasCheckedInventoryPrice) return;
     _setHasCheckedInventoryPrice(true);
     let linesToChange = [];
 
     let invIdxArr = [];
-    let discountsIdxArr = [];
     zOpenWorkorder.workorderLines.forEach((line, idx) => {
       // log("line", line);
       let curInvItem = zInventoryArr.find(
@@ -97,7 +100,6 @@ export const Items_WorkorderItemsTab = ({}) => {
         linesToChange.push({ ...curInvItem });
         invIdxArr.push({ idx, curInvItem });
       }
-
       // let curDiscount = line.discountObj?;
     });
 
@@ -118,44 +120,22 @@ export const Items_WorkorderItemsTab = ({}) => {
     }
   }, [zInventoryArr, zOpenWorkorder]);
 
-  // calculate running sale totaLS
+  // calculate runnings totals on the open workorder ///////////////
   useEffect(() => {
-    // log("here");
-    if (!zOpenWorkorder?.workorderLines) return;
-    // log("z", zOpenWorkorderObj);
-    // log("inv", zInventoryArr);
-
-    const {
-      runningQty,
-      runningTotal,
-      runningDiscount,
-      runningSubtotal,
-      runningTax,
-    } = calculateRunningTotals(zOpenWorkorder, zSettings.salesTax);
-    // clog(calculateRunningTotals(zOpenWorkorderObj, zInventoryArr));
-    _setTotalDiscount(runningDiscount);
-    _setTotalPrice(runningTotal);
-    // _zSetWorkorderObj(wo, false);
-    log("running");
+    if (!(zOpenWorkorder?.workorderLines?.length > 0)) return;
+    _setTotals(calculateRunningTotals(zOpenWorkorder, zSettings.salesTax));
   }, [zOpenWorkorder]);
 
+  ////////////////////////////////////////////////////////////////////////
   function deleteWorkorderLineItem(index) {
-    //     log("need to fix this method");
-    // return;
-    let fun = () => {
-      let woCopy = cloneDeep(zOpenWorkorder);
-      woCopy.workorderLines.splice(index, 1);
-      // log("res", WO);
-      _zSetWorkorder(woCopy);
-      // if (!zOpenWorkorderObj.isStandaloneSale) ''(woCopy);
-    };
-    fun();
+    let workorderLines = zOpenWorkorder.workorderLines.filter(
+      (o, idx) => idx != index
+    );
+    _zSetWorkorderField("workorderLines", workorderLines);
   }
 
-  function modQtyPressed(workorderLine, option) {
-    // log("here");
+  function modifyQtyPressed(workorderLine, option) {
     let newWOLine = cloneDeep(workorderLine);
-    // let wo = cloneDeep(zOpenWorkorder);
     if (option === "up") {
       newWOLine.qty = newWOLine.qty + 1;
     } else {
@@ -183,48 +163,50 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   function applyDiscount(workorderLine, discountObj) {
-    // log(discountObj?);
-    // return;
-
-    if (!discountObj?.value) discountObj = cloneDeep(DISCOUNT_OBJ_PROTO);
-
-    workorderLine = cloneDeep(workorderLine);
-    workorderLine.discountObj = discountObj;
-    workorderLine = applyDiscountToWorkorderItem(workorderLine);
-
-    let wo = cloneDeep(zOpenWorkorder);
-    wo.workorderLines = wo.workorderLines.map((o) => {
-      if (o.id === workorderLine.id) return workorderLine;
+    let workorderLines = zOpenWorkorder.workorderLines.map((o) => {
+      if (o.id === workorderLine.id) {
+        workorderLine = { ...workorderLine, discountObj };
+        let discountedWorkorderLine =
+          applyDiscountToWorkorderItem(workorderLine);
+        // log("discounted", discountedWorkorderLine);
+        return discountedWorkorderLine;
+      }
       return o;
     });
 
-    _zSetWorkorder(wo);
+    _zSetWorkorderField("workorderLines", workorderLines);
   }
 
-  function splitItems(inventoryItem, workorderLine, index) {
-    let wo = cloneDeep(zOpenWorkorder);
+  function splitItems(workorderLine, index) {
     let num = workorderLine.qty;
+    let workorderLines = cloneDeep(zOpenWorkorder.workorderLines);
     for (let i = 0; i <= num - 1; i++) {
       let newLine = cloneDeep(workorderLine);
       newLine.qty = 1;
       newLine.id = generateUPCBarcode();
-      if (newLine.discountObj?.name) {
-        let discountObj = applyDiscountToWorkorderItem(newLine);
-        if (discountObj?.newPrice > 0) newLine.discountObj = discountObj;
-      }
+      newLine.discountObj = null;
       if (i === 0) {
-        wo.workorderLines[index] = newLine;
+        workorderLines[index] = newLine;
         continue;
       }
-      wo.workorderLines.splice(index + 1, 0, newLine);
-      // wo.workorderLines.push(newLine);
+      workorderLines.splice(index + 1, 0, newLine);
     }
-    _zSetWorkorder(wo);
-    // if (!zOpenWorkorderObj.isStandaloneSale) ''(wo);
+
+    _zSetWorkorderField("workorderLines", workorderLines);
   }
 
   function handleDeleteWorkorder() {
-    log("delete workorder");
+    const deleteFun = () => {
+      log("delete it babay");
+    };
+
+    showAlert({
+      title: "Confirm Delete Workorder",
+      btn1Icon: ICONS.trash,
+      btn2Icon: ICONS.close1,
+      handleBtn1Press: deleteFun,
+      handleBtn2Press: () => {},
+    });
   }
 
   // log("here", zOpenWorkorder);
@@ -262,7 +244,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               inventoryItem={invItem}
               workorderLine={item}
               __splitItems={splitItems}
-              __modQtyPressed={modQtyPressed}
+              __modQtyPressed={modifyQtyPressed}
               index={idx}
               applyDiscount={applyDiscount}
               zSettingsObj={zSettings}
@@ -275,7 +257,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       <View
         style={{
           flexDirection: "row",
-          justifyContent: "space-around",
+          justifyContent: "space-evenly",
           alignItems: "center",
           width: "99%",
           backgroundColor: C.buttonLightGreen,
@@ -313,7 +295,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               fontSize: 14,
             }}
           >
-            {"$" + formatCurrencyDisp(sTotalPrice)}
+            {"$" + formatCurrencyDisp(sTotals.runningSubtotal)}
           </Text>
         </Text>
         <View
@@ -323,29 +305,29 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
-        {sTotalDiscount > 0 && (
-          <View>
-            <Text style={{ fontSize: 13, color: "gray" }}>
-              {"DISCOUNT: "}
-              <Text
-                style={{
-                  marginRight: 10,
-                  fontWeight: 500,
-                  color: C.text,
-                  fontSize: 14,
-                }}
-              >
-                {"$" + formatCurrencyDisp(sTotalDiscount)}
-              </Text>
-            </Text>
-            <View
+        {sTotals.runningDiscount > 0 && (
+          <Text style={{ fontSize: 13, color: "gray" }}>
+            {"DISCOUNT: "}
+            <Text
               style={{
-                width: 1,
-                height: "100%",
-                backgroundColor: C.buttonLightGreenOutline,
+                marginRight: 10,
+                fontWeight: 500,
+                color: C.text,
+                fontSize: 14,
               }}
-            />
-          </View>
+            >
+              {"$" + formatCurrencyDisp(sTotals.runningDiscount)}
+            </Text>
+          </Text>
+        )}
+        {sTotals.runningDiscount > 0 && (
+          <View
+            style={{
+              width: 1,
+              height: "100%",
+              backgroundColor: C.buttonLightGreenOutline,
+            }}
+          />
         )}
         <Text style={{ fontSize: 13, color: "gray" }}>
           {"TAX: "}
@@ -357,7 +339,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               fontSize: 14,
             }}
           >
-            {"$" + formatCurrencyDisp((sTotalPrice * zSettings.salesTax) / 100)}
+            {"$" + formatCurrencyDisp(sTotals.runningTax)}
           </Text>
         </Text>
         <View
@@ -388,10 +370,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               fontSize: 15,
             }}
           >
-            {"$" +
-              formatCurrencyDisp(
-                sTotalPrice * (zSettings.salesTax / 100) + sTotalPrice
-              )}
+            {"$" + formatCurrencyDisp(sTotals.finalTotal)}
           </Text>
         </Text>
         <View
@@ -687,84 +666,41 @@ export const LineItemComponent = ({
           }}
         >
           {workorderLine.qty > 1 && (
-            <Button
-              textStyle={{ fontSize: 13 }}
+            <Button_
+              icon={ICONS.axe}
+              iconSize={17}
+              textStyle={{ fontSize: 13, color: gray(0.55), fontWeight: 500 }}
               onPress={() => {
-                __splitItems(inventoryItem, workorderLine, index);
+                __splitItems(workorderLine, index);
                 __setButtonsRowID(null);
               }}
               text={"Split Items"}
               buttonStyle={{
-                backgroundColor: Colors.mainBackground,
-                shadowOffset: { width: 1, height: 1 },
-                marginHorizontal: 2,
-                width: null,
-                height: 25,
-                paddingHorizontal: 4,
+                backgroundColor: C.buttonLightGreen,
+                borderColor: C.buttonLightGreenOutline,
+                justifyContent: "center",
+                alignItems: "center",
+                borderWidth: 1,
+                paddingVertical: 2,
+                borderRadius: 5,
+                marginRight: 10,
               }}
             />
           )}
-          <ScreenModal
-            buttonStyle={{
-              backgroundColor: Colors.mainBackground,
-              shadowOffset: { width: 1, height: 1 },
-              marginHorizontal: 2,
-              marginLeft: 10,
-              height: 25,
-              // marginVertical: 2,
-            }}
-            buttonTextStyle={{
-              fontSize: 11,
-              paddingHorizontal: 10,
-              paddingVertical: 2,
-            }}
-            // modalVisible={}
-            buttonLabel="Discount"
-            showButtonIcon={false}
-            modalVisible={sShowDiscountModal === workorderLine.id}
-            handleOuterClick={() => _setShowDiscountModal(null)}
-            handleButtonPress={() => {
-              _setShowDiscountModal(workorderLine.id);
-            }}
-            modalCoordinateVars={{ x: -0, y: 30 }}
-            ref={ref}
-            Component={() => {
-              return (
-                <View>
-                  <FlatList
-                    data={formatDiscountsArr(zSettingsObj.discounts)}
-                    keyExtractor={(i, x) => x}
-                    renderItem={(item) => {
-                      let idx = item.index;
-                      item = item.item;
-                      return (
-                        <Button
-                          buttonStyle={{
-                            borderTopWidth: idx === 0 ? 0 : 1,
-                            borderColor: "whitesmoke",
-                            width: null,
-                            height: null,
-                            paddingVertical: 10,
-                            backgroundColor: "lightgray",
-                          }}
-                          onPress={() => {
-                            applyDiscount(
-                              workorderLine,
-                              zSettingsObj.discounts[idx]
-                            );
-                            _setShowDiscountModal(null);
-                            __setButtonsRowID(null);
-                          }}
-                          shadow={false}
-                          text={item.name}
-                        />
-                      );
-                    }}
-                  />
-                </View>
+          <DropdownMenu
+            buttonText={"Discount"}
+            modalCoordY={25}
+            modalCoordX={-80}
+            dataArr={zSettingsObj.discounts.map((o) => ({ label: o.name }))}
+            onSelect={(item) => {
+              __setButtonsRowID(null);
+              applyDiscount(
+                workorderLine,
+                zSettingsObj.discounts.find((o) => o.name === item.label)
               );
             }}
           />
+          ;
         </View>
       )}
     </View>

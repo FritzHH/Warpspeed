@@ -136,25 +136,6 @@ export const ActiveWorkorderComponent = ({}) => {
     useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
   }
 
-  const dropdownButtonStyle = {
-    width: "100%",
-    backgroundColor: C.buttonLightGreen,
-    // ...SHADOW_RADIUS_NOTHING,
-    borderColor: C.buttonLightGreenOutline,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    paddingVertical: 2,
-    borderRadius: 5,
-  };
-
-  const dropdownButtonTextStyle = {
-    fontSize: 13,
-    color: gray(0.55),
-    fontWeight: 500,
-    // width: "100%",
-  };
-
   return (
     <View
       style={{
@@ -190,7 +171,7 @@ export const ActiveWorkorderComponent = ({}) => {
             modalVisible={sShowCustomerInfoScreen}
             showOuterModal={true}
             buttonLabel={
-              zOpenWorkorder.customerFirst + " " + zOpenWorkorder.customerLast
+              zOpenWorkorder.customerFirst + " " + zOpenWorkorder?.customerLast
             }
             buttonIcon={ICONS.ridingBike}
             buttonIconStyle={{ width: 35, height: 35 }}
@@ -259,8 +240,8 @@ export const ActiveWorkorderComponent = ({}) => {
               >
                 <Image_
                   icon={ICONS.home}
-                  size={20}
-                  style={{ marginRight: 5 }}
+                  size={18}
+                  style={{ marginRight: 7 }}
                 />
                 <Text style={{ color: C.text, fontSize: 12 }}>
                   {/* {formatPhoneWithDashes(zCustomer.landline)} */}
@@ -328,23 +309,16 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 >
                   <DropdownMenu
-                    // openOnMouseOver=
-                    buttonIcon={ICONS.menu2}
-                    buttonIconSize={11}
                     dataArr={zSettings.bikeBrands}
                     onSelect={(item, idx) => {
                       _zSetWorkorderField("brand", item, zOpenWorkorder.id);
                     }}
-                    // itemViewStyle={{ backgroundColor: "gray" }}
-                    // itemTextStyle={{ fontSize: 18, color: "black" }}
                     buttonStyle={{
-                      ...dropdownButtonStyle,
                       opacity: zOpenWorkorder.brand
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
                     modalCoordX={-6}
-                    buttonTextStyle={dropdownButtonTextStyle}
                     ref={bikesRef}
                     buttonText={zSettings.bikeBrandsName}
                   />
@@ -358,20 +332,16 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 >
                   <DropdownMenu
-                    buttonIcon={ICONS.menu2}
-                    buttonIconSize={11}
                     dataArr={zSettings.bikeOptionalBrands}
                     onSelect={(item, idx) => {
                       _zSetWorkorderField("brand", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      ...dropdownButtonStyle,
                       opacity: zOpenWorkorder.brand
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
                     modalCoordX={0}
-                    buttonTextStyle={dropdownButtonTextStyle}
                     ref={ebikeRef}
                     buttonText={zSettings.bikeOptionalBrandsName}
                   />
@@ -410,8 +380,6 @@ export const ActiveWorkorderComponent = ({}) => {
               >
                 <View style={{ width: "100%" }}>
                   <DropdownMenu
-                    buttonIcon={ICONS.menu2}
-                    buttonIconSize={11}
                     modalCoordX={55}
                     dataArr={zSettings.bikeDescriptions}
                     onSelect={(item, idx) => {
@@ -423,12 +391,10 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     // modalCoordinateVars={{ x: 30, y: 30 }}
                     buttonStyle={{
-                      ...dropdownButtonStyle,
                       opacity: zOpenWorkorder.description
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
-                    buttonTextStyle={dropdownButtonTextStyle}
                     ref={descriptionRef}
                     buttonText={"Descriptions"}
                   />
@@ -491,8 +457,6 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 >
                   <DropdownMenu
-                    buttonIcon={ICONS.menu2}
-                    buttonIconSize={11}
                     itemSeparatorStyle={{ height: 0 }}
                     dataArr={COLORS}
                     menuBorderColor={"transparent"}
@@ -503,13 +467,11 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderField("color1", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      ...dropdownButtonStyle,
                       opacity: zOpenWorkorder.color1 ? 0.2 : 1,
                     }}
                     ref={color1Ref}
                     buttonText={"Color 1"}
                     modalCoordX={0}
-                    buttonTextStyle={dropdownButtonTextStyle}
                   />
                 </View>
                 <View style={{ width: 5 }} />
@@ -523,9 +485,6 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 >
                   <DropdownMenu
-                    buttonIcon={ICONS.menu2}
-                    menuBorderColor={"transparent"}
-                    buttonIconSize={11}
                     itemSeparatorStyle={{ height: 0 }}
                     dataArr={COLORS}
                     onSelect={(item, idx) => {
@@ -534,17 +493,12 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     modalCoordX={0}
                     buttonStyle={{
-                      ...dropdownButtonStyle,
-                      // backgroundColor: zWorkorderObj.color1.label
-                      //   ? "lightgray"
-                      //   : dropdownButtonStyle.backgroundColor,
                       opacity: zOpenWorkorder.color1
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
                     ref={color2Ref}
                     buttonText={"Color 2"}
-                    buttonTextStyle={dropdownButtonTextStyle}
                   />
                 </View>
               </View>
@@ -577,21 +531,17 @@ export const ActiveWorkorderComponent = ({}) => {
               >
                 <View style={{ width: "100%" }}>
                   <DropdownMenu
-                    buttonIcon={ICONS.menu2}
-                    buttonIconSize={11}
+                    modalCoordX={50}
                     dataArr={zSettings.waitTimes}
                     onSelect={(item, idx) => {
                       _zSetWorkorderField("waitTime", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      ...dropdownButtonStyle,
                       opacity: zOpenWorkorder.waitTime.label
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
-                    buttonTextStyle={dropdownButtonTextStyle}
-                    // modalCoordinateVars={{ x: 30, y: 50 }}
-                    modalCoordX={50}
+                    // modalCoordX={50}
                     ref={waitTimesRef}
                     buttonText={"Wait Times"}
                   />
@@ -599,8 +549,6 @@ export const ActiveWorkorderComponent = ({}) => {
               </View>
             </View>
             <DropdownMenu
-              buttonIcon={ICONS.menu2}
-              buttonIconSize={11}
               dataArr={zSettings.statuses}
               onSelect={(val) => {
                 _zSetWorkorderField("status", val, zOpenWorkorder.id);
@@ -611,7 +559,6 @@ export const ActiveWorkorderComponent = ({}) => {
                 marginTop: 11,
               }}
               buttonTextStyle={{
-                ...dropdownButtonTextStyle,
                 color: zOpenWorkorder.status.textColor,
                 fontWeight: "normal",
                 fontSize: 14,
@@ -692,21 +639,17 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
               >
                 <DropdownMenu
-                  buttonIcon={ICONS.menu2}
-                  buttonIconSize={11}
                   dataArr={zSettings.partSources}
                   onSelect={(item, idx) => {
                     _zSetWorkorderField("partSource", item, zOpenWorkorder.id);
                   }}
                   modalCoordX={20}
                   buttonStyle={{
-                    ...dropdownButtonStyle,
                     opacity: zOpenWorkorder.brand
                       ? DROPDOWN_SELECTED_OPACITY
                       : 1,
                     paddingHorizontal: 40,
                   }}
-                  buttonTextStyle={dropdownButtonTextStyle}
                   ref={partSourcesRef}
                   buttonText={"Part Sources"}
                 />
@@ -733,10 +676,9 @@ export const ActiveWorkorderComponent = ({}) => {
           onPress={handleNewWorkorderPress}
         />
         <Button_
-          icon={ICONS.cashRed}
+          icon={ICONS.cashRegister}
           iconSize={35}
           buttonStyle={{
-            marginRight: 5,
             backgroundColor: "transparent",
           }}
           onPress={handleStartStandaloneSalePress}

@@ -478,9 +478,6 @@ export const LineItemComponent = ({
     >
       <View
         style={{
-          flexDirection: "row",
-          width: "100%",
-          alignItems: "center",
           backgroundColor: C.backgroundListWhite,
           paddingVertical: 3,
           paddingRight: 5,
@@ -492,340 +489,292 @@ export const LineItemComponent = ({
           borderWidth: 1,
           borderRadius: 15,
           borderLeftWidth: 3,
+          width: "100%",
         }}
       >
         <View
           style={{
-            width: "65%",
-            height: "100%",
-            justifyContent: "flex-start",
-            alignItems: "center",
             flexDirection: "row",
-            // backgroundColor: "blue",
+            width: "100%",
+            alignItems: "center",
           }}
         >
-          <View style={{ width: "100%", height: "100%" }}>
-            {!!workorderLine.discountObj?.name && (
-              <Text style={{ color: C.lightred }}>
-                {workorderLine.discountObj?.name || "discount goes here"}
+          <View
+            style={{
+              width: "65%",
+              height: "100%",
+              justifyContent: "flex-start",
+              alignItems: "center",
+              flexDirection: "row",
+              // backgroundColor: "blue",
+            }}
+          >
+            <View style={{ width: "100%", height: "100%" }}>
+              {!!workorderLine.discountObj?.name && (
+                <Text style={{ color: C.lightred }}>
+                  {workorderLine.discountObj?.name || "discount goes here"}
+                </Text>
+              )}
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: C.text,
+                  fontWeight: "400",
+                }}
+                numberOfLines={2}
+              >
+                {inventoryItem.formalName}
               </Text>
-            )}
-            <Text
-              style={{
-                fontSize: 15,
-                color: C.text,
-                fontWeight: "400",
-              }}
-              numberOfLines={2}
-            >
-              {inventoryItem.formalName}
-            </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  width: "100%",
+                  // backgroundColor: "green",
+                }}
+              >
+                <TextInput
+                  numberOfLines={4}
+                  style={{ outlineWidth: 0, color: C.lightText, width: "100%" }}
+                  onChangeText={(val) => {
+                    _setLocalNotes(val);
+                    debouncedUpdateNotes(val);
+                  }}
+                  placeholder="Intake and service notes..."
+                  placeholderTextColor={gray(0.2)}
+                  value={sLocalNotes}
+                />
+              </View>
+            </View>
+          </View>
+          <View
+            style={{
+              width: "35%",
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              height: "100%",
+              // backgroundColor: "green",
+            }}
+          >
             <View
               style={{
                 flexDirection: "row",
-                alignItems: "flex-start",
-                width: "100%",
-                // backgroundColor: "green",
+                alignItems: "center",
+                justifyContent: "center",
+                // marginRight: 5,
               }}
             >
-              <TextInput
-                numberOfLines={4}
-                style={{ outlineWidth: 0, color: C.lightText, width: "100%" }}
-                onChangeText={(val) => {
-                  _setLocalNotes(val);
-                  debouncedUpdateNotes(val);
+              <Button_
+                onPress={() => __modQtyPressed(workorderLine, "up", index)}
+                buttonStyle={{
+                  backgroundColor: "transparent",
+                  paddingHorizontal: 3,
+                  // width: null,
+                  // height: null,
                 }}
-                placeholder="Intake and service notes..."
-                placeholderTextColor={gray(0.2)}
-                value={sLocalNotes}
+                icon={ICONS.upArrowOrange}
+                iconSize={23}
               />
-            </View>
-          </View>
-        </View>
-        <View
-          style={{
-            width: "35%",
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            height: "100%",
-            // backgroundColor: "green",
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              // marginRight: 5,
-            }}
-          >
-            <Button_
-              onPress={() => __modQtyPressed(workorderLine, "up", index)}
-              buttonStyle={{
-                backgroundColor: "transparent",
-                paddingHorizontal: 3,
-                // width: null,
-                // height: null,
-              }}
-              icon={ICONS.upArrowOrange}
-              iconSize={23}
-            />
-            <Button_
-              onPress={() => __modQtyPressed(workorderLine, "down", index)}
-              buttonStyle={{
-                paddingHorizontal: 4,
-                backgroundColor: "transparent",
-              }}
-              icon={ICONS.downArrowOrange}
-              iconSize={23}
-            />
-            <GradientView
-              style={{
-                marginLeft: 7,
-                borderRadius: 15,
-                width: 31,
-                height: 23,
-              }}
-            >
-              <TextInput
+              <Button_
+                onPress={() => __modQtyPressed(workorderLine, "down", index)}
+                buttonStyle={{
+                  paddingHorizontal: 4,
+                  backgroundColor: "transparent",
+                }}
+                icon={ICONS.downArrowOrange}
+                iconSize={23}
+              />
+              <GradientView
                 style={{
-                  fontSize: 16,
-                  fontWeight: 500,
-                  textAlign: "center",
-                  color: C.textWhite,
-                  outlineWidth: 0,
-                  width: "100%",
+                  marginLeft: 7,
+                  borderRadius: 15,
+                  width: 31,
+                  height: 23,
                 }}
-                value={sTempQtyVal === "" ? sTempQtyVal : workorderLine.qty}
-                onChangeText={(val) => {
-                  if (isNaN(val) || val < 0) return;
-                  if (val === "") {
-                    _setTempQtyVal("");
-                    val = 0;
-                  } else {
-                    _setTempQtyVal(null);
-                  }
-                  let line = { ...workorderLine, qty: Number(val) };
-                  __setWorkorderLineItem(line);
-                }}
-              />
-            </GradientView>
-          </View>
-          <View
-            style={{
-              alignItems: "flex-end",
-              minWidth: 85,
-              marginHorizontal: 5,
-              borderWidth: 1,
-              borderRadius: 7,
-              borderColor: C.listItemBorder,
-              height: "100%",
-              paddingRight: 3,
-              backgroundColor: C.backgroundWhite,
-              justifyContent: "center",
-            }}
-          >
-            {(workorderLine.qty > 1 || workorderLine.discountObj?.newPrice) && (
+              >
+                <TextInput
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 500,
+                    textAlign: "center",
+                    color: C.textWhite,
+                    outlineWidth: 0,
+                    width: "100%",
+                  }}
+                  value={sTempQtyVal === "" ? sTempQtyVal : workorderLine.qty}
+                  onChangeText={(val) => {
+                    if (isNaN(val) || val < 0) return;
+                    if (val === "") {
+                      _setTempQtyVal("");
+                      val = 0;
+                    } else {
+                      _setTempQtyVal(null);
+                    }
+                    let line = { ...workorderLine, qty: Number(val) };
+                    __setWorkorderLineItem(line);
+                  }}
+                />
+              </GradientView>
+            </View>
+            <View
+              style={{
+                alignItems: "flex-end",
+                minWidth: 85,
+                marginHorizontal: 5,
+                borderWidth: 1,
+                borderRadius: 7,
+                borderColor: C.listItemBorder,
+                height: "100%",
+                paddingRight: 3,
+                backgroundColor: C.backgroundWhite,
+                justifyContent: "center",
+              }}
+            >
+              {(workorderLine.qty > 1 ||
+                workorderLine.discountObj?.newPrice) && (
+                <Text
+                  style={{
+                    paddingHorizontal: 0,
+                    color: C.text,
+                  }}
+                >
+                  {"$ " +
+                    formatCurrencyDisp(
+                      workorderLine.useSalePrice
+                        ? inventoryItem.salePrice
+                        : inventoryItem.price
+                    )}
+                </Text>
+              )}
+              {!!workorderLine.discountObj?.savings && (
+                <Text
+                  style={{
+                    paddingHorizontal: 0,
+                    minWidth: 30,
+                    color: C.lightText,
+                  }}
+                >
+                  {"$ -" +
+                    formatCurrencyDisp(workorderLine.discountObj?.savings)}
+                </Text>
+              )}
               <Text
                 style={{
+                  fontWeight: "500",
+                  minWidth: 30,
+                  marginTop: 0,
                   paddingHorizontal: 0,
                   color: C.text,
                 }}
               >
-                {"$ " +
-                  formatCurrencyDisp(
-                    workorderLine.useSalePrice
-                      ? inventoryItem.salePrice
-                      : inventoryItem.price
-                  )}
+                {workorderLine.discountObj?.newPrice
+                  ? "$ " +
+                    formatCurrencyDisp(workorderLine.discountObj?.newPrice)
+                  : "$" +
+                    formatCurrencyDisp(
+                      workorderLine.useSalePrice
+                        ? inventoryItem.salePrice
+                        : inventoryItem.price * workorderLine.qty
+                    )}
               </Text>
-            )}
-            {!!workorderLine.discountObj?.savings && (
-              <Text
-                style={{
-                  paddingHorizontal: 0,
-                  minWidth: 30,
-                  color: C.lightText,
-                }}
-              >
-                {"$ -" + formatCurrencyDisp(workorderLine.discountObj?.savings)}
-              </Text>
-            )}
-            <Text
+            </View>
+            <View
               style={{
-                fontWeight: "500",
-                minWidth: 30,
-                marginTop: 0,
-                paddingHorizontal: 0,
-                color: C.text,
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                marginLeft: 7,
+                alignItems: "center",
               }}
             >
-              {workorderLine.discountObj?.newPrice
-                ? "$ " + formatCurrencyDisp(workorderLine.discountObj?.newPrice)
-                : "$" +
-                  formatCurrencyDisp(
-                    workorderLine.useSalePrice
-                      ? inventoryItem.salePrice
-                      : inventoryItem.price * workorderLine.qty
-                  )}
-            </Text>
+              <Button_
+                iconSize={20}
+                icon={ICONS.editPencil}
+                onPress={() =>
+                  __setButtonsRowID(
+                    workorderLine.id === ssButtonsRowID
+                      ? null
+                      : workorderLine.id
+                  )
+                }
+                buttonStyle={{
+                  paddingHorizontal: 5,
+                  backgroundColor: "transparent",
+                }}
+              />
+              <Button_
+                onPress={() => __deleteWorkorderLine(index)}
+                icon={ICONS.trash}
+                iconSize={16}
+                buttonStyle={{
+                  paddingRight: 4,
+                }}
+              />
+            </View>
           </View>
+        </View>
+        {ssButtonsRowID === workorderLine.id && (
           <View
             style={{
               flexDirection: "row",
               justifyContent: "flex-end",
-              marginLeft: 7,
-              alignItems: "center",
+              marginVertical: 5,
+              width: "100%",
             }}
           >
-            <Button_
-              iconSize={20}
-              icon={ICONS.editPencil}
-              onPress={() =>
-                __setButtonsRowID(
-                  workorderLine.id === ssButtonsRowID ? null : workorderLine.id
-                )
-              }
-              buttonStyle={{
-                paddingHorizontal: 5,
-                backgroundColor: "transparent",
+            {workorderLine.qty > 1 && (
+              <Button_
+                icon={ICONS.axe}
+                iconSize={20}
+                textStyle={{ fontSize: 13, color: gray(0.55) }}
+                onPress={() => {
+                  __splitItems(inventoryItem, workorderLine, index);
+                  __setButtonsRowID(null);
+                }}
+                text={"Split Items"}
+                buttonStyle={{
+                  backgroundColor: C.buttonLightGreen,
+                  borderColor: C.buttonLightGreenOutline,
+                  borderWidth: 1,
+                  borderRadius: 5,
+                  marginRight: 5,
+                  height: 25,
+                }}
+              />
+            )}
+            <DropdownMenu
+              buttonIcon={ICONS.menu2}
+              buttonIconSize={13}
+              dataArr={zSettings.discounts.map((o) => ({ label: o.name }))}
+              // modalCoordinateVars={{ x: 0, y: -5 }}
+              onSelect={(val) => {
+                let discount = zSettings.discounts.find(
+                  (o) => o.name === val.label
+                );
+                let line = {
+                  ...workorderLine,
+                  discountObj: discount,
+                };
+                __setWorkorderLineItem(line);
               }}
-            />
-            <Button_
-              onPress={() => __deleteWorkorderLine(index)}
-              icon={ICONS.trash}
-              iconSize={16}
-              buttonStyle={{
-                paddingRight: 4,
-              }}
-            />
-          </View>
-        </View>
-      </View>
-      {ssButtonsRowID === workorderLine.id && (
-        <View
-          style={{
-            flexDirection: "row",
-            // backgroundColor: "white",
-            justifyContent: "flex-end",
-            marginVertical: 5,
-            width: "100%",
-          }}
-        >
-          {workorderLine.qty > 1 && (
-            <Button_
-              icon={ICONS.axe}
-              iconSize={20}
-              textStyle={{ fontSize: 13, color: gray(0.55) }}
-              onPress={() => {
-                __splitItems(inventoryItem, workorderLine, index);
-                __setButtonsRowID(null);
-              }}
-              text={"Split Items"}
               buttonStyle={{
                 backgroundColor: C.buttonLightGreen,
                 borderColor: C.buttonLightGreenOutline,
                 borderWidth: 1,
-                borderRadius: 5,
-                marginRight: 5,
                 height: 25,
+                borderRadius: 5,
               }}
+              buttonTextStyle={{
+                fontSize: 13,
+                color: gray(0.55),
+              }}
+              ref={ref}
+              modalCoordX={-87}
+              buttonText={"Discounts"}
             />
-          )}
-          <DropdownMenu
-            buttonIcon={ICONS.menu2}
-            buttonIconSize={13}
-            dataArr={zSettings.discounts.map((o) => ({ label: o.name }))}
-            // modalCoordinateVars={{ x: 0, y: -5 }}
-            onSelect={(val) => {
-              let discount = zSettings.discounts.find(
-                (o) => o.name === val.label
-              );
-              let line = {
-                ...workorderLine,
-                discountObj: discount,
-              };
-              __setWorkorderLineItem(line);
-            }}
-            buttonStyle={{
-              backgroundColor: C.buttonLightGreen,
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-              height: 25,
-              borderRadius: 5,
-            }}
-            buttonTextStyle={{
-              fontSize: 13,
-              color: gray(0.55),
-            }}
-            ref={ref}
-            modalCoordX={-87}
-            buttonText={zSettings.bikeOptionalBrandsName}
-          />
-          {/* <ScreenModal
-            buttonStyle={{
-              backgroundColor: Colors.mainBackground,
-              shadowOffset: { width: 1, height: 1 },
-              marginHorizontal: 2,
-              marginLeft: 10,
-              height: 25,
-              // marginVertical: 2,
-            }}
-            buttonTextStyle={{
-              fontSize: 11,
-              paddingHorizontal: 10,
-              paddingVertical: 2,
-            }}
-            // modalVisible={}
-            buttonLabel="Discount"
-            showButtonIcon={false}
-            modalVisible={sShowDiscountModal === workorderLine.id}
-            handleOuterClick={() => _setShowDiscountModal(null)}
-            handleButtonPress={() => {
-              _setShowDiscountModal(workorderLine.id);
-            }}
-            modalCoordinateVars={{ x: -0, y: 30 }}
-            ref={ref}
-            Component={() => {
-              return (
-                <View>
-                  <FlatList
-                    data={formatDiscountsArr(zSettingsObj.discounts)}
-                    keyExtractor={(i, x) => x}
-                    renderItem={(item) => {
-                      let idx = item.index;
-                      item = item.item;
-                      return (
-                        <Button
-                          buttonStyle={{
-                            borderTopWidth: idx === 0 ? 0 : 1,
-                            borderColor: "whitesmoke",
-                            width: null,
-                            height: null,
-                            paddingVertical: 10,
-                            backgroundColor: "lightgray",
-                          }}
-                          onPress={() => {
-                            applyDiscount(
-                              workorderLine,
-                              zSettingsObj.discounts[idx]
-                            );
-                            _setShowDiscountModal(null);
-                            __setButtonsRowID(null);
-                          }}
-                          shadow={false}
-                          text={item.name}
-                        />
-                      );
-                    }}
-                  />
-                </View>
-              );
-            }}
-          /> */}
-        </View>
-      )}
+          </View>
+        )}
+      </View>
     </View>
   );
   // try {

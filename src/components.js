@@ -527,10 +527,8 @@ export const DropdownMenu = ({
   menuButtonStyle = { borderRadius: 11 },
   buttonTextStyle = {},
   buttonText,
-  modalCoordinateVars = {
-    x: -10,
-    y: 40,
-  },
+  modalCoordX = -15,
+  modalCoordY = 25,
   mouseOverOptions = {
     enable: true,
     opacity: 0.6,
@@ -557,6 +555,11 @@ export const DropdownMenu = ({
   if (useSelectedAsButtonTitle) {
     buttonText = dataArr[Number(selectedIdx)]?.label;
   }
+
+  const modalCoordinateVars = {
+    x: modalCoordX,
+    y: modalCoordY,
+  };
 
   const DropdownComponent = () => {
     return (
@@ -588,7 +591,7 @@ export const DropdownMenu = ({
                 buttonStyle={{
                   padding: 10,
                   height: 40,
-                  width: 130,
+                  // width: 130,
                   borderRadius: 0,
                   backgroundColor:
                     getBackgroundColor(item.backgroundColor, idx) ||

@@ -16,6 +16,7 @@ import {
   ScreenModal,
   GradientView,
   Button_,
+  DropdownMenu,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -237,7 +238,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       </View>
     );
 
-  log("main");
+  // log("main");
   return (
     <View
       style={{
@@ -265,7 +266,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               __modQtyPressed={modQtyPressed}
               index={idx}
               applyDiscount={applyDiscount}
-              zSettingsObj={zSettings}
+              zSettings={zSettings}
               ssButtonsRowID={sButtonsRowID}
               __setButtonsRowID={_setButtonsRowID}
             />
@@ -422,7 +423,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 export const LineItemComponent = ({
   inventoryItem = INVENTORY_ITEM_PROTO,
   workorderLine = WORKORDER_ITEM_PROTO,
-  zSettingsObj = SETTINGS_OBJ,
+  zSettings = SETTINGS_OBJ,
   __deleteWorkorderLine,
   __modQtyPressed,
   __setWorkorderLineItem,
@@ -437,6 +438,7 @@ export const LineItemComponent = ({
   const [sLocalNotes, _setLocalNotes] = useState(
     workorderLine.intakeNotes || ""
   );
+  const ref = useRef();
   const debounceRef = useRef(null);
 
   /////////////////////////////////////////////////////////////////////
@@ -467,7 +469,7 @@ export const LineItemComponent = ({
     return discountArr;
   }
 
-  log("item component");
+  // log("item component");
   return (
     <View
       style={{
@@ -619,7 +621,7 @@ export const LineItemComponent = ({
               borderRadius: 7,
               borderColor: C.listItemBorder,
               height: "100%",
-              paddingRight: 2,
+              paddingRight: 3,
               backgroundColor: C.backgroundWhite,
               justifyContent: "center",
             }}
@@ -712,24 +714,56 @@ export const LineItemComponent = ({
           }}
         >
           {workorderLine.qty > 1 && (
-            <Button
-              textStyle={{ fontSize: 13 }}
+            <Button_
+              icon={ICONS.axe}
+              iconSize={20}
+              textStyle={{ fontSize: 13, color: gray(0.55) }}
               onPress={() => {
                 __splitItems(inventoryItem, workorderLine, index);
                 __setButtonsRowID(null);
               }}
               text={"Split Items"}
               buttonStyle={{
-                backgroundColor: Colors.mainBackground,
-                shadowOffset: { width: 1, height: 1 },
-                marginHorizontal: 2,
-                width: null,
+                backgroundColor: C.buttonLightGreen,
+                borderColor: C.buttonLightGreenOutline,
+                borderWidth: 1,
+                borderRadius: 5,
+                marginRight: 5,
                 height: 25,
-                paddingHorizontal: 4,
               }}
             />
           )}
-          <ScreenModal
+          <DropdownMenu
+            buttonIcon={ICONS.menu2}
+            buttonIconSize={13}
+            dataArr={zSettings.discounts.map((o) => ({ label: o.name }))}
+            // modalCoordinateVars={{ x: 0, y: -5 }}
+            onSelect={(val) => {
+              let discount = zSettings.discounts.find(
+                (o) => o.name === val.label
+              );
+              let line = {
+                ...workorderLine,
+                discountObj: discount,
+              };
+              __setWorkorderLineItem(line);
+            }}
+            buttonStyle={{
+              backgroundColor: C.buttonLightGreen,
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+              height: 25,
+              borderRadius: 5,
+            }}
+            buttonTextStyle={{
+              fontSize: 13,
+              color: gray(0.55),
+            }}
+            ref={ref}
+            modalCoordX={-87}
+            buttonText={zSettings.bikeOptionalBrandsName}
+          />
+          {/* <ScreenModal
             buttonStyle={{
               backgroundColor: Colors.mainBackground,
               shadowOffset: { width: 1, height: 1 },
@@ -789,7 +823,7 @@ export const LineItemComponent = ({
                 </View>
               );
             }}
-          />
+          /> */}
         </View>
       )}
     </View>

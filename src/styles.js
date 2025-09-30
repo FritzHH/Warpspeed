@@ -136,6 +136,7 @@ export const ICONS = {
   upChevron: require(ASSETS_PATH + "up-chevron.png"),
   downChevron: require(ASSETS_PATH + "down-chevron.png"),
   trash: require(ASSETS_PATH + "trash.png"),
+  axe: require(ASSETS_PATH + "axe.png"),
 };
 
 // rgb(64, 174, 113)

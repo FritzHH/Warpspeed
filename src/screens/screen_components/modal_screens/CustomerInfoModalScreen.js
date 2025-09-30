@@ -6,15 +6,15 @@ import {
   TextInput,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import React, { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import {
   addOrRemoveFromArr,
-  arrHasItem,
   calculateRunningTotals,
+  capitalizeFirstLetterOfString,
+  checkInputForNumbersOnly,
   formatCurrencyDisp,
   formatMillisForDisplay,
   formatPhoneWithDashes,
-  generateRandomID,
   gray,
   lightenRGBByPercent,
   log,
@@ -23,28 +23,24 @@ import {
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useState } from "react";
 import { cloneDeep } from "lodash";
-import {
-  useCurrentCustomerStore,
-  useInventoryStore,
-  useSettingsStore,
-} from "../../../stores";
-import {
-  CONTACT_RESTRICTIONS,
-  CUSTOMER_PROTO,
-  WORKORDER_ITEM_PROTO,
-  WORKORDER_PROTO,
-} from "../../../data";
+import { useCurrentCustomerStore, useSettingsStore } from "../../../stores";
+import { CONTACT_RESTRICTIONS, CUSTOMER_PROTO } from "../../../data";
 import { Button_, CheckBox_ } from "../../../components";
-import { ToastAndroid } from "react-native";
+import { dbSaveCustomer } from "../../../db_calls_wrapper";
 
 export const CustomerInfoScreenModalComponent = ({
   incomingCustomer = CUSTOMER_PROTO,
   isNewCustomer = false,
+  isCurrentCustomer = true,
   button1Text,
   button2Text,
   handleButton1Press,
   handleButton2Press,
+  focus,
+  setFocus,
 }) => {
+  // const zCustomerID = useCurrentCustomerStore(state => state.customer?.id)
+
   const [sCustomerInfo, _setCustomerInfo] = useState(incomingCustomer);
   const [sWorkorderToDisplay, _setWorkorderToDisplay] = useState();
   const [sSaleToDisplay, _setSaleToDisplay] = useState();
@@ -73,6 +69,10 @@ export const CustomerInfoScreenModalComponent = ({
     }
   }
 
+  function setCustomerField(fieldName, fieldVal) {
+    _setCustomerInfo({ ...sCustomerInfo, [fieldName]: fieldVal });
+  }
+
   const TEXT_INPUT_STYLE = {
     width: "100%",
     height: 40,
@@ -93,11 +93,9 @@ export const CustomerInfoScreenModalComponent = ({
     <TouchableWithoutFeedback>
       <View
         style={{
-          // width: "60%",
           padding: 20,
           backgroundColor: C.backgroundWhite,
           height: "90%",
-          // width: "60%",
           flexDirection: "row",
           borderRadius: 15,
           shadowProps: {
@@ -120,51 +118,74 @@ export const CustomerInfoScreenModalComponent = ({
             <CheckBox_
               text={"Call Only"}
               isChecked={
-                sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call
+                sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.call
               }
               onCheck={() => {
-                let obj = cloneDeep(sCustomerInfo);
-                // __setInfoTextFocus(null);
+                let val;
                 if (obj.contactRestriction === CONTACT_RESTRICTIONS.call) {
-                  obj.contactRestriction = "";
+                  val = "";
                 } else {
-                  obj.contactRestriction = CONTACT_RESTRICTIONS.call;
+                  val = CONTACT_RESTRICTIONS.call;
                 }
-                setCustomerInfo(obj);
+                setCustomerField("contactRestriction", val);
+                if (isNewCustomer) return;
+                if (isCurrentCustomer) {
+                  useCurrentCustomerStore
+                    .getState()
+                    .setCustomerField("constactRestriction", val);
+                  return;
+                }
+                dbSaveCustomer({ ...sCustomerInfo, contactRestriction: val });
               }}
             />
             <CheckBox_
               text={"Email Only"}
               isChecked={
-                sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.email
+                sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.email
               }
               onCheck={() => {
-                let obj = cloneDeep(sCustomerInfo);
-                // __setInfoTextFocus(null);
-                // sCustomerInfo.emailOnlyOption = !sCustomerInfo.emailOnlyOption;
-                // if (sCustomerInfo.callOnlyOption && sCustomerInfo.emailOnlyOption)
-                //   sCustomerInfo.callOnlyOption = false;
-                if (obj.contactRestriction === CONTACT_RESTRICTIONS.email) {
-                  obj.contactRestriction = "";
+                let val;
+                if (
+                  sCustomerInfo.contactRestriction ===
+                  CONTACT_RESTRICTIONS.email
+                ) {
+                  val = "";
                 } else {
-                  obj.contactRestriction = CONTACT_RESTRICTIONS.email;
+                  val = CONTACT_RESTRICTIONS.email;
                 }
-                setCustomerInfo(obj);
+                setCustomerField("contactRestriction", val);
+                if (isNewCustomer) return;
+                if (isCurrentCustomer) {
+                  useCurrentCustomerStore
+                    .getState()
+                    .setCustomerField("constactRestriction", val);
+                  return;
+                }
+                dbSaveCustomer({ ...sCustomerInfo, contactRestriction: val });
               }}
             />
           </View>
           <View>
-            {!!sCustomerInfo.cell && (
+            {!!sCustomerInfo?.cell && (
               <Text style={{ color: gray(0.3), fontSize: 11, marginLeft: 2 }}>
                 Cell
               </Text>
             )}
             <TextInput
               onChangeText={(val) => {
-                let obj = cloneDeep(sCustomerInfo);
-                obj.cell = removeDashesFromPhone(val);
-                setCustomerInfo(obj);
+                val = removeDashesFromPhone(val);
+                if (val.length > 10) return;
+                setCustomerField("cell", val);
+                if (isNewCustomer) return;
+                if (isCurrentCustomer) {
+                  useCurrentCustomerStore
+                    .getState()
+                    .setCustomerField("cell", val, sCustomerInfo.id);
+                }
+                dbSaveCustomer({ ...sCustomerInfo, cell: val });
               }}
+              onFocus={() => setFocus("cell")}
+              autoFocus={focus === "cell"}
               placeholderTextColor="darkgray"
               placeholder="Cell phone"
               style={{
@@ -178,10 +199,23 @@ export const CustomerInfoScreenModalComponent = ({
 
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.landline = removeDashesFromPhone(val);
-              setCustomerInfo(obj);
+              val = removeDashesFromPhone(val);
+              if (val.length > 10) return;
+              setCustomerField("landline", val);
+              if (isNewCustomer) return;
+              if (isCurrentCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField("landline", val);
+                return;
+              }
+              dbSaveCustomer({
+                ...sCustomerInfo,
+                landline: val,
+              });
             }}
+            onFocus={() => setFocus("landline")}
+            autoFocus={focus === "landline"}
             placeholderTextColor="darkgray"
             placeholder="Landline"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -190,10 +224,24 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.first = capitalizeFirstLetterOfString(val);
-              setCustomerInfo(obj);
+              setCustomerField("first", capitalizeFirstLetterOfString(val));
+              if (isNewCustomer) return;
+              if (isCurrentCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField(
+                    "first",
+                    capitalizeFirstLetterOfString(val)
+                  );
+                return;
+              }
+              dbSaveCustomer({
+                ...sCustomerInfo,
+                first: capitalizeFirstLetterOfString(val),
+              });
             }}
+            onFocus={() => setFocus("first")}
+            autoFocus={focus === "first"}
             placeholderTextColor="darkgray"
             placeholder="First name"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -202,10 +250,21 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.last = capitalizeFirstLetterOfString(val);
-              setCustomerInfo(obj);
+              setCustomerField("last", capitalizeFirstLetterOfString(val));
+              if (isNewCustomer) return;
+              if (isCurrentCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField("last", capitalizeFirstLetterOfString(val));
+                return;
+              }
+              dbSaveCustomer({
+                ...sCustomerInfo,
+                last: capitalizeFirstLetterOfString(val),
+              });
             }}
+            onFocus={() => setFocus("last")}
+            autoFocus={focus === "last"}
             placeholderTextColor="darkgray"
             placeholder="Last name"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -214,10 +273,18 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.email = val.toLowerCase();
-              setCustomerInfo(obj);
+              setCustomerField("email", val);
+              if (isNewCustomer) return;
+              if (isCurrentCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField("email", val);
+                return;
+              }
+              dbSaveCustomer({ ...sCustomerInfo, email: val });
             }}
+            onFocus={() => setFocus("email")}
+            autoFocus={focus === "email"}
             placeholderTextColor="darkgray"
             placeholder="Email address"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -226,10 +293,18 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.streetAddress = capitalizeAllWordsInSentence(val);
-              setCustomerInfo(obj);
+              setCustomerField("streetAddress", val);
+              if (isNewCustomer) return;
+              if (isNewCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField("streetAddress", val);
+                return;
+              }
+              dbSaveCustomer({ ...sCustomerInfo, streetAddress: val });
             }}
+            onFocus={() => setFocus("streetAddress")}
+            autoFocus={focus === "streetAddress"}
             placeholderTextColor="darkgray"
             placeholder="Street address"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -238,10 +313,18 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.unit = val;
-              setCustomerInfo(obj);
+              setCustomerField("unit", val);
+              if (isNewCustomer) return;
+              if (isCurrentCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField("unit", val);
+                return;
+              }
+              dbSaveCustomer({ ...sCustomerInfo, unit: val });
             }}
+            onFocus={() => setFocus("unit")}
+            autoFocus={focus === "unit"}
             placeholderTextColor="darkgray"
             placeholder="Unit"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -250,10 +333,21 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.city = capitalizeAllWordsInSentence(val);
-              setCustomerInfo(obj);
+              setCustomerField("city", capitalizeFirstLetterOfString(val));
+              if (isNewCustomer) return;
+              if (isCurrentCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField("city", capitalizeFirstLetterOfString(val));
+                return;
+              }
+              dbSaveCustomer({
+                ...sCustomerInfo,
+                city: capitalizeFirstLetterOfString(val),
+              });
             }}
+            onFocus={() => setFocus("city")}
+            autoFocus={focus === "city"}
             placeholderTextColor="darkgray"
             placeholder="City"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -262,10 +356,18 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.state = val.toUpperCase();
-              setCustomerInfo(obj);
+              setCustomerField("state", val.toUpperCase());
+              if (isNewCustomer) return;
+              if (isCurrentCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField("state", val.toUpperCase());
+                return;
+              }
+              dbSaveCustomer({ ...sCustomerInfo, state: val.toUpperCase() });
             }}
+            onFocus={() => setFocus("state")}
+            autoFocus={focus === "state"}
             placeholderTextColor="darkgray"
             placeholder="State"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -274,10 +376,17 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.zip = val;
-              setCustomerInfo(obj);
+              if (!checkInputForNumbersOnly) return;
+              setCustomerField("zip", val);
+              if (isCurrentCustomer) {
+                if (isNewCustomer) return;
+                useCurrentCustomerStore.getState().setCustomerField("zip", val);
+                return;
+              }
+              dbSaveCustomer({ ...sCustomerInfo, zip: val });
             }}
+            onFocus={() => setFocus("zip")}
+            autoFocus={focus === "zip"}
             placeholderTextColor="darkgray"
             placeholder="Zip code"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -286,10 +395,21 @@ export const CustomerInfoScreenModalComponent = ({
           />
           <TextInput
             onChangeText={(val) => {
-              let obj = cloneDeep(sCustomerInfo);
-              obj.notes = capitalizeFirstLetterOfString(val);
-              setCustomerInfo(obj);
+              setCustomerField("notes", capitalizeFirstLetterOfString(val));
+              if (isNewCustomer) return;
+              if (isCurrentCustomer) {
+                useCurrentCustomerStore
+                  .getState()
+                  .setCustomerField(
+                    "notes",
+                    capitalizeFirstLetterOfString(val)
+                  );
+                return;
+              }
+              dbSaveCustomer({ ...sCustomerInfo, notes: val });
             }}
+            onFocus={() => setFocus("notes")}
+            autoFocus={focus === "notes"}
             placeholderTextColor="darkgray"
             placeholder="Address notes"
             style={{ ...TEXT_INPUT_STYLE }}
@@ -421,7 +541,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
   //     });
   //   }
   // }, [sSelectedWorkorder]); // Triggers when currentIndex changes
-
+  log("render");
   return (
     <View
       style={{

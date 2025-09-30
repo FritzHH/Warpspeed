@@ -6,6 +6,7 @@ import {
   formatPhoneForDisplay,
   generateUPCBarcode,
   gray,
+  log,
 } from "../../../utils";
 import {
   Button,
@@ -33,14 +34,11 @@ export function CustomerSearchListComponent({}) {
   const [sCustomerInfo, _setCustomerInfo] = useState();
 
   function handleCustomerSelected(customer) {
-    // log("here");
-    // log("cust", zCurrentUser);
-    // return;
     let currentUser = useLoginStore.getState().currentUser;
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.customerID = customer.id;
     wo.changeLog = wo.changeLog.push(
-      "Started by: " + currentUser.first + " " + currentUser.last[0]
+      "Started by: " + currentUser?.first + " " + currentUser?.last[0]
     );
     wo.customerFirst = customer.first;
     wo.customerLast = customer.last;
@@ -49,20 +47,18 @@ export function CustomerSearchListComponent({}) {
     wo.startedOnMillis = new Date().getTime();
     wo.status = SETTINGS_OBJ.statuses[0];
 
+    // log("work", wo);
+    // log("cust", customer);
     useOpenWorkordersStore.getState().setWorkorder(wo, false);
     useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
-    useCurrentCustomerStore.getState().setCustomer(customer, false);
-    _setCustomerInfo();
-    useCustomerSearchStore.getState().reset();
+    useCurrentCustomerStore.getState().setCustomer(customer);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,
       optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
-  }
-
-  function handleCancelPress() {
     _setCustomerInfo();
+    useCustomerSearchStore.getState().reset();
   }
 
   return (
@@ -105,7 +101,6 @@ export function CustomerSearchListComponent({}) {
                 marginBottom: 5,
               }}
             >
-              {" "}
               <View
                 style={{
                   width: "8%",
@@ -180,10 +175,13 @@ export function CustomerSearchListComponent({}) {
             buttonVisible={false}
             Component={() => (
               <CustomerInfoScreenModalComponent
+                isCurrentCustomer={false}
                 incomingCustomer={sCustomerInfo}
                 button1Text={"New Workorder"}
                 button2Text={"Close"}
-                handleButton1Press={() => handleCustomerSelected(sCustomerInfo)}
+                handleButton1Press={(customerInfo) =>
+                  handleCustomerSelected(customerInfo)
+                }
                 handleButton2Press={() => _setCustomerInfo()}
               />
             )}

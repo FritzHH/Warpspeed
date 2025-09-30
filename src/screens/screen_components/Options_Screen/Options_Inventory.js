@@ -4,7 +4,7 @@ import { View, FlatList, TextInput, Text } from "react-native-web";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
-import { generateUPCBarcode, log } from "../../../utils";
+import { formatCurrencyDisp, generateUPCBarcode, log } from "../../../utils";
 import {
   Button,
   Button_,
@@ -295,50 +295,59 @@ export function InventoryComponent({}) {
                           paddingRight: 5,
                         }}
                       >
-                        {item.informalName || item.formalName}
+                        {item.formalName}
                         {!!item.informalName && (
                           <Text style={{ fontSize: 12, color: "gray" }}>
-                            {"\n" + item.formalName}
+                            {"\n" + item.informalName}
                           </Text>
                         )}
                       </Text>
 
                       <View
                         style={{
-                          // borderLeftWidth: 1,
-                          // borderWidth: 1,
                           borderColor: C.buttonLightGreenOutline,
-                          // paddingLeft: 4,
-                          // paddingRight: 4,
                           width: "15%",
                           height: "100%",
                           alignItems: "flex-end",
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "space-between",
+                          justifyContent: "center",
                           borderRadius: 7,
-                          // backgroundColor: APP_BASE_COLORS.buttonLightGreen,
                         }}
                       >
                         <Text
                           style={{
                             textAlign: "right",
                             fontSize: 10,
-                            color: "dimgray",
+                            color: C.text,
                           }}
                         >
                           {"$ "}
+                          <Text
+                            style={{
+                              textAlignVertical: "top",
+                              fontSize: 14,
+                              color: C.text,
+                            }}
+                          >
+                            {formatCurrencyDisp(item.price)}
+                          </Text>
                         </Text>
-
                         <Text
                           style={{
-                            paddingVertical: 5,
-
-                            fontSize: 14,
-                            color: null,
+                            textAlign: "right",
+                            fontSize: 10,
+                            color: C.red,
                           }}
                         >
-                          {item.price}
+                          {"$ "}
+                          <Text
+                            style={{
+                              textAlignVertical: "top",
+                              fontSize: 12,
+                              color: C.red,
+                            }}
+                          >
+                            {formatCurrencyDisp(934893)}
+                          </Text>
                         </Text>
                       </View>
                     </View>
@@ -372,9 +381,4 @@ export function InventoryComponent({}) {
       </View>
     </View>
   );
-}
-
-function QuickButtonViewComponent({ buttonArr }) {
-  let invItems = buttonArr.inventoryItems;
-  let subMenuButtons = buttonArr.subMenuButtons;
 }

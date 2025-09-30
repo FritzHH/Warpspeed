@@ -561,23 +561,17 @@ export const useCurrentCustomerStore = create((set, get) => ({
   getWorkordersLoading: () => get().workordersLoading,
 
   setCustomerField: (fieldName, value, saveToDB = true) => {
+    // log({ ...get().customer, [fieldName]: value });
     set({ customer: { ...get().customer, [fieldName]: value } });
-    if (saveToDB) dbSaveSettingsField(fieldName, value);
+    if (saveToDB) dbSaveCustomer({ ...get().customer, [fieldName]: value });
   },
   setCustomer: (customer, sendToDB = true) => {
     set({ customer });
+    // log(get().customer, customer)
     if (sendToDB) dbSaveCustomer(customer);
   },
 
   loadWorkorders: () => {
-    // testing
-    // log(useOpenWorkordersStore.getState().getWorkorders());
-    // set({
-    //   workorders: [...useOpenWorkordersStore.getState().getWorkorders()],
-    // });
-
-    // return;
-
     set({ workordersLoading: true });
     let target = get().customer.workorders?.length;
     let count = 0;
@@ -670,15 +664,10 @@ export const useOpenWorkordersStore = create((set, get) => ({
   },
   getWorkorders: () => get().workorders,
 
-  // setters
-  setOpenWorkorder: (openWorkorder) => {
-    // log(openWorkorderObj);
-    set({ openWorkorder });
-  },
   setOpenWorkorderID: (openWorkorderID) => set({ openWorkorderID }),
   setOpenWorkorders: (workorders) => set({ workorders }), // real one
   setWorkorder: (wo, saveToDB = true, batch = true) => {
-    set({ workorderArr: addOrRemoveFromArr(wo) });
+    set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
     if (saveToDB) dbSaveOpenWorkorder(wo);
   },
   setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {

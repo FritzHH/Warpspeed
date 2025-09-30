@@ -723,11 +723,6 @@ export async function dbSaveCustomer(customer, customerID = null) {
       customerToSave
     );
 
-    log("Customer saved", {
-      customerID: id,
-      tenantID,
-      storeID,
-    });
 
     return {
       success: true,

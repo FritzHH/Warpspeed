@@ -160,16 +160,10 @@ export function WorkordersComponent({}) {
   ///////////////////////////////////////////////////////////////////////////////////
 
   function workorderSelected(obj) {
-    // log("obj", obj);
-    obj = cloneDeep(obj);
-
-    let settings = useSettingsStore.getState().settings;
-    dbGetCustomer(obj.customerID, settings.tenantID, settings.storeID).then(
-      (custObj) => {
-        // clog("cust obj", custObj);
-        useCurrentCustomerStore.getState().setCustomer(custObj);
-      }
-    );
+    dbGetCustomer(obj.customerID).then((customer) => {
+      // clog("cust obj", custObj);
+      useCurrentCustomerStore.getState().setCustomer(customer);
+    });
 
     useOpenWorkordersStore.getState().setOpenWorkorderID(obj.id);
     // _zSetInitialOpenWorkorder(obj);
@@ -210,7 +204,7 @@ export function WorkordersComponent({}) {
 
       finalArr = [...finalArr, ...arr];
     });
-    log("final", finalArr);
+    // log("final", finalArr);
     return finalArr;
   }
 

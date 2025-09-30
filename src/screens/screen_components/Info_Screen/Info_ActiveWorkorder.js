@@ -165,7 +165,7 @@ export const ActiveWorkorderComponent = ({}) => {
         paddingTop: 5,
         paddingHorizontal: 5,
         backgroundColor: C.backgroundWhite,
-        borderRadius: 15,
+        borderRadius: 7,
       }}
     >
       <View
@@ -183,7 +183,7 @@ export const ActiveWorkorderComponent = ({}) => {
             backgroundColor: C.buttonLightGreen,
             borderColor: C.buttonLightGreenOutline,
             borderWidth: 1,
-            borderRadius: 15,
+            borderRadius: 7,
           }}
         >
           <ScreenModal
@@ -709,25 +709,26 @@ export const ActiveWorkorderComponent = ({}) => {
       <View
         style={{
           flexDirection: "row",
-          justifyContent: "space-around",
+          justifyContent: "space-between",
           width: "100%",
+          alignItems: "center",
+          borderRadius: 5,
+          borderColor: C.listItemBorder,
+          borderWidth: 1,
         }}
       >
         <Button_
           icon={ICONS.add}
-          iconSize={20}
-          // buttonStyle={{ width: 150 }}
-          text={"Workorder"}
-          colorGradientArr={COLOR_GRADIENTS.green}
-          buttonStyle={{ paddingHorizontal: 25, paddingVertical: 5 }}
+          iconSize={50}
+          buttonStyle={{}}
           onPress={handleNewWorkorderPress}
         />
         <Button_
           icon={ICONS.cashRed}
-          iconSize={20}
-          colorGradientArr={COLOR_GRADIENTS.green}
-          buttonStyle={{ paddingHorizontal: 25, paddingVertical: 5 }}
-          text={"New Sale"}
+          iconSize={35}
+          buttonStyle={{
+            backgroundColor: "transparent",
+          }}
           onPress={handleStartStandaloneSalePress}
         />
       </View>

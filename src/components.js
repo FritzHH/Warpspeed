@@ -524,7 +524,7 @@ export const DropdownMenu = ({
   itemTextStyle = {},
   itemStyle = {},
   buttonStyle = {},
-  menuButtonStyle = { borderRadius: 11 },
+  menuButtonStyle = { borderRadius: 5 },
   buttonTextStyle = {},
   buttonText,
   modalCoordX = -15,

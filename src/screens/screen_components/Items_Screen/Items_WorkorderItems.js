@@ -309,7 +309,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             style={{
               marginRight: 10,
               color: C.text,
-              fontWeight: "bold",
+              fontWeight: 500,
               fontSize: 14,
             }}
           >
@@ -330,7 +330,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               <Text
                 style={{
                   marginRight: 10,
-                  fontWeight: "bold",
+                  fontWeight: 500,
                   color: C.text,
                   fontSize: 14,
                 }}
@@ -352,7 +352,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           <Text
             style={{
               marginRight: 10,
-              fontWeight: "bold",
+              fontWeight: 500,
               color: C.text,
               fontSize: 14,
             }}
@@ -383,7 +383,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           <Text
             style={{
               marginRight: 10,
-              fontWeight: "bold",
+              fontWeight: 500,
               color: C.text,
               fontSize: 15,
             }}
@@ -405,13 +405,8 @@ export const Items_WorkorderItemsTab = ({}) => {
           ref={checkoutBtnRef}
           textStyle={{ color: C.textWhite, fontSize: 16 }}
           icon={ICONS.shoppingCart}
-          text={"Check Out"}
-          colorGradientArr={COLOR_GRADIENTS.green}
-          buttonStyle={{
-            paddingHorizontal: 20,
-            paddingVertical: 2,
-            borderRadius: 15,
-          }}
+          iconSize={34}
+          buttonStyle={{ paddingVertical: 0 }}
           onPress={() => _zSetIsCheckingOut(true)}
         />
       </View>

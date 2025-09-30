@@ -1,94 +1,22 @@
 /* eslint-disable */
-import { FlatList, View, Text, TextInput, ScrollView } from "react-native-web";
-import {
-  CONTACT_RESTRICTIONS,
-  PAYMENT_OBJECT_PROTO,
-  SALE_OBJECT_PROTO,
-  TAB_NAMES,
-  WORKORDER_ITEM_PROTO,
-  ALERT_SCREEN_PROTO,
-  WORKORDER_PROTO,
-} from "../../../../data";
-import {
-  useAlertScreenStore,
-  useCheckoutStore,
-  useCurrentCustomerStore,
-  useInventoryStore,
-  useOpenWorkordersStore,
-  useSettingsStore,
-  useStripePaymentStore,
-  useTabNamesStore,
-} from "../../../../stores";
-import * as XLSX from "xlsx";
+import { View, Text, TextInput, ScrollView } from "react-native-web";
+import { CONTACT_RESTRICTIONS } from "../../../../data";
 
 import {
-  BicycleSpinner,
-  Button,
-  CashSaleModalComponent,
   CheckBox_,
-  StripeCreditCardModalComponent,
-  FileInput,
-  LoadingIndicator,
-  PaymentComponent,
-  ScreenModal,
   SHADOW_RADIUS_PROTO,
   Button_,
-  DropdownMenu,
-  SliderButton_,
-  GradientView,
-  AlertBox_,
   Image_,
 } from "../../../../components";
-import { cloneDeep, initial } from "lodash";
 import {
-  arrHasItem,
-  calculateRunningTotals,
-  clog,
-  formatDecimal,
   formatCurrencyDisp,
-  fuzzySearch,
-  generateRandomID,
-  generateUPCBarcode,
-  getRgbFromNamedColor,
   lightenRGBByPercent,
   log,
-  gray,
-  removeArrItem,
-  removeUnusedFields,
-  replaceOrAddToArr,
-  roundToTwoDecimals,
-  usdTypeMask,
-  dollarsToCents,
-  addOrRemoveFromArr,
-  findInMultipleArrs,
   formatMillisForDisplay,
   checkInputForNumbersOnly,
+  gray,
 } from "../../../../utils";
-import React, { useCallback, useEffect, useState } from "react";
-import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../../styles";
-import {
-  sendFCMMessage,
-  SET_FIRESTORE_FIELD,
-  setOpenWorkorder,
-} from "../../../../db";
-import {
-  dbCancelServerDrivenStripePayment,
-  dbGetClosedWorkorderItem,
-  dbGetOpenWorkorderItem,
-  dbGetSaleItem,
-  dbProcessServerDrivenStripePayment,
-  dbRetrieveAvailableStripeReaders,
-  dbSetCustomerField,
-  dbSetSalesObj,
-  dbSubscribeToStripePaymentProcess,
-} from "../../../../db_call_wrapper";
-import { TouchableOpacity } from "react-native";
-import {
-  STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL,
-  STRIPE_INITIATE_PAYMENT_INTENT_URL,
-} from "../../../../private_user_constants";
-import { FIRESTORE_COLLECTION_NAMES } from "../../../../constants";
-import { isArray } from "lodash";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 
 export const MiddleItemComponent = ({
   handleRefundPaymentCheck,
@@ -123,30 +51,9 @@ export const MiddleItemComponent = ({
   sSale,
   sCashChangeNeeded,
 }) => {
-  const _zSetIsCheckingOut = useCheckoutStore(
-    (state) => state.setIsCheckingOut
-  );
-
-  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-
-  const _zSetCustomerField = useCurrentCustomerStore(
-    (state) => state.setCustomerField
-  );
   // store getters
 
-  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-  const zOpenWorkorders = useOpenWorkordersStore((state) =>
-    state.getWorkorders()
-  );
-  const zInventory = useInventoryStore((state) => state.getInventoryArr());
-  const zGetInventoryItem = useInventoryStore(
-    (state) => state.getInventoryItem
-  );
-  const zSettings = useSettingsStore((state) => state.getSettings());
-  const zSale = useCheckoutStore((state) => state.saleObj);
-
   /////////////////////////////////////////////////////////////////////////
-  const [sEditingCustomerInfo, _setEditingCustomerInfo] = useState(false);
 
   return (
     <View

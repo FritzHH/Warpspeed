@@ -189,7 +189,7 @@ export function NewWorkorderComponent({}) {
     _zSetOpenWorkorder(wo, false);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory);
   }
 
   function handleCancelCreateNewCustomerPress() {
@@ -217,19 +217,6 @@ export function NewWorkorderComponent({}) {
     // add in the newly created workorder to the customer's file
     newCustomer.workorders.push(newWorkorder.id);
     _setCustomerInfo(newCustomer);
-    // useCurrentCustomerStore.getState().setCustomer(newCustomerObj, true);
-    // useOpenWorkordersStore.getState().setWorkorder(newWorkorder, true, true);
-    // useOpenWorkordersStore.getState().setOpenWorkorder(newWorkorder);
-    // useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.workorder);
-    // useTabNamesStore
-    //   .getState()
-    //   .setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    // useTabNamesStore
-    //   .getState()
-    //   .setOptionsTabName(TAB_NAMES.optionsTab.quickItems);
-    // _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
-    // _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    // _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
   }
 
   //////////////////////////////////////////////////////////////////////

@@ -15,22 +15,10 @@ import {
   WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "./data";
+import { setRealtimeNodeItem } from "./db";
 import {
-  set_firestore_doc,
-  setInventoryItem,
-  setOpenWorkorder,
-  setRealtimeNodeItem,
-} from "./db";
-import {
-  convertMillisToHoursMins,
-  formatDateTimeForReceipt,
   generateUPCBarcode,
-  generateRandomID,
-  generateRandomNumber,
-  formatMillisForDisplay,
-  log,
   randomWordGenerator,
-  clog,
   roundToTwoDecimals,
 } from "./utils";
 import {
@@ -39,8 +27,6 @@ import {
   dbSetWorkorder,
 } from "./db_call_wrapper";
 import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "./constants";
-import { LogBox } from "react-native";
-import { useOpenWorkordersStore } from "./stores";
 import { dbSaveInventoryItem, dbSaveSettings } from "./db_calls_wrapper";
 
 export function testPayment() {}

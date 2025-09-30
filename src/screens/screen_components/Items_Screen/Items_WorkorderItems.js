@@ -1,46 +1,28 @@
 /*eslint-disable*/
 import { View, Text, TextInput, FlatList, Image } from "react-native-web";
 import {
-  addOrRemoveFromArr,
   applyDiscountToWorkorderItem,
-  applyLineItemDiscounts,
   calculateRunningTotals,
-  calculateTaxes,
-  clog,
   deepEqual,
   formatCurrencyDisp,
-  generateRandomID,
   generateUPCBarcode,
   gray,
   lightenRGBByPercent,
   log,
   replaceOrAddToArr,
-  trimToTwoDecimals,
 } from "../../../utils";
 import {
-  TabMenuDivider as Divider,
   Button,
   ScreenModal,
   GradientView,
-  Image_,
   Button_,
-  SliderButton_,
 } from "../../../components";
+import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
-  C,
-  BUTTON_VARS,
-  COLOR_GRADIENTS,
-  Colors,
-  ICON_PATHS,
-  ICONS,
-} from "../../../styles";
-import {
-  WORKORDER_PROTO,
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   SETTINGS_OBJ,
   DISCOUNT_OBJ_PROTO,
-  COLORS,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
@@ -48,17 +30,8 @@ import {
   useCheckoutStore,
   useOpenWorkordersStore,
   useInventoryStore,
-  useLoginStore,
   useSettingsStore,
-  useCurrentCustomerStore,
 } from "../../../stores";
-import {
-  dbGetCustomerObj,
-  dbSetClosedWorkorderItem,
-} from "../../../db_call_wrapper";
-import LinearGradient from "react-native-web-linear-gradient";
-import { loadFaceDetectionModel } from "face-api.js";
-// import {} from '../../../assets/tools1.png'
 
 export const Items_WorkorderItemsTab = ({}) => {
   // store setters ///////////////////////////////////////////////////////////////
@@ -66,29 +39,27 @@ export const Items_WorkorderItemsTab = ({}) => {
   const _zSetIsCheckingOut = useCheckoutStore(
     (state) => state.setIsCheckingOut
   );
+  const _zSetWorkorderField = useOpenWorkordersStore((s) => s.setField);
 
   // store getters ///////////////////////////////////////////////////////////////
 
-  const zOpenWorkorder = useOpenWorkordersStore((state) => state.openWorkorder);
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorder()
+  );
   const zSettings = useSettingsStore((state) => state.settings);
   const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
-
-  const zOpenWorkordersArr = useOpenWorkordersStore(
-    (state) => state.workorders
-  );
-  // const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
 
   ///////////////////////////////////////////////////////////////////////////
   const [sButtonsRowID, _setButtonsRowID] = useState(null);
   const [sTotalPrice, _setTotalPrice] = useState("");
   const [sTotalDiscount, _setTotalDiscount] = useState("");
-  const [sNumItems, _setNumItems] = useState("");
-  // const [sDisc]
+  const [sHasCheckedInventoryPrice, _setHasCheckedInventoryPrice] =
+    useState(false);
 
   // dev
   const checkoutBtnRef = useRef();
   useEffect(() => {
-    if (zOpenWorkorder && zOpenWorkordersArr && zSettings.salesTax) {
+    if (zOpenWorkorder?.workordersArr && zSettings.salesTax) {
       // log("here");
       // _zSetIsCheckingOut(true);
       // dbGetCustomerObj("1236").then((res) => {
@@ -96,20 +67,25 @@ export const Items_WorkorderItemsTab = ({}) => {
       //   // log("res", res);
       // });
     }
-  }, [zOpenWorkorder, zOpenWorkordersArr, zSettings]);
+  }, [zOpenWorkorder, zSettings]);
 
   ///////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////
 
   // update the workorder inventory items to the latest prices, also watching inventory array to keep current price. also update the discont object
   useEffect(() => {
-    if (!zOpenWorkorder?.workorderLines || !zInventoryArr.length > 0) return;
-    let wo = cloneDeep(zOpenWorkorder);
+    if (
+      !(zOpenWorkorder?.workorderLines.length > 0) ||
+      !(zInventoryArr.length > 0)
+    )
+      return;
+    if (sHasCheckedInventoryPrice) return;
+    _setHasCheckedInventoryPrice(true);
     let linesToChange = [];
 
     let invIdxArr = [];
     let discountsIdxArr = [];
-    wo.workorderLines.forEach((line, idx) => {
+    zOpenWorkorder.workorderLines.forEach((line, idx) => {
       // log("line", line);
       let curInvItem = zInventoryArr.find(
         (o) => o.id === line.inventoryItem.id
@@ -118,7 +94,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       if (!deepEqual(curInvItem, line.inventoryItem)) {
         // clog("cur inv", curInvItem.price);
         // clog("previous", line.inventoryItem.price);
-        linesToChange.push(curInvItem);
+        linesToChange.push({ ...curInvItem });
         invIdxArr.push({ idx, curInvItem });
       }
 
@@ -126,19 +102,18 @@ export const Items_WorkorderItemsTab = ({}) => {
     });
 
     // the price has changed. now reset the discount object to reflect the new price as well
-    invIdxArr.forEach((obj) => {
-      // log("changing");
-      wo.workorderLines[obj.idx].inventoryItem = obj.curInvItem;
-      // clog("old line", wo.workorderLines[obj.idx].discountObj?);
-      let discountedLine = applyDiscountToWorkorderItem(
-        wo.workorderLines[obj.idx]
-      );
-      // clog("new line", discountedLine.discountObj?);
-      wo.workorderLines[obj.idx] = discountedLine;
-    });
-
     if (invIdxArr.length > 0) {
-      // log("found new inventory prices");
+      let wo = cloneDeep(zOpenWorkorder);
+      invIdxArr.forEach((obj) => {
+        // log("changing");
+        wo.workorderLines[obj.idx].inventoryItem = obj.curInvItem;
+        // clog("old line", wo.workorderLines[obj.idx].discountObj?);
+        let discountedLine = applyDiscountToWorkorderItem(
+          wo.workorderLines[obj.idx]
+        );
+        // clog("new line", discountedLine.discountObj?);
+        wo.workorderLines[obj.idx] = discountedLine;
+      });
       _zSetWorkorder(wo);
     }
   }, [zInventoryArr, zOpenWorkorder]);
@@ -158,10 +133,10 @@ export const Items_WorkorderItemsTab = ({}) => {
       runningTax,
     } = calculateRunningTotals(zOpenWorkorder, zSettings.salesTax);
     // clog(calculateRunningTotals(zOpenWorkorderObj, zInventoryArr));
-    _setNumItems(runningQty);
     _setTotalDiscount(runningDiscount);
     _setTotalPrice(runningTotal);
     // _zSetWorkorderObj(wo, false);
+    log("running");
   }, [zOpenWorkorder]);
 
   function deleteWorkorderLineItem(index) {
@@ -194,30 +169,17 @@ export const Items_WorkorderItemsTab = ({}) => {
       if (newLine.discountObj?.newPrice > 0) newWOLine = newLine;
     }
 
-    useOpenWorkordersStore
-      .getState()
-      .setWorkorderField(
-        "workorderLines",
-        replaceOrAddToArr(zOpenWorkorder.workorderLines, newWOLine),
-        zOpenWorkorder.id
-      );
+    _zSetWorkorderField(
+      "workorderLines",
+      replaceOrAddToArr(zOpenWorkorder.workorderLines, newWOLine)
+    );
   }
 
   function editWorkorderLine(workorderLine) {
-    let wo = cloneDeep(zOpenWorkorder);
-
-    let newWOLine = workorderLine;
-    if (newWOLine.discountObj?.name) {
-      let newLine = applyDiscountToWorkorderItem(newWOLine);
-      if (newLine.discountObj?.newPrice > 0) newWOLine = newLine;
-    }
-
-    let idx = zOpenWorkorder.workorderLines.findIndex(
-      (o) => o.id == workorderLine.id
+    _zSetWorkorderField(
+      "workorderLines",
+      replaceOrAddToArr(zOpenWorkorder.workorderLines, workorderLine)
     );
-    wo.workorderLines[idx] = newWOLine;
-    _zSetWorkorder(wo);
-    // if (!zOpenWorkorderObj.isStandaloneSale) ''(wo);
   }
 
   function applyDiscount(workorderLine, discountObj) {
@@ -265,8 +227,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     log("delete workorder");
   }
 
-  // clog("wo", zWorkorderObj);
-  // log('here', zOpenWorkorder);
+  // log("here", zOpenWorkorder);
   if (!(zOpenWorkorder?.workorderLines.length > 0))
     return (
       <View style={{ flex: 1, justifyContent: "center" }}>
@@ -276,11 +237,12 @@ export const Items_WorkorderItemsTab = ({}) => {
       </View>
     );
 
+  log("main");
   return (
     <View
       style={{
-        width: "100%",
-        height: "95%",
+        flex: 1,
+        justifyContent: "center",
       }}
     >
       <FlatList
@@ -299,7 +261,6 @@ export const Items_WorkorderItemsTab = ({}) => {
               __setWorkorderLineItem={editWorkorderLine}
               inventoryItem={invItem}
               workorderLine={item}
-              zWorkorderObj={zOpenWorkorder}
               __splitItems={splitItems}
               __modQtyPressed={modQtyPressed}
               index={idx}
@@ -464,9 +425,7 @@ export const LineItemComponent = ({
   zSettingsObj = SETTINGS_OBJ,
   __deleteWorkorderLine,
   __modQtyPressed,
-  __setWorkorderObj,
   __setWorkorderLineItem,
-  // __
   __splitItems,
   index,
   applyDiscount,
@@ -475,10 +434,29 @@ export const LineItemComponent = ({
 }) => {
   const [sTempQtyVal, _setTempQtyVal] = useState(null);
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
-  const ref = useRef();
+  const [sLocalNotes, _setLocalNotes] = useState(
+    workorderLine.intakeNotes || ""
+  );
+  const debounceRef = useRef(null);
 
   /////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
+
+  // Sync local state when workorderLine changes from external sources
+  useEffect(() => {
+    _setLocalNotes(workorderLine.intakeNotes || "");
+  }, [workorderLine.intakeNotes]);
+
+  // Debounced function to update workorder line
+  const debouncedUpdateNotes = (val) => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      let line = { ...workorderLine, intakeNotes: val };
+      __setWorkorderLineItem(line);
+    }, 300); // 300ms debounce
+  };
 
   function formatDiscountsArr(discountArr) {
     if (discountArr[discountArr.length - 1].name === "No Discount")
@@ -489,7 +467,7 @@ export const LineItemComponent = ({
     return discountArr;
   }
 
-  // clog("item", workorderLine);
+  log("item component");
   return (
     <View
       style={{
@@ -516,14 +494,15 @@ export const LineItemComponent = ({
       >
         <View
           style={{
-            width: "73%",
+            width: "65%",
+            height: "100%",
             justifyContent: "flex-start",
             alignItems: "center",
             flexDirection: "row",
-            // backgroundColor: "green",
+            // backgroundColor: "blue",
           }}
         >
-          <View>
+          <View style={{ width: "100%", height: "100%" }}>
             {!!workorderLine.discountObj?.name && (
               <Text style={{ color: C.lightred }}>
                 {workorderLine.discountObj?.name || "discount goes here"}
@@ -535,27 +514,35 @@ export const LineItemComponent = ({
                 color: C.text,
                 fontWeight: "400",
               }}
+              numberOfLines={2}
             >
               {inventoryItem.formalName}
             </Text>
-            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                width: "100%",
+                // backgroundColor: "green",
+              }}
+            >
               <TextInput
                 numberOfLines={4}
-                style={{ outlineWidth: 0, color: C.lightText }}
+                style={{ outlineWidth: 0, color: C.lightText, width: "100%" }}
                 onChangeText={(val) => {
-                  let line = { ...workorderLine, intakeNotes: val };
-                  __setWorkorderLineItem(line, inventoryItem);
+                  _setLocalNotes(val);
+                  debouncedUpdateNotes(val);
                 }}
                 placeholder="Intake and service notes..."
                 placeholderTextColor={gray(0.2)}
-                value={workorderLine.intakeNotes}
+                value={sLocalNotes}
               />
             </View>
           </View>
         </View>
         <View
           style={{
-            width: "27%",
+            width: "35%",
             flexDirection: "row",
             justifyContent: "flex-end",
             alignItems: "center",
@@ -572,40 +559,37 @@ export const LineItemComponent = ({
             }}
           >
             <Button_
-              onPress={() => __deleteWorkorderLine(index)}
-              icon={ICONS.close1}
-              iconSize={17}
-              buttonStyle={{
-                marginLeft: 5,
-                marginRight: 5,
-                // margin
-                backgroundColor: "transparent",
-              }}
-            />
-            <Button_
               onPress={() => __modQtyPressed(workorderLine, "up", index)}
               buttonStyle={{
                 backgroundColor: "transparent",
+                paddingHorizontal: 3,
                 // width: null,
                 // height: null,
               }}
               icon={ICONS.upArrowOrange}
-              iconSize={25}
+              iconSize={23}
             />
-
+            <Button_
+              onPress={() => __modQtyPressed(workorderLine, "down", index)}
+              buttonStyle={{
+                paddingHorizontal: 4,
+                backgroundColor: "transparent",
+              }}
+              icon={ICONS.downArrowOrange}
+              iconSize={23}
+            />
             <GradientView
               style={{
                 marginLeft: 7,
                 borderRadius: 15,
-                width: 35,
-                height: 25,
-                // backgroundColor: "green",
+                width: 31,
+                height: 23,
               }}
             >
               <TextInput
                 style={{
-                  fontSize: 18,
-                  fontWeight: 700,
+                  fontSize: 16,
+                  fontWeight: 500,
                   textAlign: "center",
                   color: C.textWhite,
                   outlineWidth: 0,
@@ -621,7 +605,7 @@ export const LineItemComponent = ({
                     _setTempQtyVal(null);
                   }
                   let line = { ...workorderLine, qty: Number(val) };
-                  __setWorkorderLineItem(line, inventoryItem);
+                  __setWorkorderLineItem(line);
                 }}
               />
             </GradientView>
@@ -629,9 +613,15 @@ export const LineItemComponent = ({
           <View
             style={{
               alignItems: "flex-end",
-              minWidth: 80,
-              // backgroundColor: "green",
-              marginRight: 1,
+              minWidth: 85,
+              marginHorizontal: 5,
+              borderWidth: 1,
+              borderRadius: 7,
+              borderColor: C.listItemBorder,
+              height: "100%",
+              paddingRight: 2,
+              backgroundColor: C.backgroundWhite,
+              justifyContent: "center",
             }}
           >
             {(workorderLine.qty > 1 || workorderLine.discountObj?.newPrice) && (
@@ -688,7 +678,7 @@ export const LineItemComponent = ({
             }}
           >
             <Button_
-              iconSize={23}
+              iconSize={20}
               icon={ICONS.editPencil}
               onPress={() =>
                 __setButtonsRowID(
@@ -696,7 +686,16 @@ export const LineItemComponent = ({
                 )
               }
               buttonStyle={{
+                paddingHorizontal: 5,
                 backgroundColor: "transparent",
+              }}
+            />
+            <Button_
+              onPress={() => __deleteWorkorderLine(index)}
+              icon={ICONS.trash}
+              iconSize={16}
+              buttonStyle={{
+                paddingRight: 4,
               }}
             />
           </View>

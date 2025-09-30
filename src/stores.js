@@ -662,8 +662,12 @@ export const useCustMessagesStore = create((set, get) => ({
 export const useOpenWorkordersStore = create((set, get) => ({
   workorders: [],
   openWorkorder: null,
+  openWorkorderID: null,
 
-  getOpenWorkorder: () => get().openWorkorder,
+  getOpenWorkorder: () => {
+    let id = get().openWorkorderID;
+    return get().workorders.find((o) => o.id === id);
+  },
   getWorkorders: () => get().workorders,
 
   // setters
@@ -671,41 +675,19 @@ export const useOpenWorkordersStore = create((set, get) => ({
     // log(openWorkorderObj);
     set({ openWorkorder });
   },
-  // setOpenWorkorders: (workorders) => {
-  //   log('workorders', workorders[0])
-  //   let custID = workorders[0].id;
-  //   dbGetCustomer(custID, '1236', '999').then(cust => useCurrentCustomerStore.getState().setCustomer(cust))
-  //   set({openWorkorderObj: workorders[0], workorders })
-  // }, // testing
+  setOpenWorkorderID: (openWorkorderID) => set({ openWorkorderID }),
   setOpenWorkorders: (workorders) => set({ workorders }), // real one
   setWorkorder: (wo, saveToDB = true, batch = true) => {
-    if (wo.isStandaloneSale) {
-      set({ openWorkorder: { ...wo } });
-      return;
-    }
-
     set({ workorderArr: addOrRemoveFromArr(wo) });
-
-    // not set it as open workorder if it is such
-    if (get().openWorkorder?.id === wo.id) {
-      set({ openWorkorder: wo });
-    }
-
-    if (saveToDB) {
-      dbSaveOpenWorkorder(wo, "1234", "999");
-      // dbSetWorkorder(wo, batch, false);
-    } // need db fun
+    if (saveToDB) dbSaveOpenWorkorder(wo);
   },
-  setWorkorderField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
-    log(fieldName, fieldVal);
+  setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
+    // log(fieldName, fieldVal);
+    if (!workorderID) workorderID = get().openWorkorderID;
     let workorder = get().workorders.find((o) => o.id === workorderID);
-    workorder[fieldName] = fieldVal;
+    workorder = { ...workorder, [fieldName]: fieldVal };
 
     set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
-
-    if (get().openWorkorder.id === workorderID)
-      set({ openWorkorder: { ...get().openWorkorder, [fieldName]: fieldVal } });
-
     if (saveToDB) dbSaveOpenWorkorder(workorder);
   },
 

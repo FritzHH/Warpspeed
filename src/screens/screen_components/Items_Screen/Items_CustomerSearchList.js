@@ -1,50 +1,33 @@
 /* eslint-disable */
 
-import React, { useMemo, useState } from "react";
-import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
+import { useMemo, useState } from "react";
+import { View, Text, FlatList } from "react-native-web";
 import {
   formatPhoneForDisplay,
-  formatPhoneWithDashes,
-  generateRandomID,
   generateUPCBarcode,
   gray,
-  log,
-  unformatPhoneForDisplay,
 } from "../../../utils";
 import {
   Button,
   Button_,
   ScreenModal,
-  SHADOW_RADIUS_PROTO,
   TouchableOpacity_,
 } from "../../../components";
 import { cloneDeep } from "lodash";
-import {
-  APP_USER,
-  FOCUS_NAMES,
-  SETTINGS_OBJ,
-  TAB_NAMES,
-  WORKORDER_PROTO,
-  WORKORDER_STATUS_NAMES,
-} from "../../../data";
+import { SETTINGS_OBJ, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import {
   useCurrentCustomerStore,
-  useCustMessagesStore,
   useCustomerSearchStore,
   useLoginStore,
   useOpenWorkordersStore,
   useTabNamesStore,
 } from "../../../stores";
-import { messagesSubscribe } from "../../../db_subscription_wrapper";
-import { dbGetCustomerObj } from "../../../db_call_wrapper";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { C, ICONS } from "../../../styles";
-import { Pressable } from "react-native";
 
 export function CustomerSearchListComponent({}) {
   // store getters //////////////////////////////////////////////////////////////////////
   const zSearchResults = useCustomerSearchStore((state) => state.searchResults);
-  const zCurrentUser = useLoginStore((state) => state.currentUser);
 
   ////////////////////////////////////////////////////////////////////////////////////////
   const [sCustomerInfo, _setCustomerInfo] = useState();
@@ -53,10 +36,11 @@ export function CustomerSearchListComponent({}) {
     // log("here");
     // log("cust", zCurrentUser);
     // return;
+    let currentUser = useLoginStore.getState().currentUser;
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.customerID = customer.id;
     wo.changeLog = wo.changeLog.push(
-      "Started by: " + zCurrentUser.first + " " + zCurrentUser.last[0]
+      "Started by: " + currentUser.first + " " + currentUser.last[0]
     );
     wo.customerFirst = customer.first;
     wo.customerLast = customer.last;
@@ -66,14 +50,14 @@ export function CustomerSearchListComponent({}) {
     wo.status = SETTINGS_OBJ.statuses[0];
 
     useOpenWorkordersStore.getState().setWorkorder(wo, false);
-    useOpenWorkordersStore.getState().setOpenWorkorder(wo);
+    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
     useCurrentCustomerStore.getState().setCustomer(customer, false);
     _setCustomerInfo();
     useCustomerSearchStore.getState().reset();
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-      optionsTabName: TAB_NAMES.optionsTab.quickItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
   }
 
@@ -88,7 +72,6 @@ export function CustomerSearchListComponent({}) {
         height: "100%",
         justifyContent: "center",
         paddingHorizontal: 10,
-        // alignItems: "center",
       }}
     >
       <FlatList
@@ -122,11 +105,26 @@ export function CustomerSearchListComponent({}) {
                 marginBottom: 5,
               }}
             >
+              {" "}
+              <View
+                style={{
+                  width: "8%",
+                  height: "100%",
+                  alignItems: "flex-start",
+                  justifyContent: "center",
+                }}
+              >
+                <Button_
+                  onPress={() => _setCustomerInfo(customer)}
+                  iconSize={20}
+                  icon={ICONS.info}
+                />
+              </View>
               <TouchableOpacity_
-                style={{ width: "100%", height: "100%", flexDirection: "row" }}
+                style={{ width: "92%", height: "100%", flexDirection: "row" }}
                 onPress={() => handleCustomerSelected(customer)}
               >
-                <View style={{ width: "80%" }}>
+                <View style={{ width: "92%" }}>
                   <Text style={{ fontSize: 16, color: C.text, width: "30%" }}>
                     {customer?.first + " " + customer?.last}
                   </Text>
@@ -168,21 +166,6 @@ export function CustomerSearchListComponent({}) {
                       </Text>
                     )}
                   </View>
-                </View>
-                <View
-                  style={{
-                    width: "20%",
-                    flexDirection: "row",
-                    height: "100%",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <Button_
-                    onPress={() => _setCustomerInfo(customer)}
-                    iconSize={25}
-                    icon={ICONS.info}
-                  />
                 </View>
               </TouchableOpacity_>
             </View>

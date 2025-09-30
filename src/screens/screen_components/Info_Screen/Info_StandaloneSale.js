@@ -1,46 +1,31 @@
 /* eslint-disable */
 import { FlatList, View, Text, TextInput } from "react-native-web";
+import { TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import {
-  PAYMENT_OBJECT_PROTO,
-  TAB_NAMES,
-  WORKORDER_PROTO,
-} from "../../../data";
-import {
-  useCheckoutStore,
   useInventoryStore,
   useOpenWorkordersStore,
   useSettingsStore,
   useStripePaymentStore,
   useTabNamesStore,
 } from "../../../stores";
-import * as XLSX from "xlsx";
 
 import {
-  BicycleSpinner,
   Button,
-  CashSaleModalComponent,
   CheckBox_,
-  StripeCreditCardModalComponent,
-  FileInput,
   LoadingIndicator,
-  PaymentComponent,
   ScreenModal,
   SHADOW_RADIUS_PROTO,
   Button_,
 } from "../../../components";
-import { cloneDeep } from "lodash";
 import {
   calculateRunningTotals,
   clog,
-  generateRandomID,
-  generateUPCBarcode,
   log,
   showAlert,
   trimToTwoDecimals,
 } from "../../../utils";
 import { useEffect, useState } from "react";
 import { COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
-import { sendFCMMessage } from "../../../db";
 import {
   dbProcessServerDrivenStripePayment,
   dbRetrieveAvailableStripeReaders,
@@ -101,8 +86,7 @@ export const StandaloneSaleComponent = ({}) => {
   // TODO need to add in combined workorders after completed the next effect
   useEffect(() => {
     // log("z", zWorkorderObj);
-    if (!zOpenWorkorder?.workorderLines || !zInventoryArr?.length > 0)
-      return;
+    if (!zOpenWorkorder?.workorderLines || !zInventoryArr?.length > 0) return;
     const { runningQty, runningTotal, runningDiscount } =
       calculateRunningTotals(zOpenWorkorder, zInventoryArr);
     _sSetTotalsObj({ total: runningTotal, discount: runningDiscount });
@@ -162,7 +146,6 @@ export const StandaloneSaleComponent = ({}) => {
     return workorders;
   }
 
-
   const handleRefundScan = async (text) => {
     log("incoming refund text", text);
     _sSetRefundScan(text);
@@ -191,7 +174,7 @@ export const StandaloneSaleComponent = ({}) => {
     // wo.isStandaloneSale = true;
     // wo.id = generateRandomID();
     // _zSetOpenWorkorderObj(wo);
-    // _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    // _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory);
     // _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
 

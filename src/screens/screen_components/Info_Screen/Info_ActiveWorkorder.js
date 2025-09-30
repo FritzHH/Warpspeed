@@ -3,29 +3,15 @@
 import { View, Text, TextInput } from "react-native-web";
 import {
   formatPhoneWithDashes,
-  clog,
-  dim,
-  generateRandomID,
   generateUPCBarcode,
-  log,
-  trimToTwoDecimals,
   gray,
 } from "../../../utils";
 import {
-  TabMenuDivider as Divider,
-  ModalDropdown,
-  // TextInputOnMainBackground,
-  TextInputLabelOnMainBackground,
   ScreenModal,
-  Button,
   SHADOW_RADIUS_NOTHING,
-  SHADOW_RADIUS_PROTO,
-  LoginModalScreen,
   DropdownMenu,
   Button_,
-  Icon_,
   Image_,
-  GradientView,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -40,15 +26,12 @@ import {
 import React, { useRef } from "react";
 import { cloneDeep } from "lodash";
 import {
-  useCheckoutStore,
   useCurrentCustomerStore,
   useOpenWorkordersStore,
   useLoginStore,
   useSettingsStore,
   useTabNamesStore,
-  useCustomerSearchStore,
 } from "../../../stores";
-import { dbSetCustomerObj, dbSetWorkorder } from "../../../db_call_wrapper";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 
 export const ActiveWorkorderComponent = ({}) => {
@@ -60,16 +43,12 @@ export const ActiveWorkorderComponent = ({}) => {
     (state) => state.setOptionsTabName
   );
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  const _zSetInitialOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setOpenWorkorder
-  );
-  const _zSetWorkorderField = useOpenWorkordersStore(
-    (s) => s.setWorkorderField
-  );
+
+  const _zSetWorkorderField = useOpenWorkordersStore((s) => s.setField);
 
   // store getters ///////////////////////////////////////////////////////////////////
   let zOpenWorkorder = WORKORDER_PROTO;
-  zOpenWorkorder = useOpenWorkordersStore((state) => state.openWorkorder);
+  zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
   let zCustomer = CUSTOMER_PROTO;
   zCustomer = useCurrentCustomerStore((state) => state.customer);
   var zSettings = SETTINGS_OBJ;
@@ -120,10 +99,10 @@ export const ActiveWorkorderComponent = ({}) => {
     wo.startedBy = zCurrentUser.id;
     wo.startedOnMillis = new Date().getTime();
 
-    _zSetInitialOpenWorkorder(wo, false);
+    useOpenWorkordersStore.setOpenWorkorderID(wo.id);
     _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
     _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory);
   }
 
   function handleNewWorkorderPress() {
@@ -149,7 +128,7 @@ export const ActiveWorkorderComponent = ({}) => {
     wo.startedOnMillis = new Date().getTime();
     wo.status = SETTINGS_OBJ.statuses[0];
     useOpenWorkordersStore.getState().setWorkorder(wo, false);
-    useOpenWorkordersStore.getState().setOpenWorkorder(wo);
+    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
   }
 
   const dropdownButtonStyle = {

@@ -1,30 +1,18 @@
 /* eslint-disable */
 
-import { Text, View } from "react-native-web";
+import { View } from "react-native-web";
 import {
   checkInternetConnection,
   dim,
-  generateRandomID,
   localStorageWrapper,
   log,
-  trimToTwoDecimals,
 } from "../../utils";
-import {
-  HorzSpacer,
-  TabMenuButton,
-  TabMenuDivider as Divider,
-  Image_,
-  Button_,
-  DateTimePicker,
-} from "../../components";
-import { AnimatedComponentSwitch } from "../../components/AnimatedComponentSwitch";
-import { C, Colors, ICONS } from "../../styles";
-import { WORKORDER_PROTO, TAB_NAMES } from "../../data";
+import { TabMenuButton, Image_, Button_ } from "../../components";
+import { C, ICONS } from "../../styles";
+import { TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import React, { useEffect, useRef, useState } from "react";
-import { cloneDeep } from "lodash";
 import { WorkordersComponent } from "../screen_components/Options_Screen/Options_Workorders";
-import { QuickItemComponent } from "../screen_components/Options_Screen/Options_QuickItems";
 import { InventoryComponent } from "../screen_components/Options_Screen/Options_Inventory";
 import { MessagesComponent } from "../screen_components/Options_Screen/Options_Messages";
 import {
@@ -32,9 +20,7 @@ import {
   useLoginStore,
   useAlertScreenStore,
 } from "../../stores";
-import { dbCreateUserPunchAction } from "../../db_call_wrapper";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
-import { UserClockHistoryModal } from "../screen_components/modal_screens/UserClockHistoryModalScreen";
 
 export const Options_Section = React.memo(({}) => {
   // store setters ///////////////////////////////////////////////////////////
@@ -104,8 +90,8 @@ export const Options_Section = React.memo(({}) => {
         return <InventoryComponent />;
       case TAB_NAMES.optionsTab.messages:
         return <MessagesComponent />;
-      case TAB_NAMES.optionsTab.quickItems:
-        return <QuickItemComponent />;
+      case TAB_NAMES.optionsTab.inventory:
+        return <InventoryComponent />;
       case TAB_NAMES.optionsTab.workorders:
         return <WorkordersComponent />;
     }
@@ -120,14 +106,9 @@ export const Options_Section = React.memo(({}) => {
         webcamDetected={zWebcamDetected}
         handleUserPress={handleUserClockPress}
       />
-      <AnimatedComponentSwitch animationType="fade" duration={200}>
-        {ScreenComponent()}
-      </AnimatedComponentSwitch>
+      {ScreenComponent()}
     </View>
   );
-
-  /////////////////////////////////////////////////////////////////
-  ////////////////////////////////////////////////////////////////
 });
 
 export const TabBar = ({
@@ -173,10 +154,10 @@ export const TabBar = ({
         <TabMenuButton
           // height={height}
           buttonStyle={{ borderTopLeftRadius: 15 }}
-          onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
-          text={TAB_NAMES.optionsTab.quickItems}
+          onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory)}
+          text={TAB_NAMES.optionsTab.inventory}
           isSelected={
-            zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
+            zOptionsTabName === TAB_NAMES.optionsTab.inventory ? true : false
           }
         />
         {/* <Divider /> */}

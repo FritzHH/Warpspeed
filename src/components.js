@@ -1604,7 +1604,8 @@ export const TouchableOpacity_ = ({
   onPress,
   style = {},
   hoverStyle = {},
-  activeOpacity = 0.7,
+  activeOpacity = 0.6,
+  hoverOpacity = 0.7,
   disabled = false,
   disabledStyle = {},
   ...props
@@ -1641,7 +1642,7 @@ export const TouchableOpacity_ = ({
   const getOpacity = () => {
     if (disabled) return 0.3;
     if (isPressed) return Math.min(activeOpacity, 0.6); // Darker (lower opacity)
-    if (isHovered) return 0.8; // Lighter (higher opacity)
+    if (isHovered) return hoverOpacity; // Lighter (higher opacity)
     return 1;
   };
 

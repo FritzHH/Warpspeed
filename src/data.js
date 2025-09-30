@@ -172,7 +172,7 @@ export const TAB_NAMES = {
     empty: "Empty",
   },
   optionsTab: {
-    quickItems: "Quick Items",
+    // quickItems: "Quick Items",
     workorders: "Workorders",
     inventory: "Inventory",
     messages: "Messages",

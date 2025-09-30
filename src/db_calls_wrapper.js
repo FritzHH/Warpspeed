@@ -347,12 +347,12 @@ export async function dbSaveOpenWorkorder(workorder, workorderID = null) {
 
     await firestoreWrite(path, workorderToSave);
 
-    log("Open workorder saved", {
-      workorderID: id,
-      tenantID,
-      storeID,
-      path,
-    });
+    // log("Open workorder saved", {
+    //   workorderID: id,
+    //   tenantID,
+    //   storeID,
+    //   path,
+    // });
 
     return {
       success: true,

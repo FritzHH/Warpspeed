@@ -1,336 +1,358 @@
-/* eslint-disable */
+/*eslint-disable*/
+import React, { use, useEffect, useRef, useState } from "react";
+import { View, FlatList, TextInput, Text } from "react-native-web";
+import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
+import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
+import { generateUPCBarcode, log } from "../../../utils";
 import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-} from "react-native-web";
-import {
-  dim,
-  generateBarcode,
-  generateRandomID,
-  generateUPCBarcode,
-  log,
-  trimToTwoDecimals,
-} from "../../../utils";
-import {
-  TabMenuDivider as Divider,
-  ScreenModal,
   Button,
+  Button_,
   InventoryItemScreeenModalComponent,
-  CheckBox_,
-  TabMenuButton,
-  TabMenuDivider,
+  ScreenModal,
+  TouchableOpacity_,
 } from "../../../components";
-import { Colors } from "../../../styles";
-import {
-  INVENTORY_ITEM_PROTO,
-  INVENTORY_CATEGORY_NAMES,
-  TAB_NAMES,
-  WORKORDER_ITEM_PROTO,
-} from "../../../data";
-import React, { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
-  useCurrentCustomerStore,
-  useInventoryStore,
-  useLoginStore,
-  useOpenWorkordersStore,
   useSettingsStore,
-  useTabNamesStore,
+  useOpenWorkordersStore,
+  useInventoryStore,
 } from "../../../stores";
 
-const tabMargin = 20;
 export function InventoryComponent({}) {
-  /// store setters ///////////////////////////////////////////////////////////////
-  const _zSetWorkorderObj = useOpenWorkordersStore(
-    (state) => state.setWorkorderObj
-  );
-  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  const _zExecute = useLoginStore((state) => state.execute);
-  const _zSetOptionsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
+  // store setters ///////////////////////////////////////////////////////////////
 
-  /// store getters /////////////////////////////////////////////////////////////
+  // store getters //////////////////////////////////////////////////////////////
+  const zQuickItemButtons = useSettingsStore(
+    (state) => state.settings?.quickItemButtons
+  );
+  const zOpenWorkorderID = useOpenWorkordersStore(
+    (state) => state.openWorkorderID
+  );
   const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
-  const zWorkorderObj = useOpenWorkordersStore((state) => state.openWorkorder);
-  const zOptionsTabName = useTabNamesStore((state) => state.optionsTabName);
 
-  // local state ////////////////////////////////////////////////////////
+  // Check if all required data is loaded
+  const isDataLoaded = zQuickItemButtons && zInventoryArr?.length > 0;
+
+  ///////////////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
-  const [sCheckBox_Value, _setCheckBox_Value] = React.useState(null);
-  const [sNewItemObj, _setNewItemObject] = useState(null);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
 
-  //////////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////////
+  // Solution B: Delayed subscription to batch store updates
+  const [isReady, setIsReady] = useState(false);
+
+  // Timeout to batch all store updates and reduce re-renders
+  useEffect(() => {
+    const timer = setTimeout(() => setIsReady(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
-    let count = 0;
     let arr = [];
     if (sSearchResults.length > 20) return;
     for (let i = 0; i <= 10; i++) {
-      // log(zInventoryArr[i]);
       if (zInventoryArr[i]) arr.push(zInventoryArr[i]);
     }
     _setSearchResults(arr);
   }, [zInventoryArr]);
+  ///////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////////
 
-  function clearSearch() {
-    _setSearchResults([]);
-    _setSearchTerm("");
-    _setCheckBox_Value(null);
-  }
-
-  function search(searchTerm, o) {
-    searchTerm = searchTerm.toString();
+  function search(searchTerm) {
+    lastSearchMillis = new Date().getTime();
     _setSearchTerm(searchTerm);
-    if (searchTerm.length == 0 || searchTerm.length < 4) {
+    if (searchTerm.length == 0) {
       _setSearchResults([]);
       return;
     }
-
+    if (searchTerm.length < 2) return;
     let res = {};
     let keys = Object.keys(INVENTORY_ITEM_PROTO);
     zInventoryArr.forEach((invItem) => {
       keys.forEach((key) => {
-        try {
-          if (
-            invItem[key]
-              .toString()
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase())
-          )
-            res[invItem.id] = invItem;
-        } catch (e) {}
+        if (
+          invItem[key]
+            .toString()
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+        )
+          res[invItem.id] = invItem;
       });
     });
     res = Object.values(res);
-
-    if (res.length === 0 && searchTerm.length === 12) {
-      _setNewItemObject({
-        ...cloneDeep(INVENTORY_ITEM_PROTO),
-        upc: searchTerm,
-      });
-      _setModalInventoryObjIdx(-1);
-      _setSearchTerm("");
-    }
-
+    // log("search arr res", res);
     _setSearchResults(res);
   }
 
-  function inventoryItemSelected(item) {
-    // log(item);
-    // return;
-    if (!zWorkorderObj?.id) {
-      _setModalInventoryObj(item);
-      return;
-    }
-
-    let wo = cloneDeep(zWorkorderObj);
-    if (!wo.workorderLines) wo.workorderLines = [];
-    // log("item", item);
-    let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-    lineItem.invItemID = item.id;
-    lineItem.id = generateUPCBarcode();
-    wo.workorderLines.push(lineItem);
-    _zSetWorkorderObj(wo);
-    return;
-
-    // if (!zWorkorderObj?.id) return;
-    // let wo = cloneDeep(zWorkorderObj);
-    // if (!wo.workorderLines) wo.workorderLines = [];
-    // // log("item", item);
-    // let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-    // lineItem.invItemID = item.id;
-    // lineItem.id = generateRandomID();
-    // wo.workorderLines.push(lineItem);
-
-    // only save to db if not standalone sale
-    _zSetWorkorderObj(wo, zWorkorderObj.isStandaloneSale);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+  // to do make sure that deleting an inventory item or button alse removes it from the settings button lists
+  function handleQuickButtonPress(buttonObj) {
+    let inventoryItemsForButton = [];
+    buttonObj.items?.forEach((invItemID) => {
+      let invItem = zInventoryArr.find((item) => item.id === invItem);
+      if (invItem) inventoryItemsForButton.push(invItem);
+    });
+    let subMenuButtonsForButton = [];
+    buttonObj.buttons?.forEach((buttonID) => {
+      // let buttonObj = zSettingsObj.quickItemButtons.find(btn => btn.id ===)
+    });
   }
 
-  function inventoryItemViewPressed(item) {
-    let idx = zInventoryArr.findIndex((o) => o.id == item.id);
+  function inventoryItemSelected(item) {
+    let workorderLines = useOpenWorkordersStore
+      .getState()
+      .getOpenWorkorder().workorderLines;
+    if (!workorderLines) workorderLines = [];
+    let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
+    lineItem.inventoryItem = item;
+    lineItem.id = generateUPCBarcode();
+    workorderLines.push(lineItem);
+    useOpenWorkordersStore
+      .getState()
+      .setField("workorderLines", workorderLines);
+  }
+
+  function handleInventoryInfoPress(item) {
     _setModalInventoryObjIdx(idx);
   }
 
-  ///////////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////////////
-  // log("wo", zWorkorderObj);
-  function setComponent() {
+  function clearSearch() {
+    _setSearchResults([]);
+    _setSearchTerm("");
+  }
+
+  //////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////
+
+  // Show loading state until all data is ready and component is ready
+  if (!isDataLoaded || !isReady) {
     return (
       <View
         style={{
           flex: 1,
-          // width: "100%",
-          // height: __screenHeight,
-          paddingHorizontal: 5,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: C.listItemWhite,
         }}
       >
+        <Text style={{ fontSize: 16, color: C.text, textAlign: "center" }}>
+          {/* Loading Quick Items... */}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View
+      style={{
+        paddingRight: 3,
+        flex: 1,
+      }}
+    >
+      <View
+        style={{
+          width: "100%",
+          height: "5%",
+          // marginTop: 20,
+          flexDirection: "row",
+          paddingHorizontal: 4,
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Button_
+          icon={ICONS.reset1}
+          iconSize={30}
+          onPress={() => clearSearch()}
+          useColorGradient={false}
+        />
+        <TextInput
+          style={{
+            borderBottomWidth: 1,
+            borderBottomColor: sSearchTerm.length > 0 ? "dimgray" : "darkgray",
+            fontSize: 20,
+            color: Colors.darkTextOnMainBackground,
+            outlineWidth: 0,
+            width: "80%",
+            marginLeft: 20,
+            marginRight: 30,
+          }}
+          placeholder="Search inventory"
+          placeholderTextColor={"darkgray"}
+          value={sSearchTerm}
+          onChangeText={(val) => search(val)}
+        />
+        <Button_
+          icon={ICONS.new}
+          iconSize={35}
+          useColorGradient={false}
+          // buttonStyle={{ width: null }}
+          // text={"+"}
+          onPress={() => {
+            _setModalInventoryObjIdx(-1);
+          }}
+        />
+      </View>
+      <View
+        style={{
+          width: "100%",
+          flexDirection: "row",
+          paddingTop: 10,
+          justifyContent: "flex-start",
+          height: "95%",
+          // backgroundColor: "green",
+        }}
+      >
+        {/**Quick items buttons vertical list */}
         <View
           style={{
-            width: "100%",
-            height: "5%",
-            flexDirection: "row",
-            paddingHorizontal: 4,
-            alignItems: "center",
-            // backgroundColor: "blue",
+            justifyContent: "flex-start",
+            width: "20%",
+            paddingHorizontal: 2,
           }}
         >
-          <Button
-            onPress={() => clearSearch()}
-            text={"reset"}
-            textStyle={{ color: "white" }}
-            buttonStyle={{ height: 30 }}
-          />
-          <TextInput
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: "gray",
-              fontSize: 20,
-              color: Colors.darkTextOnMainBackground,
-              outlineWidth: 0,
-              width: "90%",
-              marginLeft: 20,
-              marginRight: 30,
-            }}
-            placeholder="Search inventory..."
-            placeholderTextColor={"gray"}
-            value={sSearchTerm}
-            onChangeText={(val) => search(val)}
-            // onChange={(ev) => log(ev)}
-            // onSubmitEditing={(ev) => log(ev)}
-            // onKeyPress={(ev) => log(ev)}
-          />
-          <Button
-            buttonStyle={{ width: null }}
-            text={"+"}
-            onPress={() => {
-              _setModalInventoryObjIdx(-1);
-              _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
-            }}
-          />
+          {zQuickItemButtons?.map((item) => (
+            <Button_
+              key={item.id}
+              onPress={() => handleQuickButtonPress(item)}
+              colorGradientArr={COLOR_GRADIENTS.blue}
+              buttonStyle={{
+                // ...SHADOW_RADIUS_NOTHING,
+                borderWidth: 1,
+                borderRadius: 5,
+                borderColor: C.buttonLightGreen,
+                borderColor: C.buttonLightGreenOutline,
+                marginBottom: 10,
+              }}
+              textStyle={{ fontSize: 14, fontWeight: 400, color: C.textWhite }}
+              text={item.name.toUpperCase()}
+            />
+          ))}
         </View>
 
-        {/* inventory results flatLIST */}
-        <View style={{ height: "95%", width: "100%", paddingTop: 10 }}>
+        <View
+          style={{
+            height: "100%",
+            width: "80%",
+            paddingTop: 10,
+            paddingLeft: 3,
+            paddingRight: 3,
+            // backgroundColor: "green",
+          }}
+        >
           <FlatList
             style={{
               width: "100%",
               height: "100%",
+              // backgroundColor: "green",
             }}
-            data={sSearchResults}
-            ItemSeparatorComponent={() => (
-              <View
-                style={{
-                  width: "100%",
-                  backgroundColor: "gray",
-                  height: 1,
-                  // marginVertical: 1,
-                }}
-              />
-            )}
+            data={[...sSearchResults]}
             renderItem={(item) => {
               // if (!item.item) return null;
-              let itemIndex = item.index;
+              let idx = item.index;
               item = item.item;
               // log("item", item);
               return (
                 <View
                   style={{
-                    // backgroundColor: "green",
+                    marginBottom: 2,
+                    borderRadius: 7,
+                    borderLeftWidth: 3,
+                    borderLeftColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.listItemWhite,
                     flexDirection: "row",
-                    width: "100%",
-                    justifyContent: "space-between",
                     alignItems: "center",
                   }}
                 >
-                  <Button
-                    onPress={() =>
-                      zWorkorderObj?.id
-                        ? inventoryItemSelected(item)
-                        : inventoryItemViewPressed(item)
-                    }
-                    shadow={false}
-                    // mouseOverOptions={{ opacity: 1 }}
-                    buttonStyle={{ backgroundColor: "transparent" }}
-                    viewStyle={{ width: "100%" }}
-                    TextComponent={() => (
-                      <View
+                  {!!zOpenWorkorderID && (
+                    <View style={{ width: "5%" }}>
+                      <Button_
+                        icon={ICONS.info}
+                        iconSize={15}
+                        buttonStyle={{ width: 30 }}
+                        onPress={() => {
+                          handleInventoryInfoPress(item);
+                        }}
+                      />
+                    </View>
+                  )}
+                  <TouchableOpacity_
+                    style={{
+                      width: zOpenWorkorderID ? "95%" : "100%",
+                    }}
+                    onPress={() => inventoryItemSelected(item)}
+                  >
+                    <View
+                      style={{
+                        width: "100%",
+                        flexDirection: "row",
+                      }}
+                    >
+                      <Text
                         style={{
-                          width: "100%",
-                          flexDirection: "row",
-                          // backgroundColor: "blue",
-                          justifyContent: "space-between",
-                          alignItems: "center",
+                          width: "85%",
+                          fontSize: 14,
+                          paddingLeft: 7,
+                          paddingRight: 5,
                         }}
                       >
-                        <Button
-                          mouseOverOptions={{ highlightColor: "red" }}
-                          buttonStyle={{
-                            backgroundColor: "transparent",
-                            // width: "8%",
-                          }}
-                          text={"i"}
-                          onPress={() => {
-                            _setModalInventoryObjIdx(-1);
-                            _setNewItemObject(cloneDeep(INVENTORY_ITEM_PROTO));
-                          }}
-                        />
-                        <Text
-                          style={{ width: "85%", fontSize: 14, marginLeft: 20 }}
-                        >
-                          {item.informalName || item.formalName}
-                          {!!item.informalName && (
-                            <Text style={{ fontSize: 12, color: "gray" }}>
-                              {"\n" + item.formalName}
-                            </Text>
-                          )}
-                        </Text>
-                        <View
-                          style={{
-                            borderLeftWidth: 1,
-                            borderColor: "gray",
-                            paddingLeft: 5,
-                            width: "10%",
-                            alignItems: "flex-end",
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              color: "dimgray",
-                              // width: "100%",
-                            }}
-                          >
-                            {"$ "}
-                            <Text style={{ fontSize: 16, color: null }}>
-                              {item.price}
-                            </Text>
+                        {item.informalName || item.formalName}
+                        {!!item.informalName && (
+                          <Text style={{ fontSize: 12, color: "gray" }}>
+                            {"\n" + item.formalName}
                           </Text>
-                        </View>
+                        )}
+                      </Text>
+
+                      <View
+                        style={{
+                          // borderLeftWidth: 1,
+                          // borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          // paddingLeft: 4,
+                          // paddingRight: 4,
+                          width: "15%",
+                          height: "100%",
+                          alignItems: "flex-end",
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          borderRadius: 7,
+                          // backgroundColor: APP_BASE_COLORS.buttonLightGreen,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            textAlign: "right",
+                            fontSize: 10,
+                            color: "dimgray",
+                          }}
+                        >
+                          {"$ "}
+                        </Text>
+
+                        <Text
+                          style={{
+                            paddingVertical: 5,
+
+                            fontSize: 14,
+                            color: null,
+                          }}
+                        >
+                          {item.price}
+                        </Text>
                       </View>
-                    )}
-                  />
+                    </View>
+                  </TouchableOpacity_>
                 </View>
               );
             }}
           />
         </View>
-        {/* Full screen inventory item modal */}
         <ScreenModal
           buttonVisible={false}
           handleOuterClick={() => {
             // log("screen modal clicked");
             _setModalInventoryObjIdx(null);
-            _setNewItemObject(null);
           }}
           modalVisible={sModalInventoryObjIdx}
           textStyle={{ fontSize: 14 }}
@@ -348,83 +370,11 @@ export function InventoryComponent({}) {
           }}
         />
       </View>
-    );
-  }
-  try {
-    return setComponent();
-  } catch (e) {
-    log("Error setting component InventoryComponent", e);
-    return null;
-  }
+    </View>
+  );
 }
 
-const height = 30;
-const TabBar = ({
-  zOptionsTabName,
-  _zSetOptionsTabName,
-  __setShowWorkorderModal,
-  __setShowInventoryModal,
-}) => (
-  <View
-    style={{
-      flexDirection: "row",
-      // width: "100%",
-      // justifyContent: "space-between",
-      height,
-    }}
-  >
-    <TabMenuButton
-      height={height}
-      onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems)}
-      text={TAB_NAMES.optionsTab.quickItems}
-      isSelected={
-        zOptionsTabName === TAB_NAMES.optionsTab.quickItems ? true : false
-      }
-    />
-    <TabMenuDivider />
-    <TabMenuButton
-      height={height}
-      onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
-      text={TAB_NAMES.optionsTab.workorders}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
-      }
-    />
-    <TabMenuButton
-      height={height}
-      onPress={() => __setShowWorkorderModal(true)}
-      buttonStyle={{ width: 50 }}
-      text={`\u2610`}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
-      }
-    />
-    <TabMenuDivider />
-    <TabMenuButton
-      height={height}
-      onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory)}
-      text={TAB_NAMES.optionsTab.inventory}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
-      }
-    />
-    <TabMenuButton
-      height={height}
-      onPress={() => __setShowInventoryModal(true)}
-      buttonStyle={{ width: 50 }}
-      text={`\u2610`}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.inventory ? true : false
-      }
-    />
-    <TabMenuDivider />
-    <TabMenuButton
-      height={height}
-      onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}
-      text={TAB_NAMES.optionsTab.messages}
-      isSelected={
-        zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
-      }
-    />
-  </View>
-);
+function QuickButtonViewComponent({ buttonArr }) {
+  let invItems = buttonArr.inventoryItems;
+  let subMenuButtons = buttonArr.subMenuButtons;
+}

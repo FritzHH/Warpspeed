@@ -1,5 +1,4 @@
 /* eslint-disable */
-
 import {
   View,
   Text,
@@ -7,19 +6,11 @@ import {
   FlatList,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import {
-  clog,
-  dim,
-  generateRandomID,
-  log,
-  trimToTwoDecimals,
-} from "../../../utils";
+import { generateRandomID } from "../../../utils";
 import { Image_ } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
-import { cloneDeep } from "lodash";
 import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
-import { dbSetWorkorder } from "../../../db_call_wrapper";
 
 /// Notes Tab Component
 export function Notes_MainComponent() {
@@ -28,12 +19,40 @@ export function Notes_MainComponent() {
     (state) => state.setWorkorder
   );
   const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
-  const _zExecute = useLoginStore((state) => state.execute);
 
   // getters /////////////////////////////////////////////////////////////////////
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
+
+  const EMPTY_NOTES = [];
+  const zInternalNotes = useOpenWorkordersStore(
+    (state) => {
+      const workorder = state.workorders.find(
+        (wo) => wo.id === state.openWorkorderID
+      );
+      return workorder?.internalNotes || EMPTY_NOTES;
+    },
+    (prev, next) => {
+      if (!prev && !next) return true;
+      if (!prev || !next) return false;
+      if (prev.length !== next.length) return false;
+      return prev.every((note, i) => note === next[i]);
+    }
   );
+  const zCustomerNotes = useOpenWorkordersStore(
+    (state) => {
+      const workorder = state.workorders.find(
+        (wo) => wo.id === state.openWorkorderID
+      );
+      return workorder?.customerNotes || EMPTY_NOTES;
+    },
+    (prev, next) => {
+      if (!prev && !next) return true;
+      if (!prev || !next) return false;
+      if (prev.length !== next.length) return false;
+      return prev.every((note, i) => note === next[i]);
+    }
+  );
+
+  // const zInternalNotes = useOpenWorkordersStore(s => )
 
   /////////////////////////////////////////////////////////////////////////////////
   const [customerNotesHeight, setCustomerNotesHeight] = useState([25]); // Initial height
@@ -42,21 +61,19 @@ export function Notes_MainComponent() {
 
   function formatUserShowName() {
     return (
-      "(" +
-      zCurrentUser.first.toString() +
-      " " +
-      zCurrentUser.last[0] +
-      ")  "
+      "(" + zCurrentUser.first.toString() + " " + zCurrentUser.last[0] + ")  "
     );
   }
 
   function outsideClicked(option) {
-    let wo = cloneDeep(zOpenWorkorder);
     let notesArr;
+    let fieldName;
     if (option == "customer") {
-      notesArr = wo.customerNotes || [];
+      notesArr = zCustomerNotes;
+      fieldName = "customerNotes";
     } else {
-      notesArr = wo.internalNotes || [];
+      notesArr = zInternalNotes;
+      fieldName = "internalNotes";
     }
 
     notesArr.unshift({
@@ -65,53 +82,42 @@ export function Notes_MainComponent() {
       value: "",
       id: generateRandomID(),
     });
-    if (option === "customer") {
-      wo.customerNotes = notesArr;
-    } else {
-      wo.internalNotes = notesArr;
-    }
 
-    _setFocusIdx(0);
-    _zSetWorkorderObj(wo);
-    // ''(wo);
+    useOpenWorkordersStore.getState().setField(fieldName, notesArr);
   }
 
   function deleteItem(item, index, option) {
-    let newObj = cloneDeep(zOpenWorkorder);
-    let arr;
+    let notesArr;
+    let fieldName;
     if (option == "customer") {
-      arr = zOpenWorkorder.customerNotes;
+      notesArr = zCustomerNotes;
+      fieldName = "customerNotes";
     } else {
-      arr = zOpenWorkorder.internalNotes;
+      notesArr = zInternalNotes;
+      fieldName = "internalNotes";
     }
-    arr = arr.filter((o) => o.id != item.id);
-    if (option == "customer") {
-      newObj.customerNotes = arr;
-    } else {
-      newObj.internalNotes = arr;
-    }
-    _zSetWorkorderObj(newObj);
-    // ''(newObj);
+
+    notesArr = notesArr.filter((o) => o.id != item.id);
+    useOpenWorkordersStore.getState().setField(fieldName, notesArr);
   }
 
   function textChanged(value, index, option) {
-    let wo = cloneDeep(zOpenWorkorder);
-    let item;
-    if (option === "customer") {
-      item = wo.customerNotes;
+    let notesArr;
+    let fieldName;
+    if (option == "customer") {
+      notesArr = zCustomerNotes;
+      fieldName = "customerNotes";
     } else {
-      item = wo.internalNotes;
+      notesArr = zInternalNotes;
+      fieldName = "internalNotes";
     }
-    let line = item[index];
-    line.value = value;
-    item[index] = line;
 
-    if (option === "customer") {
-      wo.customerNotes = item;
-    } else {
-      wo.internalNotes = item;
-    }
-    _zSetWorkorderObj(wo);
+    let line = notesArr[index];
+    line.value = value;
+    notesArr[index] = line;
+
+    useOpenWorkordersStore.getState().setField(fieldName, notesArr);
+
     // ''(wo);
   }
 
@@ -148,7 +154,6 @@ export function Notes_MainComponent() {
   };
 
   // clog(zWorkorderObj);
-  if (!zOpenWorkorder) return null;
 
   return (
     <View
@@ -230,7 +235,7 @@ export function Notes_MainComponent() {
             >
               <FlatList
                 keyExtractor={(i, idx) => idx}
-                data={zOpenWorkorder.customerNotes}
+                data={zCustomerNotes}
                 renderItem={(item) => {
                   let index = item.index;
                   item = item.item;
@@ -334,7 +339,7 @@ export function Notes_MainComponent() {
             >
               <FlatList
                 keyExtractor={(i, idx) => idx}
-                data={zOpenWorkorder.internalNotes}
+                data={zInternalNotes}
                 renderItem={(item) => {
                   let index = item.index;
                   item = item.item;

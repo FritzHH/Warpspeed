@@ -27,34 +27,17 @@ const NUM_MILLIS_IN_DAY = 86400000; // millis in day
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
-  const zSettings = useSettingsStore((state) => state.settings);
-
 
   // setters ////////////////////////////////////////////////////////
   const _zSetPreviewObj = useWorkorderPreviewStore(
     (state) => state.setPreviewObj
   );
-  const _zSetCurrentCustomer = useCurrentCustomerStore(
-    (state) => state.setCustomer
-  );
-  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  const _zSetOptionsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
-  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
-  const _zModOpenWorkorderArrItem = useOpenWorkordersStore(
-    (state) => state.modItem
-  );
-  const _zSetInitialOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setOpenWorkorder
-  );
 
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
   const [sItemOptions, _setItemOptions] = useState({});
-// log('here', zOpenWorkorders)
+  // log('here', zOpenWorkorders)
   useEffect(() => {
-    // log(zSettingsObj);
     let hour = 3600000;
     const intervalId = setInterval(() => {
       try {
@@ -75,8 +58,9 @@ export function WorkordersComponent({}) {
           // check to see if any shop closed days exist in the quoted wait time
           // first get all day names that the shop is closed
           let closedDayNamesArr = [];
-          Object.keys(zSettings?.storeHours).forEach((dayName) => {
-            if (!zSettings.storeHours[dayName]?.isOpen)
+          const settings = useSettingsStore().getState().settings;
+          Object.keys(settings?.storeHours).forEach((dayName) => {
+            if (!settings.storeHours[dayName]?.isOpen)
               closedDayNamesArr.push(dayName);
           });
 
@@ -170,7 +154,7 @@ export function WorkordersComponent({}) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [zOpenWorkorders, sItemOptions, zSettings]);
+  }, [zOpenWorkorders, sItemOptions]);
 
   ///////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////
@@ -178,27 +162,33 @@ export function WorkordersComponent({}) {
   function workorderSelected(obj) {
     // log("obj", obj);
     obj = cloneDeep(obj);
-    
-    dbGetCustomer(obj.customerID, 
-      '1234', '999'
-    ).then((custObj) => {
-      // clog("cust obj", custObj);
-      _zSetCurrentCustomer(custObj);
-    });
 
-    _zSetInitialOpenWorkorder(obj);
-    _zSetInfoTabName(TAB_NAMES.infoTab.workorder);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    let settings = useSettingsStore.getState().settings;
+    dbGetCustomer(obj.customerID, settings.tenantID, settings.storeID).then(
+      (custObj) => {
+        // clog("cust obj", custObj);
+        useCurrentCustomerStore.getState().setCustomer(custObj);
+      }
+    );
+
+    useOpenWorkordersStore.getState().setOpenWorkorderID(obj.id);
+    // _zSetInitialOpenWorkorder(obj);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
+    });
+    useWorkorderPreviewStore;
     _zSetPreviewObj(null);
   }
 
   function sortWorkorders(inputArr) {
-    return inputArr
+    return inputArr;
     // log('input arr', inputArr)
     let finalArr = [];
     let nowMillis = new Date().getTime();
-    zSettings?.statuses?.forEach((status) => {
+    const statuses = useSettingsStore.getState().settings?.statuses;
+    statuses?.statuses?.forEach((status) => {
       // log(status)
       let arr = [];
       inputArr.forEach((wo) => {
@@ -220,7 +210,7 @@ export function WorkordersComponent({}) {
 
       finalArr = [...finalArr, ...arr];
     });
-    log('final', finalArr)
+    log("final", finalArr);
     return finalArr;
   }
 

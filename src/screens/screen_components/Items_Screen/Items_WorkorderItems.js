@@ -18,6 +18,7 @@ import {
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   SETTINGS_OBJ,
+  TAB_NAMES,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
@@ -26,6 +27,7 @@ import {
   useOpenWorkordersStore,
   useInventoryStore,
   useSettingsStore,
+  useTabNamesStore,
 } from "../../../stores";
 
 export const Items_WorkorderItemsTab = ({}) => {
@@ -197,7 +199,12 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   function handleDeleteWorkorder() {
     const deleteFun = () => {
-      log("delete it babay");
+      useOpenWorkordersStore.getState().removeWorkorder(zOpenWorkorder.id);
+      useTabNamesStore.getState().setItems({
+        itemsTabName: TAB_NAMES.itemsTab.empty,
+        infoTabName: TAB_NAMES.infoTab.customer,
+        optionsTabName: TAB_NAMES.optionsTab.workorders,
+      });
     };
 
     showAlert({
@@ -205,9 +212,7 @@ export const Items_WorkorderItemsTab = ({}) => {
         ? "Confirm Delete Sale"
         : "Confirm Delete Workorder",
       btn1Icon: ICONS.trash,
-      // btn2Icon: ICONS.close1,
       handleBtn1Press: deleteFun,
-      // handleBtn2Press: () => {},
     });
   }
 

@@ -682,14 +682,14 @@ export const useOpenWorkordersStore = create((set, get) => ({
 
   removeWorkorder: (workorderID, saveToDB = true, batch = true) => {
     let workorders = get().workorders.filter((o) => o.id !== workorderID);
-    set({ workorderArr: workorders });
+    set({ workorders });
 
-    if (get().openWorkorder?.id === workorderID) {
-      set({ openWorkorder: null });
+    if (get().openWorkorderID === workorderID) {
+      set({ openWorkorderID: null });
     }
 
-    if (saveToDB) {
-      dbDeleteWorkorder(workorderID.id);
+    if (saveToDB && !workorderID.isStandaloneSale) {
+      dbDeleteWorkorder(workorderID);
     }
   },
 }));

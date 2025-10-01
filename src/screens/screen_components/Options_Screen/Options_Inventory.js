@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import React, { use, useEffect, useRef, useState } from "react";
+import React, { use, useEffect, useState } from "react";
 import { View, FlatList, TextInput, Text } from "react-native-web";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
@@ -17,6 +17,7 @@ import {
   InventoryItemScreeenModalComponent,
   ScreenModal,
   TouchableOpacity_,
+  TextInput_,
 } from "../../../components";
 import { cloneDeep } from "lodash";
 import {
@@ -44,8 +45,6 @@ export function InventoryComponent({}) {
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
-
-  // Solution B: Delayed subscription to batch store updates
   const [isReady, setIsReady] = useState(false);
 
   // Timeout to batch all store updates and reduce re-renders
@@ -89,6 +88,30 @@ export function InventoryComponent({}) {
     // log("search arr res", res);
     _setSearchResults(res);
   }
+
+  // Search function (now called by debounced TextInput_)
+  const handleSearch = (searchTerm) => {
+    if (searchTerm.length == 0) {
+      _setSearchResults([]);
+      return;
+    }
+    if (searchTerm.length < 2) return;
+    let res = {};
+    let keys = Object.keys(INVENTORY_ITEM_PROTO);
+    zInventoryArr.forEach((invItem) => {
+      keys.forEach((key) => {
+        if (
+          invItem[key]
+            .toString()
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
+        )
+          res[invItem.id] = invItem;
+      });
+    });
+    res = Object.values(res);
+    _setSearchResults(res);
+  };
 
   // to do make sure that deleting an inventory item or button alse removes it from the settings button lists
   function handleQuickButtonPress(buttonObj) {
@@ -169,7 +192,7 @@ export function InventoryComponent({}) {
           onPress={() => clearSearch()}
           useColorGradient={false}
         />
-        <TextInput
+        <TextInput_
           style={{
             borderBottomWidth: 1,
             borderBottomColor: gray(0.2),
@@ -183,7 +206,7 @@ export function InventoryComponent({}) {
           placeholder="Search inventory"
           placeholderTextColor={gray(0.2)}
           value={sSearchTerm}
-          onChangeText={(val) => search(val)}
+          onChangeText={(val) => handleSearch(val)}
         />
         <Button_
           icon={ICONS.new}

@@ -17,6 +17,7 @@ export const DISCOUNT_TYPES = {
 export const INTERNET_CHECK_DELAY = 1000;
 export const FACIAL_RECOGNITION_INTERVAL_MILLIS = 1500;
 export const PAUSE_USER_CLOCK_IN_CHECK_MILLIS = MILLIS_IN_MINUTE * 10;
+export const DEBOUNCE_DELAY = 300;
 
 // keys
 export const LOCAL_DB_KEYS = {

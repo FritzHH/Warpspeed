@@ -176,6 +176,8 @@ export function WorkordersComponent({}) {
   }
 
   function sortWorkorders(inputArr) {
+    // first remove any standalone sales
+    inputArr = inputArr.filter((o) => !o.isStandaloneSale);
     return inputArr;
     // log('input arr', inputArr)
     let finalArr = [];

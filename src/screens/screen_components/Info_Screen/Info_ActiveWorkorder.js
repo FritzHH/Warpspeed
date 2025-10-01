@@ -13,6 +13,7 @@ import {
   DropdownMenu,
   Button_,
   Image_,
+  TextInput_,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -39,20 +40,13 @@ const DROPDOWN_SELECTED_OPACITY = 0.3;
 export const ActiveWorkorderComponent = ({}) => {
   // store setters /////////////////////////////////////////////////////////////////
   const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-  const _zSetCustomer = useCurrentCustomerStore((state) => state.setCustomer);
-  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
-  const _zSetOptionsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
-  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-
   const _zSetWorkorderField = useOpenWorkordersStore((s) => s.setField);
 
   // store getters ///////////////////////////////////////////////////////////////////
-  let zOpenWorkorder = WORKORDER_PROTO;
-  zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
-  let zCustomer = CUSTOMER_PROTO;
-  zCustomer = useCurrentCustomerStore((state) => state.customer);
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.getOpenWorkorder()
+  );
+  const zCustomer = useCurrentCustomerStore((state) => state.customer);
   var zSettings = SETTINGS_OBJ;
   zSettings = useSettingsStore((state) => state.settings);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
@@ -72,11 +66,9 @@ export const ActiveWorkorderComponent = ({}) => {
   const statusRef = useRef();
   const partSourcesRef = useRef();
 
-  // dev
   ///////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
 
-  // log("wo", zWorkorderObj);
   function setBikeColor(incomingColorVal, fieldName) {
     let foundColor = false;
     let newColorObj = {};
@@ -177,7 +169,7 @@ export const ActiveWorkorderComponent = ({}) => {
             modalVisible={sShowCustomerInfoScreen}
             showOuterModal={true}
             buttonLabel={
-              zOpenWorkorder.customerFirst + " " + zOpenWorkorder?.customerLast
+              zOpenWorkorder?.customerFirst + " " + zOpenWorkorder?.customerLast
             }
             buttonIcon={ICONS.ridingBike}
             buttonIconStyle={{ width: 35, height: 35 }}
@@ -191,7 +183,7 @@ export const ActiveWorkorderComponent = ({}) => {
             }}
             handleButtonPress={() => _setShowCustomerInfoScreen(true)}
             buttonTextStyle={{
-              fontSize: 25,
+              fontSize: 20,
               color: Colors.lightText,
             }}
             Component={() => (
@@ -286,11 +278,22 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
             >
               {/* <View style={{}}> */}
-              <TextInputOnMainBackground
-                placeholderText={"Brand"}
-                style={{ width: "45%" }}
+              <TextInput_
+                placeholder={"Brand"}
+                style={{
+                  width: "45%",
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  color: C.text,
+                  paddingVertical: 2,
+                  paddingHorizontal: 4,
+                  fontSize: 15,
+                  outlineWidth: 0,
+                  borderRadius: 5,
+                  fontWeight: zOpenWorkorder.brand ? "500" : null,
+                }}
                 value={zOpenWorkorder.brand}
-                onTextChange={(val) =>
+                onChangeText={(val) =>
                   _zSetWorkorderField("brand", val, zOpenWorkorder.id)
                 }
               />
@@ -365,11 +368,22 @@ export const ActiveWorkorderComponent = ({}) => {
                 // backgroundColor: "blue",
               }}
             >
-              <TextInputOnMainBackground
-                placeholderText={"Model/Description"}
-                style={{ width: "45%" }}
+              <TextInput_
+                placeholder={"Model/Description"}
+                style={{
+                  width: "45%",
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  color: C.text,
+                  paddingVertical: 2,
+                  paddingHorizontal: 4,
+                  fontSize: 15,
+                  outlineWidth: 0,
+                  borderRadius: 5,
+                  fontWeight: zOpenWorkorder.description ? "500" : null,
+                }}
                 value={zOpenWorkorder.description}
-                onTextChange={(val) => {
+                onChangeText={(val) => {
                   _zSetWorkorderField("description", val, zOpenWorkorder.id);
                 }}
               />
@@ -418,29 +432,44 @@ export const ActiveWorkorderComponent = ({}) => {
                 marginTop: 11,
               }}
             >
-              <TextInputOnMainBackground
-                placeholderText={"Color 1"}
+              <TextInput_
+                placeholder={"Color 1"}
                 value={zOpenWorkorder.color1.label}
                 style={{
                   width: "48%",
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  paddingVertical: 2,
+                  paddingHorizontal: 4,
+                  fontSize: 15,
+                  outlineWidth: 0,
+                  borderRadius: 5,
+                  fontWeight: zOpenWorkorder.color1.label ? "500" : null,
                   backgroundColor: zOpenWorkorder.color1.backgroundColor,
                   color: zOpenWorkorder.color1.textColor,
-                  // borderRadius: 8,
                 }}
-                onTextChange={(val) => {
+                onChangeText={(val) => {
                   setBikeColor(val, "color1");
                 }}
               />
               <View style={{ width: 5 }} />
-              <TextInputOnMainBackground
-                placeholderText={"Color 2"}
+              <TextInput_
+                placeholder={"Color 2"}
                 value={zOpenWorkorder.color2.label}
                 style={{
                   width: "48%",
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  paddingVertical: 2,
+                  paddingHorizontal: 4,
+                  fontSize: 15,
+                  outlineWidth: 0,
+                  borderRadius: 5,
+                  fontWeight: zOpenWorkorder.color2.label ? "500" : null,
                   backgroundColor: zOpenWorkorder.color2.backgroundColor,
                   color: zOpenWorkorder.color2.textColor,
                 }}
-                onTextChange={(val) => {
+                onChangeText={(val) => {
                   setBikeColor(val, "color2");
                 }}
               />
@@ -518,9 +547,18 @@ export const ActiveWorkorderComponent = ({}) => {
                 marginTop: 11,
               }}
             >
-              <TextInputOnMainBackground
+              <TextInput
                 placeholderText={"Estimated Wait"}
-                style={{ backgroundColor: "", width: "45%" }}
+                style={{
+                  width: "45%",
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  paddingVertical: 2,
+                  paddingHorizontal: 4,
+                  fontSize: 15,
+                  outlineWidth: 0,
+                  borderRadius: 5,
+                }}
                 value={zOpenWorkorder.waitTime?.label}
                 editable={false}
               />
@@ -598,14 +636,23 @@ export const ActiveWorkorderComponent = ({}) => {
                 marginTop: 5,
               }}
             >
-              <TextInputOnMainBackground
-                placeholderText={"Part Ordered"}
+              <TextInput_
+                placeholder={"Part Ordered"}
                 style={{
                   width: "100%",
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  color: C.text,
+                  paddingVertical: 2,
+                  paddingHorizontal: 4,
+                  fontSize: 15,
+                  outlineWidth: 0,
+                  borderRadius: 5,
+                  fontWeight: zOpenWorkorder.partOrdered ? "500" : null,
                   backgroundColor: C.backgroundWhite,
                 }}
                 value={zOpenWorkorder.partOrdered}
-                onTextChange={(val) =>
+                onChangeText={(val) =>
                   _zSetWorkorderField("partOrdered", val, zOpenWorkorder.id)
                 }
               />
@@ -621,14 +668,23 @@ export const ActiveWorkorderComponent = ({}) => {
                 marginTop: 11,
               }}
             >
-              <TextInputOnMainBackground
+              <TextInput_
                 value={zOpenWorkorder.partSource}
-                placeholderText={"Part Source"}
+                placeholder={"Part Source"}
                 style={{
                   width: "50%",
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  color: C.text,
+                  paddingVertical: 2,
+                  paddingHorizontal: 4,
+                  fontSize: 15,
+                  outlineWidth: 0,
+                  borderRadius: 5,
+                  fontWeight: zOpenWorkorder.partSource ? "500" : null,
                   backgroundColor: C.backgroundWhite,
                 }}
-                onTextChange={(val) => {
+                onChangeText={(val) => {
                   _zSetWorkorderField("partSource", val, zOpenWorkorder.id);
                 }}
               />
@@ -694,34 +750,3 @@ export const ActiveWorkorderComponent = ({}) => {
   );
 };
 
-
-
-const TextInputOnMainBackground = ({
-  value,
-  onTextChange,
-  style = {},
-  placeholderText,
-  editable = true,
-}) => {
-  return (
-    <TextInput
-      editable={editable}
-      value={value}
-      placeholder={placeholderText}
-      placeholderTextColor={"gray"}
-      style={{
-        borderWidth: 1,
-        borderColor: C.buttonLightGreenOutline,
-        color: C.text,
-        paddingVertical: 2,
-        paddingHorizontal: 4,
-        fontSize: 15,
-        outlineWidth: 0,
-        borderRadius: 5,
-        fontWeight: value ? "500" : null,
-        ...style,
-      }}
-      onChangeText={(val) => onTextChange(val)}
-    />
-  );
-};

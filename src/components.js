@@ -11,13 +11,19 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native-web";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import { Image } from "react-native-web";
 import { gray, ifNumIsOdd, lightenRGBByPercent, log } from "./utils";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
-import { useState } from "react";
 import { SETTINGS_OBJ, PRIVILEDGE_LEVELS } from "./data";
 import { cloneDeep } from "lodash";
+import { DEBOUNCE_DELAY } from "./constants";
 import {
   useInventoryStore,
   useInvModalStore,
@@ -127,32 +133,6 @@ export const TextInputLabelOnMainBackground = ({ value, styleProps = {} }) => {
     marginBottom: 1,
   };
   return <Text style={{ ...text_style, ...styleProps }}>{value}</Text>;
-};
-
-export const TextInputOnMainBackground = ({
-  value,
-  onTextChange,
-  styleProps = {},
-  placeholderText,
-}) => {
-  return (
-    <TextInput
-      value={value}
-      placeholder={placeholderText}
-      placeholderTextColor={"darkgray"}
-      style={{
-        borderWidth: 2,
-        borderColor: "gray",
-        color: Colors.lightTextOnMainBackground,
-        paddingVertical: 3,
-        paddingHorizontal: 4,
-        fontSize: 16,
-        outlineWidth: 0,
-        ...styleProps,
-      }}
-      onChangeText={(val) => onTextChange(val)}
-    />
-  );
 };
 
 export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
@@ -2505,3 +2485,71 @@ export function SliderButton_({
     </View>
   );
 }
+
+export const TextInput_ = ({
+  value = "",
+  onChangeText,
+  debounceMs = DEBOUNCE_DELAY,
+  style = {},
+  placeholder = "",
+  placeholderTextColor = "gray",
+  multiline = false,
+  numberOfLines = 1,
+  autoFocus = false,
+  editable = true,
+  onFocus,
+  onBlur,
+  onContentSizeChange,
+  ...props
+}) => {
+  const [localValue, setLocalValue] = useState(value || "");
+  const debounceRef = useRef(null);
+
+  // Sync local state when value prop changes from external sources
+  useEffect(() => {
+    setLocalValue(value || "");
+  }, [value]);
+
+  // Debounced function to call onChangeText
+  const debouncedOnChangeText = useCallback(
+    (val) => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      debounceRef.current = setTimeout(() => {
+        onChangeText?.(val);
+      }, debounceMs);
+    },
+    [onChangeText, debounceMs]
+  );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <TextInput
+      value={localValue}
+      onChangeText={(val) => {
+        setLocalValue(val);
+        debouncedOnChangeText(val);
+      }}
+      placeholder={placeholder}
+      placeholderTextColor={placeholderTextColor}
+      style={style}
+      multiline={multiline}
+      numberOfLines={numberOfLines}
+      autoFocus={autoFocus}
+      editable={editable}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onContentSizeChange={onContentSizeChange}
+      {...props}
+    />
+  );
+};

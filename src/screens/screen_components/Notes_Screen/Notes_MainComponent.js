@@ -7,7 +7,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import { generateRandomID, gray } from "../../../utils";
-import { Image_, TouchableOpacity_ } from "../../../components";
+import { Image_, TouchableOpacity_, TextInput_ } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
 import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
@@ -260,7 +260,7 @@ export function Notes_MainComponent() {
                       >
                         {item.name}
                       </Text>
-                      <TextInput
+                      <TextInput_
                         onContentSizeChange={(ev) =>
                           handleCustomerContentSizeChange(ev, index)
                         }
@@ -379,7 +379,7 @@ export function Notes_MainComponent() {
                         >
                           {item.name}
                         </Text>
-                        <TextInput
+                        <TextInput_
                           onContentSizeChange={(ev) =>
                             handleInternalContentSizeChange(ev, index)
                           }
@@ -409,3 +409,4 @@ export function Notes_MainComponent() {
     </View>
   );
 }
+

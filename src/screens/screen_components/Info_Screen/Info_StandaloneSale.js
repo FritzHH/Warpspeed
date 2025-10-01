@@ -17,6 +17,7 @@ import {
 } from "../../../components";
 import {
   calculateRunningTotals,
+  gray,
   log,
   showAlert,
   trimToTwoDecimals,
@@ -39,7 +40,32 @@ export const StandaloneSaleComponent = ({}) => {
         alignItems: "center",
         // backgroundColor: "green",
       }}
-    ></View>
+    >
+      <View style={{ height: "85%", justifyContent: "center" }}>
+        <Text style={{ fontSize: 72, color: gray(0.08) }}>{"SALE"}</Text>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          width: "100%",
+          height: "15%",
+          alignItems: "flex-end",
+        }}
+      >
+        <Button_
+          onPress={() => {
+            useTabNamesStore.getState().setItems({
+              infoTabName: TAB_NAMES.infoTab.customer,
+              itemsTabName: TAB_NAMES.itemsTab.empty,
+              optionsTabName: TAB_NAMES.optionsTab.workorders,
+            });
+          }}
+          icon={ICONS.bicycle}
+          iconSize={55}
+          buttonStyle={{ marginBottom: 0, paddingLeft: 15 }}
+        />
+      </View>
+    </View>
   );
 };
 

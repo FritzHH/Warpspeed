@@ -25,7 +25,6 @@ import {
   useLoginStore,
   useAlertScreenStore,
 } from "./stores";
-import { dbSetInventoryItem } from "./db_call_wrapper";
 import LinearGradient from "react-native-web-linear-gradient";
 // import DateTimePicker from "@react-native-community/datetimepicker";
 import CalendarPicker, { useDefaultStyles } from "react-native-ui-datepicker";
@@ -33,6 +32,7 @@ import { PanResponder } from "react-native";
 
 import { StyleSheet } from "react-native";
 import { Animated } from "react-native";
+import { dbDeleteInventoryItem, dbSaveInventoryItem } from "./db_calls_wrapper";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
@@ -905,7 +905,7 @@ export const InventoryItemScreeenModalComponent = ({
     if (!sNewItem)
       // _zExecute(() => {
       _zModInventoryItem(item, "change");
-    dbSetInventoryItem(item);
+    dbSaveInventoryItem(item);
     // }, PRIVILEDGE_LEVELS.superUser);
   }
 
@@ -949,15 +949,12 @@ export const InventoryItemScreeenModalComponent = ({
   function handleNewItemPress() {
     log("new item", sItem);
     return;
-    _zModInventoryItem(sItem, "add");
-    dbSetInventoryItem(sItem);
-    handleClosePress();
   }
 
   function handleRemoveItem() {
     _zExecute(() => {
       _zModInventoryItem(sItem, "remove");
-      dbSetInventoryItem(sItem, true);
+      dbDeleteInventoryItem(sItem.id);
       handleClosePress();
     }, "Admin");
   }

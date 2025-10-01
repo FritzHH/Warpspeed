@@ -21,7 +21,7 @@ import {
   SHADOW_RADIUS_PROTO,
   Button_,
 } from "../../../components";
-import { cloneDeep, initial } from "lodash";
+import { cloneDeep } from "lodash";
 import {
   arrHasItem,
   calculateRunningTotals,
@@ -38,9 +38,8 @@ import {
   extractStripeErrorMessage,
 } from "../../../utils";
 import { useEffect, useRef, useState } from "react";
-import { C, Colors, Fonts, ICONS } from "../../../styles";
+import { C, Colors, Fonts } from "../../../styles";
 
-import { dbSetSalesObj } from "../../../db_call_wrapper";
 import { TouchableOpacity } from "react-native";
 import { STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL } from "../../../private_user_constants";
 import { MILLIS_IN_MINUTE } from "../../../constants";
@@ -48,6 +47,7 @@ import { isArray } from "lodash";
 import { StripeCreditCardComponent } from "./checkout_components/CardSaleComponent";
 import { CashSaleComponent } from "./checkout_components/CashSaleComponent";
 import { MiddleItemComponent } from "./checkout_components/MiddleItemComponent";
+import { dbCompleteSale } from "../../../db_calls_wrapper";
 
 export function CheckoutModalScreen({}) {
   // store getters ////////////////////////////////////////////////
@@ -515,7 +515,7 @@ export function CheckoutModalScreen({}) {
 
     // printReceipt(payment);
     _setSale(sale);
-    dbSetSalesObj(removeUnusedFields(sale)); // db
+    dbCompleteSale(removeUnusedFields(sale));
     _zSetCustomerField("deposits", deposits); // db
     _zSetCustomerField("sales", sales); // db
 

@@ -185,13 +185,16 @@ export function NewWorkorderComponent({}) {
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateUPCBarcode();
-    wo.startedBy = useLoginStore.currentUser?.id;
+    wo.startedBy = useLoginStore.getState().currentUser?.id;
     wo.startedOnMillis = new Date().getTime();
 
-    _zSetOpenWorkorder(wo, false);
-    _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
-    _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.quickItems);
+    useOpenWorkordersStore.getState().setWorkorder(wo);
+    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.checkout,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
+    });
   }
 
   function handleCancelCreateNewCustomerPress() {

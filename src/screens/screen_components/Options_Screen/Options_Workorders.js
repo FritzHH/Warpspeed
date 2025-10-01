@@ -19,7 +19,6 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../../stores";
-// import { dbGetCustomerObj } from "../../../db_call_wrapper";
 
 import { dbGetCustomer } from "../../../db_calls_wrapper";
 

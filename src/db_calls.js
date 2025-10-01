@@ -45,6 +45,7 @@ import {
   listAll,
 } from "firebase/storage";
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { log } from "./utils";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -67,6 +68,10 @@ export const RDB = getDatabase(firebaseApp);
 export const AUTH = getAuth(firebaseApp);
 export const STORAGE = getStorage(firebaseApp);
 export const FUNCTIONS = getFunctions(firebaseApp);
+// Initialize Firebase Functions
+const functions = getFunctions(firebaseApp);
+// Initialize Firebase Storage
+const storage = getStorage(firebaseApp);
 
 // ============================================================================
 // FIRESTORE OPERATIONS (Dumb functions - no business logic)
@@ -158,19 +163,23 @@ export async function firestoreQuery(
  */
 export function firestoreSubscribe(path, callback) {
   const docRef = doc(DB, ...path.split("/"));
-  
+
   // Set up the snapshot listener
-  const unsubscribe = onSnapshot(docRef, (docSnap) => {
-    if (docSnap.exists()) {
-      callback(docSnap.data());
-    } else {
-      callback(null); // Document doesn't exist
+  const unsubscribe = onSnapshot(
+    docRef,
+    (docSnap) => {
+      if (docSnap.exists()) {
+        callback(docSnap.data());
+      } else {
+        callback(null); // Document doesn't exist
+      }
+    },
+    (error) => {
+      console.error("Firestore subscription error:", error);
+      callback(null, error);
     }
-  }, (error) => {
-    console.error("Firestore subscription error:", error);
-    callback(null, error);
-  });
-  
+  );
+
   return unsubscribe;
 }
 
@@ -182,19 +191,23 @@ export function firestoreSubscribe(path, callback) {
  */
 export function firestoreSubscribeCollection(path, callback) {
   const collectionRef = collection(DB, ...path.split("/"));
-  
+
   // Set up the snapshot listener
-  const unsubscribe = onSnapshot(collectionRef, (querySnapshot) => {
-    const documents = [];
-    querySnapshot.forEach((doc) => {
-      documents.push({ id: doc.id, ...doc.data() });
-    });
-    callback(documents);
-  }, (error) => {
-    console.error("Firestore collection subscription error:", error);
-    callback([], error);
-  });
-  
+  const unsubscribe = onSnapshot(
+    collectionRef,
+    (querySnapshot) => {
+      const documents = [];
+      querySnapshot.forEach((doc) => {
+        documents.push({ id: doc.id, ...doc.data() });
+      });
+      callback(documents);
+    },
+    (error) => {
+      console.error("Firestore collection subscription error:", error);
+      callback([], error);
+    }
+  );
+
   return unsubscribe;
 }
 
@@ -324,6 +337,142 @@ export async function storageList(path) {
   }));
 }
 
+//////////////////////////////////////////////////////////////////////
+////// Google Cloud Storage Functions ///////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+/**
+ * Upload a file to Google Cloud Storage bucket
+ * @param {File|Blob} file - The file to upload
+ * @param {string} path - The path in the bucket (e.g., 'images/profile.jpg')
+ * @param {Object} metadata - Optional metadata for the file
+ * @returns {Promise<Object>} - Returns { success: true, downloadURL: string, path: string }
+ */
+export async function uploadFileToStorage(file, path, metadata = {}) {
+  try {
+    // Create a reference to the file location in storage
+    const fileRef = storageRef(storage, path);
+
+    // Upload the file
+    const snapshot = await uploadBytes(fileRef, file, metadata);
+
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+
+    log(`File uploaded successfully: ${path}`);
+    return {
+      success: true,
+      downloadURL,
+      path: snapshot.ref.fullPath,
+      metadata: snapshot.metadata,
+    };
+  } catch (error) {
+    log("Error uploading file to storage:", error);
+    throw error;
+  }
+}
+
+/**
+ * Upload a string (JSON, text, etc.) to Google Cloud Storage bucket
+ * @param {string} content - The string content to upload
+ * @param {string} path - The path in the bucket (e.g., 'data/config.json')
+ * @param {string} format - The format type ('raw' or 'base64')
+ * @returns {Promise<Object>} - Returns { success: true, downloadURL: string, path: string }
+ */
+export async function uploadStringToStorage(content, path, format = "raw") {
+  try {
+    // Create a reference to the file location in storage
+    const fileRef = storageRef(storage, path);
+
+    // Upload the string
+    const snapshot = await uploadString(fileRef, content, format);
+
+    // Get the download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+
+    log(`String uploaded successfully: ${path}`);
+    return {
+      success: true,
+      downloadURL,
+      path: snapshot.ref.fullPath,
+    };
+  } catch (error) {
+    log("Error uploading string to storage:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get the download URL for a file in storage
+ * @param {string} path - The path to the file in storage
+ * @returns {Promise<string>} - The download URL
+ */
+export async function getFileDownloadURL(path) {
+  try {
+    const fileRef = storageRef(storage, path);
+    const downloadURL = await getDownloadURL(fileRef);
+    return downloadURL;
+  } catch (error) {
+    log("Error getting download URL:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a file from Google Cloud Storage bucket
+ * @param {string} path - The path to the file in storage
+ * @returns {Promise<Object>} - Returns { success: true, path: string }
+ */
+export async function deleteFileFromStorage(path) {
+  try {
+    const fileRef = storageRef(storage, path);
+    await deleteObject(fileRef);
+
+    log(`File deleted successfully: ${path}`);
+    return {
+      success: true,
+      path,
+    };
+  } catch (error) {
+    log("Error deleting file from storage:", error);
+    throw error;
+  }
+}
+
+/**
+ * List all files in a storage folder
+ * @param {string} folderPath - The folder path in storage (e.g., 'images/')
+ * @returns {Promise<Array>} - Array of file references and metadata
+ */
+export async function listFilesInStorage(folderPath = "") {
+  try {
+    const folderRef = storageRef(storage, folderPath);
+    const result = await listAll(folderRef);
+
+    const files = result.items.map((itemRef) => ({
+      name: itemRef.name,
+      fullPath: itemRef.fullPath,
+      bucket: itemRef.bucket,
+    }));
+
+    const folders = result.prefixes.map((prefixRef) => ({
+      name: prefixRef.name,
+      fullPath: prefixRef.fullPath,
+    }));
+
+    log(`Listed files in folder: ${folderPath}`);
+    return {
+      files,
+      folders,
+      totalFiles: files.length,
+      totalFolders: folders.length,
+    };
+  } catch (error) {
+    log("Error listing files in storage:", error);
+    throw error;
+  }
+}
+
 // ============================================================================
 // AUTHENTICATION OPERATIONS (Dumb functions)
 // ============================================================================
@@ -380,6 +529,43 @@ export async function callCloudFunction(functionName, data) {
   return result.data;
 }
 
+// Create callable functions
+const sendSMSCallable = httpsCallable(functions, "sendSMS");
+
+export const processServerDrivenStripePaymentCallable = httpsCallable(
+  functions,
+  "initiatePaymentIntent"
+);
+export const processServerDrivenStripeRefundCallable = httpsCallable(
+  functions,
+  "initiateRefund"
+);
+export const cancelServerDrivenStripePaymentCallable = httpsCallable(
+  functions,
+  "cancelServerDrivenStripePayment"
+);
+export const retrieveAvailableStripeReadersCallable = httpsCallable(
+  functions,
+  "getAvailableStripeReaders"
+);
+const loginAppUserCallable = httpsCallable(functions, "loginAppUser");
+const createStoreCallable = httpsCallable(functions, "createStore");
+const createTenantCallable = httpsCallable(functions, "createTenant");
+
+export function sendSMS(messageBody) {
+  return sendSMSCallable(messageBody)
+    .then((result) => {
+      log("SMS sent successfully:", result.data);
+      return result.data;
+    })
+    .catch((error) => {
+      log("Error sending SMS:", error);
+      throw error;
+    });
+}
+
+// old functions need to update to use callable
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -391,3 +577,5 @@ export async function callCloudFunction(functionName, data) {
 export function getServerTimestamp() {
   return serverTimestamp();
 }
+
+

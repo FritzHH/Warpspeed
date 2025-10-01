@@ -18,7 +18,6 @@ import {
 } from "./constants";
 import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
 import { cloneDeep } from "lodash";
-// import { dbSetAppUserObj, dbCreateUserPunchAction } from "./db_call_wrapper";
 import { Button_ } from "./components";
 import { C, COLOR_GRADIENTS } from "./styles";
 // import {} from "./models";

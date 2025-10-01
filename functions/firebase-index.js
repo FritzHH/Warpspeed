@@ -15,9 +15,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
 admin.initializeApp({
   credential: admin.credential.cert(creds),
-  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com/",
 });
-const RDB = admin.database();
 const DB = getFirestore();
 
 // Check if running in emulator mode
@@ -399,11 +397,37 @@ exports.stripeEventWebhook = onRequest(
         });
       }
 
-      // Update database with action data
-      let dbRef = RDB.ref(
-        "PAYMENT-PROCESSING/" + readerID + "/" + paymentIntentID + "/update/"
+      // Extract tenant/store context from payment intent metadata
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentID
       );
-      await dbRef.set(action);
+      const tenantID = paymentIntent.metadata?.tenantID;
+      const storeID = paymentIntent.metadata?.storeID;
+
+      if (!tenantID || !storeID) {
+        throw new Error(
+          `Payment intent ${paymentIntentID} missing required tenant/store metadata`
+        );
+      }
+
+      // Update database with action data using Firestore
+      const updateRef = DB.collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("payment-processing")
+        .doc(readerID)
+        .collection("payments")
+        .doc(paymentIntentID)
+        .collection("updates")
+        .doc("current");
+
+      await updateRef.set({
+        ...action,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        readerID,
+        paymentIntentID,
+      });
 
       log("data package to show reader ID", req.body.data);
 
@@ -425,10 +449,25 @@ exports.stripeEventWebhook = onRequest(
           log("Charge ID", chargeID);
 
           const charge = await stripe.charges.retrieve(chargeID);
-          dbRef = RDB.ref(
-            "PAYMENT-PROCESSING/" + paymentIntentID + "/complete/"
-          );
-          await dbRef.set(charge);
+
+          // Use Firestore with tenant/store hierarchy for completion
+          const completeRef = DB.collection("tenants")
+            .doc(tenantID)
+            .collection("stores")
+            .doc(storeID)
+            .collection("payment-processing")
+            .doc(readerID)
+            .collection("payments")
+            .doc(paymentIntentID)
+            .collection("completions")
+            .doc("current");
+
+          await completeRef.set({
+            ...charge,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            readerID,
+            paymentIntentID,
+          });
           log("Card charge object", charge);
         } catch (stripeError) {
           log("Error retrieving payment details", stripeError);
@@ -580,9 +619,36 @@ exports.sendSMS = onRequest({ cors: true }, async (request, response) => {
   let body = request.body;
   log("Incoming SMS body from APP", body);
 
+  // Extract tenant/store context from request body
+  const { tenantID, storeID, customerID } = body;
+
+  if (!tenantID || !storeID) {
+    return res.status(400).json({
+      success: false,
+      message: "tenantID and storeID are required in request body",
+    });
+  }
+
   let res = await sendTwilioMessage(body);
-  let dbRef = RDB.ref("OUTGOING_MESSAGES/" + body.customerID);
-  if (res.status != 400) dbRef.update({ [body.id]: { ...body } });
+
+  if (res.status != 400) {
+    // Use Firestore with tenant/store hierarchy
+    const messageRef = DB.collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .collection("outgoing-messages")
+      .doc(customerID)
+      .collection("messages")
+      .doc(body.id);
+
+    await messageRef.set({
+      ...body,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      tenantID,
+      storeID,
+    });
+  }
 
   sendSuccessfulResult(response, res);
 });
@@ -598,38 +664,76 @@ exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
   log("phone", incomingPhone);
   log("message", incomingMessage);
 
-  // get the customer from firestore
-  let customerRef = DB.collection("CUSTOMERS");
-  let snapshot = await customerRef.where("cell", "==", incomingPhone).get();
-  let customerObj;
-  if (!snapshot | snapshot.empty) {
-    log("no customer snapshot found", snapshot);
-  } else {
-    let arr = [];
-    snapshot.forEach((snap) => arr.push(snap.data()));
-    log("here is the arrary", arr);
-    customerObj = arr[0];
-  }
-  log("here is the customer obj", customerObj);
+  // get the customer from firestore using the new tenant/store hierarchy
+  // Search across all tenants and stores for customer with matching phone
+  let customerObj = null;
+  let tenantID = null;
+  let storeID = null;
 
-  let lastOutgoingMessage;
-  if (customerObj) {
-    // get the last message from us to see if they are allowed to respond
-    lastOutgoingMessageObj = await RDB.ref(
-      "OUTGOING_MESSAGES/" + customerObj.id
-    )
-      .orderByChild("millis")
-      .limitToLast(1)
-      .once("value")
-      .then((snap) => {
-        return snap.val();
-      });
+  try {
+    // Get all tenants
+    const tenantsSnapshot = await DB.collection("tenants").get();
 
-    lastOutgoingMessage = lastOutgoingMessageObj
-      ? Object.values(lastOutgoingMessageObj)[0]
-      : null;
-    log("last outgoing message", lastOutgoingMessage);
+    for (const tenantDoc of tenantsSnapshot.docs) {
+      const currentTenantID = tenantDoc.id;
+      const storesSnapshot = await DB.collection("tenants")
+        .doc(currentTenantID)
+        .collection("stores")
+        .get();
+
+      for (const storeDoc of storesSnapshot.docs) {
+        const currentStoreID = storeDoc.id;
+        const customersSnapshot = await DB.collection("tenants")
+          .doc(currentTenantID)
+          .collection("stores")
+          .doc(currentStoreID)
+          .collection("customers")
+          .where("cell", "==", incomingPhone)
+          .get();
+
+        if (!customersSnapshot.empty) {
+          customerObj = customersSnapshot.docs[0].data();
+          tenantID = currentTenantID;
+          storeID = currentStoreID;
+          break;
+        }
+      }
+      if (customerObj) break;
+    }
+
+    if (!customerObj) {
+      log("no customer found with phone", incomingPhone);
+      return; // Exit early if no customer found
+    } else {
+      log("found customer", { customerObj, tenantID, storeID });
+    }
+  } catch (error) {
+    log("error searching for customer", error);
+    return; // Exit early on error
   }
+
+  // get the last message from us to see if they are allowed to respond
+  let lastOutgoingMessage = null;
+  try {
+    const lastMessageSnapshot = await DB.collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .collection("outgoing-messages")
+      .doc(customerObj.id)
+      .collection("messages")
+      .orderBy("millis", "desc")
+      .limit(1)
+      .get();
+
+    if (!lastMessageSnapshot.empty) {
+      lastOutgoingMessage = lastMessageSnapshot.docs[0].data();
+    }
+  } catch (error) {
+    log("error getting last outgoing message", error);
+  }
+
+  log("last outgoing message", lastOutgoingMessage);
   log("here is this one", lastOutgoingMessage);
   let canRespond = lastOutgoingMessage ? lastOutgoingMessage.canRespond : null;
 
@@ -660,8 +764,26 @@ exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
     type: "incoming",
   };
 
-  let dbRef = RDB.ref("INCOMING_MESSAGES/" + customerObj.id);
-  dbRef.update({ [body.SmsSid]: { ...message } });
+  // Store incoming message using Firestore with tenant/store hierarchy
+  try {
+    const incomingMessageRef = DB.collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .collection("incoming-messages")
+      .doc(customerObj.id)
+      .collection("messages")
+      .doc(body.SmsSid);
+
+    await incomingMessageRef.set({
+      ...message,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      tenantID,
+      storeID,
+    });
+  } catch (error) {
+    log("error storing incoming message in Firestore", error);
+  }
 });
 
 ///////////////////////////////////////////////////////////////////////////////

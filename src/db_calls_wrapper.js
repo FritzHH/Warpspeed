@@ -2,7 +2,7 @@
 // This file contains all business logic and calls the "dumb" db.js functions
 
 import { log } from "./utils";
-import { DB_NODES } from "./constants";
+import { DB_NODES, MILLIS_IN_MINUTE } from "./constants";
 import {
   firestoreWrite,
   firestoreRead,
@@ -15,8 +15,21 @@ import {
   authSignIn,
   authSignOut,
   getServerTimestamp,
+  AUTH,
+  DB,
+  processServerDrivenStripePaymentCallable,
+  processServerDrivenStripeRefundCallable,
+  cancelServerDrivenStripePaymentCallable,
+  retrieveAvailableStripeReadersCallable,
 } from "./db_calls";
 import { useSettingsStore } from "./stores";
+import {
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  updatePassword,
+} from "firebase/auth";
+import { collection, doc } from "firebase/firestore";
+import { get } from "firebase/database";
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -53,8 +66,8 @@ function getTenantAndStore() {
  * @returns {string} Full Firestore path for settings document
  */
 function buildSettingsPath(tenantID, storeID) {
-  // Firestore paths must have even number of segments (collection/document/collection/document...)
-  // Format: tenants/{tenantID}/stores/{storeID}/settings/{settingsDoc}
+  // Firestore path for settings document (separate settings document)
+  // Format: tenants/{tenantID}/stores/{storeID}/settings/settings
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.SETTINGS}/${DB_NODES.FIRESTORE.SETTINGS}`;
 }
 
@@ -120,6 +133,168 @@ function buildCurrentPunchClockPath(tenantID, storeID) {
   // Firestore paths must have even number of segments (collection/document/collection/document...)
   // Format: tenants/{tenantID}/stores/{storeID}/punch_clock/current
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PUNCH_CLOCK}/current`;
+}
+
+/**
+ * Build Firestore path for printer document (ensures even number of segments)
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} printerID - Printer ID
+ * @returns {string} Full Firestore path for printer document
+ */
+function buildPrinterPath(tenantID, storeID, printerID) {
+  // Firestore paths must have even number of segments (collection/document/collection/document...)
+  // Format: tenants/{tenantID}/stores/{storeID}/printers/{printerID}
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PRINTERS}/${printerID}`;
+}
+
+/**
+ * Build Firestore path for user document
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} userID - User ID
+ * @returns {string} Full Firestore path for user document
+ */
+function buildUserPath(tenantID, storeID, userID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/users/{userID}
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/users/${userID}`;
+}
+
+/**
+ * Build Firestore path for payment processing update
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} readerID - Reader ID
+ * @param {string} paymentIntentID - Payment Intent ID
+ * @returns {string} Full Firestore path for payment update
+ */
+function buildPaymentUpdatePath(tenantID, storeID, readerID, paymentIntentID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/payment-processing/{readerID}/payments/{paymentIntentID}/updates/current
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PAYMENT_PROCESSING}/${readerID}/payments/${paymentIntentID}/updates/current`;
+}
+
+/**
+ * Build Firestore path for payment processing completion
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} readerID - Reader ID
+ * @param {string} paymentIntentID - Payment Intent ID
+ * @returns {string} Full Firestore path for payment completion
+ */
+function buildPaymentCompletionPath(
+  tenantID,
+  storeID,
+  readerID,
+  paymentIntentID
+) {
+  // Format: tenants/{tenantID}/stores/{storeID}/payment-processing/{readerID}/payments/{paymentIntentID}/completions/current
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PAYMENT_PROCESSING}/${readerID}/payments/${paymentIntentID}/completions/current`;
+}
+
+/**
+ * Build Firestore path for outgoing message
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} customerID - Customer ID
+ * @param {string} messageID - Message ID
+ * @returns {string} Full Firestore path for outgoing message
+ */
+function buildOutgoingMessagePath(tenantID, storeID, customerID, messageID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/outgoing-messages/{customerID}/messages/{messageID}
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OUTGOING_MESSAGES}/${customerID}/messages/${messageID}`;
+}
+
+/**
+ * Build Firestore path for incoming message
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} customerID - Customer ID
+ * @param {string} messageID - Message ID
+ * @returns {string} Full Firestore path for incoming message
+ */
+function buildIncomingMessagePath(tenantID, storeID, customerID, messageID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/incoming-messages/{customerID}/messages/{messageID}
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INCOMING_MESSAGES}/${customerID}/messages/${messageID}`;
+}
+
+/**
+ * Build Firestore collection path for customers
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @returns {string} Full Firestore collection path for customers
+ */
+function buildCustomerCollectionPath(tenantID, storeID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/customers
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.CUSTOMERS}`;
+}
+
+/**
+ * Build Firestore collection path for inventory
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @returns {string} Full Firestore collection path for inventory
+ */
+function buildInventoryCollectionPath(tenantID, storeID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/inventory
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INVENTORY}`;
+}
+
+/**
+ * Build Firestore collection path for open workorders
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @returns {string} Full Firestore collection path for open workorders
+ */
+function buildOpenWorkordersCollectionPath(tenantID, storeID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/open-workorders
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}`;
+}
+
+/**
+ * Build Firestore collection path for punches
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @returns {string} Full Firestore collection path for punches
+ */
+function buildPunchesCollectionPath(tenantID, storeID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/punches
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PUNCHES}`;
+}
+
+/**
+ * Build Firestore path for payment processing reader updates
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} readerID - Reader ID
+ * @param {string} paymentIntentID - Payment Intent ID
+ * @returns {string} Full Firestore path for payment updates
+ */
+function buildPaymentReaderUpdatesPath(
+  tenantID,
+  storeID,
+  readerID,
+  paymentIntentID
+) {
+  // Format: tenants/{tenantID}/stores/{storeID}/payment-processing/{readerID}/payments/{paymentIntentID}/updates/current
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PAYMENT_PROCESSING}/${readerID}/payments/${paymentIntentID}/updates/current`;
+}
+
+/**
+ * Build Firestore path for payment processing reader completions
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} readerID - Reader ID
+ * @param {string} paymentIntentID - Payment Intent ID
+ * @returns {string} Full Firestore path for payment completions
+ */
+function buildPaymentReaderCompletionsPath(
+  tenantID,
+  storeID,
+  readerID,
+  paymentIntentID
+) {
+  // Format: tenants/{tenantID}/stores/{storeID}/payment-processing/{readerID}/payments/{paymentIntentID}/completions/current
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PAYMENT_PROCESSING}/${readerID}/payments/${paymentIntentID}/completions/current`;
 }
 
 // ============================================================================
@@ -427,56 +602,6 @@ export async function dbGetCompletedWorkorder(id) {
 }
 
 /**
- * Get completed sale from Cloud Storage by ID
- * @param {string} id - Sale ID (required)
- * @returns {Promise<Object>} Completed sale object or null
- */
-export async function dbGetCompletedSale(id) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-
-    if (!tenantID || !storeID) {
-      log(
-        "Error: tenantID and storeID are not configured for dbGetCompletedSale"
-      );
-      return null;
-    }
-
-    if (!id) {
-      log("Error: id is required for dbGetCompletedSale");
-      return null;
-    }
-
-    // Build storage path: closed-sales/{tenantID}/{storeID}/{saleID}.json
-    const storagePath = `${DB_NODES.STORAGE.CLOSED_SALES}/${tenantID}/${storeID}/${id}.json`;
-
-    // Get the download URL for the file
-    const downloadURL = await storageGetDownloadURL(storagePath);
-
-    if (!downloadURL) {
-      log("Error: Completed sale not found for dbGetCompletedSale");
-      return null;
-    }
-
-    // Fetch the JSON content from the download URL
-    const response = await fetch(downloadURL);
-
-    if (!response.ok) {
-      log("Error: Failed to fetch completed sale content");
-      return null;
-    }
-
-    // Parse the JSON string back to an object
-    const sale = await response.json();
-
-    return sale;
-  } catch (error) {
-    log("Error retrieving completed sale:", error);
-    return null;
-  }
-}
-
-/**
  * Complete a sale by saving it to Cloud Storage
  * @param {Object} sale - Sale object to complete
  * @param {string} saleID - Sale ID (optional, will use sale.id if not provided)
@@ -722,7 +847,6 @@ export async function dbSaveCustomer(customer, customerID = null) {
       buildCustomerPath(tenantID, storeID, id),
       customerToSave
     );
-
 
     return {
       success: true,
@@ -988,7 +1112,155 @@ export async function dbSaveCurrentPunchClock(punchClockData) {
   }
 }
 
+/**
+ * Save printer object to Firestore
+ * @param {Object} printer - Printer object with "id" field
+ * @param {string} printerID - Optional printer ID (uses printer.id if not provided)
+ * @returns {Promise<Object>} Save result
+ */
+export async function dbSavePrinter(printer, printerID = null) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbSavePrinter");
+      return {
+        success: false,
+        error: "Configuration Error",
+        message:
+          "tenantID and storeID are not configured. Please check your settings.",
+        printer: null,
+        printerID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    if (!printer || typeof printer !== "object") {
+      log("Error: printer object is required for dbSavePrinter");
+      return {
+        success: false,
+        error: "Validation Error",
+        message: "printer object is required for dbSavePrinter",
+        printer: null,
+        printerID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    // Use provided printerID or extract from printer object
+    const finalPrinterID = printerID || printer.id;
+
+    if (!finalPrinterID) {
+      log("Error: printerID is required for dbSavePrinter");
+      return {
+        success: false,
+        error: "Validation Error",
+        message: "printerID is required for dbSavePrinter",
+        printer: null,
+        printerID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    // Ensure printer object has the id field
+    const printerWithID = { ...printer, id: finalPrinterID };
+
+    const path = buildPrinterPath(tenantID, storeID, finalPrinterID);
+    log(`Saving printer to path: ${path}`);
+
+    const result = await firestoreWrite(path, printerWithID);
+
+    if (result.success) {
+      log(`Successfully saved printer with ID: ${finalPrinterID}`);
+      return {
+        success: true,
+        message: "Printer saved successfully",
+        printer: printerWithID,
+        printerID: finalPrinterID,
+        tenantID,
+        storeID,
+        path,
+      };
+    } else {
+      log(`Error saving printer: ${result.error}`);
+      return {
+        success: false,
+        error: result.error,
+        message: "Failed to save printer",
+        printer: null,
+        printerID: null,
+        tenantID,
+        storeID,
+        path,
+      };
+    }
+  } catch (error) {
+    log("Error in dbSavePrinter:", error);
+    return {
+      success: false,
+      error: "Database Error",
+      message: "An error occurred while saving the printer",
+      printer: null,
+      printerID: null,
+      tenantID: null,
+      storeID: null,
+    };
+  }
+}
+
 // getters ///////////////////////////////////////////////////////////////////////////
+/**
+ * Get completed sale from Cloud Storage by ID
+ * @param {string} id - Sale ID (required)
+ * @returns {Promise<Object>} Completed sale object or null
+ */
+export async function dbGetCompletedSale(id) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log(
+        "Error: tenantID and storeID are not configured for dbGetCompletedSale"
+      );
+      return null;
+    }
+
+    if (!id) {
+      log("Error: id is required for dbGetCompletedSale");
+      return null;
+    }
+
+    // Build storage path: closed-sales/{tenantID}/{storeID}/{saleID}.json
+    const storagePath = `${DB_NODES.STORAGE.CLOSED_SALES}/${tenantID}/${storeID}/${id}.json`;
+
+    // Get the download URL for the file
+    const downloadURL = await storageGetDownloadURL(storagePath);
+
+    if (!downloadURL) {
+      log("Error: Completed sale not found for dbGetCompletedSale");
+      return null;
+    }
+
+    // Fetch the JSON content from the download URL
+    const response = await fetch(downloadURL);
+
+    if (!response.ok) {
+      log("Error: Failed to fetch completed sale content");
+      return null;
+    }
+
+    // Parse the JSON string back to an object
+    const sale = await response.json();
+
+    return sale;
+  } catch (error) {
+    log("Error retrieving completed sale:", error);
+    return null;
+  }
+}
 
 /**
  * Get settings object
@@ -1001,6 +1273,7 @@ export async function dbGetSettings(tenantID, storeID) {
       return null;
     }
 
+    log(tenantID, storeID);
     const settings = await firestoreRead(buildSettingsPath(tenantID, storeID));
 
     if (!settings) {
@@ -1066,7 +1339,7 @@ export async function dbGetOpenWorkorders() {
     }
 
     // Build collection path: tenants/{tenantID}/stores/{storeID}/open-workorders
-    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}`;
+    const collectionPath = buildOpenWorkordersCollectionPath(tenantID, storeID);
 
     const workorders = await firestoreQuery(collectionPath, []);
 
@@ -1093,7 +1366,7 @@ export async function dbGetInventoryItems() {
     }
 
     // Build collection path: tenants/{tenantID}/stores/{storeID}/inventory
-    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INVENTORY}`;
+    const collectionPath = buildInventoryCollectionPath(tenantID, storeID);
 
     const items = await firestoreQuery(collectionPath, []);
 
@@ -1131,6 +1404,192 @@ export async function dbGetTenantById(id) {
   } catch (error) {
     log("Error retrieving tenant by id:", error);
     return null;
+  }
+}
+
+/**
+ * Get single workorder by ID from Firestore
+ * @param {string} workorderID - Workorder ID (required)
+ * @returns {Promise<Object>} Workorder object or null
+ */
+export async function dbGetWorkorder(workorderID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbGetWorkorder");
+      return null;
+    }
+
+    if (!workorderID) {
+      log("Error: workorderID is required for dbGetWorkorder");
+      return null;
+    }
+
+    const path = buildWorkorderPath(tenantID, storeID, workorderID);
+    const workorder = await firestoreRead(path);
+
+    if (!workorder) {
+      log("Error: Workorder not found for dbGetWorkorder");
+      return null;
+    }
+
+    return workorder;
+  } catch (error) {
+    log("Error retrieving workorder:", error);
+    return null;
+  }
+}
+
+/**
+ * Delete workorder from Firestore by ID
+ * @param {string} workorderID - Workorder ID (required)
+ * @returns {Promise<Object>} Delete result
+ */
+export async function dbDeleteWorkorder(workorderID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log(
+        "Error: tenantID and storeID are not configured for dbDeleteWorkorder"
+      );
+      return {
+        success: false,
+        error: "Configuration Error",
+        message:
+          "tenantID and storeID are not configured. Please check your settings.",
+        workorderID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    if (!workorderID) {
+      log("Error: workorderID is required for dbDeleteWorkorder");
+      return {
+        success: false,
+        error: "Validation Error",
+        message: "workorderID is required for dbDeleteWorkorder",
+        workorderID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    const path = buildWorkorderPath(tenantID, storeID, workorderID);
+    log(`Deleting workorder from path: ${path}`);
+
+    const result = await firestoreDelete(path);
+
+    if (result.success) {
+      log(`Successfully deleted workorder with ID: ${workorderID}`);
+      return {
+        success: true,
+        message: "Workorder deleted successfully",
+        workorderID,
+        tenantID,
+        storeID,
+        path,
+      };
+    } else {
+      log(`Error deleting workorder: ${result.error}`);
+      return {
+        success: false,
+        error: result.error,
+        message: "Failed to delete workorder",
+        workorderID: null,
+        tenantID,
+        storeID,
+        path,
+      };
+    }
+  } catch (error) {
+    log("Error in dbDeleteWorkorder:", error);
+    return {
+      success: false,
+      error: "Database Error",
+      message: "An error occurred while deleting the workorder",
+      workorderID: null,
+      tenantID: null,
+      storeID: null,
+    };
+  }
+}
+
+/**
+ * Delete inventory item from Firestore by ID
+ * @param {string} itemID - Inventory item ID (required)
+ * @returns {Promise<Object>} Delete result
+ */
+export async function dbDeleteInventoryItem(itemID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log(
+        "Error: tenantID and storeID are not configured for dbDeleteInventoryItem"
+      );
+      return {
+        success: false,
+        error: "Configuration Error",
+        message:
+          "tenantID and storeID are not configured. Please check your settings.",
+        itemID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    if (!itemID) {
+      log("Error: itemID is required for dbDeleteInventoryItem");
+      return {
+        success: false,
+        error: "Validation Error",
+        message: "itemID is required for dbDeleteInventoryItem",
+        itemID: null,
+        tenantID,
+        storeID,
+      };
+    }
+
+    const path = buildInventoryPath(tenantID, storeID, itemID);
+    log(`Deleting inventory item from path: ${path}`);
+
+    const result = await firestoreDelete(path);
+
+    if (result.success) {
+      log(`Successfully deleted inventory item with ID: ${itemID}`);
+      return {
+        success: true,
+        message: "Inventory item deleted successfully",
+        itemID,
+        tenantID,
+        storeID,
+        path,
+      };
+    } else {
+      log(`Error deleting inventory item: ${result.error}`);
+      return {
+        success: false,
+        error: result.error,
+        message: "Failed to delete inventory item",
+        itemID: null,
+        tenantID,
+        storeID,
+        path,
+      };
+    }
+  } catch (error) {
+    log("Error in dbDeleteInventoryItem:", error);
+    return {
+      success: false,
+      error: "Database Error",
+      message: "An error occurred while deleting the inventory item",
+      itemID: null,
+      tenantID: null,
+      storeID: null,
+    };
   }
 }
 
@@ -1177,7 +1636,7 @@ export async function dbGetPunchesByTimeFrame(
     }
 
     // Build collection path: tenants/{tenantID}/stores/{storeID}/punches
-    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PUNCHES}`;
+    const collectionPath = buildPunchesCollectionPath(tenantID, storeID);
 
     // Build where clauses for time range
     const whereClauses = [
@@ -1216,6 +1675,7 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
       log(
         "Error: tenantID and storeID are not configured for dbSearchCustomersByPhone"
       );
+      return [];
       return {
         success: false,
         error: "Configuration Error",
@@ -1233,6 +1693,7 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
       log(
         "Error: phoneNumber is required and must be a string for dbSearchCustomersByPhone"
       );
+      return [];
       return {
         success: false,
         error: "Invalid Parameter",
@@ -1252,6 +1713,7 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
       log(
         "Error: Phone number must contain at least one digit for dbSearchCustomersByPhone"
       );
+      return [];
       return {
         success: false,
         error: "Invalid Parameter",
@@ -1265,7 +1727,7 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
     }
 
     // Build collection path for customers
-    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.CUSTOMERS}`;
+    const collectionPath = buildCustomerCollectionPath(tenantID, storeID);
 
     // Create queries for phone number search (partial match for real-time typing)
     // Each field gets a range query to find partial matches
@@ -1308,7 +1770,7 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
         log(`Query failed for field ${fieldQuery.field}:`, queryError);
       }
     }
-return allResults;
+    return allResults;
   } catch (error) {
     log("Error searching customers by phone:", error);
     return {
@@ -1386,7 +1848,7 @@ export async function dbSearchCustomersByEmail(email) {
     }
 
     // Build collection path for customers
-    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.CUSTOMERS}`;
+    const collectionPath = buildCustomerCollectionPath(tenantID, storeID);
 
     // Create query for email search (partial match for real-time typing)
     const whereClauses = [
@@ -1484,7 +1946,7 @@ export async function dbSearchCustomersByName(name) {
     }
 
     // Build collection path for customers
-    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.CUSTOMERS}`;
+    const collectionPath = buildCustomerCollectionPath(tenantID, storeID);
 
     // Create queries for name search (partial match for real-time typing)
     // Each field gets a range query to find partial matches
@@ -1532,7 +1994,6 @@ export async function dbSearchCustomersByName(name) {
     }
 
     return allResults;
-    
   } catch (error) {
     log("Error searching customers by name:", error);
     return {
@@ -1574,7 +2035,7 @@ export function dbListenToOpenWorkorders(onSnapshot) {
     }
 
     // Build collection path: tenants/{tenantID}/stores/{storeID}/open-workorders
-    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}`;
+    const collectionPath = buildOpenWorkordersCollectionPath(tenantID, storeID);
 
     // Subscribe to collection changes
     const unsubscribe = firestoreSubscribeCollection(
@@ -1706,7 +2167,7 @@ export function dbListenToInventory(onSnapshot) {
     }
 
     // Build collection path: tenants/{tenantID}/stores/{storeID}/inventory
-    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INVENTORY}`;
+    const collectionPath = buildInventoryCollectionPath(tenantID, storeID);
 
     // Subscribe to collection changes
     const unsubscribe = firestoreSubscribeCollection(
@@ -1724,6 +2185,125 @@ export function dbListenToInventory(onSnapshot) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up inventory listener:", error);
+    return null;
+  }
+}
+
+/**
+ * Listen to payment processing reader updates for a specific reader and payment intent
+ * @param {string} readerID - Reader ID
+ * @param {string} paymentIntentID - Payment Intent ID
+ * @param {Function} onUpdate - Callback function called with update data
+ * @param {Function} onCompletion - Callback function called with completion data
+ * @returns {Object} Object with unsubscribe functions for both listeners
+ */
+export function dbListenToPaymentReaderUpdates(
+  readerID,
+  paymentIntentID,
+  onUpdate,
+  onCompletion
+) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log(
+        "Error: tenantID and storeID are not configured for dbListenToPaymentReaderUpdates"
+      );
+      return null;
+    }
+
+    if (!readerID || typeof readerID !== "string") {
+      log(
+        "Error: readerID is required and must be a string for dbListenToPaymentReaderUpdates"
+      );
+      return null;
+    }
+
+    if (!paymentIntentID || typeof paymentIntentID !== "string") {
+      log(
+        "Error: paymentIntentID is required and must be a string for dbListenToPaymentReaderUpdates"
+      );
+      return null;
+    }
+
+    if (!onUpdate || typeof onUpdate !== "function") {
+      log(
+        "Error: onUpdate callback function is required for dbListenToPaymentReaderUpdates"
+      );
+      return null;
+    }
+
+    if (!onCompletion || typeof onCompletion !== "function") {
+      log(
+        "Error: onCompletion callback function is required for dbListenToPaymentReaderUpdates"
+      );
+      return null;
+    }
+
+    // Build paths for updates and completions
+    const updatesPath = buildPaymentReaderUpdatesPath(
+      tenantID,
+      storeID,
+      readerID,
+      paymentIntentID
+    );
+    const completionsPath = buildPaymentReaderCompletionsPath(
+      tenantID,
+      storeID,
+      readerID,
+      paymentIntentID
+    );
+
+    // Subscribe to updates
+    const unsubscribeUpdates = firestoreSubscribe(
+      updatesPath,
+      (updateData, error) => {
+        if (error) {
+          log("Payment reader updates listener error", {
+            tenantID,
+            storeID,
+            readerID,
+            paymentIntentID,
+            error,
+          });
+          return;
+        }
+
+        onUpdate(updateData);
+      }
+    );
+
+    // Subscribe to completions
+    const unsubscribeCompletions = firestoreSubscribe(
+      completionsPath,
+      (completionData, error) => {
+        if (error) {
+          log("Payment reader completions listener error", {
+            tenantID,
+            storeID,
+            readerID,
+            paymentIntentID,
+            error,
+          });
+          return;
+        }
+
+        onCompletion(completionData);
+      }
+    );
+
+    // Return object with both unsubscribe functions
+    return {
+      unsubscribeUpdates,
+      unsubscribeCompletions,
+      unsubscribe: () => {
+        unsubscribeUpdates();
+        unsubscribeCompletions();
+      },
+    };
+  } catch (error) {
+    log("Error setting up payment reader listener:", error);
     return null;
   }
 }
@@ -1797,4 +2377,254 @@ export async function dbLogout(options = {}) {
     log("Sign out failed:", error);
     throw error;
   }
+}
+
+export async function sendPasswordReset(email) {
+  try {
+    await sendPasswordResetEmail(AUTH, email);
+    log("Password reset email sent to:", email);
+    return { success: true };
+  } catch (error) {
+    log("Error sending password reset email:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update user password
+ * @param {string} newPassword - New password
+ * @returns {Promise<Object>} - Returns success status
+ */
+export async function updateUserPassword(newPassword) {
+  try {
+    const user = AUTH.currentUser;
+    if (!user) {
+      throw new Error("No user is currently signed in");
+    }
+
+    await updatePassword(user, newPassword);
+    log("Password updated successfully");
+    return { success: true };
+  } catch (error) {
+    log("Error updating password:", error);
+    throw error;
+  }
+}
+
+/**
+ * Listen to authentication state changes
+ * @param {Function} callback - Callback function to handle auth state changes
+ * @returns {Function} - Unsubscribe function
+ */
+export function onAuthStateChange(callback) {
+  return onAuthStateChanged(AUTH, callback);
+}
+
+// creates a random ID using firestore utility
+export function getNewCollectionRef(collectionName) {
+  let ref = doc(collection(DB, collectionName));
+  return ref;
+}
+
+// server driven Stripe payments ////////////////////////////////////////////////
+export function createPaymentPollingFallback(
+  pollingConfig,
+  onUpdate,
+  onComplete,
+  onError,
+  onTimeout
+) {
+  const {
+    firestorePaths,
+    pollingInterval = 3000,
+    maxPollingTime = MILLIS_IN_MINUTE * 2,
+    timeoutMessage = "Payment processing timeout",
+  } = pollingConfig;
+
+  let pollingTimer = null;
+  let timeoutTimer = null;
+  let isPolling = false;
+  let lastUpdateTime = Date.now();
+
+  const startPolling = () => {
+    if (isPolling) return;
+
+    isPolling = true;
+    log(
+      `Starting payment polling fallback for Firestore paths:`,
+      firestorePaths
+    );
+
+    // Set up timeout timer
+    timeoutTimer = setTimeout(() => {
+      stopPolling();
+      onTimeout && onTimeout(timeoutMessage);
+      log(`Payment polling timeout reached for Firestore paths`);
+    }, maxPollingTime);
+
+    // Start polling
+    pollingTimer = setInterval(async () => {
+      try {
+        // Check for updates in Firestore
+        const updateData = await firestoreRead(firestorePaths.update);
+        const completeData = await firestoreRead(firestorePaths.complete);
+
+        // Check for completion
+        if (completeData) {
+          log("Payment completed via polling fallback", completeData);
+          stopPolling();
+          onComplete && onComplete(completeData);
+          return;
+        }
+
+        // Check for updates
+        if (updateData) {
+          const updateTime =
+            updateData.timestamp?.toMillis?.() ||
+            updateData.timestamp ||
+            Date.now();
+
+          // Only process if this is a new update
+          if (updateTime > lastUpdateTime) {
+            lastUpdateTime = updateTime;
+            log("Payment update received via polling fallback", updateData);
+            onUpdate && onUpdate(updateData);
+
+            // Check if this is a final status (success/failure)
+            if (
+              updateData.status === "succeeded" ||
+              updateData.status === "failed" ||
+              updateData.status === "canceled"
+            ) {
+              stopPolling();
+            }
+          }
+        }
+
+        // Check for stale data (no updates for too long)
+        const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+        if (timeSinceLastUpdate > 60000) {
+          // 1 minute without updates
+          log(
+            `Stale data detected for Firestore paths, no updates for ${timeSinceLastUpdate}ms`
+          );
+          onError &&
+            onError("Payment processing appears stalled - no updates received");
+        }
+      } catch (error) {
+        log("Error in payment polling fallback:", error);
+        onError && onError(`Polling error: ${error.message}`);
+      }
+    }, pollingInterval);
+  };
+
+  const stopPolling = () => {
+    if (!isPolling) return;
+
+    isPolling = false;
+
+    if (pollingTimer) {
+      clearInterval(pollingTimer);
+      pollingTimer = null;
+    }
+
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer);
+      timeoutTimer = null;
+    }
+
+    log(`Stopped payment polling fallback for Firestore paths`);
+  };
+
+  const isActive = () => isPolling;
+
+  return {
+    start: startPolling,
+    stop: stopPolling,
+    isActive,
+  };
+}
+
+export async function dbProcessServerDrivenStripePayment(
+  saleAmount,
+  terminalID,
+  paymentIntentID
+) {
+  return processServerDrivenStripePayment(
+    saleAmount,
+    terminalID,
+    paymentIntentID
+  );
+}
+
+export function dbCancelServerDrivenStripePayment(readerID) {
+  return cancelServerDrivenStripePayment(readerID);
+}
+
+export function dbRetrieveAvailableStripeReaders() {
+  return retrieveAvailableStripeReaders();
+}
+
+export function processServerDrivenStripePayment(
+  saleAmount,
+  readerID,
+  paymentIntentID
+) {
+  // log(readerID);
+  return processServerDrivenStripePaymentCallable({
+    amount: Number(saleAmount),
+    readerID,
+    paymentIntentID,
+  })
+    .then((result) => {
+      log("Payment initiated successfully:", result.data);
+      return result.data;
+    })
+    .catch((error) => {
+      log("Error initiating payment:", error);
+      throw error;
+    });
+}
+
+export function processServerDrivenStripeRefund(amount, paymentIntentID) {
+  return processServerDrivenStripeRefundCallable({
+    amount,
+    paymentIntentID,
+  })
+    .then((result) => {
+      log("Refund initiated successfully:", result.data);
+      return result.data;
+    })
+    .catch((error) => {
+      log("Error initiating refund:", error);
+      throw error;
+    });
+}
+
+export function cancelServerDrivenStripePayment(readerID) {
+  return cancelServerDrivenStripePaymentCallable({
+    readerID,
+  })
+    .then((result) => {
+      log("Payment cancelled successfully:", result.data);
+      return result.data;
+    })
+    .catch((error) => {
+      log("Error cancelling payment:", error);
+      throw error;
+    });
+}
+
+export function retrieveAvailableStripeReaders(readerID) {
+  return retrieveAvailableStripeReadersCallable({
+    readerID,
+  })
+    .then((result) => {
+      log("Stripe readers retrieved successfully:", result.data);
+      return result.data;
+    })
+    .catch((error) => {
+      log("Error retrieving Stripe readers:", error);
+      throw error;
+    });
 }

@@ -222,21 +222,24 @@ export const DB_NODES = {
   // Firestore collections
   FIRESTORE: {
     TENANTS: "tenants",
-    STORES: "stores", 
+    STORES: "stores",
     SETTINGS: "settings",
     CUSTOMERS: "customers",
     OPEN_WORKORDERS: "open-workorders",
     INVENTORY: "inventory",
     EMAIL_USERS: "email_users",
     PUNCHES: "punches",
-    PUNCH_CLOCK: 'punch_clock'
-  },
-  
-  // Realtime Database nodes
-  REALTIME: {
+    PUNCH_CLOCK: "punch_clock",
+    PRINTERS: "printers",
+    PAYMENT_PROCESSING: "payment-processing",
+    OUTGOING_MESSAGES: "outgoing-messages",
+    INCOMING_MESSAGES: "incoming-messages",
   },
 
+  // Realtime Database nodes
+  REALTIME: {},
+
   STORAGE: {
-    CLOSED_WORKORDERS: 'closed-workorders'
-  }
+    CLOSED_WORKORDERS: "closed-workorders",
+  },
 };

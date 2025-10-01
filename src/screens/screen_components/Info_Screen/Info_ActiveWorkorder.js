@@ -101,19 +101,25 @@ export const ActiveWorkorderComponent = ({}) => {
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateUPCBarcode();
-    wo.startedBy = zCurrentUser.id;
+    wo.startedBy = useLoginStore.getState().currentUser?.id;
     wo.startedOnMillis = new Date().getTime();
 
-    useOpenWorkordersStore.setOpenWorkorderID(wo.id);
-    _zSetInfoTabName(TAB_NAMES.infoTab.checkout);
-    _zSetItemsTabName(TAB_NAMES.infoTab.workorder);
-    _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory);
+    useOpenWorkordersStore.getState().setWorkorder(wo);
+    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.checkout,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
+    });
   }
 
   function handleNewWorkorderPress() {
-    null;
-    _zSetCustomer(null);
-    _zSetInfoTabName(TAB_NAMES.infoTab.customer);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.customer,
+      itemsTabName: TAB_NAMES.itemsTab.empty,
+      optionsTab: TAB_NAMES.optionsTab.workorders,
+    });
+    useCurrentCustomerStore.getState().setCustomer(null);
   }
 
   function handleCustomerNewWorkorderPress(customer) {
@@ -218,7 +224,7 @@ export const ActiveWorkorderComponent = ({}) => {
               width: "95%",
             }}
           >
-            {zCustomer.cell.length > 0 && (
+            {zCustomer?.cell.length > 0 && (
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Image_
                   icon={ICONS.cellPhone}
@@ -230,7 +236,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 </Text>
               </View>
             )}
-            {!zCustomer.landline.length > 0 && (
+            {!zCustomer?.landline.length > 0 && (
               <View
                 style={{
                   flexDirection: "row",
@@ -249,10 +255,10 @@ export const ActiveWorkorderComponent = ({}) => {
                 </Text>
               </View>
             )}
-            {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.call && (
+            {zCustomer?.contactRestriction === CONTACT_RESTRICTIONS.call && (
               <Text style={{ color: C.text, fontSize: 13 }}>CALL ONLY</Text>
             )}
-            {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.email && (
+            {zCustomer?.contactRestriction === CONTACT_RESTRICTIONS.email && (
               <Text style={{ color: C.text, fontSize: 13 }}>EMAIL ONLY</Text>
             )}
           </View>

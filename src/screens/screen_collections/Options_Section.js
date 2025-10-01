@@ -41,7 +41,7 @@ export const Options_Section = React.memo(({}) => {
 
   function handleUserClockPress(user) {
     let millis = new Date().getTime();
-    let option = zPunchClock[user.id] ? "out" : "in";
+    let option = useLoginStore.getState().punchClock[user.id] ? "out" : "in";
 
     // log("clocked in arr", zClockedInUsersArr);
     let clockinFun = () => {

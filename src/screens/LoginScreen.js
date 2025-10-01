@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native-web";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
-import { sendPasswordReset } from "../db";
+import { sendPasswordReset } from "../db_calls_wrapper";
 import { dbLoginUser } from "../db_calls_wrapper";
 
 export function LoginScreen({ onLoginSuccess }) {

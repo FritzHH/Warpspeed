@@ -210,11 +210,13 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   // log("here", zOpenWorkorder);
+  if (!zOpenWorkorder) return null;
   if (!(zOpenWorkorder?.workorderLines.length > 0))
     return (
       <View style={{ flex: 1, justifyContent: "center" }}>
         <Text style={{ fontSize: 100, color: gray(0.07), textAlign: "center" }}>
-          {"Empty\nWorkorder"}
+          {"Empty\n" +
+            (zOpenWorkorder?.isStandaloneSale ? "Sale " : "Workorder")}
         </Text>
       </View>
     );

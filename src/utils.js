@@ -1,14 +1,13 @@
 /* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
-import { getNewCollectionRef, setInventoryItem } from "./db";
-import { CUSTOMER_PROTO, INVENTORY_ITEM_PROTO, SETTINGS_OBJ, WORKORDER_PROTO } from "./data";
+import { getNewCollectionRef } from "./db_calls_wrapper";
+import { CUSTOMER_PROTO, SETTINGS_OBJ, WORKORDER_PROTO } from "./data";
 import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
 import { useAlertScreenStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
-import { arrayRemove } from "firebase/firestore";
 
 // const fs = require("node:fs");
 export const dim = {

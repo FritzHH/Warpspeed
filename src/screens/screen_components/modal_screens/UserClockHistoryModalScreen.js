@@ -15,32 +15,20 @@ import {
   SHADOW_RADIUS_PROTO,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  clog,
   convertMillisToHoursMins,
-  decrementNumByFive,
   formatMillisForDisplay,
   generateRandomID,
   getPreviousMondayDayJS,
-  getWordDayOfWeek,
-  incrementNumByFive,
   log,
   gray,
-  numberIsEven,
   trimToTwoDecimals,
 } from "../../../utils";
 import dayjs from "dayjs";
-import {
-  build_db_path,
-  _dbFindPunchHistoryByMillisRange,
-  dbSetOrUpdateUserPunchObj,
-  setDBItem,
-  dbDeleteUserPunchAction,
-} from "../../../db_call_wrapper";
+
 import sr from "dayjs/locale/sr";
 import { cloneDeep, range, sortBy } from "lodash";
-import { loadBundle } from "firebase/firestore";
 import { isEven } from "face-api.js/build/commonjs/utils";
 import { useLoginStore, useSettingsStore } from "../../../stores";
 import {
@@ -48,9 +36,11 @@ import {
   MILLIS_IN_HOUR,
   MILLIS_IN_MINUTE,
 } from "../../../constants";
-import { ToolContextImpl } from "twilio/lib/rest/assistants/v1/tool";
-import { ItemAssignmentContextImpl } from "twilio/lib/rest/numbers/v2/regulatoryCompliance/bundle/itemAssignment";
 import { TIME_PUNCH_PROTO } from "../../../data";
+import {
+  dbGetPunchesByTimeFrame,
+  dbSavePunchObject,
+} from "../../../db_calls_wrapper";
 
 // eslint-disable-next-line no-lone-blocks
 {
@@ -127,7 +117,8 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     dayBegin = dayBegin.getTime();
     dayEnd = dayEnd.getTime();
 
-    _dbFindPunchHistoryByMillisRange(sUserObj.id, dayBegin, dayEnd)
+    // old database getter need to replace
+    dbGetPunchesByTimeFrame(dayBegin, dayEnd, sUserObj.id)
       .then((resArr) => {
         // log(formatMillisForDisplay(dayBegin), formatMillisForDisplay(dayEnd));
         // clog("res arr", resArr);
@@ -272,12 +263,12 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       _setFilteredArr(filteredArr);
 
       // send to db
-      dbSetOrUpdateUserPunchObj(punchObj);
+      dbSavePunchObject(punchObj);
     }
 
     function handleDeletePunchPress(punchObj) {
       // log(sUserObj);
-      dbSetOrUpdateUserPunchObj(punchObj, true);
+      dbSavePunchObject(punchObj);
       let arr = cloneDeep(sFilteredArr).filter((o) => o.id != punchObj.id);
       _setFilteredArr(arr);
     }
@@ -368,7 +359,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       filteredArr[idx] = punchObj;
       _setFilteredArr(filteredArr);
       // add to database
-      dbSetOrUpdateUserPunchObj(punchObj);
+      dbSavePunchObject(punchObj);
     }
 
     const iconSize = 30;

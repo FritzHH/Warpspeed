@@ -15,7 +15,6 @@ import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
 
-import { subscribeToDBNodeChanges } from "../db_subscription_wrapper";
 import {
   useInventoryStore,
   useOpenWorkordersStore,
@@ -25,14 +24,17 @@ import {
   useCheckoutStore,
   useAlertScreenStore,
 } from "../stores";
-import { createStore, createTenant, signOutUser } from "../db";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
-import { DB_BATCH_INTERVAL_MILLIS } from "../constants";
-import { fillInventory, fillOpenWorkorders, fillSettings } from "../testing";
 import { CheckoutModalScreen } from "./screen_components/modal_screens/CheckoutModalScreen";
-import { dbLogout, dbSaveSettings, dbGetSettings, dbGetOpenWorkorders, dbGetInventoryItems, dbListenToSettings, dbListenToOpenWorkorders, dbListenToCurrentPunchClock, dbListenToInventory } from "../db_calls_wrapper";
+import {
+  dbListenToSettings,
+  dbListenToOpenWorkorders,
+  dbListenToCurrentPunchClock,
+  dbListenToInventory,
+} from "../db_calls_wrapper";
 import { SETTINGS_OBJ } from "../data";
 import { clog, log } from "../utils";
+import { cloneDeep } from "lodash";
 
 export function BaseScreen() {
   // store setters ////////////////////////////////////////////////////////////////
@@ -133,11 +135,7 @@ export function BaseScreen() {
   }, []);
 
   useEffect(() => {
-    // try {
-    //   _zSetLoginTimeout(zSettingsObj?.loginTimeout);
-    //   // testing take out this is your user obj
-    //   // _zSetCurrentUserObj(zSettingsObj?.users[0]);
-    // } catch (e) {}
+    // let po = cloneDeep(PRIN);
   }, [zSettings]);
 
   // database batching
@@ -155,19 +153,6 @@ export function BaseScreen() {
     // };
   }, [zLastDatabaseBatchMillis, zLastDatabaseWriteMillis]);
   // log("BaseScreen render");
-
-  // In BaseScreen
-  useEffect(() => {
-    if (zShowAlert) {
-      // Force a re-render or additional logic
-      // console.log("Alert should be showing");
-      // useAlertScreenStore.getState().setShowAlert(false);
-      // setTimeout(() => {
-      //   log("here");
-      //   useAlertScreenStore.getState().setShowAlert(true);
-      // }, 10);
-    }
-  }, [zShowAlert]);
 
   return (
     <View

@@ -3,8 +3,12 @@ import React, { useState, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
-import { onAuthStateChange } from "./db";
-import { dbAutoLogin, dbGetSettings, dbGetTenantById } from "./db_calls_wrapper";
+import { onAuthStateChange } from "./db_calls_wrapper";
+import {
+  dbAutoLogin,
+  dbGetSettings,
+  dbGetTenantById,
+} from "./db_calls_wrapper";
 import { log } from "./utils";
 import { useSettingsStore } from "./stores";
 
@@ -16,7 +20,7 @@ export const ROUTES = {
 const DEVELOPMENT_AUTO_LOGIN = {
   enabled: true,
   email: "fritz@bonitabikes.com",
-  password: "BonitaBikes.1236"
+  password: "BonitaBikes.1236",
 };
 
 /////////////////////////////////////
@@ -34,18 +38,21 @@ function App() {
             DEVELOPMENT_AUTO_LOGIN.email,
             DEVELOPMENT_AUTO_LOGIN.password
           );
-          
+
           if (loginResult.success) {
-            console.log("Auto-login successful, loading initial data:", loginResult.user.email);
-            dbGetTenantById(loginResult.user.uid).then(res => {
-              dbGetSettings(res.tenantID, res.storeID).then(settings => {
+            console.log(
+              "Auto-login successful, loading initial data:",
+              loginResult.user.email
+            );
+            dbGetTenantById(loginResult.user.uid).then((res) => {
+              // log("tenatn", res);
+              dbGetSettings(res.tenantID, res.storeID).then((settings) => {
                 // log("settings", settings);
                 useSettingsStore.getState().setSettings(settings, false, false);
                 log("initial data loaded, heading to Main");
                 setUser(loginResult.user);
-              })
-            })
-
+              });
+            });
           } else {
             throw new Error("Auto-login failed");
           }
@@ -55,7 +62,7 @@ function App() {
             setUser(user);
             setIsLoading(false);
           });
-          
+
           return () => unsubscribe();
         }
       } catch (error) {
@@ -65,7 +72,7 @@ function App() {
           setUser(user);
           setIsLoading(false);
         });
-        
+
         return () => unsubscribe();
       } finally {
         setIsLoading(false);

@@ -6,9 +6,9 @@ import {
   generateUPCBarcode,
   trimToTwoDecimals,
 } from "./utils";
-import { dbSetInventoryItem } from "./db_call_wrapper";
 import { INVENTORY_ITEM_PROTO } from "./data";
 import * as XLSX from "xlsx";
+import { dbSaveInventoryItem } from "./db_calls_wrapper";
 
 function readXLSXBinaryReturnRows(binaryStr) {
   let readedData = XLSX.read(binaryStr, { type: "binary" });
@@ -70,6 +70,6 @@ export function fillInventoryFromLightspeedObjArr(lightspeedObjArr) {
     inv.upc = obj.upc;
     inv.cost = trimToTwoDecimals(obj.cost);
     inv.price = trimToTwoDecimals(obj.cost * 2);
-    dbSetInventoryItem(inv);
+    dbSaveInventoryItem(inv);
   }
 }

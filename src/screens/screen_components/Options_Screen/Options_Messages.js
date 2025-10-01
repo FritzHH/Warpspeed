@@ -34,7 +34,6 @@ import {
   useCustMessagesStore,
   useLoginStore,
 } from "../../../stores";
-import { dbSendMessageToCustomer } from "../../../db_call_wrapper";
 
 export function MessagesComponent({}) {
   // setters /////////////////////////////////////////////////////////////
@@ -75,7 +74,7 @@ export function MessagesComponent({}) {
     msg.senderUserObj = zCurrentUserObj;
     _setNewMessage("");
     _zSetOutgoingMessage(msg);
-    dbSendMessageToCustomer(msg);
+    // dbSendMessageToCustomer(msg);
   }
 
   // log("res", sCanRespond);

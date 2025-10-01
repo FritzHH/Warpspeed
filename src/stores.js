@@ -18,19 +18,15 @@ import {
   replaceOrAddToArr,
 } from "./utils";
 import { cloneDeep } from "lodash";
+
 import {
-  dbSetInventoryItem,
-  dbSetCustomerField,
-  dbGetOpenWorkorderItem,
-  dbGetClosedWorkorderItem,
-  dbGetSaleItem,
-  dbDeleteCompletedWorkorder,
-} from "./db_call_wrapper";
-import {
+  dbDeleteWorkorder,
   dbGetCompletedSale,
   dbGetCompletedWorkorder,
+  dbGetWorkorder,
   dbSaveCurrentPunchClock,
   dbSaveCustomer,
+  dbSaveInventoryItem,
   dbSaveOpenWorkorder,
   dbSavePunchObject,
   dbSaveSettings,
@@ -136,7 +132,7 @@ export const useCheckoutStore = create((set, get) => ({
         message: "Searching for transaction...",
       });
 
-      dbGetSaleItem(receiptScan)
+      dbGetCompletedSale(receiptScan)
         .then((sale) => {
           if (sale) {
             set({
@@ -146,7 +142,7 @@ export const useCheckoutStore = create((set, get) => ({
             let count = 0;
             let workorders = [];
             sale.workorderIDs.forEach((workorderID) => {
-              dbGetOpenWorkorderItem(workorderID).then((workorder) => {
+              dbGetWorkorder(workorderID).then((workorder) => {
                 count++;
                 // if (workorder) addToCombinedArr(workorder);
                 if (workorder) workorders.push(workorder);
@@ -162,7 +158,7 @@ export const useCheckoutStore = create((set, get) => ({
                 // addToCombinedArr(workorders, sale);
               });
 
-              dbGetClosedWorkorderItem(workorderID).then((workorder) => {
+              dbGetCompletedWorkorder(workorderID).then((workorder) => {
                 count++;
                 // if (res) addToCombinedArr(res);
                 if (workorder) workorders.push(workorder);
@@ -531,7 +527,7 @@ export const useInventoryStore = create((set, get) => ({
     inventoryArr = inventoryArr.filter((o) => o.id === item.id);
     set({ inventoryArr });
 
-    if (sendToDB) dbSetInventoryItem(item, batch, true);
+    if (sendToDB) dbSaveInventoryItem(item);
   },
   setItem: (item, sendToDB = true, batch = true) => {
     // clog("item", item);
@@ -543,7 +539,7 @@ export const useInventoryStore = create((set, get) => ({
       inventoryArr.push(item);
     }
     set({ inventoryArr });
-    if (sendToDB) dbSetInventoryItem(item, batch);
+    if (sendToDB) dbSaveInventoryItem(item, batch);
   },
   setItems: (inventoryArr) => set({ inventoryArr }),
 }));
@@ -665,8 +661,9 @@ export const useOpenWorkordersStore = create((set, get) => ({
   getWorkorders: () => get().workorders,
 
   setOpenWorkorderID: (openWorkorderID) => set({ openWorkorderID }),
-  setOpenWorkorders: (workorders) => set({ workorders }), // real one
+  setOpenWorkorders: (workorders) => set({ workorders }),
   setWorkorder: (wo, saveToDB = true, batch = true) => {
+    if (wo.isStandaloneSale) saveToDB = false;
     set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
     if (saveToDB) dbSaveOpenWorkorder(wo);
   },
@@ -694,7 +691,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     }
 
     if (saveToDB) {
-      dbDeleteCompletedWorkorder(workorderID.id);
+      dbDeleteWorkorder(workorderID.id);
     }
   },
 }));

@@ -15,17 +15,11 @@ import {
   WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "./data";
-import { setRealtimeNodeItem } from "./db";
 import {
   generateUPCBarcode,
   randomWordGenerator,
   roundToTwoDecimals,
 } from "./utils";
-import {
-  dbSetCustomerObj,
-  // dbCreateUserPunchAction,
-  dbSetWorkorder,
-} from "./db_call_wrapper";
 import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "./constants";
 import { dbSaveInventoryItem, dbSaveSettings } from "./db_calls_wrapper";
 
@@ -115,13 +109,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
       // clog(line, i);
     }
 
-    // log(wo.workorderLines.length.toString());
-    // arr.push(wo);
-    // log("status", wo.status);
-    dbSetWorkorder(wo, false);
-  }
-  // clog(arr);
-  // }
+
 }
 
 export function fillCustomers() {
@@ -132,7 +120,6 @@ export function fillCustomers() {
     cust.last = "test last " + i;
     cust.cell = "111111111" + i;
     cust.city = "test city " + i;
-    dbSetCustomerObj(cust);
   }
 }
 
@@ -205,11 +192,11 @@ export function fillReceipt() {
     },
   ];
 
-  setRealtimeNodeItem("PRINTERS/to_print", { [receipt.id]: receipt });
+  // setRealtimeNodeItem("PRINTERS/to_print", { [receipt.id]: receipt });
 }
 
 export function fillPrinterNames() {
-  setRealtimeNodeItem("PRINTERS/printer_names", PRINTER_NAMES);
+  // setRealtimeNodeItem("PRINTERS/printer_names", PRINTER_NAMES);
 }
 
 export function fillPunchHistory() {

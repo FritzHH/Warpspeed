@@ -31,10 +31,10 @@ import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   dbCancelServerDrivenStripePayment,
   dbProcessServerDrivenStripePayment,
-  dbProcessStripeRefund,
-  dbSubscribeToStripePaymentProcess,
   createPaymentPollingFallback,
-} from "../../../../db_call_wrapper";
+  processServerDrivenStripeRefund,
+  dbListenToPaymentReaderUpdates,
+} from "../../../../db_calls_wrapper";
 import { STRIPE_INITIATE_PAYMENT_INTENT_URL } from "../../../../private_user_constants";
 
 export const StripeCreditCardComponent = ({
@@ -205,7 +205,7 @@ export const StripeCreditCardComponent = ({
     let error = false;
     log("starting refund  " + paymentAmount, payment);
     try {
-      const res = await dbProcessStripeRefund(
+      const res = await processServerDrivenStripeRefund(
         paymentAmount,
         payment.paymentIntentID
       );
@@ -275,7 +275,7 @@ export const StripeCreditCardComponent = ({
 
         // Set up realtime database listener
         let listenerArr = cloneDeep(sListeners);
-        let listener = dbSubscribeToStripePaymentProcess(
+        let listener = dbListenToPaymentReaderUpdates(
           sCardReader.id,
           readerResult.paymentIntentID,
           handleStripeCardPaymentDBSubscriptionUpdate

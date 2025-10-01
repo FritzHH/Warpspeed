@@ -204,6 +204,7 @@ export const useAlertScreenStore = create((set, get) => ({
   handleBtn3Press: null,
   canExitOnOuterClick: true,
   pauseOnBaseComponent: false,
+  useCancelButton: false,
 
   getPauseOnBaseComponent: () => get().pauseOnBaseComponent,
   getMessage: () => get().message,
@@ -245,6 +246,7 @@ export const useAlertScreenStore = create((set, get) => ({
     alertBoxStyle = {},
     showAlert = true,
     pauseOnBaseComponent = false,
+    useCancelButton,
   }) => {
     set(() => ({
       title,
@@ -266,6 +268,7 @@ export const useAlertScreenStore = create((set, get) => ({
       alertBoxStyle,
       showAlert,
       pauseOnBaseComponent,
+      useCancelButton,
     }));
   },
   setMessage: (message) => {
@@ -330,6 +333,7 @@ export const useAlertScreenStore = create((set, get) => ({
       handleBtn3Press: null,
       canExitOnOuterClick: true,
       pauseOnBaseComponent: false,
+      useCancelButton: false,
     }));
   },
 }));
@@ -663,9 +667,8 @@ export const useOpenWorkordersStore = create((set, get) => ({
   setOpenWorkorderID: (openWorkorderID) => set({ openWorkorderID }),
   setOpenWorkorders: (workorders) => set({ workorders }),
   setWorkorder: (wo, saveToDB = true, batch = true) => {
-    if (wo.isStandaloneSale) saveToDB = false;
     set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
-    if (saveToDB) dbSaveOpenWorkorder(wo);
+    if (saveToDB && !wo.isStandaloneSale) dbSaveOpenWorkorder(wo);
   },
   setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
     // log(fieldName, fieldVal);
@@ -674,7 +677,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     workorder = { ...workorder, [fieldName]: fieldVal };
 
     set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
-    if (saveToDB) dbSaveOpenWorkorder(workorder);
+    if (saveToDB && !workorder.isStandaloneSale) dbSaveOpenWorkorder(workorder);
   },
 
   removeWorkorder: (workorderID, saveToDB = true, batch = true) => {
@@ -682,11 +685,6 @@ export const useOpenWorkordersStore = create((set, get) => ({
     set({ workorderArr: workorders });
 
     if (get().openWorkorder?.id === workorderID) {
-      useTabNamesStore().getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.customer,
-        itemsTabName: TAB_NAMES.itemsTab.empty,
-        optionsTabName: TAB_NAMES.optionsTab.workorders,
-      });
       set({ openWorkorder: null });
     }
 

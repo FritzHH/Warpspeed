@@ -187,36 +187,60 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   const zAlertBoxStyle = useAlertScreenStore((state) =>
     state.getAlertBoxStyle()
   );
+  let zUseCancelButton = useAlertScreenStore((state) => state.useCancelButton);
+
+  // Animation state ///////////////////////////////////////////////////////////
+  const [sAnimation, _setAnimation] = useState("fade");
 
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
   function handleButton1Press() {
     zButton1Handler();
-    _zResetAll();
+    useAlertScreenStore.getState().setShowAlert(false);
+    setTimeout(() => {
+      _zResetAll();
+    }, 100);
   }
 
   function handleButton2Press() {
     zButton2Handler();
-    _zResetAll();
+    useAlertScreenStore.getState().setShowAlert(false);
+    setTimeout(() => {
+      _zResetAll();
+    }, 100);
   }
 
   function handleButton3Press() {
     zButton3Handler();
-    _zResetAll();
+    useAlertScreenStore.getState().setShowAlert(false);
+    setTimeout(() => {
+      _zResetAll();
+    }, 100);
   }
 
-  useEffect(() => {});
+  // Animation control //////////////////////////////////////////////////////////
+  useEffect(() => {
+    if (showAlert) {
+      _setAnimation("fade"); // Fade in when opening
+    } else {
+      _setAnimation("slide"); // Slide out when closing
+    }
+  }, [showAlert]);
+
+  if ((!zButton2Handler && !zButton3Handler) || zUseCancelButton)
+    zUseCancelButton = true;
 
   // log(zButton1Text, zButton2Text);
   return (
     <TouchableWithoutFeedback
       onPress={() => (zCanExitOnOuterClick ? _zResetAll() : null)}
     >
-      <Modal visible={showAlert} transparent>
+      <Modal animationType={sAnimation} visible={showAlert} transparent>
         <View
           style={{
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            // backgroundColor: "rgba(0, 0, 0, 0.8)",
+            // back
             alignItems: "center",
             justifyContent: "center",
             alignSelf: "center",
@@ -227,96 +251,131 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
         >
           <View
             style={{
-              backgroundColor: C.backgroundWhite,
-              borderRadius: 15,
+              justifyContent: "center",
               alignItems: "center",
-              justifyContent: "space-around",
-              minWidth: "30%",
-              minHeight: "20%",
-              ...zAlertBoxStyle,
+              minWidth: "40%",
+              minHeight: "40%",
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+              borderRadius: 15,
             }}
           >
-            {!!zTitle && (
-              <Text
-                numberOfLines={3}
-                style={{
-                  fontWeight: "500",
-                  marginTop: 25,
-                  color: Colors.darkText,
-                  fontSize: 25,
-                  color: "red",
-                }}
-              >
-                {zTitle || "Alert:"}
-              </Text>
-            )}
-
-            {!!zMessage && (
-              <Text
-                style={{
-                  textAlign: "center",
-                  width: "90%",
-                  marginTop: 10,
-                  color: Colors.darkText,
-                  fontSize: 18,
-                }}
-              >
-                {zMessage}
-              </Text>
-            )}
-            {!!zSubMessage && (
-              <Text
-                style={{
-                  marginTop: 20,
-                  width: "80%",
-                  textAlign: "center",
-                  color: Colors.darkText,
-                  fontSize: 16,
-                }}
-              >
-                {zSubMessage}
-              </Text>
-            )}
             <View
               style={{
-                marginTop: 25,
-                flexDirection: "row",
-                justifyContent: "center",
-                marginBottom: 25,
-                width: "100%",
+                backgroundColor: C.backgroundWhite,
+                borderRadius: 15,
+                alignItems: "center",
+                justifyContent: "space-around",
+                minWidth: "80%",
+                minHeight: "60%",
+                ...zAlertBoxStyle,
               }}
             >
-              <Button_
-                colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
-                text={zButton1Text}
-                buttonStyle={{ marginRight: 20 }}
-                textStyle={{ color: C.textWhite }}
-                onPress={handleButton1Press}
-                iconSize={zIcon1Size || 60}
-                icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
-              />
-              {!!zButton2Handler && (
+              <View>
+                {!!zTitle && (
+                  <Text
+                    numberOfLines={3}
+                    style={{
+                      fontWeight: "500",
+                      marginTop: 25,
+                      color: Colors.darkText,
+                      fontSize: 25,
+                      color: "red",
+                    }}
+                  >
+                    {zTitle || "Alert:"}
+                  </Text>
+                )}
+
+                {!!zMessage && (
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      width: "90%",
+                      marginTop: 10,
+                      color: Colors.darkText,
+                      fontSize: 18,
+                    }}
+                  >
+                    {zMessage}
+                  </Text>
+                )}
+                {!!zSubMessage && (
+                  <Text
+                    style={{
+                      marginTop: 20,
+                      width: "80%",
+                      textAlign: "center",
+                      color: Colors.darkText,
+                      fontSize: 16,
+                    }}
+                  >
+                    {zSubMessage}
+                  </Text>
+                )}
+              </View>
+              <View
+                style={{
+                  marginTop: 25,
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  marginBottom: 25,
+                  width: "100%",
+                }}
+              >
                 <Button_
-                  colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
-                  text={zButton2Text}
+                  colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
+                  text={zButton1Text}
                   buttonStyle={{ marginRight: 20 }}
-                  textStyle={zButton2Text ? { color: C.textWhite } : {}}
-                  onPress={handleButton2Press}
-                  iconSize={zIcon2Size || 60}
-                  icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
+                  textStyle={{ color: C.textWhite }}
+                  onPress={handleButton1Press}
+                  iconSize={zIcon1Size || 60}
+                  icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
                 />
-              )}
-              {!!zButton3Handler && (
-                <Button_
-                  colorGradientArr={zButton3Text ? COLOR_GRADIENTS.purple : []}
-                  text={zButton3Text}
-                  buttonStyle={zButton3Text ? {} : {}}
-                  textStyle={zButton3Text ? { color: C.textWhite } : {}}
-                  onPress={handleButton3Press}
-                  iconSize={zIcon3Size || 60}
-                  icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
-                />
-              )}
+                {!!zButton2Handler && (
+                  <Button_
+                    colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
+                    text={zButton2Text}
+                    buttonStyle={{ marginRight: 20 }}
+                    textStyle={zButton2Text ? { color: C.textWhite } : {}}
+                    onPress={handleButton2Press}
+                    iconSize={zIcon2Size || 60}
+                    icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
+                  />
+                )}
+                {!!zButton3Handler && (
+                  <Button_
+                    colorGradientArr={
+                      zButton3Text ? COLOR_GRADIENTS.purple : []
+                    }
+                    text={zButton3Text}
+                    buttonStyle={zButton3Text ? {} : {}}
+                    textStyle={zButton3Text ? { color: C.textWhite } : {}}
+                    onPress={handleButton3Press}
+                    iconSize={zIcon3Size || 60}
+                    icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
+                  />
+                )}
+              </View>
+              <View style={{ width: "100%", justifyContent: "flex-end" }}>
+                {zUseCancelButton && (
+                  <Button_
+                    textStyle={{ color: gray(0.4) }}
+                    buttonStyle={{
+                      backgroundColor: gray(0.09),
+                      borderRadius: 0,
+                      borderBottomRightRadius: 15,
+                      borderBottomLeftRadius: 15,
+                    }}
+                    text={"CANCEL"}
+                    onPress={() => {
+                      useAlertScreenStore.getState().setShowAlert(false);
+                      setTimeout(() => {
+                        _zResetAll();
+                      }, 100);
+                    }}
+                  />
+                )}
+              </View>
             </View>
           </View>
         </View>

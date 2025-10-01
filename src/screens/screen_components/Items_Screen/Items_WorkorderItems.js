@@ -201,11 +201,13 @@ export const Items_WorkorderItemsTab = ({}) => {
     };
 
     showAlert({
-      title: "Confirm Delete Workorder",
+      title: zOpenWorkorder.isStandaloneSale
+        ? "Confirm Delete Sale"
+        : "Confirm Delete Workorder",
       btn1Icon: ICONS.trash,
-      btn2Icon: ICONS.close1,
+      // btn2Icon: ICONS.close1,
       handleBtn1Press: deleteFun,
-      handleBtn2Press: () => {},
+      // handleBtn2Press: () => {},
     });
   }
 

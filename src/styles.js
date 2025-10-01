@@ -73,6 +73,8 @@ export const COLOR_GRADIENTS = {
 
 const ASSETS_PATH = "./assets/";
 export const ICONS = {
+  cartFinished: require(ASSETS_PATH + "cart_finished.png"),
+  bicycle: require(ASSETS_PATH + "bicycle.png"),
   wheelGIF: require(ASSETS_PATH + "wheelGIF.gif"),
   greenDollar: require(ASSETS_PATH + "bank.png"),
   creditCard: require(ASSETS_PATH + "credit-card.png"),
@@ -92,7 +94,8 @@ export const ICONS = {
   check: require(ASSETS_PATH + "check.png"),
   shoppingCart: require(ASSETS_PATH + "shopping_cart.png"),
   new: require(ASSETS_PATH + "new.png"),
-  add: require(ASSETS_PATH + "add.png"),
+  add: require(ASSETS_PATH + "plus.png"),
+  addRound: require(ASSETS_PATH + "add_round.png"),
   cashBag: require(ASSETS_PATH + "cash.png"),
   cashHand: require(ASSETS_PATH + "cashHand.png"),
   cashRed: require(ASSETS_PATH + "cashRed.png"),

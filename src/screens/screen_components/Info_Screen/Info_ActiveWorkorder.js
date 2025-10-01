@@ -670,8 +670,8 @@ export const ActiveWorkorderComponent = ({}) => {
         }}
       >
         <Button_
-          icon={ICONS.add}
-          iconSize={50}
+          icon={ICONS.bicycle}
+          iconSize={48}
           buttonStyle={{}}
           onPress={handleNewWorkorderPress}
         />

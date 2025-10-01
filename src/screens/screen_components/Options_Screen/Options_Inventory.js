@@ -8,6 +8,7 @@ import {
   formatCurrencyDisp,
   generateUPCBarcode,
   gray,
+  lightenRGBByPercent,
   log,
 } from "../../../utils";
 import {
@@ -322,7 +323,7 @@ export function InventoryComponent({}) {
                           style={{
                             textAlign: "right",
                             fontSize: 10,
-                            color: C.text,
+                            color: gray(0.4),
                           }}
                         >
                           {"$ "}
@@ -341,7 +342,7 @@ export function InventoryComponent({}) {
                             style={{
                               textAlign: "right",
                               fontSize: 10,
-                              color: C.red,
+                              color: lightenRGBByPercent(C.red, 60),
                             }}
                           >
                             {"$ "}
@@ -352,7 +353,7 @@ export function InventoryComponent({}) {
                                 color: C.red,
                               }}
                             >
-                              {formatCurrencyDisp(item.salePrice)}
+                              {/* {formatCurrencyDisp(item.salePrice)} */}
                             </Text>
                           </Text>
                         )}

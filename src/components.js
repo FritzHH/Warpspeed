@@ -429,7 +429,7 @@ export const ScreenModal = ({
   handleButtonPress = () => {},
   handleMouseOver,
   handleMouseExit,
-  buttonLabel = "Modal Btn",
+  buttonLabel,
   buttonVisible = true,
   showOuterModal = false,
   buttonIconSize,

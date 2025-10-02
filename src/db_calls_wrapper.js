@@ -2,7 +2,11 @@
 // This file contains all business logic and calls the "dumb" db.js functions
 
 import { log } from "./utils";
-import { DB_NODES, MILLIS_IN_MINUTE } from "./constants";
+import {
+  DB_NODES,
+  MILLIS_IN_MINUTE,
+  PRINT_OBJECT_REMOVAL_DELAY,
+} from "./constants";
 import {
   firestoreWrite,
   firestoreRead,
@@ -1201,6 +1205,34 @@ export async function dbSavePrintObj(printObj, printerID) {
       log(
         `Successfully saved print object with ID: ${printObj.id} to printer: ${printerID}`
       );
+
+      // Set timer to remove the print object after 100ms
+      setTimeout(async () => {
+        try {
+          log(
+            `Removing print object with ID: ${printObj.id} after ${PRINT_OBJECT_REMOVAL_DELAY}ms`
+          );
+          let deleteResult;
+          if (!printObj.persistFlag) {
+            deleteResult = await firestoreDelete(path);
+          }
+
+          if (deleteResult.success) {
+            log(`Successfully removed print object with ID: ${printObj.id}`);
+          } else {
+            log(
+              `Error removing print object with ID: ${printObj.id}:`,
+              deleteResult.error
+            );
+          }
+        } catch (error) {
+          log(
+            `Error in timer removal of print object with ID: ${printObj.id}:`,
+            error
+          );
+        }
+      }, PRINT_OBJECT_REMOVAL_DELAY);
+
       return {
         success: true,
         message: "Print object saved successfully",

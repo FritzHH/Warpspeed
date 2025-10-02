@@ -3,6 +3,7 @@ import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef } from "./db_calls_wrapper";
 import {
   CUSTOMER_PROTO,
+  RECEIPT_PROTO,
   RECEIPT_TYPES,
   SETTINGS_OBJ,
   WORKORDER_PROTO,
@@ -1749,13 +1750,17 @@ export function createNewWorkorder({
 
 /// RECEIPT PRINTING ////////////////////////////////////////////////////////////
 const RECEIPT_CONSTS = {};
+function parseWorkorder(wo) {
+  let r = cloneDeep(RECEIPT_PROTO);
+}
+
 export const printBuilder = {
-  testReceipt: () => {
+  test: () => {
     return {
       ...RECEIPT_CONSTS,
       id: generateRandomID(),
       receiptType: RECEIPT_TYPES.test,
-      hello: "buddy",
+      // persistFlag: true,
     };
   },
 };

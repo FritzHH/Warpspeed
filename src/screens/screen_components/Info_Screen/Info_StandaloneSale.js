@@ -69,7 +69,7 @@ export const StandaloneSaleComponent = ({}) => {
         <Button_
           icon={ICONS.expandGreen}
           onPress={() =>
-            dbSavePrintObj(printBuilder.testReceipt(), "8C:77:3B:60:33:22")
+            dbSavePrintObj(printBuilder.test(), "8C:77:3B:60:33:22")
           }
         />
       </View>

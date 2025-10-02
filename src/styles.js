@@ -73,6 +73,8 @@ export const COLOR_GRADIENTS = {
 
 const ASSETS_PATH = "./assets/";
 export const ICONS = {
+  workorder: require(ASSETS_PATH + "workorder.png"),
+  receipt: require(ASSETS_PATH + "receipt.png"),
   bicycle: require(ASSETS_PATH + "bicycle.png"),
   wheelGIF: require(ASSETS_PATH + "wheelGIF.gif"),
   greenDollar: require(ASSETS_PATH + "bank.png"),

@@ -14,6 +14,7 @@ import {
   Button_,
   Image_,
   TextInput_,
+  PrinterButton,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -24,6 +25,7 @@ import {
   COLORS,
   NONREMOVABLE_STATUSES,
   CONTACT_RESTRICTIONS,
+  RECEIPT_TYPES,
 } from "../../../data";
 import React, { useRef, useState } from "react";
 import { cloneDeep } from "lodash";
@@ -35,7 +37,12 @@ import {
   useTabNamesStore,
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+
 const DROPDOWN_SELECTED_OPACITY = 0.3;
+const RECEIPT_DROPDOWN_SELECTIONS = [
+  RECEIPT_TYPES.intake,
+  RECEIPT_TYPES.workorder,
+];
 
 export const ActiveWorkorderComponent = ({}) => {
   // store setters /////////////////////////////////////////////////////////////////
@@ -133,6 +140,10 @@ export const ActiveWorkorderComponent = ({}) => {
     useOpenWorkordersStore.getState().setWorkorder(wo, false);
     useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
   }
+
+  function handleWorkorderPrintPress() {}
+
+  function handleIntakePrintPress() {}
 
   return (
     <View
@@ -729,12 +740,16 @@ export const ActiveWorkorderComponent = ({}) => {
           borderRadius: 5,
           borderColor: C.listItemBorder,
           borderWidth: 1,
+          paddingHorizontal: 3,
         }}
       >
         <Button_
           icon={ICONS.bicycle}
           iconSize={48}
-          buttonStyle={{}}
+          buttonStyle={{
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+          }}
           onPress={handleNewWorkorderPress}
         />
         <Button_
@@ -742,8 +757,25 @@ export const ActiveWorkorderComponent = ({}) => {
           iconSize={35}
           buttonStyle={{
             backgroundColor: "transparent",
+            paddingHorizontal: 0,
+            paddingVertical: 0,
           }}
           onPress={handleStartStandaloneSalePress}
+        />
+
+        <Button_
+          icon={ICONS.receipt}
+          iconSize={32}
+          iconStyle={{ paddingHorizontal: 0 }}
+          style={{ paddingHorizontal: 0, paddingVertical: 0 }}
+          onPress={handleWorkorderPrintPress}
+        />
+        <Button_
+          icon={ICONS.workorder}
+          iconSize={28}
+          iconStyle={{ paddingHorizontal: 0 }}
+          style={{ paddingHorizontal: 0, paddingVertical: 0 }}
+          onPress={handleIntakePrintPress}
         />
       </View>
     </View>

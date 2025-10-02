@@ -29,7 +29,6 @@ import {
   updatePassword,
 } from "firebase/auth";
 import { collection, doc } from "firebase/firestore";
-import { get } from "firebase/database";
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -146,6 +145,19 @@ function buildPrinterPath(tenantID, storeID, printerID) {
   // Firestore paths must have even number of segments (collection/document/collection/document...)
   // Format: tenants/{tenantID}/stores/{storeID}/printers/{printerID}
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PRINTERS}/${printerID}`;
+}
+
+/**
+ * Build Firestore path for print object in to_print subcollection
+ * @param {string} tenantID - Tenant ID
+ * @param {string} storeID - Store ID
+ * @param {string} printerID - Printer ID
+ * @param {string} objectID - Print object ID
+ * @returns {string} Full Firestore path for print object document
+ */
+function buildPrintObjectPath(tenantID, storeID, printerID, objectID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/printers/{printerID}/to_print/{objectID}
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PRINTERS}/${printerID}/to_print/${objectID}`;
 }
 
 /**
@@ -1113,84 +1125,98 @@ export async function dbSaveCurrentPunchClock(punchClockData) {
 }
 
 /**
- * Save printer object to Firestore
- * @param {Object} printer - Printer object with "id" field
- * @param {string} printerID - Optional printer ID (uses printer.id if not provided)
+ * Save print object to Firestore to_print subcollection
+ * @param {Object} printObj - Print object with "id" field
+ * @param {string} printerID - Required printer ID for the path
  * @returns {Promise<Object>} Save result
  */
-export async function dbSavePrinter(printer, printerID = null) {
+export async function dbSavePrintObj(printObj, printerID) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
     if (!tenantID || !storeID) {
-      log("Error: tenantID and storeID are not configured for dbSavePrinter");
+      log("Error: tenantID and storeID are not configured for dbSavePrintObj");
       return {
         success: false,
         error: "Configuration Error",
         message:
           "tenantID and storeID are not configured. Please check your settings.",
-        printer: null,
+        printObj: null,
         printerID: null,
         tenantID,
         storeID,
       };
     }
 
-    if (!printer || typeof printer !== "object") {
-      log("Error: printer object is required for dbSavePrinter");
+    if (!printObj || typeof printObj !== "object") {
+      log("Error: print object is required for dbSavePrintObj");
       return {
         success: false,
         error: "Validation Error",
-        message: "printer object is required for dbSavePrinter",
-        printer: null,
+        message: "print object is required for dbSavePrintObj",
+        printObj: null,
         printerID: null,
         tenantID,
         storeID,
       };
     }
 
-    // Use provided printerID or extract from printer object
-    const finalPrinterID = printerID || printer.id;
-
-    if (!finalPrinterID) {
-      log("Error: printerID is required for dbSavePrinter");
+    if (!printerID) {
+      log("Error: printerID is required for dbSavePrintObj");
       return {
         success: false,
         error: "Validation Error",
-        message: "printerID is required for dbSavePrinter",
-        printer: null,
+        message: "printerID is required for dbSavePrintObj",
+        printObj: null,
         printerID: null,
         tenantID,
         storeID,
       };
     }
 
-    // Ensure printer object has the id field
-    const printerWithID = { ...printer, id: finalPrinterID };
+    if (!printObj.id) {
+      log("Error: print object must have an 'id' field for dbSavePrintObj");
+      return {
+        success: false,
+        error: "Validation Error",
+        message: "print object must have an 'id' field",
+        printObj: null,
+        printerID,
+        tenantID,
+        storeID,
+      };
+    }
 
-    const path = buildPrinterPath(tenantID, storeID, finalPrinterID);
-    log(`Saving printer to path: ${path}`);
+    const path = buildPrintObjectPath(
+      tenantID,
+      storeID,
+      printerID,
+      printObj.id
+    );
+    log(`Saving print object to path: ${path}`);
 
-    const result = await firestoreWrite(path, printerWithID);
+    const result = await firestoreWrite(path, printObj);
 
     if (result.success) {
-      log(`Successfully saved printer with ID: ${finalPrinterID}`);
+      log(
+        `Successfully saved print object with ID: ${printObj.id} to printer: ${printerID}`
+      );
       return {
         success: true,
-        message: "Printer saved successfully",
-        printer: printerWithID,
-        printerID: finalPrinterID,
+        message: "Print object saved successfully",
+        printObj: printObj,
+        printerID: printerID,
         tenantID,
         storeID,
         path,
       };
     } else {
-      log(`Error saving printer: ${result.error}`);
+      log(`Error saving print object: ${result.error}`);
       return {
         success: false,
         error: result.error,
-        message: "Failed to save printer",
-        printer: null,
+        message: "Failed to save print object",
+        printObj: null,
         printerID: null,
         tenantID,
         storeID,
@@ -1198,12 +1224,12 @@ export async function dbSavePrinter(printer, printerID = null) {
       };
     }
   } catch (error) {
-    log("Error in dbSavePrinter:", error);
+    log("Error in dbSavePrintObj:", error);
     return {
       success: false,
       error: "Database Error",
-      message: "An error occurred while saving the printer",
-      printer: null,
+      message: "An error occurred while saving the print object",
+      printObj: null,
       printerID: null,
       tenantID: null,
       storeID: null,

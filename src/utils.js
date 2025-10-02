@@ -1,7 +1,12 @@
 /* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef } from "./db_calls_wrapper";
-import { CUSTOMER_PROTO, SETTINGS_OBJ, WORKORDER_PROTO } from "./data";
+import {
+  CUSTOMER_PROTO,
+  RECEIPT_TYPES,
+  SETTINGS_OBJ,
+  WORKORDER_PROTO,
+} from "./data";
 import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
@@ -1721,16 +1726,36 @@ export function extractStripeErrorMessage(data, response = null) {
   }
 }
 
-export function createNewWorkorder({ customerID, customerFirst, customerLast, customerPhone, startedByFirst, startedByLast }) {
-      let wo = cloneDeep(WORKORDER_PROTO);
-      wo.id = generateUPCBarcode();
-      wo.status = SETTINGS_OBJ.statuses[0];
-      wo.customerFirst = customerFirst
-      wo.customerLast = customerLast
-      wo.customerPhone = customerPhone
-      wo.customerID = customerID
-      wo.startedBy = startedByFirst + ' ' + startedByLast,
-      wo.changeLog.push("Started by: " + startedByFirst + " " + startedByLast);
+export function createNewWorkorder({
+  customerID,
+  customerFirst,
+  customerLast,
+  customerPhone,
+  startedByFirst,
+  startedByLast,
+}) {
+  let wo = cloneDeep(WORKORDER_PROTO);
+  wo.id = generateUPCBarcode();
+  wo.status = SETTINGS_OBJ.statuses[0];
+  wo.customerFirst = customerFirst;
+  wo.customerLast = customerLast;
+  wo.customerPhone = customerPhone;
+  wo.customerID = customerID;
+  (wo.startedBy = startedByFirst + " " + startedByLast),
+    wo.changeLog.push("Started by: " + startedByFirst + " " + startedByLast);
   wo.startedOnMillis = new Date().getTime();
   return wo;
 }
+
+/// RECEIPT PRINTING ////////////////////////////////////////////////////////////
+const RECEIPT_CONSTS = {};
+export const printBuilder = {
+  testReceipt: () => {
+    return {
+      ...RECEIPT_CONSTS,
+      id: generateRandomID(),
+      receiptType: RECEIPT_TYPES.test,
+      hello: "buddy",
+    };
+  },
+};

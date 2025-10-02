@@ -19,11 +19,13 @@ import {
   calculateRunningTotals,
   gray,
   log,
+  printBuilder,
   showAlert,
   trimToTwoDecimals,
 } from "../../../utils";
 import { useEffect, useState } from "react";
 import { COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
+import { dbSavePrintObj } from "../../../db_calls_wrapper";
 
 export const StandaloneSaleComponent = ({}) => {
   // store getters
@@ -47,9 +49,9 @@ export const StandaloneSaleComponent = ({}) => {
       <View
         style={{
           flexDirection: "row",
+          justifyContent: "space-between",
           width: "100%",
           height: "15%",
-          alignItems: "flex-end",
         }}
       >
         <Button_
@@ -63,6 +65,12 @@ export const StandaloneSaleComponent = ({}) => {
           icon={ICONS.bicycle}
           iconSize={55}
           buttonStyle={{ marginBottom: 0, paddingLeft: 15 }}
+        />
+        <Button_
+          icon={ICONS.expandGreen}
+          onPress={() =>
+            dbSavePrintObj(printBuilder.testReceipt(), "8C:77:3B:60:33:22")
+          }
         />
       </View>
     </View>

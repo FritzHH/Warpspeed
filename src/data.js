@@ -211,19 +211,6 @@ export const TIME_PUNCH_PROTO = {
   option: "",
 };
 
-// export const ALERT_BOX_PROTO = {
-//   message: "",
-//   btnText1: "",
-//   btnText2: "",
-//   btnText3: "",
-//   handleBtn1Press: () => {},
-//   handleBtn2Press: () => {},
-//   handleBtn3Press: () => {},
-//   showBox: false,
-//   onModalDismiss: () => {},
-//   canExitOnOuterClick: true,
-// }; 
-
 export const ALERT_SCREEN_PROTO = {
   showAlert: true,
   title: "Alert",
@@ -848,9 +835,9 @@ export const RECEIPT_TYPES = {
   intake: "Intake",
   estimate: "Estimate",
   register: "pop-register",
+  test: "Test",
 };
 
-export const PRINTER_NAMES = ["Left Printer", "Right Printer", "Back Printer"];
 
 export const RECEIPT_LINE_ITEM_OBJ_PROTO = {
   itemName: "Brake Pads - Standard - BB Brand",

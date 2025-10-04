@@ -25,6 +25,7 @@ import {
   processServerDrivenStripeRefundCallable,
   cancelServerDrivenStripePaymentCallable,
   retrieveAvailableStripeReadersCallable,
+  sendSMSEnhanced,
 } from "./db_calls";
 import { useSettingsStore } from "./stores";
 import {
@@ -2685,4 +2686,103 @@ export function retrieveAvailableStripeReaders(readerID) {
       log("Error retrieving Stripe readers:", error);
       throw error;
     });
+}
+
+/**
+ * Send SMS using enhanced function with comprehensive error handling
+ * @param {Object} params - SMS parameters object
+ * @param {string} params.message - Message content to send
+ * @param {string} params.phoneNumber - Phone number (10 digits, US format)
+ * @param {string} params.tenantID - Tenant ID (required)
+ * @param {string} params.storeID - Store ID (required)
+ * @param {string} [params.customerID] - Customer ID (optional)
+ * @param {string} [params.messageID] - Message ID (optional)
+ * @param {string} [params.fromNumber] - From phone number (optional, defaults to +12393171234)
+ * @returns {Promise<Object>} Result object with success status and data
+ */
+
+export async function dbSendSMSEnhanced({
+  message,
+  phoneNumber,
+  tenantID,
+  storeID,
+  customerID,
+  messageID,
+  fromNumber,
+}) {
+  try {
+    if (!message || typeof message !== "string") {
+      throw new Error("Message is required and must be a string");
+    }
+
+    if (!phoneNumber || typeof phoneNumber !== "string") {
+      throw new Error("Phone number is required and must be a string");
+    }
+
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new Error("Tenant ID is required and must be a string");
+    }
+
+    if (!storeID || typeof storeID !== "string") {
+      throw new Error("Store ID is required and must be a string");
+    }
+
+    // Prepare SMS data object
+    const smsData = {
+      message: message.trim(),
+      phoneNumber: phoneNumber,
+      tenantID: tenantID,
+      storeID: storeID,
+    };
+
+    // Add optional parameters if provided
+    if (customerID) {
+      smsData.customerID = customerID;
+    }
+
+    if (messageID) {
+      smsData.messageID = messageID;
+    }
+
+    if (fromNumber) {
+      smsData.fromNumber = fromNumber;
+    }
+
+    log("Sending enhanced SMS with data:", smsData);
+
+    // Call the enhanced SMS function
+    const result = await sendSMSEnhanced(smsData);
+
+    if (result.success) {
+      log("Enhanced SMS sent successfully:", result.data);
+      return {
+        success: true,
+        message: result.message,
+        data: result.data,
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      log("Enhanced SMS failed:", result.error);
+      return {
+        success: false,
+        error: result.error,
+        code: result.code,
+        details: result.details,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  } catch (error) {
+    log("Error in dbSendSMSEnhanced:", error);
+
+    return {
+      success: false,
+      error: error.message || "Unknown error occurred",
+      code: "WRAPPER_ERROR",
+      details: {
+        originalError: error,
+        timestamp: new Date().toISOString(),
+      },
+      timestamp: new Date().toISOString(),
+    };
+  }
 }

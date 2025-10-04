@@ -46,14 +46,14 @@ export function NewWorkorderComponent({}) {
   );
 
   //////////////////////////////////////////////////////////////////////
-  const [sTextInput, _setTextInput] = React.useState("239");
+  const [sTextInput, _setTextInput] = React.useState("");
   const [sSearchFieldName, _setSearchFieldName] = React.useState("phone");
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
   const [buttonVisible, setButtonVisible] = React.useState(false);
 
   // dev ////////////////////////////////////
   useEffect(() => {
-    handleTextChange(sTextInput);
+    // handleTextChange(sTextInput);
   }, [sTextInput]);
   // dev ///////////////////////////////////
 
@@ -77,6 +77,7 @@ export function NewWorkorderComponent({}) {
   }, [sSearchFieldName, sTextInput.length, zCustomerSearchResults.length]);
 
   async function handleTextChange(incomingText = "") {
+    log(incomingText);
     let isEmail;
     let rawText = removeDashesFromPhone(incomingText);
     let isNumeric = stringIsNumeric(incomingText.substring(0, 3));

@@ -531,26 +531,40 @@ export async function callCloudFunction(functionName, data) {
 
 // Create callable functions
 const sendSMSCallable = httpsCallable(functions, "sendSMS");
+const sendSMSEnhancedCallable = httpsCallable(functions, "sendSMSEnhanced");
 
 export const processServerDrivenStripePaymentCallable = httpsCallable(
   functions,
-  "initiatePaymentIntent"
+  "initiatePaymentIntentCallable"
 );
 export const processServerDrivenStripeRefundCallable = httpsCallable(
   functions,
-  "initiateRefund"
+  "initiateRefundCallable"
 );
 export const cancelServerDrivenStripePaymentCallable = httpsCallable(
   functions,
-  "cancelServerDrivenStripePayment"
+  "cancelServerDrivenStripePaymentCallable"
 );
 export const retrieveAvailableStripeReadersCallable = httpsCallable(
   functions,
-  "getAvailableStripeReaders"
+  "getAvailableStripeReadersCallable"
 );
-const loginAppUserCallable = httpsCallable(functions, "loginAppUser");
-const createStoreCallable = httpsCallable(functions, "createStore");
-const createTenantCallable = httpsCallable(functions, "createTenant");
+export const loginAppUserCallable = httpsCallable(
+  functions,
+  "loginAppUserCallable"
+);
+export const createAppUserCallable = httpsCallable(
+  functions,
+  "createAppUserCallable"
+);
+export const createStoreCallable = httpsCallable(
+  functions,
+  "createStoreCallable"
+);
+export const createTenantCallable = httpsCallable(
+  functions,
+  "createTenantCallable"
+);
 
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)
@@ -561,6 +575,71 @@ export function sendSMS(messageBody) {
     .catch((error) => {
       log("Error sending SMS:", error);
       throw error;
+    });
+}
+
+/**
+ * Send SMS using enhanced function with comprehensive error handling
+ * @param {Object} smsData - SMS data object
+ * @param {string} smsData.message - Message content
+ * @param {string} smsData.phoneNumber - Phone number (10 digits, US format)
+ * @param {string} smsData.tenantID - Tenant ID
+ * @param {string} smsData.storeID - Store ID
+ * @param {string} [smsData.customerID] - Customer ID (optional)
+ * @param {string} [smsData.messageID] - Message ID (optional)
+ * @param {string} [smsData.fromNumber] - From phone number (optional, defaults to +12393171234)
+ * @returns {Promise<Object>} Result object with success status and data
+ */
+export function sendSMSEnhanced(smsData) {
+  return sendSMSEnhancedCallable(smsData)
+    .then((result) => {
+      log("Enhanced SMS sent successfully", result.data);
+      return {
+        success: true,
+        data: result.data,
+        message: "SMS sent successfully",
+      };
+    })
+    .catch((error) => {
+      log("Error sending enhanced SMS", error);
+
+      // Handle Firebase Functions errors
+      let errorMessage = "Failed to send SMS";
+      let errorCode = "UNKNOWN_ERROR";
+
+      if (error.code) {
+        switch (error.code) {
+          case "functions/invalid-argument":
+            errorMessage = error.message || "Invalid arguments provided";
+            errorCode = "INVALID_ARGUMENTS";
+            break;
+          case "functions/permission-denied":
+            errorMessage = error.message || "Permission denied";
+            errorCode = "PERMISSION_DENIED";
+            break;
+          case "functions/resource-exhausted":
+            errorMessage = error.message || "Service temporarily unavailable";
+            errorCode = "SERVICE_UNAVAILABLE";
+            break;
+          case "functions/internal":
+            errorMessage = error.message || "Internal server error";
+            errorCode = "INTERNAL_ERROR";
+            break;
+          default:
+            errorMessage = error.message || "Unknown error occurred";
+            errorCode = error.code || "UNKNOWN_ERROR";
+        }
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+        code: errorCode,
+        details: {
+          originalError: error,
+          timestamp: new Date().toISOString(),
+        },
+      };
     });
 }
 

@@ -838,6 +838,11 @@ export const RECEIPT_TYPES = {
   test: "Test",
 };
 
+
+export const RECEIPT_NOTES_PROTO = {
+  name: "",
+  value: "",
+};
 export const RECEIPT_LINE_ITEM_PROTO = {
   itemName: "",
   notes: "",
@@ -851,11 +856,6 @@ export const RECEIPT_LINE_ITEM_PROTO = {
   showNotes: true,
   isSalePrice: false,
   header: "",
-};
-
-export const RECEIPT_NOTES_PROTO = {
-  name: "",
-  value: "",
 };
 
 export const PRINT_WORKORDER_PROTO = {

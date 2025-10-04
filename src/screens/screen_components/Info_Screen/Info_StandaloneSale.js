@@ -52,6 +52,7 @@ export const StandaloneSaleComponent = ({}) => {
           justifyContent: "space-between",
           width: "100%",
           height: "15%",
+          alignItems: "center",
         }}
       >
         <Button_
@@ -67,7 +68,8 @@ export const StandaloneSaleComponent = ({}) => {
           buttonStyle={{ marginBottom: 0, paddingLeft: 15 }}
         />
         <Button_
-          icon={ICONS.expandGreen}
+          icon={ICONS.receipt}
+          iconSize={40}
           onPress={() =>
             dbSavePrintObj(printBuilder.test(), "8C:77:3B:60:33:22")
           }

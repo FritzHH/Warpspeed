@@ -2611,12 +2611,12 @@ const PaymentProcessingComponent = ({
               marginRight: 3,
               width: 75,
             }}
-            value={zSettingsObj?.salesTax || ""}
+            value={zSettingsObj?.salesTaxPercent || ""}
             onChangeText={(val) => {
               const regex = new RegExp(".", "g");
               let containsDecimalAlready = val.split(".").length > 2;
               if (checkInputForNumbersOnly(val) && !containsDecimalAlready) {
-                handleSettingsFieldChange("salesTax", val);
+                handleSettingsFieldChange("salesTaxPercent", val);
               }
             }}
           />

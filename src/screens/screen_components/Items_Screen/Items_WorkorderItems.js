@@ -64,7 +64,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   const checkoutBtnRef = useRef();
 
   useEffect(() => {
-    if (zOpenWorkorder?.workordersArr && zSettings.salesTax) {
+    if (zOpenWorkorder?.workordersArr && zSettings.salesTaxPercent) {
       // log("here");
       // _zSetIsCheckingOut(true);
       // dbGetCustomerObj("1236").then((res) => {
@@ -125,7 +125,9 @@ export const Items_WorkorderItemsTab = ({}) => {
   // calculate runnings totals on the open workorder ///////////////
   useEffect(() => {
     if (!(zOpenWorkorder?.workorderLines?.length > 0)) return;
-    _setTotals(calculateRunningTotals(zOpenWorkorder, zSettings.salesTax));
+    _setTotals(
+      calculateRunningTotals(zOpenWorkorder, zSettings.salesTaxPercent)
+    );
   }, [zOpenWorkorder]);
 
   ////////////////////////////////////////////////////////////////////////

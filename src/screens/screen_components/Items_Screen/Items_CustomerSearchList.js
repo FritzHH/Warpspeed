@@ -34,21 +34,16 @@ export function CustomerSearchListComponent({}) {
   const [sCustomerInfo, _setCustomerInfo] = useState();
 
   function handleCustomerSelected(customer) {
-    let currentUser = useLoginStore.getState().currentUser;
-    let wo = cloneDeep(WORKORDER_PROTO);
-    wo.customerID = customer.id;
-    wo.changeLog = wo.changeLog.push(
-      "Started by: " + currentUser?.first + " " + currentUser?.last[0]
-    );
-    wo.customerFirst = customer.first;
-    wo.customerLast = customer.last;
-    wo.customerPhone = customer.cell || customer.landline;
-    wo.id = generateUPCBarcode();
-    wo.startedOnMillis = new Date().getTime();
-    wo.status = SETTINGS_OBJ.statuses[0];
+        let wo = createNewWorkorder({
+          customerID: customer.id,
+          customerFirst: customer.first,
+          customerLast: customer.last,
+          customerPhone: customer.cell || customer.landline,
+          startedByFirst: useLoginStore.getCurrentUser().first,
+          startedByLast: useLoginStore.getCurrentUser().last,
+          status: SETTINGS_OBJ.statuses[0],
+        });
 
-    // log("work", wo);
-    // log("cust", customer);
     useOpenWorkordersStore.getState().setWorkorder(wo, false);
     useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
     useCurrentCustomerStore.getState().setCustomer(customer);

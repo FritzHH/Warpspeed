@@ -27,6 +27,7 @@ import {
   retrieveAvailableStripeReadersCallable,
   sendSMSEnhanced,
 } from "./db_calls";
+import { removeUnusedFields } from "./utils";
 import { useSettingsStore } from "./stores";
 import {
   onAuthStateChanged,
@@ -1137,7 +1138,15 @@ export async function dbSaveCurrentPunchClock(punchClockData) {
  */
 export async function dbSavePrintObj(printObj, printerID) {
   try {
+    // log("=== dbSavePrintObj START ===");
+    // log("Input printObj:", printObj);
+    // log("Input printerID:", printerID);
+    // log("printObj type:", typeof printObj);
+    // log("printObj keys:", printObj ? Object.keys(printObj) : "null");
+
     const { tenantID, storeID } = getTenantAndStore();
+    // log("tenantID:", tenantID);
+    // log("storeID:", storeID);
 
     if (!tenantID || !storeID) {
       log("Error: tenantID and storeID are not configured for dbSavePrintObj");
@@ -1198,11 +1207,85 @@ export async function dbSavePrintObj(printObj, printerID) {
       printerID,
       printObj.id
     );
-    log(`Saving print object to path: ${path}`);
+    // log(`Saving print object to path: ${path}`);
 
-    const result = await firestoreWrite(path, printObj);
+    // Clean undefined/empty fields before saving to Firestore
+    // log("=== CLEANING PROCESS ===");
+    // log(
+    //   "Original printObj before cleaning:",
+    //   JSON.stringify(printObj, null, 2)
+    // );
 
-    if (result.success) {
+    // First pass: Remove undefined values recursively
+    function removeUndefinedValues(obj) {
+      if (obj === null || typeof obj !== "object") {
+        return obj;
+      }
+
+      if (Array.isArray(obj)) {
+        return obj
+          .map((item) => removeUndefinedValues(item))
+          .filter((item) => item !== undefined);
+      }
+
+      const cleaned = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = removeUndefinedValues(value);
+        } else {
+          // log(`Removing undefined field: ${key}`);
+        }
+      }
+      return cleaned;
+    }
+
+    // Remove undefined values first
+    const noUndefinedObj = removeUndefinedValues(printObj);
+    // log(
+    //   "After removing undefined values:",
+    //   JSON.stringify(noUndefinedObj, null, 2)
+    // );
+
+    // Then apply the existing removeUnusedFields function
+    const cleanedPrintObj = removeUnusedFields(noUndefinedObj);
+    // log("Final cleaned object:", JSON.stringify(cleanedPrintObj, null, 2));
+
+    // Final safety check for any remaining undefined values
+    const undefinedFields = [];
+    function findUndefined(obj, path = "") {
+      if (obj === undefined) {
+        undefinedFields.push(path || "root");
+        return;
+      }
+      if (obj === null || typeof obj !== "object") return;
+
+      for (const [key, value] of Object.entries(obj)) {
+        findUndefined(value, path ? `${path}.${key}` : key);
+      }
+    }
+
+    findUndefined(cleanedPrintObj);
+
+    if (undefinedFields.length > 0) {
+      log(
+        "CRITICAL: Found undefined fields after all cleaning:",
+        undefinedFields
+      );
+      throw new Error(
+        `Undefined fields found after cleaning: ${undefinedFields.join(", ")}`
+      );
+    }
+
+    // log("=== SAVING TO FIRESTORE ===");
+    // log("Path:", path);
+    // log("Final object to save:", cleanedPrintObj);
+
+    const result = await firestoreWrite(path, cleanedPrintObj);
+    // log("firestoreWrite result:", result);
+    // log("result type:", typeof result);
+    // log("result.success:", result?.success);
+
+    if (result && result.success) {
       log(
         `Successfully saved print object with ID: ${printObj.id} to printer: ${printerID}`
       );
@@ -1257,11 +1340,19 @@ export async function dbSavePrintObj(printObj, printerID) {
       };
     }
   } catch (error) {
-    log("Error in dbSavePrintObj:", error);
+    log("=== ERROR IN dbSavePrintObj ===");
+    log("Error details:", error);
+    log("Error message:", error.message);
+    log("Error stack:", error.stack);
+    log("Error code:", error.code);
+    log("Error name:", error.name);
+    log("Full error object:", JSON.stringify(error, null, 2));
+    log("=== END ERROR LOGGING ===");
+
     return {
       success: false,
       error: "Database Error",
-      message: "An error occurred while saving the print object",
+      message: `An error occurred while saving the print object: ${error.message}`,
       printObj: null,
       printerID: null,
       tenantID: null,
@@ -1499,6 +1590,8 @@ export async function dbGetWorkorder(workorderID) {
     return null;
   }
 }
+
+// deleters ////////////////////////////////////////////////////////////////////
 
 /**
  * Delete workorder from Firestore by ID

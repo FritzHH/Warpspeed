@@ -84,8 +84,23 @@ const storage = getStorage(firebaseApp);
  * @returns {Promise<void>}
  */
 export async function firestoreWrite(path, data) {
-  const docRef = doc(DB, ...path.split("/"));
-  await setDoc(docRef, data);
+  try {
+    const docRef = doc(DB, ...path.split("/"));
+    await setDoc(docRef, data);
+    return {
+      success: true,
+      message: "Document written successfully",
+      path: path,
+    };
+  } catch (error) {
+    log("Error in firestoreWrite:", error);
+    return {
+      success: false,
+      error: error.message,
+      message: "Failed to write document",
+      path: path,
+    };
+  }
 }
 
 /**

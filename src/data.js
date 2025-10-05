@@ -309,6 +309,7 @@ export const SALE_PROTO = {
 
 // workorder stuff ////////////////////////////////////////////////////
 export const WORKORDER_PROTO = {
+  workorderNumber: "",
   paymentComplete: false,
   amountPaid: 0,
   sales: [],
@@ -337,6 +338,7 @@ export const WORKORDER_PROTO = {
   changeLog: [],
   startedBy: "",
   startedOnMillis: "",
+  finishedOnMillis: "",
   partOrdered: "",
   partSource: "",
   itemIdArr: [],
@@ -399,7 +401,7 @@ export const INVENTORY_ITEM_PROTO = {
   brand: "",
   price: 0,
   salePrice: 0,
-  // category: ,
+  category: "Part",
   id: "",
   cost: "",
 };
@@ -812,7 +814,7 @@ export const SETTINGS_OBJ = {
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   activeLoginTimeoutSeconds: 15,
   idleLoginTimeoutHours: 24,
-  salesTax: 6.5,
+  salesTaxPercent: 6.5,
   acceptChecks: true,
   userPinStrength: 2,
   cardRefundFeePercent: 3,
@@ -831,13 +833,11 @@ export const SETTINGS_OBJ = {
 // RECEIPT STUFF ////////////////////////////////////////////////////
 export const RECEIPT_TYPES = {
   workorder: "Workorder",
-  sales: "Sales",
-  refund: "Refund",
+  sales: "Sale",
   intake: "Intake",
   register: "pop-register",
   test: "Test",
 };
-
 
 export const RECEIPT_NOTES_PROTO = {
   name: "",
@@ -859,12 +859,12 @@ export const RECEIPT_LINE_ITEM_PROTO = {
 };
 
 export const PRINT_WORKORDER_PROTO = {
-  customerFirstName: "",
-  customerLastName: "",
-  customerCell: "",
-  customerLandline: "",
-  customerContactRestriction: "",
-  customerAddress: "",
+  first: "",
+  last: "",
+  cell: "",
+  landline: "",
+  contactRestriction: "",
+  addressBlurb: "",
   workorderNumber: "",
   barcode: "",
   id: "",
@@ -884,14 +884,26 @@ export const PRINT_WORKORDER_PROTO = {
   finishedOnDate: "",
   status: "",
   shopName: "",
-  lineItems: "",
-  lineItems: [],
+  workorderItems: [],
   internalNotes: [],
 };
 
+export const PRINT_WORKORDER_LINE_ITEM_PROTO = {
+  qty: 0,
+  itemName: "",
+  notes: "",
+  discountName: "",
+  discountSavings: "",
+  price: "",
+  finalPrice: "",
+  workorderBarcode: "",
+  showNotes: "",
+};
+
 export const PRINT_INTAKE_PROTO = {
-  customerFirstName: "",
-  customerLastName: "",
+  first: "",
+  last: "",
+  phone: "",
   customerPhone: "",
   workorderNumber: "",
   barcode: "",
@@ -989,20 +1001,14 @@ export const RECEIPT_PROTO = {
   thankYouBlurb:
     "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
   taxFree: false,
-  isStandaloneSale: true,
+  isStandaloneSale: false,
   popCashRegister: false,
   persistFlag: false,
 
-  lineItems: [],
+  workorderLines: [],
   customerNotes: [],
   internalNotes: [],
   payments: [],
-
-  ///////////////////////////////////////
-
-  ///////////////////////////////////////
-
-  lineItems: [],
 };
 
 // END RECEIPT STUFF /////////////////////////////////////////////

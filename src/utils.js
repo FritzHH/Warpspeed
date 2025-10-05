@@ -3,16 +3,18 @@ import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef } from "./db_calls_wrapper";
 import {
   CUSTOMER_PROTO,
+  PRINT_WORKORDER_LINE_ITEM_PROTO,
   RECEIPT_PROTO,
   RECEIPT_TYPES,
   SETTINGS_OBJ,
+  WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "./data";
 import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
-import { useAlertScreenStore } from "./stores";
+import { useAlertScreenStore, useSettingsStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
 
 // const fs = require("node:fs");
@@ -152,8 +154,8 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
     totalTax: 0,
   };
   if (workorderObj.taxFree) return returnObj;
-  // log("total", totalAmount * zSettingsObj.salesTax);
-  let tax = Number(totalAmount) * Number(settingsObj.salesTax);
+  // log("total", totalAmount * zSettingsObj.salesTaxPercent);
+  let tax = Number(totalAmount) * Number(settingsObj.salesTaxPercent);
   let total = tax + Number(totalAmount);
   return {
     totalAmount: total,
@@ -408,6 +410,34 @@ export function getRgbFromNamedColor(colorName) {
 }
 
 // numbers /////////////////////////////////////////////////////////
+export function extractRandomFourDigits(twelveDigitNumber) {
+  // Convert to string and validate
+  const numStr = String(twelveDigitNumber);
+
+  // Validate input
+  if (!numStr || numStr.length !== 12) {
+    throw new Error("Input must be exactly 12 digits");
+  }
+
+  if (!/^\d{12}$/.test(numStr)) {
+    throw new Error("Input must contain only digits");
+  }
+
+  // Generate 5 unique random indexes between 0 and 11
+  const indexes = [];
+  while (indexes.length < 5) {
+    const randomIndex = Math.floor(Math.random() * 12);
+    if (!indexes.includes(randomIndex)) {
+      indexes.push(randomIndex);
+    }
+  }
+
+  // Extract digits at the random indexes
+  const result = indexes.map((index) => numStr[index]).join("");
+
+  return result;
+}
+
 export function stringIsNumeric(str) {
   return /^\d+$/.test(str);
 }
@@ -1134,15 +1164,35 @@ export async function randomWordGenerator() {
 export function removeUnusedFields(obj) {
   if (!isObject(obj)) return obj;
 
+  log("=== removeUnusedFields START ===");
+  log("Input object:", obj);
+  log("Object keys:", Object.keys(obj));
+
   let usedFields = [];
   let keys = Object.keys(obj);
+
   keys.forEach((key) => {
-    if (obj[key]) usedFields.push(key);
+    const value = obj[key];
+    log(
+      `Checking key: ${key}, value: ${value}, type: ${typeof value}, truthy: ${!!value}`
+    );
+
+    if (value) {
+      usedFields.push(key);
+      log(`✓ Keeping field: ${key}`);
+    } else {
+      log(`✗ Removing field: ${key} (falsy value: ${value})`);
+    }
   });
-  // log("sed", usedFields);
+
+  log("Fields to keep:", usedFields);
+
   let newObj = {};
   usedFields.forEach((field) => (newObj[field] = obj[field]));
-  log(newObj);
+
+  log("Final cleaned object:", newObj);
+  log("=== removeUnusedFields END ===");
+
   return newObj;
 }
 
@@ -1319,20 +1369,6 @@ export function addOrRemoveFromArr(arr, input, fieldName = "id") {
   // Fallback for other types
   return [...arr, input];
 }
-
-// export function addOrRemoveFromArrOLD(arr, input, fieldName = "id") {
-//   if (!arr) return [];
-//   if (!input) return arr;
-//   if (!(arr.length > 0)) return [input];
-//   if (!arr[0][fieldName]) {
-//     let found = arr.find((o) => o == input);
-//     if (found) return arr.filter((o) => o != input);
-//   } else {
-//     let found = arr.find((o) => o[fieldName] === input[fieldName]);
-//     if (found) return arr.filter((o) => o[fieldName] !== input[fieldName]);
-//   }
-//   return [...arr, input];
-// }
 
 export function replaceOrAddToArr(arr, input, fieldName = "id") {
   if (!arr) arr = [];
@@ -1734,9 +1770,13 @@ export function createNewWorkorder({
   customerPhone,
   startedByFirst,
   startedByLast,
+  isStandaloneSale,
+  status,
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
+  wo.isStandaloneSale = isStandaloneSale;
   wo.id = generateUPCBarcode();
+  wo.workorderNumber = extractRandomFourDigits(wo.id);
   wo.status = SETTINGS_OBJ.statuses[0];
   wo.customerFirst = customerFirst;
   wo.customerLast = customerLast;
@@ -1745,13 +1785,52 @@ export function createNewWorkorder({
   (wo.startedBy = startedByFirst + " " + startedByLast),
     wo.changeLog.push("Started by: " + startedByFirst + " " + startedByLast);
   wo.startedOnMillis = new Date().getTime();
+  wo.status = status;
   return wo;
 }
 
 /// RECEIPT PRINTING ////////////////////////////////////////////////////////////
 const RECEIPT_CONSTS = {};
-function parseWorkorder(wo) {
+
+function parseWorkorderLines(wo = WORKORDER_PROTO) {
+  let newLines = [];
+  wo.workorderLines.forEach((workorderLine, idx) => {
+    let line = cloneDeep(PRINT_WORKORDER_LINE_ITEM_PROTO);
+    line.qty = workorderLine.qty;
+    line.itemName = workorderLine.inventoryItem.formalName;
+    line.notes = workorderLine.notes;
+    line.discountName = workorderLine.discountObj?.name;
+    line.discountSavings = workorderLine.discountObj?.savings;
+    line.price = workorderLine.inventoryItem.price;
+    line.salePrice = workorderLine.inventoryItem.salePrice;
+    line.finalPrice =
+      workorderLine.discountObj?.newPrice ||
+      workorderLine.inventoryItem.salePrice ||
+      workorderLine.inventoryItem.price;
+    line.workorderBarcode = wo.id;
+    newLines.push(line);
+  });
+  return newLines;
+}
+
+function createPrintWorkorder(
+  wo = WORKORDER_PROTO,
+  customer = CUSTOMER_PROTO,
+  salesTaxPercent
+) {
   let r = cloneDeep(RECEIPT_PROTO);
+  r = { ...r, ...wo, ...customer };
+  r.workorderLines = parseWorkorderLines(wo);
+  let totals = calculateRunningTotals(wo, salesTaxPercent);
+  r.total = totals.finalTotal;
+  r.subtotal = totals.runningSubtotal;
+  r.tax = totals.runningTax;
+  r.discount = totals.runningDiscount;
+  r.status = wo.status.label;
+  r.waitTime = wo.waitTime.label;
+  r.receiptType = RECEIPT_TYPES.workorder;
+
+  return removeUnusedFields(r);
 }
 
 export const printBuilder = {
@@ -1763,4 +1842,6 @@ export const printBuilder = {
       // persistFlag: true,
     };
   },
+  workorder: (workorder, customer, salesTaxPercent) =>
+    createPrintWorkorder(workorder, customer, salesTaxPercent),
 };

@@ -10,6 +10,7 @@ import {
   stringIsNumeric,
   gray,
   capitalizeAllWordsInSentence,
+  extractRandomFiveDigits,
 } from "../../../utils";
 import { ScreenModal, Button_, PhoneNumberInput } from "../../../components";
 import { CUSTOMER_PROTO, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
@@ -30,15 +31,8 @@ import {
 } from "../../../db_calls_wrapper";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 export function NewWorkorderComponent({}) {
-  // store setters ////////////////////////////////////////////////////////////////
-  const _zSetOptionsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
+  // store setters ////////////////////////////////////////////////////////////
   const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-  const _zSetInfoTabName = useTabNamesStore((state) => state.setInfoTabName);
-  const _zSetOpenWorkorder = useOpenWorkordersStore(
-    (state) => state.setWorkorder
-  );
 
   // store getters ///////////////////////////////////////////////////////////////
   const zCustomerSearchResults = useCustomerSearchStore((s) =>
@@ -183,11 +177,11 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleStartStandaloneSalePress() {
-    let wo = cloneDeep(WORKORDER_PROTO);
-    wo.isStandaloneSale = true;
-    wo.id = generateUPCBarcode();
-    wo.startedBy = useLoginStore.getState().currentUser?.id;
-    wo.startedOnMillis = new Date().getTime();
+    let wo = createNewWorkorder({
+      startedByFirst: useLoginStore.getState().currentUser?.first,
+      startedByLast: useLoginStore.getState().currentUser?.last,
+      isStandaloneSale: true,
+    });
 
     useOpenWorkordersStore.getState().setWorkorder(wo);
     useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
@@ -218,6 +212,7 @@ export function NewWorkorderComponent({}) {
       customerPhone: newCustomer.cell || newCustomer.landline,
       startedByFirst: useLoginStore.getCurrentUser().first,
       startedByLast: useLoginStore.getCurrentUser().last,
+      status: SETTINGS_OBJ.statuses[0],
     });
 
     // add in the newly created workorder to the customer's file
@@ -227,141 +222,133 @@ export function NewWorkorderComponent({}) {
 
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
-  // log(sTextInput.length);
-  // log(sSearchFieldName);
-  function setComponent() {
-    return (
+  return (
+    <View
+      style={{
+        width: "100%",
+        height: "100%",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      {/* <LoginModalScreen modalVisible={zShowLoginScreen} /> */}
+
+      <View
+        style={{
+          alignItems: "flex-end",
+          width: "100%",
+          padding: 20,
+          marginTop: "70%",
+        }}
+      >
+        {sSearchFieldName === "phone" ? (
+          <PhoneNumberInput
+            boxStyle={{
+              width: "8%",
+              height: 37,
+              outlineStyle: "none",
+              borderColor: gray(0.08),
+              fontSize: 25,
+              color: C.text,
+            }}
+            autoFocus={true}
+            value={sTextInput}
+            onChangeText={(val) => handleTextChange(val)}
+            dashStyle={{ width: 10, marginHorizontal: 4 }}
+            dashColor={gray(0.2)}
+            textColor={C.text}
+          />
+        ) : (
+          <TextInput
+            value={capitalizeAllWordsInSentence(sTextInput)}
+            placeholder={"First, last or email"}
+            placeholderTextColor={gray(0.3)}
+            onChangeText={(val) => handleTextChange(val)}
+            autoFocus={true}
+            style={{
+              caretColor: C.cursorRed,
+              color: C.text,
+              borderBottomWidth: 1,
+              borderColor: gray(0.2),
+              width: 300,
+              height: 37,
+              outlineWidth: 0,
+              fontSize: 18,
+              alignSelf: "center",
+            }}
+          />
+        )}
+        <View
+          style={{ flexDirection: "row", alignItems: "center", marginTop: 5 }}
+        >
+          {useMemo(
+            () => (
+              <ScreenModal
+                showOuterModal={true}
+                modalVisible={sCustomerInfo}
+                ButtonComponent={() => (
+                  <Button_
+                    text={"CUSTOMER"}
+                    buttonStyle={{
+                      marginRight: 20,
+                      height: 37,
+                      marginTop: 10,
+                      paddingHorizontal: 25,
+                    }}
+                    textStyle={{ fontSize: 15 }}
+                    colorGradientArr={COLOR_GRADIENTS.blue}
+                    icon={ICONS.new}
+                    iconSize={25}
+                    onPress={handleCreateCustomerBtnPressed}
+                    visible={buttonVisible}
+                  />
+                )}
+                Component={() => (
+                  <CustomerInfoScreenModalComponent
+                    incomingCustomer={sCustomerInfo}
+                    isNewCustomer={true}
+                    button1Text={"Create Customer"}
+                    button2Text={"Cancel"}
+                    handleButton1Press={handleCreateNewCustomerPressed}
+                    handleButton2Press={handleCancelCreateNewCustomerPress}
+                  />
+                )}
+              />
+            ),
+            [sCustomerInfo, buttonVisible]
+          )}
+          <Button_
+            icon={ICONS.reset1}
+            buttonStyle={{ marginTop: 10, paddingHorizontal: 0 }}
+            onPress={() => {
+              if (sSearchFieldName === "phone") {
+                _setSearchFieldName("name");
+              } else {
+                _setSearchFieldName("phone");
+              }
+              _setTextInput("");
+            }}
+          />
+        </View>
+      </View>
       <View
         style={{
           width: "100%",
-          height: "100%",
-          justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-end",
+          marginRight: 11,
+          marginBottom: 20,
         }}
       >
-        {/* <LoginModalScreen modalVisible={zShowLoginScreen} /> */}
-
-        <View
-          style={{
-            alignItems: "flex-end",
-            width: "100%",
-            padding: 20,
-            marginTop: "70%",
-          }}
-        >
-          {sSearchFieldName === "phone" ? (
-            <PhoneNumberInput
-              boxStyle={{
-                width: "8%",
-                height: 37,
-                outlineStyle: "none",
-                borderColor: gray(0.08),
-                fontSize: 25,
-                color: C.text,
-              }}
-              autoFocus={true}
-              value={sTextInput}
-              onChangeText={(val) => handleTextChange(val)}
-              dashStyle={{ width: 10, marginHorizontal: 4 }}
-              dashColor={gray(0.2)}
-              textColor={C.text}
-            />
-          ) : (
-            <TextInput
-              value={capitalizeAllWordsInSentence(sTextInput)}
-              placeholder={"First, last or email"}
-              placeholderTextColor={gray(0.3)}
-              onChangeText={(val) => handleTextChange(val)}
-              autoFocus={true}
-              style={{
-                caretColor: C.cursorRed,
-                color: C.text,
-                borderBottomWidth: 1,
-                borderColor: gray(0.2),
-                width: 300,
-                height: 37,
-                outlineWidth: 0,
-                fontSize: 18,
-                alignSelf: "center",
-              }}
-            />
-          )}
-          <View
-            style={{ flexDirection: "row", alignItems: "center", marginTop: 5 }}
-          >
-            {useMemo(
-              () => (
-                <ScreenModal
-                  showOuterModal={true}
-                  modalVisible={sCustomerInfo}
-                  ButtonComponent={() => (
-                    <Button_
-                      text={"CUSTOMER"}
-                      buttonStyle={{
-                        marginRight: 20,
-                        height: 37,
-                        marginTop: 10,
-                        paddingHorizontal: 25,
-                      }}
-                      textStyle={{ fontSize: 15 }}
-                      colorGradientArr={COLOR_GRADIENTS.blue}
-                      icon={ICONS.new}
-                      iconSize={25}
-                      onPress={handleCreateCustomerBtnPressed}
-                      visible={buttonVisible}
-                    />
-                  )}
-                  Component={() => (
-                    <CustomerInfoScreenModalComponent
-                      incomingCustomer={sCustomerInfo}
-                      isNewCustomer={true}
-                      button1Text={"Create Customer"}
-                      button2Text={"Cancel"}
-                      handleButton1Press={handleCreateNewCustomerPressed}
-                      handleButton2Press={handleCancelCreateNewCustomerPress}
-                    />
-                  )}
-                />
-              ),
-              [sCustomerInfo, buttonVisible]
-            )}
-            <Button_
-              icon={ICONS.reset1}
-              buttonStyle={{ marginTop: 10, paddingHorizontal: 0 }}
-              onPress={() => {
-                if (sSearchFieldName === "phone") {
-                  _setSearchFieldName("name");
-                } else {
-                  _setSearchFieldName("phone");
-                }
-                _setTextInput("");
-              }}
-            />
-          </View>
-        </View>
-        <View
-          style={{
-            width: "100%",
-            alignItems: "flex-end",
-            marginRight: 11,
-            marginBottom: 20,
-          }}
-        >
-          <Button_
-            onPress={handleStartStandaloneSalePress}
-            icon={ICONS.cashRegister}
-            iconSize={35}
-          />
-        </View>
-
-        {/** customer info modal */}
+        <Button_
+          onPress={handleStartStandaloneSalePress}
+          icon={ICONS.cashRegister}
+          iconSize={35}
+        />
       </View>
-    );
-  }
 
-  try {
-    return setComponent();
-  } catch (e) {
-    log("Error returning NewWorkorderComponent", e);
-  }
+      {/** customer info modal */}
+    </View>
+  );
 }
+
+

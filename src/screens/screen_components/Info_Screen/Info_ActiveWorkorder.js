@@ -6,6 +6,8 @@ import {
   generateUPCBarcode,
   gray,
   log,
+  printBuilder,
+  removeUnusedFields,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -37,6 +39,7 @@ import {
   useTabNamesStore,
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+import { dbSavePrintObj } from "../../../db_calls_wrapper";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -141,7 +144,14 @@ export const ActiveWorkorderComponent = ({}) => {
     useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
   }
 
-  function handleWorkorderPrintPress() {}
+  function handleWorkorderPrintPress() {
+    let toPrint = printBuilder.workorder(
+      zOpenWorkorder,
+      zCustomer,
+      useSettingsStore.getState().settings?.salesTaxPercent
+    );
+    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22");
+  }
 
   function handleIntakePrintPress() {}
 
@@ -768,14 +778,14 @@ export const ActiveWorkorderComponent = ({}) => {
           iconSize={32}
           iconStyle={{ paddingHorizontal: 0 }}
           style={{ paddingHorizontal: 0, paddingVertical: 0 }}
-          onPress={handleWorkorderPrintPress}
+          onPress={handleIntakePrintPress}
         />
         <Button_
           icon={ICONS.workorder}
           iconSize={28}
           iconStyle={{ paddingHorizontal: 0 }}
           style={{ paddingHorizontal: 0, paddingVertical: 0 }}
-          onPress={handleIntakePrintPress}
+          onPress={handleWorkorderPrintPress}
         />
       </View>
     </View>

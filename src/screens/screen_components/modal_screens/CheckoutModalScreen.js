@@ -233,7 +233,7 @@ export function CheckoutModalScreen({}) {
         // create new sale object to work with
         let sale = cloneDeep(SALE_PROTO);
         sale.id = generateUPCBarcode(); //////// dev
-        sale.salesTaxPercent = zSettings.salesTax;
+        sale.salesTaxPercent = zSettings.salesTaxPercent;
         sale.millis = new Date().getTime();
         setRunningSaleTotals(sale, combinedWorkorders);
         // setRefund(zOpenWorkorder, sale);
@@ -581,7 +581,7 @@ export function CheckoutModalScreen({}) {
       runningTax,
     } = calculateRunningTotals(
       combinedWorkorders,
-      zSettings?.salesTax
+      zSettings?.salesTaxPercent
       // refundItems,
       // sIsRefund
     );
@@ -1516,7 +1516,7 @@ const WorkorderListComponent = ({
                     {"$" +
                       formatCurrencyDisp(
                         (calculateRunningTotals(workorder).runningTotal *
-                          zSettings.salesTax) /
+                          zSettings.salesTaxPercent) /
                           100
                       )}
                   </Text>
@@ -1552,7 +1552,7 @@ const WorkorderListComponent = ({
                     {"$" +
                       formatCurrencyDisp(
                         calculateRunningTotals(workorder).runningTotal *
-                          (zSettings.salesTax / 100) +
+                          (zSettings.salesTaxPercent / 100) +
                           calculateRunningTotals(workorder).runningTotal
                       )}
                   </Text>

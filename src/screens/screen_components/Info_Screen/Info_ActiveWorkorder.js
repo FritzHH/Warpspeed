@@ -150,7 +150,7 @@ export const ActiveWorkorderComponent = ({}) => {
       zCustomer,
       useSettingsStore.getState().settings?.salesTaxPercent
     );
-    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22");
+    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Rongta");
   }
 
   function handleIntakePrintPress() {}
@@ -750,12 +750,12 @@ export const ActiveWorkorderComponent = ({}) => {
           borderRadius: 5,
           borderColor: C.listItemBorder,
           borderWidth: 1,
-          paddingHorizontal: 3,
+          paddingHorizontal: 10,
         }}
       >
         <Button_
           icon={ICONS.bicycle}
-          iconSize={48}
+          iconSize={50}
           buttonStyle={{
             paddingHorizontal: 0,
             paddingVertical: 0,
@@ -775,16 +775,16 @@ export const ActiveWorkorderComponent = ({}) => {
 
         <Button_
           icon={ICONS.receipt}
-          iconSize={32}
+          iconSize={35}
           iconStyle={{ paddingHorizontal: 0 }}
-          style={{ paddingHorizontal: 0, paddingVertical: 0 }}
+          buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
           onPress={handleIntakePrintPress}
         />
         <Button_
           icon={ICONS.workorder}
-          iconSize={28}
+          iconSize={30}
           iconStyle={{ paddingHorizontal: 0 }}
-          style={{ paddingHorizontal: 0, paddingVertical: 0 }}
+          buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
           onPress={handleWorkorderPrintPress}
         />
       </View>

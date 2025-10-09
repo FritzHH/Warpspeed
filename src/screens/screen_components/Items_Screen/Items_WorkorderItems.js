@@ -500,7 +500,7 @@ export const LineItemComponent = ({
                 }}
                 placeholder="Intake and service notes..."
                 placeholderTextColor={gray(0.2)}
-                value={workorderLine.intakeNotes}
+                value={workorderLine.notes}
               />
             </View>
           </View>

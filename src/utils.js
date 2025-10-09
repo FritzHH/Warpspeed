@@ -1795,10 +1795,11 @@ const RECEIPT_CONSTS = {};
 function parseWorkorderLines(wo = WORKORDER_PROTO) {
   let newLines = [];
   wo.workorderLines.forEach((workorderLine, idx) => {
+    log('workorder line ->>>>>>>>>', workorderLine)
     let line = cloneDeep(PRINT_WORKORDER_LINE_ITEM_PROTO);
-    line.qty = workorderLine.qty;
+    line.qty = workorderLine.qty.toString();
     line.itemName = workorderLine.inventoryItem.formalName;
-    line.notes = workorderLine.notes;
+    line.intakeNotes = workorderLine.intakeNotes;
     line.discountName = workorderLine.discountObj?.name;
     line.discountSavings = workorderLine.discountObj?.savings;
     line.price = workorderLine.inventoryItem.price;
@@ -1807,7 +1808,9 @@ function parseWorkorderLines(wo = WORKORDER_PROTO) {
       workorderLine.discountObj?.newPrice ||
       workorderLine.inventoryItem.salePrice ||
       workorderLine.inventoryItem.price;
+    line.finalPrice = line.finalPrice.toString();
     line.workorderBarcode = wo.id;
+    line = removeUnusedFields(line);
     newLines.push(line);
   });
   return newLines;
@@ -1829,8 +1832,12 @@ function createPrintWorkorder(
   r.status = wo.status.label;
   r.waitTime = wo.waitTime.label;
   r.receiptType = RECEIPT_TYPES.workorder;
+  r.salesTaxPercent = salesTaxPercent;
+  r.color1 = wo.color1.label;
+  r.color2 = wo.color2.label;
+  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production
 
-  return removeUnusedFields(r);
+  return r;
 }
 
 export const printBuilder = {

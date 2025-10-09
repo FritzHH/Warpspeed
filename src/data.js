@@ -351,7 +351,7 @@ export const WORKORDER_PROTO = {
 
 export const WORKORDER_ITEM_PROTO = {
   qty: 1,
-  notes: "",
+  intakeNotes: "",
   inventoryItem: null,
   discountObj: null,
   id: "",
@@ -891,7 +891,7 @@ export const PRINT_WORKORDER_PROTO = {
 export const PRINT_WORKORDER_LINE_ITEM_PROTO = {
   qty: 0,
   itemName: "",
-  notes: "",
+  intakeNotes: "",
   discountName: "",
   discountSavings: "",
   price: "",

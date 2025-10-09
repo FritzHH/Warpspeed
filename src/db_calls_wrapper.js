@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { log } from "./utils";
+import { generateRandomID, log } from "./utils";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
@@ -1138,15 +1138,8 @@ export async function dbSaveCurrentPunchClock(punchClockData) {
  */
 export async function dbSavePrintObj(printObj, printerID) {
   try {
-    // log("=== dbSavePrintObj START ===");
-    // log("Input printObj:", printObj);
-    // log("Input printerID:", printerID);
-    // log("printObj type:", typeof printObj);
-    // log("printObj keys:", printObj ? Object.keys(printObj) : "null");
 
     const { tenantID, storeID } = getTenantAndStore();
-    // log("tenantID:", tenantID);
-    // log("storeID:", storeID);
 
     if (!tenantID || !storeID) {
       log("Error: tenantID and storeID are not configured for dbSavePrintObj");
@@ -1201,6 +1194,7 @@ export async function dbSavePrintObj(printObj, printerID) {
       };
     }
 
+    printObj.id = generateRandomID();
     const path = buildPrintObjectPath(
       tenantID,
       storeID,
@@ -1209,46 +1203,95 @@ export async function dbSavePrintObj(printObj, printerID) {
     );
     // log(`Saving print object to path: ${path}`);
 
-    // Clean undefined/empty fields before saving to Firestore
-    // log("=== CLEANING PROCESS ===");
-    // log(
-    //   "Original printObj before cleaning:",
-    //   JSON.stringify(printObj, null, 2)
-    // );
+    // Clean and process fields before saving to Firestore
+    // Fields to preserve unchanged: internalNotes, customerNotes, workorderLines, paymentsSet
+    const PRESERVE_FIELDS = [
+      "internalNotes",
+      "customerNotes",
+      "workorderLines",
+      "paymentsSet",
+    ];
 
-    // First pass: Remove undefined values recursively
-    function removeUndefinedValues(obj) {
+    function cleanPrintObject(obj) {
       if (obj === null || typeof obj !== "object") {
         return obj;
       }
 
-      if (Array.isArray(obj)) {
-        return obj
-          .map((item) => removeUndefinedValues(item))
-          .filter((item) => item !== undefined);
+      const cleaned = {};
+
+      for (const [key, value] of Object.entries(obj)) {
+        // Preserve specific fields unchanged
+        if (PRESERVE_FIELDS.includes(key)) {
+          cleaned[key] = value;
+          continue;
+        }
+
+        // Handle arrays (non-preserved fields)
+        if (Array.isArray(value)) {
+          if (value.length === 0) {
+            // Empty array - remove the field
+            continue;
+          }
+          // Convert array items to strings
+          const stringArray = value
+            .map((item) => {
+              if (typeof item === "object" && item !== null) {
+                return cleanPrintObject(item); // Recursively clean nested objects
+              }
+              return String(item);
+            })
+            .filter(
+              (item) => item !== "" && item !== "undefined" && item !== "null"
+            );
+
+          if (stringArray.length > 0) {
+            cleaned[key] = stringArray;
+          }
+          continue;
+        }
+
+        // Handle objects (non-preserved fields)
+        if (typeof value === "object" && value !== null) {
+          const cleanedObject = cleanPrintObject(value);
+          // Check if object has any valid fields
+          if (Object.keys(cleanedObject).length > 0) {
+            cleaned[key] = cleanedObject;
+          }
+          continue;
+        }
+
+        // Handle primitive values
+        if (value === undefined || value === null) {
+          continue; // Remove undefined/null fields
+        }
+
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          if (trimmed === "") {
+            continue; // Remove empty strings
+          }
+          cleaned[key] = trimmed;
+          continue;
+        }
+
+        if (typeof value === "boolean") {
+          cleaned[key] = value.toString();
+          continue;
+        }
+
+        if (typeof value === "number") {
+          cleaned[key] = value.toString();
+          continue;
+        }
+
+        // Convert any other type to string
+        cleaned[key] = String(value);
       }
 
-      const cleaned = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (value !== undefined) {
-          cleaned[key] = removeUndefinedValues(value);
-        } else {
-          // log(`Removing undefined field: ${key}`);
-        }
-      }
       return cleaned;
     }
 
-    // Remove undefined values first
-    const noUndefinedObj = removeUndefinedValues(printObj);
-    // log(
-    //   "After removing undefined values:",
-    //   JSON.stringify(noUndefinedObj, null, 2)
-    // );
-
-    // Then apply the existing removeUnusedFields function
-    const cleanedPrintObj = removeUnusedFields(noUndefinedObj);
-    // log("Final cleaned object:", JSON.stringify(cleanedPrintObj, null, 2));
+    let cleanedPrintObj = cleanPrintObject(printObj);
 
     // Final safety check for any remaining undefined values
     const undefinedFields = [];
@@ -1278,44 +1321,43 @@ export async function dbSavePrintObj(printObj, printerID) {
 
     // log("=== SAVING TO FIRESTORE ===");
     // log("Path:", path);
-    // log("Final object to save:", cleanedPrintObj);
-
+    log("Final object to save:", cleanedPrintObj);
     const result = await firestoreWrite(path, cleanedPrintObj);
     // log("firestoreWrite result:", result);
     // log("result type:", typeof result);
     // log("result.success:", result?.success);
 
     if (result && result.success) {
-      log(
-        `Successfully saved print object with ID: ${printObj.id} to printer: ${printerID}`
-      );
+      // log(
+      //   `Successfully saved print object with ID: ${cleanedPrintObj.id} to printer: ${printerID}`
+      // );
 
       // Set timer to remove the print object after 100ms
-      setTimeout(async () => {
-        try {
-          log(
-            `Removing print object with ID: ${printObj.id} after ${PRINT_OBJECT_REMOVAL_DELAY}ms`
-          );
-          let deleteResult;
-          if (!printObj.persistFlag) {
-            deleteResult = await firestoreDelete(path);
-          }
+      // setTimeout(async () => {
+      //   try {
+      //     log(
+      //       `Removing print object with ID: ${printObj.id} after ${PRINT_OBJECT_REMOVAL_DELAY}ms`
+      //     );
+      //     let deleteResult;
+      //     // if (!printObj.persistFlag) {
+      //     deleteResult = await firestoreDelete(path);
+      //     // }
 
-          if (deleteResult.success) {
-            log(`Successfully removed print object with ID: ${printObj.id}`);
-          } else {
-            log(
-              `Error removing print object with ID: ${printObj.id}:`,
-              deleteResult.error
-            );
-          }
-        } catch (error) {
-          log(
-            `Error in timer removal of print object with ID: ${printObj.id}:`,
-            error
-          );
-        }
-      }, PRINT_OBJECT_REMOVAL_DELAY);
+      //     if (deleteResult.success) {
+      //       log(`Successfully removed print object with ID: ${printObj.id}`);
+      //     } else {
+      //       log(
+      //         `Error removing print object with ID: ${printObj.id}:`,
+      //         deleteResult.error
+      //       );
+      //     }
+      //   } catch (error) {
+      //     log(
+      //       `Error in timer removal of print object with ID: ${printObj.id}:`,
+      //       error
+      //     );
+      //   }
+      // }, PRINT_OBJECT_REMOVAL_DELAY);
 
       return {
         success: true,

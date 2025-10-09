@@ -693,28 +693,28 @@ exports.sendSMSEnhanced = onCall(
       // Store message in Firestore if customerID and messageID provided
       if (customerID && messageID) {
         try {
-          const messageRef = DB.collection("tenants")
-            .doc(tenantID)
-            .collection("stores")
-            .doc(storeID)
-            .collection("outgoing-messages")
-            .doc(customerID)
-            .collection("messages")
-            .doc(messageID);
+    const messageRef = DB.collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .collection("outgoing-messages")
+      .doc(customerID)
+      .collection("messages")
+      .doc(messageID);
 
-          await messageRef.set({
-            id: messageID,
-            customerID: customerID,
-            message: message.trim(),
-            phoneNumber: cleanPhoneNumber,
-            messageSid: twilioResponse.sid,
-            status: twilioResponse.status,
-            fromNumber: fromNumber,
-            tenantID: tenantID,
-            storeID: storeID,
-            sentAt: admin.firestore.FieldValue.serverTimestamp(),
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
+    await messageRef.set({
+      id: messageID,
+      customerID: customerID,
+      message: message.trim(),
+      phoneNumber: cleanPhoneNumber,
+      messageSid: twilioResponse.sid,
+      status: twilioResponse.status,
+      fromNumber: fromNumber,
+      tenantID: tenantID,
+      storeID: storeID,
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
           log("Message stored in Firestore successfully", {
             messageID,

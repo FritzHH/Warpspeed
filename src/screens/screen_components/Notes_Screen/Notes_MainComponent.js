@@ -252,28 +252,29 @@ export function Notes_MainComponent() {
                     >
                       <Text
                         style={{
+                          color: gray(.4),
                           padding: 2,
-                          height: customerNotesHeight[index] || null,
+                          fontSize: 12,
+                          // height: customerNotesHeight[index] || null,
                           outlineWidth: 0,
-                          // width: "100%",
                         }}
                       >
                         {item.name}
                       </Text>
                       <TextInput_
-                        onContentSizeChange={(ev) =>
-                          handleCustomerContentSizeChange(ev, index)
-                        }
+
                         multiline={true}
-                        // numberOfLines={5}
+                        numberOfLines={10}
                         onChangeText={(val) =>
                           textChanged(val, index, "customer")
                         }
                         style={{
-                          padding: 2,
+                          padding: 2,                            paddingLeft: 4,
+
                           height: customerNotesHeight[index] || null,
                           outlineWidth: 0,
                           width: "100%",
+                          color: C.text
                         }}
                         autoFocus={index === sFocusIdx}
                         value={item.value}
@@ -373,26 +374,27 @@ export function Notes_MainComponent() {
                       >
                         <Text
                           style={{
+                            color: gray(.4),
                             padding: 2,
-                            height: internalNotesHeight[index] || null,
+                            // height: internalNotesHeight[index] || null,
+                            fontSize: 12
                           }}
                         >
                           {item.name}
                         </Text>
                         <TextInput_
-                          onContentSizeChange={(ev) =>
-                            handleInternalContentSizeChange(ev, index)
-                          }
                           multiline={true}
-                          // numberOfLines={5}
+                          numberOfLines={10}
                           onChangeText={(val) =>
                             textChanged(val, index, "internal")
                           }
                           style={{
                             padding: 2,
+                            paddingLeft: 4,
                             height: internalNotesHeight[index] || null,
                             outlineWidth: 0,
                             width: "100%",
+                            color: C.text
                           }}
                           autoFocus={index === sFocusIdx}
                           value={item.value}

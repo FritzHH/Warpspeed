@@ -145,11 +145,19 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleWorkorderPrintPress() {
-    let toPrint = printBuilder.workorder(
+    // let toPrint = printBuilder.workorder(
+    //   zOpenWorkorder,
+    //   zCustomer,
+    //   useSettingsStore.getState().settings?.salesTaxPercent
+    // );
+
+        let toPrint = printBuilder.intake(
       zOpenWorkorder,
       zCustomer,
       useSettingsStore.getState().settings?.salesTaxPercent
     );
+    
+
     dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Rongta");
   }
 

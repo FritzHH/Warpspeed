@@ -12,7 +12,12 @@ import {
   replaceOrAddToArr,
   showAlert,
 } from "../../../utils";
-import { GradientView, Button_, DropdownMenu } from "../../../components";
+import {
+  GradientView,
+  Button_,
+  DropdownMenu,
+  TextInput_,
+} from "../../../components";
 import { C, ICONS } from "../../../styles";
 import {
   WORKORDER_ITEM_PROTO,
@@ -491,8 +496,9 @@ export const LineItemComponent = ({
                 // backgroundColor: "green",
               }}
             >
-              <TextInput
-                numberOfLines={4}
+              <TextInput_
+                multiline={true}
+                numberOfLines={5}
                 style={{ outlineWidth: 0, color: C.lightText, width: "100%" }}
                 onChangeText={(val) => {
                   let line = { ...workorderLine, intakeNotes: val };
@@ -500,7 +506,7 @@ export const LineItemComponent = ({
                 }}
                 placeholder="Intake and service notes..."
                 placeholderTextColor={gray(0.2)}
-                value={workorderLine.notes}
+                value={workorderLine.intakeNotes}
               />
             </View>
           </View>

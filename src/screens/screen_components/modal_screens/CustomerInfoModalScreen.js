@@ -756,7 +756,7 @@ const WorkordersList = ({ workorders, sSelectedWorkorder }) => {
                               }}
                             >
                               {/**DEVVVVVVVVVVVVVVVVV */}
-                              {workorderLine.notes}
+                              {workorderLine.intakeNotes}
                             </Text>
                           </View>
                         </View>

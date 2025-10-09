@@ -1816,13 +1816,10 @@ function parseWorkorderLines(wo = WORKORDER_PROTO) {
   return newLines;
 }
 
-function createPrintWorkorder(
-  wo = WORKORDER_PROTO,
-  customer = CUSTOMER_PROTO,
-  salesTaxPercent
-) {
-  let r = cloneDeep(RECEIPT_PROTO);
+function createPrintIntakeTicket(wo = WORKORDER_PROTO, customer = CUSTOMER_PROTO, salesTaxPercent) {
+    let r = cloneDeep(RECEIPT_PROTO);
   r = { ...r, ...wo, ...customer };
+  r.receiptType = RECEIPT_TYPES.intake;
   r.workorderLines = parseWorkorderLines(wo);
   let totals = calculateRunningTotals(wo, salesTaxPercent);
   r.total = totals.finalTotal;
@@ -1831,11 +1828,57 @@ function createPrintWorkorder(
   r.discount = totals.runningDiscount;
   r.status = wo.status.label;
   r.waitTime = wo.waitTime.label;
-  r.receiptType = RECEIPT_TYPES.workorder;
   r.salesTaxPercent = salesTaxPercent;
   r.color1 = wo.color1.label;
   r.color2 = wo.color2.label;
-  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production
+  r.shopContactBlurb =
+    "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
+    "(239) 291-9396\n" +
+    "support@bonitabikes.com\n" +
+    "www.bonitabikes.com";
+  r.thankYouBlurb = "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.";
+  r.intakeBlurb="This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion."
+  
+  let startedBySplit = wo.startedBy.split(" ");
+  r.startedBy = startedBySplit[0]
+  if (startedBySplit[1]?.length > 0) 
+  {
+     r.startedBy = r.startedBy + " " +  startedBySplit[1].substring(0) + '.';
+
+  }
+  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
+
+  return r;
+}
+
+function createPrintWorkorder(
+  wo = WORKORDER_PROTO,
+  customer = CUSTOMER_PROTO,
+  salesTaxPercent
+) {
+  let r = cloneDeep(RECEIPT_PROTO);
+  r = { ...r, ...wo, ...customer };
+  r.receiptType = RECEIPT_TYPES.workorder;
+  r.workorderLines = parseWorkorderLines(wo);
+  let totals = calculateRunningTotals(wo, salesTaxPercent);
+  r.total = totals.finalTotal;
+  r.subtotal = totals.runningSubtotal;
+  r.tax = totals.runningTax;
+  r.discount = totals.runningDiscount;
+  r.status = wo.status.label;
+  r.waitTime = wo.waitTime.label;
+  r.salesTaxPercent = salesTaxPercent;
+  r.color1 = wo.color1.label;
+  r.color2 = wo.color2.label;
+
+  let startedBySplit = wo.startedBy.split(" ");
+  r.startedBy = startedBySplit[0]
+  if (startedBySplit[1]?.length > 0) 
+  {
+     r.startedBy = r.startedBy + " " +  startedBySplit[1].substring(0) + '.';
+
+  }
+  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
 
   return r;
 }
@@ -1851,4 +1894,5 @@ export const printBuilder = {
   },
   workorder: (workorder, customer, salesTaxPercent) =>
     createPrintWorkorder(workorder, customer, salesTaxPercent),
+  intake: (workorder, customer, salesTaxPercent) => createPrintIntakeTicket(workorder, customer, salesTaxPercent)
 };

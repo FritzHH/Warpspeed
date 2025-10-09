@@ -2504,6 +2504,7 @@ export const TextInput_ = ({
 }) => {
   const [localValue, setLocalValue] = useState(value || "");
   const debounceRef = useRef(null);
+  const [inputHeight, setInputHeight] = useState(undefined);
 
   // Sync local state when value prop changes from external sources
   useEffect(() => {
@@ -2532,23 +2533,53 @@ export const TextInput_ = ({
     };
   }, []);
 
+  // Compute dynamic height: be as thin as possible (1 line) and grow up to optional numberOfLines
+  const baseLineHeight = (style && style.lineHeight) || 20;
+  const minHeight = multiline ? baseLineHeight : undefined; // 1 line minimum
+  const maxHeight =
+    multiline && numberOfLines ? baseLineHeight * numberOfLines : undefined;
+
+  const handleContentSizeChange = (e) => {
+    // Let consumer receive the raw event first
+    onContentSizeChange?.(e);
+
+    if (!multiline) return;
+    const nextHeight = e?.nativeEvent?.contentSize?.height;
+    if (typeof nextHeight === "number" && nextHeight > 0) {
+      // Clamp between min (1 line) and optional max (numberOfLines lines)
+      const h = Math.max(minHeight || 0, Math.ceil(nextHeight));
+      setInputHeight(maxHeight ? Math.min(h, maxHeight) : h);
+    }
+  };
+
   return (
     <TextInput
       value={localValue}
       onChangeText={(val) => {
         setLocalValue(val);
+        // Allow shrink: clear height so next contentSize measurement can reduce it
+        if (multiline) setInputHeight(undefined);
         debouncedOnChangeText(val);
       }}
       placeholder={placeholder}
       placeholderTextColor={placeholderTextColor}
-      style={style}
+      style={[
+        style,
+        multiline
+          ? {
+              height: inputHeight ?? minHeight,
+              textAlignVertical: "top",
+            }
+          : null,
+      ]}
       multiline={multiline}
-      numberOfLines={numberOfLines}
+      // Do not pass numberOfLines down to avoid enforcing a fixed min-height;
+      // we manage height via content size instead.
       autoFocus={autoFocus}
       editable={editable}
       onFocus={onFocus}
       onBlur={onBlur}
-      onContentSizeChange={onContentSizeChange}
+      onContentSizeChange={handleContentSizeChange}
       {...props}
     />
   );

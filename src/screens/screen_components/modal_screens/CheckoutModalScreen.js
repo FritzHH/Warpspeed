@@ -1354,7 +1354,7 @@ const WorkorderListComponent = ({
                               fontWeight: "500",
                             }}
                           >
-                            {workorderLine.notes}
+                            {workorderLine.intakeNotes}
                             {/* {inventoryItem?.formalName || "Item Not Found"} */}
                           </Text>
                         </View>

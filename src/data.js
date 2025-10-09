@@ -971,6 +971,7 @@ export const RECEIPT_PROTO = {
   customerContactRestriction: "",
   barcode: "",
   id: "",
+  startedBy: "",
   receiptType: "",
   dateTime: "",
   brand: "",
@@ -993,18 +994,13 @@ export const RECEIPT_PROTO = {
   salesTaxPercent: "",
   total: "",
   shopName: "Bonita Bikes LLC",
-  shopContactBlurb:
-    "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
-    "(239) 291-9396\n" +
-    "support@bonitabikes.com\n" +
-    "www.bonitabikes.com",
-  thankYouBlurb:
-    "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
+  shopContactBlurb: "",
+  thankYouBlurb: "",
   taxFree: false,
   isStandaloneSale: false,
   popCashRegister: false,
   persistFlag: false,
-
+  intakeBlurb: "",
   workorderLines: [],
   customerNotes: [],
   internalNotes: [],

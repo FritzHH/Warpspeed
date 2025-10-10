@@ -862,6 +862,7 @@ export const PRINT_WORKORDER_PROTO = {
   first: "",
   last: "",
   cell: "",
+  customerContact: "",
   landline: "",
   contactRestriction: "",
   addressBlurb: "",
@@ -904,6 +905,7 @@ export const PRINT_INTAKE_PROTO = {
   first: "",
   last: "",
   phone: "",
+  customerContact: "",
   customerPhone: "",
   workorderNumber: "",
   barcode: "",
@@ -961,6 +963,7 @@ export const PRINT_SALE_PROTO = {
 };
 
 export const RECEIPT_PROTO = {
+  customerContact: "",
   workorderNumber: "",
   customerFirstName: "",
   customerLastName: "",

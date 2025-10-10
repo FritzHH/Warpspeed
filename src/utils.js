@@ -2,6 +2,7 @@
 import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef } from "./db_calls_wrapper";
 import {
+  CONTACT_RESTRICTIONS,
   CUSTOMER_PROTO,
   PRINT_WORKORDER_LINE_ITEM_PROTO,
   RECEIPT_PROTO,
@@ -1831,6 +1832,8 @@ function createPrintIntakeTicket(wo = WORKORDER_PROTO, customer = CUSTOMER_PROTO
   r.salesTaxPercent = salesTaxPercent;
   r.color1 = wo.color1.label;
   r.color2 = wo.color2.label;
+  r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
+
   r.shopContactBlurb =
     "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
     "(239) 291-9396\n" +

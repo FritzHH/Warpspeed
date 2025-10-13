@@ -319,9 +319,9 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontSize: 15,
                   outlineWidth: 0,
                   borderRadius: 5,
-                  fontWeight: zOpenWorkorder.brand ? "500" : null,
+                  fontWeight: zOpenWorkorder?.brand ? "500" : null,
                 }}
-                value={zOpenWorkorder.brand}
+                value={zOpenWorkorder?.brand}
                 onChangeText={(val) =>
                   _zSetWorkorderField("brand", val, zOpenWorkorder.id)
                 }
@@ -352,7 +352,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderField("brand", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      opacity: zOpenWorkorder.brand
+                      opacity: zOpenWorkorder?.brand
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
@@ -375,7 +375,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderField("brand", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      opacity: zOpenWorkorder.brand
+                      opacity: zOpenWorkorder?.brand
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
@@ -409,9 +409,9 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontSize: 15,
                   outlineWidth: 0,
                   borderRadius: 5,
-                  fontWeight: zOpenWorkorder.description ? "500" : null,
+                  fontWeight: zOpenWorkorder?.description ? "500" : null,
                 }}
-                value={zOpenWorkorder.description}
+                value={zOpenWorkorder?.description}
                 onChangeText={(val) => {
                   _zSetWorkorderField("description", val, zOpenWorkorder.id);
                 }}
@@ -440,7 +440,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     // modalCoordinateVars={{ x: 30, y: 30 }}
                     buttonStyle={{
-                      opacity: zOpenWorkorder.description
+                      opacity: zOpenWorkorder?.description
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
@@ -463,7 +463,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInput_
                 placeholder={"Color 1"}
-                value={zOpenWorkorder.color1.label}
+                value={zOpenWorkorder?.color1.label}
                 style={{
                   width: "48%",
                   borderWidth: 1,
@@ -473,9 +473,9 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontSize: 15,
                   outlineWidth: 0,
                   borderRadius: 5,
-                  fontWeight: zOpenWorkorder.color1.label ? "500" : null,
-                  backgroundColor: zOpenWorkorder.color1.backgroundColor,
-                  color: zOpenWorkorder.color1.textColor,
+                  fontWeight: zOpenWorkorder?.color1.label ? "500" : null,
+                  backgroundColor: zOpenWorkorder?.color1.backgroundColor,
+                  color: zOpenWorkorder?.color1.textColor,
                 }}
                 onChangeText={(val) => {
                   setBikeColor(val, "color1");
@@ -484,7 +484,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <View style={{ width: 5 }} />
               <TextInput_
                 placeholder={"Color 2"}
-                value={zOpenWorkorder.color2.label}
+                value={zOpenWorkorder?.color2.label}
                 style={{
                   width: "48%",
                   borderWidth: 1,
@@ -494,9 +494,9 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontSize: 15,
                   outlineWidth: 0,
                   borderRadius: 5,
-                  fontWeight: zOpenWorkorder.color2.label ? "500" : null,
-                  backgroundColor: zOpenWorkorder.color2.backgroundColor,
-                  color: zOpenWorkorder.color2.textColor,
+                  fontWeight: zOpenWorkorder?.color2.label ? "500" : null,
+                  backgroundColor: zOpenWorkorder?.color2.backgroundColor,
+                  color: zOpenWorkorder?.color2.textColor,
                 }}
                 onChangeText={(val) => {
                   setBikeColor(val, "color2");
@@ -531,7 +531,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderField("color1", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      opacity: zOpenWorkorder.color1 ? 0.2 : 1,
+                      opacity: zOpenWorkorder?.color1 ? 0.2 : 1,
                     }}
                     ref={color1Ref}
                     buttonText={"Color 1"}
@@ -557,7 +557,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     modalCoordX={0}
                     buttonStyle={{
-                      opacity: zOpenWorkorder.color1
+                      opacity: zOpenWorkorder?.color1
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
@@ -588,7 +588,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   outlineWidth: 0,
                   borderRadius: 5,
                 }}
-                value={zOpenWorkorder.waitTime?.label}
+                value={zOpenWorkorder?.waitTime?.label}
                 editable={false}
               />
               <View
@@ -610,7 +610,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       _zSetWorkorderField("waitTime", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      opacity: zOpenWorkorder.waitTime.label
+                      opacity: zOpenWorkorder?.waitTime.label
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
@@ -628,18 +628,18 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
               buttonStyle={{
                 width: "100%",
-                backgroundColor: zOpenWorkorder.status.backgroundColor,
+                backgroundColor: zOpenWorkorder?.status.backgroundColor,
                 marginTop: 11,
               }}
               buttonTextStyle={{
-                color: zOpenWorkorder.status.textColor,
+                color: zOpenWorkorder?.status.textColor,
                 fontWeight: "normal",
                 fontSize: 14,
               }}
               modalCoordX={100}
               modalCoordY={40}
               ref={statusRef}
-              buttonText={zOpenWorkorder.status.label}
+              buttonText={zOpenWorkorder?.status.label}
             />
           </View>
 
@@ -677,10 +677,10 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontSize: 15,
                   outlineWidth: 0,
                   borderRadius: 5,
-                  fontWeight: zOpenWorkorder.partOrdered ? "500" : null,
+                  fontWeight: zOpenWorkorder?.partOrdered ? "500" : null,
                   backgroundColor: C.backgroundWhite,
                 }}
-                value={zOpenWorkorder.partOrdered}
+                value={zOpenWorkorder?.partOrdered}
                 onChangeText={(val) =>
                   _zSetWorkorderField("partOrdered", val, zOpenWorkorder.id)
                 }
@@ -698,7 +698,7 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
             >
               <TextInput_
-                value={zOpenWorkorder.partSource}
+                value={zOpenWorkorder?.partSource}
                 placeholder={"Part Source"}
                 style={{
                   width: "50%",
@@ -710,7 +710,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontSize: 15,
                   outlineWidth: 0,
                   borderRadius: 5,
-                  fontWeight: zOpenWorkorder.partSource ? "500" : null,
+                  fontWeight: zOpenWorkorder?.partSource ? "500" : null,
                   backgroundColor: C.backgroundWhite,
                 }}
                 onChangeText={(val) => {
@@ -736,7 +736,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                   modalCoordX={20}
                   buttonStyle={{
-                    opacity: zOpenWorkorder.brand
+                    opacity: zOpenWorkorder?.brand
                       ? DROPDOWN_SELECTED_OPACITY
                       : 1,
                     paddingHorizontal: 40,

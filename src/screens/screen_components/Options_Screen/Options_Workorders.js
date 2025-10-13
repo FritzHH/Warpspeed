@@ -209,6 +209,23 @@ export function WorkordersComponent({}) {
     return finalArr;
   }
 
+  function onMouseEnter(workorder) {
+    // log(workorder)
+    useOpenWorkordersStore.getState().setOpenWorkorderID(workorder.id)
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems
+    })
+  }
+
+  function onMouseExit(workorder) {
+    useOpenWorkordersStore.getState().setOpenWorkorderID(null)
+        useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.customer,
+      itemsTabName: TAB_NAMES.itemsTab.empty
+    })
+  }
+
   return (
     <View
       style={{
@@ -219,7 +236,6 @@ export function WorkordersComponent({}) {
       <View
         style={{
           height: "4%",
-          // backgroundColor: "blue",
           paddingVertical: 5,
           justifyContent: "flex-end",
           flexDirection: "row",
@@ -257,11 +273,11 @@ export function WorkordersComponent({}) {
                 onLongPress={() => deleteWorkorder(workorder)}
                 onMouseOver={() => {
                   if (!sAllowPreview) return;
-                  _zSetPreviewObj(workorder);
+                  onMouseEnter(workorder)
                 }}
                 onMouseLeave={() => {
                   if (!sAllowPreview) return;
-                  _zSetPreviewObj(null);
+                  onMouseExit()
                 }}
                 onPress={() => {
                   workorderSelected(workorder);

@@ -27,6 +27,7 @@ export const Items_Section = React.memo(({}) => {
   ///////////////////////////////////////////////////////////////////////////
   // log("Items_Section render");
   function ScreenComponent() {
+
     switch (zItemsTabName) {
       case TAB_NAMES.itemsTab.changeLog:
         return <Text>Change Log Tab</Text>;

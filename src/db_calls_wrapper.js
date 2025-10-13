@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { generateRandomID, log } from "./utils";
+import { generateRandomID, log, stringifyObject } from "./utils";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
@@ -1322,6 +1322,8 @@ export async function dbSavePrintObj(printObj, printerID) {
     // log("=== SAVING TO FIRESTORE ===");
     // log("Path:", path);
     log("Final object to save:", cleanedPrintObj);
+    // now stringify all fields 
+    cleanedPrintObject = stringifyAllObjectFields(cleanPrintObject);
     const result = await firestoreWrite(path, cleanedPrintObj);
     // log("firestoreWrite result:", result);
     // log("result type:", typeof result);
@@ -1333,31 +1335,31 @@ export async function dbSavePrintObj(printObj, printerID) {
       // );
 
       // Set timer to remove the print object after 100ms
-      // setTimeout(async () => {
-      //   try {
-      //     log(
-      //       `Removing print object with ID: ${printObj.id} after ${PRINT_OBJECT_REMOVAL_DELAY}ms`
-      //     );
-      //     let deleteResult;
-      //     // if (!printObj.persistFlag) {
-      //     deleteResult = await firestoreDelete(path);
-      //     // }
+      setTimeout(async () => {
+        try {
+          log(
+            `Removing print object with ID: ${printObj.id} after ${PRINT_OBJECT_REMOVAL_DELAY}ms`
+          );
+          let deleteResult;
+          // if (!printObj.persistFlag) {
+          deleteResult = await firestoreDelete(path);
+          // }
 
-      //     if (deleteResult.success) {
-      //       log(`Successfully removed print object with ID: ${printObj.id}`);
-      //     } else {
-      //       log(
-      //         `Error removing print object with ID: ${printObj.id}:`,
-      //         deleteResult.error
-      //       );
-      //     }
-      //   } catch (error) {
-      //     log(
-      //       `Error in timer removal of print object with ID: ${printObj.id}:`,
-      //       error
-      //     );
-      //   }
-      // }, PRINT_OBJECT_REMOVAL_DELAY);
+          if (deleteResult.success) {
+            // log(`Successfully removed print object with ID: ${printObj.id}`);
+          } else {
+            // log(
+            //   `Error removing print object with ID: ${printObj.id}:`,
+            //   deleteResult.error
+            // );
+          }
+        } catch (error) {
+          log(
+            `Error in timer removal of print object with ID: ${printObj.id}:`,
+            error
+          );
+        }
+      }, PRINT_OBJECT_REMOVAL_DELAY);
 
       return {
         success: true,

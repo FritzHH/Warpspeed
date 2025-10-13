@@ -71,7 +71,7 @@ export function NewWorkorderComponent({}) {
   }, [sSearchFieldName, sTextInput.length, zCustomerSearchResults.length]);
 
   async function handleTextChange(incomingText = "") {
-    log(incomingText);
+    // log(incomingText);
     let isEmail;
     let rawText = removeDashesFromPhone(incomingText);
     let isNumeric = stringIsNumeric(incomingText.substring(0, 3));
@@ -106,6 +106,7 @@ export function NewWorkorderComponent({}) {
     if (rawText.length <= 2) {
       // do nothing, string too short to search
       _setTextInput(rawText);
+      useCustomerSearchStore.getState().reset();
       return;
     } else if (isNumeric && rawText.length <= 3) {
       // check to see if the last character is a '-' in the string before user edit
@@ -326,7 +327,7 @@ export function NewWorkorderComponent({}) {
               } else {
                 _setSearchFieldName("phone");
               }
-              _setTextInput("");
+              handleTextChange("");
             }}
           />
         </View>

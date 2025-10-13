@@ -4,9 +4,9 @@ import { getNewCollectionRef } from "./db_calls_wrapper";
 import {
   CONTACT_RESTRICTIONS,
   CUSTOMER_PROTO,
-  PRINT_WORKORDER_LINE_ITEM_PROTO,
   RECEIPT_PROTO,
   RECEIPT_TYPES,
+  SALE_PROTO,
   SETTINGS_OBJ,
   WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
@@ -408,6 +408,28 @@ export function getRgbFromNamedColor(colorName) {
   // log("match", match[0]);
 
   return match[0];
+}
+
+// string ops ///////////////////////////////////////////////////////
+export function stringifyAllObjectFields(obj) {
+    if (obj === null || obj === undefined) return obj;
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => stringifyAllObjectFields(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const result = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        result[key] = stringifyAllObjectFields(obj[key]);
+      }
+    }
+    return result;
+  }
+  
+  // Convert primitives to strings
+  return String(obj);
 }
 
 // numbers /////////////////////////////////////////////////////////
@@ -1792,15 +1814,20 @@ export function createNewWorkorder({
 
 /// RECEIPT PRINTING ////////////////////////////////////////////////////////////
 const RECEIPT_CONSTS = {};
+const SHOP_CONTACT_BLURB = "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
+    "(239) 291-9396\n" +
+    "support@bonitabikes.com\n" +
+    "www.bonitabikes.com"
+const INTAKE_BLURB = "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.",
+const THANK_YOU_BLURB = "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again."
 
+ 
 function parseWorkorderLines(wo = WORKORDER_PROTO) {
   let newLines = [];
   wo.workorderLines.forEach((workorderLine, idx) => {
-    log('workorder line ->>>>>>>>>', workorderLine)
-    let line = cloneDeep(PRINT_WORKORDER_LINE_ITEM_PROTO);
-    line.qty = workorderLine.qty.toString();
+    // log('workorder line ->>>>>>>>>', workorderLine)
+    let line = {...workorderLine};
     line.itemName = workorderLine.inventoryItem.formalName;
-    line.intakeNotes = workorderLine.intakeNotes;
     line.discountName = workorderLine.discountObj?.name;
     line.discountSavings = workorderLine.discountObj?.savings;
     line.price = workorderLine.inventoryItem.price;
@@ -1809,16 +1836,15 @@ function parseWorkorderLines(wo = WORKORDER_PROTO) {
       workorderLine.discountObj?.newPrice ||
       workorderLine.inventoryItem.salePrice ||
       workorderLine.inventoryItem.price;
-    line.finalPrice = line.finalPrice.toString();
-    line.workorderBarcode = wo.id;
-    line = removeUnusedFields(line);
+    line.finalPrice = line.finalPrice;
+    // line = removeUnusedFields(line);
     newLines.push(line);
   });
   return newLines;
 }
 
 function createPrintIntakeTicket(wo = WORKORDER_PROTO, customer = CUSTOMER_PROTO, salesTaxPercent) {
-    let r = cloneDeep(RECEIPT_PROTO);
+    let r = {};
   r = { ...r, ...wo, ...customer };
   r.receiptType = RECEIPT_TYPES.intake;
   r.workorderLines = parseWorkorderLines(wo);
@@ -1835,12 +1861,9 @@ function createPrintIntakeTicket(wo = WORKORDER_PROTO, customer = CUSTOMER_PROTO
   r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
 
   r.shopContactBlurb =
-    "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
-    "(239) 291-9396\n" +
-    "support@bonitabikes.com\n" +
-    "www.bonitabikes.com";
-  r.thankYouBlurb = "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.";
-  r.intakeBlurb="This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion."
+    SHOP_CONTACT_BLURB;
+  r.thankYouBlurb = THANK_YOU_BLURB;
+  r.intakeBlurb = INTAKE_BLURB;
   
   let startedBySplit = wo.startedBy.split(" ");
   r.startedBy = startedBySplit[0]
@@ -1859,21 +1882,45 @@ function createPrintWorkorder(
   customer = CUSTOMER_PROTO,
   salesTaxPercent
 ) {
-  let r = cloneDeep(RECEIPT_PROTO);
-  r = { ...r, ...wo, ...customer };
+  let r = {};
+  r = { ...r, ...wo, ...customer, ...calculateRunningTotals(wo, salesTaxPercent) };
   r.receiptType = RECEIPT_TYPES.workorder;
   r.workorderLines = parseWorkorderLines(wo);
-  let totals = calculateRunningTotals(wo, salesTaxPercent);
-  r.total = totals.finalTotal;
-  r.subtotal = totals.runningSubtotal;
-  r.tax = totals.runningTax;
-  r.discount = totals.runningDiscount;
   r.status = wo.status.label;
   r.waitTime = wo.waitTime.label;
   r.salesTaxPercent = salesTaxPercent;
   r.color1 = wo.color1.label;
   r.color2 = wo.color2.label;
 
+  let startedBySplit = wo.startedBy.split(" ");
+  r.startedBy = startedBySplit[0]
+  if (startedBySplit[1]?.length > 0) 
+  {
+     r.startedBy = r.startedBy + " " +  startedBySplit[1].substring(0) + '.';
+
+  }
+  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
+
+  return r;
+}
+
+function createPrintSale(sale = SALE_PROTO, customer, wo =  WORKORDER_PROTO, salesTaxPercent) {
+    let r = {};
+  r = { ...r, ...wo, ...customer, ...sale, ...calculateRunningTotals(wo, salesTaxPercent) };
+  r.receiptType = RECEIPT_TYPES.sales;
+  r.workorderLines = parseWorkorderLines(wo);
+  r.status = wo.status.label;
+  r.salesTaxPercent = salesTaxPercent;
+  r.color1 = wo.color1.label;
+  r.color2 = wo.color2.label;
+  r.payments = sale.payments;
+
+  r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
+
+  r.shopContactBlurb =
+    SHOP_CONTACT_BLURB;
+  r.thankYouBlurb = THANK_YOU_BLURB;
+  
   let startedBySplit = wo.startedBy.split(" ");
   r.startedBy = startedBySplit[0]
   if (startedBySplit[1]?.length > 0) 
@@ -1897,5 +1944,6 @@ export const printBuilder = {
   },
   workorder: (workorder, customer, salesTaxPercent) =>
     createPrintWorkorder(workorder, customer, salesTaxPercent),
-  intake: (workorder, customer, salesTaxPercent) => createPrintIntakeTicket(workorder, customer, salesTaxPercent)
+  intake: (workorder, customer, salesTaxPercent) => createPrintIntakeTicket(workorder, customer, salesTaxPercent),
+  sale: (sale, payments, customer, workorder, salesTaxPercent) => createPrintSale(sale, payments, customer, workorder, salesTaxPercent) 
 };

@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { generateRandomID, log, stringifyAllObjectFields, stringifyObject } from "./utils";
+import { generateRandomID, log, removeEmptyFields, stringifyAllObjectFields, stringifyObject } from "./utils";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
@@ -1205,126 +1205,127 @@ export async function dbSavePrintObj(printObj, printerID) {
 
     // Clean and process fields before saving to Firestore
     // Fields to preserve unchanged: internalNotes, customerNotes, workorderLines, paymentsSet
-    const PRESERVE_FIELDS = [
-      "internalNotes",
-      "customerNotes",
-      "workorderLines",
-      "paymentsSet",
-    ];
+    // const PRESERVE_FIELDS = [
+    //   "internalNotes",
+    //   "customerNotes",
+    //   "workorderLines",
+    //   "paymentsSet",
+    // ];
 
-    function cleanPrintObject(obj) {
-      if (obj === null || typeof obj !== "object") {
-        return obj;
-      }
+    // function cleanPrintObject(obj) {
+    //   if (obj === null || typeof obj !== "object") {
+    //     return obj;
+    //   }
 
-      const cleaned = {};
+    //   const cleaned = {};
 
-      for (const [key, value] of Object.entries(obj)) {
-        // Preserve specific fields unchanged
-        if (PRESERVE_FIELDS.includes(key)) {
-          cleaned[key] = value;
-          continue;
-        }
+    //   for (const [key, value] of Object.entries(obj)) {
+    //     // Preserve specific fields unchanged
+    //     if (PRESERVE_FIELDS.includes(key)) {
+    //       cleaned[key] = value;
+    //       continue;
+    //     }
 
-        // Handle arrays (non-preserved fields)
-        if (Array.isArray(value)) {
-          if (value.length === 0) {
-            // Empty array - remove the field
-            continue;
-          }
-          // Convert array items to strings
-          const stringArray = value
-            .map((item) => {
-              if (typeof item === "object" && item !== null) {
-                return cleanPrintObject(item); // Recursively clean nested objects
-              }
-              return String(item);
-            })
-            .filter(
-              (item) => item !== "" && item !== "undefined" && item !== "null"
-            );
+    //     // Handle arrays (non-preserved fields)
+    //     if (Array.isArray(value)) {
+    //       if (value.length === 0) {
+    //         // Empty array - remove the field
+    //         continue;
+    //       }
+    //       // Convert array items to strings
+    //       const stringArray = value
+    //         .map((item) => {
+    //           if (typeof item === "object" && item !== null) {
+    //             return cleanPrintObject(item); // Recursively clean nested objects
+    //           }
+    //           return String(item);
+    //         })
+    //         .filter(
+    //           (item) => item !== "" && item !== "undefined" && item !== "null"
+    //         );
 
-          if (stringArray.length > 0) {
-            cleaned[key] = stringArray;
-          }
-          continue;
-        }
+    //       if (stringArray.length > 0) {
+    //         cleaned[key] = stringArray;
+    //       }
+    //       continue;
+    //     }
 
-        // Handle objects (non-preserved fields)
-        if (typeof value === "object" && value !== null) {
-          const cleanedObject = cleanPrintObject(value);
-          // Check if object has any valid fields
-          if (Object.keys(cleanedObject).length > 0) {
-            cleaned[key] = cleanedObject;
-          }
-          continue;
-        }
+    //     // Handle objects (non-preserved fields)
+    //     if (typeof value === "object" && value !== null) {
+    //       const cleanedObject = cleanPrintObject(value);
+    //       // Check if object has any valid fields
+    //       if (Object.keys(cleanedObject).length > 0) {
+    //         cleaned[key] = cleanedObject;
+    //       }
+    //       continue;
+    //     }
 
-        // Handle primitive values
-        if (value === undefined || value === null) {
-          continue; // Remove undefined/null fields
-        }
+    //     // Handle primitive values
+    //     if (value === undefined || value === null) {
+    //       continue; // Remove undefined/null fields
+    //     }
 
-        if (typeof value === "string") {
-          const trimmed = value.trim();
-          if (trimmed === "") {
-            continue; // Remove empty strings
-          }
-          cleaned[key] = trimmed;
-          continue;
-        }
+    //     if (typeof value === "string") {
+    //       const trimmed = value.trim();
+    //       if (trimmed === "") {
+    //         continue; // Remove empty strings
+    //       }
+    //       cleaned[key] = trimmed;
+    //       continue;
+    //     }
 
-        if (typeof value === "boolean") {
-          cleaned[key] = value.toString();
-          continue;
-        }
+    //     if (typeof value === "boolean") {
+    //       cleaned[key] = value.toString();
+    //       continue;
+    //     }
 
-        if (typeof value === "number") {
-          cleaned[key] = value.toString();
-          continue;
-        }
+    //     if (typeof value === "number") {
+    //       cleaned[key] = value.toString();
+    //       continue;
+    //     }
 
-        // Convert any other type to string
-        cleaned[key] = String(value);
-      }
+    //     // Convert any other type to string
+    //     cleaned[key] = String(value);
+    //   }
 
-      return cleaned;
-    }
+    //   return cleaned;
+    // }
 
-    let cleanedPrintObj = cleanPrintObject(printObj);
+    let cleanedPrintObj = removeEmptyFields(printObj);
 
     // Final safety check for any remaining undefined values
-    const undefinedFields = [];
-    function findUndefined(obj, path = "") {
-      if (obj === undefined) {
-        undefinedFields.push(path || "root");
-        return;
-      }
-      if (obj === null || typeof obj !== "object") return;
+    // const undefinedFields = [];
+    // function findUndefined(obj, path = "") {
+    //   if (obj === undefined) {
+    //     undefinedFields.push(path || "root");
+    //     return;
+    //   }
+    //   if (obj === null || typeof obj !== "object") return;
 
-      for (const [key, value] of Object.entries(obj)) {
-        findUndefined(value, path ? `${path}.${key}` : key);
-      }
-    }
+    //   for (const [key, value] of Object.entries(obj)) {
+    //     findUndefined(value, path ? `${path}.${key}` : key);
+    //   }
+    // }
 
-    findUndefined(cleanedPrintObj);
+    // findUndefined(cleanedPrintObj);
 
-    if (undefinedFields.length > 0) {
-      log(
-        "CRITICAL: Found undefined fields after all cleaning:",
-        undefinedFields
-      );
-      throw new Error(
-        `Undefined fields found after cleaning: ${undefinedFields.join(", ")}`
-      );
-    }
+    // if (undefinedFields.length > 0) {
+    //   log(
+    //     "CRITICAL: Found undefined fields after all cleaning:",
+    //     undefinedFields
+    //   );
+    //   throw new Error(
+    //     `Undefined fields found after cleaning: ${undefinedFields.join(", ")}`
+    //   );
+    // }
 
     // log("=== SAVING TO FIRESTORE ===");
     // log("Path:", path);
-    log("Final object to save:", cleanedPrintObj);
     // now stringify all fields 
-    cleanedPrintObject = stringifyAllObjectFields(cleanPrintObject);
-    const result = await firestoreWrite(path, cleanedPrintObj);
+    let stringifiedPrintObj = stringifyAllObjectFields(cleanedPrintObj);
+    log("Final object to save:", stringifiedPrintObj);
+
+    const result = await firestoreWrite(path, stringifiedPrintObj);
     // log("firestoreWrite result:", result);
     // log("result type:", typeof result);
     // log("result.success:", result?.success);

@@ -412,12 +412,12 @@ export function getRgbFromNamedColor(colorName) {
 
 // string ops ///////////////////////////////////////////////////////
 export function stringifyAllObjectFields(obj) {
-    if (obj === null || obj === undefined) return obj;
-  
+  if (obj === null || obj === undefined) return obj;
+
   if (Array.isArray(obj)) {
     return obj.map(item => stringifyAllObjectFields(item));
   }
-  
+
   if (typeof obj === 'object') {
     const result = {};
     for (const key in obj) {
@@ -427,7 +427,7 @@ export function stringifyAllObjectFields(obj) {
     }
     return result;
   }
-  
+
   // Convert primitives to strings
   return String(obj);
 }
@@ -486,11 +486,11 @@ export function formatCurrencyDisp(value, withCurrency = false) {
   const amount = cents / 100;
   const opts = withCurrency
     ? {
-        style: "currency",
-        currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }
     : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
   return amount.toLocaleString(locale, opts);
   // log(input);
@@ -541,9 +541,8 @@ export function usdTypeMask(raw, { withDollar = false } = {}) {
   }
   if (neg) centsVal = -centsVal;
 
-  const display = `${neg ? "-" : ""}${
-    withDollar ? "$" : ""
-  }${dollarsWithCommas}.${centsStr}`;
+  const display = `${neg ? "-" : ""}${withDollar ? "$" : ""
+    }${dollarsWithCommas}.${centsStr}`;
   return { display, cents: centsVal };
 }
 
@@ -1184,6 +1183,59 @@ export async function randomWordGenerator() {
 }
 
 // OBJECT operations /////////////////////////////////////////////////
+/**
+ * Recursively removes empty, undefined, or null fields from an object
+ * - Removes fields with null or undefined values
+ * - Removes empty strings
+ * - Removes empty arrays
+ * - Recursively processes nested objects and arrays
+ * - Preserves fields with value 0 or false (as they may be intentional)
+ * @param {any} obj - The object to clean
+ * @returns {any} - The cleaned object
+ */
+export function removeEmptyFields(obj) {
+  // Handle null, undefined, or empty string
+  if (obj === null || obj === undefined || obj === '') {
+    return undefined;
+  }
+
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    // Recursively clean each item in the array
+    const cleaned = obj
+      .map(item => removeEmptyFields(item))
+      .filter(item => item !== undefined);
+
+    // Return undefined if array is empty after cleaning
+    return cleaned.length === 0 ? undefined : cleaned;
+  }
+
+  // Handle objects
+  if (typeof obj === 'object') {
+    const result = {};
+
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const value = obj[key];
+
+        // Recursively clean the value
+        const cleanedValue = removeEmptyFields(value);
+
+        // Only include if not undefined
+        if (cleanedValue !== undefined) {
+          result[key] = cleanedValue;
+        }
+      }
+    }
+
+    // Return undefined if object is empty after cleaning
+    return Object.keys(result).length === 0 ? undefined : result;
+  }
+
+  // Return primitive values as-is (including 0 and false)
+  return obj;
+}
+
 export function removeUnusedFields(obj) {
   if (!isObject(obj)) return obj;
 
@@ -1697,7 +1749,7 @@ export function showAlert({
   icon1Size,
   icon2Size,
   icon3Size,
-  handleBtn1Press = () => {},
+  handleBtn1Press = () => { },
   handleBtn2Press,
   handleBtn3Press,
   canExitOnOuterClick,
@@ -1730,7 +1782,7 @@ export function startTimer(
   duration = MILLIS_IN_MINUTE,
   intervalMs = 500,
   onTick,
-  onComplete = () => {}
+  onComplete = () => { }
 ) {
   let remaining = duration;
   const interval = setInterval(() => {
@@ -1813,20 +1865,20 @@ export function createNewWorkorder({
 }
 
 /// RECEIPT PRINTING ////////////////////////////////////////////////////////////
-const RECEIPT_CONSTS = {};
 const SHOP_CONTACT_BLURB = "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
-    "(239) 291-9396\n" +
-    "support@bonitabikes.com\n" +
-    "www.bonitabikes.com"
+  "(239) 291-9396\n" +
+  "support@bonitabikes.com\n" +
+  "www.bonitabikes.com"
 const INTAKE_BLURB = "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.";
 const THANK_YOU_BLURB = "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again."
+const SHOP_NAME = "Bonita Bikes LLC"
 
- 
+
 function parseWorkorderLines(wo = WORKORDER_PROTO) {
   let newLines = [];
   wo.workorderLines.forEach((workorderLine, idx) => {
     // log('workorder line ->>>>>>>>>', workorderLine)
-    let line = {...workorderLine};
+    let line = { ...workorderLine };
     line.itemName = workorderLine.inventoryItem.formalName;
     line.discountName = workorderLine.discountObj?.name;
     line.discountSavings = workorderLine.discountObj?.savings;
@@ -1843,36 +1895,60 @@ function parseWorkorderLines(wo = WORKORDER_PROTO) {
   return newLines;
 }
 
-function createPrintIntakeTicket(wo = WORKORDER_PROTO, customer = CUSTOMER_PROTO, salesTaxPercent) {
-    let r = {};
-  r = { ...r, ...wo, ...customer };
-  r.receiptType = RECEIPT_TYPES.intake;
-  r.workorderLines = parseWorkorderLines(wo);
-  let totals = calculateRunningTotals(wo, salesTaxPercent);
-  r.total = totals.finalTotal;
-  r.subtotal = totals.runningSubtotal;
-  r.tax = totals.runningTax;
-  r.discount = totals.runningDiscount;
-  r.status = wo.status.label;
-  r.waitTime = wo.waitTime.label;
+function createPrintBase(workorder, customer, salesTaxPercent) {
+  let r = { ...workorder, ...customer, ...calculateRunningTotals(workorder, salesTaxPercent) }
+  r.workorderLines = parseWorkorderLines(workorder);
+  r.status = workorder.status.label;
   r.salesTaxPercent = salesTaxPercent;
-  r.color1 = wo.color1.label;
-  r.color2 = wo.color2.label;
-  r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
+  r.color1 = workorder.color1.label;
+  r.color2 = workorder.color2.label;
+  r.barcode = r.id
+  r.shopName = SHOP_NAME
+  r.waitTime = workorder.waitTime?.label;
 
+  let startedBySplit = workorder.startedBy.split(" ");
+  r.startedBy = startedBySplit[0]
+  if (startedBySplit[1]?.length > 0) {
+    r.startedBy = r.startedBy + " " + startedBySplit[1].substring(0) + '.';
+
+  }
+  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(workorder.id) // remove for production, initial workorders did not save this field
   r.shopContactBlurb =
     SHOP_CONTACT_BLURB;
   r.thankYouBlurb = THANK_YOU_BLURB;
   r.intakeBlurb = INTAKE_BLURB;
-  
-  let startedBySplit = wo.startedBy.split(" ");
-  r.startedBy = startedBySplit[0]
-  if (startedBySplit[1]?.length > 0) 
-  {
-     r.startedBy = r.startedBy + " " +  startedBySplit[1].substring(0) + '.';
+  r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
 
-  }
-  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
+  return r;
+}
+
+function createPrintIntakeTicket(workorder = WORKORDER_PROTO, customer = CUSTOMER_PROTO, salesTaxPercent) {
+  let r = { ...createPrintBase(workorder, salesTaxPercent, customer) };
+  r.receiptType = RECEIPT_TYPES.intake;
+  // r.workorderLines = parseWorkorderLines(wo);
+  // r.status = wo.status.label;
+  // r.waitTime = wo.waitTime.label;
+  // r.salesTaxPercent = salesTaxPercent;
+  // r.color1 = wo.color1.label;
+  // r.color2 = wo.color2.label;
+  // r.barcode = r.id
+
+  r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
+
+// r.shopName = "Bonita Bikes LLC"
+// r.shopContactBlurb =
+//   SHOP_CONTACT_BLURB;
+// r.thankYouBlurb = THANK_YOU_BLURB;
+// r.intakeBlurb = INTAKE_BLURB;
+
+  // let startedBySplit = wo.startedBy.split(" ");
+  // r.startedBy = startedBySplit[0]
+  // if (startedBySplit[1]?.length > 0)
+  // {
+  //    r.startedBy = r.startedBy + " " +  startedBySplit[1].substring(0) + '.';
+
+  // }
+  // r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
 
   return r;
 }
@@ -1891,12 +1967,13 @@ function createPrintWorkorder(
   r.salesTaxPercent = salesTaxPercent;
   r.color1 = wo.color1.label;
   r.color2 = wo.color2.label;
+  r.barcode = r.id
+  r.shopName = "Bonita Bikes LLC"
 
   let startedBySplit = wo.startedBy.split(" ");
   r.startedBy = startedBySplit[0]
-  if (startedBySplit[1]?.length > 0) 
-  {
-     r.startedBy = r.startedBy + " " +  startedBySplit[1].substring(0) + '.';
+  if (startedBySplit[1]?.length > 0) {
+    r.startedBy = r.startedBy + " " + startedBySplit[1].substring(0) + '.';
 
   }
   r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
@@ -1904,9 +1981,8 @@ function createPrintWorkorder(
   return r;
 }
 
-function createPrintSale(sale = SALE_PROTO, customer, wo =  WORKORDER_PROTO, salesTaxPercent) {
-    let r = {};
-  r = { ...r, ...wo, ...customer, ...sale, ...calculateRunningTotals(wo, salesTaxPercent) };
+function createPrintSale(sale = SALE_PROTO, customer, wo = WORKORDER_PROTO, salesTaxPercent) {
+  let r = { ...r, ...wo, ...customer, ...sale, ...calculateRunningTotals(wo, salesTaxPercent) };
   r.receiptType = RECEIPT_TYPES.sales;
   r.workorderLines = parseWorkorderLines(wo);
   r.status = wo.status.label;
@@ -1914,24 +1990,28 @@ function createPrintSale(sale = SALE_PROTO, customer, wo =  WORKORDER_PROTO, sal
   r.color1 = wo.color1.label;
   r.color2 = wo.color2.label;
   r.payments = sale.payments;
+  r.barcode = r.id
+  r.shopName = "Bonita Bikes LLC"
+
 
   r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
 
   r.shopContactBlurb =
     SHOP_CONTACT_BLURB;
   r.thankYouBlurb = THANK_YOU_BLURB;
-  
+
   let startedBySplit = wo.startedBy.split(" ");
   r.startedBy = startedBySplit[0]
-  if (startedBySplit[1]?.length > 0) 
-  {
-     r.startedBy = r.startedBy + " " +  startedBySplit[1].substring(0) + '.';
+  if (startedBySplit[1]?.length > 0) {
+    r.startedBy = r.startedBy + " " + startedBySplit[1].substring(0) + '.';
 
   }
   r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
 
   return r;
 }
+
+
 
 export const printBuilder = {
   test: () => {
@@ -1944,6 +2024,12 @@ export const printBuilder = {
   },
   workorder: (workorder, customer, salesTaxPercent) =>
     createPrintWorkorder(workorder, customer, salesTaxPercent),
-  intake: (workorder, customer, salesTaxPercent) => createPrintIntakeTicket(workorder, customer, salesTaxPercent),
-  sale: (sale, payments, customer, workorder, salesTaxPercent) => createPrintSale(sale, payments, customer, workorder, salesTaxPercent) 
+  intake: (workorder, customer, salesTaxPercent) => {
+    let receipt = createPrintBase
+      (workorder, customer, salesTaxPercent);
+    receipt.receiptType = RECEIPT_TYPES.intake;
+    return receipt;
+  },
+
+  sale: (sale, payments, customer, workorder, salesTaxPercent) => createPrintSale(sale, payments, customer, workorder, salesTaxPercent)
 };

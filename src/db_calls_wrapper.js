@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { generateRandomID, log, stringifyObject } from "./utils";
+import { generateRandomID, log, stringifyAllObjectFields, stringifyObject } from "./utils";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,

@@ -1818,7 +1818,7 @@ const SHOP_CONTACT_BLURB = "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
     "(239) 291-9396\n" +
     "support@bonitabikes.com\n" +
     "www.bonitabikes.com"
-const INTAKE_BLURB = "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.",
+const INTAKE_BLURB = "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.";
 const THANK_YOU_BLURB = "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again."
 
  

@@ -832,6 +832,8 @@ export const SETTINGS_OBJ = {
 };
 
 // RECEIPT STUFF ////////////////////////////////////////////////////
+
+// DB CONNECETED DO NOT CHANGE
 export const RECEIPT_TYPES = {
   workorder: "Workorder",
   sales: "Sale",

@@ -15,6 +15,7 @@ import {
   formatMillisForDisplay,
   checkInputForNumbersOnly,
   gray,
+  formatPhoneWithDashes,
 } from "../../../../utils";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 
@@ -109,6 +110,17 @@ export const MiddleItemComponent = ({
                   {zCustomer?.email}
                 </Text>
               </View>
+              <Button_
+                buttonStyle={{
+                  paddingVertical: 0,
+                  backgroundColor: "green",
+                }}
+                icon={ICONS.editPencil}
+                iconSize={15}
+                onPress={() => {
+                  log("edit customer info fun needed");
+                }}
+              />
               <View>
                 {!!zCustomer?.cell && (
                   <Text style={{ color: C.text }}>
@@ -154,17 +166,7 @@ export const MiddleItemComponent = ({
                       {zCustomer?.addressNotes}
                     </Text>
                   )}
-                  <Button_
-                    buttonStyle={{
-                      paddingVertical: 0,
-                      backgroundColor: "green",
-                    }}
-                    icon={ICONS.editPencil}
-                    iconSize={15}
-                    onPress={() => {
-                      log("edit customer info fun needed");
-                    }}
-                  />
+
                 </View>
               </View>
             )}
@@ -246,6 +248,7 @@ export const MiddleItemComponent = ({
             borderRadius: 10,
             borderWidth: 1,
             borderColor: C.buttonLightGreenOutline,
+            marginTop: 5
           }}
         >
           <View
@@ -261,18 +264,16 @@ export const MiddleItemComponent = ({
               <Text
                 style={{
                   fontSize: 13,
-                  color: gray(0.5),
-                  marginRight: 10,
+                  color: C.green,
+                  marginRight: 10,  
                 }}
               >
                 $
               </Text>
               <Text
                 style={{
-                  fontSize: 18,
-                  color: sIsRefund
-                    ? gray(0.5)
-                    : lightenRGBByPercent(C.green, 20),
+                  fontSize: 17,
+                  color: gray(0.5)
                 }}
               >
                 {formatCurrencyDisp(sSale?.subtotal)}
@@ -302,7 +303,7 @@ export const MiddleItemComponent = ({
                 style={{
                   marginLeft: 15,
                   fontSize: 13,
-                  color: sIsRefund ? gray(0.5) : C.lightred,
+                  color: gray(0.5),
                 }}
               >
                 DISCOUNT
@@ -313,14 +314,15 @@ export const MiddleItemComponent = ({
                     fontSize: 13,
                     color: sIsRefund ? gray(0.5) : C.lightred,
                     marginRight: 10,
+                    color: C.green
                   }}
                 >
                   $
                 </Text>
                 <Text
                   style={{
-                    fontSize: 18,
-                    color: sIsRefund ? gray(0.5) : C.lightred,
+                    fontSize: 17,
+                    color: gray(0.5),
                   }}
                 >
                   {"- " +
@@ -354,17 +356,16 @@ export const MiddleItemComponent = ({
                   style={{
                     fontSize: 13,
                     color: gray(0.5),
-                    marginRight: 10,
+                    marginRight: 10, color: C.green
+
                   }}
                 >
                   $
                 </Text>
                 <Text
                   style={{
-                    fontSize: 18,
-                    color: sIsRefund
-                      ? gray(0.5)
-                      : lightenRGBByPercent(C.green, 20),
+                    fontSize: 17,
+                    color: gray(0.5)
                   }}
                 >
                   {formatCurrencyDisp(sSale?.subtotal - sSale?.discount)}
@@ -397,16 +398,17 @@ export const MiddleItemComponent = ({
                   fontSize: 13,
                   color: gray(0.5),
                   marginRight: 10,
+                  color: C.green
+
                 }}
               >
                 $
               </Text>
               <Text
                 style={{
-                  fontSize: 18,
-                  color: sIsRefund
-                    ? gray(0.5)
-                    : lightenRGBByPercent(C.green, 20),
+                  fontSize: 17,
+                  color:
+                    gray(0.5)
                 }}
               >
                 {formatCurrencyDisp(sSale?.tax)}
@@ -427,17 +429,16 @@ export const MiddleItemComponent = ({
                 style={{
                   fontSize: 13,
                   color: gray(0.5),
-                  marginRight: 10,
+                  marginRight: 10, color: C.green
                 }}
               >
                 $
               </Text>
               <Text
                 style={{
-                  fontSize: 18,
-                  color: sIsRefund
-                    ? gray(0.5)
-                    : lightenRGBByPercent(C.green, 20),
+                  fontSize: 17,
+                  color:
+                    gray(0.5)
                 }}
               >
                 {formatCurrencyDisp(sSale?.total)}
@@ -513,7 +514,7 @@ export const MiddleItemComponent = ({
                     style={{
                       fontSize: 13,
                       color: gray(0.5),
-                      marginRight: 10,
+                      marginRight: 10, color: C.green
                     }}
                   >
                     $
@@ -543,7 +544,7 @@ export const MiddleItemComponent = ({
                   style={{
                     fontSize: 13,
                     color: gray(0.5),
-                    marginRight: 10,
+                    marginRight: 10, color: C.green
                   }}
                 >
                   $
@@ -582,7 +583,7 @@ export const MiddleItemComponent = ({
                   style={{
                     fontSize: 13,
                     color: gray(0.5),
-                    marginRight: 10,
+                    marginRight: 10, color: C.green
                   }}
                 >
                   $
@@ -610,7 +611,7 @@ export const MiddleItemComponent = ({
                 style={{
                   fontSize: 13,
                   color: gray(0.5),
-                  marginRight: 10,
+                  marginRight: 10, color: C.green
                 }}
               >
                 $
@@ -618,8 +619,8 @@ export const MiddleItemComponent = ({
               <Text
                 style={{
                   fontWeight: 500,
-                  fontSize: 21,
-                  color: C.green,
+                  fontSize: 18,
+                  color: gray(0.6),
                 }}
               >
                 {formatCurrencyDisp(
@@ -857,7 +858,7 @@ export const MiddleItemComponent = ({
               style={{
                 fontSize: 18,
                 fontWeight: 500,
-                color: C.green,
+                color: gray(.6),
               }}
             >
               {"CASH REFUNDED:   $" +
@@ -869,7 +870,7 @@ export const MiddleItemComponent = ({
               style={{
                 fontSize: 18,
                 fontWeight: 500,
-                color: C.green,
+                color: gray(.6),
               }}
             >
               {"CARD AMOUNT REFUNDED:   $" +
@@ -881,7 +882,7 @@ export const MiddleItemComponent = ({
               style={{
                 fontSize: 18,
                 fontWeight: 500,
-                color: sSale?.paymentComplete ? C.green : C.red,
+                color: gray(.6),
               }}
             >
               {"AMOUNT LEFT TO PAY:   $" +
@@ -893,7 +894,7 @@ export const MiddleItemComponent = ({
               style={{
                 fontSize: 18,
                 fontWeight: 500,
-                color: sSale?.paymentComplete ? C.green : C.red,
+                color: gray(.6),
               }}
             >
               {"PAYMENT COMPLETE!"}

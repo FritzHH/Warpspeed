@@ -36,6 +36,7 @@ import {
   addOrRemoveFromArr,
   resetObject,
   extractStripeErrorMessage,
+  printBuilder,
 } from "../../../utils";
 import { useEffect, useRef, useState } from "react";
 import { C, Colors, Fonts } from "../../../styles";
@@ -47,7 +48,7 @@ import { isArray } from "lodash";
 import { StripeCreditCardComponent } from "./checkout_components/CardSaleComponent";
 import { CashSaleComponent } from "./checkout_components/CashSaleComponent";
 import { MiddleItemComponent } from "./checkout_components/MiddleItemComponent";
-import { dbCompleteSale } from "../../../db_calls_wrapper";
+import { dbCompleteSale, dbSavePrintObj } from "../../../db_calls_wrapper";
 
 export function CheckoutModalScreen({}) {
   // store getters ////////////////////////////////////////////////
@@ -445,53 +446,18 @@ export function CheckoutModalScreen({}) {
     }
   }
 
-  // Manual function to stop the reader checking timer
-  function stopReaderCheckingTimer() {
-    if (readerCheckIntervalRef.current) {
-      log("Manually stopping card reader timer");
-      clearInterval(readerCheckIntervalRef.current);
-      readerCheckIntervalRef.current = null;
-      _setIsCheckingForReaders(false);
-      readerCheckStartTimeRef.current = null;
-    }
-  }
-
-  // Manual function to start checking for readers
-  function startCheckingForReaders() {
-    if (!readerCheckIntervalRef.current) {
-      log("Manually starting reader check timer");
-      _setIsCheckingForReaders(true);
-      readerCheckStartTimeRef.current = Date.now();
-
-      readerCheckIntervalRef.current = setInterval(() => {
-        log("Manual timer tick: checking for readers");
-        fetchStripeReaders();
-      }, 2000);
-    }
-  }
-
   ///////////////////  SALES /////////////////////////////////////
   function handlePaymentCapture(payment = PAYMENT_OBJECT_PROTO) {
     // log(paymentObj);
     let sale = cloneDeep(sSale);
     payment.saleID = sale.id;
-    payment.isDeposit = sIsDeposit;
-    sale.payments.push(payment);
+    sale.payments ? sale.payments = [...sale.payments, payment] : sale.payments = [payment]
     sale.amountCaptured = sale.amountCaptured + payment.amountCaptured;
 
-    //************************************************************** */
-    // need to send print object here //////////////////////////////////
-
-    // saleObj.amountCaptured = saleObj.amountCaptured + paymentObj.amountCaptured;
-    let deposits = cloneDeep(zCustomer.depositArr);
-    if (!Array.isArray(deposits)) deposits = [];
-
-    if (!payment.isDeposit) {
       let workorderIDs = sCombinedWorkorders.map((o) => o.id);
       sale.workorderIDs = workorderIDs;
-      cloneDeep(sCombinedWorkorders).forEach((wo) => {
-        wo.sales.push(sale.id);
-        _zSetWorkorder(wo); // db
+    sCombinedWorkorders.forEach((wo) => {
+      wo.sales ? wo.sales = [...wo.sales, sale.id] : wo.sales = [sale.id];
         sale.workorderIDs = replaceOrAddToArr(sale.workorderIDs, wo.id);
         if (sale.amountCaptured === sTotalAmount) {
           wo.paymentComplete = true;
@@ -499,25 +465,33 @@ export function CheckoutModalScreen({}) {
         if (sale.amountCaptured === sale.total) {
           sale.paymentComplete = true;
         }
-      });
-    } else {
-      deposits.push(sale);
-    }
-
-    let sales = cloneDeep(zCustomer.sales);
-    if (!isArray(sales)) sales = [];
-    sales = replaceOrAddToArr(sales, sale.id);
+      _zSetWorkorder(wo); // db
+    });
 
     // remove unused fields
-    sale.payments = sale.payments.map((payment) => removeUnusedFields(payment));
     if (payment.cash)
       _setCashChangeNeeded(payment.amountTendered - payment.amountCaptured);
 
+
+    //   let toPrint = printBuilder.intake(
+    // zOpenWorkorder,
+    // zCustomer,
+    // useSettingsStore.getState().settings?.salesTaxPercent
+    //   );
+
+    sale.finishedOnMillis = new Date().getTime();
+    let toPrint = printBuilder.sale(sale, sale.payments, zCustomer, zOpenWorkorder, zSettings.salesTaxPercent)
+
+    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Rongta");
+
+
+    return
+    sale.payments = sale.payments?.map((payment) => removeUnusedFields(payment))
     // printReceipt(payment);
     _setSale(sale);
     dbCompleteSale(removeUnusedFields(sale));
     _zSetCustomerField("deposits", deposits); // db
-    _zSetCustomerField("sales", sales); // db
+    _zSetCustomerField("sales", replaceOrAddToArr(zCustomer.sales, sale.id)); // db
 
     if (!sale.payments[sale.payments.length - 1].cash) {
       if (sIsDeposit || sale.paymentComplete) closeCheckoutScreenModal();

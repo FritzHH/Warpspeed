@@ -2019,17 +2019,27 @@ export const printBuilder = {
       ...RECEIPT_CONSTS,
       id: generateRandomID(),
       receiptType: RECEIPT_TYPES.test,
-      // persistFlag: true,
     };
   },
   workorder: (workorder, customer, salesTaxPercent) =>
-    createPrintWorkorder(workorder, customer, salesTaxPercent),
+  {
+    let receipt = createPrintBase
+      (workorder, customer, salesTaxPercent);
+    receipt.receiptType = RECEIPT_TYPES.workorder;
+    return receipt;
+  },
   intake: (workorder, customer, salesTaxPercent) => {
     let receipt = createPrintBase
       (workorder, customer, salesTaxPercent);
     receipt.receiptType = RECEIPT_TYPES.intake;
     return receipt;
   },
-
-  sale: (sale, payments, customer, workorder, salesTaxPercent) => createPrintSale(sale, payments, customer, workorder, salesTaxPercent)
+  sale: (sale, payments, customer, workorder, salesTaxPercent) => {
+    let receipt = createPrintBase
+      (workorder, customer, salesTaxPercent);
+    receipt = { ...receipt, ...sale }
+    receipt.receiptType = RECEIPT_TYPES.sales;
+    receipt.payments = payments;
+    return receipt;
+  },
 };

@@ -156,7 +156,6 @@ export const ActiveWorkorderComponent = ({}) => {
       zCustomer,
       useSettingsStore.getState().settings?.salesTaxPercent
         );
-    toPrint.workorderLines = [];
 
     dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Rongta");
   }

@@ -203,7 +203,7 @@ export function NewWorkorderComponent({}) {
     // first create new customer
     let newCustomer = cloneDeep(sCustomerInfo);
     newCustomer.id = generateUPCBarcode();
-    newCustomer.dateCreated = new Date().getTime();
+    newCustomer.millisCreated = new Date().getTime();
 
     // next create new empty workorder for automatic population of next screen
     let newWorkorder = createNewWorkorder({
@@ -219,6 +219,17 @@ export function NewWorkorderComponent({}) {
     // add in the newly created workorder to the customer's file
     newCustomer.workorders.push(newWorkorder.id);
     _setCustomerInfo(newCustomer);
+    useCurrentCustomerStore.getState().setCustomer(newCustomer);
+    useOpenWorkordersStore.getState().setWorkorder(newWorkorder, false)
+    useOpenWorkordersStore.getState().setOpenWorkorderID(newWorkorder.id)
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
+    });
+    useCustomerSearchStore.getState().reset();
+
+
   }
 
   //////////////////////////////////////////////////////////////////////

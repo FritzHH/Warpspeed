@@ -3,9 +3,8 @@ import React, { useState, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
-import { onAuthStateChange } from "./db_calls_wrapper";
 import {
-  dbAutoLogin,
+  dbLoginUser, onAuthStateChange,
   dbGetSettings,
   dbGetTenantById,
 } from "./db_calls_wrapper";
@@ -34,7 +33,7 @@ function App() {
         if (DEVELOPMENT_AUTO_LOGIN.enabled) {
           // Auto-login for development
           // console.log("Auto-logging in for development...");
-          const loginResult = await dbAutoLogin(
+          const loginResult = await dbLoginUser(
             DEVELOPMENT_AUTO_LOGIN.email,
             DEVELOPMENT_AUTO_LOGIN.password
           );

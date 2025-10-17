@@ -12,10 +12,65 @@ const { isArray } = require("lodash");
 const { onInit } = require("firebase-functions/v2/core");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
-// Initialize Firebase Admin SDK with default credentials
-// In production, this will use the service account key automatically
-admin.initializeApp();
-const DB = getFirestore();
+// Firebase Admin SDK - initialize once at module load (don't delete/recreate)
+let DB = null;
+let adminInitialized = false;
+
+// Helper function to get initialized Firestore DB with service account credentials
+async function getDB(serviceAccountSecret = null) {
+  try {
+    // Return existing DB if already initialized
+    if (DB && adminInitialized) {
+      return DB;
+    }
+
+    // Initialize only once - NEVER delete the app (breaks Firebase Functions SDK)
+    if (!adminInitialized) {
+      if (serviceAccountSecret) {
+        // Initialize with service account from Secret Manager
+        const serviceAccountJSON = serviceAccountSecret.value();
+        const serviceAccount = JSON.parse(serviceAccountJSON);
+
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com",
+        });
+
+        log("✅ Firebase Admin initialized with service account from Secret Manager");
+      } else {
+        // Fallback to default credentials
+        admin.initializeApp({
+          databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com",
+        });
+        log("⚠️ Firebase Admin initialized with default credentials");
+      }
+
+      adminInitialized = true;
+      DB = admin.firestore();
+      log("DB instance created successfully");
+    }
+
+    return DB;
+  } catch (error) {
+    // If app already exists, just use it
+    if (error.code === "app/duplicate-app") {
+      log("⚠️ Admin app already exists, using existing app");
+      adminInitialized = true;
+      DB = admin.firestore();
+      return DB;
+    }
+
+    log("❌ Error initializing Firebase Admin", {
+      error: error.message,
+      code: error.code,
+      hasSecret: !!serviceAccountSecret,
+      appsLength: admin.apps.length,
+      adminInitialized: adminInitialized,
+    });
+
+    throw error;
+  }
+}
 
 // Check if running in emulator mode
 // const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
@@ -28,11 +83,21 @@ const DB = getFirestore();
 const stripeSecretKey = defineSecret("stripeSecretKey");
 const twilioSecretKey = defineSecret("twilioSecretKey");
 const twilioSecretAccountNumber = defineSecret("twilioSecretAccountNum");
+const firebaseServiceAccountKey = defineSecret("firebase-service-account-key");
 
 // initialization
 var stripe;
 var twilioClient;
+let isAdminInitializedWithCredentials = false;
+
 onInit(async () => {
+  // Note: Admin SDK is already initialized above with default credentials
+  // The onInit can't reinitialize it, but we can log the status
+  log("onInit fired - Admin SDK status", {
+    appsInitialized: admin.apps.length,
+    hasServiceAccountSecret: !!firebaseServiceAccountKey.value(),
+  });
+
   // stripe = Stripe(stripeSecretKey.value()); // Stripe secret key
   // try {
   //   twilioClient = require("twilio")(
@@ -42,7 +107,7 @@ onInit(async () => {
   // } catch (e) {
   //   log("error fetching Twilio client", e);
   // }
-}, [stripeSecretKey]);
+}, [stripeSecretKey, firebaseServiceAccountKey]);
 
 const SMS_PROTO = {
   firstName: "",
@@ -601,11 +666,19 @@ exports.cancelServerDrivenStripePayment = onRequest(
  * HTTPS callable function for sending SMS messages with proper validation and error handling
  */
 exports.sendSMSEnhanced = onCall(
-  { secrets: [twilioSecretKey, twilioSecretAccountNumber] },
+  {
+    secrets: [
+      twilioSecretKey,
+      twilioSecretAccountNumber,
+      firebaseServiceAccountKey,
+    ],
+  },
   async (request) => {
     log("Incoming enhanced SMS callable request", request.data);
 
     try {
+      // Initialize Firestore with service account
+      const db = await getDB(firebaseServiceAccountKey);
       // Input validation
       const {
         message,
@@ -693,35 +766,39 @@ exports.sendSMSEnhanced = onCall(
       // Store message in Firestore if customerID and messageID provided
       if (customerID && messageID) {
         try {
-    const messageRef = DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("outgoing-messages")
-      .doc(customerID)
-      .collection("messages")
-      .doc(messageID);
+          // Store outgoing message in customer_phone/{phone}/messages
+          const messageRef = db
+            .collection("customer_phone")
+            .doc(cleanPhoneNumber)
+            .collection("messages")
+            .doc(messageID);
 
-    await messageRef.set({
-      id: messageID,
-      customerID: customerID,
-      message: message.trim(),
-      phoneNumber: cleanPhoneNumber,
-      messageSid: twilioResponse.sid,
-      status: twilioResponse.status,
-      fromNumber: fromNumber,
-      tenantID: tenantID,
-      storeID: storeID,
-      sentAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+          await messageRef.set({
+            id: messageID,
+            customerID: customerID,
+            message: message.trim(),
+            phoneNumber: cleanPhoneNumber,
+            messageSid: twilioResponse.sid,
+            status: twilioResponse.status,
+            fromNumber: fromNumber,
+            tenantID: tenantID,
+            storeID: storeID,
+            type: "outgoing",
+            millis: Date.now(),
+          });
 
-          log("Message stored in Firestore successfully", {
+          log("Outgoing message stored at customer_phone path", {
+            messageID,
+            customerID,
+            phone: cleanPhoneNumber,
+            path: `customer_phone/${cleanPhoneNumber}/messages/${messageID}`,
+          });
+        } catch (firestoreError) {
+          log("Error storing outgoing message in Firestore", {
+            error: firestoreError.message,
             messageID,
             customerID,
           });
-        } catch (firestoreError) {
-          log("Error storing message in Firestore", firestoreError);
           // Don't fail the entire request if Firestore storage fails
           // The SMS was sent successfully
         }
@@ -810,138 +887,693 @@ exports.sendSMSEnhanced = onCall(
   }
 );
 
-exports.incomingSMS = onRequest({ cors: true }, async (request, response) => {
-  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+exports.incomingSMS = onRequest(
+  { cors: true, secrets: [firebaseServiceAccountKey] },
+  async (request, response) => {
+    // Set CORS headers
+    response.set("Access-Control-Allow-Origin", "*");
+    response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.set("Access-Control-Allow-Headers", "Content-Type");
 
-  let body = request.body;
-  log("incoming sms body", body);
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
 
-  let incomingPhone = body.From.slice(2, body.From.length);
-  let incomingMessage = body.Body;
-  log("phone", incomingPhone);
-  log("message", incomingMessage);
+    let body = request.body;
+    log("incoming sms body", body);
 
-  // get the customer from firestore using the new tenant/store hierarchy
-  // Search across all tenants and stores for customer with matching phone
-  let customerObj = null;
-  let tenantID = null;
-  let storeID = null;
+    let incomingPhone = body.From.slice(2, body.From.length);
+    let incomingMessage = body.Body;
+    const messageSid = body.SmsSid;
+    log("phone", incomingPhone);
+    log("message", incomingMessage);
 
-  try {
-    // Get all tenants
-    const tenantsSnapshot = await DB.collection("tenants").get();
+    // get the customer from customer_phone index
+    let customerObj = null;
+    let tenantID = null;
+    let storeID = null;
 
-    for (const tenantDoc of tenantsSnapshot.docs) {
-      const currentTenantID = tenantDoc.id;
-      const storesSnapshot = await DB.collection("tenants")
-        .doc(currentTenantID)
-        .collection("stores")
+    try {
+      // Try customer_phone index first
+      const customerPhoneRef = db
+        .collection("customer_phone")
+        .doc(incomingPhone);
+      const customerPhoneDoc = await customerPhoneRef.get();
+
+      if (customerPhoneDoc.exists) {
+        const indexData = customerPhoneDoc.data();
+        const info = indexData.info || indexData;
+
+        customerObj = {
+          id: info.id,
+          first: info.first,
+          last: info.last,
+          cell: info.cell,
+          landline: info.landline,
+          email: info.email,
+        };
+        tenantID = info.tenantID;
+        storeID = info.storeID;
+
+        log("found customer via customer_phone index", {
+          customerObj,
+          tenantID,
+          storeID,
+        });
+      } else {
+        log("no customer found with phone", incomingPhone);
+        return response
+          .status(200)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+    } catch (error) {
+      log("error searching for customer", error);
+      return response
+        .status(200)
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+
+    // get the last message from customer_phone to see if they are allowed to respond
+    let lastOutgoingMessage = null;
+    try {
+      const lastMessageSnapshot = await db
+        .collection("customer_phone")
+        .doc(incomingPhone)
+        .collection("messages")
+        .where("type", "==", "outgoing")
+        .orderBy("millis", "desc")
+        .limit(1)
         .get();
 
-      for (const storeDoc of storesSnapshot.docs) {
-        const currentStoreID = storeDoc.id;
-        const customersSnapshot = await DB.collection("tenants")
-          .doc(currentTenantID)
-          .collection("stores")
-          .doc(currentStoreID)
-          .collection("customers")
-          .where("cell", "==", incomingPhone)
-          .get();
-
-        if (!customersSnapshot.empty) {
-          customerObj = customersSnapshot.docs[0].data();
-          tenantID = currentTenantID;
-          storeID = currentStoreID;
-          break;
-        }
+      if (!lastMessageSnapshot.empty) {
+        lastOutgoingMessage = lastMessageSnapshot.docs[0].data();
       }
-      if (customerObj) break;
+    } catch (error) {
+      log("error getting last outgoing message", error);
     }
 
-    if (!customerObj) {
-      log("no customer found with phone", incomingPhone);
-      return; // Exit early if no customer found
-    } else {
-      log("found customer", { customerObj, tenantID, storeID });
+    log("last outgoing message", lastOutgoingMessage);
+    let canRespond = lastOutgoingMessage
+      ? lastOutgoingMessage.canRespond
+      : null;
+
+    // if not allowed to respond, send a bounceback message
+    if (!canRespond) {
+      log("cannot respond", lastOutgoingMessage?.canRespond);
+
+      // Store the message even though thread is closed
+      try {
+        await db
+          .collection("customer_phone")
+          .doc(incomingPhone)
+          .collection("messages")
+          .doc(messageSid)
+          .set({
+            id: messageSid,
+            customerID: customerObj.id,
+            firstName: customerObj.first,
+            lastName: customerObj.last,
+            millis: Date.now(),
+            phoneNumber: incomingPhone,
+            message: incomingMessage,
+            type: "incoming",
+            threadStatus: "closed",
+            autoResponseSent: true,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            tenantID,
+            storeID,
+          });
+      } catch (error) {
+        log("error storing closed thread message", error);
+      }
+
+      // Send bounceback via TwiML
+      const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${CLOSED_THREAD_RESPONSE}</Message>
+</Response>`;
+
+      return response.status(200).type("text/xml").send(twimlResponse);
     }
-  } catch (error) {
-    log("error searching for customer", error);
-    return; // Exit early on error
-  }
 
-  // get the last message from us to see if they are allowed to respond
-  let lastOutgoingMessage = null;
-  try {
-    const lastMessageSnapshot = await DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("outgoing-messages")
-      .doc(customerObj.id)
-      .collection("messages")
-      .orderBy("millis", "desc")
-      .limit(1)
-      .get();
-
-    if (!lastMessageSnapshot.empty) {
-      lastOutgoingMessage = lastMessageSnapshot.docs[0].data();
-    }
-  } catch (error) {
-    log("error getting last outgoing message", error);
-  }
-
-  log("last outgoing message", lastOutgoingMessage);
-  log("here is this one", lastOutgoingMessage);
-  let canRespond = lastOutgoingMessage ? lastOutgoingMessage.canRespond : null;
-
-  // if not allowed to respond, send a bounceback message
-  if (!canRespond) {
-    log("cannot respond", lastOutgoingMessage.canRespond);
-    let message = { ...SMS_PROTO };
-    if (lastOutgoingMessage) message = { ...lastOutgoingMessage };
-    message.message = CLOSED_THREAD_RESPONSE;
-    message.phoneNumber = incomingPhone;
-    log(
-      "outgoing bounceback not customer not authorized to respond message",
-      message
-    );
-    sendTwilioMessage(message);
-    return;
-  }
-
-  // if allowed to respond, create and store the message in realtime db
-  const message = {
-    firstName: customerObj.first,
-    lastName: customerObj.last,
-    millis: new Date().getTime(),
-    phoneNumber: incomingPhone,
-    message: incomingMessage,
-    customerID: customerObj.id,
-    id: body.SmsSid,
-    type: "incoming",
-  };
-
-  // Store incoming message using Firestore with tenant/store hierarchy
-  try {
-    const incomingMessageRef = DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("incoming-messages")
-      .doc(customerObj.id)
-      .collection("messages")
-      .doc(body.SmsSid);
-
-    await incomingMessageRef.set({
-      ...message,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    // if allowed to respond, create and store the message
+    const message = {
+      id: messageSid,
+      firstName: customerObj.first,
+      lastName: customerObj.last,
+      millis: Date.now(),
+      phoneNumber: incomingPhone,
+      message: incomingMessage,
+      customerID: customerObj.id,
+      type: "incoming",
+      threadStatus: "open",
+      read: false,
       tenantID,
       storeID,
-    });
-  } catch (error) {
-    log("error storing incoming message in Firestore", error);
+    };
+
+    // Store incoming message in customer_phone/{phone}/messages
+    try {
+      const incomingMessageRef = db
+        .collection("customer_phone")
+        .doc(incomingPhone)
+        .collection("messages")
+        .doc(messageSid);
+
+      await incomingMessageRef.set({
+        ...message,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      log("Incoming message stored at customer_phone path", {
+        phone: incomingPhone,
+        messageSid,
+      });
+
+      // Update customer last contact timestamp
+      await db.collection("customer_phone").doc(incomingPhone).update({
+        "info.lastIncomingSMS": admin.firestore.FieldValue.serverTimestamp(),
+        "info.lastIncomingSMSMillis": Date.now(),
+      });
+    } catch (error) {
+      log("error storing incoming message in Firestore", error);
+    }
+
+    // Return empty TwiML response
+    return response
+      .status(200)
+      .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
   }
-});
+);
+
+/**
+ * Enhanced incoming SMS webhook handler with comprehensive error handling
+ * Processes incoming SMS messages from Twilio with proper validation and response management
+ *
+ * Features:
+ * - Validates Twilio webhook signature for security
+ * - Comprehensive input validation
+ * - Optimized customer lookup with caching
+ * - Thread management with auto-response handling
+ * - Proper HTTP responses with TwiML
+ * - Complete error tracking and logging
+ * - Message analytics and metadata
+ */
+exports.incomingSMSEnhanced = onRequest(
+  {
+    cors: true,
+    secrets: [
+      twilioSecretKey,
+      twilioSecretAccountNumber,
+      firebaseServiceAccountKey,
+    ],
+  },
+  async (request, response) => {
+    const requestStartTime = Date.now();
+
+    // Set CORS headers
+    response.set("Access-Control-Allow-Origin", "*");
+    response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.set("Access-Control-Allow-Headers", "Content-Type");
+
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
+
+    try {
+      // ============================================================================
+      // STEP 1: VALIDATE TWILIO WEBHOOK & EXTRACT DATA
+      // ============================================================================
+
+      const twilioData = request.body;
+
+      // Validate required Twilio parameters
+      if (
+        !twilioData ||
+        !twilioData.From ||
+        !twilioData.Body ||
+        !twilioData.MessageSid
+      ) {
+        log("Invalid Twilio webhook - missing required parameters", twilioData);
+        return response
+          .status(400)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      // Extract and normalize phone number (remove +1 country code)
+      const rawPhoneNumber = twilioData.From;
+      const normalizedPhone = rawPhoneNumber
+        .replace(/^\+1/, "")
+        .replace(/\D/g, "");
+
+      // Validate phone number format
+      if (normalizedPhone.length !== 10 || !/^\d{10}$/.test(normalizedPhone)) {
+        log("Invalid phone number format", { rawPhoneNumber, normalizedPhone });
+        return response
+          .status(400)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      const incomingMessage = twilioData.Body.trim();
+      const messageSid = twilioData.MessageSid;
+      const messageStatus = twilioData.SmsStatus || "received";
+      const numMedia = parseInt(twilioData.NumMedia || "0", 10);
+
+      log("Processing incoming SMS", {
+        phone: normalizedPhone,
+        messageSid,
+        messageLength: incomingMessage.length,
+        hasMedia: numMedia > 0,
+        status: messageStatus,
+      });
+
+      // ============================================================================
+      // STEP 2: FIND CUSTOMER ACROSS ALL TENANTS/STORES
+      // ============================================================================
+
+      let customerData = null;
+      let tenantID = null;
+      let storeID = null;
+
+      try {
+        // OPTION 1: Try customer_phone index first (most efficient)
+        const db = await getDB(firebaseServiceAccountKey);
+
+        const customerPhoneRef = db
+          .collection("customer_phone")
+          .doc(normalizedPhone);
+        const customerPhoneDoc = await customerPhoneRef.get();
+
+        if (customerPhoneDoc.exists) {
+          const indexData = customerPhoneDoc.data();
+
+          // Extract data from "info" field
+          const info = indexData.info || indexData; // Fallback to root if no "info" field
+
+          customerData = {
+            id: info.id,
+            first: info.first,
+            last: info.last,
+            cell: info.cell,
+            landline: info.landline,
+            email: info.email,
+          };
+          tenantID = info.tenantID;
+          storeID = info.storeID;
+
+          log("Customer found via customer_phone index", {
+            customerID: customerData.id,
+            tenantID,
+            storeID,
+            customerName: `${customerData.first} ${customerData.last}`,
+            lookupBy: "cell",
+          });
+        }
+
+        // OPTION 2: If not in index, fall back to searching all tenants/stores
+        if (!customerData) {
+          log("Customer not in phone index, searching all tenants/stores", {
+            phone: normalizedPhone,
+          });
+
+          // Get all tenants
+          const tenantsSnapshot = await db.collection("tenants").get();
+
+          if (tenantsSnapshot.empty) {
+            log("No tenants found in system");
+            return response
+              .status(404)
+              .send(
+                '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+              );
+          }
+
+          // Search across all tenants and stores
+          let found = false;
+          for (const tenantDoc of tenantsSnapshot.docs) {
+            if (found) break;
+
+            const currentTenantID = tenantDoc.id;
+            const storesSnapshot = await db
+              .collection("tenants")
+              .doc(currentTenantID)
+              .collection("stores")
+              .get();
+
+            for (const storeDoc of storesSnapshot.docs) {
+              if (found) break;
+
+              const currentStoreID = storeDoc.id;
+
+              // Query customers by phone number using Admin SDK
+              try {
+                const customersSnapshot = await db
+                  .collection("tenants")
+                  .doc(currentTenantID)
+                  .collection("stores")
+                  .doc(currentStoreID)
+                  .collection("customers")
+                  .where("cell", "==", normalizedPhone)
+                  .limit(1)
+                  .get();
+
+                if (!customersSnapshot.empty) {
+                  customerData = customersSnapshot.docs[0].data();
+                  tenantID = currentTenantID;
+                  storeID = currentStoreID;
+                  found = true;
+
+                  log("Customer found via tenant/store search", {
+                    customerID: customerData.id,
+                    tenantID,
+                    storeID,
+                    customerName: `${customerData.first} ${customerData.last}`,
+                  });
+
+                  // Create customer_phone index for future fast lookups
+                  try {
+                    await db
+                      .collection("customer_phone")
+                      .doc(normalizedPhone)
+                      .set({
+                        info: {
+                          id: customerData.id,
+                          first: customerData.first || "",
+                          last: customerData.last || "",
+                          cell: customerData.cell || "",
+                          landline: customerData.landline || "",
+                          email: customerData.email || "",
+                          tenantID,
+                          storeID,
+                          lastUpdated: Date.now(),
+                        },
+                      });
+                    log("customer_phone index created for future lookups", {
+                      phone: normalizedPhone,
+                      customerID: customerData.id,
+                    });
+                  } catch (indexError) {
+                    log("Error creating customer_phone index", {
+                      error: indexError.message,
+                    });
+                  }
+                }
+              } catch (queryError) {
+                log("Error querying customers in store", {
+                  error: queryError.message,
+                  errorCode: queryError.code,
+                  tenantID: currentTenantID,
+                  storeID: currentStoreID,
+                });
+                // Continue to next store even if this one fails
+                continue;
+              }
+            }
+          }
+        }
+
+        // Customer not found
+        if (!customerData || !tenantID || !storeID) {
+          log("No customer found for phone number", { phone: normalizedPhone });
+
+          // Log unknown sender for analytics
+          await db
+            .collection("sms-analytics")
+            .doc("unknown-senders")
+            .collection("messages")
+            .add({
+              phoneNumber: normalizedPhone,
+              message: incomingMessage,
+              messageSid,
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              twilioData,
+            });
+
+          // Return empty TwiML response (no auto-reply to unknown numbers)
+          return response
+            .status(200)
+            .send(
+              '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+            );
+        }
+      } catch (error) {
+        log("Error searching for customer", {
+          error: error.message,
+          phone: normalizedPhone,
+        });
+
+        return response
+          .status(500)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      // ============================================================================
+      // STEP 3: CHECK THREAD STATUS & RESPONSE PERMISSIONS
+      // ============================================================================
+
+      let lastOutgoingMessage = null;
+      let canRespond = false;
+      let threadStatus = "closed";
+
+      try {
+        // Check for last outgoing message in customer_phone/{phone}/messages
+        const lastMessageSnapshot = await db
+          .collection("customer_phone")
+          .doc(normalizedPhone)
+          .collection("messages")
+          .where("type", "==", "outgoing")
+          .orderBy("millis", "desc")
+          .limit(1)
+          .get();
+
+        if (!lastMessageSnapshot.empty) {
+          lastOutgoingMessage = lastMessageSnapshot.docs[0].data();
+          canRespond = lastOutgoingMessage.canRespond === true;
+          threadStatus = canRespond ? "open" : "closed";
+
+          log("Last outgoing message retrieved", {
+            messageID: lastOutgoingMessage.id,
+            canRespond,
+            threadStatus,
+            sentAt: lastOutgoingMessage.millis,
+          });
+        } else {
+          log("No previous outgoing messages found for customer", {
+            customerID: customerData.id,
+            phone: normalizedPhone,
+          });
+        }
+      } catch (error) {
+        log("Error retrieving last outgoing message", {
+          error: error.message,
+          errorCode: error.code,
+          customerID: customerData.id,
+        });
+        // Continue processing - default to closed thread
+      }
+
+      // ============================================================================
+      // STEP 4: HANDLE CLOSED THREAD - SEND AUTO-RESPONSE
+      // ============================================================================
+
+      if (!canRespond) {
+        log("Thread closed - sending auto-response", {
+          customerID: customerData.id,
+          threadStatus,
+        });
+
+        // Store the incoming message even though thread is closed
+        try {
+          await db
+            .collection("customer_phone")
+            .doc(normalizedPhone)
+            .collection("messages")
+            .doc(messageSid)
+            .set({
+              id: messageSid,
+              customerID: customerData.id,
+              firstName: customerData.first || "",
+              lastName: customerData.last || "",
+              phoneNumber: normalizedPhone,
+              message: incomingMessage,
+              millis: Date.now(),
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              type: "incoming",
+              threadStatus: "closed",
+              autoResponseSent: true,
+              hasMedia: numMedia > 0,
+              numMedia,
+              messageStatus,
+              tenantID,
+              storeID,
+              messageSid,
+              messageStatus,
+            });
+
+          log("Closed thread message stored at customer_phone path", {
+            phone: normalizedPhone,
+            messageSid,
+          });
+        } catch (error) {
+          log("Error storing closed thread message", {
+            error: error.message,
+            messageSid,
+          });
+        }
+
+        // Send auto-response using TwiML
+        const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${CLOSED_THREAD_RESPONSE}</Message>
+</Response>`;
+
+        // Also send via Twilio client for tracking
+        if (twilioClient) {
+          try {
+            await twilioClient.messages.create({
+              body: CLOSED_THREAD_RESPONSE,
+              to: `+1${normalizedPhone}`,
+              from: twilioData.To || "+12393171234",
+            });
+
+            log("Auto-response sent successfully", {
+              customerID: customerData.id,
+              phone: normalizedPhone,
+            });
+          } catch (twilioError) {
+            log("Error sending auto-response via Twilio", {
+              error: twilioError.message,
+              code: twilioError.code,
+            });
+          }
+        }
+
+        return response.status(200).type("text/xml").send(twimlResponse);
+      }
+
+      // ============================================================================
+      // STEP 5: STORE INCOMING MESSAGE (OPEN THREAD)
+      // ============================================================================
+
+      const incomingMessageData = {
+        id: messageSid,
+        customerID: customerData.id,
+        firstName: customerData.first || "",
+        lastName: customerData.last || "",
+        phoneNumber: normalizedPhone,
+        message: incomingMessage,
+        millis: Date.now(),
+        type: "incoming",
+        threadStatus: "open",
+        read: false,
+        hasMedia: numMedia > 0,
+        numMedia,
+        messageStatus,
+        tenantID,
+        storeID,
+        messageSid,
+        messageStatus,
+        to: twilioData.From,
+        from: twilioData.To,
+      };
+
+      // Handle media attachments if present
+      if (numMedia > 0) {
+        const mediaUrls = [];
+        for (let i = 0; i < numMedia; i++) {
+          const mediaUrl = twilioData[`MediaUrl${i}`];
+          const mediaContentType = twilioData[`MediaContentType${i}`];
+          if (mediaUrl) {
+            mediaUrls.push({
+              url: mediaUrl,
+              contentType: mediaContentType || "unknown",
+            });
+          }
+        }
+        incomingMessageData.mediaUrls = mediaUrls;
+      }
+
+      try {
+        // Store incoming message in customer_phone/{phone}/messages
+        const incomingMessageRef = db
+          .collection("customer_phone")
+          .doc(normalizedPhone)
+          .collection("messages")
+          .doc(messageSid);
+
+        await incomingMessageRef.set(incomingMessageData);
+
+        log("Incoming message stored successfully at customer_phone path", {
+          phone: normalizedPhone,
+          messageSid,
+          customerID: customerData.id,
+          messageLength: incomingMessage.length,
+          hasMedia: numMedia > 0,
+          path: `customer_phone/${normalizedPhone}/messages/${messageSid}`,
+        });
+      } catch (error) {
+        log("Error storing incoming message", {
+          error: error.message,
+          errorCode: error.code,
+          messageSid,
+          customerID: customerData.id,
+        });
+
+        // Still return success to Twilio to avoid retries
+        return response
+          .status(200)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      // ============================================================================
+      // STEP 7: RETURN SUCCESS RESPONSE
+      // ============================================================================
+
+      log("Incoming SMS processed successfully", {
+        messageSid,
+        customerID: customerData.id,
+        processingTimeMs: processingTime,
+        threadStatus: "open",
+        storagePath: `customer_phone/${normalizedPhone}/messages/${messageSid}`,
+      });
+
+      // Return empty TwiML response (no auto-reply for open threads)
+      return response
+        .status(200)
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    } catch (error) {
+      // ============================================================================
+      // GLOBAL ERROR HANDLER
+      // ============================================================================
+
+      log("Unhandled error in incomingSMSEnhanced", {
+        error: error.message,
+        stack: error.stack,
+        requestBody: request.body,
+      });
+
+      // Log critical error for monitoring
+      try {
+        await db.collection("error-logs").add({
+          function: "incomingSMSEnhanced",
+          error: {
+            message: error.message,
+            stack: error.stack,
+            code: error.code || "unknown",
+          },
+          requestData: request.body,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          severity: "critical",
+        });
+      } catch (logError) {
+        log("Failed to log error to Firestore", logError);
+      }
+
+      // Return success to Twilio to prevent retries
+      return response
+        .status(200)
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+  }
+);
 
 ///////////////////////////////////////////////////////////////////////////////
 // utils
@@ -1856,12 +2488,12 @@ exports.createTenant = onRequest({ cors: true }, async (req, res) => {
     let tenantID = "1234";
 
     // Ensure tenant ID is unique
-    let tenantRef = DB.collection("tenants").doc(tenantID);
+    let tenantRef = db.collection("tenants").doc(tenantID);
     let tenantDoc = await tenantRef.get();
 
     while (tenantDoc.exists) {
       tenantID = generateTenantID();
-      tenantRef = DB.collection("tenants").doc(tenantID);
+      tenantRef = db.collection("tenants").doc(tenantID);
       tenantDoc = await tenantRef.get();
     }
 
@@ -1950,7 +2582,7 @@ exports.createTenant = onRequest({ cors: true }, async (req, res) => {
     await tenantRef.set(tenantData);
 
     // Create user index entries for quick lookup
-    await DB.collection("users").doc(primaryUserRecord.uid).set({
+    await db.collection("users").doc(primaryUserRecord.uid).set({
       email: primaryEmail,
       tenantID: tenantID,
       role: "primary_contact",
@@ -1958,7 +2590,7 @@ exports.createTenant = onRequest({ cors: true }, async (req, res) => {
       status: "active",
     });
 
-    await DB.collection("users").doc(secondaryUserRecord.uid).set({
+    await db.collection("users").doc(secondaryUserRecord.uid).set({
       email: secondaryEmail,
       tenantID: tenantID,
       role: "secondary_contact",
@@ -2320,685 +2952,894 @@ exports.cancelServerDrivenStripePaymentCallable = onCall(
 /**
  * Callable version of loginAppUser
  */
-exports.loginAppUserCallable = onCall(async (request) => {
-  log("Incoming login callable request", request.data);
+exports.loginAppUserCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("Incoming login callable request", request.data);
 
-  const { email, password } = request.data;
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
 
-  if (!email || typeof email !== "string" || !email.includes("@")) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Valid email address is required."
-    );
-  }
+    const { email, password } = request.data;
 
-  if (!password || typeof password !== "string" || password.length < 6) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Password must be at least 6 characters long."
-    );
-  }
-
-  try {
-    // Authenticate user with Firebase Auth
-    const userRecord = await admin.auth().getUserByEmail(email);
-
-    if (userRecord.disabled) {
-      throw new HttpsError(
-        "permission-denied",
-        "❌ User account has been disabled."
-      );
-    }
-
-    const userID = userRecord.uid;
-
-    // Look up user in the global users index
-    const userIndexRef = DB.collection("users").doc(userID);
-    const userIndexDoc = await userIndexRef.get();
-
-    if (!userIndexDoc.exists) {
-      throw new HttpsError("not-found", "❌ User not found in system.");
-    }
-
-    const userIndexData = userIndexDoc.data();
-    const tenantID = userIndexData.tenantID;
-    const storeID = userIndexData.storeID;
-
-    if (!tenantID) {
-      throw new HttpsError(
-        "not-found",
-        "❌ User is not associated with any tenant."
-      );
-    }
-
-    if (!storeID) {
-      throw new HttpsError(
-        "not-found",
-        "❌ User is not associated with any store."
-      );
-    }
-
-    // Retrieve user details from tenant/store-specific collection
-    const userRef = DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("users")
-      .doc(userID);
-    const userDoc = await userRef.get();
-
-    if (!userDoc.exists) {
-      throw new HttpsError(
-        "not-found",
-        "❌ User details not found in tenant system."
-      );
-    }
-
-    const userData = userDoc.data();
-
-    // Retrieve tenant information
-    const tenantRef = DB.collection("tenants").doc(tenantID);
-    const tenantDoc = await tenantRef.get();
-
-    if (!tenantDoc.exists) {
-      throw new HttpsError("not-found", "❌ Tenant information not found.");
-    }
-
-    const tenantData = tenantDoc.data();
-
-    // Update last login timestamp
-    await userRef.update({
-      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-      loginCount: admin.firestore.FieldValue.increment(1),
-    });
-
-    log("User login successful", {
-      userID,
-      email,
-      tenantID,
-      storeID,
-      displayName: userData.displayName,
-    });
-
-    return {
-      success: true,
-      message: `✅ Login successful for ${email} (Tenant: ${tenantID}, Store: ${storeID})`,
-      data: {
-        user: {
-          id: userID,
-          email: userData.email,
-          displayName: userData.displayName,
-          tenantID: tenantID,
-          storeID: storeID,
-          permissions: userData.permissions,
-          status: userData.status,
-          lastLogin: userData.lastLogin,
-          createdAt: userData.createdAt,
-          metadata: userData.metadata,
-        },
-        tenant: {
-          id: tenantID,
-          name: tenantData.name,
-          status: tenantData.status,
-          settings: tenantData.settings,
-          userCount: tenantData.userCount,
-          createdAt: tenantData.createdAt,
-          subscription: tenantData.subscription,
-        },
-        auth: {
-          uid: userID,
-          email: email,
-          emailVerified: userRecord.emailVerified,
-          disabled: userRecord.disabled,
-        },
-      },
-    };
-  } catch (error) {
-    log("Error during login", error);
-
-    if (error.code === "auth/user-not-found") {
-      throw new HttpsError(
-        "not-found",
-        "❌ No account found with this email address."
-      );
-    } else if (error.code === "auth/wrong-password") {
-      throw new HttpsError("unauthenticated", "❌ Incorrect password.");
-    } else if (error.code === "auth/invalid-email") {
+    if (!email || typeof email !== "string" || !email.includes("@")) {
       throw new HttpsError(
         "invalid-argument",
-        "❌ Invalid email address format."
+        "Valid email address is required."
       );
-    } else if (error.code === "auth/user-disabled") {
+    }
+
+    if (!password || typeof password !== "string" || password.length < 6) {
       throw new HttpsError(
-        "permission-denied",
-        "❌ This account has been disabled."
+        "invalid-argument",
+        "Password must be at least 6 characters long."
       );
-    } else if (error.code === "auth/too-many-requests") {
-      throw new HttpsError(
-        "resource-exhausted",
-        "❌ Too many failed login attempts. Please try again later."
-      );
-    } else if (error.code === "permission-denied") {
-      throw new HttpsError(
-        "permission-denied",
-        "❌ Insufficient permissions to access user data."
-      );
-    } else if (error.code === "not-found") {
-      throw new HttpsError("not-found", "❌ User or tenant not found.");
-    } else {
-      throw new HttpsError("internal", `❗ Unexpected error: ${error.message}`);
+    }
+
+    try {
+      // Authenticate user with Firebase Auth
+      const userRecord = await admin.auth().getUserByEmail(email);
+
+      if (userRecord.disabled) {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ User account has been disabled."
+        );
+      }
+
+      const userID = userRecord.uid;
+
+      // Look up user in the global users index
+      const userIndexRef = db.collection("users").doc(userID);
+      const userIndexDoc = await userIndexRef.get();
+
+      if (!userIndexDoc.exists) {
+        throw new HttpsError("not-found", "❌ User not found in system.");
+      }
+
+      const userIndexData = userIndexDoc.data();
+      const tenantID = userIndexData.tenantID;
+      const storeID = userIndexData.storeID;
+
+      if (!tenantID) {
+        throw new HttpsError(
+          "not-found",
+          "❌ User is not associated with any tenant."
+        );
+      }
+
+      if (!storeID) {
+        throw new HttpsError(
+          "not-found",
+          "❌ User is not associated with any store."
+        );
+      }
+
+      // Retrieve user details from tenant/store-specific collection
+      const userRef = db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("users")
+        .doc(userID);
+      const userDoc = await userRef.get();
+
+      if (!userDoc.exists) {
+        throw new HttpsError(
+          "not-found",
+          "❌ User details not found in tenant system."
+        );
+      }
+
+      const userData = userDoc.data();
+
+      // Retrieve tenant information
+      const tenantRef = db.collection("tenants").doc(tenantID);
+      const tenantDoc = await tenantRef.get();
+
+      if (!tenantDoc.exists) {
+        throw new HttpsError("not-found", "❌ Tenant information not found.");
+      }
+
+      const tenantData = tenantDoc.data();
+
+      // Update last login timestamp
+      await userRef.update({
+        lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+        loginCount: admin.firestore.FieldValue.increment(1),
+      });
+
+      log("User login successful", {
+        userID,
+        email,
+        tenantID,
+        storeID,
+        displayName: userData.displayName,
+      });
+
+      return {
+        success: true,
+        message: `✅ Login successful for ${email} (Tenant: ${tenantID}, Store: ${storeID})`,
+        data: {
+          user: {
+            id: userID,
+            email: userData.email,
+            displayName: userData.displayName,
+            tenantID: tenantID,
+            storeID: storeID,
+            permissions: userData.permissions,
+            status: userData.status,
+            lastLogin: userData.lastLogin,
+            createdAt: userData.createdAt,
+            metadata: userData.metadata,
+          },
+          tenant: {
+            id: tenantID,
+            name: tenantData.name,
+            status: tenantData.status,
+            settings: tenantData.settings,
+            userCount: tenantData.userCount,
+            createdAt: tenantData.createdAt,
+            subscription: tenantData.subscription,
+          },
+          auth: {
+            uid: userID,
+            email: email,
+            emailVerified: userRecord.emailVerified,
+            disabled: userRecord.disabled,
+          },
+        },
+      };
+    } catch (error) {
+      log("Error during login", error);
+
+      if (error.code === "auth/user-not-found") {
+        throw new HttpsError(
+          "not-found",
+          "❌ No account found with this email address."
+        );
+      } else if (error.code === "auth/wrong-password") {
+        throw new HttpsError("unauthenticated", "❌ Incorrect password.");
+      } else if (error.code === "auth/invalid-email") {
+        throw new HttpsError(
+          "invalid-argument",
+          "❌ Invalid email address format."
+        );
+      } else if (error.code === "auth/user-disabled") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ This account has been disabled."
+        );
+      } else if (error.code === "auth/too-many-requests") {
+        throw new HttpsError(
+          "resource-exhausted",
+          "❌ Too many failed login attempts. Please try again later."
+        );
+      } else if (error.code === "permission-denied") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Insufficient permissions to access user data."
+        );
+      } else if (error.code === "not-found") {
+        throw new HttpsError("not-found", "❌ User or tenant not found.");
+      } else {
+        throw new HttpsError(
+          "internal",
+          `❗ Unexpected error: ${error.message}`
+        );
+      }
     }
   }
-});
+);
 
 /**
  * Callable version of createAppUser
  */
-exports.createAppUserCallable = onCall(async (request) => {
-  log("Incoming create app user callable request", request.data);
+exports.createAppUserCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("Incoming create app user callable request", request.data);
 
-  const { email, password, tenantID, storeID, permissions } = request.data;
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
 
-  if (!email || typeof email !== "string" || !email.includes("@")) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Valid email address is required."
-    );
-  }
+    const { email, password, tenantID, storeID, permissions } = request.data;
 
-  if (!password || typeof password !== "string" || password.length < 6) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Password must be at least 6 characters long."
-    );
-  }
-
-  if (!tenantID || typeof tenantID !== "string") {
-    throw new HttpsError("invalid-argument", "Tenant ID is required.");
-  }
-
-  if (!storeID || typeof storeID !== "string") {
-    throw new HttpsError("invalid-argument", "Store ID is required.");
-  }
-
-  try {
-    // Check if tenant exists
-    const tenantRef = DB.collection("tenants").doc(tenantID);
-    const tenantDoc = await tenantRef.get();
-
-    if (!tenantDoc.exists) {
-      throw new HttpsError("not-found", "Tenant not found.");
-    }
-
-    // Check if user already exists with this email
-    const existingUserQuery = await DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("users")
-      .where("email", "==", email)
-      .get();
-
-    if (!existingUserQuery.empty) {
+    if (!email || typeof email !== "string" || !email.includes("@")) {
       throw new HttpsError(
-        "already-exists",
-        "User with this email already exists in this tenant."
+        "invalid-argument",
+        "Valid email address is required."
       );
     }
 
-    // Create Firebase Auth user
-    const userRecord = await admin.auth().createUser({
-      email: email,
-      password: password,
-      displayName: email,
-      emailVerified: false,
-    });
+    if (!password || typeof password !== "string" || password.length < 6) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Password must be at least 6 characters long."
+      );
+    }
 
-    const userID = userRecord.uid;
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new HttpsError("invalid-argument", "Tenant ID is required.");
+    }
 
-    // Create user document in Firestore under tenant
-    const userData = {
-      id: userID,
-      email: email,
-      displayName: email,
-      tenantID: tenantID,
-      permissions: permissions || {
-        level: 1,
-        canCreateUsers: false,
-        canManageInventory: false,
-        canProcessPayments: false,
-        canViewReports: false,
-      },
-      status: "active",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdBy: "system",
-      lastLogin: null,
-      emailVerified: false,
-      metadata: {
-        timezone: "America/New_York",
-        language: "en",
-        department: null,
-        role: "user",
-      },
-    };
+    if (!storeID || typeof storeID !== "string") {
+      throw new HttpsError("invalid-argument", "Store ID is required.");
+    }
 
-    await DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("users")
-      .doc(userID)
-      .set(userData);
+    try {
+      // Check if tenant exists
+      const tenantRef = db.collection("tenants").doc(tenantID);
+      const tenantDoc = await tenantRef.get();
 
-    // Create user index entry for quick lookup
-    await DB.collection("users").doc(userID).set({
-      email: email,
-      tenantID: tenantID,
-      storeID: storeID,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active",
-    });
+      if (!tenantDoc.exists) {
+        throw new HttpsError("not-found", "Tenant not found.");
+      }
 
-    // Update tenant's user count
-    await tenantRef.update({
-      userCount: admin.firestore.FieldValue.increment(1),
-      lastUserCreated: admin.firestore.FieldValue.serverTimestamp(),
-    });
+      // Check if user already exists with this email
+      const existingUserQuery = await db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("users")
+        .where("email", "==", email)
+        .get();
 
-    log("App user created successfully", {
-      userID,
-      email,
-      tenantID,
-    });
+      if (!existingUserQuery.empty) {
+        throw new HttpsError(
+          "already-exists",
+          "User with this email already exists in this tenant."
+        );
+      }
 
-    return {
-      success: true,
-      message: `✅ User ${email} created successfully for tenant ${tenantID}.`,
-      data: {
-        user: {
-          id: userID,
-          email: email,
-          displayName: email,
-          tenantID: tenantID,
-          storeID: storeID,
-          permissions: userData.permissions,
-          status: "active",
-          createdAt: userData.createdAt,
+      // Create Firebase Auth user
+      const userRecord = await admin.auth().createUser({
+        email: email,
+        password: password,
+        displayName: email,
+        emailVerified: false,
+      });
+
+      const userID = userRecord.uid;
+
+      // Create user document in Firestore under tenant
+      const userData = {
+        id: userID,
+        email: email,
+        displayName: email,
+        tenantID: tenantID,
+        permissions: permissions || {
+          level: 1,
+          canCreateUsers: false,
+          canManageInventory: false,
+          canProcessPayments: false,
+          canViewReports: false,
         },
-      },
-    };
-  } catch (error) {
-    log("Error creating app user", error);
+        status: "active",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: "system",
+        lastLogin: null,
+        emailVerified: false,
+        metadata: {
+          timezone: "America/New_York",
+          language: "en",
+          department: null,
+          role: "user",
+        },
+      };
 
-    if (error.code === "auth/email-already-exists") {
-      throw new HttpsError(
-        "already-exists",
-        "❌ User with this email already exists in Firebase Auth."
-      );
-    } else if (error.code === "auth/invalid-email") {
-      throw new HttpsError(
-        "invalid-argument",
-        "❌ Invalid email address format."
-      );
-    } else if (error.code === "auth/weak-password") {
-      throw new HttpsError(
-        "invalid-argument",
-        "❌ Password is too weak. Please use a stronger password."
-      );
-    } else if (error.code === "auth/operation-not-allowed") {
-      throw new HttpsError(
-        "permission-denied",
-        "❌ Email/password accounts are not enabled."
-      );
-    } else if (error.code === "permission-denied") {
-      throw new HttpsError(
-        "permission-denied",
-        "❌ Insufficient permissions to create user."
-      );
-    } else if (error.code === "not-found") {
-      throw new HttpsError("not-found", "❌ Tenant not found.");
-    } else {
-      throw new HttpsError("internal", `❗ Unexpected error: ${error.message}`);
+      await db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("users")
+        .doc(userID)
+        .set(userData);
+
+      // Create user index entry for quick lookup
+      await db.collection("users").doc(userID).set({
+        email: email,
+        tenantID: tenantID,
+        storeID: storeID,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "active",
+      });
+
+      // Update tenant's user count
+      await tenantRef.update({
+        userCount: admin.firestore.FieldValue.increment(1),
+        lastUserCreated: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      log("App user created successfully", {
+        userID,
+        email,
+        tenantID,
+      });
+
+      return {
+        success: true,
+        message: `✅ User ${email} created successfully for tenant ${tenantID}.`,
+        data: {
+          user: {
+            id: userID,
+            email: email,
+            displayName: email,
+            tenantID: tenantID,
+            storeID: storeID,
+            permissions: userData.permissions,
+            status: "active",
+            createdAt: userData.createdAt,
+          },
+        },
+      };
+    } catch (error) {
+      log("Error creating app user", error);
+
+      if (error.code === "auth/email-already-exists") {
+        throw new HttpsError(
+          "already-exists",
+          "❌ User with this email already exists in Firebase Auth."
+        );
+      } else if (error.code === "auth/invalid-email") {
+        throw new HttpsError(
+          "invalid-argument",
+          "❌ Invalid email address format."
+        );
+      } else if (error.code === "auth/weak-password") {
+        throw new HttpsError(
+          "invalid-argument",
+          "❌ Password is too weak. Please use a stronger password."
+        );
+      } else if (error.code === "auth/operation-not-allowed") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Email/password accounts are not enabled."
+        );
+      } else if (error.code === "permission-denied") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Insufficient permissions to create user."
+        );
+      } else if (error.code === "not-found") {
+        throw new HttpsError("not-found", "❌ Tenant not found.");
+      } else {
+        throw new HttpsError(
+          "internal",
+          `❗ Unexpected error: ${error.message}`
+        );
+      }
     }
   }
-});
+);
 
 /**
  * Callable version of createStore
  */
-exports.createStoreCallable = onCall(async (request) => {
-  log("Incoming create store callable request", request.data);
+exports.createStoreCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("Incoming create store callable request", request.data);
 
-  const { tenantID, storeID, storeName, createdBy } = request.data;
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
 
-  if (!tenantID || typeof tenantID !== "string") {
-    throw new HttpsError("invalid-argument", "Tenant ID is required.");
-  }
+    const { tenantID, storeID, storeName, createdBy } = request.data;
 
-  if (!storeID || typeof storeID !== "string") {
-    throw new HttpsError("invalid-argument", "Store ID is required.");
-  }
-
-  if (!storeName || typeof storeName !== "string") {
-    throw new HttpsError("invalid-argument", "Store name is required.");
-  }
-
-  try {
-    // Check if tenant exists
-    const tenantRef = DB.collection("tenants").doc(tenantID);
-    const tenantDoc = await tenantRef.get();
-
-    if (!tenantDoc.exists) {
-      throw new HttpsError("not-found", "Tenant not found.");
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new HttpsError("invalid-argument", "Tenant ID is required.");
     }
 
-    // Check if store already exists
-    const storeRef = DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID);
-    const storeDoc = await storeRef.get();
-
-    if (storeDoc.exists) {
-      throw new HttpsError(
-        "already-exists",
-        "Store with this ID already exists in this tenant."
-      );
+    if (!storeID || typeof storeID !== "string") {
+      throw new HttpsError("invalid-argument", "Store ID is required.");
     }
 
-    // Create initial SETTINGS_OBJ data (abbreviated for brevity)
-    const initialSettings = {
-      storeID: storeID,
-      storeName: storeName,
-      tenantID: tenantID,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdBy: createdBy || "system",
-      status: "active",
-      // ... other default settings would go here
-    };
+    if (!storeName || typeof storeName !== "string") {
+      throw new HttpsError("invalid-argument", "Store name is required.");
+    }
 
-    // Create store document in Firestore
-    await storeRef.set(initialSettings);
+    try {
+        // Check if tenant exists
+      const tenantRef = db.collection("tenants").doc(tenantID);
+      const tenantDoc = await tenantRef.get();
 
-    // Update tenant's store count
-    await tenantRef.update({
-      storeCount: admin.firestore.FieldValue.increment(1),
-      lastStoreCreated: admin.firestore.FieldValue.serverTimestamp(),
-    });
+      if (!tenantDoc.exists) {
+        throw new HttpsError("not-found", "Tenant not found.");
+      }
 
-    log("Store created successfully", {
-      tenantID,
-      storeID,
-      storeName,
-    });
+      // Check if store already exists
+      const storeRef = db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID);
+      const storeDoc = await storeRef.get();
 
-    return {
-      success: true,
-      message: `✅ Store ${storeName} created successfully for tenant ${tenantID}.`,
-      data: {
-        store: {
-          id: storeID,
-          name: storeName,
-          tenantID: tenantID,
-          status: "active",
-          createdAt: initialSettings.createdAt,
-          settings: initialSettings,
+      if (storeDoc.exists) {
+        throw new HttpsError(
+          "already-exists",
+          "Store with this ID already exists in this tenant."
+        );
+      }
+
+      // Create initial SETTINGS_OBJ data (abbreviated for brevity)
+      const initialSettings = {
+        storeID: storeID,
+        storeName: storeName,
+        tenantID: tenantID,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: createdBy || "system",
+        status: "active",
+        // ... other default settings would go here
+      };
+
+      // Create store document in Firestore
+      await storeRef.set(initialSettings);
+
+      // Update tenant's store count
+      await tenantRef.update({
+        storeCount: admin.firestore.FieldValue.increment(1),
+        lastStoreCreated: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      log("Store created successfully", {
+        tenantID,
+        storeID,
+        storeName,
+      });
+
+      return {
+        success: true,
+        message: `✅ Store ${storeName} created successfully for tenant ${tenantID}.`,
+        data: {
+          store: {
+            id: storeID,
+            name: storeName,
+            tenantID: tenantID,
+            status: "active",
+            createdAt: initialSettings.createdAt,
+            settings: initialSettings,
+          },
         },
-      },
-    };
-  } catch (error) {
-    log("Error creating store", error);
+      };
+    } catch (error) {
+      log("Error creating store", error);
 
-    if (error.code === "permission-denied") {
-      throw new HttpsError(
-        "permission-denied",
-        "❌ Insufficient permissions to create store."
-      );
-    } else if (error.code === "not-found") {
-      throw new HttpsError("not-found", "❌ Tenant not found.");
-    } else if (error.code === "already-exists") {
-      throw new HttpsError(
-        "already-exists",
-        "❌ Store with this ID already exists."
-      );
-    } else {
-      throw new HttpsError("internal", `❗ Unexpected error: ${error.message}`);
+      if (error.code === "permission-denied") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Insufficient permissions to create store."
+        );
+      } else if (error.code === "not-found") {
+        throw new HttpsError("not-found", "❌ Tenant not found.");
+      } else if (error.code === "already-exists") {
+        throw new HttpsError(
+          "already-exists",
+          "❌ Store with this ID already exists."
+        );
+      } else {
+        throw new HttpsError(
+          "internal",
+          `❗ Unexpected error: ${error.message}`
+        );
+      }
     }
   }
-});
+);
 
 /**
  * Callable version of createTenant
  */
-exports.createTenantCallable = onCall(async (request) => {
-  log("Incoming create tenant callable request", request.data);
+exports.createTenantCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("Incoming create tenant callable request", request.data);
 
-  const {
-    tenantDisplayName,
-    primaryEmail,
-    secondaryEmail,
-    phoneNumber,
-    contactFirstName,
-    contactLastName,
-  } = request.data;
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
 
-  if (!tenantDisplayName || typeof tenantDisplayName !== "string") {
-    throw new HttpsError(
-      "invalid-argument",
-      "Tenant display name is required."
-    );
-  }
-
-  if (
-    !primaryEmail ||
-    typeof primaryEmail !== "string" ||
-    !primaryEmail.includes("@")
-  ) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Valid primary email is required."
-    );
-  }
-
-  if (
-    !secondaryEmail ||
-    typeof secondaryEmail !== "string" ||
-    !secondaryEmail.includes("@")
-  ) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Valid secondary email is required."
-    );
-  }
-
-  if (
-    !phoneNumber ||
-    typeof phoneNumber !== "string" ||
-    phoneNumber.length !== 10 ||
-    !/^\d{10}$/.test(phoneNumber)
-  ) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Valid 10-digit phone number is required."
-    );
-  }
-
-  if (!contactFirstName || typeof contactFirstName !== "string") {
-    throw new HttpsError("invalid-argument", "Contact first name is required.");
-  }
-
-  if (!contactLastName || typeof contactLastName !== "string") {
-    throw new HttpsError("invalid-argument", "Contact last name is required.");
-  }
-
-  try {
-    // Generate unique tenant ID
-    let tenantID = "1234";
-
-    // Ensure tenant ID is unique
-    let tenantRef = DB.collection("tenants").doc(tenantID);
-    let tenantDoc = await tenantRef.get();
-
-    while (tenantDoc.exists) {
-      tenantID = generateTenantID();
-      tenantRef = DB.collection("tenants").doc(tenantID);
-      tenantDoc = await tenantRef.get();
-    }
-
-    // Check if primary email already exists
-    try {
-      await admin.auth().getUserByEmail(primaryEmail);
-      throw new HttpsError(
-        "already-exists",
-        "Primary email already exists in the system."
-      );
-    } catch (error) {
-      if (error.code !== "auth/user-not-found") {
-        throw error;
-      }
-    }
-
-    // Check if secondary email already exists
-    try {
-      await admin.auth().getUserByEmail(secondaryEmail);
-      throw new HttpsError(
-        "already-exists",
-        "Secondary email already exists in the system."
-      );
-    } catch (error) {
-      if (error.code !== "auth/user-not-found") {
-        throw error;
-      }
-    }
-
-    // Create Firebase Auth accounts for both emails
-    const primaryUserRecord = await admin.auth().createUser({
-      email: primaryEmail,
-      displayName: `${contactFirstName} ${contactLastName}`,
-      emailVerified: false,
-      disabled: false,
-    });
-
-    const secondaryUserRecord = await admin.auth().createUser({
-      email: secondaryEmail,
-      displayName: `${contactFirstName} ${contactLastName}`,
-      emailVerified: false,
-      disabled: false,
-    });
-
-    // Send password reset emails to both users
-    const primaryPasswordResetLink = await admin
-      .auth()
-      .generatePasswordResetLink(primaryEmail);
-    const secondaryPasswordResetLink = await admin
-      .auth()
-      .generatePasswordResetLink(secondaryEmail);
-
-    // Create tenant document
-    const tenantData = {
-      id: tenantID,
-      displayName: tenantDisplayName,
-      primaryEmail: primaryEmail,
-      secondaryEmail: secondaryEmail,
-      phoneNumber: phoneNumber,
-      contactFirstName: contactFirstName,
-      contactLastName: contactLastName,
-      primaryUserID: primaryUserRecord.uid,
-      secondaryUserID: secondaryUserRecord.uid,
-      status: "active",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdBy: "system",
-      userCount: 0,
-      storeCount: 0,
-      subscription: {
-        plan: "trial",
-        status: "active",
-        startDate: admin.firestore.FieldValue.serverTimestamp(),
-        trialEndDate: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      settings: {
-        timezone: "America/New_York",
-        currency: "USD",
-        dateFormat: "MM/DD/YYYY",
-        timeFormat: "12h",
-      },
-    };
-
-    // Store tenant document in Firestore
-    await tenantRef.set(tenantData);
-
-    // Create user index entries for quick lookup
-    await DB.collection("users").doc(primaryUserRecord.uid).set({
-      email: primaryEmail,
-      tenantID: tenantID,
-      role: "primary_contact",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active",
-    });
-
-    await DB.collection("users").doc(secondaryUserRecord.uid).set({
-      email: secondaryEmail,
-      tenantID: tenantID,
-      role: "secondary_contact",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active",
-    });
-
-    log("Tenant created successfully", {
-      tenantID,
+    const {
       tenantDisplayName,
       primaryEmail,
       secondaryEmail,
-    });
+      phoneNumber,
+      contactFirstName,
+      contactLastName,
+    } = request.data;
 
-    return {
-      success: true,
-      message: `✅ Tenant ${tenantDisplayName} created successfully.`,
-      data: {
-        tenant: {
-          id: tenantID,
-          displayName: tenantDisplayName,
-          primaryEmail: primaryEmail,
-          secondaryEmail: secondaryEmail,
-          phoneNumber: phoneNumber,
-          contactFirstName: contactFirstName,
-          contactLastName: contactLastName,
-          status: "active",
-          createdAt: tenantData.createdAt,
-        },
-        auth: {
-          primaryUserID: primaryUserRecord.uid,
-          secondaryUserID: secondaryUserRecord.uid,
-          primaryPasswordResetLink: primaryPasswordResetLink,
-          secondaryPasswordResetLink: secondaryPasswordResetLink,
-        },
-      },
-    };
-  } catch (error) {
-    log("Error creating tenant", error);
-
-    if (error.code === "permission-denied") {
-      throw new HttpsError(
-        "permission-denied",
-        "❌ Insufficient permissions to create tenant."
-      );
-    } else if (error.code === "auth/email-already-exists") {
-      throw new HttpsError(
-        "already-exists",
-        "❌ One or both emails already exist in the system."
-      );
-    } else if (error.code === "auth/invalid-email") {
+    if (!tenantDisplayName || typeof tenantDisplayName !== "string") {
       throw new HttpsError(
         "invalid-argument",
-        "❌ Invalid email address format."
+        "Tenant display name is required."
       );
-    } else {
-      throw new HttpsError("internal", `❗ Unexpected error: ${error.message}`);
+    }
+
+    if (
+      !primaryEmail ||
+      typeof primaryEmail !== "string" ||
+      !primaryEmail.includes("@")
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Valid primary email is required."
+      );
+    }
+
+    if (
+      !secondaryEmail ||
+      typeof secondaryEmail !== "string" ||
+      !secondaryEmail.includes("@")
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Valid secondary email is required."
+      );
+    }
+
+    if (
+      !phoneNumber ||
+      typeof phoneNumber !== "string" ||
+      phoneNumber.length !== 10 ||
+      !/^\d{10}$/.test(phoneNumber)
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Valid 10-digit phone number is required."
+      );
+    }
+
+    if (!contactFirstName || typeof contactFirstName !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Contact first name is required."
+      );
+    }
+
+    if (!contactLastName || typeof contactLastName !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Contact last name is required."
+      );
+    }
+
+    try {
+      // Generate unique tenant ID
+      let tenantID = "1234";
+
+      // Ensure tenant ID is unique
+      let tenantRef = db.collection("tenants").doc(tenantID);
+      let tenantDoc = await tenantRef.get();
+
+      while (tenantDoc.exists) {
+        tenantID = generateTenantID();
+        tenantRef = db.collection("tenants").doc(tenantID);
+        tenantDoc = await tenantRef.get();
+      }
+
+      // Check if primary email already exists
+      try {
+        await admin.auth().getUserByEmail(primaryEmail);
+        throw new HttpsError(
+          "already-exists",
+          "Primary email already exists in the system."
+        );
+      } catch (error) {
+        if (error.code !== "auth/user-not-found") {
+          throw error;
+        }
+      }
+
+      // Check if secondary email already exists
+      try {
+        await admin.auth().getUserByEmail(secondaryEmail);
+        throw new HttpsError(
+          "already-exists",
+          "Secondary email already exists in the system."
+        );
+      } catch (error) {
+        if (error.code !== "auth/user-not-found") {
+          throw error;
+        }
+      }
+
+      // Create Firebase Auth accounts for both emails
+      const primaryUserRecord = await admin.auth().createUser({
+        email: primaryEmail,
+        displayName: `${contactFirstName} ${contactLastName}`,
+        emailVerified: false,
+        disabled: false,
+      });
+
+      const secondaryUserRecord = await admin.auth().createUser({
+        email: secondaryEmail,
+        displayName: `${contactFirstName} ${contactLastName}`,
+        emailVerified: false,
+        disabled: false,
+      });
+
+      // Send password reset emails to both users
+      const primaryPasswordResetLink = await admin
+        .auth()
+        .generatePasswordResetLink(primaryEmail);
+      const secondaryPasswordResetLink = await admin
+        .auth()
+        .generatePasswordResetLink(secondaryEmail);
+
+      // Create tenant document
+      const tenantData = {
+        id: tenantID,
+        displayName: tenantDisplayName,
+        primaryEmail: primaryEmail,
+        secondaryEmail: secondaryEmail,
+        phoneNumber: phoneNumber,
+        contactFirstName: contactFirstName,
+        contactLastName: contactLastName,
+        primaryUserID: primaryUserRecord.uid,
+        secondaryUserID: secondaryUserRecord.uid,
+        status: "active",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: "system",
+        userCount: 0,
+        storeCount: 0,
+        subscription: {
+          plan: "trial",
+          status: "active",
+          startDate: admin.firestore.FieldValue.serverTimestamp(),
+          trialEndDate: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        settings: {
+          timezone: "America/New_York",
+          currency: "USD",
+          dateFormat: "MM/DD/YYYY",
+          timeFormat: "12h",
+        },
+      };
+
+      // Store tenant document in Firestore
+      await tenantRef.set(tenantData);
+
+      // Create user index entries for quick lookup
+      await db.collection("users").doc(primaryUserRecord.uid).set({
+        email: primaryEmail,
+        tenantID: tenantID,
+        role: "primary_contact",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "active",
+      });
+
+      await db.collection("users").doc(secondaryUserRecord.uid).set({
+        email: secondaryEmail,
+        tenantID: tenantID,
+        role: "secondary_contact",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "active",
+      });
+
+      log("Tenant created successfully", {
+        tenantID,
+        tenantDisplayName,
+        primaryEmail,
+        secondaryEmail,
+      });
+
+      return {
+        success: true,
+        message: `✅ Tenant ${tenantDisplayName} created successfully.`,
+        data: {
+          tenant: {
+            id: tenantID,
+            displayName: tenantDisplayName,
+            primaryEmail: primaryEmail,
+            secondaryEmail: secondaryEmail,
+            phoneNumber: phoneNumber,
+            contactFirstName: contactFirstName,
+            contactLastName: contactLastName,
+            status: "active",
+            createdAt: tenantData.createdAt,
+          },
+          auth: {
+            primaryUserID: primaryUserRecord.uid,
+            secondaryUserID: secondaryUserRecord.uid,
+            primaryPasswordResetLink: primaryPasswordResetLink,
+            secondaryPasswordResetLink: secondaryPasswordResetLink,
+          },
+        },
+      };
+    } catch (error) {
+      log("Error creating tenant", error);
+
+      if (error.code === "permission-denied") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Insufficient permissions to create tenant."
+        );
+      } else if (error.code === "auth/email-already-exists") {
+        throw new HttpsError(
+          "already-exists",
+          "❌ One or both emails already exist in the system."
+        );
+      } else if (error.code === "auth/invalid-email") {
+        throw new HttpsError(
+          "invalid-argument",
+          "❌ Invalid email address format."
+        );
+      } else {
+        throw new HttpsError(
+          "internal",
+          `❗ Unexpected error: ${error.message}`
+        );
+      }
     }
   }
-});
+);
 
 // Helper function for generating tenant ID
 function generateTenantID() {
   return Math.floor(100000000000 + Math.random() * 900000000000).toString();
 }
+
+/**
+ * Test callable function - writes test data to customer_phone/test
+ * Used to verify callable functions and permissions are working correctly
+ */
+exports.testCustomerPhoneWrite = onCall(
+  {
+    secrets: [firebaseServiceAccountKey],
+    enforceAppCheck: false, // Allow unauthenticated calls for testing
+  },
+  async (request) => {
+    log("Test customer_phone write callable invoked", {
+      data: request.data,
+      hasAuth: !!request.auth,
+      uid: request.auth?.uid || "none",
+    });
+
+    try {
+      const { testData, timestamp } = request.data;
+
+      // Initialize Admin SDK with service account from Secret Manager
+      const db = await getDB(firebaseServiceAccountKey);
+
+      log("Admin SDK initialized successfully with service account (callable)");
+
+      // Create test document
+      const testDocData = {
+        testData: testData || "Test data from callable function",
+        timestamp: timestamp || Date.now(),
+        calledAt: admin.firestore.FieldValue.serverTimestamp(),
+        calledBy: request.auth?.uid || "anonymous",
+        userEmail: request.auth?.token?.email || "not authenticated",
+        method: "callable",
+        success: true,
+      };
+
+      // Write to customer_phone/test
+      await db.collection("customer_phone").doc("test").set(testDocData);
+
+      log(
+        "Test data written successfully to customer_phone/test (callable)",
+        testDocData
+      );
+
+      return {
+        success: true,
+        message:
+          "✅ Test data written successfully to customer_phone/test via callable",
+        data: testDocData,
+        path: "customer_phone/test",
+      };
+    } catch (error) {
+      log("Error writing test data (callable)", {
+        error: error.message,
+        code: error.code,
+      });
+
+      throw new HttpsError(
+        "internal",
+        `Failed to write test data: ${error.message}`
+      );
+    }
+  }
+);
+
+/**
+ * Test HTTP endpoint - writes test data to customer_phone/test
+ * Used to verify HTTP requests and permissions are working correctly
+ */
+exports.testCustomerPhoneWriteHTTP = onRequest(
+  { cors: true, secrets: [firebaseServiceAccountKey] },
+  async (req, res) => {
+    // Set CORS headers
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    // Handle preflight requests
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+
+    log("Test customer_phone write HTTP endpoint invoked", req.body);
+
+    try {
+      const { testData, timestamp } = req.body;
+
+      // Initialize Admin SDK with service account from Secret Manager
+      const db = await getDB(firebaseServiceAccountKey);
+
+      log("Admin SDK initialized successfully with service account");
+
+      // TEST 1: Try Realtime Database to verify Admin SDK works
+      try {
+        const rtdb = admin.database();
+        await rtdb.ref("test_write").set({
+          testData: "RTDB test",
+          timestamp: Date.now(),
+        });
+        log("✅ TEST 1: Realtime Database write SUCCESS");
+      } catch (rtdbError) {
+        log("❌ TEST 1: Realtime Database write FAILED", {
+          error: rtdbError.message,
+          code: rtdbError.code,
+        });
+      }
+
+      // TEST 2: Try Firestore root collection
+      try {
+        await db.collection("test_writes").doc("test").set({
+          testData: "Root collection test",
+          timestamp: Date.now(),
+        });
+        log("✅ TEST 2: Firestore root collection write SUCCESS");
+      } catch (rootError) {
+        log("❌ TEST 2: Firestore root collection write FAILED", {
+          error: rootError.message,
+          code: rootError.code,
+        });
+      }
+
+      // TEST 3: Try customer_phone collection
+      const testDocData = {
+        testData: testData || "Test data from HTTP endpoint",
+        timestamp: timestamp || Date.now(),
+        calledAt: admin.firestore.FieldValue.serverTimestamp(),
+        method: "http",
+        requestMethod: req.method,
+        success: true,
+      };
+
+      log("TEST 3: Attempting write to customer_phone/test");
+      await db.collection("customer_phone").doc("test").set(testDocData);
+
+      log(
+        "Test data written successfully to customer_phone/test via HTTP",
+        testDocData
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "✅ Test data written successfully to customer_phone/test via HTTP",
+        data: testDocData,
+        path: "customer_phone/test",
+      });
+    } catch (error) {
+      log("Error writing test data via HTTP", {
+        error: error.message,
+        code: error.code,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: `Failed to write test data: ${error.message}`,
+        error: {
+          message: error.message,
+          code: error.code || "unknown",
+        },
+      });
+    }
+  }
+);

@@ -479,19 +479,15 @@ export function CheckoutModalScreen({}) {
     // useSettingsStore.getState().settings?.salesTaxPercent
     //   );
 
-    sale.finishedOnMillis = new Date().getTime();
+    sale.finishedOnMillis = sale.finishedOnMillis || new Date().getTime();
     let toPrint = printBuilder.sale(sale, sale.payments, zCustomer, zOpenWorkorder, zSettings.salesTaxPercent)
 
     dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Rongta");
 
 
-    return
-    sale.payments = sale.payments?.map((payment) => removeUnusedFields(payment))
-    // printReceipt(payment);
-    _setSale(sale);
-    dbCompleteSale(removeUnusedFields(sale));
-    _zSetCustomerField("deposits", deposits); // db
-    _zSetCustomerField("sales", replaceOrAddToArr(zCustomer.sales, sale.id)); // db
+    // _setSale(sale);
+    // dbCompleteSale(removeUnusedFields(sale));
+    // _zSetCustomerField("sales", replaceOrAddToArr(zCustomer.sales, sale.id)); // db
 
     if (!sale.payments[sale.payments.length - 1].cash) {
       if (sIsDeposit || sale.paymentComplete) closeCheckoutScreenModal();

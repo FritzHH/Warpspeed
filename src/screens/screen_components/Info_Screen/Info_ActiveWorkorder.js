@@ -39,7 +39,7 @@ import {
   useTabNamesStore,
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
-import { dbSavePrintObj } from "../../../db_calls_wrapper";
+import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP } from "../../../db_calls_wrapper";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -157,7 +157,10 @@ export const ActiveWorkorderComponent = ({}) => {
       useSettingsStore.getState().settings?.salesTaxPercent
         );
 
-    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Rongta");
+    // dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Rongta");
+
+    dbTestCustomerPhoneWrite();
+
   }
 
   function handleIntakePrintPress() {}
@@ -197,7 +200,7 @@ export const ActiveWorkorderComponent = ({}) => {
             modalVisible={sShowCustomerInfoScreen}
             showOuterModal={true}
             buttonLabel={
-              zOpenWorkorder?.customerFirst + " " + zOpenWorkorder?.customerLast
+              (zCustomer?.first || zOpenWorkorder?.customerFirst) + " " + (zCustomer?.last || zOpenWorkorder?.customerLast)
             }
             buttonIcon={ICONS.ridingBike}
             buttonIconStyle={{ width: 35, height: 35 }}

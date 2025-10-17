@@ -46,30 +46,16 @@ import {
 } from "firebase/storage";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { log } from "./utils";
+import { firebaseApp } from "./init";
 
-// Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM",
-  authDomain: "warpspeed-bonitabikes.firebaseapp.com",
-  databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com",
-  projectId: "warpspeed-bonitabikes",
-  storageBucket: "warpspeed-bonitabikes.firebasestorage.app",
-  messagingSenderId: "357992532514",
-  appId: "1:357992532514:web:dc7d8f6408ea96ea72187b",
-  measurementId: "G-HE8GCTBEEK",
-};
-
-// Initialize Firebase
-const firebaseApp = initializeApp(firebaseConfig);
-
-// Initialize services
+// Initialize services using the existing Firebase app
 export const DB = getFirestore(firebaseApp);
 export const RDB = getDatabase(firebaseApp);
 export const AUTH = getAuth(firebaseApp);
 export const STORAGE = getStorage(firebaseApp);
-export const FUNCTIONS = getFunctions(firebaseApp);
-// Initialize Firebase Functions
-const functions = getFunctions(firebaseApp);
+// Initialize Firebase Functions with region
+export const FUNCTIONS = getFunctions(firebaseApp, "us-central1");
+const functions = FUNCTIONS;
 // Initialize Firebase Storage
 const storage = getStorage(firebaseApp);
 
@@ -579,6 +565,10 @@ export const createStoreCallable = httpsCallable(
 export const createTenantCallable = httpsCallable(
   functions,
   "createTenantCallable"
+);
+export const testCustomerPhoneWriteCallable = httpsCallable(
+  functions,
+  "testCustomerPhoneWrite"
 );
 
 export function sendSMS(messageBody) {

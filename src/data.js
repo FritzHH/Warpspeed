@@ -296,11 +296,12 @@ export const SALE_PROTO = {
   id: "",
   millis: "",
   subtotal: 0,
-  discount: 0,
+  discount: null,
   tax: 0,
   salesTaxPercent: 0,
   total: 0,
   amountCaptured: 0,
+  amountRefunded: null,
   paymentComplete: false,
   workorderIDs: [],
   payments: [],
@@ -385,7 +386,7 @@ export const CUSTOMER_PROTO = {
   workorders: [],
   previousBikes: [],
   sales: [],
-  dateCreated: "",
+  millisCreated: "",
 };
 
 export const CUSTOMER_PREVIEW_PROTO = {

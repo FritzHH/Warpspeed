@@ -25,6 +25,7 @@ import {
   processServerDrivenStripeRefundCallable,
   cancelServerDrivenStripePaymentCallable,
   retrieveAvailableStripeReadersCallable,
+  loginAppUserCallable,
   sendSMSEnhanced,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
@@ -800,7 +801,7 @@ export async function dbCompleteWorkorder(workorder) {
  * @param {string} customerID - Customer ID (optional, will use customer.id if not provided)
  * @returns {Promise<Object>} Save result
  */
-export async function dbSaveCustomer(customer, customerID = null) {
+export async function dbSaveCustomer(customer) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -831,24 +832,6 @@ export async function dbSaveCustomer(customer, customerID = null) {
       };
     }
 
-    // Get customer ID from parameter or customer object
-    const id = customerID || customer.id || customer["id"];
-    if (!id) {
-      log(
-        "Error: customerID must be provided either as parameter, customer.id, or customer['id'] for dbSaveCustomer"
-      );
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message:
-          "customerID must be provided either as parameter, customer.id, or customer['id']",
-        customer: null,
-        customerID: null,
-        tenantID,
-        storeID,
-      };
-    }
-
     // Convert typed arrays to regular arrays for Firestore compatibility
     let customerToSave = { ...customer };
 
@@ -862,14 +845,49 @@ export async function dbSaveCustomer(customer, customerID = null) {
     }
 
     await firestoreWrite(
-      buildCustomerPath(tenantID, storeID, id),
+      buildCustomerPath(tenantID, storeID, customer.id),
       customerToSave
     );
+
+    // Save customer contact info to phone/email index for fast lookups
+    try {
+      let contactIndexData = {
+        id: customer.id,
+        first: customer.first || "",
+        last: customer.last || "",
+        cell: customer.cell || "",
+        landline: customer.landline || "",
+        email: customer.email || "",
+        tenantID,
+        storeID,
+        lastUpdated: new Date().getTime(),
+      };
+
+      // Remove unused fields before saving
+      contactIndexData = removeUnusedFields(contactIndexData);
+
+      // Save by cell phone if exists - store under "info" field
+      if (customer.cell && customer.cell.length === 10) {
+        await firestoreWrite(`customer_phone/${customer.cell}`, {
+          info: contactIndexData,
+        });
+        log("Customer cell phone index updated", {
+          customerID: customer.id,
+          phone: customer.cell,
+        });
+      }
+    } catch (indexError) {
+      log("Error updating customer contact index", {
+        error: indexError.message,
+        customerID: customer.id,
+      });
+      // Don't fail the main save if index update fails
+    }
 
     return {
       success: true,
       customer: customerToSave,
-      customerID: id,
+      customerID: customer.id,
       tenantID,
       storeID,
     };
@@ -1138,7 +1156,6 @@ export async function dbSaveCurrentPunchClock(punchClockData) {
  */
 export async function dbSavePrintObj(printObj, printerID) {
   try {
-
     const { tenantID, storeID } = getTenantAndStore();
 
     if (!tenantID || !storeID) {
@@ -1203,138 +1220,14 @@ export async function dbSavePrintObj(printObj, printerID) {
     );
     // log(`Saving print object to path: ${path}`);
 
-    // Clean and process fields before saving to Firestore
-    // Fields to preserve unchanged: internalNotes, customerNotes, workorderLines, paymentsSet
-    // const PRESERVE_FIELDS = [
-    //   "internalNotes",
-    //   "customerNotes",
-    //   "workorderLines",
-    //   "paymentsSet",
-    // ];
-
-    // function cleanPrintObject(obj) {
-    //   if (obj === null || typeof obj !== "object") {
-    //     return obj;
-    //   }
-
-    //   const cleaned = {};
-
-    //   for (const [key, value] of Object.entries(obj)) {
-    //     // Preserve specific fields unchanged
-    //     if (PRESERVE_FIELDS.includes(key)) {
-    //       cleaned[key] = value;
-    //       continue;
-    //     }
-
-    //     // Handle arrays (non-preserved fields)
-    //     if (Array.isArray(value)) {
-    //       if (value.length === 0) {
-    //         // Empty array - remove the field
-    //         continue;
-    //       }
-    //       // Convert array items to strings
-    //       const stringArray = value
-    //         .map((item) => {
-    //           if (typeof item === "object" && item !== null) {
-    //             return cleanPrintObject(item); // Recursively clean nested objects
-    //           }
-    //           return String(item);
-    //         })
-    //         .filter(
-    //           (item) => item !== "" && item !== "undefined" && item !== "null"
-    //         );
-
-    //       if (stringArray.length > 0) {
-    //         cleaned[key] = stringArray;
-    //       }
-    //       continue;
-    //     }
-
-    //     // Handle objects (non-preserved fields)
-    //     if (typeof value === "object" && value !== null) {
-    //       const cleanedObject = cleanPrintObject(value);
-    //       // Check if object has any valid fields
-    //       if (Object.keys(cleanedObject).length > 0) {
-    //         cleaned[key] = cleanedObject;
-    //       }
-    //       continue;
-    //     }
-
-    //     // Handle primitive values
-    //     if (value === undefined || value === null) {
-    //       continue; // Remove undefined/null fields
-    //     }
-
-    //     if (typeof value === "string") {
-    //       const trimmed = value.trim();
-    //       if (trimmed === "") {
-    //         continue; // Remove empty strings
-    //       }
-    //       cleaned[key] = trimmed;
-    //       continue;
-    //     }
-
-    //     if (typeof value === "boolean") {
-    //       cleaned[key] = value.toString();
-    //       continue;
-    //     }
-
-    //     if (typeof value === "number") {
-    //       cleaned[key] = value.toString();
-    //       continue;
-    //     }
-
-    //     // Convert any other type to string
-    //     cleaned[key] = String(value);
-    //   }
-
-    //   return cleaned;
-    // }
-
     let cleanedPrintObj = removeEmptyFields(printObj);
 
-    // Final safety check for any remaining undefined values
-    // const undefinedFields = [];
-    // function findUndefined(obj, path = "") {
-    //   if (obj === undefined) {
-    //     undefinedFields.push(path || "root");
-    //     return;
-    //   }
-    //   if (obj === null || typeof obj !== "object") return;
-
-    //   for (const [key, value] of Object.entries(obj)) {
-    //     findUndefined(value, path ? `${path}.${key}` : key);
-    //   }
-    // }
-
-    // findUndefined(cleanedPrintObj);
-
-    // if (undefinedFields.length > 0) {
-    //   log(
-    //     "CRITICAL: Found undefined fields after all cleaning:",
-    //     undefinedFields
-    //   );
-    //   throw new Error(
-    //     `Undefined fields found after cleaning: ${undefinedFields.join(", ")}`
-    //   );
-    // }
-
-    // log("=== SAVING TO FIRESTORE ===");
-    // log("Path:", path);
-    // now stringify all fields 
     let stringifiedPrintObj = stringifyAllObjectFields(cleanedPrintObj);
     log("Final object to save:", stringifiedPrintObj);
 
     const result = await firestoreWrite(path, stringifiedPrintObj);
-    // log("firestoreWrite result:", result);
-    // log("result type:", typeof result);
-    // log("result.success:", result?.success);
 
     if (result && result.success) {
-      // log(
-      //   `Successfully saved print object with ID: ${cleanedPrintObj.id} to printer: ${printerID}`
-      // );
-
       // Set timer to remove the print object after 100ms
       setTimeout(async () => {
         try {
@@ -1347,12 +1240,7 @@ export async function dbSavePrintObj(printObj, printerID) {
           // }
 
           if (deleteResult.success) {
-            // log(`Successfully removed print object with ID: ${printObj.id}`);
           } else {
-            // log(
-            //   `Error removing print object with ID: ${printObj.id}:`,
-            //   deleteResult.error
-            // );
           }
         } catch (error) {
           log(
@@ -2507,7 +2395,7 @@ export function dbListenToPaymentReaderUpdates(
 
 // auth /////////////////////////////////////////////////////////////////////////////////
 /**
- * Login user with email and password - handles only authentication
+ * Login user with email and password using Firebase Cloud Function
  * @param {string} email - User email
  * @param {string} password - User password
  * @param {Object} options - Optional parameters
@@ -2515,36 +2403,39 @@ export function dbListenToPaymentReaderUpdates(
  * @returns {Promise<Object>} Login result with authentication data only
  */
 export async function dbLoginUser(email, password, options = {}) {
-  const isAutoLogin = false;
+  const isAutoLogin = options.isAutoLogin || false;
 
   try {
-    // Use the existing authSignIn function from db_calls.js
-    const authResult = await authSignIn(email, password);
+    // Use Firebase Auth directly for login
+    const { signInWithEmailAndPassword } = await import("firebase/auth");
+    const { AUTH } = await import("./db_calls");
 
-    if (!authResult.user) {
-      throw new Error("Authentication failed - no user returned");
+    const userCredential = await signInWithEmailAndPassword(
+      AUTH,
+      email,
+      password
+    );
+    const user = userCredential.user;
+
+    if (!user) {
+      throw new Error("Login failed - no user data returned");
     }
 
     return {
       success: true,
-      user: authResult.user,
-      auth: authResult,
+      user: {
+        uid: user.uid,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        displayName: user.displayName,
+      },
+      auth: userCredential,
     };
   } catch (error) {
     const logPrefix = isAutoLogin ? "Auto-login" : "Login";
     log(`${logPrefix} failed:`, error);
     throw error;
   }
-}
-
-/**
- * Auto-login for development purposes - convenience wrapper around dbLoginUser
- * @param {string} email - User email
- * @param {string} password - User password
- * @returns {Promise<Object>} Login result with user data and settings
- */
-export async function dbAutoLogin(email, password) {
-  return dbLoginUser(email, password, { isAutoLogin: true });
 }
 
 /**
@@ -2839,7 +2730,7 @@ export function retrieveAvailableStripeReaders(readerID) {
  * @returns {Promise<Object>} Result object with success status and data
  */
 
-export async function dbSendSMSEnhanced({
+export async function dbSendSMS({
   message,
   phoneNumber,
   tenantID,
@@ -2921,6 +2812,226 @@ export async function dbSendSMSEnhanced({
         timestamp: new Date().toISOString(),
       },
       timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+/**
+ * Test callable function - writes test data to customer_phone/test
+ * @returns {Promise<Object>} Result with success status
+ */
+export async function dbTestCustomerPhoneWrite() {
+  try {
+    log("Testing customer_phone write via callable function");
+
+    const { testCustomerPhoneWriteCallable } = await import("./db_calls");
+
+    const result = await testCustomerPhoneWriteCallable({
+      testData: "Hello from client",
+      timestamp: Date.now(),
+    });
+
+    log("Test write result", result.data);
+
+    return {
+      success: true,
+      data: result.data,
+      message: "Test write completed successfully",
+    };
+  } catch (error) {
+    log("Error in dbTestCustomerPhoneWrite", {
+      error: error.message,
+      code: error.code,
+    });
+
+    return {
+      success: false,
+      error: error.message || "Test write failed",
+      code: error.code,
+    };
+  }
+}
+
+/**
+ * Test HTTP endpoint - writes test data to customer_phone/test using fetch
+ * @returns {Promise<Object>} Result with success status
+ */
+export async function dbTestCustomerPhoneWriteHTTP() {
+  try {
+    log("Testing customer_phone write via HTTP endpoint");
+
+    const response = await fetch(
+      "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/testCustomerPhoneWriteHTTP",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          testData: "Hello from HTTP client",
+          timestamp: Date.now(),
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    log("Test HTTP write result", result);
+
+    return {
+      success: result.success,
+      data: result.data,
+      message: result.message,
+    };
+  } catch (error) {
+    log("Error in dbTestCustomerPhoneWriteHTTP", {
+      error: error.message,
+    });
+
+    return {
+      success: false,
+      error: error.message || "Test HTTP write failed",
+    };
+  }
+}
+
+/**
+ * Retrieve customer's last 10 messages with pagination support
+ * @param {string} customerPhone - Customer's phone number (10 digits)
+ * @param {Timestamp|null} startAfterTimestamp - Firestore timestamp to paginate from (optional)
+ * @returns {Promise<Object>} Result with messages array and pagination info
+ *
+ * Usage:
+ * - First page: dbGetCustomerMessages("2393369177", null)
+ * - Next page: dbGetCustomerMessages("2393369177", lastMessage.timestamp)
+ */
+export async function dbGetCustomerMessages(
+  customerPhone,
+  startAfterTimestamp = null
+) {
+  try {
+    // Validate phone number
+    if (!customerPhone || typeof customerPhone !== "string") {
+      throw new Error("Customer phone number is required and must be a string");
+    }
+
+    const cleanPhone = customerPhone.replace(/\D/g, "");
+    if (cleanPhone.length !== 10) {
+      throw new Error("Phone number must be 10 digits");
+    }
+
+    log("Retrieving customer messages", {
+      phone: cleanPhone,
+      startAfter: startAfterTimestamp ? "paginating" : "first page",
+    });
+
+    // Import Firestore functions directly
+    const { collection, query, orderBy, limit, startAfter, getDocs } =
+      await import("firebase/firestore");
+    const { DB } = await import("./db_calls");
+
+    // Build collection reference
+    const messagesRef = collection(
+      DB,
+      "customer_phone",
+      cleanPhone,
+      "messages"
+    );
+
+    // Build query - order by timestamp descending (newest first)
+    let q;
+    if (startAfterTimestamp) {
+      // Paginated query - start after the provided timestamp
+      q = query(
+        messagesRef,
+        orderBy("timestamp", "desc"),
+        startAfter(startAfterTimestamp),
+        limit(10)
+      );
+    } else {
+      // First page - get most recent 10 messages
+      q = query(messagesRef, orderBy("timestamp", "desc"), limit(10));
+    }
+
+    // Execute query
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      log("No messages found for customer", { phone: cleanPhone });
+      return {
+        success: true,
+        messages: [],
+        hasMore: false,
+        count: 0,
+        customerPhone: cleanPhone,
+      };
+    }
+
+    // Map messages to clean format
+    const messages = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      messages.push({
+        id: doc.id,
+        customerID: data.customerID,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber,
+        message: data.message,
+        type: data.type, // "incoming" or "outgoing"
+        millis: data.millis,
+        timestamp: data.timestamp,
+        threadStatus: data.threadStatus,
+        read: data.read,
+        tenantID: data.tenantID,
+        storeID: data.storeID,
+        messageSid: data.messageSid || data.metadata?.twilioMessageSid,
+        status: data.status || data.messageStatus,
+        hasMedia: data.hasMedia || false,
+        mediaUrls: data.mediaUrls || [],
+        autoResponseSent: data.autoResponseSent || false,
+        canRespond: data.canRespond,
+      });
+    });
+
+    // Get the last message timestamp for pagination
+    const lastMessage = messages[messages.length - 1];
+    const nextPageTimestamp = lastMessage ? lastMessage.timestamp : null;
+
+    log("Messages retrieved successfully", {
+      phone: cleanPhone,
+      count: messages.length,
+      hasMore: messages.length === 10,
+    });
+
+    return {
+      success: true,
+      messages: messages,
+      hasMore: messages.length === 10, // If we got 10, there might be more
+      count: messages.length,
+      customerPhone: cleanPhone,
+      nextPageTimestamp: nextPageTimestamp,
+      firstMessageTimestamp: messages[0]?.timestamp,
+      lastMessageTimestamp: lastMessage?.timestamp,
+    };
+  } catch (error) {
+    log("Error retrieving customer messages", {
+      error: error.message,
+      phone: customerPhone,
+    });
+
+    return {
+      success: false,
+      error: error.message || "Failed to retrieve messages",
+      messages: [],
+      hasMore: false,
+      count: 0,
+      customerPhone: customerPhone,
     };
   }
 }

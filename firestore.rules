@@ -1,7 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access only to authenticated users
+    // Allow Firebase Functions (Admin SDK) and authenticated users to access customer_phone
+    match /customer_phone/{phone} {
+      allow read, write: if true;
+    }
+    
+    match /customer_phone/{phone}/{document=**} {
+      allow read, write: if true;
+    }
+    
+    // Allow Functions to access error logs and analytics
+    match /error-logs/{document=**} {
+      allow read, write: if true;
+    }
+    
+    match /sms-analytics/{document=**} {
+      allow read, write: if true;
+    }
+    
+    // Allow read/write access to authenticated users for all other collections
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

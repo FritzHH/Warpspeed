@@ -1,11 +1,14 @@
 /* eslint-disable */
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native-web";
+import { useNavigate } from "react-router-dom";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
 import { sendPasswordReset } from "../db_calls_wrapper";
 import { dbLoginUser } from "../db_calls_wrapper";
+import { ROUTES } from "../routes";
 
 export function LoginScreen({ onLoginSuccess }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +29,8 @@ export function LoginScreen({ onLoginSuccess }) {
         // The settings have already been set in the Zustand store
         // Pass the user data to the success callback
         onLoginSuccess(result.user);
+        // Navigate to dashboard
+        navigate(ROUTES.dashboard);
       }
     } catch (error) {
       setError(getErrorMessage(error.message || error.code));

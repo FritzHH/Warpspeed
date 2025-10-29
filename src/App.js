@@ -1,19 +1,21 @@
 /* eslint-disable */
 import React, { useState, useEffect } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
+import { ProtectedRoute } from "./components";
 import {
-  dbLoginUser, onAuthStateChange,
+  dbLoginUser,
+  onAuthStateChange,
   dbGetSettings,
   dbGetTenantById,
 } from "./db_calls_wrapper";
 import { log } from "./utils";
-import { useSettingsStore } from "./stores";
+import { useSettingsStore, useLayoutStore } from "./stores";
+import { ROUTES } from "./routes";
 
-export const ROUTES = {
-  init: "/",
-};
+// Re-export ROUTES for backward compatibility
+export { ROUTES };
 
 // Development auto-login credentials
 const DEVELOPMENT_AUTO_LOGIN = {
@@ -26,6 +28,42 @@ const DEVELOPMENT_AUTO_LOGIN = {
 function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const setIsMobile = useLayoutStore((state) => state.setIsMobile);
+
+  // Detect if app is running on mobile device or desktop browser
+  useEffect(() => {
+    const detectDevice = () => {
+      // Check if running on mobile device
+      const isMobileDevice =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
+
+      // Also check screen width as secondary indicator
+      const isMobileWidth = window.innerWidth <= 768;
+
+      // Set isMobile if either condition is true
+      const mobile = isMobileDevice || isMobileWidth;
+      setIsMobile(mobile);
+      // useLayoutStore.setIsMobile(mobile)
+      // useLayoutStore.setwindow
+
+      log(
+        `Device detected: ${mobile ? "Mobile" : "Desktop"} (${window.innerWidth
+        }×${window.innerHeight})`
+      );
+    };
+
+    // Initial detection
+    detectDevice();
+
+    // Re-detect on window resize
+    window.addEventListener("resize", detectDevice);
+
+    return () => {
+      window.removeEventListener("resize", detectDevice);
+    };
+  }, [setIsMobile]);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -50,6 +88,7 @@ function App() {
                 useSettingsStore.getState().setSettings(settings, false, false);
                 log("initial data loaded, heading to Main");
                 setUser(loginResult.user);
+                setIsLoading(false);
               });
             });
           } else {
@@ -66,6 +105,7 @@ function App() {
         }
       } catch (error) {
         console.error("Auto-login error:", error);
+        setIsLoading(false);
         // Fall back to normal auth flow on error
         const unsubscribe = onAuthStateChange((user) => {
           setUser(user);
@@ -73,8 +113,6 @@ function App() {
         });
 
         return () => unsubscribe();
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -112,14 +150,33 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public route - Login */}
         <Route
-          path={ROUTES.init}
+          path={ROUTES.login}
           element={
             user ? (
-              <BaseScreen />
+              <Navigate to={ROUTES.dashboard} replace />
             ) : (
               <LoginScreen onLoginSuccess={handleLoginSuccess} />
             )
+          }
+        />
+
+        {/* Protected route - Dashboard/Base Screen */}
+        <Route
+          path={ROUTES.dashboard}
+          element={
+            <ProtectedRoute user={user}>
+              <BaseScreen />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catch-all redirect to dashboard for authenticated users, login for unauthenticated */}
+        <Route
+          path="*"
+          element={
+            <Navigate to={user ? ROUTES.dashboard : ROUTES.login} replace />
           }
         />
       </Routes>

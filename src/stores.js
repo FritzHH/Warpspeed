@@ -31,9 +31,33 @@ import {
   dbSavePunchObject,
   dbSaveSettings,
   dbSaveSettingsField,
+  dbSendSMS,
 } from "./db_calls_wrapper";
 
 // internal use  /////////////////////////////////////////////////////
+
+export const useLayoutStore = create((set, get) => ({
+  width: 0,
+  height: 0,
+  simWidth: 390,
+  simHeight: 844,
+  useSimulator: false,
+  isMobile: false,
+
+  getDimensions: () => {
+    let width = get().width;
+    let height = get().height;
+
+    if (get().useSimulator) {
+      width = get().simWidth;
+      height = get().simHeight;
+    }
+    return { width, height }
+  },
+  setWindow: (window) => set({ width: window.innerWidth, height: window.innerHeight }),
+  setUseSimulator: (useSimulator) => set({ useSimulator }),
+  setIsMobile: (isMobile) => set({ isMobile }),
+}));
 
 export const useTabNamesStore = create((set, get) => ({
   infoTabName: TAB_NAMES.infoTab.customer,
@@ -632,25 +656,33 @@ export const useCurrentCustomerStore = create((set, get) => ({
 }));
 
 export const useCustMessagesStore = create((set, get) => ({
-  incomingMessagesArr: [],
-  outgoingMessagesArr: [],
-  getIncomingMessagesArr: () => get().incomingMessagesArr,
-  getOutgoingMessagesArr: () => get().outgoingMessagesArr,
+  incomingMessages: [],
+  outgoingMessages: [],
+  getIncomingMessages: () => get().incomingMessages,
+  getOutgoingMessages: () => get().outgoingMessages,
+  setOutgoingMessages: (outgoingMessages) => set({ outgoingMessages }),
+  setIncomingMessages: (incomingMessages) => set({ incomingMessages }),
   setIncomingMessage: (obj) => {
-    let messages = get().incomingMessagesArr;
+    let messages = get().incomingMessages;
     if (checkArr(messages, obj)) return;
     set((state) => ({
-      incomingMessagesArr: [...state.incomingMessagesArr, obj],
+      incomingMessages: [...state.incomingMessages, obj],
     }));
   },
-  setOutgoingMessage: (obj) => {
+  setOutgoingMessage: (message) => {
+
     let messages = get().outgoingMessagesArr;
-    if (checkArr(messages, obj)) return;
+    if (checkArr(messages, message)) return;
     // log("out", obj);
     set((state) => ({
-      outgoingMessagesArr: [...state.outgoingMessagesArr, obj],
+      outgoingMessagesArr: [...state.outgoingMessagesArr, message],
     }));
+    if (sendIt) {
+      dbSendSMS(message)
+    }
+
   },
+
 }));
 
 export const useOpenWorkordersStore = create((set, get) => ({

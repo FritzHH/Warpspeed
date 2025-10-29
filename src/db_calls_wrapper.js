@@ -2730,21 +2730,17 @@ export function retrieveAvailableStripeReaders(readerID) {
  * @returns {Promise<Object>} Result object with success status and data
  */
 
-export async function dbSendSMS({
+export async function dbSendSMS(
   message,
-  phoneNumber,
-  tenantID,
-  storeID,
-  customerID,
-  messageID,
-  fromNumber,
-}) {
+) {
+  const { tenantID, storeID } = getTenantAndStore();
+
   try {
     if (!message || typeof message !== "string") {
       throw new Error("Message is required and must be a string");
     }
 
-    if (!phoneNumber || typeof phoneNumber !== "string") {
+    if (!message.phoneNumber || typeof message.phoneNumber !== "string") {
       throw new Error("Phone number is required and must be a string");
     }
 
@@ -2759,31 +2755,18 @@ export async function dbSendSMS({
     // Prepare SMS data object
     const smsData = {
       message: message.trim(),
-      phoneNumber: phoneNumber,
+      phoneNumber: message.phoneNumber,
       tenantID: tenantID,
       storeID: storeID,
     };
 
-    // Add optional parameters if provided
-    if (customerID) {
-      smsData.customerID = customerID;
-    }
-
-    if (messageID) {
-      smsData.messageID = messageID;
-    }
-
-    if (fromNumber) {
-      smsData.fromNumber = fromNumber;
-    }
-
-    log("Sending enhanced SMS with data:", smsData);
+    log("Sending SMS with data:", smsData);
 
     // Call the enhanced SMS function
-    const result = await sendSMSEnhanced(smsData);
+    let result = await sendSMSEnhanced(smsData);
 
     if (result.success) {
-      log("Enhanced SMS sent successfully:", result.data);
+      log("SMS sent successfully:", result.data);
       return {
         success: true,
         message: result.message,
@@ -2791,7 +2774,7 @@ export async function dbSendSMS({
         timestamp: new Date().toISOString(),
       };
     } else {
-      log("Enhanced SMS failed:", result.error);
+      log("SMS failed:", result.error);
       return {
         success: false,
         error: result.error,

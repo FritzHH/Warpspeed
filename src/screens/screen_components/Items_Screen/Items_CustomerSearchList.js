@@ -7,6 +7,7 @@ import {
   generateUPCBarcode,
   gray,
   log,
+  createNewWorkorder
 } from "../../../utils";
 import {
   Button,
@@ -39,8 +40,8 @@ export function CustomerSearchListComponent({}) {
           customerFirst: customer.first,
           customerLast: customer.last,
           customerPhone: customer.cell || customer.landline,
-          startedByFirst: useLoginStore.getCurrentUser().first,
-          startedByLast: useLoginStore.getCurrentUser().last,
+          startedByFirst: useLoginStore.getState().getCurrentUser().first,
+          startedByLast: useLoginStore.getState().getCurrentUser().last,
           status: SETTINGS_OBJ.statuses[0],
         });
 

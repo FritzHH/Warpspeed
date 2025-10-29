@@ -830,6 +830,28 @@ export const SETTINGS_OBJ = {
     id: "tmr_GFKNEgYkwcsIFF",
   },
   autoConnectToCardReader: "true",
+  amazonExtension: {
+    enabled: true,
+    storeId: 999, // Will be auto-generated from tenantID_storeID
+    shippingAddress: {
+      fullName: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      phoneNumber: "",
+    },
+    lastSync: null,
+    extensionVersion: "1.0.0",
+    autoSync: true,
+    features: {
+      autoFill: true,
+      simplifyUI: true,
+      hideAds: true,
+      quickSearch: true,
+    },
+  },
 };
 
 // RECEIPT STUFF ////////////////////////////////////////////////////

@@ -13,27 +13,39 @@ import {
   dim,
   formatDateTimeForReceipt,
   generateRandomID,
+  gray,
   log,
 } from "../../../utils";
 import {
   TabMenuDivider as Divider,
   Button,
   CheckBox_,
+  Button_,
+  DropdownMenu,
 } from "../../../components";
-import { Colors } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors } from "../../../styles";
 import {
   SMS_PROTO,
   WORKORDER_PROTO,
   CUSTOMER_PROTO,
   SETTINGS_OBJ,
 } from "../../../data";
-import React, { memo, useEffect, useReducer, useRef, useState } from "react";
+import React, {
+  memo,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import {
   useCurrentCustomerStore,
   useOpenWorkordersStore,
   useCustMessagesStore,
   useLoginStore,
 } from "../../../stores";
+import { smsService } from "../../../data_service_modules";
+import { DEBOUNCE_DELAY } from "../../../constants";
 
 export function MessagesComponent({}) {
   // setters /////////////////////////////////////////////////////////////
@@ -41,41 +53,49 @@ export function MessagesComponent({}) {
     (state) => state.setOutgoingMessage
   );
 
-  const _zExecute = useLoginStore((state) => state.execute);
   // getters ///////////////////////////////////////////////////////////////
   let zCustomer = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
   zCustomer = useCurrentCustomerStore((state) => state.customer);
   zWorkorderObj = useOpenWorkordersStore((state) => state.openWorkorder);
   const zIncomingMessagesArr = useCustMessagesStore(
-    (state) => state.incomingMessagesArr
+    (state) => state.incomingMessages
   );
   const zOutgoingMessagesArr = useCustMessagesStore(
-    (state) => state.outgoingMessagesArr
+    (state) => state.outgoingMessages
   );
-  const zCurrentUserObj = useLoginStore((state) => state.currentUser);
   //////////////////////////////////////////////////////////////////////////
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
+  const debounceTimerRef = useRef(null);
 
-  function sendMessage(text, canRespond) {
-    let msg = { ...SMS_PROTO };
-    msg.message = text;
-    msg.phoneNumber = zCustomer.cell; // || "2393369177";
-    msg.firstName = zCustomer.first; // || "Fritz";
-    msg.lastName = zCustomer.last; // || "Hieb";
-    msg.canRespond = canRespond || sCanRespond;
-    msg.millis = new Date().getTime();
-    msg.customerID = zCustomer.id; // || "3d2E63TXCY2bzmOdeQc8";
-    msg.id = generateRandomID();
-    msg.type = "outgoing";
-    msg.senderUserObj = zCurrentUserObj;
-    _setNewMessage("");
-    _zSetOutgoingMessage(msg);
-    // dbSendMessageToCustomer(msg);
-  }
+  // Debounced handler for message input
+  const handleMessageChange = useCallback((val) => {
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Update state immediately for responsive UI
+    _setNewMessage(val);
+
+    // Debounce any side effects (if needed in future)
+    debounceTimerRef.current = setTimeout(() => {
+      // Any debounced logic can go here
+      // Currently just using for debouncing the state update itself
+    }, DEBOUNCE_DELAY);
+  }, []);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // log("res", sCanRespond);
   useEffect(() => {
@@ -99,8 +119,32 @@ export function MessagesComponent({}) {
     } catch (e) {}
   }, [zIncomingMessagesArr, zOutgoingMessagesArr]);
 
+  function sendMessage(text) {
+    let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+    let msg = { ...SMS_PROTO };
+    msg.message = text;
+    msg.phoneNumber = zCustomer.cell; // || "2393369177";
+    msg.firstName = zCustomer.first; // || "Fritz";
+    msg.lastName = zCustomer.last; // || "Hieb";
+    msg.canRespond = sCanRespond ? new Date().getTime() : null;
+    msg.millis = new Date().getTime();
+    msg.customerID = zCustomer.id; // || "3d2E63TXCY2bzmOdeQc8";
+    msg.id = generateRandomID();
+    msg.type = "outgoing";
+    msg.senderUserObj = zCurrentUserObj;
+    _setNewMessage("");
+    _setCanRespond(false);
+    smsService.send(msg);
+    // _zSetOutgoingMessage(msg, true);
+  }
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
+
+  let messagesArr = combine2ArraysOrderByMillis(
+    zIncomingMessagesArr,
+    zOutgoingMessagesArr
+  );
+
   return (
     <View
       style={{
@@ -110,79 +154,111 @@ export function MessagesComponent({}) {
     >
       <View
         style={{
-          // width: "100%",
-          height: dim.windowHeight * 0.8,
-          backgroundColor: "transparent",
-        }}
-      >
-        <FlatList
-          onScrollToIndexFailed={(info) => {
-            const wait = new Promise((resolve) => setTimeout(resolve, 50));
-            wait.then(() => {
-              messageListRef.current?.scrollToIndex({
-                index: info.index,
-                animated: true,
-              });
-            });
-          }}
-          ref={messageListRef}
-          data={combine2ArraysOrderByMillis(
-            zIncomingMessagesArr,
-            zOutgoingMessagesArr
-          )}
-          renderItem={(item) => {
-            let idx = item.index;
-            item = item.item;
-            // log("item", item);
-            if (item.type === "incoming")
-              return <IncomingMessageComponent msgObj={item} />;
-            return <OutgoingMessageComponent msgObj={item} />;
-          }}
-        />
-      </View>
-      <View
-        style={{
-          marginTop: 5,
-          flexDirection: "row",
           width: "100%",
-          height: dim.windowHeight * 0.16,
+          height: "80%",
         }}
       >
-        <TextInput
-          onChangeText={(val) => _setNewMessage(val)}
-          ref={textInputRef}
-          autoFocus={true}
-          numberOfLines={4}
-          multiline={true}
-          placeholderTextColor={"gray"}
-          placeholder={"Message..."}
+        {messagesArr.length < 1 && (
+          <View
+            style={{
+              width: "100%",
+              height: "100%",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{ textAlign: "center", fontSize: 18, color: gray(0.25) }}
+            >
+              {!zCustomer?.id
+                ? "Select a customer to message"
+                : zCustomer?.cell
+                ? "No messages to/from this cell phone #"
+                : "No cell phone on account\n\nText messaging deactivated"}
+            </Text>
+          </View>
+        )}
+        {messagesArr.length > 0 && (
+          <FlatList
+            onScrollToIndexFailed={(info) => {
+              const wait = new Promise((resolve) => setTimeout(resolve, 50));
+              wait.then(() => {
+                messageListRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                });
+              });
+            }}
+            ref={messageListRef}
+            data={messagesArr}
+            renderItem={(item) => {
+              let idx = item.index;
+              item = item.item;
+              if (item.type === "incoming")
+                return <IncomingMessageComponent msgObj={item} />;
+              return <OutgoingMessageComponent msgObj={item} />;
+            }}
+          />
+        )}
+      </View>
+      {!zCustomer?.cell ? (
+        <View style={{ width: "100%", height: "100%" }}></View>
+      ) : (
+        <View
           style={{
-            fontSize: 15,
-            flexWrap: "wrap",
-            textWrap: "pretty",
-            outlineWidth: 0,
-            width: "85%",
+            paddingTop: 10,
+            flexDirection: "row",
+            width: "100%",
+            height: "20%",
           }}
-          value={sNewMessage}
-        />
-        <View style={{ width: "14%" }}>
-          {sNewMessage.length > 5 && (
-            <Button
-              onPress={() => endMessage(sNewMessage)}
+        >
+          <TextInput
+            onChangeText={handleMessageChange}
+            ref={textInputRef}
+            autoFocus={true}
+            autoCapitalize="sentences"
+            multiline={true}
+            placeholderTextColor={"gray"}
+            placeholder={"Message..."}
+            style={{
+              color: C.text,
+              padding: 5,
+              fontSize: 15,
+              flexWrap: "wrap",
+              textWrap: "pretty",
+              outlineWidth: 0,
+              borderWidth: 2,
+              borderRadius: 15,
+              borderColor: sCanRespond ? C.red : gray(0.15),
+              width: "80%",
+            }}
+            value={sNewMessage}
+          />
+          <View style={{ width: "20%", paddingHorizontal: 5, height: "100%" }}>
+            {/* {sNewMessage.length > 5 || true && ( */}
+            <Button_
+              onPress={() => sendMessage(sNewMessage)}
               text={"Send"}
+              colorGradientArr={COLOR_GRADIENTS.blue}
               buttonStyle={{ width: "100%" }}
             />
-          )}
-          <CheckBox_
-            checkedColor={"red"}
-            buttonStyle={{ borderWidth: 1, borderColor: "gray" }}
-            text={"Respond"}
-            isChecked={sCanRespond}
-            onCheck={() => _setCanRespond(!sCanRespond)}
-          />
+            {/* )} */}
+            <DropdownMenu
+              dataArr={[{ label: "hello" }]}
+              buttonText={"Templates"}
+              buttonStyle={{ marginTop: 10, borderRadius: 15 }}
+            />
+            <CheckBox_
+              buttonStyle={{ marginTop: 10 }}
+              text={"Respond"}
+              isChecked={sCanRespond}
+              onCheck={() => _setCanRespond(!sCanRespond)}
+            />
+          </View>
         </View>
-      </View>
+      )}
     </View>
+    // </View>
   );
 }
 

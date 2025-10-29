@@ -23,6 +23,8 @@ import {
   useDatabaseBatchStore,
   useCheckoutStore,
   useAlertScreenStore,
+  useTabNamesStore,
+  useCurrentCustomerStore,
 } from "../stores";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { CheckoutModalScreen } from "./screen_components/modal_screens/CheckoutModalScreen";
@@ -31,8 +33,9 @@ import {
   dbListenToOpenWorkorders,
   dbListenToCurrentPunchClock,
   dbListenToInventory,
+  dbGetCustomer,
 } from "../db_calls_wrapper";
-import { SETTINGS_OBJ } from "../data";
+import { SETTINGS_OBJ, TAB_NAMES } from "../data";
 import { clog, log } from "../utils";
 import { cloneDeep } from "lodash";
 
@@ -105,7 +108,25 @@ export function BaseScreen() {
   }, []);
   // }, []);
 
+  // initialize on first open workorder
+  let workorders = useOpenWorkordersStore(s => s.workorders)
+  useEffect(() => {
+    // let workorders = useOpenWorkordersStore.getState().getWorkorders();
+    let openID = useOpenWorkordersStore.getState().getOpenWorkorder()?.id;
+    log('workorders', workorders)
+    if (workorders.length > 0 && !openID) {
+      useOpenWorkordersStore.getState().setOpenWorkorderID(workorders[0].id)
+      useTabNamesStore.getState().setItems({
+        optionsTabName: TAB_NAMES.optionsTab.messages,
+        infoTabName: TAB_NAMES.infoTab.workorder,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems
+      })
+
+      dbGetCustomer(workorders[0].customerID).then(customer => useCurrentCustomerStore.getState().setCustomer(customer, false))
+    }
+  }, [workorders])
   ////////// testing   ////////////////////////////////////////////////////////////////////
+
 
   // subscribe to database listeners
   useEffect(() => {
@@ -134,25 +155,6 @@ export function BaseScreen() {
     });
   }, []);
 
-  useEffect(() => {
-    // let po = cloneDeep(PRIN);
-  }, [zSettings]);
-
-  // database batching
-  useEffect(() => {
-    // const intervalId = setInterval(() => {
-    //   let curMillis = new Date().getTime();
-    //   let diff = curMillis - zLastDatabaseWriteMillis;
-    //   // let batchDiff = curMillis - batchDiff
-    //   // log("diff", diff);
-    //   if (diff > DB_BATCH_INTERVAL_MILLIS) executeDBBatch();
-    // }, 100);
-    // // Cleanup function to clear the interval
-    // return () => {
-    //   clearInterval(intervalId);
-    // };
-  }, [zLastDatabaseBatchMillis, zLastDatabaseWriteMillis]);
-  // log("BaseScreen render");
 
   return (
     <View

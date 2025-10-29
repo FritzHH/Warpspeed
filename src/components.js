@@ -2584,3 +2584,6 @@ export const TextInput_ = ({
     />
   );
 };
+
+// Export ProtectedRoute for routing
+export { ProtectedRoute } from "./components/ProtectedRoute";

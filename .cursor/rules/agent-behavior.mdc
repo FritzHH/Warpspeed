@@ -25,4 +25,8 @@ Follow these steps before acting on any user request:
 
 **No new `useEffect` without permission.** You are not allowed to create a new `useEffect` under any circumstances without the user's explicit permission. You must explain why you need it first; the user will confirm before you add it. No exceptions.
 
+**Use only react-native-web components.** You will use only react-native-web components (and project wrappers that use them) unless the user explicitly gives permission to use a standard React component or feature. No exceptions.
+
+**Inline styling only.** Use inline styling only for both new and existing components; stay consistent with the rest of the app. Do not separate styles from the components (no separate StyleSheet files or style objects in other files).
+
 Then execute the user's prompt according to these guidelines.

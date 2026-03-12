@@ -2504,6 +2504,7 @@ export const TextInput_ = ({
 }) => {
   const [localValue, setLocalValue] = useState(value || "");
   const debounceRef = useRef(null);
+  const inputRef = useRef(null);
   const [inputHeight, setInputHeight] = useState(undefined);
 
   // Sync local state when value prop changes from external sources
@@ -2554,11 +2555,18 @@ export const TextInput_ = ({
 
   return (
     <TextInput
+      ref={inputRef}
       value={localValue}
       onChangeText={(val) => {
         setLocalValue(val);
-        // Allow shrink: clear height so next contentSize measurement can reduce it
-        if (multiline) setInputHeight(undefined);
+        if (multiline && inputRef.current) {
+          const node = inputRef.current;
+          node.value = val;
+          node.style.height = "0px";
+          const scrollH = node.scrollHeight;
+          const h = Math.max(minHeight || 0, Math.ceil(scrollH));
+          setInputHeight(maxHeight ? Math.min(h, maxHeight) : h);
+        }
         debouncedOnChangeText(val);
       }}
       placeholder={placeholder}
@@ -2569,6 +2577,9 @@ export const TextInput_ = ({
           ? {
               height: inputHeight ?? minHeight,
               textAlignVertical: "top",
+              outlineWidth: 0,
+              outlineStyle: "none",
+              borderWidth: 0,
             }
           : null,
       ]}

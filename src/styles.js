@@ -93,6 +93,8 @@ export const ICONS = {
   check1: require(ASSETS_PATH + "check1.png"),
   check: require(ASSETS_PATH + "check.png"),
   shoppingCart: require(ASSETS_PATH + "shopping_cart.png"),
+  minus: require("./assets/minus.png"),
+  asterisk: require("./assets/asterisk.png"),
   new: require(ASSETS_PATH + "new.png"),
   add: require(ASSETS_PATH + "plus.png"),
   addRound: require(ASSETS_PATH + "add_round.png"),

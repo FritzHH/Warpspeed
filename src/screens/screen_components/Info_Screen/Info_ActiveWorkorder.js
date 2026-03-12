@@ -527,13 +527,12 @@ export const ActiveWorkorderComponent = ({}) => {
                     dataArr={COLORS}
                     menuBorderColor={"transparent"}
                     onSelect={(item, idx) => {
-                      let wo = cloneDeep(zOpenWorkorder);
-                      wo.color1 = item;
-                      _zSetWorkorder(wo);
                       _zSetWorkorderField("color1", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      opacity: zOpenWorkorder?.color1 ? 0.2 : 1,
+                      opacity: zOpenWorkorder?.color1
+                        ? DROPDOWN_SELECTED_OPACITY
+                        : 1,
                     }}
                     ref={color1Ref}
                     buttonText={"Color 1"}

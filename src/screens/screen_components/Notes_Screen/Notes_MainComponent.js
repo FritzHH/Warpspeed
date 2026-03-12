@@ -9,8 +9,10 @@ import {
 import { generateRandomID, gray } from "../../../utils";
 import { Image_, TouchableOpacity_, TextInput_ } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
+
+const DOUBLE_TAP_MS = 350;
 
 /// Notes Tab Component
 export function Notes_MainComponent() {
@@ -51,9 +53,8 @@ export function Notes_MainComponent() {
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
 
   /////////////////////////////////////////////////////////////////////////////////
-  const [customerNotesHeight, setCustomerNotesHeight] = useState([25]); // Initial height
-  const [internalNotesHeight, setInternalNotesHeight] = useState([20]); // Initial height
   const [sFocusIdx, _setFocusIdx] = useState(null);
+  const lastTapRef = useRef({ time: 0, key: null });
 
   function formatUserShowName() {
     return (
@@ -80,6 +81,19 @@ export function Notes_MainComponent() {
     });
 
     useOpenWorkordersStore.getState().setField(fieldName, notesArr);
+  }
+
+  function handleRowPress(item, index, option) {
+    const now = Date.now();
+    const key = `${option}-${item.id}`;
+    const prev = lastTapRef.current;
+    if (prev.key === key && now - prev.time < DOUBLE_TAP_MS) {
+      deleteItem(item, index, option);
+      lastTapRef.current = { time: 0, key: null };
+      return;
+    }
+    lastTapRef.current = { time: now, key };
+    _setFocusIdx(index);
   }
 
   function deleteItem(item, index, option) {
@@ -116,38 +130,6 @@ export function Notes_MainComponent() {
 
     // ''(wo);
   }
-
-  const handleCustomerContentSizeChange = (event, index) => {
-    // let arr = [];
-    let ar = customerNotesHeight.map((h, idx) => {
-      if (idx === index) {
-        return event.nativeEvent.contentSize.height;
-      }
-      return h;
-    });
-
-    if (index > customerNotesHeight.length - 1) {
-      ar.push(25);
-    }
-
-    setCustomerNotesHeight(ar);
-  };
-
-  const handleInternalContentSizeChange = (event, index) => {
-    // let arr = [];
-    let ar = internalNotesHeight.map((h, idx) => {
-      if (idx === index) {
-        return event.nativeEvent.contentSize.height;
-      }
-      return h;
-    });
-
-    if (index > internalNotesHeight.length - 1) {
-      ar.push(25);
-    }
-
-    setInternalNotesHeight(ar);
-  };
 
   // clog(zWorkorderObj);
 
@@ -237,8 +219,7 @@ export function Notes_MainComponent() {
                 item = item.item;
                 return (
                   <TouchableWithoutFeedback
-                    onPress={() => _setFocusIdx(index)}
-                    onLongPress={() => deleteItem(item, index, "customer")}
+                    onPress={() => handleRowPress(item, index, "customer")}
                   >
                     <View
                       style={{
@@ -262,19 +243,20 @@ export function Notes_MainComponent() {
                         {item.name}
                       </Text>
                       <TextInput_
-
                         multiline={true}
                         numberOfLines={10}
                         onChangeText={(val) =>
                           textChanged(val, index, "customer")
                         }
                         style={{
-                          padding: 2,                            paddingLeft: 4,
-
-                          height: customerNotesHeight[index] || null,
+                          padding: 2,
+                          paddingLeft: 4,
+                          lineHeight: 18,
                           outlineWidth: 0,
+                          outlineStyle: "none",
+                          borderWidth: 0,
                           width: "100%",
-                          color: C.text
+                          color: C.text,
                         }}
                         autoFocus={index === sFocusIdx}
                         value={item.value}
@@ -360,8 +342,7 @@ export function Notes_MainComponent() {
                   item = item.item;
                   return (
                     <TouchableWithoutFeedback
-                      onPress={() => _setFocusIdx(index)}
-                      onLongPress={() => deleteItem(item, index, "internal")}
+                      onPress={() => handleRowPress(item, index, "internal")}
                     >
                       <View
                         style={{
@@ -391,10 +372,12 @@ export function Notes_MainComponent() {
                           style={{
                             padding: 2,
                             paddingLeft: 4,
-                            height: internalNotesHeight[index] || null,
+                            lineHeight: 18,
                             outlineWidth: 0,
+                            outlineStyle: "none",
+                            borderWidth: 0,
                             width: "100%",
-                            color: C.text
+                            color: C.text,
                           }}
                           autoFocus={index === sFocusIdx}
                           value={item.value}

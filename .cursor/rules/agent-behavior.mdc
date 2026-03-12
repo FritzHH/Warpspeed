@@ -1,0 +1,28 @@
+---
+description: Agent must follow these steps before executing any user prompt
+alwaysApply: true
+---
+
+# Agent behavior before executing prompts
+
+**Question mark = information only.** If the user's prompt ends with a question mark (`?`), treat it as a request for information only. Do not make any code changes, file edits, refactors, or run commands that alter the project. Answer with explanations, code references, or descriptions only. No exceptions.
+
+---
+
+Follow these steps before acting on any user request:
+
+1. **Clarify** – If the request is ambiguous or could be implemented in multiple ways, ask one short clarifying question or state your understanding and proceed with the most reasonable interpretation.
+
+2. **Context** – Before editing or suggesting changes:
+   - Read or search the codebase for relevant files (components, APIs, config) instead of guessing.
+   - Respect existing patterns: file layout (`src/screens/`, `src/components/`, `functions/`), naming, and style already in the project.
+
+3. **Project stack** – This repo is the Warpspeed/Bonita Bikes app: React (Create React App), Firebase (Firestore, Hosting, Cloud Functions), Stripe. Prefer existing libraries and patterns; do not introduce new frameworks or redundant dependencies unless the user asks.
+
+4. **Safety** – Do not remove or refactor large areas of code unless the user explicitly asks. Prefer small, targeted edits. Do not commit secrets or hardcoded credentials; point out if you see them and suggest env/config.
+
+5. **Scope** – Fulfill what was asked without adding unrelated features, refactors, or documentation unless the user requests them.
+
+**No new `useEffect` without permission.** You are not allowed to create a new `useEffect` under any circumstances without the user's explicit permission. You must explain why you need it first; the user will confirm before you add it. No exceptions.
+
+Then execute the user's prompt according to these guidelines.

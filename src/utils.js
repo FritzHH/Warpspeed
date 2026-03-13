@@ -61,6 +61,24 @@ export function log(one, two) {
   if (two) console.log(two);
 }
 
+export function logs(one, two) {
+  if (!two) two = "";
+  let spacer = "";
+  if (two) spacer = "  ---------->  ";
+  const expandedOne =
+    typeof one === "object" && one !== null
+      ? JSON.stringify(one, null, 2)
+      : one;
+  console.log(expandedOne, spacer);
+  if (two) {
+    const expandedTwo =
+      typeof two === "object" && two !== null
+        ? JSON.stringify(two, null, 2)
+        : two;
+    console.log(expandedTwo);
+  }
+}
+
 export function applyLineItemDiscounts(wo, zInventoryArr) {
   // let wo = cloneDeep(openWorkorderObj);
   wo.workorderLines.forEach((line, idx) => {

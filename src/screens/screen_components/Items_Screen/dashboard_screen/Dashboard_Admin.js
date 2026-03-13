@@ -179,6 +179,7 @@ export function Dashboard_Admin({}) {
                 )
               }
               text={TAB_NAMES.quickItems}
+              icon={ICONS.quickItemButton}
               style={{
                 fontWeight: sExpand === TAB_NAMES.quickItems ? 500 : null,
                 color: sExpand === TAB_NAMES.quickItems ? C.green : gray(0.6),
@@ -191,6 +192,7 @@ export function Dashboard_Admin({}) {
                 _setExpand(sExpand === TAB_NAMES.users ? null : TAB_NAMES.users)
               }
               text={TAB_NAMES.users}
+              icon={ICONS.userControl}
               style={{
                 fontWeight: sExpand === TAB_NAMES.users ? 500 : null,
                 color: sExpand === TAB_NAMES.users ? C.green : gray(0.6),
@@ -205,6 +207,7 @@ export function Dashboard_Admin({}) {
                 )
               }
               text={TAB_NAMES.payments}
+              icon={ICONS.paymentProcessing}
               style={{
                 fontWeight: sExpand === TAB_NAMES.payments ? 500 : null,
 
@@ -220,6 +223,7 @@ export function Dashboard_Admin({}) {
                 )
               }
               text={TAB_NAMES.statuses}
+              icon={ICONS.workorderStatuses}
               style={{
                 fontWeight: sExpand === TAB_NAMES.statuses ? 500 : null,
 
@@ -232,6 +236,7 @@ export function Dashboard_Admin({}) {
               handleExpandPress={() =>
                 _setExpand(sExpand === TAB_NAMES.lists ? null : TAB_NAMES.lists)
               }
+              icon={ICONS.listsAndOptions}
               style={{
                 fontWeight: sExpand === TAB_NAMES.lists ? 500 : null,
 
@@ -247,6 +252,7 @@ export function Dashboard_Admin({}) {
                   sExpand === TAB_NAMES.storeInfo ? null : TAB_NAMES.storeInfo
                 )
               }
+              icon={ICONS.storeInfo}
               style={{
                 fontWeight: sExpand === TAB_NAMES.storeInfo ? 500 : null,
                 color: sExpand === TAB_NAMES.storeInfo ? C.green : gray(0.6),
@@ -309,7 +315,7 @@ export function Dashboard_Admin({}) {
               }}
               dropdownLabel={"ORDERING"}
               text={TAB_NAMES.ordering}
-              icon={ICONS.menu2}
+              icon={ICONS.ordering}
             />
           </View>
         </View>

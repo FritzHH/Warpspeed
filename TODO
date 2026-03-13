@@ -1,0 +1,17 @@
+//////// LAYOUT ////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+
+
+/////////// FUNCTION //////////////////////////
+ 
+ workorder items need to have both Intake Notes and Receipt Notes; if neither are present, show 2 plus buttons; if 1 is present, show that text and the other button. here is how it will work: on item title press, if there are no internal notes then internal notes input will show. if there are internal notes (they will be showing already), show the receipt notes input. if the receipt notes input is already showing, then show the internal notes input.

@@ -129,6 +129,13 @@ export const ICONS = {
   downChevron: require(ASSETS_PATH + "down-chevron.png"),
   trash: require(ASSETS_PATH + "trash.png"),
   axe: require(ASSETS_PATH + "axe.png"),
+  quickItemButton: require(ASSETS_PATH + "quickItemButton.png"),
+  userControl: require(ASSETS_PATH + "userControl.png"),
+  paymentProcessing: require(ASSETS_PATH + "paymentProcessing.png"),
+  workorderStatuses: require(ASSETS_PATH + "workorderStatuses.png"),
+  listsAndOptions: require(ASSETS_PATH + "listsAndOptions.png"),
+  storeInfo: require(ASSETS_PATH + "storeInfo.png"),
+  ordering: require(ASSETS_PATH + "ordering.png"),
 };
 
 // rgb(64, 174, 113)

@@ -501,7 +501,7 @@ export const LineItemComponent = ({
                 multiline={true}
                 numberOfLines={5}
                 debounceMs={500}
-                autoCapitalize="sentences"
+                capitalize={true}
                 style={{ outlineWidth: 0, color: C.lightText, width: "100%" }}
                 onChangeText={(val) => {
                   __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
@@ -511,10 +511,10 @@ export const LineItemComponent = ({
                 value={workorderLine.intakeNotes || ""}
               />
               <TextInput_
+                capitalize
                 multiline={true}
                 numberOfLines={5}
                 debounceMs={500}
-                autoCapitalize="sentences"
                 style={{ outlineWidth: 0, color: 'green', width: "100%" }}
                 onChangeText={(val) => {
                   __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });

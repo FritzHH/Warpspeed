@@ -141,12 +141,33 @@ export function MessagesComponent({}) {
     smsService.send(msg);
     // _zSetOutgoingMessage(msg, true);
   }
+  function formatStoreHours(storeHours) {
+    if (!storeHours?.standard || storeHours.standard.length === 0) return "";
+    let days = storeHours.standard;
+    let shortNames = { Monday: "Mon", Tuesday: "Tues", Wednesday: "Wed", Thursday: "Thurs", Friday: "Fri", Saturday: "Sat", Sunday: "Sun" };
+    let groups = [];
+    let currentGroup = null;
+    for (let i = 0; i < days.length; i++) {
+      let day = days[i];
+      let key = day.isOpen ? day.open + "-" + day.close : "closed";
+      if (currentGroup && currentGroup.key === key) {
+        currentGroup.end = day.name;
+      } else {
+        currentGroup = { key, start: day.name, end: day.name, isOpen: day.isOpen, open: day.open, close: day.close };
+        groups.push(currentGroup);
+      }
+    }
+    return groups.map((g) => {
+      let label = g.start === g.end ? shortNames[g.start] || g.start : (shortNames[g.start] || g.start) + "-" + (shortNames[g.end] || g.end);
+      return g.isOpen ? label + " " + g.open + " - " + g.close : "Closed " + label;
+    }).join(", ");
+  }
   function resolveTemplate(templateMessage) {
     if (!templateMessage) return "";
     let totalAmount = "";
     try {
       let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent);
-      totalAmount = "$" + (totals.finalTotal / 100).toFixed(2);
+      totalAmount = "$" + (totals.finalTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     } catch (e) {
       totalAmount = "$0.00";
     }
@@ -159,6 +180,10 @@ export function MessagesComponent({}) {
         })
         .join(", ");
     } catch (e) {}
+    let storeHoursText = "";
+    try {
+      storeHoursText = formatStoreHours(zSettings?.storeHours);
+    } catch (e) {}
     return templateMessage
       .replace(/\{firstName\}/g, zCustomer?.first || "")
       .replace(/\{lastName\}/g, zCustomer?.last || "")
@@ -167,7 +192,9 @@ export function MessagesComponent({}) {
       .replace(/\{totalAmount\}/g, totalAmount)
       .replace(/\{lineItems\}/g, lineItems)
       .replace(/\{partOrdered\}/g, zWorkorderObj?.partOrdered || "")
-      .replace(/\{partSource\}/g, zWorkorderObj?.partSource || "");
+      .replace(/\{partSource\}/g, zWorkorderObj?.partSource || "")
+      .replace(/\{storeHours\}/g, storeHoursText)
+      .replace(/\{storePhone\}/g, ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || ""));
   }
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
@@ -258,7 +285,7 @@ export function MessagesComponent({}) {
             onContentSizeChange={(e) => {
               let h = e?.nativeEvent?.contentSize?.height;
               if (typeof h === "number" && h > 0) {
-                _setInputHeight(Math.min(Math.max(36, Math.ceil(h)), 200));
+                _setInputHeight(Math.max(36, Math.ceil(h)));
               }
             }}
               style={{
@@ -294,13 +321,20 @@ export function MessagesComponent({}) {
               dataArr={(zSettings?.textTemplates || []).map((t) => ({ label: t.name || "Untitled", message: t.message }))}
               onSelect={(item) => _setNewMessage(resolveTemplate(item.message))}
               buttonText={"Templates"}
-                buttonStyle={{ paddingVertical: 5 }}
+              buttonStyle={{ paddingVertical: 5 }}
+              openUpward={true}
             />
             <CheckBox_
                 buttonStyle={{}}
                 text={"Can Respond"}
               isChecked={sCanRespond}
               onCheck={() => _setCanRespond(!sCanRespond)}
+            />
+            <Button_
+              onPress={() => { _setNewMessage(""); _setInputHeight(36); }}
+              text={"Clear"}
+              colorGradientArr={COLOR_GRADIENTS.red}
+              buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
             />
           </View>
         </View>

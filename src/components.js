@@ -447,6 +447,7 @@ export const ScreenModal = ({
   buttonIconStyle = {},
   handleModalActionInternally = false,
   handleOuterClick = () => {},
+  openUpward = false,
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sInternalModalShow, _setInternalModalShow] = useState(false);
@@ -470,7 +471,7 @@ export const ScreenModal = ({
     //   _zSetModalVisible(false);
     // };
   });
-  if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
+  if (!openUpward && modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
   // log("ref in ScreenModal", ref);
   useEffect(() => {
     const el = ref ? ref.current : null;
@@ -542,7 +543,8 @@ export const ScreenModal = ({
               justifySelf: "center",
               ...outerModalStyle,
               position: ref ? "absolute" : null,
-              top: ref ? sModalCoordinates.y + modalCoordinateVars.y : null,
+              top: ref && !openUpward ? sModalCoordinates.y + modalCoordinateVars.y : null,
+              bottom: ref && openUpward ? window.innerHeight - sModalCoordinates.y : null,
               left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
             }}
           >
@@ -578,6 +580,7 @@ export const DropdownMenu = ({
   menuBorderColor,
   selectedIdx = 0,
   useSelectedAsButtonTitle = false,
+  openUpward = false,
 }) => {
   const [sModalVisible, _setModalVisible] = useState(false);
   const ref = useRef();
@@ -717,6 +720,7 @@ export const DropdownMenu = ({
       shadowStyle={shadowStyle}
       handleOuterClick={() => _setModalVisible(false)}
       enabled={enabled}
+      openUpward={openUpward}
     />
   );
 };

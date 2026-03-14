@@ -26,7 +26,7 @@ import {
   TAB_NAMES,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
-import { cloneDeep } from "lodash";
+import { cloneDeep, zipObject } from "lodash";
 import {
   useCheckoutStore,
   useOpenWorkordersStore,
@@ -34,6 +34,7 @@ import {
   useSettingsStore,
   useTabNamesStore,
 } from "../../../stores";
+import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
 
 export const Items_WorkorderItemsTab = ({}) => {
   // store setters ///////////////////////////////////////////////////////////////
@@ -45,14 +46,24 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // store getters ///////////////////////////////////////////////////////////////
 
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
+  // Fix 1+2: read directly from state snapshot (no getter methods); deepEqual prevents
+  // re-renders when Firestore syncs identical data with new object references
+  const zOpenWorkorder = useOpenWorkordersStore(
+    (state) => {
+      const id = state.workorderPreviewID || state.openWorkorderID;
+      return state.workorders.find((o) => o.id === id) ?? null;
+    },
+    deepEqual
   );
-  const zSettings = useSettingsStore((state) => state.settings);
-  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
+
+  // Fix 3: deepEqual prevents re-renders from unrelated inventory changes
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr, deepEqual);
+
+  // Fix 4: subscribe only to the two fields actually used, not the whole settings object
+  const zSalesTaxPercent = useSettingsStore((state) => state.settings?.salesTaxPercent);
+  const zDiscounts = useSettingsStore((state) => state.settings?.discounts, deepEqual);
 
   ///////////////////////////////////////////////////////////////////////////
-  const [sButtonsRowID, _setButtonsRowID] = useState(null);
   const [sTotalDiscount, _setTotalDiscount] = useState("");
   const [sTotals, _setTotals] = useState({
     runningQty: 0,
@@ -68,16 +79,6 @@ export const Items_WorkorderItemsTab = ({}) => {
   // dev
   const checkoutBtnRef = useRef();
 
-  useEffect(() => {
-    if (zOpenWorkorder?.workordersArr && zSettings.salesTaxPercent) {
-      // log("here");
-      // _zSetIsCheckingOut(true);
-      // dbGetCustomerObj("1236").then((res) => {
-      //   _zSetCustomer(res);
-      //   // log("res", res);
-      // });
-    }
-  }, [zOpenWorkorder, zSettings]);
 
   ///////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////
@@ -131,7 +132,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   useEffect(() => {
     if (!(zOpenWorkorder?.workorderLines?.length > 0)) return;
     _setTotals(
-      calculateRunningTotals(zOpenWorkorder, zSettings.salesTaxPercent)
+      calculateRunningTotals(zOpenWorkorder, zSalesTaxPercent)
     );
   }, [zOpenWorkorder]);
 
@@ -164,10 +165,12 @@ export const Items_WorkorderItemsTab = ({}) => {
     );
   }
 
-  function editWorkorderLine(workorderLine) {
+  function editWorkorderLine(workorderLine, saveToDB = true) {
     _zSetWorkorderField(
       "workorderLines",
-      replaceOrAddToArr(zOpenWorkorder.workorderLines, workorderLine)
+      replaceOrAddToArr(zOpenWorkorder.workorderLines, workorderLine),
+      undefined,
+      saveToDB
     );
   }
 
@@ -263,9 +266,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               __modQtyPressed={modifyQtyPressed}
               index={idx}
               applyDiscount={applyDiscount}
-              zSettingsObj={zSettings}
-              ssButtonsRowID={sButtonsRowID}
-              __setButtonsRowID={_setButtonsRowID}
+              zSettingsObj={{ discounts: zDiscounts }}
             />
           );
         }}
@@ -419,8 +420,6 @@ export const LineItemComponent = ({
   __splitItems,
   index,
   applyDiscount,
-  ssButtonsRowID,
-  __setButtonsRowID,
 }) => {
   const [sTempQtyVal, _setTempQtyVal] = useState(null);
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
@@ -437,7 +436,9 @@ export const LineItemComponent = ({
     return discountArr;
   }
 
-  // log("item component");
+  // log("INTAKE NOTES", sIntakeNotes);
+  // log("WORKORDER NOTES", workorderLine.intakeNotes);
+  // console.log("RECEIPT NOTES", sReceiptNotes);
   return (
     <View
       style={{
@@ -490,7 +491,7 @@ export const LineItemComponent = ({
             </Text>
             <View
               style={{
-                flexDirection: "row",
+                flexDirection: "column",
                 alignItems: "flex-start",
                 width: "100%",
                 // backgroundColor: "green",
@@ -499,14 +500,28 @@ export const LineItemComponent = ({
               <TextInput_
                 multiline={true}
                 numberOfLines={5}
+                debounceMs={500}
+                autoCapitalize="sentences"
                 style={{ outlineWidth: 0, color: C.lightText, width: "100%" }}
                 onChangeText={(val) => {
-                  let line = { ...workorderLine, intakeNotes: val };
-                  __setWorkorderLineItem(line);
+                  __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
                 }}
-                placeholder="Intake and service notes..."
+                placeholder="Intake notes..."
                 placeholderTextColor={gray(0.2)}
-                value={workorderLine.intakeNotes}
+                value={workorderLine.intakeNotes || ""}
+              />
+              <TextInput_
+                multiline={true}
+                numberOfLines={5}
+                debounceMs={500}
+                autoCapitalize="sentences"
+                style={{ outlineWidth: 0, color: 'green', width: "100%" }}
+                onChangeText={(val) => {
+                  __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
+                }}
+                placeholder="Receipt notes..."
+                placeholderTextColor={gray(0.2)}
+                value={workorderLine.receiptNotes || ""}
               />
             </View>
           </View>
@@ -649,22 +664,33 @@ export const LineItemComponent = ({
             }}
           >
             <Button_
-              iconSize={20}
-              icon={ICONS.editPencil}
-              onPress={() =>
-                __setButtonsRowID(
-                  workorderLine.id === ssButtonsRowID ? null : workorderLine.id
-                )
-              }
+              icon={ICONS.axe}
+              iconSize={22}
+              onPress={workorderLine.qty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
               buttonStyle={{
-                paddingHorizontal: 5,
                 backgroundColor: "transparent",
+                paddingHorizontal: 3,
+                opacity: workorderLine.qty > 1 ? 1 : 0,
+              }}
+            />
+            <DropdownMenu
+              buttonIcon={ICONS.dollarYellow}
+              buttonIconSize={25}
+              modalCoordY={25}
+              modalCoordX={-80}
+              buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
+              dataArr={zSettingsObj.discounts.map((o) => ({ label: o.name }))}
+              onSelect={(item) => {
+                applyDiscount(
+                  workorderLine,
+                  zSettingsObj.discounts.find((o) => o.name === item.label)
+                );
               }}
             />
             <Button_
               onPress={() => __deleteWorkorderLine(index)}
               icon={ICONS.trash}
-              iconSize={16}
+              iconSize={21}
               buttonStyle={{
                 paddingRight: 2,
               }}
@@ -672,54 +698,6 @@ export const LineItemComponent = ({
           </View>
         </View>
       </View>
-      {ssButtonsRowID === workorderLine.id && (
-        <View
-          style={{
-            flexDirection: "row",
-            // backgroundColor: "white",
-            justifyContent: "flex-end",
-            marginVertical: 5,
-            width: "100%",
-          }}
-        >
-          {workorderLine.qty > 1 && (
-            <Button_
-              icon={ICONS.axe}
-              iconSize={17}
-              textStyle={{ fontSize: 13, color: gray(0.55), fontWeight: 500 }}
-              onPress={() => {
-                __splitItems(workorderLine, index);
-                __setButtonsRowID(null);
-              }}
-              text={"Split Items"}
-              buttonStyle={{
-                backgroundColor: C.buttonLightGreen,
-                borderColor: C.buttonLightGreenOutline,
-                justifyContent: "center",
-                alignItems: "center",
-                borderWidth: 1,
-                paddingVertical: 2,
-                borderRadius: 5,
-                marginRight: 10,
-              }}
-            />
-          )}
-          <DropdownMenu
-            buttonText={"Discount"}
-            modalCoordY={25}
-            modalCoordX={-80}
-            dataArr={zSettingsObj.discounts.map((o) => ({ label: o.name }))}
-            onSelect={(item) => {
-              __setButtonsRowID(null);
-              applyDiscount(
-                workorderLine,
-                zSettingsObj.discounts.find((o) => o.name === item.label)
-              );
-            }}
-          />
-          ;
-        </View>
-      )}
     </View>
   );
   // try {

@@ -10,6 +10,7 @@ import {
 } from "react-native-web";
 import {
   combine2ArraysOrderByMillis,
+  calculateRunningTotals,
   dim,
   formatDateTimeForReceipt,
   generateRandomID,
@@ -43,6 +44,7 @@ import {
   useOpenWorkordersStore,
   useCustMessagesStore,
   useLoginStore,
+  useSettingsStore,
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY } from "../../../constants";
@@ -57,7 +59,8 @@ export function MessagesComponent({}) {
   let zCustomer = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
   zCustomer = useCurrentCustomerStore((state) => state.customer);
-  zWorkorderObj = useOpenWorkordersStore((state) => state.openWorkorder);
+  zWorkorderObj = useOpenWorkordersStore((state) => state.getOpenWorkorder());
+  const zSettings = useSettingsStore((state) => state.settings);
   const zIncomingMessagesArr = useCustMessagesStore(
     (state) => state.incomingMessages
   );
@@ -67,6 +70,7 @@ export function MessagesComponent({}) {
   //////////////////////////////////////////////////////////////////////////
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);
+  const [sInputHeight, _setInputHeight] = useState(36);
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
@@ -137,6 +141,34 @@ export function MessagesComponent({}) {
     smsService.send(msg);
     // _zSetOutgoingMessage(msg, true);
   }
+  function resolveTemplate(templateMessage) {
+    if (!templateMessage) return "";
+    let totalAmount = "";
+    try {
+      let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent);
+      totalAmount = "$" + (totals.finalTotal / 100).toFixed(2);
+    } catch (e) {
+      totalAmount = "$0.00";
+    }
+    let lineItems = "";
+    try {
+      lineItems = (zWorkorderObj?.workorderLines || [])
+        .map((line) => {
+          let name = line.inventoryItem?.informalName || line.inventoryItem?.formalName || "";
+          return line.qty + "x " + name;
+        })
+        .join(", ");
+    } catch (e) {}
+    return templateMessage
+      .replace(/\{firstName\}/g, zCustomer?.first || "")
+      .replace(/\{lastName\}/g, zCustomer?.last || "")
+      .replace(/\{brand\}/g, zWorkorderObj?.brand || "")
+      .replace(/\{description\}/g, zWorkorderObj?.description || "")
+      .replace(/\{totalAmount\}/g, totalAmount)
+      .replace(/\{lineItems\}/g, lineItems)
+      .replace(/\{partOrdered\}/g, zWorkorderObj?.partOrdered || "")
+      .replace(/\{partSource\}/g, zWorkorderObj?.partSource || "");
+  }
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
 
@@ -150,12 +182,15 @@ export function MessagesComponent({}) {
       style={{
         flex: 1,
         padding: 5,
+        justifyContent: "space-between",
       }}
     >
       <View
         style={{
           width: "100%",
-          height: "80%",
+          flex: 1,
+          flexShrink: 1,
+          backgroundColor: 'blue'
         }}
       >
         {messagesArr.length < 1 && (
@@ -207,9 +242,9 @@ export function MessagesComponent({}) {
         <View
           style={{
             paddingTop: 10,
-            flexDirection: "row",
+              flexDirection: "column",
             width: "100%",
-            height: "20%",
+              // height: "20%",
           }}
         >
           <TextInput
@@ -217,40 +252,53 @@ export function MessagesComponent({}) {
             ref={textInputRef}
             autoFocus={true}
             autoCapitalize="sentences"
-            multiline={true}
+              multiline={true}
             placeholderTextColor={"gray"}
-            placeholder={"Message..."}
-            style={{
+              placeholder={"Message..."}
+            onContentSizeChange={(e) => {
+              let h = e?.nativeEvent?.contentSize?.height;
+              if (typeof h === "number" && h > 0) {
+                _setInputHeight(Math.min(Math.max(36, Math.ceil(h)), 200));
+              }
+            }}
+              style={{
+                outlineColor: 'transparent',
+                outlineWidth: 0,
               color: C.text,
               padding: 5,
               fontSize: 15,
+              height: sInputHeight,
+              overflow: "hidden",
               flexWrap: "wrap",
-              textWrap: "pretty",
-              outlineWidth: 0,
+                textWrap: "pretty",
               borderWidth: 2,
-              borderRadius: 15,
+                borderRadius: 5,
               borderColor: sCanRespond ? C.red : gray(0.15),
-              width: "80%",
+                width: "100%",
             }}
             value={sNewMessage}
           />
-          <View style={{ width: "20%", paddingHorizontal: 5, height: "100%" }}>
+            <View style={{
+              width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "space-around", marginTop: 10, paddingHorizontal: 0
+
+            }}>
             {/* {sNewMessage.length > 5 || true && ( */}
             <Button_
               onPress={() => sendMessage(sNewMessage)}
               text={"Send"}
               colorGradientArr={COLOR_GRADIENTS.blue}
-              buttonStyle={{ width: "100%" }}
+                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
             />
             {/* )} */}
             <DropdownMenu
-              dataArr={[{ label: "hello" }]}
+              dataArr={(zSettings?.textTemplates || []).map((t) => ({ label: t.name || "Untitled", message: t.message }))}
+              onSelect={(item) => _setNewMessage(resolveTemplate(item.message))}
               buttonText={"Templates"}
-              buttonStyle={{ marginTop: 10, borderRadius: 15 }}
+                buttonStyle={{ paddingVertical: 5 }}
             />
             <CheckBox_
-              buttonStyle={{ marginTop: 10 }}
-              text={"Respond"}
+                buttonStyle={{}}
+                text={"Can Respond"}
               isChecked={sCanRespond}
               onCheck={() => _setCanRespond(!sCanRespond)}
             />

@@ -39,8 +39,9 @@ import {
   NumberSpinner_,
   ScreenModal,
   TimeSpinner,
+  Tooltip,
 } from "../../../../components";
-import { cloneDeep, set } from "lodash";
+import { cloneDeep, set, debounce } from "lodash";
 import { Children, useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
@@ -61,6 +62,7 @@ const TAB_NAMES = {
   quickItems: "Quick Item Buttons",
   sales: "Sales Reports",
   ordering: "Ordering",
+  textTemplates: "Text Templates",
 };
 
 const DROPDOWN_ORDERING_SELECTION_NAMES = {
@@ -87,6 +89,23 @@ export function Dashboard_Admin({}) {
 
   //////////////////////////////////////////////////////////////////////////
 
+  // Per-field debounced DB saves (500ms). Store updates are immediate.
+  const debouncedDBSavesRef = useRef({});
+  function debouncedDBSave(fieldName, fieldValue) {
+    if (!debouncedDBSavesRef.current[fieldName]) {
+      debouncedDBSavesRef.current[fieldName] = debounce((val) => {
+        _zSetSettingsField(fieldName, val);
+      }, 500);
+    }
+    debouncedDBSavesRef.current[fieldName](fieldValue);
+  }
+
+  function cancelDebouncedDBSave(fieldName) {
+    if (debouncedDBSavesRef.current[fieldName]) {
+      debouncedDBSavesRef.current[fieldName].cancel();
+    }
+  }
+
   function commitUserInfoChange(userObj, sNewUserObj) {
     let userArr;
     if (sNewUserObj) {
@@ -98,15 +117,18 @@ export function Dashboard_Admin({}) {
       });
     }
 
-    _zSetSettingsField("users", userArr);
+    _zSetSettingsField("users", userArr, false);
+    debouncedDBSave("users", userArr);
   }
 
   function handleRemoveUserPress(userObj) {
+    cancelDebouncedDBSave("users");
     let userArr = zSettingsObj.users.filter((o) => o.id != userObj.id);
     _zSetSettingsField("users", userArr);
   }
 
   function handleDescriptorCapture(userObj, desc) {
+    cancelDebouncedDBSave("users");
     let userArr = zSettingsObj.users.map((o) => {
       if (o.id === userObj.id) {
         return { ...o, faceDescriptor: desc };
@@ -117,7 +139,8 @@ export function Dashboard_Admin({}) {
   }
 
   function handleSettingsFieldChange(fieldName, fieldValue) {
-    _zSetSettingsField(fieldName, fieldValue);
+    _zSetSettingsField(fieldName, fieldValue, false);
+    debouncedDBSave(fieldName, fieldValue);
   }
 
   //////////////////////////////////////////////////////////////////////////
@@ -307,15 +330,53 @@ export function Dashboard_Admin({}) {
             }}
           >
             <MenuListLabelComponent
-              dropdownDataArr={Object.values(DROPDOWN_ORDERING_SELECTION_NAMES)}
               selected={sExpand === TAB_NAMES.ordering}
-              handleExpandPress={() => {}}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.ordering ? null : TAB_NAMES.ordering
+                )
+              }
               style={{
+                fontWeight: sExpand === TAB_NAMES.ordering ? 500 : null,
                 color: sExpand === TAB_NAMES.ordering ? C.green : gray(0.6),
               }}
-              dropdownLabel={"ORDERING"}
               text={TAB_NAMES.ordering}
               icon={ICONS.ordering}
+            />
+          </View>
+
+          {/****************** text templates tab *****************************/}
+          <View
+            style={{
+              width: "100%",
+              alignItems: "flex-start",
+              borderRadius: 5,
+              paddingRight: 10,
+              paddingLeft: 5,
+              backgroundColor: C.backgroundListWhite,
+              borderColor: C.buttonLightGreenOutline,
+              height: 50,
+              borderWidth: 1,
+              paddingTop: 13,
+              marginTop: 50,
+            }}
+          >
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.textTemplates}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.textTemplates
+                    ? null
+                    : TAB_NAMES.textTemplates
+                )
+              }
+              style={{
+                fontWeight: sExpand === TAB_NAMES.textTemplates ? 500 : null,
+                color:
+                  sExpand === TAB_NAMES.textTemplates ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.textTemplates}
+              icon={ICONS.notes}
             />
           </View>
         </View>
@@ -377,6 +438,18 @@ export function Dashboard_Admin({}) {
           )}
           {sExpand === TAB_NAMES.quickItems && (
             <QuickItemButtonsComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          )}
+          {sExpand === TAB_NAMES.ordering && (
+            <OrderingComponent
+              sOrderingMenuSelectionName={sOrderingMenuSelectionName}
+              _setOrderingMenuSelectionName={_setOrderingMenuSelectionName}
+            />
+          )}
+          {sExpand === TAB_NAMES.textTemplates && (
+            <TextTemplatesComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
@@ -1698,7 +1771,7 @@ const WaitTimesComponent = ({
                     onChangeText={(val) => {
                       let arr = zSettingsObj.waitTimes.map((o) => {
                         if (o.id === item.id)
-                          return { ...o, maxVaitTimeDays: val };
+                          return { ...o, maxWaitTimeDays: val };
                         return o;
                       });
                       handleSettingsFieldChange("waitTimes", arr);
@@ -1871,10 +1944,10 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               outlineWidth: 0,
             }}
             value={zSettingsObj?.storeInfo.displayName}
-            onChangeText={(unit) => {
-              handleSettingsFieldChange("displayName", {
-                ...zSettingsObj?.displayName,
-                unit,
+            onChangeText={(displayName) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj.storeInfo,
+                displayName,
               });
             }}
           />
@@ -1920,10 +1993,10 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               outlineWidth: 0,
             }}
             value={formatPhoneWithDashes(zSettingsObj?.storeInfo.phone)}
-            onChangeText={(unit) => {
-              handleSettingsFieldChange("phone", {
-                ...zSettingsObj?.phone,
-                unit,
+            onChangeText={(phone) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj.storeInfo,
+                phone,
               });
             }}
           />
@@ -3001,11 +3074,11 @@ const QuickItemButtonsComponent = ({
                       onChangeText={(val) => {
                         let quickButtonsArr = zSettingsObj.quickItemButtons;
                         quickButtonsArr[idx] = {
-                          ...quickButtonsArr,
+                          ...quickButtonsArr[idx],
                           name: val,
                         };
                         handleSettingsFieldChange(
-                          "partSources",
+                          "quickItemButtons",
                           quickButtonsArr
                         );
                       }}
@@ -3064,6 +3137,352 @@ const QuickItemButtonsComponent = ({
               }}
             />
           </View>
+        </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+const TEXT_TEMPLATE_VARIABLES = [
+  { label: "First Name", variable: "{firstName}" },
+  { label: "Last Name", variable: "{lastName}" },
+  { label: "Brand", variable: "{brand}" },
+  { label: "Description", variable: "{description}" },
+  { label: "Total Amount", variable: "{totalAmount}" },
+  { label: "Line Items", variable: "{lineItems}" },
+  { label: "Part Ordered", variable: "{partOrdered}" },
+  { label: "Part Source", variable: "{partSource}" },
+  { label: "Store Hours", variable: "{storeHours}" },
+  { label: "Store Phone", variable: "{storePhone}" },
+];
+
+const OrderingComponent = ({
+  sOrderingMenuSelectionName,
+  _setOrderingMenuSelectionName,
+}) => {
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center" }}>
+        {/* Sub-tab buttons */}
+        <View
+          style={{
+            flexDirection: "row",
+            width: "100%",
+            marginBottom: 15,
+            borderBottomWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            paddingBottom: 10,
+          }}
+        >
+          {Object.values(DROPDOWN_ORDERING_SELECTION_NAMES).map((name) => {
+            let isActive = sOrderingMenuSelectionName === name;
+            return (
+              <TouchableOpacity
+                key={name}
+                onPress={() => _setOrderingMenuSelectionName(name)}
+                style={{
+                  marginRight: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 5,
+                  borderRadius: 7,
+                  borderWidth: 1,
+                  borderColor: isActive ? C.green : C.buttonLightGreenOutline,
+                  backgroundColor: isActive ? C.buttonLightGreen : "transparent",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: isActive ? "500" : "400",
+                    color: isActive ? C.green : gray(0.5),
+                  }}
+                >
+                  {name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Content area */}
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <Text style={{ color: gray(0.4), fontSize: 14 }}>
+            {sOrderingMenuSelectionName}
+          </Text>
+        </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const [sSelectedTemplateId, _setSelectedTemplateId] = useState(null);
+  const [sLocalEdits, _setLocalEdits] = useState({});
+  const [sNewTemplateIds, _setNewTemplateIds] = useState([]);
+  const [sUnsavedTemplates, _setUnsavedTemplates] = useState([]);
+  const cursorPositionRefs = useRef({});
+  const textInputRefs = useRef({});
+
+  let savedTemplates = zSettingsObj?.textTemplates || [];
+  let templates = [...sUnsavedTemplates, ...savedTemplates];
+
+  function getLocalValue(templateId, field) {
+    let key = templateId + "_" + field;
+    return key in sLocalEdits ? sLocalEdits[key] : null;
+  }
+
+  function isNewTemplate(templateId) {
+    return sNewTemplateIds.indexOf(templateId) !== -1;
+  }
+
+  function handleAddTemplate() {
+    let newTemplate = {
+      id: generateRandomID(),
+      name: "",
+      message: "",
+    };
+    _setUnsavedTemplates([newTemplate, ...sUnsavedTemplates]);
+    _setNewTemplateIds([...sNewTemplateIds, newTemplate.id]);
+    _setSelectedTemplateId(newTemplate.id);
+  }
+
+  function handleSaveNewTemplate(templateObj) {
+    let finalTemplate = {
+      ...templateObj,
+      name: getLocalValue(templateObj.id, "name") ?? templateObj.name,
+      message: getLocalValue(templateObj.id, "message") ?? templateObj.message,
+    };
+    let arr = [finalTemplate, ...savedTemplates];
+    handleSettingsFieldChange("textTemplates", arr);
+    _setUnsavedTemplates(sUnsavedTemplates.filter((t) => t.id !== templateObj.id));
+    _setNewTemplateIds(sNewTemplateIds.filter((id) => id !== templateObj.id));
+    let newEdits = { ...sLocalEdits };
+    delete newEdits[templateObj.id + "_name"];
+    delete newEdits[templateObj.id + "_message"];
+    _setLocalEdits(newEdits);
+  }
+
+  function handleDeleteTemplate(templateObj) {
+    if (isNewTemplate(templateObj.id)) {
+      _setUnsavedTemplates(sUnsavedTemplates.filter((t) => t.id !== templateObj.id));
+      _setNewTemplateIds(sNewTemplateIds.filter((id) => id !== templateObj.id));
+    } else {
+      let arr = savedTemplates.filter((t) => t.id !== templateObj.id);
+      handleSettingsFieldChange("textTemplates", arr);
+    }
+    if (sSelectedTemplateId === templateObj.id) _setSelectedTemplateId(null);
+    let newEdits = { ...sLocalEdits };
+    delete newEdits[templateObj.id + "_name"];
+    delete newEdits[templateObj.id + "_message"];
+    _setLocalEdits(newEdits);
+  }
+
+  function handleTemplateNameChange(templateObj, val) {
+    if (isNewTemplate(templateObj.id)) {
+      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_name"]: val });
+    } else {
+      let arr = savedTemplates.map((t) => {
+        if (t.id === templateObj.id) return { ...t, name: val };
+        return t;
+      });
+      handleSettingsFieldChange("textTemplates", arr);
+    }
+  }
+
+  function handleTemplateMessageChange(templateObj, val) {
+    if (isNewTemplate(templateObj.id)) {
+      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_message"]: val });
+    } else {
+      let arr = savedTemplates.map((t) => {
+        if (t.id === templateObj.id) return { ...t, message: val };
+        return t;
+      });
+      handleSettingsFieldChange("textTemplates", arr);
+    }
+  }
+
+  function handleInsertVariable(templateObj, variableStr) {
+    let currentMessage = isNewTemplate(templateObj.id)
+      ? (getLocalValue(templateObj.id, "message") ?? templateObj.message)
+      : templateObj.message;
+    let cursorPos =
+      cursorPositionRefs.current[templateObj.id] ?? currentMessage.length;
+    let before = currentMessage.slice(0, cursorPos);
+    let after = currentMessage.slice(cursorPos);
+    let newMessage = before + variableStr + after;
+
+    if (isNewTemplate(templateObj.id)) {
+      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_message"]: newMessage });
+    } else {
+      let arr = savedTemplates.map((t) => {
+        if (t.id === templateObj.id) return { ...t, message: newMessage };
+        return t;
+      });
+      handleSettingsFieldChange("textTemplates", arr);
+    }
+    cursorPositionRefs.current[templateObj.id] =
+      cursorPos + variableStr.length;
+    textInputRefs.current[templateObj.id]?.focus();
+  }
+
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent
+        style={{ width: "100%", alignItems: "center" }}
+      >
+        {/* Add button */}
+        <View style={{ width: "100%", alignItems: "flex-start" }}>
+          <BoxButton1 onPress={handleAddTemplate} />
+        </View>
+
+        {/* Templates list */}
+        <View style={{ marginTop: 10, width: "100%" }}>
+          <FlatList
+            data={templates}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item: templateObj }) => {
+              let isSelected = sSelectedTemplateId === templateObj.id;
+
+              return (
+                <View
+                  style={{
+                    width: "100%",
+                    marginBottom: 15,
+                    borderWidth: 1,
+                    borderColor: isSelected
+                      ? C.green
+                      : C.buttonLightGreenOutline,
+                    borderRadius: 10,
+                    padding: 10,
+                    backgroundColor: C.backgroundListWhite,
+                  }}
+                >
+                  {/* Row: template name + delete button */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <TextInput
+                      onChangeText={(val) =>
+                        handleTemplateNameChange(templateObj, val)
+                      }
+                      onFocus={() => _setSelectedTemplateId(templateObj.id)}
+                      placeholder="Template name..."
+                      placeholderTextColor={gray(0.3)}
+                      style={{
+                        flex: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderWidth: 1,
+                        borderRadius: 5,
+                        padding: 5,
+                        color: C.text,
+                        outlineWidth: 0,
+                        fontWeight: "500",
+                        fontSize: 14,
+                      }}
+                      value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "name") ?? templateObj.name) : templateObj.name}
+                    />
+                    <Tooltip text="Delete template" position="top">
+                      <BoxButton1
+                        onPress={() => handleDeleteTemplate(templateObj)}
+                        style={{ marginLeft: 10 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                      />
+                    </Tooltip>
+                  </View>
+
+                  {/* Message body */}
+                  <TextInput
+                    ref={(el) => { if (el) textInputRefs.current[templateObj.id] = el; }}
+                    multiline={true}
+                    onChangeText={(val) =>
+                      handleTemplateMessageChange(templateObj, val)
+                    }
+                    onFocus={() => _setSelectedTemplateId(templateObj.id)}
+                    onSelectionChange={(event) => {
+                      let { start } = event.nativeEvent.selection;
+                      cursorPositionRefs.current[templateObj.id] = start;
+                    }}
+                    onContentSizeChange={(event) => {
+                      let el = event?.target || event?.nativeEvent?.target;
+                      if (el) {
+                        el.style.height = "auto";
+                        el.style.height = el.scrollHeight + "px";
+                      }
+                    }}
+                    placeholder="Message body..."
+                    placeholderTextColor={gray(0.3)}
+                    style={{
+                      borderColor: C.buttonLightGreenOutline,
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      padding: 8,
+                      color: C.text,
+                      outlineWidth: 0,
+                      fontSize: 14,
+                      minHeight: 80,
+                      textAlignVertical: "top",
+                      overflow: "hidden",
+                    }}
+                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "message") ?? templateObj.message) : templateObj.message}
+                  />
+
+                  {/* Variable buttons - shown when template is selected */}
+                  {isSelected && (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        marginTop: 8,
+                      }}
+                    >
+                      {TEXT_TEMPLATE_VARIABLES.map((v) => (
+                        <TouchableOpacity
+                          key={v.variable}
+                          onPress={() =>
+                            handleInsertVariable(templateObj, v.variable)
+                          }
+                          style={{
+                            backgroundColor: C.buttonLightGreen,
+                            borderWidth: 1,
+                            borderColor: C.buttonLightGreenOutline,
+                            borderRadius: 5,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            marginRight: 5,
+                            marginBottom: 5,
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: C.text }}>
+                            {v.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Save button - only for new unsaved templates */}
+                  {isNewTemplate(templateObj.id) && (
+                    <Button_
+                      colorGradientArr={COLOR_GRADIENTS.greenblue}
+                      text="SAVE"
+                      onPress={() => handleSaveNewTemplate(templateObj)}
+                      textStyle={{ color: C.textWhite, fontSize: 13 }}
+                      buttonStyle={{
+                        alignSelf: "flex-end",
+                        marginTop: 8,
+                        width: 100,
+                      }}
+                    />
+                  )}
+                </View>
+              );
+            }}
+          />
         </View>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>

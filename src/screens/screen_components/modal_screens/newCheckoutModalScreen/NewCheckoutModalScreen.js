@@ -1,0 +1,580 @@
+/* eslint-disable */
+import { View, Text, ScrollView } from "react-native-web";
+import { useState, useRef } from "react";
+import { cloneDeep } from "lodash";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_ } from "../../../../components";
+import { C, Fonts, COLOR_GRADIENTS } from "../../../../styles";
+import {
+  useCheckoutStore,
+  useOpenWorkordersStore,
+  useCurrentCustomerStore,
+  useInventoryStore,
+  useSettingsStore,
+  useLoginStore,
+  useAlertScreenStore,
+} from "../../../../stores";
+import {
+  lightenRGBByPercent,
+  formatCurrencyDisp,
+  generateUPCBarcode,
+  log,
+  printBuilder,
+  gray,
+  replaceOrAddToArr,
+  formatPhoneWithDashes,
+} from "../../../../utils";
+import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS } from "../../../../data";
+import {
+  createNewSale,
+  updateSaleWithTotals,
+  calculateSaleTotals,
+} from "./newCheckoutUtils";
+import {
+  newCheckoutSaveActiveSale,
+  newCheckoutGetActiveSale,
+  newCheckoutCompleteSale,
+  newCheckoutSaveWorkorder,
+  newCheckoutCompleteWorkorder,
+  newCheckoutGetStripeReaders,
+} from "./newCheckoutFirebaseCalls";
+
+import { SaleHeader } from "./SaleHeader";
+import { CashPayment } from "./CashPayment";
+import { CardPayment } from "./CardPayment";
+import { SaleTotals } from "./SaleTotals";
+import { PaymentsList } from "./PaymentsList";
+import { WorkorderCombiner } from "./WorkorderCombiner";
+import { InventorySearch } from "./InventorySearch";
+
+export function NewCheckoutModalScreen() {
+  // ─── Zustand Store Access ─────────────────────────────────
+  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
+  const _zSetIsCheckingOut = useCheckoutStore((state) => state.setIsCheckingOut);
+
+  const zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
+  const zOpenWorkorders = useOpenWorkordersStore((state) => state.getWorkorders());
+  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
+  const _zRemoveWorkorder = useOpenWorkordersStore((state) => state.removeWorkorder);
+
+  const zCustomer = useCurrentCustomerStore((state) => state.getCustomer());
+  const zInventory = useInventoryStore((state) => state.getInventoryArr());
+  const zSettings = useSettingsStore((state) => state.getSettings());
+  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
+  const _zSetAlert = useAlertScreenStore((state) => state.setValues);
+
+  // ─── Local State ──────────────────────────────────────────
+  const [sSale, _setSale] = useState(null);
+  const [sCombinedWorkorders, _setCombinedWorkorders] = useState([]);
+  const [sAddedItems, _setAddedItems] = useState([]);
+  const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
+  const [sStripeReaders, _setStripeReaders] = useState([]);
+  const [sInitialized, _setInitialized] = useState(false);
+
+  // ─── Derived Values ───────────────────────────────────────
+  let isStandalone = !zOpenWorkorder;
+  let saleComplete = sSale?.paymentComplete || false;
+  let amountLeftToPay = (sSale?.total || 0) - (sSale?.amountCaptured || 0);
+  if (amountLeftToPay < 0) amountLeftToPay = 0;
+
+  // ─── Initialization ──────────────────────────────────────
+  // Called once when the modal opens. We use a flag to avoid
+  // repeated init without adding a useEffect.
+  if (zIsCheckingOut && !sInitialized) {
+    _setInitialized(true);
+    initializeCheckout();
+  }
+
+  async function initializeCheckout() {
+    let createdBy = zCurrentUser?.first
+      ? zCurrentUser.first + " " + (zCurrentUser.last || "")
+      : "";
+
+    // Check if workorder has an existing partial-payment sale to resume
+    if (zOpenWorkorder?.activeSaleID) {
+      let existingSale = await newCheckoutGetActiveSale(zOpenWorkorder.activeSaleID);
+      if (existingSale) {
+        log("Resuming existing sale:", existingSale.id);
+
+        // Rebuild combined workorders from the sale's workorderIDs
+        let combined = [cloneDeep(zOpenWorkorder)];
+        if (existingSale.workorderIDs?.length > 1) {
+          for (let woID of existingSale.workorderIDs) {
+            if (woID === zOpenWorkorder.id) continue;
+            let otherWO = (zOpenWorkorders || []).find((w) => w.id === woID);
+            if (otherWO) combined.push(cloneDeep(otherWO));
+          }
+        }
+        _setCombinedWorkorders(combined);
+
+        // Restore added items from the sale
+        if (existingSale.addedItems?.length > 0) {
+          _setAddedItems(existingSale.addedItems);
+        }
+
+        _setSale(existingSale);
+        fetchReaders();
+        return;
+      }
+    }
+
+    // No existing sale — create a new one
+    let sale = createNewSale(zSettings, createdBy);
+
+    if (zOpenWorkorder) {
+      // Checkout with workorder
+      sale.customerID = zOpenWorkorder.customerID || "";
+      let combined = [cloneDeep(zOpenWorkorder)];
+      _setCombinedWorkorders(combined);
+
+      // Calculate initial totals
+      sale = updateSaleWithTotals(sale, combined, [], zSettings);
+      sale.workorderIDs = [zOpenWorkorder.id];
+    } else {
+      // Standalone sale
+      sale.status = "active";
+    }
+
+    _setSale(sale);
+
+    // Persist immediately for network resilience
+    newCheckoutSaveActiveSale(sale);
+
+    // Fetch card readers
+    fetchReaders();
+  }
+
+  async function fetchReaders() {
+    try {
+      let result = await newCheckoutGetStripeReaders();
+      if (result?.data?.data) {
+        let readers = result.data.data.filter((r) => r.status === "online");
+        _setStripeReaders(readers);
+      }
+    } catch (e) {
+      log("Failed to fetch card readers:", e);
+    }
+  }
+
+  // ─── Workorder Combining ──────────────────────────────────
+  function handleToggleWorkorder(wo) {
+    // Cannot uncheck primary workorder
+    if (wo.id === zOpenWorkorder?.id) return;
+
+    let newArr;
+    if (sCombinedWorkorders.find((o) => o.id === wo.id)) {
+      newArr = sCombinedWorkorders.filter((o) => o.id !== wo.id);
+    } else {
+      newArr = [...sCombinedWorkorders, cloneDeep(wo)];
+    }
+    _setCombinedWorkorders(newArr);
+
+    // Recalculate totals
+    let updated = updateSaleWithTotals(sSale, newArr, sAddedItems, zSettings);
+    updated.workorderIDs = newArr.map((o) => o.id);
+    _setSale(updated);
+    newCheckoutSaveActiveSale(updated);
+  }
+
+  // Other open workorders for the same customer
+  function getOtherCustomerWorkorders() {
+    if (!zOpenWorkorder?.customerID) return [];
+    return (zOpenWorkorders || []).filter(
+      (wo) =>
+        wo.customerID === zOpenWorkorder.customerID &&
+        wo.id !== zOpenWorkorder.id
+    );
+  }
+
+  // ─── Inventory Item Management ────────────────────────────
+  function handleAddItem(invItem) {
+    let newItem = {
+      qty: 1,
+      inventoryItem: cloneDeep(invItem),
+      discountObj: null,
+      id: generateUPCBarcode(),
+      useSalePrice: false,
+      warranty: false,
+    };
+
+    let newAddedItems = [...sAddedItems, newItem];
+    _setAddedItems(newAddedItems);
+
+    // Recalculate totals
+    let updated = updateSaleWithTotals(
+      sSale,
+      sCombinedWorkorders,
+      newAddedItems,
+      zSettings
+    );
+    _setSale(updated);
+    newCheckoutSaveActiveSale(updated);
+  }
+
+  function handleRemoveItem(item) {
+    let newAddedItems = sAddedItems.filter((i) => i.id !== item.id);
+    _setAddedItems(newAddedItems);
+
+    let updated = updateSaleWithTotals(
+      sSale,
+      sCombinedWorkorders,
+      newAddedItems,
+      zSettings
+    );
+    _setSale(updated);
+    newCheckoutSaveActiveSale(updated);
+  }
+
+  // ─── Payment Handling ─────────────────────────────────────
+  function handlePaymentCapture(payment) {
+    let sale = cloneDeep(sSale);
+    payment.saleID = sale.id;
+    sale.payments = [...sale.payments, payment];
+    sale.amountCaptured = sale.amountCaptured + payment.amountCaptured;
+    sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);
+
+    // Store added items on the sale so they can be restored on resume
+    sale.addedItems = cloneDeep(sAddedItems);
+
+    // Check if fully paid
+    if (sale.amountCaptured >= sale.total) {
+      sale.paymentComplete = true;
+      sale.status = "complete";
+      handleSaleComplete(sale);
+    } else {
+      sale.status = "partial";
+      // Update all combined workorders with partial payment info
+      updateWorkordersWithPaymentStatus(sale);
+    }
+
+    _setSale(sale);
+
+    // Persist immediately — network-failure-proof
+    newCheckoutSaveActiveSale(sale);
+  }
+
+  // Update workorders to track that a sale is in progress
+  function updateWorkordersWithPaymentStatus(sale) {
+    for (let wo of sCombinedWorkorders) {
+      let updated = cloneDeep(wo);
+      updated.activeSaleID = sale.id;
+      updated.amountPaid = sale.amountCaptured;
+      _zSetWorkorder(updated, true);
+    }
+  }
+
+  async function handleSaleComplete(sale) {
+    // Merge added items into workorder lines
+    if (sAddedItems.length > 0 && sCombinedWorkorders.length > 0) {
+      let primaryWO = cloneDeep(sCombinedWorkorders[0]);
+      sAddedItems.forEach((addedItem) => {
+        primaryWO.workorderLines = [
+          ...primaryWO.workorderLines,
+          cloneDeep(addedItem),
+        ];
+      });
+
+      // Update workorder in store and DB
+      primaryWO.paymentComplete = true;
+      primaryWO.saleID = sale.id;
+      primaryWO.sales = replaceOrAddToArr(primaryWO.sales || [], sale.id);
+      primaryWO.endedOnMillis = Date.now();
+      _zSetWorkorder(primaryWO, true);
+    }
+
+    // Mark all combined workorders as complete
+    for (let wo of sCombinedWorkorders) {
+      let woToComplete = cloneDeep(wo);
+      woToComplete.paymentComplete = true;
+      woToComplete.activeSaleID = "";
+      woToComplete.amountPaid = sale.total;
+      woToComplete.saleID = sale.id;
+      woToComplete.sales = replaceOrAddToArr(woToComplete.sales || [], sale.id);
+      woToComplete.endedOnMillis = Date.now();
+
+      // Merge added items into primary only (already done above for first)
+      if (wo.id === sCombinedWorkorders[0]?.id && sAddedItems.length > 0) {
+        sAddedItems.forEach((addedItem) => {
+          woToComplete.workorderLines = [
+            ...woToComplete.workorderLines,
+            cloneDeep(addedItem),
+          ];
+        });
+      }
+
+      await newCheckoutCompleteWorkorder(woToComplete);
+      _zRemoveWorkorder(woToComplete, false); // remove from local store, don't send DB delete (already archived)
+    }
+
+    // Save completed sale to Cloud Storage
+    await newCheckoutCompleteSale(sale);
+  }
+
+  function handleCashChange(change) {
+    _setCashChangeNeeded(change);
+  }
+
+  // ─── Close Modal ──────────────────────────────────────────
+  function closeModal() {
+    if (
+      sSale?.payments?.length > 0 &&
+      !sSale.paymentComplete
+    ) {
+      // Partial payment — confirm with user
+      _zSetAlert({
+        showAlert: true,
+        title: "Partial Payment In Progress",
+        message:
+          "This sale has partial payments recorded. They have been saved and you can resume later.",
+        btn1Text: "Close Anyway",
+        btn1Handler: () => {
+          resetAndClose();
+          _zSetAlert({ showAlert: false });
+        },
+        btn2Text: "Go Back",
+        btn2Handler: () => {
+          _zSetAlert({ showAlert: false });
+        },
+      });
+      return;
+    }
+    resetAndClose();
+  }
+
+  function resetAndClose() {
+    _setSale(null);
+    _setCombinedWorkorders([]);
+    _setAddedItems([]);
+    _setCashChangeNeeded(0);
+    _setStripeReaders([]);
+    _setInitialized(false);
+    _zSetIsCheckingOut(false);
+  }
+
+  function handleReprint() {
+    if (!sSale) return;
+    let toPrint = printBuilder.sale(
+      sSale,
+      sSale.payments,
+      zCustomer,
+      sCombinedWorkorders[0],
+      zSettings?.salesTaxPercent
+    );
+    // dbSavePrintObj would be called here if printing is needed
+    log("Reprint receipt:", toPrint);
+  }
+
+  // ─── Render ───────────────────────────────────────────────
+  return (
+    <ScreenModal
+      modalVisible={zIsCheckingOut}
+      showOuterModal={true}
+      outerModalStyle={{
+        backgroundColor: "rgba(50,50,50,.65)",
+      }}
+      buttonVisible={false}
+      Component={() => (
+        <View
+          style={{
+            flexDirection: "column",
+            backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
+            width: "85%",
+            height: "90%",
+            borderRadius: 15,
+            ...SHADOW_RADIUS_PROTO,
+            shadowColor: C.green,
+            overflow: "hidden",
+          }}
+        >
+          {/* ── Main 3-Column Layout ────────────────────── */}
+          <View
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              padding: 20,
+            }}
+          >
+            {/* ── LEFT COLUMN: Payment Methods ──────────── */}
+            <View
+              style={{
+                width: "29%",
+                height: "100%",
+                justifyContent: "space-between",
+              }}
+            >
+              <CashPayment
+                amountLeftToPay={amountLeftToPay}
+                onPaymentCapture={handlePaymentCapture}
+                acceptChecks={zSettings?.acceptChecks}
+                saleComplete={saleComplete}
+                onCashChange={handleCashChange}
+              />
+              <CardPayment
+                amountLeftToPay={amountLeftToPay}
+                onPaymentCapture={handlePaymentCapture}
+                stripeReaders={sStripeReaders}
+                settings={zSettings}
+                saleComplete={saleComplete}
+              />
+            </View>
+
+            {/* ── MIDDLE COLUMN: Totals & Payments ──────── */}
+            <View
+              style={{
+                width: "29%",
+                paddingLeft: 10,
+                justifyContent: "space-between",
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <ScrollView style={{ flex: 1 }}>
+                  {/* Customer Info */}
+                  {zCustomer && (
+                    <View
+                      style={{
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 10,
+                        paddingVertical: 5,
+                        paddingHorizontal: 10,
+                        backgroundColor: C.backgroundListWhite,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <View>
+                          <Text style={{ color: C.text }}>
+                            {zCustomer.first} {zCustomer.last}
+                            {!!zCustomer.contactRestriction && (
+                              <Text style={{ color: C.red }}>
+                                {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.call
+                                  ? "    (CALL ONLY)"
+                                  : "    (EMAIL ONLY)"}
+                              </Text>
+                            )}
+                          </Text>
+                          {zCustomer.email && (
+                            <Text style={{ color: gray(0.6), fontSize: 12 }}>
+                              {zCustomer.email}
+                            </Text>
+                          )}
+                        </View>
+                        <View>
+                          {!!zCustomer.cell && (
+                            <Text style={{ color: C.text }}>
+                              <Text>{"cell: "}</Text>
+                              {formatPhoneWithDashes(zCustomer.cell)}
+                            </Text>
+                          )}
+                          {!!zCustomer.land && (
+                            <Text style={{ color: C.text, fontSize: 13 }}>
+                              <Text>{"land: "}</Text>
+                              {formatPhoneWithDashes(zCustomer.land)}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      {!!zCustomer.streetAddress && (
+                        <Text style={{ color: C.text, fontSize: 13 }}>
+                          {zCustomer.streetAddress}
+                          {!!zCustomer.unit && (
+                            <Text style={{ color: C.text, fontSize: 13 }}>
+                              {"  |  Unit " + zCustomer.unit}
+                            </Text>
+                          )}
+                          {!!zCustomer.city && (
+                            <Text style={{ color: C.text, fontSize: 13 }}>
+                              {"   |   " + zCustomer.city}
+                            </Text>
+                          )}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Sale Totals */}
+                  <SaleTotals
+                    sale={sSale}
+                    cashChangeNeeded={sCashChangeNeeded}
+                    settings={zSettings}
+                  />
+
+                  {/* Payments List */}
+                  <PaymentsList payments={sSale?.payments} />
+                </ScrollView>
+              </View>
+
+              {/* Bottom Buttons: Cancel/Close + Reprint */}
+              <View
+                style={{
+                  width: "100%",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-around",
+                  paddingTop: 10,
+                }}
+              >
+                <Button_
+                  enabled={
+                    saleComplete ||
+                    (!(sSale?.amountCaptured > 0) && !saleComplete)
+                  }
+                  colorGradientArr={COLOR_GRADIENTS.red}
+                  text={saleComplete ? "CLOSE" : "CANCEL"}
+                  onPress={closeModal}
+                  textStyle={{ color: C.textWhite }}
+                  buttonStyle={{ width: 150 }}
+                />
+                {saleComplete && (
+                  <Button_
+                    colorGradientArr={COLOR_GRADIENTS.greenblue}
+                    text="REPRINT"
+                    onPress={handleReprint}
+                    textStyle={{ color: C.textWhite }}
+                    buttonStyle={{ width: 150 }}
+                  />
+                )}
+              </View>
+            </View>
+
+            {/* ── RIGHT COLUMN: Workorders & Inventory ───── */}
+            <View
+              style={{
+                width: "42%",
+                paddingLeft: 10,
+              }}
+            >
+              <ScrollView style={{ flex: 1 }}>
+                {/* Inventory Search (always available) */}
+                <InventorySearch
+                  addedItems={sAddedItems}
+                  onAddItem={handleAddItem}
+                  onRemoveItem={handleRemoveItem}
+                  inventory={zInventory}
+                />
+
+                {/* Workorders (combiner + line items) */}
+                {!isStandalone && (
+                  <View style={{ marginTop: 15 }} />
+                )}
+                {!isStandalone && (
+                  <WorkorderCombiner
+                    combinedWorkorders={sCombinedWorkorders}
+                    otherCustomerWorkorders={getOtherCustomerWorkorders()}
+                    onToggle={handleToggleWorkorder}
+                    primaryWorkorderID={zOpenWorkorder?.id}
+                    saleHasPayments={sSale?.payments?.length > 0}
+                    salesTaxPercent={zSettings?.salesTaxPercent || 0}
+                  />
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      )}
+    />
+  );
+}

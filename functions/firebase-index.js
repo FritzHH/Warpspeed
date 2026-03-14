@@ -3843,3 +3843,255 @@ exports.testCustomerPhoneWriteHTTP = onRequest(
     }
   }
 );
+
+// ═══════════════════════════════════════════════════════════════
+// NEW CHECKOUT SYSTEM — Cloud Functions
+// Prefix: newCheckout
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * newCheckoutGetAvailableReadersCallable
+ * Lists all Stripe Terminal readers and their status.
+ */
+exports.newCheckoutGetAvailableReadersCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: get available readers request", request.data);
+
+    try {
+      const readers = await stripe.terminal.readers.list({});
+      return {
+        success: true,
+        data: readers,
+        message: "Readers retrieved successfully",
+      };
+    } catch (error) {
+      log("newCheckout: error getting readers", error);
+      throw new HttpsError("internal", "Failed to retrieve Stripe readers");
+    }
+  }
+);
+
+/**
+ * newCheckoutInitiatePaymentIntentCallable
+ * Creates a PaymentIntent and processes it on the specified reader.
+ * Input: { amount (cents), readerID, paymentIntentID? }
+ */
+exports.newCheckoutInitiatePaymentIntentCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: initiate payment intent request", request.data);
+
+    const { amount, readerID, paymentIntentID } = request.data;
+
+    if (!amount || typeof amount !== "number") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Amount must be a valid number in cents."
+      );
+    }
+
+    if (!readerID || typeof readerID !== "string") {
+      throw new HttpsError("invalid-argument", "Reader ID must be provided.");
+    }
+
+    try {
+      // Check reader status
+      const reader = await stripe.terminal.readers.retrieve(readerID);
+
+      if (reader.status && reader.status !== "online") {
+        throw new HttpsError(
+          "unavailable",
+          "Terminal is offline or unreachable."
+        );
+      }
+
+      // Check if reader is busy
+      const action = reader.action;
+      if (action && action.type) {
+        if (action.type === "process_payment_intent") {
+          const currentPiId =
+            action.process_payment_intent?.payment_intent || null;
+          throw new HttpsError(
+            "resource-exhausted",
+            currentPiId
+              ? `Reader is currently processing payment ${currentPiId}.`
+              : "Reader is currently processing a different payment."
+          );
+        } else {
+          throw new HttpsError(
+            "resource-exhausted",
+            `Reader is busy (${action.type}). Please wait or cancel current action.`
+          );
+        }
+      }
+
+      // Create or reuse PaymentIntent
+      let paymentIntent;
+      let finalPaymentIntentID;
+
+      if (!paymentIntentID) {
+        paymentIntent = await stripe.paymentIntents.create({
+          amount,
+          payment_method_types: ["card_present"],
+          capture_method: "automatic",
+          currency: "usd",
+        });
+        finalPaymentIntentID = paymentIntent.id;
+      } else {
+        finalPaymentIntentID = paymentIntentID;
+        paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentID);
+      }
+
+      // Process the PaymentIntent with the reader
+      const processedIntent =
+        await stripe.terminal.readers.processPaymentIntent(readerID, {
+          payment_intent: paymentIntent.id,
+        });
+
+      const processedPaymentIntentID =
+        processedIntent.action.process_payment_intent.payment_intent;
+
+      log("newCheckout: payment started successfully", processedIntent);
+
+      return {
+        success: true,
+        message: `Payment of $${(amount / 100).toFixed(2)} initiated.`,
+        data: {
+          paymentIntentID: processedPaymentIntentID,
+          readerID: processedIntent.id,
+          status: processedIntent.status,
+          pollingConfig: {
+            enabled: true,
+            pollingInterval: 3000,
+            maxPollingTime: 300000,
+            timeoutMessage:
+              "Payment processing timeout - please check reader status",
+            fallbackEnabled: true,
+          },
+        },
+      };
+    } catch (error) {
+      log("newCheckout: error initiating payment", error);
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to initiate payment"
+      );
+    }
+  }
+);
+
+/**
+ * newCheckoutProcessRefundCallable
+ * Processes a refund for a given PaymentIntent.
+ * Input: { paymentIntentID, amount (cents, optional for partial) }
+ */
+exports.newCheckoutProcessRefundCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: process refund request", request.data);
+
+    const { paymentIntentID, amount } = request.data;
+
+    if (!paymentIntentID || typeof paymentIntentID !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "PaymentIntent ID must be provided."
+      );
+    }
+
+    if (amount !== undefined && typeof amount !== "number") {
+      throw new HttpsError(
+        "invalid-argument",
+        "If provided, refund amount must be a valid number in cents."
+      );
+    }
+
+    try {
+      // Retrieve the PaymentIntent to get the charge
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentID
+      );
+
+      const chargeId = paymentIntent.charges?.data?.[0]?.id;
+      if (!chargeId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "No charge found for the given PaymentIntent."
+        );
+      }
+
+      // Create the refund
+      const refund = await stripe.refunds.create({
+        charge: chargeId,
+        ...(amount ? { amount } : {}),
+      });
+
+      return {
+        success: true,
+        message: `Refund ${
+          amount ? `$${(amount / 100).toFixed(2)}` : "for full amount"
+        } processed successfully.`,
+        data: {
+          refundId: refund.id,
+          status: refund.status,
+        },
+      };
+    } catch (error) {
+      log("newCheckout: error processing refund", error);
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to process refund"
+      );
+    }
+  }
+);
+
+/**
+ * newCheckoutCancelPaymentCallable
+ * Cancels the current action on a Stripe Terminal reader.
+ * Input: { readerID }
+ */
+exports.newCheckoutCancelPaymentCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: cancel payment request", request.data);
+
+    const { readerID } = request.data;
+
+    if (!readerID || typeof readerID !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Reader ID must be provided."
+      );
+    }
+
+    try {
+      const readerBefore = await stripe.terminal.readers.retrieve(readerID);
+      if (readerBefore.status !== "online") {
+        throw new HttpsError(
+          "unavailable",
+          "Reader is offline or unreachable."
+        );
+      }
+
+      const readerAfter = await stripe.terminal.readers.cancelAction(readerID);
+
+      return {
+        success: true,
+        message: "Reader reset complete.",
+        data: {
+          readerId: readerAfter.id,
+          readerStatus: readerAfter.status,
+          reader: readerAfter,
+        },
+      };
+    } catch (error) {
+      log("newCheckout: error cancelling payment", error);
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to reset reader"
+      );
+    }
+  }
+);

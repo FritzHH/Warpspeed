@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.js$\")",
+      "Bash(xargs grep -l \"BoxContainerOuterComponent\")",
+      "Bash(node -e \":*)"
+    ]
+  }
+}

@@ -211,7 +211,7 @@ export function WorkordersComponent({}) {
 
   function onMouseEnter(workorder) {
     // log(workorder)
-    useOpenWorkordersStore.getState().setOpenWorkorderID(workorder.id)
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id)
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems
@@ -219,11 +219,11 @@ export function WorkordersComponent({}) {
   }
 
   function onMouseExit(workorder) {
-    useOpenWorkordersStore.getState().setOpenWorkorderID(null)
-        useTabNamesStore.getState().setItems({
-      infoTabName: TAB_NAMES.infoTab.customer,
-      itemsTabName: TAB_NAMES.itemsTab.empty
-    })
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(null)
+    //     useTabNamesStore.getState().setItems({
+    //   infoTabName: TAB_NAMES.infoTab.customer,
+    //   itemsTabName: TAB_NAMES.itemsTab.empty
+    // })
   }
 
   return (

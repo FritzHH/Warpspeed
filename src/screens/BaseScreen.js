@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View } from "react-native-web";
 import { Button } from "react-native-web";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
@@ -16,11 +16,10 @@ import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
 
 import {
-  useInventoryStore,
   useOpenWorkordersStore,
   useSettingsStore,
+  useInventoryStore,
   useLoginStore,
-  useDatabaseBatchStore,
   useCheckoutStore,
   useAlertScreenStore,
   useTabNamesStore,
@@ -28,6 +27,9 @@ import {
 } from "../stores";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { CheckoutModalScreen } from "./screen_components/modal_screens/CheckoutModalScreen";
+import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
+import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
+import { isSaleID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import {
   dbListenToSettings,
   dbListenToOpenWorkorders,
@@ -37,27 +39,11 @@ import {
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES } from "../data";
 import { clog, log } from "../utils";
-import { cloneDeep } from "lodash";
+import { cloneDeep, throttle } from "lodash";
 
 export function BaseScreen() {
-  // store setters ////////////////////////////////////////////////////////////////
-
-  const _zSetLastActionMillis = useLoginStore(
-    (state) => state.setLastActionMillis
-  );
-
-  // testing
-  // const _zSetCurrentUserObj = useLoginStore((state) => state.setCurrentUserObj);
-
   // store getters /////////////////////////////////////////////////////////////////
   const zIsCheckingOut = useCheckoutStore((state) => state.isCheckingOut);
-  const zLastDatabaseBatchMillis = useDatabaseBatchStore(
-    (state) => state.lastBatchMillis
-  );
-  const zLastDatabaseWriteMillis = useDatabaseBatchStore(
-    (state) => state.lastWriteMillis
-  );
-  const zSettings = useSettingsStore((state) => state.settings);
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
   const zLoginModalVisible = useLoginStore((state) => state.modalVisible);
   const zRunBackgroundRecognition = useLoginStore(
@@ -68,7 +54,24 @@ export function BaseScreen() {
   );
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
 
-  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
+  const throttledSetLastAction = useRef(throttle(() => {
+    useLoginStore.getState().setLastActionMillis();
+  }, 5000)).current;
+
+  // new checkout refund modal state
+  const [sRefundModalVisible, _setRefundModalVisible] = useState(false);
+  const [sRefundSaleID, _setRefundSaleID] = useState("");
+
+  const zReceiptScan = useCheckoutStore((state) => state.receiptScan);
+
+  // Detect sale-ID scans (starts with "s") to open refund modal
+  useEffect(() => {
+    if (zReceiptScan && isSaleID(zReceiptScan) && !sRefundModalVisible) {
+      _setRefundSaleID(zReceiptScan);
+      _setRefundModalVisible(true);
+      useCheckoutStore.getState().setStringOnly("");
+    }
+  }, [zReceiptScan]);
 
   // local state ////////////////////////////////////////////////////////////////////////
   const [screenWidth, _setScreenWidth] = useState(window.innerWidth);
@@ -109,9 +112,9 @@ export function BaseScreen() {
   // }, []);
 
   // initialize on first open workorder
-  let workorders = useOpenWorkordersStore(s => s.workorders)
+  let workordersLength = useOpenWorkordersStore(s => s.workorders.length)
   useEffect(() => {
-    // let workorders = useOpenWorkordersStore.getState().getWorkorders();
+    let workorders = useOpenWorkordersStore.getState().workorders;
     let openID = useOpenWorkordersStore.getState().getOpenWorkorder()?.id;
     log('workorders', workorders)
     if (workorders.length > 0 && !openID) {
@@ -124,7 +127,7 @@ export function BaseScreen() {
 
       dbGetCustomer(workorders[0].customerID).then(customer => useCurrentCustomerStore.getState().setCustomer(customer, false))
     }
-  }, [workorders])
+  }, [workordersLength])
   ////////// testing   ////////////////////////////////////////////////////////////////////
 
 
@@ -168,16 +171,21 @@ export function BaseScreen() {
       }}
     >
       <div
-        onKeyUp={() => {
-          _zSetLastActionMillis();
-        }}
-        onMouseMove={() => {
-          _zSetLastActionMillis();
-        }}
+        onKeyUp={() => throttledSetLastAction()}
+        onMouseMove={() => throttledSetLastAction()}
         style={{ width: "100%", height: 0 }}
       />
 
-      {!!zIsCheckingOut && <CheckoutModalScreen />}
+      {/* {!!zIsCheckingOut && <CheckoutModalScreen />} */}
+      <NewCheckoutModalScreen />
+      <NewRefundModalScreen
+        visible={sRefundModalVisible}
+        saleID={sRefundSaleID}
+        onClose={() => {
+          _setRefundModalVisible(false);
+          _setRefundSaleID("");
+        }}
+      />
       <LoginModalScreen
         modalVisible={zShowLoginScreen && !zLoginModalVisible}
       />

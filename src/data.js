@@ -157,6 +157,7 @@ export const INVENTORY_CATEGORY_NAMES = {
   labor: "Labor",
 };
 
+
 export const TAB_NAMES = {
   infoTab: {
     customer: "Customer Entry",
@@ -313,6 +314,7 @@ export const WORKORDER_PROTO = {
   workorderNumber: "",
   paymentComplete: false,
   amountPaid: 0,
+  activeSaleID: "",
   sales: [],
   endedOnMillis: "",
   saleID: "",
@@ -353,6 +355,7 @@ export const WORKORDER_PROTO = {
 export const WORKORDER_ITEM_PROTO = {
   qty: 1,
   intakeNotes: "",
+  receiptNotes: "",
   inventoryItem: null,
   discountObj: null,
   id: "",
@@ -820,6 +823,9 @@ export const SETTINGS_OBJ = {
   acceptChecks: true,
   userPinStrength: 2,
   cardRefundFeePercent: 3,
+  useCardFee: false,
+  cardFeePercent: 3,
+  cardFeeRefund: false,
   lockScreenWhenUserLogsOut: false,
   tenantID: "1234",
   storeID: "999",
@@ -852,6 +858,7 @@ export const SETTINGS_OBJ = {
       quickSearch: true,
     },
   },
+  textTemplates: [],
 };
 
 // RECEIPT STUFF ////////////////////////////////////////////////////

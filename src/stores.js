@@ -689,13 +689,20 @@ export const useOpenWorkordersStore = create((set, get) => ({
   workorders: [],
   openWorkorder: null,
   openWorkorderID: null,
+  workorderPreviewID: null,
 
   getOpenWorkorder: () => {
     let id = get().openWorkorderID;
     return get().workorders.find((o) => o.id === id);
   },
   getWorkorders: () => get().workorders,
+  getPreviewWorkorder: () => {
+    let id = get().workorderPreviewID;
+    return get().workorders.find((o) => o.id === id)
+  },
+  getWorkorderPreviewID: () => get().workorderPreviewID,
 
+  setWorkorderPreviewID: (workorderPreviewID) => set({ workorderPreviewID }), 
   setOpenWorkorderID: (openWorkorderID) => set({ openWorkorderID }),
   setOpenWorkorders: (workorders) => set({ workorders }),
   setWorkorder: (wo, saveToDB = true, batch = true) => {
@@ -703,7 +710,6 @@ export const useOpenWorkordersStore = create((set, get) => ({
     if (saveToDB && !wo.isStandaloneSale) dbSaveOpenWorkorder(wo);
   },
   setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
-    // log(fieldName, fieldVal);
     if (!workorderID) workorderID = get().openWorkorderID;
     let workorder = get().workorders.find((o) => o.id === workorderID);
     workorder = { ...workorder, [fieldName]: fieldVal };
@@ -750,13 +756,9 @@ export const useSettingsStore = create((set, get) => ({
     }
   },
 
-  setField: (fieldName, fieldVal, sendToDB = true, batch = true) => {
-    let settings = get().settings || {};
-    settings = cloneDeep(settings);
-    settings[fieldName] = fieldVal;
-    // log(fieldName, fieldVal);
-    set({ settings: settings });
-    // if (sendToDB) dbSetSettings(settings, batch);
+  setField: (fieldName, fieldVal, sendToDB = true) => {
+    set({ settings: { ...get().settings, [fieldName]: fieldVal } });
+    if (sendToDB) dbSaveSettingsField(fieldName, fieldVal);
   },
 }));
 

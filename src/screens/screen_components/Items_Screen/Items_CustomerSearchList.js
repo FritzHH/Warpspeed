@@ -35,6 +35,28 @@ export function CustomerSearchListComponent({}) {
   const [sCustomerInfo, _setCustomerInfo] = useState();
 
   function handleCustomerSelected(customer) {
+    // #region agent log
+    (function () {
+      var u = useLoginStore.getState().getCurrentUser();
+      fetch("http://127.0.0.1:7294/ingest/14603333-b1b8-4a19-8543-f609c335e2a8", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "1a100b" },
+        body: JSON.stringify({
+          sessionId: "1a100b",
+          location: "Items_CustomerSearchList.js:handleCustomerSelected",
+          message: "handleCustomerSelected entry",
+          data: {
+            currentUserIsNull: u === null,
+            currentUserFirst: u?.first,
+            customerId: customer?.id,
+            hasCustomer: !!customer,
+          },
+          timestamp: Date.now(),
+          hypothesisId: "H1",
+        }),
+      }).catch(function () {});
+    })();
+    // #endregion
         let wo = createNewWorkorder({
           customerID: customer.id,
           customerFirst: customer.first,

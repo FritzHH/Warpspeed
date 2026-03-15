@@ -62,8 +62,8 @@ export function CustomerSearchListComponent({}) {
           customerFirst: customer.first,
           customerLast: customer.last,
           customerPhone: customer.cell || customer.landline,
-          startedByFirst: useLoginStore.getState().getCurrentUser().first,
-          startedByLast: useLoginStore.getState().getCurrentUser().last,
+          startedByFirst: useLoginStore.getState().currentUser?.first,
+          startedByLast: useLoginStore.getState().currentUser?.last,
           status: SETTINGS_OBJ.statuses[0],
         });
 

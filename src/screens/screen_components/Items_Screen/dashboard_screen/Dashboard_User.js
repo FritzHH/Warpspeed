@@ -5,11 +5,10 @@ import { ExtensionSettingsComponent } from "./ExtensionSettings";
 
 export function Dashboard_User({}) {
   const zSettingsObj = useSettingsStore((state) => state.settings);
-  const _zSetSettingsField = useSettingsStore((state) => state.setField);
 
   const handleSettingsFieldChange = (fieldName, value) => {
     // Update Zustand store immediately for responsive UI
-    _zSetSettingsField(fieldName, value);
+    useSettingsStore.getState().setField(fieldName, value);
 
     // Note: Actual database save happens when user clicks "Save Settings" button
     // in the ExtensionSettingsComponent to avoid excessive database writes

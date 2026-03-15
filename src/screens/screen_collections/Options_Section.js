@@ -23,14 +23,6 @@ import {
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
 
 export const Options_Section = React.memo(({}) => {
-  // store setters ///////////////////////////////////////////////////////////
-  const _zSetOptionsTabName = useTabNamesStore(
-    (state) => state.setOptionsTabName
-  );
-
-  const _zSetShowAlert = useAlertScreenStore((state) => state.setShowAlert);
-  const _zSetAlertValues = useAlertScreenStore((state) => state.setValues);
-
   // store getters ///////////////////////////////////////////////////////////////
   const zOptionsTabName = useTabNamesStore((state) => state.optionsTabName);
 
@@ -68,8 +60,8 @@ export const Options_Section = React.memo(({}) => {
       log("view history here");
     };
 
-    _zSetShowAlert(true);
-    _zSetAlertValues({
+    useAlertScreenStore.getState().setShowAlert(true);
+    useAlertScreenStore.getState().setValues({
       title: "PUNCH CLOCK",
       btn1Text: option == "in" ? "CLOCK IN" : "CLOCK OUT",
       btn2Text: "VIEW HISTORY",
@@ -102,7 +94,6 @@ export const Options_Section = React.memo(({}) => {
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
       <TabBar
         zOptionsTabName={zOptionsTabName}
-        _zSetOptionsTabName={_zSetOptionsTabName}
         webcamDetected={zWebcamDetected}
         handleUserPress={handleUserClockPress}
       />
@@ -115,7 +106,6 @@ export const TabBar = ({
   webcamDetected,
   // sIsOnline,
   zOptionsTabName,
-  _zSetOptionsTabName,
   handleUserPress,
 }) => {
   const zCurrentUser = useLoginStore((state) => state.currentUser);
@@ -154,7 +144,7 @@ export const TabBar = ({
         <TabMenuButton
           // height={height}
           buttonStyle={{ borderTopLeftRadius: 15 }}
-          onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.inventory)}
+          onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.inventory)}
           text={TAB_NAMES.optionsTab.inventory}
           isSelected={
             zOptionsTabName === TAB_NAMES.optionsTab.inventory ? true : false
@@ -163,7 +153,7 @@ export const TabBar = ({
         {/* <Divider /> */}
         <TabMenuButton
           // height={height}
-          onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.workorders)}
+          onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders)}
           text={TAB_NAMES.optionsTab.workorders}
           isSelected={
             zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
@@ -171,7 +161,7 @@ export const TabBar = ({
         />
         <TabMenuButton
           // height={height}
-          onPress={() => _zSetOptionsTabName(TAB_NAMES.optionsTab.messages)}
+          onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.messages)}
           text={TAB_NAMES.optionsTab.messages}
           isSelected={
             zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false

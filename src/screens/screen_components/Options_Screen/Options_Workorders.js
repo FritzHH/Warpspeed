@@ -27,10 +27,7 @@ export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
 
-  // setters ////////////////////////////////////////////////////////
-  const _zSetPreviewObj = useWorkorderPreviewStore(
-    (state) => state.setPreviewObj
-  );
+  ///////////////////////////////////////////////////////////////////
 
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
@@ -172,7 +169,7 @@ export function WorkordersComponent({}) {
       optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
     useWorkorderPreviewStore;
-    _zSetPreviewObj(null);
+    useWorkorderPreviewStore.getState().setPreviewObj(null);
   }
 
   function sortWorkorders(inputArr) {
@@ -210,7 +207,6 @@ export function WorkordersComponent({}) {
   }
 
   function onMouseEnter(workorder) {
-    // log(workorder)
     useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id)
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
@@ -219,11 +215,23 @@ export function WorkordersComponent({}) {
   }
 
   function onMouseExit(workorder) {
-    useOpenWorkordersStore.getState().setWorkorderPreviewID(null)
-    //     useTabNamesStore.getState().setItems({
-    //   infoTabName: TAB_NAMES.infoTab.customer,
-    //   itemsTabName: TAB_NAMES.itemsTab.empty
-    // })
+    let store = useOpenWorkordersStore.getState();
+    store.setWorkorderPreviewID(null);
+    let activeID = store.openWorkorderID;
+    if (!activeID) {
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.customer,
+        itemsTabName: TAB_NAMES.itemsTab.empty
+      });
+    } else {
+      let activeWO = store.workorders.find((o) => o.id === activeID);
+      if (activeWO?.isStandaloneSale) {
+        useTabNamesStore.getState().setItems({
+          infoTabName: TAB_NAMES.infoTab.checkout,
+          itemsTabName: TAB_NAMES.itemsTab.workorderItems
+        });
+      }
+    }
   }
 
   return (

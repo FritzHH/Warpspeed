@@ -80,25 +80,11 @@ export const StripeCreditCardComponent = ({
     return refundAmountLeft;
   };
 
-  const _zSetIsCheckingOut = useCheckoutStore(
-    (state) => state.setIsCheckingOut
-  );
-
-  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-
-  const _zSetCustomerField = useCurrentCustomerStore(
-    (state) => state.setCustomerField
-  );
   // store getters
 
-  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-  const zOpenWorkorders = useOpenWorkordersStore((state) =>
-    state.getWorkorders()
-  );
-  const zInventory = useInventoryStore((state) => state.getInventoryArr());
-  const zGetInventoryItem = useInventoryStore(
-    (state) => state.getInventoryItem
-  );
+  const zIsCheckingOut = useCheckoutStore((state) => state.isCheckingOut);
+  const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
+  const zInventory = useInventoryStore((state) => state.inventoryArr);
   const zSale = useCheckoutStore((state) => state.saleObj);
   const [sRequestedAmount, _setRequestedAmount] = useState(
     sIsRefund ? getRefundAmountLeft() : ""

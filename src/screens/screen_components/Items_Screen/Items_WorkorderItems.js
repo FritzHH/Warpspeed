@@ -33,17 +33,12 @@ import {
   useInventoryStore,
   useSettingsStore,
   useTabNamesStore,
+  useCurrentCustomerStore,
 } from "../../../stores";
+import { dbGetCustomer } from "../../../db_calls_wrapper";
 import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
 
 export const Items_WorkorderItemsTab = ({}) => {
-  // store setters ///////////////////////////////////////////////////////////////
-  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-  const _zSetIsCheckingOut = useCheckoutStore(
-    (state) => state.setIsCheckingOut
-  );
-  const _zSetWorkorderField = useOpenWorkordersStore((s) => s.setField);
-
   // store getters ///////////////////////////////////////////////////////////////
 
   // Fix 1+2: read directly from state snapshot (no getter methods); deepEqual prevents
@@ -124,7 +119,7 @@ export const Items_WorkorderItemsTab = ({}) => {
         // clog("new line", discountedLine.discountObj?);
         wo.workorderLines[obj.idx] = discountedLine;
       });
-      _zSetWorkorder(wo);
+      useOpenWorkordersStore.getState().setWorkorder(wo);
     }
   }, [zInventoryArr, zOpenWorkorder]);
 
@@ -141,7 +136,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     let workorderLines = zOpenWorkorder.workorderLines.filter(
       (o, idx) => idx != index
     );
-    _zSetWorkorderField("workorderLines", workorderLines);
+    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
   }
 
   function modifyQtyPressed(workorderLine, option) {
@@ -159,14 +154,14 @@ export const Items_WorkorderItemsTab = ({}) => {
       if (newLine.discountObj?.newPrice > 0) newWOLine = newLine;
     }
 
-    _zSetWorkorderField(
+    useOpenWorkordersStore.getState().setField(
       "workorderLines",
       replaceOrAddToArr(zOpenWorkorder.workorderLines, newWOLine)
     );
   }
 
   function editWorkorderLine(workorderLine, saveToDB = true) {
-    _zSetWorkorderField(
+    useOpenWorkordersStore.getState().setField(
       "workorderLines",
       replaceOrAddToArr(zOpenWorkorder.workorderLines, workorderLine),
       undefined,
@@ -186,7 +181,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       return o;
     });
 
-    _zSetWorkorderField("workorderLines", workorderLines);
+    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
   }
 
   function splitItems(workorderLine, index) {
@@ -204,17 +199,36 @@ export const Items_WorkorderItemsTab = ({}) => {
       workorderLines.splice(index + 1, 0, newLine);
     }
 
-    _zSetWorkorderField("workorderLines", workorderLines);
+    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
   }
 
   function handleDeleteWorkorder() {
     const deleteFun = () => {
-      useOpenWorkordersStore.getState().removeWorkorder(zOpenWorkorder.id);
-      useTabNamesStore.getState().setItems({
-        itemsTabName: TAB_NAMES.itemsTab.empty,
-        infoTabName: TAB_NAMES.infoTab.customer,
-        optionsTabName: TAB_NAMES.optionsTab.workorders,
-      });
+      const store = useOpenWorkordersStore.getState();
+      const remainingWorkorders = store.workorders.filter(
+        (wo) => wo.id !== zOpenWorkorder.id && !wo.isStandaloneSale
+      );
+      const previousWorkorder = remainingWorkorders[0] ?? null;
+
+      store.removeWorkorder(zOpenWorkorder.id);
+
+      if (previousWorkorder) {
+        store.setOpenWorkorderID(previousWorkorder.id);
+        useTabNamesStore.getState().setItems({
+          infoTabName: TAB_NAMES.infoTab.workorder,
+          itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+          optionsTabName: TAB_NAMES.optionsTab.inventory,
+        });
+        dbGetCustomer(previousWorkorder.customerID).then((customer) =>
+          useCurrentCustomerStore.getState().setCustomer(customer, false)
+        );
+      } else {
+        useTabNamesStore.getState().setItems({
+          itemsTabName: TAB_NAMES.itemsTab.empty,
+          infoTabName: TAB_NAMES.infoTab.customer,
+          optionsTabName: TAB_NAMES.optionsTab.workorders,
+        });
+      }
     };
 
     showAlert({
@@ -403,7 +417,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           icon={ICONS.shoppingCart}
           iconSize={34}
           buttonStyle={{ paddingVertical: 0 }}
-          onPress={() => _zSetIsCheckingOut(true)}
+          onPress={() => useCheckoutStore.getState().setIsCheckingOut(true)}
         />
       </View>
     </View>
@@ -679,12 +693,19 @@ export const LineItemComponent = ({
               modalCoordY={25}
               modalCoordX={-80}
               buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
-              dataArr={zSettingsObj.discounts.map((o) => ({ label: o.name }))}
+              dataArr={[
+                { label: "No Discount" },
+                ...(zSettingsObj.discounts || []).map((o) => ({ label: o.name })),
+              ]}
               onSelect={(item) => {
-                applyDiscount(
-                  workorderLine,
-                  zSettingsObj.discounts.find((o) => o.name === item.label)
-                );
+                if (item.label === "No Discount") {
+                  __setWorkorderLineItem({ ...workorderLine, discountObj: null });
+                } else {
+                  applyDiscount(
+                    workorderLine,
+                    zSettingsObj.discounts.find((o) => o.name === item.label)
+                  );
+                }
               }}
             />
             <Button_

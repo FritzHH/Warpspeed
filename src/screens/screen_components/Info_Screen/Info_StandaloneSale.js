@@ -1,10 +1,7 @@
 /* eslint-disable */
 import { FlatList, View, Text, TextInput } from "react-native-web";
-import { TAB_NAMES, WORKORDER_PROTO } from "../../../data";
+import { TAB_NAMES } from "../../../data";
 import {
-  useInventoryStore,
-  useOpenWorkordersStore,
-  useSettingsStore,
   useTabNamesStore,
 } from "../../../stores";
 
@@ -29,8 +26,6 @@ import { dbSavePrintObj } from "../../../db_calls_wrapper";
 
 export const StandaloneSaleComponent = ({}) => {
   // store getters
-  let zOpenWorkorder = WORKORDER_PROTO;
-  zOpenWorkorder = useOpenWorkordersStore((state) => state.openWorkorder);
 
   //////////////////////////////////////////////////////////////////////
 

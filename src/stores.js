@@ -706,6 +706,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
   setOpenWorkorderID: (openWorkorderID) => set({ openWorkorderID }),
   setOpenWorkorders: (workorders) => set({ workorders }),
   setWorkorder: (wo, saveToDB = true, batch = true) => {
+    if (wo.isStandaloneSale) wo = { ...wo, lastInteractionMillis: Date.now() };
     set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
     if (saveToDB && !wo.isStandaloneSale) dbSaveOpenWorkorder(wo);
   },
@@ -713,6 +714,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     if (!workorderID) workorderID = get().openWorkorderID;
     let workorder = get().workorders.find((o) => o.id === workorderID);
     workorder = { ...workorder, [fieldName]: fieldVal };
+    if (workorder.isStandaloneSale) workorder.lastInteractionMillis = Date.now();
 
     set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
     if (saveToDB && !workorder.isStandaloneSale) dbSaveOpenWorkorder(workorder);

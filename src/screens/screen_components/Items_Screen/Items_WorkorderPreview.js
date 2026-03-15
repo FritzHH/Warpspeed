@@ -7,9 +7,7 @@ import { useWorkorderPreviewStore } from "../../../stores";
 
 export function WorkorderPreview() {
   let zWorkorderPreview = WORKORDER_PROTO;
-  zWorkorderPreview = useWorkorderPreviewStore((state) =>
-    state.getPreviewObj()
-  );
+  zWorkorderPreview = useWorkorderPreviewStore((state) => state.previewObj);
   return (
     <View style={{ width: "100%", height: "100%", backgroundColor: "green" }}>
       <Text>

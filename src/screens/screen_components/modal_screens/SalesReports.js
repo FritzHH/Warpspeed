@@ -5,16 +5,9 @@ import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getPreviousMondayDayJS, log } from "../../../utils";
 import dayjs from "dayjs";
-import { useLoginStore, useSettingsStore } from "../../../stores";
+// stores imported if needed in future
 
 export const SalesReportsModal = ({ handleExit }) => {
-  // store getters //////////////////////////////////////////////////////
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUser());
-  const zSettingsObj = useSettingsStore((state) => state.getSettings());
-  const zUserHasAdminRole = useLoginStore((state) =>
-    state.getUserHasAdminRole()
-  );
-
   // local state ////////////////////////////////////////////////////////
 
   const [sRange, _setRange] = useState({

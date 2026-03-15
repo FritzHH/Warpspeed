@@ -31,13 +31,8 @@ import {
 } from "../../../db_calls_wrapper";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 export function NewWorkorderComponent({}) {
-  // store setters ////////////////////////////////////////////////////////////
-  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
-
   // store getters ///////////////////////////////////////////////////////////////
-  const zCustomerSearchResults = useCustomerSearchStore((s) =>
-    s.getSearchResults()
-  );
+  const zCustomerSearchResults = useCustomerSearchStore((s) => s.searchResults);
 
   //////////////////////////////////////////////////////////////////////
   const [sTextInput, _setTextInput] = React.useState("");
@@ -53,9 +48,9 @@ export function NewWorkorderComponent({}) {
 
   useEffect(() => {
     if (zCustomerSearchResults.length > 0) {
-      _zSetItemsTabName(TAB_NAMES.itemsTab.customerList);
+      useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.customerList);
     } else {
-      _zSetItemsTabName(TAB_NAMES.itemsTab.empty);
+      useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
     }
   }, [zCustomerSearchResults]);
 
@@ -178,6 +173,25 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleStartStandaloneSalePress() {
+    let store = useOpenWorkordersStore.getState();
+    store.setWorkorderPreviewID(null);
+    let existing = store.workorders.find((o) => o.isStandaloneSale);
+
+    if (existing) {
+      let elapsed = Date.now() - (existing.lastInteractionMillis || existing.startedOnMillis || 0);
+      if (elapsed > 5 * 60 * 1000) {
+        store.removeWorkorder(existing.id);
+      } else {
+        store.setOpenWorkorderID(existing.id);
+        useTabNamesStore.getState().setItems({
+          infoTabName: TAB_NAMES.infoTab.checkout,
+          itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+          optionsTabName: TAB_NAMES.optionsTab.inventory,
+        });
+        return;
+      }
+    }
+
     let wo = createNewWorkorder({
       startedByFirst: useLoginStore.getState().currentUser?.first,
       startedByLast: useLoginStore.getState().currentUser?.last,

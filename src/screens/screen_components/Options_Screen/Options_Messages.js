@@ -49,17 +49,27 @@ import {
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY } from "../../../constants";
 
-export function MessagesComponent({}) {
-  // setters /////////////////////////////////////////////////////////////
-  const _zSetOutgoingMessage = useCustMessagesStore(
-    (state) => state.setOutgoingMessage
-  );
+const TEXT_TEMPLATE_VARIABLES = [
+  { label: "First Name", variable: "{firstName}" },
+  { label: "Last Name", variable: "{lastName}" },
+  { label: "Brand", variable: "{brand}" },
+  { label: "Description", variable: "{description}" },
+  { label: "Total Amount", variable: "{totalAmount}" },
+  { label: "Line Items", variable: "{lineItems}" },
+  { label: "Part Ordered", variable: "{partOrdered}" },
+  { label: "Part Source", variable: "{partSource}" },
+  { label: "Store Hours", variable: "{storeHours}" },
+  { label: "Store Phone", variable: "{storePhone}" },
+];
 
+export function MessagesComponent({}) {
   // getters ///////////////////////////////////////////////////////////////
   let zCustomer = CUSTOMER_PROTO;
   let zWorkorderObj = WORKORDER_PROTO;
   zCustomer = useCurrentCustomerStore((state) => state.customer);
-  zWorkorderObj = useOpenWorkordersStore((state) => state.getOpenWorkorder());
+  zWorkorderObj = useOpenWorkordersStore((state) =>
+    state.workorders.find((o) => o.id === state.openWorkorderID) || null
+  );
   const zSettings = useSettingsStore((state) => state.settings);
   const zIncomingMessagesArr = useCustMessagesStore(
     (state) => state.incomingMessages
@@ -74,6 +84,7 @@ export function MessagesComponent({}) {
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  const cursorPositionRef = useRef(0);
 
   // Debounced handler for message input
   const handleMessageChange = useCallback((val) => {
@@ -122,6 +133,16 @@ export function MessagesComponent({}) {
       }
     } catch (e) {}
   }, [zIncomingMessagesArr, zOutgoingMessagesArr]);
+
+  function handleInsertVariable(variableStr) {
+    let cursorPos = cursorPositionRef.current ?? sNewMessage.length;
+    let before = sNewMessage.slice(0, cursorPos);
+    let after = sNewMessage.slice(cursorPos);
+    let newMessage = before + variableStr + after;
+    _setNewMessage(newMessage);
+    cursorPositionRef.current = cursorPos + variableStr.length;
+    textInputRef.current?.focus();
+  }
 
   function sendMessage(text) {
     let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
@@ -282,6 +303,9 @@ export function MessagesComponent({}) {
               multiline={true}
             placeholderTextColor={"gray"}
               placeholder={"Message..."}
+            onSelectionChange={(e) => {
+              cursorPositionRef.current = e.nativeEvent.selection.start;
+            }}
             onContentSizeChange={(e) => {
               let h = e?.nativeEvent?.contentSize?.height;
               if (typeof h === "number" && h > 0) {
@@ -292,7 +316,8 @@ export function MessagesComponent({}) {
                 outlineColor: 'transparent',
                 outlineWidth: 0,
               color: C.text,
-              padding: 5,
+                padding: 5,
+                paddingBottom: 10,
               fontSize: 15,
               height: sInputHeight,
               overflow: "hidden",
@@ -321,6 +346,13 @@ export function MessagesComponent({}) {
               dataArr={(zSettings?.textTemplates || []).map((t) => ({ label: t.name || "Untitled", message: t.message }))}
               onSelect={(item) => _setNewMessage(resolveTemplate(item.message))}
               buttonText={"Templates"}
+              buttonStyle={{ paddingVertical: 5 }}
+              openUpward={true}
+            />
+            <DropdownMenu
+              dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
+              onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
+              buttonText={"Variables"}
               buttonStyle={{ paddingVertical: 5 }}
               openUpward={true}
             />

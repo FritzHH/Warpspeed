@@ -48,19 +48,15 @@ import { InventorySearch } from "./InventorySearch";
 
 export function NewCheckoutModalScreen() {
   // ─── Zustand Store Access ─────────────────────────────────
-  const zIsCheckingOut = useCheckoutStore((state) => state.getIsCheckingOut());
-  const _zSetIsCheckingOut = useCheckoutStore((state) => state.setIsCheckingOut);
-
-  const zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
-  const zOpenWorkorders = useOpenWorkordersStore((state) => state.getWorkorders());
-  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-  const _zRemoveWorkorder = useOpenWorkordersStore((state) => state.removeWorkorder);
-
-  const zCustomer = useCurrentCustomerStore((state) => state.getCustomer());
-  const zInventory = useInventoryStore((state) => state.getInventoryArr());
-  const zSettings = useSettingsStore((state) => state.getSettings());
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
-  const _zSetAlert = useAlertScreenStore((state) => state.setValues);
+  const zIsCheckingOut = useCheckoutStore((state) => state.isCheckingOut);
+  const zOpenWorkorder = useOpenWorkordersStore((state) =>
+    state.workorders.find((o) => o.id === state.openWorkorderID) || null
+  );
+  const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
+  const zCustomer = useCurrentCustomerStore((state) => state.customer);
+  const zInventory = useInventoryStore((state) => state.inventoryArr);
+  const zSettings = useSettingsStore((state) => state.settings);
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
 
   // ─── Local State ──────────────────────────────────────────
   const [sSale, _setSale] = useState(null);
@@ -175,6 +171,18 @@ export function NewCheckoutModalScreen() {
     newCheckoutSaveActiveSale(updated);
   }
 
+  function handleWorkorderLineChange(woId, newLines) {
+    let newArr = sCombinedWorkorders.map((wo) =>
+      wo.id === woId ? { ...wo, workorderLines: newLines } : wo
+    );
+    _setCombinedWorkorders(newArr);
+    useOpenWorkordersStore.getState().setField("workorderLines", newLines, woId);
+
+    let updated = updateSaleWithTotals(sSale, newArr, sAddedItems, zSettings);
+    _setSale(updated);
+    newCheckoutSaveActiveSale(updated);
+  }
+
   // Other open workorders for the same customer
   function getOtherCustomerWorkorders() {
     if (!zOpenWorkorder?.customerID) return [];
@@ -258,29 +266,11 @@ export function NewCheckoutModalScreen() {
       let updated = cloneDeep(wo);
       updated.activeSaleID = sale.id;
       updated.amountPaid = sale.amountCaptured;
-      _zSetWorkorder(updated, true);
+      useOpenWorkordersStore.getState().setWorkorder(updated, true);
     }
   }
 
   async function handleSaleComplete(sale) {
-    // Merge added items into workorder lines
-    if (sAddedItems.length > 0 && sCombinedWorkorders.length > 0) {
-      let primaryWO = cloneDeep(sCombinedWorkorders[0]);
-      sAddedItems.forEach((addedItem) => {
-        primaryWO.workorderLines = [
-          ...primaryWO.workorderLines,
-          cloneDeep(addedItem),
-        ];
-      });
-
-      // Update workorder in store and DB
-      primaryWO.paymentComplete = true;
-      primaryWO.saleID = sale.id;
-      primaryWO.sales = replaceOrAddToArr(primaryWO.sales || [], sale.id);
-      primaryWO.endedOnMillis = Date.now();
-      _zSetWorkorder(primaryWO, true);
-    }
-
     // Mark all combined workorders as complete
     for (let wo of sCombinedWorkorders) {
       let woToComplete = cloneDeep(wo);
@@ -291,7 +281,7 @@ export function NewCheckoutModalScreen() {
       woToComplete.sales = replaceOrAddToArr(woToComplete.sales || [], sale.id);
       woToComplete.endedOnMillis = Date.now();
 
-      // Merge added items into primary only (already done above for first)
+      // Merge added items into primary workorder only
       if (wo.id === sCombinedWorkorders[0]?.id && sAddedItems.length > 0) {
         sAddedItems.forEach((addedItem) => {
           woToComplete.workorderLines = [
@@ -302,7 +292,7 @@ export function NewCheckoutModalScreen() {
       }
 
       await newCheckoutCompleteWorkorder(woToComplete);
-      _zRemoveWorkorder(woToComplete, false); // remove from local store, don't send DB delete (already archived)
+      useOpenWorkordersStore.getState().removeWorkorder(woToComplete, false); // remove from local store, don't send DB delete (already archived)
     }
 
     // Save completed sale to Cloud Storage
@@ -320,7 +310,7 @@ export function NewCheckoutModalScreen() {
       !sSale.paymentComplete
     ) {
       // Partial payment — confirm with user
-      _zSetAlert({
+      useAlertScreenStore.getState().setValues({
         showAlert: true,
         title: "Partial Payment In Progress",
         message:
@@ -328,11 +318,11 @@ export function NewCheckoutModalScreen() {
         btn1Text: "Close Anyway",
         btn1Handler: () => {
           resetAndClose();
-          _zSetAlert({ showAlert: false });
+          useAlertScreenStore.getState().setValues({ showAlert: false });
         },
         btn2Text: "Go Back",
         btn2Handler: () => {
-          _zSetAlert({ showAlert: false });
+          useAlertScreenStore.getState().setValues({ showAlert: false });
         },
       });
       return;
@@ -347,7 +337,7 @@ export function NewCheckoutModalScreen() {
     _setCashChangeNeeded(0);
     _setStripeReaders([]);
     _setInitialized(false);
-    _zSetIsCheckingOut(false);
+    useCheckoutStore.getState().setIsCheckingOut(false);
   }
 
   function handleReprint() {
@@ -565,6 +555,7 @@ export function NewCheckoutModalScreen() {
                     combinedWorkorders={sCombinedWorkorders}
                     otherCustomerWorkorders={getOtherCustomerWorkorders()}
                     onToggle={handleToggleWorkorder}
+                    onLineChange={handleWorkorderLineChange}
                     primaryWorkorderID={zOpenWorkorder?.id}
                     saleHasPayments={sSale?.payments?.length > 0}
                     salesTaxPercent={zSettings?.salesTaxPercent || 0}

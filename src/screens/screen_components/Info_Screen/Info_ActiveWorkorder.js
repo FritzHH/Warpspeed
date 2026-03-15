@@ -48,18 +48,14 @@ const RECEIPT_DROPDOWN_SELECTIONS = [
 ];
 
 export const ActiveWorkorderComponent = ({}) => {
-  // store setters /////////////////////////////////////////////////////////////////
-  const _zSetWorkorder = useOpenWorkordersStore((state) => state.setWorkorder);
-  const _zSetWorkorderField = useOpenWorkordersStore((s) => s.setField);
-
   // store getters ///////////////////////////////////////////////////////////////////
-  const zOpenWorkorder = useOpenWorkordersStore((state) =>
-    state.getOpenWorkorder()
-  );
+  const zOpenWorkorder = useOpenWorkordersStore((state) => {
+    let id = state.workorderPreviewID || state.openWorkorderID;
+    return state.workorders.find((o) => o.id === id) || null;
+  });
   const zCustomer = useCurrentCustomerStore((state) => state.customer);
   var zSettings = SETTINGS_OBJ;
   zSettings = useSettingsStore((state) => state.settings);
-  const zCurrentUser = useLoginStore((state) => state.currentUser);
 
   ///////////////////////////////////////////////////////////////////////////////
   const [sShowCustomerInfoScreen, _setShowCustomerInfoScreen] =
@@ -94,12 +90,29 @@ export const ActiveWorkorderComponent = ({}) => {
       newColorObj.textColor = null;
     }
 
-    _zSetWorkorderField(fieldName, newColorObj, zOpenWorkorder.id);
+    useOpenWorkordersStore.getState().setField(fieldName, newColorObj, zOpenWorkorder.id);
   }
 
   function handleStartStandaloneSalePress() {
-    // log(zCurrentUser);
-    // return;
+    let store = useOpenWorkordersStore.getState();
+    store.setWorkorderPreviewID(null);
+    let existing = store.workorders.find((o) => o.isStandaloneSale);
+
+    if (existing) {
+      let elapsed = Date.now() - (existing.lastInteractionMillis || existing.startedOnMillis || 0);
+      if (elapsed > 5 * 60 * 1000) {
+        store.removeWorkorder(existing.id);
+      } else {
+        store.setOpenWorkorderID(existing.id);
+        useTabNamesStore.getState().setItems({
+          infoTabName: TAB_NAMES.infoTab.checkout,
+          itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+          optionsTabName: TAB_NAMES.optionsTab.inventory,
+        });
+        return;
+      }
+    }
+
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.isStandaloneSale = true;
     wo.id = generateUPCBarcode();
@@ -116,10 +129,11 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleNewWorkorderPress() {
+    useOpenWorkordersStore.getState().setOpenWorkorderID(null);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.customer,
       itemsTabName: TAB_NAMES.itemsTab.empty,
-      optionsTab: TAB_NAMES.optionsTab.workorders,
+      optionsTabName: TAB_NAMES.optionsTab.workorders,
     });
     useCurrentCustomerStore.getState().setCustomer(null);
   }
@@ -131,8 +145,9 @@ export const ActiveWorkorderComponent = ({}) => {
     _setShowCustomerInfoScreen();
     let wo = cloneDeep(WORKORDER_PROTO);
     wo.customerID = customer.id;
+    let _currentUser = useLoginStore.getState().currentUser;
     wo.changeLog = wo.changeLog.push(
-      "Started by: " + zCurrentUser.first + " " + zCurrentUser.last[0]
+      "Started by: " + _currentUser?.first + " " + _currentUser?.last?.[0]
     );
     wo.customerFirst = customer.first;
     wo.customerLast = customer.last;
@@ -247,7 +262,7 @@ export const ActiveWorkorderComponent = ({}) => {
               width: "95%",
             }}
           >
-            {zCustomer?.cell.length > 0 && (
+            {(zCustomer?.cell?.length > 0 || zOpenWorkorder?.customerPhone?.length > 0) && (
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Image_
                   icon={ICONS.cellPhone}
@@ -255,7 +270,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{ marginRight: 5 }}
                 />
                 <Text style={{ color: C.text, fontSize: 12 }}>
-                  {formatPhoneWithDashes(zCustomer.cell)}
+                  {formatPhoneWithDashes(zCustomer?.cell || zOpenWorkorder?.customerPhone)}
                 </Text>
               </View>
             )}
@@ -325,7 +340,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
                 value={zOpenWorkorder?.brand}
                 onChangeText={(val) =>
-                  _zSetWorkorderField("brand", val, zOpenWorkorder.id)
+                  useOpenWorkordersStore.getState().setField("brand", val, zOpenWorkorder.id)
                 }
               />
               {/* </View> */}
@@ -351,7 +366,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   <DropdownMenu
                     dataArr={zSettings.bikeBrands}
                     onSelect={(item, idx) => {
-                      _zSetWorkorderField("brand", item, zOpenWorkorder.id);
+                      useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.brand
@@ -374,7 +389,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   <DropdownMenu
                     dataArr={zSettings.bikeOptionalBrands}
                     onSelect={(item, idx) => {
-                      _zSetWorkorderField("brand", item, zOpenWorkorder.id);
+                      useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.brand
@@ -415,7 +430,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
                 value={zOpenWorkorder?.description}
                 onChangeText={(val) => {
-                  _zSetWorkorderField("description", val, zOpenWorkorder.id);
+                  useOpenWorkordersStore.getState().setField("description", val, zOpenWorkorder.id);
                 }}
               />
               <View
@@ -434,7 +449,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     modalCoordX={55}
                     dataArr={zSettings.bikeDescriptions}
                     onSelect={(item, idx) => {
-                      _zSetWorkorderField(
+                      useOpenWorkordersStore.getState().setField(
                         "description",
                         item,
                         zOpenWorkorder.id
@@ -527,7 +542,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     dataArr={COLORS}
                     menuBorderColor={"transparent"}
                     onSelect={(item, idx) => {
-                      _zSetWorkorderField("color1", item, zOpenWorkorder.id);
+                      useOpenWorkordersStore.getState().setField("color1", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.color1
@@ -553,7 +568,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     itemSeparatorStyle={{ height: 0 }}
                     dataArr={COLORS}
                     onSelect={(item, idx) => {
-                      _zSetWorkorderField("color2", item, zOpenWorkorder.id);
+                      useOpenWorkordersStore.getState().setField("color2", item, zOpenWorkorder.id);
                       // ''(wo);
                     }}
                     modalCoordX={0}
@@ -608,7 +623,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     modalCoordX={50}
                     dataArr={zSettings.waitTimes}
                     onSelect={(item, idx) => {
-                      _zSetWorkorderField("waitTime", item, zOpenWorkorder.id);
+                      useOpenWorkordersStore.getState().setField("waitTime", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.waitTime.label
@@ -625,7 +640,7 @@ export const ActiveWorkorderComponent = ({}) => {
             <DropdownMenu
               dataArr={zSettings.statuses}
               onSelect={(val) => {
-                _zSetWorkorderField("status", val, zOpenWorkorder.id);
+                useOpenWorkordersStore.getState().setField("status", val, zOpenWorkorder.id);
               }}
               buttonStyle={{
                 width: "100%",
@@ -683,7 +698,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
                 value={zOpenWorkorder?.partOrdered}
                 onChangeText={(val) =>
-                  _zSetWorkorderField("partOrdered", val, zOpenWorkorder.id)
+                  useOpenWorkordersStore.getState().setField("partOrdered", val, zOpenWorkorder.id)
                 }
               />
             </View>
@@ -715,7 +730,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   backgroundColor: C.backgroundWhite,
                 }}
                 onChangeText={(val) => {
-                  _zSetWorkorderField("partSource", val, zOpenWorkorder.id);
+                  useOpenWorkordersStore.getState().setField("partSource", val, zOpenWorkorder.id);
                 }}
               />
               <View
@@ -733,7 +748,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 <DropdownMenu
                   dataArr={zSettings.partSources}
                   onSelect={(item, idx) => {
-                    _zSetWorkorderField("partSource", item, zOpenWorkorder.id);
+                    useOpenWorkordersStore.getState().setField("partSource", item, zOpenWorkorder.id);
                   }}
                   modalCoordX={20}
                   buttonStyle={{

@@ -137,37 +137,24 @@ export const TextInputLabelOnMainBackground = ({ value, styleProps = {} }) => {
 };
 
 export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
-  // store setters /////////////////////////////////////////////////////////////
-  const _zResetAll = useAlertScreenStore((state) => state.resetAll);
-
   // store getters //////////////////////////////////////////////////////////////
-  const zCanExitOnOuterClick = useAlertScreenStore((state) =>
-    state.getCanExitOnOuterClick()
-  );
-  const zTitle = useAlertScreenStore((state) => state.getTitle());
-  const zMessage = useAlertScreenStore((state) => state.getMessage());
-  const zSubMessage = useAlertScreenStore((state) => state.getSubMessage());
-  const zButton1Text = useAlertScreenStore((state) => state.getButton1Text());
-  const zButton2Text = useAlertScreenStore((state) => state.getButton2Text());
-  const zButton3Text = useAlertScreenStore((state) => state.getButton3Text());
-  const zButton1Handler = useAlertScreenStore((state) =>
-    state.getButton1Handler()
-  );
-  const zButton2Handler = useAlertScreenStore((state) =>
-    state.getButton2Handler()
-  );
-  const zButton3Handler = useAlertScreenStore((state) =>
-    state.getButton3Handler()
-  );
-  const zButton1Icon = useAlertScreenStore((state) => state.getButton1Icon());
-  const zButton2Icon = useAlertScreenStore((state) => state.getButton2Icon());
-  const zButton3Icon = useAlertScreenStore((state) => state.getButton3Icon());
-  const zIcon1Size = useAlertScreenStore((state) => state.getIcon1Size());
-  const zIcon2Size = useAlertScreenStore((state) => state.getIcon2Size());
-  const zIcon3Size = useAlertScreenStore((state) => state.getIcon3Size());
-  const zAlertBoxStyle = useAlertScreenStore((state) =>
-    state.getAlertBoxStyle()
-  );
+  const zCanExitOnOuterClick = useAlertScreenStore((state) => state.canExitOnOuterClick);
+  const zTitle = useAlertScreenStore((state) => state.title);
+  const zMessage = useAlertScreenStore((state) => state.message);
+  const zSubMessage = useAlertScreenStore((state) => state.subMessage);
+  const zButton1Text = useAlertScreenStore((state) => state.btn1Text);
+  const zButton2Text = useAlertScreenStore((state) => state.btn2Text);
+  const zButton3Text = useAlertScreenStore((state) => state.btn3Text);
+  const zButton1Handler = useAlertScreenStore((state) => state.handleBtn1Press);
+  const zButton2Handler = useAlertScreenStore((state) => state.handleBtn2Press);
+  const zButton3Handler = useAlertScreenStore((state) => state.handleBtn3Press);
+  const zButton1Icon = useAlertScreenStore((state) => state.btn1Icon);
+  const zButton2Icon = useAlertScreenStore((state) => state.btn2Icon);
+  const zButton3Icon = useAlertScreenStore((state) => state.btn3Icon);
+  const zIcon1Size = useAlertScreenStore((state) => state.icon1Size);
+  const zIcon2Size = useAlertScreenStore((state) => state.icon2Size);
+  const zIcon3Size = useAlertScreenStore((state) => state.icon3Size);
+  const zAlertBoxStyle = useAlertScreenStore((state) => state.alertBoxStyle);
   let zUseCancelButton = useAlertScreenStore((state) => state.useCancelButton);
 
   // Animation state ///////////////////////////////////////////////////////////
@@ -180,7 +167,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
     zButton1Handler();
     useAlertScreenStore.getState().setShowAlert(false);
     setTimeout(() => {
-      _zResetAll();
+      useAlertScreenStore.getState().resetAll();
     }, 100);
   }
 
@@ -188,7 +175,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
     zButton2Handler();
     useAlertScreenStore.getState().setShowAlert(false);
     setTimeout(() => {
-      _zResetAll();
+      useAlertScreenStore.getState().resetAll();
     }, 100);
   }
 
@@ -196,7 +183,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
     zButton3Handler();
     useAlertScreenStore.getState().setShowAlert(false);
     setTimeout(() => {
-      _zResetAll();
+      useAlertScreenStore.getState().resetAll();
     }, 100);
   }
 
@@ -215,7 +202,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   // log(zButton1Text, zButton2Text);
   return (
     <TouchableWithoutFeedback
-      onPress={() => (zCanExitOnOuterClick ? _zResetAll() : null)}
+      onPress={() => (zCanExitOnOuterClick ? useAlertScreenStore.getState().resetAll() : null)}
     >
       <Modal animationType={sAnimation} visible={showAlert} transparent>
         <View
@@ -351,7 +338,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                     onPress={() => {
                       useAlertScreenStore.getState().setShowAlert(false);
                       setTimeout(() => {
-                        _zResetAll();
+                        useAlertScreenStore.getState().resetAll();
                       }, 100);
                     }}
                   />
@@ -466,9 +453,9 @@ export const ScreenModal = ({
   }, [modalVisible, sInternalModalShow]);
 
   useEffect(() => {
-    // _zSetModalVisible(true);
+    // useLoginStore.getState().setModalVisible(true);
     // return () => {
-    //   _zSetModalVisible(false);
+    //   useLoginStore.getState().setModalVisible(false);
     // };
   });
   if (!openUpward && modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
@@ -745,15 +732,14 @@ export const ModalDropdown = ({
 
   // modalStyle = {},
 }) => {
-  const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedValue, setSelectedValue] = useState(null);
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    _zSetModalVisible(true);
+    useLoginStore.getState().setModalVisible(true);
     return () => {
-      _zSetModalVisible(false);
+      useLoginStore.getState().setModalVisible(false);
     };
   });
 
@@ -902,24 +888,11 @@ export const InventoryItemScreeenModalComponent = ({
   itemIdx,
   handleClosePress,
 }) => {
-  // store setters ////////////////////////////////////////////////////////
-  const _zSetFocus = useInvModalStore((state) => state.setFocus);
-  const _zModInventoryItem = useInventoryStore((state) => state.modItem);
-  const _zSetSettings = useSettingsStore((state) => state.setSettings);
-  const _zSetLoginFunctionCallback = useLoginStore(
-    (state) => state.setLoginFunctionCallback
-  );
-  const _zSetShowLoginScreen = useLoginStore(
-    (state) => state.setShowLoginScreen
-  );
-  const _zExecute = useLoginStore((state) => state.execute);
-  // const _zSetModalVisible = useLoginStore((state) => state.setModalVisible);
-
   // store getters ///////////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.getSettings());
-  const zFocus = useInvModalStore((state) => state.getFocus());
-  const zInventoryArr = useInventoryStore((state) => state.getInventoryArr());
-  const zShowLoginScreen = useLoginStore((state) => state.getShowLoginScreen());
+  const zSettingsObj = useSettingsStore((state) => state.settings);
+  const zFocus = useInvModalStore((state) => state.currentFocusName);
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
+  const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -943,12 +916,12 @@ export const InventoryItemScreeenModalComponent = ({
   ///////////////////////////////////////////////////////////////////////
 
   function handleChangeItem(item, focusName) {
-    _zSetFocus(focusName);
+    useInvModalStore.getState().setFocus(focusName);
     _setItem(item);
 
     if (!sNewItem)
-      // _zExecute(() => {
-      _zModInventoryItem(item, "change");
+      // useLoginStore.getState().execute(() => {
+      useInventoryStore.getState().modItem(item, "change");
     dbSaveInventoryItem(item);
     // }, PRIVILEDGE_LEVELS.superUser);
   }
@@ -962,7 +935,7 @@ export const InventoryItemScreeenModalComponent = ({
     let newAssignmentsArr = assignments.filter((id) => id != obj.id);
     let newSettingsObj = { ...zSettingsObj };
     newSettingsObj.quickItemButtonNames[idx] = newAssignmentsArr;
-    _zSetSettings(newSettingsObj);
+    useSettingsStore.getState().setSettings(newSettingsObj);
     // dbSaveSettings(newSettingsObj);
   }
 
@@ -986,7 +959,7 @@ export const InventoryItemScreeenModalComponent = ({
     }
     // log(obj.assignments);
     settingsObj.quickItemButtonNames[idx] = obj;
-    _zSetSettings(settingsObj);
+    useSettingsStore.getState().setSettings(settingsObj);
     // dbSaveSettings(settingsObj);
   }
 
@@ -996,8 +969,8 @@ export const InventoryItemScreeenModalComponent = ({
   }
 
   function handleRemoveItem() {
-    _zExecute(() => {
-      _zModInventoryItem(sItem, "remove");
+    useLoginStore.getState().execute(() => {
+      useInventoryStore.getState().modItem(sItem, "remove");
       dbDeleteInventoryItem(sItem.id);
       handleClosePress();
     }, "Admin");
@@ -1039,7 +1012,7 @@ export const InventoryItemScreeenModalComponent = ({
                   // borderBottomWidth: 1,
                 }}
                 autoFocus={zFocus === INPUT_FIELD_NAMES.formalName}
-                onClick={() => _zSetFocus(INPUT_FIELD_NAMES.formalName)}
+                onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.formalName)}
                 onChangeText={(val) => {
                   let newItem = cloneDeep(sItem);
                   newItem.formalName = val;
@@ -1061,7 +1034,7 @@ export const InventoryItemScreeenModalComponent = ({
                   // borderWidth: 1,
                 }}
                 autoFocus={zFocus === INPUT_FIELD_NAMES.informalName}
-                onClick={() => _zSetFocus(INPUT_FIELD_NAMES.informalName)}
+                onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.informalName)}
                 onChangeText={(val) => {
                   let newItem = cloneDeep(sItem);
                   newItem.informalName = val;
@@ -1100,7 +1073,7 @@ export const InventoryItemScreeenModalComponent = ({
               >
                 <TextInput
                   autoFocus={zFocus === INPUT_FIELD_NAMES.price}
-                  onClick={() => _zSetFocus(INPUT_FIELD_NAMES.price)}
+                  onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.price)}
                   onChangeText={(val) => {
                     let newItem = cloneDeep(sItem);
                     newItem.price = val;
@@ -1111,7 +1084,7 @@ export const InventoryItemScreeenModalComponent = ({
                 />
                 <TextInput
                   autoFocus={zFocus === INPUT_FIELD_NAMES.sale}
-                  onClick={() => _zSetFocus(INPUT_FIELD_NAMES.sale)}
+                  onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.sale)}
                   onChangeText={(val) => {
                     let newItem = cloneDeep(sItem);
                     newItem.salePrice = val;
@@ -1145,7 +1118,7 @@ export const InventoryItemScreeenModalComponent = ({
 
             <TextInput
               autoFocus={zFocus === INPUT_FIELD_NAMES.upc}
-              onClick={() => _zSetFocus(INPUT_FIELD_NAMES.upc)}
+              onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.upc)}
               style={{ fontSize: 12, color: "black", marginTop: 0 }}
               value={sItem.upc}
               onChangeText={(val) => {
@@ -1220,18 +1193,10 @@ export const InventoryItemScreeenModalComponent = ({
 };
 
 export const LoginModalScreen = ({ modalVisible }) => {
-  // setters /////////////////////////////////////////////////////////////
-  const _zSetShowLoginScreen = useLoginStore(
-    (state) => state.setShowLoginScreen
-  );
-
   // getters ////////////////////////////////////////////////////////////
-  const zRunPostLoginCallback = useLoginStore(
-    (state) => state.runPostLoginFunction
-  );
-  const zAdminPrivilege = useLoginStore((state) => state.getAdminPrivilege());
+  const zAdminPrivilege = useLoginStore((state) => state.adminPrivilege);
   let zSettingsObj = SETTINGS_OBJ;
-  zSettingsObj = useSettingsStore((state) => state.getSettings());
+  zSettingsObj = useSettingsStore((state) => state.settings);
   /////////////////////////////////////////////////////////////////////
   const [sBackgroundColor, _setBackgroundColor] = useState("green");
   const [sInput, _setInput] = useState("");
@@ -1277,16 +1242,16 @@ export const LoginModalScreen = ({ modalVisible }) => {
       _setBackgroundColor("red");
       setTimeout(() => {
         _setInput("");
-        _zSetShowLoginScreen(false);
+        useLoginStore.getState().setShowLoginScreen(false);
       }, 500);
       userObj = null;
     }
 
     if (userObj && !failedAccessCheck) {
       useLoginStore.getState().setCurrentUser(userObj);
-      _zSetShowLoginScreen(false);
+      useLoginStore.getState().setShowLoginScreen(false);
       _setInput("");
-      zRunPostLoginCallback();
+      useLoginStore.getState().runPostLoginFunction();
     }
   }
 
@@ -2564,6 +2529,9 @@ export const TextInput_ = ({
       ref={inputRef}
       value={localValue}
       onChangeText={(val) => {
+        if (capitalize) {
+          val = val.replace(/(^|[.!?]\s+|\n[-*]+\s*)([a-z])/g, (_, sep, char) => sep + char.toUpperCase());
+        }
         setLocalValue(val);
         if (multiline && inputRef.current) {
           const node = inputRef.current;

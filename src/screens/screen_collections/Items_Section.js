@@ -58,9 +58,8 @@ export const Items_Section = React.memo(({}) => {
 const TabBar = () => {
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
-  const _zSetItemsTabName = useTabNamesStore((state) => state.setItemsTabName);
   const zIsStandaloneSale = useOpenWorkordersStore(
-    (s) => s.getOpenWorkorder()?.isStandaloneSale
+    (s) => s.workorders.find((o) => o.id === s.openWorkorderID)?.isStandaloneSale
   );
   // log("Items_Section TabBar render");
   return (
@@ -85,7 +84,7 @@ const TabBar = () => {
                 borderTopLeftRadius: 15,
               }}
               onPress={() =>
-                _zSetItemsTabName(TAB_NAMES.itemsTab.workorderItems)
+                useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems)
               }
               text={
                 zIsStandaloneSale
@@ -103,7 +102,7 @@ const TabBar = () => {
         )}
         {zOpenWorkorderID && !zIsStandaloneSale && (
           <TabMenuButton
-            onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.changeLog)}
+            onPress={() => useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}
             isSelected={
               zItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
@@ -122,7 +121,7 @@ const TabBar = () => {
           buttonStyle={{
             borderTopRightRadius: 15,
           }}
-          onPress={() => _zSetItemsTabName(TAB_NAMES.itemsTab.dashboard)}
+          onPress={() => useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.dashboard)}
           text={TAB_NAMES.itemsTab.dashboard}
           isSelected={
             zItemsTabName === TAB_NAMES.itemsTab.dashboard ? true : false

@@ -71,11 +71,8 @@ const DROPDOWN_ORDERING_SELECTION_NAMES = {
 };
 
 export function Dashboard_Admin({}) {
-  // store setters ///////////////////////////////////////////////////////////
-  const _zSetSettingsField = useSettingsStore((state) => state.setField);
-
   // store getters ///////////////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.getSettings());
+  const zSettingsObj = useSettingsStore((state) => state.settings);
 
   // local state ///////////////////////////////////////////////////////////
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
@@ -94,7 +91,7 @@ export function Dashboard_Admin({}) {
   function debouncedDBSave(fieldName, fieldValue) {
     if (!debouncedDBSavesRef.current[fieldName]) {
       debouncedDBSavesRef.current[fieldName] = debounce((val) => {
-        _zSetSettingsField(fieldName, val);
+        useSettingsStore.getState().setField(fieldName, val);
       }, 500);
     }
     debouncedDBSavesRef.current[fieldName](fieldValue);
@@ -117,14 +114,14 @@ export function Dashboard_Admin({}) {
       });
     }
 
-    _zSetSettingsField("users", userArr, false);
+    useSettingsStore.getState().setField("users", userArr, false);
     debouncedDBSave("users", userArr);
   }
 
   function handleRemoveUserPress(userObj) {
     cancelDebouncedDBSave("users");
     let userArr = zSettingsObj.users.filter((o) => o.id != userObj.id);
-    _zSetSettingsField("users", userArr);
+    useSettingsStore.getState().setField("users", userArr);
   }
 
   function handleDescriptorCapture(userObj, desc) {
@@ -135,11 +132,11 @@ export function Dashboard_Admin({}) {
       }
       return o;
     });
-    _zSetSettingsField("users", userArr);
+    useSettingsStore.getState().setField("users", userArr);
   }
 
   function handleSettingsFieldChange(fieldName, fieldValue) {
-    _zSetSettingsField(fieldName, fieldValue, false);
+    useSettingsStore.getState().setField(fieldName, fieldValue, false);
     debouncedDBSave(fieldName, fieldValue);
   }
 

@@ -49,11 +49,8 @@ import {
 
 export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   // store getters //////////////////////////////////////////////////////
-  const zCurrentUserObj = useLoginStore((state) => state.getCurrentUser());
-  const zSettingsObj = useSettingsStore((state) => state.getSettings());
-  const zUserHasAdminRole = useLoginStore((state) =>
-    state.getUserHasAdminRole()
-  );
+  const zCurrentUserObj = useLoginStore((state) => state.currentUser);
+  const zSettingsObj = useSettingsStore((state) => state.settings);
 
   // local state ////////////////////////////////////////////////////////
   const [sUserObj, _setUserObj] = useState(userObj);

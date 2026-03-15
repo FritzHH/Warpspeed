@@ -49,7 +49,7 @@ export function Notes_MainComponent() {
       return prev.every((note, i) => note === next[i]);
     }
   );
-  const zCurrentUser = useLoginStore((state) => state.getCurrentUser());
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
 
   /////////////////////////////////////////////////////////////////////////////////
@@ -245,6 +245,7 @@ export function Notes_MainComponent() {
                       <TextInput_
                         multiline={true}
                         numberOfLines={10}
+                        capitalize={true}
                         onChangeText={(val) =>
                           textChanged(val, index, "customer")
                         }
@@ -366,6 +367,7 @@ export function Notes_MainComponent() {
                         <TextInput_
                           multiline={true}
                           numberOfLines={10}
+                          capitalize={true}
                           onChangeText={(val) =>
                             textChanged(val, index, "internal")
                           }

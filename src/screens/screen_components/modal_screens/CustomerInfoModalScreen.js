@@ -44,8 +44,10 @@ export const CustomerInfoScreenModalComponent = ({
   const [sCustomerInfo, _setCustomerInfo] = useState(incomingCustomer);
   const [sWorkorderToDisplay, _setWorkorderToDisplay] = useState();
   const [sSaleToDisplay, _setSaleToDisplay] = useState();
-  const { salesLoading, workordersLoading, workorders, sales } =
-    useCurrentCustomerStore();
+  const salesLoading = useCurrentCustomerStore((s) => s.salesLoading);
+  const workordersLoading = useCurrentCustomerStore((s) => s.workordersLoading);
+  const workorders = useCurrentCustomerStore((s) => s.workorders);
+  const sales = useCurrentCustomerStore((s) => s.sales);
 
   // testings //////////////////////////////////////////////////////////////
   useEffect(() => {

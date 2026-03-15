@@ -35,8 +35,7 @@ import { RefundItemSelector } from "./RefundItemSelector";
 import { RefundPaymentSelector } from "./RefundPaymentSelector";
 
 export function NewRefundModalScreen({ visible, saleID, onClose }) {
-  const zSettings = useSettingsStore((state) => state.getSettings());
-  const _zSetAlert = useAlertScreenStore((state) => state.setValues);
+  const zSettings = useSettingsStore((state) => state.settings);
 
   // ─── Local State ──────────────────────────────────────────
   const [sOriginalSale, _setOriginalSale] = useState(null);
@@ -131,7 +130,7 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
       let newTotalWithTax = newItemsTotal + Math.round(newItemsTotal * (taxRate / 100));
 
       if (newTotalWithTax > refundLimits.maxRefund) {
-        _zSetAlert({
+        useAlertScreenStore.getState().setValues({
           showAlert: true,
           title: "Refund Limit Exceeded",
           message: `Adding this item would bring the refund to ${formatCurrencyDisp(newTotalWithTax)}, which exceeds the maximum refund of ${formatCurrencyDisp(refundLimits.maxRefund)}.`,
@@ -139,7 +138,7 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
             ? `Previous refunds totaling ${formatCurrencyDisp(refundLimits.previouslyRefunded)} have already been processed.`
             : "",
           btn1Text: "OK",
-          btn1Handler: () => _zSetAlert({ showAlert: false }),
+          btn1Handler: () => useAlertScreenStore.getState().setValues({ showAlert: false }),
         });
         return;
       }

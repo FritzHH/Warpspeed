@@ -26,7 +26,6 @@ import {
   useCurrentCustomerStore,
 } from "../stores";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
-import { CheckoutModalScreen } from "./screen_components/modal_screens/CheckoutModalScreen";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { isSaleID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
@@ -43,14 +42,10 @@ import { cloneDeep, throttle } from "lodash";
 
 export function BaseScreen() {
   // store getters /////////////////////////////////////////////////////////////////
-  const zIsCheckingOut = useCheckoutStore((state) => state.isCheckingOut);
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
   const zLoginModalVisible = useLoginStore((state) => state.modalVisible);
   const zRunBackgroundRecognition = useLoginStore(
     (state) => state.runBackgroundRecognition
-  );
-  const zPauseAlertOnBaseComponent = useAlertScreenStore(
-    (state) => state.pauseOnBaseComponent
   );
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
 
@@ -176,7 +171,6 @@ export function BaseScreen() {
         style={{ width: "100%", height: 0 }}
       />
 
-      {/* {!!zIsCheckingOut && <CheckoutModalScreen />} */}
       <NewCheckoutModalScreen />
       <NewRefundModalScreen
         visible={sRefundModalVisible}

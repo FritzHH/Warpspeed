@@ -3,7 +3,8 @@
     "allow": [
       "Bash(grep -E \"\\\\.js$\")",
       "Bash(xargs grep -l \"BoxContainerOuterComponent\")",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(npx react-scripts build)"
     ]
   }
 }

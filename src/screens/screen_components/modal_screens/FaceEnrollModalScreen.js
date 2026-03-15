@@ -19,7 +19,7 @@ export function FaceEnrollModalScreen({
   );
 
   // store getters ///////////////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.getSettings());
+  const zSettingsObj = useSettingsStore((state) => state.settings);
 
   // local state ///////////////////////////////////////////////////////////
   useEffect(() => {

@@ -17,6 +17,7 @@ import {
   Button_,
   DropdownMenu,
   TextInput_,
+  Tooltip,
 } from "../../../components";
 import { C, ICONS } from "../../../styles";
 import {
@@ -307,13 +308,13 @@ export const Items_WorkorderItemsTab = ({}) => {
           alignSelf: "center",
         }}
       >
-        {/* <View style={{ width: "15%" }}> */}
-        <Button_
-          icon={ICONS.trash}
-          iconSize={22}
-          onPress={handleDeleteWorkorder}
-        />
-        {/* </View> */}
+        <Tooltip text="Delete workorder" position="top">
+          <Button_
+            icon={ICONS.trash}
+            iconSize={22}
+            onPress={handleDeleteWorkorder}
+          />
+        </Tooltip>
         <View
           style={{
             width: 1,
@@ -417,14 +418,16 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
-        <Button_
-          ref={checkoutBtnRef}
-          textStyle={{ color: C.textWhite, fontSize: 16 }}
-          icon={ICONS.shoppingCart}
-          iconSize={34}
-          buttonStyle={{ paddingVertical: 0 }}
-          onPress={() => useCheckoutStore.getState().setIsCheckingOut(true)}
-        />
+        <Tooltip text="Check out workorder" position="top">
+          <Button_
+            ref={checkoutBtnRef}
+            textStyle={{ color: C.textWhite, fontSize: 16 }}
+            icon={ICONS.shoppingCart}
+            iconSize={34}
+            buttonStyle={{ paddingVertical: 0 }}
+            onPress={() => useCheckoutStore.getState().setIsCheckingOut(true)}
+          />
+        </Tooltip>
       </View>
     </View>
   );
@@ -477,7 +480,7 @@ export const LineItemComponent = ({
           marginVertical: 3,
           marginHorizontal: 8,
           borderColor: C.listItemBorder,
-          borderLeftColor: lightenRGBByPercent(C.green, 60),
+          borderLeftColor: workorderLine.discountObj?.name ? C.lightred : lightenRGBByPercent(C.green, 60),
           borderWidth: 1,
           borderRadius: 15,
           borderLeftWidth: 3,
@@ -679,47 +682,52 @@ export const LineItemComponent = ({
             style={{
               flexDirection: "row",
               justifyContent: "flex-end",
-              marginLeft: 7,
+              marginLeft: 4,
               alignItems: "center",
             }}
           >
-            <Button_
-              icon={ICONS.axe}
-              iconSize={22}
-              onPress={workorderLine.qty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
-              buttonStyle={{
-                backgroundColor: "transparent",
-                paddingHorizontal: 3,
-                opacity: workorderLine.qty > 1 ? 1 : 0,
-              }}
-            />
-            <DropdownMenu
-              buttonIcon={ICONS.dollarYellow}
-              buttonIconSize={25}
-              modalCoordY={25}
-              modalCoordX={-80}
-              buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
-              dataArr={[
-                { label: "No Discount" },
-                ...(zSettingsObj.discounts || []).map((o) => ({ label: o.name })),
-              ]}
-              onSelect={(item) => {
-                if (item.label === "No Discount") {
-                  __setWorkorderLineItem({ ...workorderLine, discountObj: null });
-                } else {
-                  applyDiscount(
-                    workorderLine,
-                    zSettingsObj.discounts.find((o) => o.name === item.label)
-                  );
-                }
-              }}
-            />
+            <Tooltip text="Split items" position="top">
+              <Button_
+                icon={ICONS.axe}
+                iconSize={22}
+                onPress={workorderLine.qty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
+                buttonStyle={{
+                  backgroundColor: "transparent",
+                  paddingHorizontal: 0,
+                  opacity: workorderLine.qty > 1 ? 1 : 0,
+                }}
+              />
+            </Tooltip>
+            <Tooltip text="Discounts" position="top">
+              <DropdownMenu
+                buttonIcon={ICONS.dollarYellow}
+                buttonIconSize={25}
+                modalCoordY={25}
+                modalCoordX={-80}
+                buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
+                dataArr={[
+                  { label: "No Discount" },
+                  ...(zSettingsObj.discounts || []).map((o) => ({ label: o.name })),
+                ]}
+                onSelect={(item) => {
+                  if (item.label === "No Discount") {
+                    __setWorkorderLineItem({ ...workorderLine, discountObj: null });
+                  } else {
+                    applyDiscount(
+                      workorderLine,
+                      zSettingsObj.discounts.find((o) => o.name === item.label)
+                    );
+                  }
+                }}
+              />
+            </Tooltip>
             <Button_
               onPress={() => __deleteWorkorderLine(index)}
               icon={ICONS.trash}
               iconSize={21}
               buttonStyle={{
                 paddingRight: 2,
+                marginLeft: -8,
               }}
             />
           </View>

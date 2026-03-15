@@ -715,6 +715,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     let workorder = get().workorders.find((o) => o.id === workorderID);
     workorder = { ...workorder, [fieldName]: fieldVal };
     if (workorder.isStandaloneSale) workorder.lastInteractionMillis = Date.now();
+    if (workorder._unsaved) delete workorder._unsaved;
 
     set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
     if (saveToDB && !workorder.isStandaloneSale) dbSaveOpenWorkorder(workorder);

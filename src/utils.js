@@ -1879,6 +1879,7 @@ export function createNewWorkorder({
     wo.changeLog.push("Started by: " + startedByFirst + " " + startedByLast);
   wo.startedOnMillis = new Date().getTime();
   wo.status = status;
+  wo._unsaved = true;
   return wo;
 }
 

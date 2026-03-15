@@ -67,8 +67,10 @@ export function CustomerSearchListComponent({}) {
           status: SETTINGS_OBJ.statuses[0],
         });
 
-    useOpenWorkordersStore.getState().setWorkorder(wo, false);
-    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+    let store = useOpenWorkordersStore.getState();
+    store.setWorkorderPreviewID(null);
+    store.setWorkorder(wo, false);
+    store.setOpenWorkorderID(wo.id);
     useCurrentCustomerStore.getState().setCustomer(customer);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,

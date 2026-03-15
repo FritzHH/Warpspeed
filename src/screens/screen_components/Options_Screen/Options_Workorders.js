@@ -5,6 +5,7 @@ import {
   formatMillisForDisplay,
   getWordDayOfWeek,
   getWordMonth,
+  lightenRGBByPercent,
   log,
 } from "../../../utils";
 import { TabMenuDivider as Divider, CheckBox_ } from "../../../components";
@@ -26,6 +27,8 @@ const NUM_MILLIS_IN_DAY = 86400000; // millis in day
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
+  const zOpenWorkorderID = useOpenWorkordersStore((state) => state.openWorkorderID);
+  const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
 
   ///////////////////////////////////////////////////////////////////
 
@@ -295,12 +298,13 @@ export function WorkordersComponent({}) {
                   style={{
                     marginBottom: 4,
                     borderRadius: 7,
-                    // borderWidth: 1,
                     borderLeftWidth: 4,
-
-                    borderLeftColor: C.buttonLightGreenOutline,
+                    borderLeftColor: workorder.status?.backgroundColor || C.buttonLightGreenOutline,
                     borderColor: C.buttonLightGreenOutline,
-                    backgroundColor: C.listItemWhite,
+                    opacity: workorder.id === zPreviewID ? 0.6 : 1,
+                    backgroundColor: workorder.id === zOpenWorkorderID
+                      ? lightenRGBByPercent(C.lightred, 60)
+                      : C.listItemWhite,
                     flexDirection: "row",
                     width: "100%",
                     justifyContent: "flex-start",

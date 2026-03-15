@@ -896,7 +896,7 @@ export const InventoryItemScreeenModalComponent = ({
 
   //////////////////////////////////////////////////////////////////////////
 
-  const [sItem, _setItem] = React.useState(null);
+  const [sItem, _setItem] = React.useState(() => zInventoryArr[itemIdx] ?? null);
   const [sNewItem, _setNewItem] = React.useState(false);
 
   // for automatic focus
@@ -910,8 +910,8 @@ export const InventoryItemScreeenModalComponent = ({
   };
 
   useEffect(() => {
-    _setItem(zInventoryArr[itemIdx]);
-  }, []);
+    _setItem(zInventoryArr[itemIdx] ?? null);
+  }, [itemIdx]);
 
   ///////////////////////////////////////////////////////////////////////
 
@@ -977,6 +977,7 @@ export const InventoryItemScreeenModalComponent = ({
   }
 
   function setComponent() {
+    if (!sItem) return null;
     return (
       <TouchableWithoutFeedback>
         <View
@@ -1139,7 +1140,7 @@ export const InventoryItemScreeenModalComponent = ({
             onSelect={(itemName) => handleQuickButtonAdd(itemName)}
           />
           <FlatList
-            data={zSettingsObj.quickItemButtonNames.map((nameObj) => {
+            data={(zSettingsObj.quickItemButtonNames || []).map((nameObj) => {
               let found;
               nameObj.assignments?.forEach((id) => {
                 if (id == sItem.id) found = nameObj;

@@ -127,9 +127,13 @@ export function InventoryComponent({}) {
   }
 
   function inventoryItemSelected(item) {
-    let workorderLines = useOpenWorkordersStore
-      .getState()
-      .getOpenWorkorder().workorderLines;
+    const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
+    if (!openWorkorder) {
+      const idx = zInventoryArr.findIndex((o) => o.id === item.id);
+      _setModalInventoryObjIdx(idx);
+      return;
+    }
+    let workorderLines = openWorkorder.workorderLines;
     if (!workorderLines) workorderLines = [];
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
     lineItem.inventoryItem = item;
@@ -141,6 +145,7 @@ export function InventoryComponent({}) {
   }
 
   function handleInventoryInfoPress(item) {
+    const idx = zInventoryArr.findIndex((o) => o.id === item.id);
     _setModalInventoryObjIdx(idx);
   }
 

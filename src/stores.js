@@ -17,7 +17,7 @@ import {
   removeFieldFromObj,
   replaceOrAddToArr,
 } from "./utils";
-import { cloneDeep } from "lodash";
+import { cloneDeep, debounce } from "lodash";
 
 import {
   dbDeleteWorkorder,
@@ -685,6 +685,10 @@ export const useCustMessagesStore = create((set, get) => ({
 
 }));
 
+const debouncedSaveWorkorder = debounce((workorder) => {
+  dbSaveOpenWorkorder(workorder);
+}, 500);
+
 export const useOpenWorkordersStore = create((set, get) => ({
   workorders: [],
   openWorkorder: null,
@@ -718,7 +722,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
     if (workorder._unsaved) delete workorder._unsaved;
 
     set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
-    if (saveToDB && !workorder.isStandaloneSale) dbSaveOpenWorkorder(workorder);
+    if (saveToDB && !workorder.isStandaloneSale) debouncedSaveWorkorder(workorder);
   },
 
   removeWorkorder: (workorderID, saveToDB = true, batch = true) => {

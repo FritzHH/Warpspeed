@@ -686,24 +686,34 @@ export const LineItemComponent = ({
               alignItems: "center",
             }}
           >
-            <Tooltip text="Split items" position="top">
-              <Button_
-                icon={ICONS.axe}
-                iconSize={22}
-                onPress={workorderLine.qty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
-                buttonStyle={{
-                  backgroundColor: "transparent",
-                  paddingHorizontal: 0,
-                  opacity: workorderLine.qty > 1 ? 1 : 0,
-                }}
-              />
-            </Tooltip>
+            <View
+              style={{
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                // backgroundColor: "green",
+              }
+              }
+            >
+              {workorderLine.qty > 1 && <Tooltip text="Split items" position="top">
+                <Button_
+                  icon={ICONS.axe}
+                  iconSize={23}
+                  onPress={workorderLine.qty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
+                  buttonStyle={{
+                    backgroundColor: "transparent",
+                    paddingRight: 14,
+                    opacity: workorderLine.qty > 1 ? 1 : 0,
+                  }}
+                />
+              </Tooltip>
+              }
             <Tooltip text="Discounts" position="top">
               <DropdownMenu
                 buttonIcon={ICONS.dollarYellow}
                 buttonIconSize={25}
                 modalCoordY={25}
-                modalCoordX={-80}
+                  modalCoordX={-100}
                 buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
                 dataArr={[
                   { label: "No Discount" },
@@ -720,7 +730,9 @@ export const LineItemComponent = ({
                   }
                 }}
               />
-            </Tooltip>
+              </Tooltip>
+            </View>
+
             <Button_
               onPress={() => __deleteWorkorderLine(index)}
               icon={ICONS.trash}

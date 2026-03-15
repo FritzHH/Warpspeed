@@ -23,8 +23,9 @@ export function Notes_MainComponent() {
   const EMPTY_NOTES = [];
   const zInternalNotes = useOpenWorkordersStore(
     (state) => {
+      const resolvedID = state.workorderPreviewID || state.openWorkorderID;
       const workorder = state.workorders.find(
-        (wo) => wo.id === state.openWorkorderID
+        (wo) => wo.id === resolvedID
       );
       return workorder?.internalNotes || EMPTY_NOTES;
     },
@@ -37,8 +38,9 @@ export function Notes_MainComponent() {
   );
   const zCustomerNotes = useOpenWorkordersStore(
     (state) => {
+      const resolvedID = state.workorderPreviewID || state.openWorkorderID;
       const workorder = state.workorders.find(
-        (wo) => wo.id === state.openWorkorderID
+        (wo) => wo.id === resolvedID
       );
       return workorder?.customerNotes || EMPTY_NOTES;
     },
@@ -50,7 +52,7 @@ export function Notes_MainComponent() {
     }
   );
   const zCurrentUser = useLoginStore((state) => state.currentUser);
-  const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
+  const zOpenWorkorderID = useOpenWorkordersStore((s) => s.workorderPreviewID || s.openWorkorderID);
 
   /////////////////////////////////////////////////////////////////////////////////
   const [sFocusIdx, _setFocusIdx] = useState(null);

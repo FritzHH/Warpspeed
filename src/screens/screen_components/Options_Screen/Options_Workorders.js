@@ -35,6 +35,7 @@ export function WorkordersComponent({}) {
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
   const [sItemOptions, _setItemOptions] = useState({});
+  const exitTimerRef = useRef(null);
   // log('here', zOpenWorkorders)
   useEffect(() => {
     let hour = 3600000;
@@ -210,31 +211,38 @@ export function WorkordersComponent({}) {
   }
 
   function onMouseEnter(workorder) {
-    useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id)
+    if (exitTimerRef.current) {
+      clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = null;
+    }
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems
-    })
+    });
   }
 
   function onMouseExit(workorder) {
-    let store = useOpenWorkordersStore.getState();
-    store.setWorkorderPreviewID(null);
-    let activeID = store.openWorkorderID;
-    if (!activeID) {
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.customer,
-        itemsTabName: TAB_NAMES.itemsTab.empty
-      });
-    } else {
-      let activeWO = store.workorders.find((o) => o.id === activeID);
-      if (activeWO?.isStandaloneSale) {
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+    exitTimerRef.current = setTimeout(() => {
+      let store = useOpenWorkordersStore.getState();
+      let activeID = store.openWorkorderID;
+      if (!activeID) {
         useTabNamesStore.getState().setItems({
-          infoTabName: TAB_NAMES.infoTab.checkout,
-          itemsTabName: TAB_NAMES.itemsTab.workorderItems
+          infoTabName: TAB_NAMES.infoTab.customer,
+          itemsTabName: TAB_NAMES.itemsTab.empty
         });
+      } else {
+        let activeWO = store.workorders.find((o) => o.id === activeID);
+        if (activeWO?.isStandaloneSale) {
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.checkout,
+            itemsTabName: TAB_NAMES.itemsTab.workorderItems
+          });
+        }
       }
-    }
+      exitTimerRef.current = null;
+    }, 50);
   }
 
   return (

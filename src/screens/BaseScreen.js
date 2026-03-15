@@ -106,22 +106,11 @@ export function BaseScreen() {
   }, []);
   // }, []);
 
-  // initialize on first open workorder
+  // log open workorders on change
   let workordersLength = useOpenWorkordersStore(s => s.workorders.length)
   useEffect(() => {
     let workorders = useOpenWorkordersStore.getState().workorders;
-    let openID = useOpenWorkordersStore.getState().getOpenWorkorder()?.id;
     log('workorders', workorders)
-    if (workorders.length > 0 && !openID) {
-      useOpenWorkordersStore.getState().setOpenWorkorderID(workorders[0].id)
-      useTabNamesStore.getState().setItems({
-        optionsTabName: TAB_NAMES.optionsTab.messages,
-        infoTabName: TAB_NAMES.infoTab.workorder,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems
-      })
-
-      dbGetCustomer(workorders[0].customerID).then(customer => useCurrentCustomerStore.getState().setCustomer(customer, false))
-    }
   }, [workordersLength])
   ////////// testing   ////////////////////////////////////////////////////////////////////
 

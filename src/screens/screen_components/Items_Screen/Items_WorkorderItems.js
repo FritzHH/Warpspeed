@@ -205,30 +205,36 @@ export const Items_WorkorderItemsTab = ({}) => {
   function handleDeleteWorkorder() {
     const deleteFun = () => {
       const store = useOpenWorkordersStore.getState();
-      const remainingWorkorders = store.workorders.filter(
-        (wo) => wo.id !== zOpenWorkorder.id && !wo.isStandaloneSale
-      );
-      const previousWorkorder = remainingWorkorders[0] ?? null;
+      const isStandalone = zOpenWorkorder.isStandaloneSale;
 
       store.removeWorkorder(zOpenWorkorder.id);
 
-      if (previousWorkorder) {
-        store.setOpenWorkorderID(previousWorkorder.id);
-        useTabNamesStore.getState().setItems({
-          infoTabName: TAB_NAMES.infoTab.workorder,
-          itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-          optionsTabName: TAB_NAMES.optionsTab.inventory,
-        });
-        dbGetCustomer(previousWorkorder.customerID).then((customer) =>
-          useCurrentCustomerStore.getState().setCustomer(customer, false)
+      if (!isStandalone) {
+        const remainingWorkorders = store.workorders.filter(
+          (wo) => !wo.isStandaloneSale
         );
-      } else {
-        useTabNamesStore.getState().setItems({
-          itemsTabName: TAB_NAMES.itemsTab.empty,
-          infoTabName: TAB_NAMES.infoTab.customer,
-          optionsTabName: TAB_NAMES.optionsTab.workorders,
-        });
+        const previousWorkorder = remainingWorkorders[0] ?? null;
+
+        if (previousWorkorder) {
+          store.setOpenWorkorderID(previousWorkorder.id);
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.workorder,
+            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+            optionsTabName: TAB_NAMES.optionsTab.inventory,
+          });
+          dbGetCustomer(previousWorkorder.customerID).then((customer) =>
+            useCurrentCustomerStore.getState().setCustomer(customer, false)
+          );
+          return;
+        }
       }
+
+      store.setOpenWorkorderID(null);
+      useTabNamesStore.getState().setItems({
+        itemsTabName: TAB_NAMES.itemsTab.empty,
+        infoTabName: TAB_NAMES.infoTab.customer,
+        optionsTabName: TAB_NAMES.optionsTab.workorders,
+      });
     };
 
     showAlert({
@@ -516,7 +522,7 @@ export const LineItemComponent = ({
                 numberOfLines={5}
                 debounceMs={500}
                 capitalize={true}
-                style={{ outlineWidth: 0, color: C.lightText, width: "100%" }}
+                style={{ outlineWidth: 0, color: 'orange', width: "100%" }}
                 onChangeText={(val) => {
                   __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
                 }}

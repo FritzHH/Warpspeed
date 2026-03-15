@@ -23,13 +23,11 @@ export const Info_Section = React.memo(({}) => {
   function ScreenComponent(tabName) {
     switch (tabName) {
       case TAB_NAMES.infoTab.workorder:
-        // if (zOpenWorkorder?.id) return <ActiveWorkorderComponent />;
-        return <ActiveWorkorderComponent />;
-        break;
+        return <ActiveWorkorderComponent key={tabName} />;
       case TAB_NAMES.infoTab.customer:
-        return <NewWorkorderComponent />;
+        return <NewWorkorderComponent key={tabName} />;
       case TAB_NAMES.infoTab.checkout:
-        return <StandaloneSaleComponent />;
+        return <StandaloneSaleComponent key={tabName} />;
     }
     return null;
   }

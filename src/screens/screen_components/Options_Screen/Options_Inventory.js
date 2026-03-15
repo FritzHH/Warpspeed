@@ -46,6 +46,8 @@ export function InventoryComponent({}) {
   const [sSearchResults, _setSearchResults] = React.useState([]);
   const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
   const [isReady, setIsReady] = useState(false);
+  const [sCurrentParentID, _setCurrentParentID] = useState(null);
+  const [sMenuPath, _setMenuPath] = useState([]);
 
   // Timeout to batch all store updates and reduce re-renders
   useEffect(() => {
@@ -113,17 +115,44 @@ export function InventoryComponent({}) {
     _setSearchResults(res);
   };
 
-  // to do make sure that deleting an inventory item or button alse removes it from the settings button lists
   function handleQuickButtonPress(buttonObj) {
-    let inventoryItemsForButton = [];
-    buttonObj.items?.forEach((invItemID) => {
-      let invItem = zInventoryArr.find((item) => item.id === invItem);
-      if (invItem) inventoryItemsForButton.push(invItem);
+    let children = zQuickItemButtons.filter(
+      (b) => b.parentID === buttonObj.id
+    );
+    if (children.length > 0) {
+      _setMenuPath((prev) => [
+        ...prev,
+        { id: buttonObj.id, name: buttonObj.name },
+      ]);
+      _setCurrentParentID(buttonObj.id);
+    }
+    let items = [];
+    buttonObj.items?.forEach((id) => {
+      let item = zInventoryArr.find((i) => i.id === id);
+      if (item) items.push(item);
     });
-    let subMenuButtonsForButton = [];
-    buttonObj.buttons?.forEach((buttonID) => {
-      // let buttonObj = zSettingsObj.quickItemButtons.find(btn => btn.id ===)
-    });
+    _setSearchResults(items);
+    _setSearchTerm("");
+  }
+
+  function handleBackPress() {
+    let path = [...sMenuPath];
+    path.pop();
+    let newParentID = path.length > 0 ? path[path.length - 1].id : null;
+    _setMenuPath(path);
+    _setCurrentParentID(newParentID);
+    if (newParentID) {
+      let parentButton = zQuickItemButtons.find((b) => b.id === newParentID);
+      let items = [];
+      parentButton?.items?.forEach((id) => {
+        let item = zInventoryArr.find((i) => i.id === id);
+        if (item) items.push(item);
+      });
+      _setSearchResults(items);
+    } else {
+      _setSearchResults([]);
+    }
+    _setSearchTerm("");
   }
 
   function inventoryItemSelected(item) {
@@ -152,6 +181,8 @@ export function InventoryComponent({}) {
   function clearSearch() {
     _setSearchResults([]);
     _setSearchTerm("");
+    _setCurrentParentID(null);
+    _setMenuPath([]);
   }
 
   //////////////////////////////////////////////////////////////////
@@ -240,23 +271,49 @@ export function InventoryComponent({}) {
             paddingHorizontal: 2,
           }}
         >
-          {zQuickItemButtons?.map((item) => (
+          {sCurrentParentID !== null && (
             <Button_
-              key={item.id}
-              onPress={() => handleQuickButtonPress(item)}
-              colorGradientArr={COLOR_GRADIENTS.blue}
+              onPress={handleBackPress}
               buttonStyle={{
-                // ...SHADOW_RADIUS_NOTHING,
                 borderWidth: 1,
                 borderRadius: 5,
-                borderColor: C.buttonLightGreen,
                 borderColor: C.buttonLightGreenOutline,
                 marginBottom: 10,
               }}
-              textStyle={{ fontSize: 14, fontWeight: 400, color: C.textWhite }}
-              text={item.name.toUpperCase()}
+              textStyle={{ fontSize: 13, fontWeight: 400, color: C.text }}
+              text={
+                "\u25C0  " +
+                (sMenuPath.length > 0
+                  ? sMenuPath[sMenuPath.length - 1].name
+                  : "Back")
+              }
             />
-          ))}
+          )}
+          {zQuickItemButtons
+            ?.filter((b) =>
+              sCurrentParentID === null
+                ? !b.parentID
+                : b.parentID === sCurrentParentID
+            )
+            .map((item) => (
+              <Button_
+                key={item.id}
+                onPress={() => handleQuickButtonPress(item)}
+                colorGradientArr={COLOR_GRADIENTS.blue}
+                buttonStyle={{
+                  borderWidth: 1,
+                  borderRadius: 5,
+                  borderColor: C.buttonLightGreenOutline,
+                  marginBottom: 10,
+                }}
+                textStyle={{
+                  fontSize: 14,
+                  fontWeight: 400,
+                  color: C.textWhite,
+                }}
+                text={item.name.toUpperCase()}
+              />
+            ))}
         </View>
 
         <View

@@ -612,6 +612,10 @@ function DropdownComponent({
   itemStyle = {},
   itemTextStyle = {},
   label,
+  modalCoordX,
+  modalCoordY,
+  menuMaxHeight,
+  centerMenuVertically,
 }) {
   return (
     <DropdownMenu
@@ -630,6 +634,10 @@ function DropdownComponent({
       onSelect={onSelect}
       dataArr={data}
       ref={ref}
+      modalCoordX={modalCoordX}
+      modalCoordY={modalCoordY}
+      menuMaxHeight={menuMaxHeight}
+      centerMenuVertically={centerMenuVertically}
     />
   );
 }
@@ -3005,134 +3013,419 @@ const QuickItemButtonsComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
 }) => {
+  const [sCurrentParentID, _setCurrentParentID] = useState(null);
+  const [sMenuPath, _setMenuPath] = useState([]);
+  const [sDragIdx, _setDragIdx] = useState(null);
+  const [sDragOverIdx, _setDragOverIdx] = useState(null);
+
+  function getDescendantIDs(buttonID, allButtons) {
+    let descendants = [];
+    let children = allButtons.filter((b) => b.parentID === buttonID);
+    children.forEach((child) => {
+      descendants.push(child.id);
+      descendants.push(...getDescendantIDs(child.id, allButtons));
+    });
+    return descendants;
+  }
+
+  function getChildCount(buttonID) {
+    return (zSettingsObj?.quickItemButtons || []).filter(
+      (b) => b.parentID === buttonID
+    ).length;
+  }
+
+  function drillIn(btn) {
+    _setMenuPath((prev) => [...prev, { id: btn.id, name: btn.name }]);
+    _setCurrentParentID(btn.id);
+  }
+
+  function handleBack() {
+    let path = [...sMenuPath];
+    path.pop();
+    _setMenuPath(path);
+    _setCurrentParentID(path.length > 0 ? path[path.length - 1].id : null);
+  }
+
+  function handleDelete(btn) {
+    if (btn.id === "labor" || btn.id === "part") return;
+    let deletedParentID = btn.parentID || null;
+    handleSettingsFieldChange(
+      "quickItemButtons",
+      zSettingsObj.quickItemButtons
+        .filter((o) => o.id !== btn.id)
+        .map((o) =>
+          o.parentID === btn.id ? { ...o, parentID: deletedParentID } : o
+        )
+    );
+  }
+
+  function handleNameChange(btn, val) {
+    handleSettingsFieldChange(
+      "quickItemButtons",
+      zSettingsObj.quickItemButtons.map((o) =>
+        o.id === btn.id ? { ...o, name: val } : o
+      )
+    );
+  }
+
+  function handleAdd() {
+    let quickButtonsArr = [...(zSettingsObj?.quickItemButtons || [])];
+    quickButtonsArr.push({
+      id: generateRandomID(),
+      name: "",
+      parentID: sCurrentParentID,
+      items: [],
+    });
+    handleSettingsFieldChange("quickItemButtons", quickButtonsArr);
+  }
+
+  function reorderSubButtons(fromIdx, toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+    let allButtons = [...zSettingsObj.quickItemButtons];
+    let children = allButtons.filter(
+      (b) => b.parentID === sCurrentParentID
+    );
+    let [dragged] = children.splice(fromIdx, 1);
+    children.splice(toIdx, 0, dragged);
+    let childIndex = 0;
+    let result = allButtons.map((b) => {
+      if (b.parentID === sCurrentParentID) return children[childIndex++];
+      return b;
+    });
+    handleSettingsFieldChange("quickItemButtons", result);
+  }
+
+  let allButtons = zSettingsObj?.quickItemButtons || [];
+  let topLevelButtons = allButtons.filter((b) => !b.parentID);
+  let currentChildren = allButtons.filter(
+    (b) => b.parentID === sCurrentParentID
+  );
+
+  // ── TOP-LEVEL VIEW ──
+  if (sCurrentParentID === null) {
+    return (
+      <BoxContainerOuterComponent>
+        <BoxContainerInnerComponent
+          style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+        >
+          <View style={{ width: "100%", alignItems: "flex-start" }}>
+            <BoxButton1 onPress={handleAdd} />
+            <View style={{ marginTop: 10, width: "100%" }}>
+              <FlatList
+                data={topLevelButtons}
+                keyExtractor={(item) => item.id}
+                renderItem={(obj) => {
+                  let btn = obj.item;
+                  let globalIdx = allButtons.findIndex((b) => b.id === btn.id);
+                  let childCount = getChildCount(btn.id);
+                  return (
+                    <View
+                      style={{
+                        alignItems: "center",
+                        width: "100%",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        marginBottom: 5,
+                      }}
+                    >
+                      <BoxButton1
+                        style={{ paddingHorizontal: 5, marginRight: 10 }}
+                        iconSize={22}
+                        icon={ICONS.upChevron}
+                        onPress={() => {
+                          let arr = moveItemInArr(
+                            zSettingsObj.quickItemButtons,
+                            globalIdx,
+                            "up"
+                          );
+                          handleSettingsFieldChange("quickItemButtons", arr);
+                        }}
+                      />
+                      <BoxButton1
+                        style={{ paddingHorizontal: 5 }}
+                        iconSize={22}
+                        icon={ICONS.downChevron}
+                        onPress={() => {
+                          let arr = moveItemInArr(
+                            zSettingsObj.quickItemButtons,
+                            globalIdx,
+                            "down"
+                          );
+                          handleSettingsFieldChange("quickItemButtons", arr);
+                        }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => drillIn(btn)}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginLeft: 20,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "25%",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <TextInput
+                          onChangeText={(val) => handleNameChange(btn, val)}
+                          placeholder="Quick item button name..."
+                          placeholderTextColor={gray(0.3)}
+                          style={{
+                            flex: 1,
+                            textAlign: "center",
+                            color: C.text,
+                            outlineWidth: 0,
+                            fontSize: 14,
+                          }}
+                          value={btn.name}
+                        />
+                        {childCount > 0 && (
+                          <View
+                            style={{
+                              backgroundColor: C.blue,
+                              borderRadius: 10,
+                              minWidth: 20,
+                              height: 20,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginLeft: 4,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: C.textWhite,
+                                fontSize: 11,
+                                fontWeight: "bold",
+                              }}
+                            >
+                              {childCount}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                      <BoxButton1
+                        onPress={() => handleDelete(btn)}
+                        style={{ marginLeft: 20 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                      />
+                    </View>
+                  );
+                }}
+              />
+            </View>
+          </View>
+        </BoxContainerInnerComponent>
+      </BoxContainerOuterComponent>
+    );
+  }
+
+  // ── SUB-LEVEL VIEW ──
   return (
     <BoxContainerOuterComponent>
       <BoxContainerInnerComponent
         style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
       >
-        <View style={{ width: "100%", alignItems: "flex-start" }}>
-          <BoxButton1
-            onPress={() => {
-              let quickButtonsArr = zSettingsObj?.quickItemButtons;
-              quickButtonsArr = [
-                {
-                  id: generateRandomID(),
-                  name: "",
-                  type: "Menu",
-                },
-                ...quickButtonsArr,
-              ];
-              handleSettingsFieldChange("quickItemButtons", quickButtonsArr);
+        <View style={{ width: "100%" }}>
+          {/* Navigation header */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 10,
+              flexWrap: "wrap",
             }}
-          />
-          <View style={{ marginTop: 10, width: "100%" }}>
-            <FlatList
-              data={zSettingsObj?.quickItemButtons || []}
-              renderItem={(obj) => {
-                let idx = obj.index;
-                let quickItemButtonObj = obj.item;
-                return (
-                  <View
-                    style={{
-                      alignItems: "center",
-                      width: "100%",
-                      flexDirection: "row",
-                      justifyContent: "center",
-                      marginBottom: 5,
+          >
+            <TouchableOpacity
+              onPress={() => {
+                _setCurrentParentID(null);
+                _setMenuPath([]);
+              }}
+              style={{
+                paddingVertical: 4,
+                paddingHorizontal: 8,
+                borderRadius: 5,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                marginRight: 8,
+              }}
+            >
+              <Text style={{ fontSize: 12, color: C.blue, fontWeight: "bold" }}>
+                {"Top Level"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleBack}
+              style={{
+                paddingVertical: 4,
+                paddingHorizontal: 8,
+                borderRadius: 5,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                marginRight: 12,
+              }}
+            >
+              <Text style={{ fontSize: 12, color: C.text }}>
+                {"\u25C0 Back"}
+              </Text>
+            </TouchableOpacity>
+            {/* Breadcrumb trail */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              {sMenuPath.map((crumb, i) => (
+                <View
+                  key={crumb.id}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  {i > 0 && (
+                    <Text
+                      style={{
+                        color: gray(0.3),
+                        marginHorizontal: 4,
+                        fontSize: 13,
+                      }}
+                    >
+                      {">"}
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => {
+                      _setMenuPath((prev) => prev.slice(0, i + 1));
+                      _setCurrentParentID(crumb.id);
                     }}
                   >
-                    <BoxButton1
-                      style={{ paddingHorizontal: 5, marginRight: 10 }}
-                      iconSize={22}
-                      icon={ICONS.upChevron}
-                      onPress={() => {
-                        let arr = moveItemInArr(
-                          zSettingsObj.quickItemButtons,
-                          idx,
-                          "up"
-                        );
-                        handleSettingsFieldChange("quickItemButtons", arr);
+                    <Text
+                      style={{
+                        color:
+                          i === sMenuPath.length - 1 ? C.text : C.blue,
+                        fontSize: 13,
+                        fontWeight:
+                          i === sMenuPath.length - 1 ? "bold" : "normal",
                       }}
-                    />
-                    <BoxButton1
-                      style={{ paddingHorizontal: 5 }}
-                      iconSize={22}
-                      icon={ICONS.downChevron}
-                      onPress={() => {
-                        let arr = moveItemInArr(
-                          zSettingsObj.quickItemButtons,
-                          idx,
-                          "down"
-                        );
-                        handleSettingsFieldChange("quickItemButtons", arr);
-                      }}
-                    />
+                    >
+                      {crumb.name || "(unnamed)"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Add button */}
+          <BoxButton1 onPress={handleAdd} />
+
+          {/* Flex-wrap grid of sub-buttons */}
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              marginTop: 10,
+            }}
+          >
+            {currentChildren.map((btn, idx) => {
+              let childCount = getChildCount(btn.id);
+              return (
+                <View
+                  key={btn.id}
+                  draggable={true}
+                  onDragStart={() => _setDragIdx(idx)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    _setDragOverIdx(idx);
+                  }}
+                  onDragEnd={() => {
+                    _setDragIdx(null);
+                    _setDragOverIdx(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    reorderSubButtons(sDragIdx, idx);
+                    _setDragIdx(null);
+                    _setDragOverIdx(null);
+                  }}
+                  style={{
+                    width: 170,
+                    minHeight: 60,
+                    margin: 4,
+                    padding: 8,
+                    borderWidth: sDragOverIdx === idx ? 2 : 1,
+                    borderColor:
+                      sDragOverIdx === idx
+                        ? C.blue
+                        : C.buttonLightGreenOutline,
+                    borderRadius: 8,
+                    backgroundColor: C.listItemWhite,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "grab",
+                    opacity: sDragIdx === idx ? 0.5 : 1,
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => drillIn(btn)}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      width: "100%",
+                      justifyContent: "space-between",
+                    }}
+                  >
                     <TextInput
-                      onChangeText={(val) => {
-                        let quickButtonsArr = zSettingsObj.quickItemButtons;
-                        quickButtonsArr[idx] = {
-                          ...quickButtonsArr[idx],
-                          name: val,
-                        };
-                        handleSettingsFieldChange(
-                          "quickItemButtons",
-                          quickButtonsArr
-                        );
-                      }}
-                      placeholder="Quick item button name..."
+                      onChangeText={(val) => handleNameChange(btn, val)}
+                      placeholder="Name..."
                       placeholderTextColor={gray(0.3)}
                       style={{
-                        marginLeft: 20,
                         borderColor: C.buttonLightGreenOutline,
-                        borderWidth: 1,
-                        borderRadius: 5,
-                        padding: 5,
-                        width: "35%",
+                        borderBottomWidth: 1,
+                        padding: 3,
+                        flex: 1,
+                        fontSize: 13,
                         textAlign: "center",
                         color: C.text,
                         outlineWidth: 0,
                       }}
-                      value={quickItemButtonObj.name}
+                      value={btn.name}
                     />
-                    <DropdownComponent
-                      buttonStyle={{ width: 90, marginLeft: 20 }}
-                      data={["Menu", "Sub-menu"]}
-                      label={quickItemButtonObj.type}
-                      onSelect={(val) =>
-                        handleSettingsFieldChange(
-                          "quickItemButtons",
-                          zSettingsObj.quickItemButtons.map((obj) =>
-                            obj.id === quickItemButtonObj.id
-                              ? { ...quickItemButtonObj, type: val }
-                              : obj
-                          )
-                        )
-                      }
-                    />
+                    {childCount > 0 && (
+                      <View
+                        style={{
+                          backgroundColor: C.blue,
+                          borderRadius: 8,
+                          minWidth: 16,
+                          height: 16,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginLeft: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: C.textWhite,
+                            fontSize: 10,
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {childCount}
+                        </Text>
+                      </View>
+                    )}
                     <BoxButton1
-                      onPress={() => {
-                        let idx = zSettingsObj.quickItemButtons.findIndex(
-                          (obj) => obj.id === quickItemButtonObj.id
-                        );
-                        if (zSettingsObj.quickItemButtons[idx].id === "labor")
-                          return;
-                        if (zSettingsObj.quickItemButtons[idx].id === "part")
-                          return;
-                        handleSettingsFieldChange(
-                          "quickItemButtons",
-                          zSettingsObj.quickItemButtons.filter(
-                            (o) => o.id !== quickItemButtonObj.id
-                          )
-                        );
-                      }}
-                      style={{ marginLeft: 20 }}
-                      iconSize={15}
+                      onPress={() => handleDelete(btn)}
+                      style={{ marginLeft: 4 }}
+                      iconSize={12}
                       icon={ICONS.close1}
                     />
-                  </View>
-                );
-              }}
-            />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </View>
         </View>
       </BoxContainerInnerComponent>

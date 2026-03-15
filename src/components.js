@@ -435,6 +435,8 @@ export const ScreenModal = ({
   handleModalActionInternally = false,
   handleOuterClick = () => {},
   openUpward = false,
+  centerMenuVertically = false,
+  menuHeight,
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
   const [sInternalModalShow, _setInternalModalShow] = useState(false);
@@ -458,13 +460,13 @@ export const ScreenModal = ({
     //   useLoginStore.getState().setModalVisible(false);
     // };
   });
-  if (!openUpward && modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
+  if (!openUpward && !centerMenuVertically && modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
   // log("ref in ScreenModal", ref);
   useEffect(() => {
     const el = ref ? ref.current : null;
     if (el) {
       let rect = el.getBoundingClientRect();
-      _setModalCoordinates({ x: rect.x, y: rect.y });
+      _setModalCoordinates({ x: rect.x, y: rect.y, height: rect.height });
     }
   }, [ref]);
 
@@ -530,7 +532,19 @@ export const ScreenModal = ({
               justifySelf: "center",
               ...outerModalStyle,
               position: ref ? "absolute" : null,
-              top: ref && !openUpward ? sModalCoordinates.y + modalCoordinateVars.y : null,
+              top: ref && !openUpward
+                ? centerMenuVertically && menuHeight
+                  ? Math.max(
+                      10,
+                      Math.min(
+                        sModalCoordinates.y +
+                          (sModalCoordinates.height || 30) / 2 -
+                          menuHeight / 2,
+                        window.innerHeight - menuHeight - 10
+                      )
+                    )
+                  : sModalCoordinates.y + modalCoordinateVars.y
+                : null,
               bottom: ref && openUpward ? window.innerHeight - sModalCoordinates.y : null,
               left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
             }}
@@ -568,9 +582,14 @@ export const DropdownMenu = ({
   selectedIdx = 0,
   useSelectedAsButtonTitle = false,
   openUpward = false,
+  menuMaxHeight,
+  centerMenuVertically = false,
 }) => {
   const [sModalVisible, _setModalVisible] = useState(false);
   const ref = useRef();
+  const calculatedMenuHeight = menuMaxHeight
+    ? Math.min(dataArr.length * 40, menuMaxHeight)
+    : dataArr.length * 40;
 
   const BUTTON_STYLE = {
     // width: "100%",
@@ -631,6 +650,8 @@ export const DropdownMenu = ({
           borderWidth: 2,
           borderColor: gray(0.08),
           backgroundColor: "white",
+          maxHeight: menuMaxHeight || undefined,
+          overflow: menuMaxHeight ? "hidden" : undefined,
         }}
       >
         <FlatList
@@ -708,6 +729,8 @@ export const DropdownMenu = ({
       handleOuterClick={() => _setModalVisible(false)}
       enabled={enabled}
       openUpward={openUpward}
+      centerMenuVertically={centerMenuVertically}
+      menuHeight={calculatedMenuHeight}
     />
   );
 };

@@ -14,11 +14,11 @@ import {
 import {
   Button,
   Button_,
-  InventoryItemScreeenModalComponent,
   ScreenModal,
   TouchableOpacity_,
   TextInput_,
 } from "../../../components";
+import { InventoryItemModalScreen } from "../modal_screens/InventoryItemModalScreen";
 import { cloneDeep } from "lodash";
 import {
   useSettingsStore,
@@ -44,7 +44,7 @@ export function InventoryComponent({}) {
   ///////////////////////////////////////////////////////////////////////
   const [sSearchTerm, _setSearchTerm] = React.useState("");
   const [sSearchResults, _setSearchResults] = React.useState([]);
-  const [sModalInventoryObjIdx, _setModalInventoryObjIdx] = useState(null);
+  const [sModalItem, _setModalItem] = useState(null);
   const [isReady, setIsReady] = useState(false);
   const [sCurrentParentID, _setCurrentParentID] = useState(null);
   const [sMenuPath, _setMenuPath] = useState([]);
@@ -158,8 +158,7 @@ export function InventoryComponent({}) {
   function inventoryItemSelected(item) {
     const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
     if (!openWorkorder) {
-      const idx = zInventoryArr.findIndex((o) => o.id === item.id);
-      _setModalInventoryObjIdx(idx);
+      _setModalItem(item);
       return;
     }
     let workorderLines = openWorkorder.workorderLines;
@@ -174,8 +173,7 @@ export function InventoryComponent({}) {
   }
 
   function handleInventoryInfoPress(item) {
-    const idx = zInventoryArr.findIndex((o) => o.id === item.id);
-    _setModalInventoryObjIdx(idx);
+    _setModalItem(item);
   }
 
   function clearSearch() {
@@ -450,27 +448,12 @@ export function InventoryComponent({}) {
             }}
           />
         </View>
-        <ScreenModal
-          buttonVisible={false}
-          handleOuterClick={() => {
-            // log("screen modal clicked");
-            _setModalInventoryObjIdx(null);
-          }}
-          modalVisible={sModalInventoryObjIdx}
-          textStyle={{ fontSize: 14 }}
-          showOuterModal={true}
-          outerModalStyle={{
-            backgroundColor: "rgba(50,50,50,.5)",
-          }}
-          Component={() => {
-            return (
-              <InventoryItemScreeenModalComponent
-                itemIdx={sModalInventoryObjIdx}
-                handleClosePress={() => _setModalInventoryObjIdx(null)}
-              />
-            );
-          }}
-        />
+        {sModalItem && (
+          <InventoryItemModalScreen
+            item={sModalItem}
+            handleExit={() => _setModalItem(null)}
+          />
+        )}
       </View>
     </View>
   );

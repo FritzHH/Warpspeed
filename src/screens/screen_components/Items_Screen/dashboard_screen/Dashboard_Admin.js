@@ -23,6 +23,7 @@ import {
   moveItemInArr,
   NUMS,
   removeDashesFromPhone,
+  dollarsToCents,
 } from "../../../../utils";
 import {
   // useDatabaseStore,
@@ -38,6 +39,7 @@ import {
   ModalDropdown,
   NumberSpinner_,
   ScreenModal,
+  TextInput_,
   TimeSpinner,
   Tooltip,
 } from "../../../../components";
@@ -46,11 +48,12 @@ import { Children, useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
-import { APP_USER } from "../../../../data";
+import { APP_USER, INVENTORY_ITEM_PROTO, CUSTOMER_PROTO, WORKORDER_PROTO } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
+import { dbSaveInventoryItem, dbSaveCustomer, dbSaveOpenWorkorder } from "../../../../db_calls_wrapper";
 
 const TAB_NAMES = {
   users: "User Control",
@@ -63,6 +66,7 @@ const TAB_NAMES = {
   sales: "Sales Reports",
   ordering: "Ordering",
   textTemplates: "Text Templates",
+  import: "Import",
 };
 
 const DROPDOWN_ORDERING_SELECTION_NAMES = {
@@ -142,11 +146,13 @@ export function Dashboard_Admin({}) {
 
   //////////////////////////////////////////////////////////////////////////
   // Main component /////////////////////////////////////////////////////////
+  let OuterWrapper = sExpand === TAB_NAMES.quickItems ? View : ScrollView;
   return (
-    <ScrollView
+    <OuterWrapper
       style={{
         padding: 0,
         paddingTop: 20,
+        flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
       }}
     >
       {/**Modals that will appear when user takes an action */}
@@ -172,6 +178,7 @@ export function Dashboard_Admin({}) {
           flexDirection: "row",
           justifyContent: "space-between",
           paddingHorizontal: 5,
+          flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
         }}
       >
         {/*********************left-side column container *****************/}
@@ -185,9 +192,9 @@ export function Dashboard_Admin({}) {
               paddingLeft: 5,
               backgroundColor: C.backgroundListWhite,
               borderColor: C.buttonLightGreenOutline,
-              height: 250,
               borderWidth: 1,
               paddingTop: 13,
+              paddingBottom: 13,
             }}
           >
             {/************************* settings list names ****************** */}
@@ -279,24 +286,8 @@ export function Dashboard_Admin({}) {
               }}
               text={TAB_NAMES.storeInfo}
             />
-          </View>
-
-          {/****************** sales report modal *****************************/}
-          <View
-            style={{
-              width: "100%",
-              alignItems: "flex-start",
-              borderRadius: 5,
-              paddingRight: 10,
-              paddingLeft: 5,
-              backgroundColor: C.backgroundListWhite,
-              borderColor: C.buttonLightGreenOutline,
-              height: 50,
-              borderWidth: 1,
-              paddingTop: 13,
-              marginTop: 50,
-            }}
-          >
+            <VerticalSpacer />
+            {/****************** sales report modal *****************************/}
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.sales}
               handleExpandPress={() => _setShowSalesReportModal(true)}
@@ -308,24 +299,8 @@ export function Dashboard_Admin({}) {
               icon={ICONS.dollarYellow}
               iconSize={25}
             />
-          </View>
-
-          {/****************** ordering tab***********************************/}
-          <View
-            style={{
-              width: "100%",
-              alignItems: "flex-start",
-              borderRadius: 5,
-              paddingRight: 10,
-              paddingLeft: 5,
-              backgroundColor: C.backgroundListWhite,
-              borderColor: C.buttonLightGreenOutline,
-              height: 50,
-              borderWidth: 1,
-              paddingTop: 13,
-              marginTop: 50,
-            }}
-          >
+            <VerticalSpacer />
+            {/****************** ordering tab***********************************/}
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.ordering}
               handleExpandPress={() =>
@@ -340,24 +315,8 @@ export function Dashboard_Admin({}) {
               text={TAB_NAMES.ordering}
               icon={ICONS.ordering}
             />
-          </View>
-
-          {/****************** text templates tab *****************************/}
-          <View
-            style={{
-              width: "100%",
-              alignItems: "flex-start",
-              borderRadius: 5,
-              paddingRight: 10,
-              paddingLeft: 5,
-              backgroundColor: C.backgroundListWhite,
-              borderColor: C.buttonLightGreenOutline,
-              height: 50,
-              borderWidth: 1,
-              paddingTop: 13,
-              marginTop: 50,
-            }}
-          >
+            <VerticalSpacer />
+            {/****************** text templates tab *****************************/}
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.textTemplates}
               handleExpandPress={() =>
@@ -375,6 +334,22 @@ export function Dashboard_Admin({}) {
               text={TAB_NAMES.textTemplates}
               icon={ICONS.notes}
             />
+            <VerticalSpacer />
+            {/****************** import tab *****************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.import}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.import ? null : TAB_NAMES.import
+                )
+              }
+              style={{
+                fontWeight: sExpand === TAB_NAMES.import ? 500 : null,
+                color: sExpand === TAB_NAMES.import ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.import}
+              icon={ICONS.importIcon}
+            />
           </View>
         </View>
 
@@ -384,6 +359,7 @@ export function Dashboard_Admin({}) {
           style={{
             width: "70%",
             alignItems: "center",
+            flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
           }}
         >
           <Text
@@ -451,9 +427,10 @@ export function Dashboard_Admin({}) {
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
           )}
+          {sExpand === TAB_NAMES.import && <ImportComponent />}
         </View>
       </View>
-    </ScrollView>
+    </OuterWrapper>
   );
 }
 
@@ -3017,6 +2994,7 @@ const QuickItemButtonsComponent = ({
   const [sMenuPath, _setMenuPath] = useState([]);
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
+  const [sEditingID, _setEditingID] = useState(null);
 
   function getDescendantIDs(buttonID, allButtons) {
     let descendants = [];
@@ -3069,14 +3047,16 @@ const QuickItemButtonsComponent = ({
   }
 
   function handleAdd() {
+    let newID = generateRandomID();
     let quickButtonsArr = [...(zSettingsObj?.quickItemButtons || [])];
     quickButtonsArr.push({
-      id: generateRandomID(),
+      id: newID,
       name: "",
       parentID: sCurrentParentID,
       items: [],
     });
     handleSettingsFieldChange("quickItemButtons", quickButtonsArr);
+    _setEditingID(newID);
   }
 
   function reorderSubButtons(fromIdx, toIdx) {
@@ -3101,36 +3081,198 @@ const QuickItemButtonsComponent = ({
     (b) => b.parentID === sCurrentParentID
   );
 
+  function renderButtonCard(btn, idx, isDraggable) {
+    let isEditing = sEditingID === btn.id;
+    let childCount = getChildCount(btn.id);
+    return (
+      <View
+        key={btn.id}
+        draggable={isDraggable}
+        onDragStart={isDraggable ? () => _setDragIdx(idx) : undefined}
+        onDragOver={
+          isDraggable
+            ? (e) => {
+                e.preventDefault();
+                _setDragOverIdx(idx);
+              }
+            : undefined
+        }
+        onDragEnd={
+          isDraggable
+            ? () => {
+                _setDragIdx(null);
+                _setDragOverIdx(null);
+              }
+            : undefined
+        }
+        onDrop={
+          isDraggable
+            ? (e) => {
+                e.preventDefault();
+                reorderSubButtons(sDragIdx, idx);
+                _setDragIdx(null);
+                _setDragOverIdx(null);
+              }
+            : undefined
+        }
+        onMouseEnter={(e) => {
+          if (!isEditing) e.currentTarget.style.opacity = "0.7";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = "1";
+        }}
+        style={{
+          width: 170,
+          minHeight: 60,
+          margin: 4,
+          padding: 8,
+          borderWidth:
+            isDraggable && sDragOverIdx === idx ? 2 : 1,
+          borderColor:
+            isDraggable && sDragOverIdx === idx
+              ? C.blue
+              : C.buttonLightGreenOutline,
+          borderRadius: 8,
+          backgroundColor: isEditing ? C.orange : C.listItemWhite,
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: isDraggable ? "grab" : "pointer",
+          opacity: isDraggable && sDragIdx === idx ? 0.5 : 1,
+        }}
+      >
+        {/* Name area */}
+        {isEditing ? (
+          <TextInput_
+            autoFocus={true}
+            onChangeText={(val) => handleNameChange(btn, val)}
+            placeholder="Enter name..."
+            placeholderTextColor={gray(0.3)}
+            style={{
+              width: "100%",
+              paddingHorizontal: 5,
+              paddingVertical: 3,
+              fontSize: 13,
+              textAlign: "center",
+              color: C.text,
+              outlineWidth: 0,
+              outlineStyle: "none",
+            }}
+            value={btn.name}
+          />
+        ) : (
+          <TouchableOpacity
+            onPress={() => drillIn(btn)}
+            style={{
+              width: "100%",
+              cursor: "pointer",
+            }}
+          >
+            <Text
+              style={{
+                width: "100%",
+                fontSize: 13,
+                textAlign: "center",
+                color: C.text,
+                paddingHorizontal: 5,
+                paddingVertical: 3,
+              }}
+              numberOfLines={1}
+            >
+              {btn.name || "(unnamed)"}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {/* Bottom row: badge + edit + delete */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: 4,
+          }}
+        >
+          {childCount > 0 && (
+            <View
+              style={{
+                backgroundColor: C.blue,
+                borderRadius: 8,
+                minWidth: 16,
+                height: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: 6,
+              }}
+            >
+              <Text
+                style={{
+                  color: C.textWhite,
+                  fontSize: 10,
+                  fontWeight: "bold",
+                  paddingHorizontal: 4,
+                }}
+              >
+                {childCount}
+              </Text>
+            </View>
+          )}
+          <BoxButton1
+            onPress={() =>
+              _setEditingID(isEditing ? null : btn.id)
+            }
+            iconSize={isEditing ? 37 : 17}
+            icon={isEditing ? ICONS.clickHere : ICONS.editPencil}
+          />
+          <BoxButton1
+            onPress={() => handleDelete(btn)}
+            style={{ marginLeft: 6 }}
+            iconSize={17}
+            icon={ICONS.close1}
+          />
+        </View>
+      </View>
+    );
+  }
+
   // ── TOP-LEVEL VIEW ──
   if (sCurrentParentID === null) {
     return (
-      <BoxContainerOuterComponent>
+      <BoxContainerOuterComponent style={{ flex: 1 }}>
         <BoxContainerInnerComponent
-          style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+          style={{ width: "100%", alignItems: "center", borderWidth: 0, flex: 1 }}
         >
-          <View style={{ width: "100%", alignItems: "flex-start" }}>
+          <View style={{ width: "100%", alignItems: "center", flex: 1 }}>
             <BoxButton1 onPress={handleAdd} />
-            <View style={{ marginTop: 10, width: "100%" }}>
-              <FlatList
-                data={topLevelButtons}
-                keyExtractor={(item) => item.id}
-                renderItem={(obj) => {
-                  let btn = obj.item;
-                  let globalIdx = allButtons.findIndex((b) => b.id === btn.id);
-                  let childCount = getChildCount(btn.id);
-                  return (
+            <ScrollView
+              style={{
+                marginTop: 10,
+                flex: 1,
+                width: "100%",
+              }}
+              contentContainerStyle={{
+                alignItems: "center",
+              }}
+            >
+              {topLevelButtons.map((btn, idx) => {
+                let globalIdx = allButtons.findIndex((b) => b.id === btn.id);
+                return (
+                  <View
+                    key={btn.id}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: 5,
+                    }}
+                  >
                     <View
                       style={{
+                        flexDirection: "column",
                         alignItems: "center",
-                        width: "100%",
-                        flexDirection: "row",
-                        justifyContent: "center",
-                        marginBottom: 5,
+                        marginRight: 6,
                       }}
                     >
                       <BoxButton1
-                        style={{ paddingHorizontal: 5, marginRight: 10 }}
-                        iconSize={22}
+                        style={{ paddingHorizontal: 3 }}
+                        iconSize={18}
                         icon={ICONS.upChevron}
                         onPress={() => {
                           let arr = moveItemInArr(
@@ -3142,8 +3284,8 @@ const QuickItemButtonsComponent = ({
                         }}
                       />
                       <BoxButton1
-                        style={{ paddingHorizontal: 5 }}
-                        iconSize={22}
+                        style={{ paddingHorizontal: 3, marginTop: 2 }}
+                        iconSize={18}
                         icon={ICONS.downChevron}
                         onPress={() => {
                           let arr = moveItemInArr(
@@ -3154,68 +3296,12 @@ const QuickItemButtonsComponent = ({
                           handleSettingsFieldChange("quickItemButtons", arr);
                         }}
                       />
-                      <TouchableOpacity
-                        onPress={() => drillIn(btn)}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          marginLeft: 20,
-                          borderColor: C.buttonLightGreenOutline,
-                          borderWidth: 1,
-                          borderRadius: 5,
-                          padding: 5,
-                          width: "25%",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <TextInput
-                          onChangeText={(val) => handleNameChange(btn, val)}
-                          placeholder="Quick item button name..."
-                          placeholderTextColor={gray(0.3)}
-                          style={{
-                            flex: 1,
-                            textAlign: "center",
-                            color: C.text,
-                            outlineWidth: 0,
-                            fontSize: 14,
-                          }}
-                          value={btn.name}
-                        />
-                        {childCount > 0 && (
-                          <View
-                            style={{
-                              backgroundColor: C.blue,
-                              borderRadius: 10,
-                              minWidth: 20,
-                              height: 20,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginLeft: 4,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                color: C.textWhite,
-                                fontSize: 11,
-                                fontWeight: "bold",
-                              }}
-                            >
-                              {childCount}
-                            </Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                      <BoxButton1
-                        onPress={() => handleDelete(btn)}
-                        style={{ marginLeft: 20 }}
-                        iconSize={15}
-                        icon={ICONS.close1}
-                      />
                     </View>
-                  );
-                }}
-              />
-            </View>
+                    {renderButtonCard(btn, idx, false)}
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
         </BoxContainerInnerComponent>
       </BoxContainerOuterComponent>
@@ -3329,103 +3415,9 @@ const QuickItemButtonsComponent = ({
               marginTop: 10,
             }}
           >
-            {currentChildren.map((btn, idx) => {
-              let childCount = getChildCount(btn.id);
-              return (
-                <View
-                  key={btn.id}
-                  draggable={true}
-                  onDragStart={() => _setDragIdx(idx)}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    _setDragOverIdx(idx);
-                  }}
-                  onDragEnd={() => {
-                    _setDragIdx(null);
-                    _setDragOverIdx(null);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    reorderSubButtons(sDragIdx, idx);
-                    _setDragIdx(null);
-                    _setDragOverIdx(null);
-                  }}
-                  style={{
-                    width: 170,
-                    minHeight: 60,
-                    margin: 4,
-                    padding: 8,
-                    borderWidth: sDragOverIdx === idx ? 2 : 1,
-                    borderColor:
-                      sDragOverIdx === idx
-                        ? C.blue
-                        : C.buttonLightGreenOutline,
-                    borderRadius: 8,
-                    backgroundColor: C.listItemWhite,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "grab",
-                    opacity: sDragIdx === idx ? 0.5 : 1,
-                  }}
-                >
-                  <TouchableOpacity
-                    onPress={() => drillIn(btn)}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      width: "100%",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <TextInput
-                      onChangeText={(val) => handleNameChange(btn, val)}
-                      placeholder="Name..."
-                      placeholderTextColor={gray(0.3)}
-                      style={{
-                        borderColor: C.buttonLightGreenOutline,
-                        borderBottomWidth: 1,
-                        padding: 3,
-                        flex: 1,
-                        fontSize: 13,
-                        textAlign: "center",
-                        color: C.text,
-                        outlineWidth: 0,
-                      }}
-                      value={btn.name}
-                    />
-                    {childCount > 0 && (
-                      <View
-                        style={{
-                          backgroundColor: C.blue,
-                          borderRadius: 8,
-                          minWidth: 16,
-                          height: 16,
-                          alignItems: "center",
-                          justifyContent: "center",
-                          marginLeft: 4,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: C.textWhite,
-                            fontSize: 10,
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {childCount}
-                        </Text>
-                      </View>
-                    )}
-                    <BoxButton1
-                      onPress={() => handleDelete(btn)}
-                      style={{ marginLeft: 4 }}
-                      iconSize={12}
-                      icon={ICONS.close1}
-                    />
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
+            {currentChildren.map((btn, idx) =>
+              renderButtonCard(btn, idx, true)
+            )}
           </View>
         </View>
       </BoxContainerInnerComponent>
@@ -3500,6 +3492,330 @@ const OrderingComponent = ({
             {sOrderingMenuSelectionName}
           </Text>
         </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+const ImportComponent = () => {
+  const [sImporting, _setImporting] = useState("");
+  const [sResult, _setResult] = useState("");
+
+  // --- CSV parsing utilities ---
+  function parseCSVLine(line) {
+    let result = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      let ch = line[i];
+      if (ch === '"') { inQuotes = !inQuotes; }
+      else if (ch === ',' && !inQuotes) { result.push(current); current = ""; }
+      else { current += ch; }
+    }
+    result.push(current);
+    return result;
+  }
+
+  function parseCSV(text) {
+    let lines = text.split("\n").filter(l => l.trim());
+    let headers = parseCSVLine(lines[0]);
+    return lines.slice(1).map(line => {
+      let values = parseCSVLine(line);
+      let obj = {};
+      headers.forEach((h, i) => obj[h.trim()] = (values[i] || "").trim());
+      return obj;
+    });
+  }
+
+  function cleanPhone(str) {
+    if (!str) return "";
+    let digits = str.replace(/\D/g, "");
+    if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
+    return digits.length === 10 ? digits : "";
+  }
+
+  // --- Import Inventory (preview mode) ---
+  async function handleImportInventory() {
+    try {
+      _setImporting("inventory");
+      _setResult("");
+      let res = await fetch(process.env.PUBLIC_URL + "/import_data/inventory.csv");
+      let text = await res.text();
+      let rows = parseCSV(text);
+
+      let items = rows.map(row => {
+        let item = cloneDeep(INVENTORY_ITEM_PROTO);
+        item.id = generateRandomID();
+        item.formalName = row["Description"] || "";
+        item.price = dollarsToCents(row["Price"]) || 0;
+        item.cost = dollarsToCents(row["Default Cost"]) || 0;
+        item.upc = row["UPC"] || "";
+        item.ean = row["EAN"] || "";
+        item.customSku = row["Custom SKU"] || "";
+        item.manufacturerSku = row["Manufact. SKU"] || "";
+        if ((item.formalName || "").toLowerCase().includes("labor")) {
+          item.category = "Labor";
+        }
+        return item;
+      });
+
+      console.log("=== IMPORT PREVIEW: INVENTORY ===");
+      console.log("Total entries:", items.length);
+      console.log(JSON.stringify(items.slice(0, 50), null, 2));
+      _setResult("Preview logged to console. Total: " + items.length);
+      // Phase 2: actual DB save will go here
+    } catch (err) {
+      console.error("Import inventory error:", err);
+      _setResult("Error: " + err.message);
+    } finally {
+      _setImporting("");
+    }
+  }
+
+  // --- Import Customers with deduplication (preview mode) ---
+  function parseCustomers(rows) {
+    let customers = rows.map(row => {
+      let cust = cloneDeep(CUSTOMER_PROTO);
+      cust.id = generateRandomID();
+      cust.first = (row["First Name"] || "").toLowerCase();
+      cust.last = (row["Last Name"] || "").toLowerCase();
+      cust.email = row["Email"] || "";
+      cust.streetAddress = row["Address1"] || "";
+      cust.unit = row["Address2"] || "";
+      cust.city = row["City"] || "";
+      cust.state = row["State"] || "";
+      cust.zip = row["ZIP"] || "";
+
+      // Phone: try Mobile first, then Home, then Work
+      let mobile = cleanPhone(row["Mobile"] || "");
+      let home = cleanPhone(row["Home"] || "");
+      let work = cleanPhone(row["Work"] || "");
+      cust.cell = mobile || home || work || "";
+      // landline: second valid phone
+      let phones = [mobile, home, work].filter(p => p);
+      if (phones.length > 1) cust.landline = phones[1];
+
+      // Created At
+      let createdAt = row["Created At"];
+      if (createdAt && createdAt !== "0000-00-00") {
+        let ms = new Date(createdAt).getTime();
+        if (!isNaN(ms)) cust.millisCreated = ms;
+      }
+
+      return cust;
+    });
+
+    // Deduplicate by phone number
+    let phoneMap = new Map();
+    let noPhoneCustomers = [];
+
+    customers.forEach(cust => {
+      if (!cust.cell) {
+        noPhoneCustomers.push(cust);
+        return;
+      }
+      if (phoneMap.has(cust.cell)) {
+        // Keep the one with more filled fields
+        let existing = phoneMap.get(cust.cell);
+        let existingFilled = Object.values(existing).filter(v => v && v !== "" && v !== 0).length;
+        let newFilled = Object.values(cust).filter(v => v && v !== "" && v !== 0).length;
+        if (newFilled > existingFilled) {
+          cust.id = existing.id; // keep same ID
+          phoneMap.set(cust.cell, cust);
+        }
+      } else {
+        phoneMap.set(cust.cell, cust);
+      }
+    });
+
+    let deduplicated = [...phoneMap.values(), ...noPhoneCustomers];
+    return { deduplicated, phoneMap };
+  }
+
+  async function handleImportCustomers() {
+    try {
+      _setImporting("customers");
+      _setResult("");
+      let res = await fetch(process.env.PUBLIC_URL + "/import_data/customers.csv");
+      let text = await res.text();
+      let rows = parseCSV(text);
+
+      let { deduplicated } = parseCustomers(rows);
+
+      console.log("=== IMPORT PREVIEW: CUSTOMERS ===");
+      console.log("Total raw rows:", rows.length);
+      console.log("After deduplication:", deduplicated.length);
+      console.log("Removed duplicates:", rows.length - deduplicated.length);
+      console.log(JSON.stringify(deduplicated.slice(0, 50), null, 2));
+      _setResult("Preview logged to console. Total: " + deduplicated.length + " (removed " + (rows.length - deduplicated.length) + " duplicates)");
+      // Phase 2: actual DB save will go here
+    } catch (err) {
+      console.error("Import customers error:", err);
+      _setResult("Error: " + err.message);
+    } finally {
+      _setImporting("");
+    }
+  }
+
+  // --- Import Workorders with customer linking (preview mode) ---
+  async function handleImportWorkorders() {
+    try {
+      _setImporting("workorders");
+      _setResult("");
+
+      // First parse customers for linking
+      let custRes = await fetch(process.env.PUBLIC_URL + "/import_data/customers.csv");
+      let custText = await custRes.text();
+      let custRows = parseCSV(custText);
+      let { deduplicated: customers } = parseCustomers(custRows);
+
+      // Build name lookup map: "first last" (lowercase) -> customer
+      let nameLookup = new Map();
+      customers.forEach(cust => {
+        let fullName = ((cust.first || "") + " " + (cust.last || "")).trim().toLowerCase();
+        if (fullName) nameLookup.set(fullName, cust);
+      });
+
+      // Parse workorders
+      let woRes = await fetch(process.env.PUBLIC_URL + "/import_data/workorders.csv");
+      let woText = await woRes.text();
+      let woRows = parseCSV(woText);
+
+      let workorders = woRows.map(row => {
+        let wo = cloneDeep(WORKORDER_PROTO);
+        wo.id = generateRandomID();
+        wo.workorderNumber = row["ID"] || "";
+        wo.description = row["Item"] || "";
+        wo.status = row["Status"] || "";
+
+        // Date In -> startedOnMillis
+        let dateIn = row["Date In"];
+        if (dateIn) {
+          let ms = new Date(dateIn).getTime();
+          if (!isNaN(ms)) wo.startedOnMillis = ms;
+        }
+
+        // Customer linking
+        let custName = (row["Customer"] || "").trim();
+        if (custName) {
+          let matched = nameLookup.get(custName.toLowerCase());
+          if (matched) {
+            wo.customerID = matched.id;
+            wo.customerFirst = matched.first;
+            wo.customerLast = matched.last;
+            wo.customerPhone = matched.cell;
+          } else {
+            // Split name: first word = first, rest = last
+            let parts = custName.split(" ");
+            wo.customerFirst = (parts[0] || "").toLowerCase();
+            wo.customerLast = (parts.slice(1).join(" ") || "").toLowerCase();
+          }
+        }
+
+        return wo;
+      });
+
+      let linkedCount = workorders.filter(wo => wo.customerID).length;
+
+      console.log("=== IMPORT PREVIEW: WORKORDERS ===");
+      console.log("Total workorders:", workorders.length);
+      console.log("Linked to customers:", linkedCount);
+      console.log("Unlinked:", workorders.length - linkedCount);
+      console.log(JSON.stringify(workorders.slice(0, 50), null, 2));
+      _setResult("Preview logged to console. Total: " + workorders.length + " (" + linkedCount + " linked to customers)");
+      // Phase 2: actual DB save will go here
+    } catch (err) {
+      console.error("Import workorders error:", err);
+      _setResult("Error: " + err.message);
+    } finally {
+      _setImporting("");
+    }
+  }
+
+  let buttonStyle = {
+    width: 200,
+    height: 80,
+    margin: 10,
+    borderWidth: 1,
+    borderColor: C.buttonLightGreenOutline,
+    borderRadius: 10,
+    backgroundColor: C.listItemWhite,
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    opacity: sImporting ? 0.5 : 1,
+  };
+
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent
+        style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+      >
+        <View
+          style={{
+            width: "100%",
+            flexDirection: "row",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <TouchableOpacity
+            onPress={handleImportInventory}
+            disabled={!!sImporting}
+            style={buttonStyle}
+          >
+            <Image_ icon={ICONS.importIcon} size={30} />
+            <Text
+              style={{
+                fontSize: 14,
+                color: C.text,
+                marginTop: 8,
+                fontWeight: "500",
+              }}
+            >
+              {sImporting === "inventory" ? "Importing..." : "Import Inventory"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleImportCustomers}
+            disabled={!!sImporting}
+            style={buttonStyle}
+          >
+            <Image_ icon={ICONS.importIcon} size={30} />
+            <Text
+              style={{
+                fontSize: 14,
+                color: C.text,
+                marginTop: 8,
+                fontWeight: "500",
+              }}
+            >
+              {sImporting === "customers" ? "Importing..." : "Import Customers"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleImportWorkorders}
+            disabled={!!sImporting}
+            style={buttonStyle}
+          >
+            <Image_ icon={ICONS.importIcon} size={30} />
+            <Text
+              style={{
+                fontSize: 14,
+                color: C.text,
+                marginTop: 8,
+                fontWeight: "500",
+              }}
+            >
+              {sImporting === "workorders" ? "Importing..." : "Import Workorders"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {sResult ? (
+          <Text style={{ fontSize: 13, color: C.green, marginTop: 10, textAlign: "center" }}>
+            {sResult}
+          </Text>
+        ) : null}
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );

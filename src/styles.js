@@ -88,6 +88,8 @@ export const ICONS = {
   tools1: require(ASSETS_PATH + "tools1.png"),
   upArrowOrange: require(ASSETS_PATH + "up_arrow_orange.png"),
   downArrowOrange: require(ASSETS_PATH + "down_arrow_orange.png"),
+  clickHere: require(ASSETS_PATH + "clickHere.png"),
+  importIcon: require(ASSETS_PATH + "in.png"),
   editPencil: require(ASSETS_PATH + "edit_pencil.png"),
   close1: require(ASSETS_PATH + "close1.png"),
   check1: require(ASSETS_PATH + "check1.png"),

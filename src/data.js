@@ -207,7 +207,7 @@ export const APP_USER = {
 
 export const TIME_PUNCH_PROTO = {
   userID: "",
-  millis: null,
+  millis: "",
   id: "",
   option: "",
 };
@@ -297,12 +297,12 @@ export const SALE_PROTO = {
   id: "",
   millis: "",
   subtotal: 0,
-  discount: null,
+  discount: 0,
   tax: 0,
   salesTaxPercent: 0,
   total: 0,
   amountCaptured: 0,
-  amountRefunded: null,
+  amountRefunded: 0,
   paymentComplete: false,
   workorderIDs: [],
   payments: [],
@@ -356,8 +356,8 @@ export const WORKORDER_ITEM_PROTO = {
   qty: 1,
   intakeNotes: "",
   receiptNotes: "",
-  inventoryItem: null,
-  discountObj: null,
+  inventoryItem: "",
+  discountObj: "",
   id: "",
   useSalePrice: false,
   warranty: false,
@@ -367,8 +367,8 @@ export const CUSTOMER_PREVIOUS_BIKE_PROTO = {
   brand: "",
   model: "",
   description: "",
-  color1: null,
-  color2: null,
+  color1: "",
+  color2: "",
 };
 
 export const CUSTOMER_PROTO = {
@@ -409,6 +409,11 @@ export const INVENTORY_ITEM_PROTO = {
   category: "Part",
   id: "",
   cost: "",
+  upc: "",
+  ean: "",
+  customSku: "",
+  manufacturerSku: "",
+  minutes: 0,
 };
 
 export const LABOR_ITEM_PROTO = {

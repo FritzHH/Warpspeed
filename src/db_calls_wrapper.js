@@ -323,6 +323,39 @@ function buildPaymentReaderCompletionsPath(
 // setters /////////////////////////////////////////////////////////////////////
 
 /**
+ * Delete all documents in a Firestore collection.
+ * @param {"inventory"|"customers"|"open-workorders"} collectionName
+ * @returns {Promise<Object>} { success, deletedCount }
+ */
+export async function dbClearCollection(collectionName) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      return { success: false, error: "Configuration Error", deletedCount: 0 };
+    }
+    let collectionPath;
+    if (collectionName === "inventory") {
+      collectionPath = buildInventoryCollectionPath(tenantID, storeID);
+    } else if (collectionName === "customers") {
+      collectionPath = buildCustomerCollectionPath(tenantID, storeID);
+    } else if (collectionName === "open-workorders") {
+      collectionPath = buildOpenWorkordersCollectionPath(tenantID, storeID);
+    } else {
+      return { success: false, error: "Unknown collection: " + collectionName, deletedCount: 0 };
+    }
+    let docs = await firestoreQuery(collectionPath);
+    for (let doc of docs) {
+      await firestoreDelete(collectionPath + "/" + doc.id);
+    }
+    log("Cleared collection", { collectionName, deletedCount: docs.length });
+    return { success: true, deletedCount: docs.length };
+  } catch (error) {
+    log("Error clearing collection:", error);
+    return { success: false, error: error.message, deletedCount: 0 };
+  }
+}
+
+/**
  * Save a single field to the settings object in the database
  * @param {string} fieldName - Name of the field to update
  * @param {*} value - Value to set for the field

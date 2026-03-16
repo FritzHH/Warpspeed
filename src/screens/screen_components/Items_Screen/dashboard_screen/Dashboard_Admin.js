@@ -48,12 +48,13 @@ import { Children, useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
-import { APP_USER, INVENTORY_ITEM_PROTO, CUSTOMER_PROTO, WORKORDER_PROTO } from "../../../../data";
+import { APP_USER, INVENTORY_ITEM_PROTO, CUSTOMER_PROTO, WORKORDER_PROTO, COLORS } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
-import { dbSaveInventoryItem, dbSaveCustomer, dbSaveOpenWorkorder } from "../../../../db_calls_wrapper";
+import { dbSaveInventoryItem, dbSaveCustomer, dbSaveOpenWorkorder, dbClearCollection, dbSaveSettingsField } from "../../../../db_calls_wrapper";
+import { lightspeedInitiateAuthCallable, lightspeedCheckConnectionCallable, lightspeedImportDataCallable } from "../../../../db_calls";
 
 const TAB_NAMES = {
   users: "User Control",
@@ -3498,8 +3499,18 @@ const OrderingComponent = ({
 };
 
 const ImportComponent = () => {
+  const zSettings = useSettingsStore((state) => state.settings);
   const [sImporting, _setImporting] = useState("");
   const [sResult, _setResult] = useState("");
+  const [sClearInventory, _setClearInventory] = useState(true);
+  const [sClearCustomers, _setClearCustomers] = useState(true);
+  const [sClearWorkorders, _setClearWorkorders] = useState(true);
+  const [sClearStatuses, _setClearStatuses] = useState(true);
+  const [sLsConnected, _setLsConnected] = useState(false);
+  const [sLsAccountName, _setLsAccountName] = useState("");
+  const [sLsImporting, _setLsImporting] = useState("");
+  const [sLsResult, _setLsResult] = useState("");
+  const [sClearLsData, _setClearLsData] = useState(true);
 
   // --- CSV parsing utilities ---
   function parseCSVLine(line) {
@@ -3534,6 +3545,35 @@ const ImportComponent = () => {
     return digits.length === 10 ? digits : "";
   }
 
+  // Extract up to 2 colors from item text, case-insensitive
+  // Matches against COLORS labels. Handles "Black/Red", "black", "Blue", etc.
+  function extractColors(text) {
+    if (!text) return [];
+    // Sort labels longest-first so "Light-blue" matches before "Blue"
+    let sortedColors = [...COLORS].sort((a, b) => b.label.length - a.label.length);
+    let found = [];
+    let lowerText = text.toLowerCase();
+    let usedIndices = [];
+
+    for (let colorObj of sortedColors) {
+      if (found.length >= 2) break;
+      let label = colorObj.label.toLowerCase();
+      // Word-boundary match: color must not be embedded in another word
+      let regex = new RegExp("(?:^|[\\s/\\(])(" + label.replace("-", "[-\\s]?") + ")(?=[\\s/\\).,]|$)", "i");
+      let match = regex.exec(lowerText);
+      if (match) {
+        let idx = match.index;
+        // Avoid matching the same position twice
+        let overlaps = usedIndices.some(u => Math.abs(u - idx) < label.length);
+        if (!overlaps) {
+          found.push(colorObj);
+          usedIndices.push(idx);
+        }
+      }
+    }
+    return found;
+  }
+
   // --- Import Inventory (preview mode) ---
   async function handleImportInventory() {
     try {
@@ -3562,8 +3602,19 @@ const ImportComponent = () => {
       console.log("=== IMPORT PREVIEW: INVENTORY ===");
       console.log("Total entries:", items.length);
       console.log(JSON.stringify(items.slice(0, 50), null, 2));
-      _setResult("Preview logged to console. Total: " + items.length);
-      // Phase 2: actual DB save will go here
+
+      // Clear existing inventory if checked, then save new
+      let clearedCount = 0;
+      if (sClearInventory) {
+        let cleared = await dbClearCollection("inventory");
+        clearedCount = cleared.deletedCount;
+        console.log("Cleared inventory:", clearedCount, "docs");
+      }
+      for (let i = 0; i < items.length; i++) {
+        await dbSaveInventoryItem(items[i]);
+        if ((i + 1) % 50 === 0) console.log("Saved", i + 1, "/", items.length);
+      }
+      _setResult("Imported " + items.length + " inventory items" + (sClearInventory ? " (cleared " + clearedCount + " old)" : " (merged)"));
     } catch (err) {
       console.error("Import inventory error:", err);
       _setResult("Error: " + err.message);
@@ -3647,8 +3698,19 @@ const ImportComponent = () => {
       console.log("After deduplication:", deduplicated.length);
       console.log("Removed duplicates:", rows.length - deduplicated.length);
       console.log(JSON.stringify(deduplicated.slice(0, 50), null, 2));
-      _setResult("Preview logged to console. Total: " + deduplicated.length + " (removed " + (rows.length - deduplicated.length) + " duplicates)");
-      // Phase 2: actual DB save will go here
+
+      // Clear existing customers if checked, then save new
+      let clearedCount = 0;
+      if (sClearCustomers) {
+        let cleared = await dbClearCollection("customers");
+        clearedCount = cleared.deletedCount;
+        console.log("Cleared customers:", clearedCount, "docs");
+      }
+      for (let i = 0; i < deduplicated.length; i++) {
+        await dbSaveCustomer(deduplicated[i]);
+        if ((i + 1) % 50 === 0) console.log("Saved", i + 1, "/", deduplicated.length);
+      }
+      _setResult("Imported " + deduplicated.length + " customers" + (sClearCustomers ? " (cleared " + clearedCount + " old)" : " (merged)") + ", removed " + (rows.length - deduplicated.length) + " duplicates");
     } catch (err) {
       console.error("Import customers error:", err);
       _setResult("Error: " + err.message);
@@ -3688,11 +3750,35 @@ const ImportComponent = () => {
         wo.description = row["Item"] || "";
         wo.status = row["Status"] || "";
 
+        // Extract "PRODUCT -SOURCE" pattern (always uppercase)
+        // e.g. "BATTERY -ALIEXPRESS", "TOUCH-UP PAINT -HEYBIKE", "FREEWHEEL -JBI"
+        let partMatch = (row["Item"] || "").match(/([A-Z][A-Z0-9 /-]*?)\s+-([A-Z][A-Z0-9]+)\s*$/);
+        if (partMatch) {
+          wo.partOrdered = partMatch[1].trim();
+          wo.partSource = partMatch[2].trim();
+        } else {
+          // Check for just " -SOURCE" with no uppercase product before it (e.g. "(qty 4) -JBI")
+          let sourceOnly = (row["Item"] || "").match(/\s+-([A-Z][A-Z0-9]+)\s*$/);
+          if (sourceOnly) {
+            wo.partSource = sourceOnly[1].trim();
+          }
+        }
+
         // Date In -> startedOnMillis
         let dateIn = row["Date In"];
         if (dateIn) {
           let ms = new Date(dateIn).getTime();
           if (!isNaN(ms)) wo.startedOnMillis = ms;
+        }
+
+        // Extract colors from Item field (case-insensitive)
+        let itemText = row["Item"] || "";
+        let foundColors = extractColors(itemText);
+        if (foundColors.length >= 1) {
+          wo.color1 = { textColor: foundColors[0].textColor, backgroundColor: foundColors[0].backgroundColor, label: foundColors[0].label };
+        }
+        if (foundColors.length >= 2) {
+          wo.color2 = { textColor: foundColors[1].textColor, backgroundColor: foundColors[1].backgroundColor, label: foundColors[1].label };
         }
 
         // Customer linking
@@ -3722,8 +3808,18 @@ const ImportComponent = () => {
       console.log("Linked to customers:", linkedCount);
       console.log("Unlinked:", workorders.length - linkedCount);
       console.log(JSON.stringify(workorders.slice(0, 50), null, 2));
-      _setResult("Preview logged to console. Total: " + workorders.length + " (" + linkedCount + " linked to customers)");
-      // Phase 2: actual DB save will go here
+      // Clear existing workorders if checked, then save new
+      let clearedCount = 0;
+      if (sClearWorkorders) {
+        let cleared = await dbClearCollection("open-workorders");
+        clearedCount = cleared.deletedCount;
+        console.log("Cleared workorders:", clearedCount, "docs");
+      }
+      for (let i = 0; i < workorders.length; i++) {
+        await dbSaveOpenWorkorder(workorders[i]);
+        if ((i + 1) % 50 === 0) console.log("Saved", i + 1, "/", workorders.length);
+      }
+      _setResult("Imported " + workorders.length + " workorders" + (sClearWorkorders ? " (cleared " + clearedCount + " old)" : " (merged)") + ", " + linkedCount + " linked to customers");
     } catch (err) {
       console.error("Import workorders error:", err);
       _setResult("Error: " + err.message);
@@ -3732,10 +3828,133 @@ const ImportComponent = () => {
     }
   }
 
+  // --- Import Statuses ---
+  async function handleImportStatuses() {
+    try {
+      _setImporting("statuses");
+      _setResult("");
+      let res = await fetch(process.env.PUBLIC_URL + "/import_data/statuses.csv");
+      let text = await res.text();
+      let rows = parseCSV(text);
+
+      let statuses = rows.map(row => {
+        let bgColor = row["Color"] || "";
+        let textColor = bgColor ? bestForegroundHex(bgColor) : "black";
+        return {
+          id: generateRandomID(),
+          label: row["Status"] || "",
+          textColor: textColor,
+          backgroundColor: bgColor || "rgb(192,192,192)",
+          removable: true,
+        };
+      });
+
+      console.log("=== IMPORT PREVIEW: STATUSES ===");
+      console.log("Total statuses:", statuses.length);
+      console.log(JSON.stringify(statuses, null, 2));
+
+      // Get current settings statuses
+      let currentStatuses = useSettingsStore.getState().getSettings()?.statuses || [];
+      let nonRemovable = currentStatuses.filter(s => s.removable === false);
+
+      let newStatuses;
+      if (sClearStatuses) {
+        // Keep non-removable, replace removable with imported
+        newStatuses = [...nonRemovable, ...statuses];
+        console.log("Kept", nonRemovable.length, "non-removable, replaced removable with", statuses.length, "imported");
+      } else {
+        // Merge: keep existing, add imported
+        newStatuses = [...currentStatuses, ...statuses];
+        console.log("Merged:", currentStatuses.length, "existing +", statuses.length, "imported");
+      }
+
+      await dbSaveSettingsField("statuses", newStatuses);
+      _setResult("Imported " + statuses.length + " statuses" + (sClearStatuses ? " (kept " + nonRemovable.length + " non-removable)" : " (merged)"));
+    } catch (err) {
+      console.error("Import statuses error:", err);
+      _setResult("Error: " + err.message);
+    } finally {
+      _setImporting("");
+    }
+  }
+
+  // --- Lightspeed handlers ---
+
+  async function handleLsConnect() {
+    try {
+      _setLsImporting("connecting");
+      _setLsResult("");
+      const tenantID = zSettings?.tenantID;
+      const storeID = zSettings?.storeID;
+      if (!tenantID || !storeID) {
+        _setLsResult("Error: tenantID or storeID not found in settings");
+        _setLsImporting("");
+        return;
+      }
+      const res = await lightspeedInitiateAuthCallable({ tenantID, storeID });
+      if (res.data?.authUrl) {
+        window.open(res.data.authUrl, "_blank");
+        _setLsResult("OAuth window opened. Complete authorization, then click 'Check Connection'.");
+      } else {
+        _setLsResult("Error: No auth URL returned");
+      }
+    } catch (e) {
+      _setLsResult("Error: " + (e.message || "Connection failed"));
+    }
+    _setLsImporting("");
+  }
+
+  async function handleLsCheckConnection() {
+    try {
+      _setLsImporting("checking");
+      _setLsResult("");
+      const tenantID = zSettings?.tenantID;
+      const storeID = zSettings?.storeID;
+      const res = await lightspeedCheckConnectionCallable({ tenantID, storeID });
+      if (res.data?.connected) {
+        _setLsConnected(true);
+        _setLsAccountName(res.data.accountName || "");
+        _setLsResult("Connected to Lightspeed" + (res.data.accountName ? ": " + res.data.accountName : ""));
+      } else {
+        _setLsConnected(false);
+        _setLsResult("Not connected" + (res.data?.error ? ": " + res.data.error : ""));
+      }
+    } catch (e) {
+      _setLsConnected(false);
+      _setLsResult("Error: " + (e.message || "Check failed"));
+    }
+    _setLsImporting("");
+  }
+
+  async function handleLsImport() {
+    try {
+      _setLsImporting("importing");
+      _setLsResult("");
+      const tenantID = zSettings?.tenantID;
+      const storeID = zSettings?.storeID;
+      const res = await lightspeedImportDataCallable({
+        tenantID,
+        storeID,
+        importType: "all",
+        clearExisting: sClearLsData,
+      });
+      if (res.data?.success) {
+        let msg = "Import complete.";
+        if (res.data.customerCount != null) msg += ` Customers: ${res.data.customerCount} (${res.data.duplicatesRemoved || 0} duplicates removed).`;
+        if (res.data.workorderCount != null) msg += ` Workorders: ${res.data.workorderCount} (${res.data.linked || 0} linked, ${res.data.unlinked || 0} unlinked).`;
+        _setLsResult(msg);
+      } else {
+        _setLsResult("Import returned no success flag");
+      }
+    } catch (e) {
+      _setLsResult("Error: " + (e.message || "Import failed"));
+    }
+    _setLsImporting("");
+  }
+
   let buttonStyle = {
     width: 200,
     height: 80,
-    margin: 10,
     borderWidth: 1,
     borderColor: C.buttonLightGreenOutline,
     borderRadius: 10,
@@ -3759,61 +3978,212 @@ const ImportComponent = () => {
             flexWrap: "wrap",
           }}
         >
-          <TouchableOpacity
-            onPress={handleImportInventory}
-            disabled={!!sImporting}
-            style={buttonStyle}
-          >
-            <Image_ icon={ICONS.importIcon} size={30} />
-            <Text
-              style={{
-                fontSize: 14,
-                color: C.text,
-                marginTop: 8,
-                fontWeight: "500",
-              }}
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={handleImportInventory}
+              disabled={!!sImporting}
+              style={buttonStyle}
             >
-              {sImporting === "inventory" ? "Importing..." : "Import Inventory"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleImportCustomers}
-            disabled={!!sImporting}
-            style={buttonStyle}
-          >
-            <Image_ icon={ICONS.importIcon} size={30} />
-            <Text
-              style={{
-                fontSize: 14,
-                color: C.text,
-                marginTop: 8,
-                fontWeight: "500",
-              }}
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                }}
+              >
+                {sImporting === "inventory" ? "Importing..." : "Import Inventory"}
+              </Text>
+            </TouchableOpacity>
+            <CheckBox_
+              isChecked={sClearInventory}
+              onCheck={() => _setClearInventory(!sClearInventory)}
+              text={"Clear existing"}
+              buttonStyle={{ marginTop: 7 }}
+            />
+          </View>
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={handleImportCustomers}
+              disabled={!!sImporting}
+              style={buttonStyle}
             >
-              {sImporting === "customers" ? "Importing..." : "Import Customers"}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleImportWorkorders}
-            disabled={!!sImporting}
-            style={buttonStyle}
-          >
-            <Image_ icon={ICONS.importIcon} size={30} />
-            <Text
-              style={{
-                fontSize: 14,
-                color: C.text,
-                marginTop: 8,
-                fontWeight: "500",
-              }}
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                }}
+              >
+                {sImporting === "customers" ? "Importing..." : "Import Customers"}
+              </Text>
+            </TouchableOpacity>
+            <CheckBox_
+              isChecked={sClearCustomers}
+              onCheck={() => _setClearCustomers(!sClearCustomers)}
+              text={"Clear existing"}
+              buttonStyle={{ marginTop: 7 }}
+            />
+          </View>
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={handleImportWorkorders}
+              disabled={!!sImporting}
+              style={buttonStyle}
             >
-              {sImporting === "workorders" ? "Importing..." : "Import Workorders"}
-            </Text>
-          </TouchableOpacity>
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                }}
+              >
+                {sImporting === "workorders" ? "Importing..." : "Import Workorders"}
+              </Text>
+            </TouchableOpacity>
+            <CheckBox_
+              isChecked={sClearWorkorders}
+              onCheck={() => _setClearWorkorders(!sClearWorkorders)}
+              text={"Clear existing"}
+              buttonStyle={{ marginTop: 7 }}
+            />
+          </View>
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={handleImportStatuses}
+              disabled={!!sImporting}
+              style={buttonStyle}
+            >
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                }}
+              >
+                {sImporting === "statuses" ? "Importing..." : "Import Statuses"}
+              </Text>
+            </TouchableOpacity>
+            <CheckBox_
+              isChecked={sClearStatuses}
+              onCheck={() => _setClearStatuses(!sClearStatuses)}
+              text={"Clear existing"}
+              buttonStyle={{ marginTop: 7 }}
+            />
+          </View>
         </View>
         {sResult ? (
           <Text style={{ fontSize: 13, color: C.green, marginTop: 10, textAlign: "center" }}>
             {sResult}
+          </Text>
+        ) : null}
+
+        {/* --- Lightspeed Import Section --- */}
+        <View style={{ width: "100%", height: 1, backgroundColor: C.buttonLightGreenOutline, marginTop: 20, marginBottom: 10 }} />
+        <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 10 }}>
+          Lightspeed Import
+        </Text>
+        <View
+          style={{
+            width: "100%",
+            flexDirection: "row",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={sLsConnected ? handleLsCheckConnection : handleLsConnect}
+              disabled={!!sLsImporting}
+              style={{
+                ...buttonStyle,
+                opacity: sLsImporting ? 0.5 : 1,
+                backgroundColor: sLsConnected ? C.green : C.listItemWhite,
+              }}
+            >
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: sLsConnected ? "white" : C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                  textAlign: "center",
+                }}
+              >
+                {sLsImporting === "connecting"
+                  ? "Connecting..."
+                  : sLsImporting === "checking"
+                  ? "Checking..."
+                  : sLsConnected
+                  ? "Connected"
+                  : "Connect to Lightspeed"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {!sLsConnected && (
+            <View style={{ alignItems: "center", margin: 10 }}>
+              <TouchableOpacity
+                onPress={handleLsCheckConnection}
+                disabled={!!sLsImporting}
+                style={{
+                  ...buttonStyle,
+                  opacity: sLsImporting ? 0.5 : 1,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: C.text,
+                    fontWeight: "500",
+                    textAlign: "center",
+                  }}
+                >
+                  {sLsImporting === "checking" ? "Checking..." : "Check Connection"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={handleLsImport}
+              disabled={!!sLsImporting || !sLsConnected}
+              style={{
+                ...buttonStyle,
+                opacity: sLsImporting || !sLsConnected ? 0.5 : 1,
+              }}
+            >
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                  textAlign: "center",
+                }}
+              >
+                {sLsImporting === "importing" ? "Importing..." : "Import from Lightspeed"}
+              </Text>
+            </TouchableOpacity>
+            <CheckBox_
+              isChecked={sClearLsData}
+              onCheck={() => _setClearLsData(!sClearLsData)}
+              text={"Clear existing data"}
+              buttonStyle={{ marginTop: 7 }}
+            />
+          </View>
+        </View>
+        {sLsResult ? (
+          <Text style={{ fontSize: 13, color: sLsResult.startsWith("Error") ? C.red : C.green, marginTop: 10, textAlign: "center" }}>
+            {sLsResult}
           </Text>
         ) : null}
       </BoxContainerInnerComponent>

@@ -11,6 +11,7 @@ const Stripe = require("stripe");
 const { isArray } = require("lodash");
 const { onInit } = require("firebase-functions/v2/core");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const fetch = require("node-fetch");
 
 // Firebase Admin SDK - initialize once at module load (don't delete/recreate)
 let DB = null;
@@ -84,6 +85,8 @@ const stripeSecretKey = defineSecret("stripeSecretKey");
 const twilioSecretKey = defineSecret("twilioSecretKey");
 const twilioSecretAccountNumber = defineSecret("twilioSecretAccountNum");
 const firebaseServiceAccountKey = defineSecret("firebase-service-account-key");
+const lightspeedClientId = defineSecret("lightspeedClientId");
+const lightspeedClientSecret = defineSecret("lightspeedClientSecret");
 
 // initialization
 var stripe;
@@ -4093,5 +4096,609 @@ exports.newCheckoutCancelPaymentCallable = onCall(
         error.message || "Failed to reset reader"
       );
     }
+  }
+);
+
+// ============================================================================
+// LIGHTSPEED RETAIL R-SERIES API INTEGRATION
+// ============================================================================
+
+const LIGHTSPEED_OAUTH_URL = "https://cloud.lightspeedapp.com/oauth/authorize";
+const LIGHTSPEED_TOKEN_URL = "https://cloud.lightspeedapp.com/oauth/access_token.php";
+const LIGHTSPEED_API_BASE = "https://api.lightspeedapp.com/API/V3/Account";
+const LIGHTSPEED_CALLBACK_URL = "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/lightspeedOAuthCallback";
+
+// --- Lightspeed Helpers (internal) ---
+
+async function refreshLightspeedToken(db, tenantID, storeID) {
+  const docRef = db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("integrations").doc("lightspeed");
+  const doc = await docRef.get();
+  if (!doc.exists) throw new Error("No Lightspeed integration found");
+
+  const data = doc.data();
+  const res = await fetch(LIGHTSPEED_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: data.refreshToken,
+      client_id: lightspeedClientId.value(),
+      client_secret: lightspeedClientSecret.value(),
+    }).toString(),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    log("Lightspeed token refresh failed", errText);
+    throw new Error("Token refresh failed: " + errText);
+  }
+
+  const tokens = await res.json();
+  const updated = {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token || data.refreshToken,
+    expiresAt: Date.now() + (tokens.expires_in * 1000),
+  };
+  await docRef.update(updated);
+  return updated.accessToken;
+}
+
+async function getLightspeedToken(db, tenantID, storeID) {
+  const docRef = db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("integrations").doc("lightspeed");
+  const doc = await docRef.get();
+  if (!doc.exists) throw new Error("No Lightspeed integration found");
+
+  const data = doc.data();
+  if (Date.now() >= data.expiresAt - 60000) {
+    return await refreshLightspeedToken(db, tenantID, storeID);
+  }
+  return data.accessToken;
+}
+
+async function lightspeedGet(accessToken, accountID, endpoint, params = {}) {
+  const url = new URL(`${LIGHTSPEED_API_BASE}/${accountID}/${endpoint}.json`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  // Rate limit handling
+  const bucketLevel = res.headers.get("x-ls-api-bucket-level");
+  if (bucketLevel) {
+    const [current, max] = bucketLevel.split("/").map(Number);
+    if (current > 80) {
+      log("Lightspeed rate limit high, waiting 5s", bucketLevel);
+      await new Promise(r => setTimeout(r, 5000));
+    } else if (current > 70) {
+      log("Lightspeed rate limit approaching, waiting 2s", bucketLevel);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Lightspeed API error ${res.status}: ${errText}`);
+  }
+
+  return await res.json();
+}
+
+async function lightspeedGetAll(accessToken, accountID, endpoint, params = {}) {
+  let allItems = [];
+  let offset = 0;
+  const limit = 100;
+
+  while (true) {
+    const data = await lightspeedGet(accessToken, accountID, endpoint, {
+      ...params,
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+
+    // Lightspeed wraps results in the endpoint name (e.g. "Customer", "Workorder")
+    const key = endpoint.replace(/\?.*/g, "");
+    const items = data[key];
+    if (!items) break;
+
+    const arr = Array.isArray(items) ? items : [items];
+    allItems = allItems.concat(arr);
+
+    const attrs = data["@attributes"];
+    if (!attrs || allItems.length >= parseInt(attrs.count)) break;
+
+    offset += limit;
+  }
+
+  return allItems;
+}
+
+function lsCleanPhone(str) {
+  if (!str) return "";
+  const digits = str.replace(/\D/g, "");
+  if (digits.length === 11 && digits[0] === "1") return digits.slice(1);
+  return digits.length === 10 ? digits : "";
+}
+
+// --- Lightspeed OAuth: Initiate ---
+
+exports.lightspeedInitiateAuth = onCall(
+  { secrets: [lightspeedClientId, firebaseServiceAccountKey] },
+  async (request) => {
+    log("Lightspeed: initiate auth", request.data);
+    const { tenantID, storeID } = request.data;
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "tenantID and storeID required");
+    }
+
+    const state = Buffer.from(JSON.stringify({ tenantID, storeID })).toString("base64");
+    const authUrl = `${LIGHTSPEED_OAUTH_URL}?response_type=code&client_id=${lightspeedClientId.value()}&scope=employee:all&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(LIGHTSPEED_CALLBACK_URL)}`;
+
+    return { success: true, authUrl };
+  }
+);
+
+// --- Lightspeed OAuth: Callback (HTTP endpoint) ---
+
+exports.lightspeedOAuthCallback = onRequest(
+  { cors: true, secrets: [lightspeedClientId, lightspeedClientSecret, firebaseServiceAccountKey] },
+  async (req, res) => {
+    log("Lightspeed: OAuth callback", { query: req.query });
+
+    const { code, state } = req.query;
+    if (!code || !state) {
+      return res.status(400).send("Missing code or state parameter");
+    }
+
+    let tenantID, storeID;
+    try {
+      const decoded = JSON.parse(Buffer.from(state, "base64").toString("utf8"));
+      tenantID = decoded.tenantID;
+      storeID = decoded.storeID;
+    } catch (e) {
+      return res.status(400).send("Invalid state parameter");
+    }
+
+    // Exchange code for tokens
+    const tokenRes = await fetch(LIGHTSPEED_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        client_id: lightspeedClientId.value(),
+        client_secret: lightspeedClientSecret.value(),
+        redirect_uri: LIGHTSPEED_CALLBACK_URL,
+      }).toString(),
+    });
+
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text();
+      log("Lightspeed: token exchange failed", errText);
+      return res.status(500).send("Token exchange failed: " + errText);
+    }
+
+    const tokens = await tokenRes.json();
+    log("Lightspeed: token exchange success", { hasAccess: !!tokens.access_token });
+
+    // Get account ID from the token response or from an API call
+    let accountID = "";
+    try {
+      const accountRes = await fetch(`${LIGHTSPEED_API_BASE}.json`, {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      const accountData = await accountRes.json();
+      if (accountData.Account) {
+        accountID = Array.isArray(accountData.Account)
+          ? accountData.Account[0].accountID
+          : accountData.Account.accountID;
+      }
+    } catch (e) {
+      log("Lightspeed: could not fetch account ID", e.message);
+    }
+
+    // Save tokens to Firestore
+    const db = await getDB(firebaseServiceAccountKey);
+    await db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("integrations").doc("lightspeed")
+      .set({
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresAt: Date.now() + (tokens.expires_in * 1000),
+        accountID,
+        connectedAt: Date.now(),
+      });
+
+    log("Lightspeed: tokens saved to Firestore", { tenantID, storeID, accountID });
+
+    res.status(200).send(`
+      <html>
+        <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
+          <div style="text-align:center;">
+            <h2>Connected to Lightspeed!</h2>
+            <p>You can close this tab and return to the app.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+);
+
+// --- Lightspeed: Check Connection ---
+
+exports.lightspeedCheckConnection = onCall(
+  { secrets: [lightspeedClientId, lightspeedClientSecret, firebaseServiceAccountKey] },
+  async (request) => {
+    log("Lightspeed: check connection", request.data);
+    const { tenantID, storeID } = request.data;
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "tenantID and storeID required");
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const docRef = db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("integrations").doc("lightspeed");
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return { connected: false, error: "Not connected" };
+    }
+
+    try {
+      const accessToken = await getLightspeedToken(db, tenantID, storeID);
+      const data = doc.data();
+      const accountRes = await lightspeedGet(accessToken, data.accountID, "");
+      const accountName = accountRes.Account ? accountRes.Account.name : "";
+      return { connected: true, accountName };
+    } catch (e) {
+      log("Lightspeed: connection check failed", e.message);
+      return { connected: false, error: e.message };
+    }
+  }
+);
+
+// --- Lightspeed: Import Data ---
+
+exports.lightspeedImportData = onCall(
+  {
+    secrets: [lightspeedClientId, lightspeedClientSecret, firebaseServiceAccountKey],
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async (request) => {
+    log("Lightspeed: import data", request.data);
+    const { tenantID, storeID, importType, clearExisting } = request.data;
+    if (!tenantID || !storeID || !importType) {
+      throw new HttpsError("invalid-argument", "tenantID, storeID, and importType required");
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const docData = (await db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("integrations").doc("lightspeed").get()).data();
+
+    if (!docData) throw new HttpsError("not-found", "Lightspeed not connected");
+
+    const accessToken = await getLightspeedToken(db, tenantID, storeID);
+    const accountID = docData.accountID;
+    const basePath = `tenants/${tenantID}/stores/${storeID}`;
+
+    let result = { success: true };
+
+    // --- Import Customers ---
+    if (importType === "customers" || importType === "all") {
+      log("Lightspeed: fetching customers...");
+      const lsCustomers = await lightspeedGetAll(accessToken, accountID, "Customer", {
+        load_relations: "all",
+      });
+      log("Lightspeed: fetched customers", lsCustomers.length);
+
+      // Map to app proto
+      const mapped = [];
+      for (const c of lsCustomers) {
+        let cell = "";
+        let landline = "";
+
+        // Extract phones from Contact.Phones.ContactPhone
+        if (c.Contact && c.Contact.Phones && c.Contact.Phones.ContactPhone) {
+          const phones = Array.isArray(c.Contact.Phones.ContactPhone)
+            ? c.Contact.Phones.ContactPhone
+            : [c.Contact.Phones.ContactPhone];
+          for (const p of phones) {
+            const clean = lsCleanPhone(p.number);
+            if (!clean) continue;
+            if (!cell) { cell = clean; }
+            else if (!landline) { landline = clean; break; }
+          }
+        }
+
+        // Extract email
+        let email = "";
+        if (c.Contact && c.Contact.Emails && c.Contact.Emails.ContactEmail) {
+          const emails = Array.isArray(c.Contact.Emails.ContactEmail)
+            ? c.Contact.Emails.ContactEmail
+            : [c.Contact.Emails.ContactEmail];
+          if (emails.length > 0 && emails[0].address) {
+            email = emails[0].address;
+          }
+        }
+
+        // Extract address
+        let streetAddress = "", city = "", state = "", zip = "", unit = "";
+        if (c.Contact && c.Contact.Addresses && c.Contact.Addresses.ContactAddress) {
+          const addrs = Array.isArray(c.Contact.Addresses.ContactAddress)
+            ? c.Contact.Addresses.ContactAddress
+            : [c.Contact.Addresses.ContactAddress];
+          if (addrs.length > 0) {
+            const a = addrs[0];
+            streetAddress = a.address1 || "";
+            unit = a.address2 || "";
+            city = a.city || "";
+            state = a.state || "";
+            zip = a.zip || "";
+          }
+        }
+
+        const id = db.collection("_").doc().id; // generate Firestore ID
+
+        mapped.push({
+          first: (c.firstName || "").toLowerCase(),
+          last: (c.lastName || "").toLowerCase(),
+          cell,
+          landline,
+          contactRestriction: "",
+          email,
+          streetAddress,
+          unit,
+          city,
+          state,
+          zip,
+          addressNotes: "",
+          id,
+          interactionRating: "",
+          workorders: [],
+          previousBikes: [],
+          sales: [],
+          millisCreated: c.createTime ? new Date(c.createTime).getTime() : "",
+        });
+      }
+
+      // Deduplicate by phone
+      const phoneMap = new Map();
+      const noPhone = [];
+      for (const cust of mapped) {
+        if (!cust.cell) { noPhone.push(cust); continue; }
+        if (phoneMap.has(cust.cell)) {
+          const existing = phoneMap.get(cust.cell);
+          const existingFilled = Object.values(existing).filter(v => v !== "" && v !== 0).length;
+          const newFilled = Object.values(cust).filter(v => v !== "" && v !== 0).length;
+          if (newFilled > existingFilled) {
+            cust.id = existing.id;
+            phoneMap.set(cust.cell, cust);
+          }
+        } else {
+          phoneMap.set(cust.cell, cust);
+        }
+      }
+      const deduped = [...phoneMap.values(), ...noPhone];
+      const duplicatesRemoved = mapped.length - deduped.length;
+
+      // Clear existing if requested
+      if (clearExisting) {
+        const snap = await db.collection(`${basePath}/customers`).get();
+        const batch = db.batch();
+        let count = 0;
+        snap.forEach(doc => { batch.delete(doc.ref); count++; });
+        if (count > 0) await batch.commit();
+        log("Lightspeed: cleared existing customers", count);
+      }
+
+      // Save to Firestore
+      for (const cust of deduped) {
+        await db.collection(`${basePath}/customers`).doc(cust.id).set(cust);
+      }
+      log("Lightspeed: saved customers", deduped.length);
+
+      result.customerCount = deduped.length;
+      result.duplicatesRemoved = duplicatesRemoved;
+      result.customerMap = deduped; // pass to workorder linking
+    }
+
+    // --- Import Workorders ---
+    if (importType === "workorders" || importType === "all") {
+      log("Lightspeed: fetching workorders...");
+      const lsWorkorders = await lightspeedGetAll(accessToken, accountID, "Workorder", {
+        load_relations: '["WorkorderLines","WorkorderStatus","Customer"]',
+      });
+      log("Lightspeed: fetched workorders", lsWorkorders.length);
+
+      // Build customer name lookup from imported customers (if available)
+      let customerNameMap = new Map();
+      if (result.customerMap) {
+        for (const c of result.customerMap) {
+          const key = (c.first + " " + c.last).trim();
+          if (key) customerNameMap.set(key, c);
+        }
+      } else {
+        // Load existing customers for linking
+        const snap = await db.collection(`${basePath}/customers`).get();
+        snap.forEach(doc => {
+          const c = doc.data();
+          const key = (c.first + " " + c.last).trim();
+          if (key) customerNameMap.set(key, c);
+        });
+      }
+
+      // Color labels for extraction
+      const colorLabels = [
+        "White", "Blue", "Light-blue", "Red", "Green", "Black", "Yellow",
+        "Orange", "Maroon", "Brown", "Silver", "Tan", "Beige", "Pink",
+        "Purple", "Grey", "Gray",
+      ];
+      const colorMap = {
+        "white": { textColor: "black", backgroundColor: "whitesmoke", label: "White" },
+        "blue": { textColor: "white", backgroundColor: "blue", label: "Blue" },
+        "light-blue": { textColor: "black", backgroundColor: "lightblue", label: "Light-blue" },
+        "red": { textColor: "white", backgroundColor: "red", label: "Red" },
+        "green": { textColor: "white", backgroundColor: "green", label: "Green" },
+        "black": { textColor: "whitesmoke", backgroundColor: "black", label: "Black" },
+        "yellow": { textColor: "black", backgroundColor: "yellow", label: "Yellow" },
+        "orange": { textColor: "white", backgroundColor: "orange", label: "Orange" },
+        "maroon": { textColor: "white", backgroundColor: "maroon", label: "Maroon" },
+        "brown": { textColor: "white", backgroundColor: "rgb(139,69,19)", label: "Brown" },
+        "silver": { textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Silver" },
+        "tan": { textColor: "black", backgroundColor: "tan", label: "Tan" },
+        "beige": { textColor: "black", backgroundColor: "beige", label: "Beige" },
+        "pink": { textColor: "black", backgroundColor: "pink", label: "Pink" },
+        "purple": { textColor: "white", backgroundColor: "purple", label: "Purple" },
+        "grey": { textColor: "black", backgroundColor: "grey", label: "Grey" },
+        "gray": { textColor: "black", backgroundColor: "grey", label: "Grey" },
+      };
+      // Sort longest first to avoid "Blue" matching before "Light-blue"
+      colorLabels.sort((a, b) => b.length - a.length);
+
+      function extractColors(text) {
+        if (!text) return [];
+        const found = [];
+        for (const label of colorLabels) {
+          const regex = new RegExp(`\\b${label}\\b`, "i");
+          if (regex.test(text) && found.length < 2) {
+            const key = label.toLowerCase();
+            if (colorMap[key] && !found.find(f => f.label === colorMap[key].label)) {
+              found.push({ ...colorMap[key] });
+            }
+          }
+        }
+        return found;
+      }
+
+      // Map workorders
+      const woMapped = [];
+      let linked = 0, unlinked = 0;
+
+      for (const wo of lsWorkorders) {
+        const id = db.collection("_").doc().id;
+
+        // Build description from notes
+        let description = wo.note || "";
+        if (wo.WorkorderLines && wo.WorkorderLines.WorkorderLine) {
+          const lines = Array.isArray(wo.WorkorderLines.WorkorderLine)
+            ? wo.WorkorderLines.WorkorderLine
+            : [wo.WorkorderLines.WorkorderLine];
+          for (const line of lines) {
+            if (line.note) {
+              description += (description ? " | " : "") + line.note;
+            }
+          }
+        }
+
+        // Customer linking
+        let customerID = "", customerFirst = "", customerLast = "", customerPhone = "";
+        if (wo.Customer) {
+          customerFirst = (wo.Customer.firstName || "").toLowerCase();
+          customerLast = (wo.Customer.lastName || "").toLowerCase();
+          const nameKey = (customerFirst + " " + customerLast).trim();
+          const match = customerNameMap.get(nameKey);
+          if (match) {
+            customerID = match.id;
+            customerPhone = match.cell || "";
+            linked++;
+          } else {
+            unlinked++;
+          }
+        } else {
+          unlinked++;
+        }
+
+        // Status
+        let status = "";
+        if (wo.WorkorderStatus) {
+          status = wo.WorkorderStatus.name || "";
+        }
+
+        // Extract colors and part/source from all item descriptions
+        let allItemText = description;
+        let partOrdered = "";
+        let partSource = "";
+
+        // Check for PRODUCT -SOURCE pattern
+        const partMatch = allItemText.match(/([A-Z][A-Z0-9 /-]*?)\s+-([A-Z][A-Z0-9]+)\s*$/);
+        if (partMatch) {
+          partOrdered = partMatch[1].trim();
+          partSource = partMatch[2].trim();
+        }
+
+        const colors = extractColors(allItemText);
+        const color1 = colors[0] || { textColor: "", backgroundColor: "", label: "" };
+        const color2 = colors[1] || { textColor: "", backgroundColor: "", label: "" };
+
+        woMapped.push({
+          workorderNumber: wo.workorderID || "",
+          paymentComplete: false,
+          amountPaid: 0,
+          activeSaleID: "",
+          sales: [],
+          endedOnMillis: "",
+          saleID: "",
+          isStandaloneSale: false,
+          id,
+          customerID,
+          customerFirst,
+          customerLast,
+          customerPhone,
+          model: "",
+          brand: "",
+          description,
+          color1,
+          color2,
+          waitTime: "",
+          changeLog: [],
+          startedBy: "",
+          startedOnMillis: wo.timeIn ? new Date(wo.timeIn).getTime() : "",
+          finishedOnMillis: "",
+          partOrdered,
+          partSource,
+          itemIdArr: [],
+          workorderLines: [],
+          internalNotes: [],
+          customerNotes: [],
+          status,
+          taxFree: false,
+          archived: false,
+        });
+      }
+
+      // Clear existing if requested
+      if (clearExisting) {
+        const snap = await db.collection(`${basePath}/open-workorders`).get();
+        const batch = db.batch();
+        let count = 0;
+        snap.forEach(doc => { batch.delete(doc.ref); count++; });
+        if (count > 0) await batch.commit();
+        log("Lightspeed: cleared existing workorders", count);
+      }
+
+      // Save to Firestore
+      for (const wo of woMapped) {
+        await db.collection(`${basePath}/open-workorders`).doc(wo.id).set(wo);
+      }
+      log("Lightspeed: saved workorders", woMapped.length);
+
+      result.workorderCount = woMapped.length;
+      result.linked = linked;
+      result.unlinked = unlinked;
+    }
+
+    // Clean up internal data before returning
+    delete result.customerMap;
+
+    log("Lightspeed: import complete", result);
+    return result;
   }
 );

@@ -570,6 +570,18 @@ export const testCustomerPhoneWriteCallable = httpsCallable(
   functions,
   "testCustomerPhoneWrite"
 );
+export const lightspeedInitiateAuthCallable = httpsCallable(
+  functions,
+  "lightspeedInitiateAuth"
+);
+export const lightspeedCheckConnectionCallable = httpsCallable(
+  functions,
+  "lightspeedCheckConnection"
+);
+export const lightspeedImportDataCallable = httpsCallable(
+  functions,
+  "lightspeedImportData"
+);
 
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)

@@ -1,6 +1,6 @@
 /*eslint-disable*/
-import React, { use, useEffect, useState } from "react";
-import { View, FlatList, TextInput, Text } from "react-native-web";
+import React, { useEffect, useState } from "react";
+import { View, FlatList, Text, TouchableOpacity } from "react-native-web";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
@@ -48,6 +48,7 @@ export function InventoryComponent({}) {
   const [isReady, setIsReady] = useState(false);
   const [sCurrentParentID, _setCurrentParentID] = useState(null);
   const [sMenuPath, _setMenuPath] = useState([]);
+  const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
 
   // Timeout to batch all store updates and reduce re-renders
   useEffect(() => {
@@ -87,12 +88,12 @@ export function InventoryComponent({}) {
       });
     });
     res = Object.values(res);
-    // log("search arr res", res);
     _setSearchResults(res);
   }
 
   // Search function (now called by debounced TextInput_)
   const handleSearch = (searchTerm) => {
+    _setSelectedButtonID(null);
     if (searchTerm.length == 0) {
       _setSearchResults([]);
       return;
@@ -119,38 +120,76 @@ export function InventoryComponent({}) {
     let children = zQuickItemButtons.filter(
       (b) => b.parentID === buttonObj.id
     );
-    if (children.length > 0) {
-      _setMenuPath((prev) => [
-        ...prev,
-        { id: buttonObj.id, name: buttonObj.name },
-      ]);
-      _setCurrentParentID(buttonObj.id);
-    }
+    let hasChildren = children.length > 0;
+
+    // Resolve inventory items from IDs
     let items = [];
     buttonObj.items?.forEach((id) => {
       let item = zInventoryArr.find((i) => i.id === id);
       if (item) items.push(item);
     });
-    _setSearchResults(items);
+    let hasItems = items.length > 0;
+
+    if (hasChildren) {
+      // Button has children — show them as wrapping buttons in right panel
+      if (!buttonObj.parentID) {
+        // Root button: start a fresh menu path
+        _setMenuPath([{ id: buttonObj.id, name: buttonObj.name }]);
+      } else {
+        // Sub-button with its own children: drill deeper
+        _setMenuPath((prev) => [
+          ...prev,
+          { id: buttonObj.id, name: buttonObj.name },
+        ]);
+      }
+      _setCurrentParentID(buttonObj.id);
+
+      if (hasItems) {
+        _setSelectedButtonID(buttonObj.id);
+        _setSearchResults(items);
+      } else {
+        _setSelectedButtonID(null);
+        _setSearchResults([]);
+      }
+    } else {
+      // Leaf button (no children) — show its items in FlatList only
+      if (hasItems) {
+        _setSelectedButtonID(buttonObj.id);
+        _setSearchResults(items);
+      }
+      // Do NOT change sCurrentParentID or sMenuPath
+    }
     _setSearchTerm("");
   }
 
   function handleBackPress() {
     let path = [...sMenuPath];
     path.pop();
-    let newParentID = path.length > 0 ? path[path.length - 1].id : null;
-    _setMenuPath(path);
-    _setCurrentParentID(newParentID);
-    if (newParentID) {
+
+    if (path.length === 0) {
+      // Return to base state — no sub-menu open
+      _setCurrentParentID(null);
+      _setMenuPath([]);
+      _setSelectedButtonID(null);
+      _setSearchResults([]);
+    } else {
+      let newParentID = path[path.length - 1].id;
+      _setCurrentParentID(newParentID);
+      _setMenuPath(path);
+      // Show parent button's items if it has any
       let parentButton = zQuickItemButtons.find((b) => b.id === newParentID);
       let items = [];
       parentButton?.items?.forEach((id) => {
         let item = zInventoryArr.find((i) => i.id === id);
         if (item) items.push(item);
       });
-      _setSearchResults(items);
-    } else {
-      _setSearchResults([]);
+      if (items.length > 0) {
+        _setSelectedButtonID(newParentID);
+        _setSearchResults(items);
+      } else {
+        _setSelectedButtonID(null);
+        _setSearchResults([]);
+      }
     }
     _setSearchTerm("");
   }
@@ -181,10 +220,18 @@ export function InventoryComponent({}) {
     _setSearchTerm("");
     _setCurrentParentID(null);
     _setMenuPath([]);
+    _setSelectedButtonID(null);
   }
 
   //////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////
+
+  // Computed: children of current sub-menu level
+  let currentChildren = sCurrentParentID
+    ? (zQuickItemButtons || []).filter(
+        (b) => b.parentID === sCurrentParentID
+      )
+    : [];
 
   // Show loading state until all data is ready and component is ready
   if (!isDataLoaded || !isReady) {
@@ -247,7 +294,7 @@ export function InventoryComponent({}) {
           iconSize={25}
           useColorGradient={false}
           onPress={() => {
-            _setModalInventoryObjIdx(-1);
+            _setModalItem({});
           }}
         />
       </View>
@@ -258,10 +305,9 @@ export function InventoryComponent({}) {
           paddingTop: 10,
           justifyContent: "flex-start",
           height: "95%",
-          // backgroundColor: "green",
         }}
       >
-        {/**Quick items buttons vertical list */}
+        {/** Left column — ALWAYS shows root-level buttons */}
         <View
           style={{
             justifyContent: "flex-start",
@@ -269,51 +315,38 @@ export function InventoryComponent({}) {
             paddingHorizontal: 2,
           }}
         >
-          {sCurrentParentID !== null && (
-            <Button_
-              onPress={handleBackPress}
-              buttonStyle={{
-                borderWidth: 1,
-                borderRadius: 5,
-                borderColor: C.buttonLightGreenOutline,
-                marginBottom: 10,
-              }}
-              textStyle={{ fontSize: 13, fontWeight: 400, color: C.text }}
-              text={
-                "\u25C0  " +
-                (sMenuPath.length > 0
-                  ? sMenuPath[sMenuPath.length - 1].name
-                  : "Back")
-              }
-            />
-          )}
           {zQuickItemButtons
-            ?.filter((b) =>
-              sCurrentParentID === null
-                ? !b.parentID
-                : b.parentID === sCurrentParentID
-            )
-            .map((item) => (
-              <Button_
-                key={item.id}
-                onPress={() => handleQuickButtonPress(item)}
-                colorGradientArr={COLOR_GRADIENTS.blue}
-                buttonStyle={{
-                  borderWidth: 1,
-                  borderRadius: 5,
-                  borderColor: C.buttonLightGreenOutline,
-                  marginBottom: 10,
-                }}
-                textStyle={{
-                  fontSize: 14,
-                  fontWeight: 400,
-                  color: C.textWhite,
-                }}
-                text={item.name.toUpperCase()}
-              />
-            ))}
+            ?.filter((b) => !b.parentID)
+            .map((item) => {
+              let isActive =
+                sSelectedButtonID === item.id ||
+                (sMenuPath.length > 0 && sMenuPath[0].id === item.id);
+              return (
+                <Button_
+                  key={item.id}
+                  onPress={() => handleQuickButtonPress(item)}
+                  colorGradientArr={isActive ? [] : COLOR_GRADIENTS.blue}
+                  buttonStyle={{
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    borderColor: C.buttonLightGreenOutline,
+                    marginBottom: 10,
+                    backgroundColor: isActive
+                      ? "rgb(245,166,35)"
+                      : undefined,
+                  }}
+                  textStyle={{
+                    fontSize: 14,
+                    fontWeight: 400,
+                    color: isActive ? "white" : C.textWhite,
+                  }}
+                  text={item.name.toUpperCase()}
+                />
+              );
+            })}
         </View>
 
+        {/** Right panel — breadcrumbs + wrapping buttons + FlatList */}
         <View
           style={{
             height: "100%",
@@ -321,13 +354,127 @@ export function InventoryComponent({}) {
             paddingTop: 10,
             paddingLeft: 3,
             paddingRight: 3,
-            // backgroundColor: "green",
           }}
         >
+          {/** Section 1: Breadcrumbs + Back button (only when sub-menu is open) */}
+          {sCurrentParentID !== null && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <TouchableOpacity
+                onPress={handleBackPress}
+                style={{
+                  paddingVertical: 4,
+                  paddingHorizontal: 8,
+                  borderRadius: 5,
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  marginRight: 8,
+                }}
+              >
+                <Text style={{ fontSize: 12, color: C.text }}>
+                  {"\u25C0 Back"}
+                </Text>
+              </TouchableOpacity>
+              {sMenuPath.map((crumb, i) => (
+                <View
+                  key={crumb.id}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  {i > 0 && (
+                    <Text
+                      style={{
+                        color: gray(0.3),
+                        marginHorizontal: 4,
+                        fontSize: 13,
+                      }}
+                    >
+                      {">"}
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => {
+                      let newPath = sMenuPath.slice(0, i + 1);
+                      _setMenuPath(newPath);
+                      _setCurrentParentID(crumb.id);
+                      _setSelectedButtonID(null);
+                      _setSearchResults([]);
+                      _setSearchTerm("");
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          i === sMenuPath.length - 1 ? C.text : C.blue,
+                        fontSize: 13,
+                        fontWeight:
+                          i === sMenuPath.length - 1 ? "bold" : "normal",
+                      }}
+                    >
+                      {crumb.name || "(unnamed)"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/** Section 2: Wrapping child buttons (only when sub-menu has children) */}
+          {currentChildren.length > 0 && (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                marginBottom: 8,
+              }}
+            >
+              {currentChildren.map((btn) => {
+                let isSelected = sSelectedButtonID === btn.id;
+                let hasChildrenBelow = zQuickItemButtons.some(
+                  (b) => b.parentID === btn.id
+                );
+                return (
+                  <Button_
+                    key={btn.id}
+                    onPress={() => handleQuickButtonPress(btn)}
+                    colorGradientArr={isSelected ? [] : COLOR_GRADIENTS.blue}
+                    buttonStyle={{
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      borderColor: C.buttonLightGreenOutline,
+                      marginRight: 6,
+                      marginBottom: 6,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      backgroundColor: isSelected
+                        ? "rgb(245,166,35)"
+                        : undefined,
+                    }}
+                    textStyle={{
+                      fontSize: 13,
+                      fontWeight: 400,
+                      color: isSelected ? "white" : C.textWhite,
+                    }}
+                    text={
+                      btn.name.toUpperCase() +
+                      (hasChildrenBelow ? " \u25B6" : "")
+                    }
+                  />
+                );
+              })}
+            </View>
+          )}
+
+          {/** Section 3: FlatList — always present, fills remaining space */}
           <FlatList
             style={{
               width: "100%",
-              height: "100%",
+              flex: 1,
             }}
             data={[...sSearchResults]}
             renderItem={(item) => {

@@ -3241,68 +3241,19 @@ const QuickItemButtonsComponent = ({
         <BoxContainerInnerComponent
           style={{ width: "100%", alignItems: "center", borderWidth: 0, flex: 1 }}
         >
-          <View style={{ width: "100%", alignItems: "center", flex: 1 }}>
+          <View style={{ width: "100%" }}>
             <BoxButton1 onPress={handleAdd} />
-            <ScrollView
+            <View
               style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
                 marginTop: 10,
-                flex: 1,
-                width: "100%",
-              }}
-              contentContainerStyle={{
-                alignItems: "center",
               }}
             >
-              {topLevelButtons.map((btn, idx) => {
-                let globalIdx = allButtons.findIndex((b) => b.id === btn.id);
-                return (
-                  <View
-                    key={btn.id}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      marginBottom: 5,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "column",
-                        alignItems: "center",
-                        marginRight: 6,
-                      }}
-                    >
-                      <BoxButton1
-                        style={{ paddingHorizontal: 3 }}
-                        iconSize={18}
-                        icon={ICONS.upChevron}
-                        onPress={() => {
-                          let arr = moveItemInArr(
-                            zSettingsObj.quickItemButtons,
-                            globalIdx,
-                            "up"
-                          );
-                          handleSettingsFieldChange("quickItemButtons", arr);
-                        }}
-                      />
-                      <BoxButton1
-                        style={{ paddingHorizontal: 3, marginTop: 2 }}
-                        iconSize={18}
-                        icon={ICONS.downChevron}
-                        onPress={() => {
-                          let arr = moveItemInArr(
-                            zSettingsObj.quickItemButtons,
-                            globalIdx,
-                            "down"
-                          );
-                          handleSettingsFieldChange("quickItemButtons", arr);
-                        }}
-                      />
-                    </View>
-                    {renderButtonCard(btn, idx, false)}
-                  </View>
-                );
-              })}
-            </ScrollView>
+              {topLevelButtons.map((btn, idx) =>
+                renderButtonCard(btn, idx, true)
+              )}
+            </View>
           </View>
         </BoxContainerInnerComponent>
       </BoxContainerOuterComponent>

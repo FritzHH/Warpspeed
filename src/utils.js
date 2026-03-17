@@ -1094,7 +1094,7 @@ export function applyDiscountToWorkorderItem(
   returnAsDiscountObj
 ) {
   let discountObj = workorderLineObj.discountObj;
-  if (!discountObj.value) return workorderLineObj;
+  if (!discountObj || !discountObj.value) return workorderLineObj;
 
   let newPrice;
   let savings;

@@ -6,6 +6,7 @@ import {
   DB_NODES,
   MILLIS_IN_MINUTE,
   PRINT_OBJECT_REMOVAL_DELAY,
+  build_db_path,
 } from "./constants";
 import {
   firestoreWrite,
@@ -27,9 +28,11 @@ import {
   retrieveAvailableStripeReadersCallable,
   loginAppUserCallable,
   sendSMSEnhanced,
+  uploadFileToStorage,
+  storageDelete,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
-import { useSettingsStore } from "./stores";
+import { useSettingsStore, useLoginStore } from "./stores";
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -3049,5 +3052,54 @@ export async function dbGetCustomerMessages(
       count: 0,
       customerPhone: customerPhone,
     };
+  }
+}
+
+// ============================================================================
+// WORKORDER MEDIA
+// ============================================================================
+
+export async function dbUploadWorkorderMedia(workorderID, file) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    const currentUser = useLoginStore.getState().currentUser;
+    const storagePath = build_db_path.cloudStorage.workorderAttachment(
+      workorderID,
+      "media",
+      tenantID,
+      storeID,
+      file.name
+    );
+
+    const result = await uploadFileToStorage(file, storagePath);
+
+    if (!result.success) {
+      return { success: false, error: "Upload failed" };
+    }
+
+    const mediaItem = {
+      id: generateRandomID(),
+      url: result.downloadURL,
+      storagePath: result.path,
+      type: file.type.startsWith("video") ? "video" : "image",
+      filename: file.name,
+      uploadedAt: Date.now(),
+      uploadedBy: currentUser?.id || null,
+    };
+
+    return { success: true, mediaItem };
+  } catch (error) {
+    log("Error in dbUploadWorkorderMedia:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function dbDeleteWorkorderMedia(storagePath) {
+  try {
+    await storageDelete(storagePath);
+    return { success: true };
+  } catch (error) {
+    log("Error in dbDeleteWorkorderMedia:", error);
+    return { success: false, error: error.message };
   }
 }

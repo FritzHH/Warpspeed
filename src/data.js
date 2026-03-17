@@ -309,6 +309,29 @@ export const SALE_PROTO = {
   refunds: [],
 };
 
+export const SALE_INDEX_PROTO = {
+  id: "",
+  type: "sale",
+  saleID: "",
+  millis: 0,
+  customerFirst: "",
+  customerLast: "",
+  customerPhone: "",
+  customerID: "",
+  total: 0,
+  subtotal: 0,
+  tax: 0,
+  salesTaxPercent: 0,
+  discount: 0,
+  amountRefunded: 0,
+  itemCount: 0,
+  highestItemName: "",
+  highestItemPrice: 0,
+  isStandaloneSale: false,
+  workorderIDs: [],
+  paymentType: "",
+};
+
 // workorder stuff ////////////////////////////////////////////////////
 export const WORKORDER_PROTO = {
   workorderNumber: "",
@@ -350,7 +373,8 @@ export const WORKORDER_PROTO = {
   customerNotes: [],
   status: "",
   taxFree: false,
-  archived: false
+  archived: false,
+  media: [],
 };
 
 export const WORKORDER_ITEM_PROTO = {

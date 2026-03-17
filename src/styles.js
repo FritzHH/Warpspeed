@@ -33,7 +33,7 @@ export const Colors = {
 export const C = {
   green: "rgb(33, 148, 86)",
   purple: "",
-  orange: "",
+  orange: "#e67e22",
   blue: "rgb(53, 135, 210)",
   lightred: "rgb(227, 116, 112)",
   cursorRed: "#ff6b6b",

@@ -6,6 +6,7 @@ import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
 import {
   formatCurrencyDisp,
+  generateRandomID,
   generateUPCBarcode,
   gray,
   lightenRGBByPercent,
@@ -28,8 +29,8 @@ import {
 
 function getQuickButtonFontSize(text, baseFontSize) {
   let len = (text || "").length;
-  if (len <= 8) return baseFontSize;
-  return Math.max(7, Math.round(baseFontSize - (len - 8) * 0.5));
+  if (len <= 15) return baseFontSize;
+  return Math.max(7, Math.round(baseFontSize - (len - 15) * 0.5));
 }
 
 export function InventoryComponent({}) {
@@ -300,7 +301,9 @@ export function InventoryComponent({}) {
           iconSize={25}
           useColorGradient={false}
           onPress={() => {
-            _setModalItem({});
+            let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
+            newItem.id = generateRandomID();
+            _setModalItem(newItem);
           }}
         />
       </View>
@@ -337,13 +340,17 @@ export function InventoryComponent({}) {
                     borderRadius: 5,
                     borderColor: C.buttonLightGreenOutline,
                     marginBottom: 10,
+                    paddingHorizontal: 2,
+                    paddingLeft: 2,
                     backgroundColor: isActive
                       ? "rgb(245,166,35)"
                       : undefined,
                   }}
+                  numLines={item.name.length > 17 ? 2 : 1}
                   textStyle={{
                     fontSize: getQuickButtonFontSize(item.name, 14),
                     fontWeight: 400,
+                    textAlign: "center",
                     color: isActive ? "white" : C.textWhite,
                   }}
                   text={item.name.toUpperCase()}
@@ -613,6 +620,7 @@ export function InventoryComponent({}) {
         {sModalItem && (
           <InventoryItemModalScreen
             item={sModalItem}
+            isNew={!!(sModalItem.id && !sModalItem.formalName)}
             handleExit={() => _setModalItem(null)}
           />
         )}

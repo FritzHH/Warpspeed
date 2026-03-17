@@ -481,7 +481,6 @@ function MenuListLabelComponent({
 }) {
   let ICON_SIZE = 18;
   const [sOpacity, _setOpacity] = useState(1);
-  selected ? (icon = ICONS.check) : null;
   return (
     <TouchableOpacity
       onMouseEnter={() => _setOpacity(0.6)}
@@ -494,13 +493,17 @@ function MenuListLabelComponent({
         alignItems: "center",
         marginBottom: 4,
         opacity: sOpacity,
+        backgroundColor: selected ? C.orange : "transparent",
+        borderRadius: 5,
+        paddingVertical: 4,
+        paddingHorizontal: 6,
       }}
     >
       {!dropdownDataArr && (
         <Text
           style={{
             fontSize: 16,
-            color: gray(0.5),
+            color: selected ? C.textWhite : gray(0.5),
             fontWeight: "500",
           }}
         >
@@ -2267,13 +2270,17 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               </Text>
               <View
                 style={{
-                  width: "45%",
+                  width: "55%",
                   flexDirection: "row",
                   alignItems: "center",
                 }}
               >
-                <TextInput
-                  onChangeText={(val) => {
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  onChange={(e) => {
+                    let val = e.target.value;
                     let standardStoreHours =
                       zSettingsObj.storeHours.standard.map((o) => {
                         if (o.id === item.id) {
@@ -2299,44 +2306,31 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     textAlign: "right",
                     paddingRight: 2,
                     backgroundColor: "transparent",
-                    width: 30,
+                    width: 50,
                     fontSize: 15,
-                    marginVertical: 3,
+                    marginTop: 3,
+                    marginBottom: 3,
                     borderColor: C.buttonLightGreenOutline,
                     borderWidth: 1,
                     borderRadius: 5,
                     marginRight: 2,
-                    outlineColor: "transparent",
+                    outline: "none",
                   }}
                   value={item.open.split(":")[0]}
                 />
                 <Text>:</Text>
-                <TextInput
-                  style={{
-                    textAlign: "left",
-                    paddingLeft: 2,
-                    backgroundColor: "transparent",
-                    width: 30,
-                    fontSize: 15,
-                    marginVertical: 3,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    marginLeft: 2,
-                    outlineColor: gray(0.5),
-                    backgroundColor: "transparent",
-                    width: 30,
-                  }}
-                  onChangeText={(val) => {
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  onChange={(e) => {
+                    let val = e.target.value;
                     let standardStoreHours =
                       zSettingsObj.storeHours.standard.map((o) => {
-                        // if (val > 60 || val < 0) return;
-
                         if (o.id === item.id) {
                           let amPMSplit = o.open.split(" ");
                           let amPM = amPMSplit[1];
                           let hourMinSplit = amPMSplit[0].split(":");
-                          // if (val === "0") val = "00";
                           return {
                             ...o,
                             open: hourMinSplit[0] + ":" + val + " " + amPM,
@@ -2350,6 +2344,20 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       special: zSettingsObj.storeHours.special,
                     });
                   }}
+                  style={{
+                    textAlign: "left",
+                    paddingLeft: 2,
+                    backgroundColor: "transparent",
+                    width: 50,
+                    fontSize: 15,
+                    marginTop: 3,
+                    marginBottom: 3,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    marginLeft: 2,
+                    outline: "none",
+                  }}
                   value={item.open.split(":")[1].split(" ")[0]}
                 />
                 <Image_
@@ -2357,21 +2365,12 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   // size={13}
                   icon={ICONS.rightArrowBlue}
                 />
-                <TextInput
-                  style={{
-                    textAlign: "right",
-                    paddingRight: 2,
-                    backgroundColor: "transparent",
-                    width: 30,
-                    fontSize: 15,
-                    marginVertical: 3,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    marginRight: 2,
-                    outlineColor: "transparent",
-                  }}
-                  onChangeText={(val) => {
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  onChange={(e) => {
+                    let val = e.target.value;
                     let standardStoreHours =
                       zSettingsObj.storeHours.standard.map((o) => {
                         if (o.id === item.id) {
@@ -2393,35 +2392,35 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       special: zSettingsObj.storeHours.special,
                     });
                   }}
-                  value={item.close.split(":")[0]}
-                />
-                <Text>:</Text>
-                <TextInput
                   style={{
-                    textAlign: "left",
-                    paddingLeft: 2,
+                    textAlign: "right",
+                    paddingRight: 2,
                     backgroundColor: "transparent",
-                    width: 30,
+                    width: 50,
                     fontSize: 15,
-                    marginVertical: 3,
+                    marginTop: 3,
+                    marginBottom: 3,
                     borderColor: C.buttonLightGreenOutline,
                     borderWidth: 1,
                     borderRadius: 5,
-                    marginLeft: 2,
-                    outlineColor: "transparent",
-                    backgroundColor: "transparent",
-                    width: 30,
+                    marginRight: 2,
+                    outline: "none",
                   }}
-                  onChangeText={(val) => {
+                  value={item.close.split(":")[0]}
+                />
+                <Text>:</Text>
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  onChange={(e) => {
+                    let val = e.target.value;
                     let standardStoreHours =
                       zSettingsObj.storeHours.standard.map((o) => {
-                        // if (val > 60 || val < 0) return;
-
                         if (o.id === item.id) {
                           let amPMSplit = o.close.split(" ");
                           let amPM = amPMSplit[1];
                           let hourMinSplit = amPMSplit[0].split(":");
-                          // if (val === "0") val = "00";
                           return {
                             ...o,
                             close: hourMinSplit[0] + ":" + val + " " + amPM,
@@ -2434,6 +2433,20 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       standard: standardStoreHours,
                       special: zSettingsObj.storeHours.special,
                     });
+                  }}
+                  style={{
+                    textAlign: "left",
+                    paddingLeft: 2,
+                    backgroundColor: "transparent",
+                    width: 50,
+                    fontSize: 15,
+                    marginTop: 3,
+                    marginBottom: 3,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    marginLeft: 2,
+                    outline: "none",
                   }}
                   value={item.close.split(":")[1].split(" ")[0]}
                 />
@@ -2449,6 +2462,19 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   buttonStyle={{ marginLeft: 20 }}
                   text={"Open"}
                   isChecked={item.isOpen}
+                  onCheck={() => {
+                    let standardStoreHours =
+                      zSettingsObj.storeHours.standard.map((o) => {
+                        if (o.id === item.id) {
+                          return { ...o, isOpen: !o.isOpen };
+                        }
+                        return o;
+                      });
+                    handleSettingsFieldChange("storeHours", {
+                      standard: standardStoreHours,
+                      special: zSettingsObj.storeHours.special,
+                    });
+                  }}
                 />
               </View>
             </View>
@@ -2695,11 +2721,21 @@ const WorkorderStatusesComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
 }) => {
-  // const [sExpand, _setExpand] = useState(true);
   const [sBackgroundColorWheelItem, _setBackgroundColorWheelItem] = useState();
   const [sTextColorWheelItem, _setTextColorWheelItem] = useState();
   const [sEditableInputIdx, _setEditableInputIdx] = useState(null);
-  const [sNewItem, _setNewItem] = useState();
+  const [sDragIdx, _setDragIdx] = useState(null);
+  const [sDragOverIdx, _setDragOverIdx] = useState(null);
+
+  function reorderStatuses(fromIdx, toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+    let statuses = [...(zSettingsObj?.statuses || [])];
+    let [dragged] = statuses.splice(fromIdx, 1);
+    statuses.splice(toIdx, 0, dragged);
+    handleSettingsFieldChange("statuses", statuses);
+  }
+
+  let statuses = zSettingsObj?.statuses || [];
 
   return (
     <BoxContainerOuterComponent style={{}}>
@@ -2742,247 +2778,245 @@ const WorkorderStatusesComponent = ({
                 proto.backgroundColor = gray(0.3);
                 proto.textColor = C.text;
                 proto.removable = true;
-                let statuses = [proto, ...zSettingsObj.statuses];
-                handleSettingsFieldChange("statuses", statuses);
+                let newStatuses = [proto, ...zSettingsObj.statuses];
+                handleSettingsFieldChange("statuses", newStatuses);
               }}
             />
           </View>
-          <FlatList
-            data={zSettingsObj?.statuses || []}
-            style={{
-              width: "100%",
-            }}
-            renderItem={(obj) => {
-              let idx = obj.index;
-              let item = obj.item;
-              // log(item);
-              return (
-                <View
+          {statuses.map((item, idx) => {
+            let isEditing = sEditableInputIdx === idx;
+            return (
+              <div
+                key={item.id}
+                style={{
+                  flexDirection: "column",
+                  alignItems: "center",
+                  width: "100%",
+                }}
+              >
+                <div
+                  draggable
+                  onDragStart={() => _setDragIdx(idx)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    _setDragOverIdx(idx);
+                  }}
+                  onDragEnd={() => {
+                    _setDragIdx(null);
+                    _setDragOverIdx(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    reorderStatuses(sDragIdx, idx);
+                    _setDragIdx(null);
+                    _setDragOverIdx(null);
+                  }}
                   style={{
-                    flexDirection: "column",
-                    alignItems: "center",
+                    display: "flex",
+                    flexDirection: "row",
                     width: "100%",
-                    justifyContent: "flex-end",
-                    // backgroundColor: "red",
+                    alignItems: "center",
+                    borderWidth: sDragOverIdx === idx ? 2 : 1,
+                    borderStyle: "solid",
+                    borderColor:
+                      sDragOverIdx === idx
+                        ? C.blue
+                        : C.buttonLightGreenOutline,
+                    borderRadius: 8,
+                    backgroundColor: C.listItemWhite,
+                    padding: 6,
+                    marginBottom: 4,
+                    cursor: "grab",
+                    opacity: sDragIdx === idx ? 0.5 : 1,
+                    position: "relative",
+                    boxSizing: "border-box",
                   }}
                 >
+                  {/* Status color bar + label */}
+                  <View
+                    style={{
+                      backgroundColor: item.backgroundColor,
+                      alignItems: "center",
+                      flexDirection: "row",
+                      flex: 1,
+                      height: 35,
+                      borderRadius: 5,
+                    }}
+                  >
+                    {!item.removable && (
+                      <View style={{ width: "10%" }} />
+                    )}
+                    <TextInput
+                      style={{
+                        width: "100%",
+                        textAlign: "center",
+                        color: item.textColor,
+                        outlineWidth: 0,
+                        paddingVertical: 4,
+                        fontSize: 13,
+                        borderWidth: 1,
+                        borderColor:
+                          isEditing && item.removable
+                            ? gray(0.4)
+                            : "transparent",
+                      }}
+                      onChangeText={(val) => {
+                        let newStatuses = zSettingsObj.statuses.map((o) => {
+                          if (o.id === item.id) return { ...o, label: val };
+                          return o;
+                        });
+                        handleSettingsFieldChange("statuses", newStatuses);
+                      }}
+                      editable={isEditing && item.removable}
+                      autoFocus={isEditing}
+                      value={item.label}
+                    />
+                    {!item.removable && (
+                      <View
+                        style={{
+                          width: "10%",
+                          height: "100%",
+                          alignItems: "flex-end",
+                          justifyContent: "flex-start",
+                          padding: 3,
+                        }}
+                      >
+                        <Image_ icon={ICONS.blocked} size={15} />
+                      </View>
+                    )}
+                  </View>
+                  {/* Controls: edit, delete, color pickers */}
                   <View
                     style={{
                       flexDirection: "row",
-                      width: "100%",
                       alignItems: "center",
-                      // justifyContent: "flex-end",
+                      marginLeft: 10,
                     }}
                   >
                     <BoxButton1
                       style={{ paddingHorizontal: 5 }}
-                      iconSize={22}
-                      icon={ICONS.upChevron}
-                      onPress={() => {
-                        let arr = moveItemInArr(
-                          zSettingsObj.statuses,
-                          idx,
-                          "up"
-                        );
-                        handleSettingsFieldChange("statuses", arr);
-                      }}
-                    />
-                    <BoxButton1
-                      style={{ paddingHorizontal: 5 }}
-                      iconSize={22}
-                      icon={ICONS.downChevron}
-                      onPress={() => {
-                        let arr = moveItemInArr(
-                          zSettingsObj.statuses,
-                          idx,
-                          "down"
-                        );
-                        handleSettingsFieldChange("statuses", arr);
-                      }}
-                    />
-
-                    <BoxButton1
-                      style={{ paddingHorizontal: 5 }}
-                      iconSize={22}
-                      icon={ICONS.editPencil}
+                      iconSize={17}
+                      icon={isEditing ? ICONS.clickHere : ICONS.editPencil}
                       onPress={() =>
                         _setEditableInputIdx(
-                          sEditableInputIdx === null ||
-                            (sEditableInputIdx && sEditableInputIdx != idx)
-                            ? idx
-                            : null
+                          isEditing ? null : idx
                         )
                       }
                     />
                     <BoxButton1
-                      style={{
-                        paddingHorizontal: 5,
-                        paddingRight: 5,
-                        marginRight: 20,
-                      }}
+                      style={{ paddingHorizontal: 5 }}
                       iconSize={15}
                       icon={ICONS.close1}
                       onPress={() => {
-                        let statuses = zSettingsObj.statuses.filter(
+                        let newStatuses = zSettingsObj.statuses.filter(
                           (o) => o.id != item.id
                         );
-                        handleSettingsFieldChange("statuses", statuses);
+                        handleSettingsFieldChange("statuses", newStatuses);
                       }}
                     />
-                    <View
-                      style={{
-                        backgroundColor: item.backgroundColor,
-                        alignItems: "center",
-                        // justifyContent: ''
-                        flexDirection: "row",
-                        width: "50%",
-                        height: 35,
-                        // paddingHorizontal: 20,
-                        // paddingVertical: 5,
-                        borderTopLeftRadius: idx === 0 ? 5 : 0,
-                        borderTopRightRadius: idx === 0 ? 5 : 0,
-                        borderBottomLeftRadius:
-                          idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
-                        borderBottomRightRadius:
-                          idx === zSettingsObj.statuses.length - 1 ? 5 : 0,
+                    <BoxButton1
+                      style={{ paddingHorizontal: 5 }}
+                      iconSize={23}
+                      icon={ICONS.colorWheel}
+                      onPress={() => {
+                        if (sBackgroundColorWheelItem?.id === item.id) {
+                          _setBackgroundColorWheelItem();
+                          _setTextColorWheelItem();
+                        } else {
+                          _setBackgroundColorWheelItem(item);
+                          _setTextColorWheelItem();
+                        }
                       }}
-                    >
-                      {!!!item.removable && (
-                        <View
-                          style={{
-                            width: "10%",
-                          }}
-                        />
-                      )}
-                      <TextInput
-                        style={{
-                          width: "100%",
-                          textAlign: "center",
-                          color: item.textColor,
-                          outlineWidth: 0,
-                          paddingVertical: 4,
-                          fontSize: 13,
-                          borderWidth: 1,
-                          borderColor:
-                            sEditableInputIdx === idx && item.removable
-                              ? gray(0.4)
-                              : "transparent",
-                        }}
-                        onChangeText={(val) => {
-                          let statuses = zSettingsObj.statuses.map((o) => {
-                            if (o.id === item.id) return { ...o, label: val };
-                            return o;
-                          });
-                          handleSettingsFieldChange("statuses", statuses);
-                        }}
-                        editable={sEditableInputIdx === idx && item.removable}
-                        autoFocus={sEditableInputIdx === idx}
-                        value={item.label}
-                      />
-                      {!!!item.removable && (
-                        <View
-                          style={{
-                            width: "10%",
-                            height: "100%",
-                            alignItems: "flex-end",
-                            justifyContent: "flex-start",
-                            padding: 3,
-                          }}
-                        >
-                          <Image_ icon={ICONS.blocked} size={15} />
-                        </View>
-                      )}
-                    </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        width: "15%",
-                        justifyContent: "space-between",
-                        // backgroundColor: "blue",
-                        paddingLeft: 20,
+                    />
+                    <BoxButton1
+                      onPress={() => {
+                        if (sTextColorWheelItem?.id === item.id) {
+                          _setBackgroundColorWheelItem();
+                          _setTextColorWheelItem();
+                        } else {
+                          _setBackgroundColorWheelItem();
+                          _setTextColorWheelItem(item);
+                        }
                       }}
-                    >
-                      <BoxButton1
-                        style={{ paddingHorizontal: 7 }}
-                        iconSize={23}
-                        icon={ICONS.colorWheel}
-                        onPress={() => {
-                          if (sBackgroundColorWheelItem) {
-                            _setBackgroundColorWheelItem();
-                            _setTextColorWheelItem();
-                          } else {
-                            _setBackgroundColorWheelItem(item);
-                            _setTextColorWheelItem();
-                          }
-                        }}
-                      />
-                      <BoxButton1
-                        onPress={() => {
-                          if (sTextColorWheelItem) {
-                            _setBackgroundColorWheelItem();
-                            _setTextColorWheelItem();
-                          } else {
-                            _setBackgroundColorWheelItem();
-                            _setTextColorWheelItem(item);
-                          }
-                        }}
-                        style={{ paddingHorizontal: 7 }}
-                        iconSize={22}
-                        icon={ICONS.letterT}
-                      />
-                    </View>
+                      style={{ paddingHorizontal: 5 }}
+                      iconSize={22}
+                      icon={ICONS.letterT}
+                    />
                   </View>
-
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      width: "100%",
-                      justifyContent: "flex-end",
-                      paddingRight: "21%",
-                    }}
-                  >
-                    {!!sBackgroundColorWheelItem?.id === item.id && (
-                      <ColorWheel
-                        initialColor={item.backgroundColor}
-                        style={{ marginVertical: 7 }}
-                        onColorChange={(val) => {
-                          let back = val.hex;
-                          let text = bestForegroundHex(val.hex);
-                          let statuses = zSettingsObj.statuses.map((o) => {
-                            if (o.id === item.id)
-                              return {
-                                ...o,
-                                backgroundColor: back,
-                                textColor: text,
-                              };
-                            return o;
-                          });
-                          handleSettingsFieldChange("statuses", statuses);
-                        }}
-                      />
-                    )}
-                    {!!sTextColorWheelItem?.id === item.id && (
-                      <ColorWheel
-                        initialColor={item.textColor}
-                        style={{ marginVertical: 7 }}
-                        onColorChange={(val) => {
-                          let statuses = zSettingsObj.statuses.map((o) => {
-                            if (o.id === item.id)
-                              return {
-                                ...o,
-                                textColor: val.hex,
-                              };
-                            return o;
-                          });
-                          handleSettingsFieldChange("statuses", statuses);
-                        }}
-                      />
-                    )}
-                  </View>
+                  {/* Drag direction indicators */}
+                  {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
+                    <Image_
+                      icon={ICONS.backRed}
+                      size={14}
+                      style={{
+                        position: "absolute",
+                        bottom: 4,
+                        left: 4,
+                      }}
+                    />
+                  )}
+                  {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx < idx && (
+                    <Image_
+                      icon={ICONS.rightArrowBlue}
+                      size={14}
+                      style={{
+                        position: "absolute",
+                        bottom: 4,
+                        left: 4,
+                      }}
+                    />
+                  )}
+                </div>
+                {/* Color wheel pickers */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    width: "100%",
+                    justifyContent: "flex-end",
+                    paddingRight: "5%",
+                  }}
+                >
+                  {sBackgroundColorWheelItem?.id === item.id && (
+                    <ColorWheel
+                      initialColor={item.backgroundColor}
+                      style={{ marginVertical: 7 }}
+                      onColorChange={(val) => {
+                        let back = val.hex;
+                        let text = bestForegroundHex(val.hex);
+                        let newStatuses = zSettingsObj.statuses.map((o) => {
+                          if (o.id === item.id)
+                            return {
+                              ...o,
+                              backgroundColor: back,
+                              textColor: text,
+                            };
+                          return o;
+                        });
+                        handleSettingsFieldChange("statuses", newStatuses);
+                      }}
+                    />
+                  )}
+                  {sTextColorWheelItem?.id === item.id && (
+                    <ColorWheel
+                      initialColor={item.textColor}
+                      style={{ marginVertical: 7 }}
+                      onColorChange={(val) => {
+                        let newStatuses = zSettingsObj.statuses.map((o) => {
+                          if (o.id === item.id)
+                            return {
+                              ...o,
+                              textColor: val.hex,
+                            };
+                          return o;
+                        });
+                        handleSettingsFieldChange("statuses", newStatuses);
+                      }}
+                    />
+                  )}
                 </View>
-              );
-            }}
-          />
+              </div>
+            );
+          })}
         </View>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
@@ -3039,14 +3073,12 @@ const QuickItemButtonsComponent = ({
   function handleDelete(btn) {
     if (btn.id === "labor" || btn.id === "part") return;
     let deletedParentID = btn.parentID || null;
-    handleSettingsFieldChange(
-      "quickItemButtons",
-      zSettingsObj.quickItemButtons
-        .filter((o) => o.id !== btn.id)
-        .map((o) =>
-          o.parentID === btn.id ? { ...o, parentID: deletedParentID } : o
-        )
-    );
+    let updated = zSettingsObj.quickItemButtons
+      .filter((o) => o.id !== btn.id)
+      .map((o) =>
+        o.parentID === btn.id ? { ...o, parentID: deletedParentID } : o
+      );
+    useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
   function handleNameChange(btn, val) {
@@ -3075,13 +3107,14 @@ const QuickItemButtonsComponent = ({
     if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
     let allButtons = [...zSettingsObj.quickItemButtons];
     let children = allButtons.filter(
-      (b) => b.parentID === sCurrentParentID
+      (b) => sCurrentParentID === null ? !b.parentID : b.parentID === sCurrentParentID
     );
     let [dragged] = children.splice(fromIdx, 1);
     children.splice(toIdx, 0, dragged);
     let childIndex = 0;
+    let isMatch = sCurrentParentID === null ? (b) => !b.parentID : (b) => b.parentID === sCurrentParentID;
     let result = allButtons.map((b) => {
-      if (b.parentID === sCurrentParentID) return children[childIndex++];
+      if (isMatch(b)) return children[childIndex++];
       return b;
     });
     handleSettingsFieldChange("quickItemButtons", result);

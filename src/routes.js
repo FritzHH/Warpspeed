@@ -8,5 +8,10 @@ export const ROUTES = {
   login: "/login",
   dashboard: "/",
   home: "/",
+  mobile: {
+    home: "/",
+    workorders: "/workorders",
+    workorderDetail: "/workorder/:id",
+  },
 };
 

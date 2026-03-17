@@ -540,6 +540,45 @@ exports.stripeEventWebhook = onRequest(
           log("Error retrieving payment details", stripeError);
           // Continue execution - don't fail the webhook for this
         }
+      } else if (action.status === "failed") {
+        log("Payment attempt failed", action);
+
+        const completeRef = DB.collection("tenants")
+          .doc(tenantID)
+          .collection("stores")
+          .doc(storeID)
+          .collection("payment-processing")
+          .doc(readerID)
+          .collection("payments")
+          .doc(paymentIntentID)
+          .collection("completions")
+          .doc("current");
+
+        let failureData = {
+          status: "failed",
+          failure_code: action.failure_code || "unknown",
+          failure_message: action.failure_message || "Payment failed",
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          readerID,
+          paymentIntentID,
+        };
+
+        // Retrieve PaymentIntent for detailed decline info
+        try {
+          const pi = await stripe.paymentIntents.retrieve(paymentIntentID);
+          if (pi.last_payment_error) {
+            failureData.decline_code =
+              pi.last_payment_error.decline_code || "";
+            failureData.error_message =
+              pi.last_payment_error.message || "";
+            failureData.error_code = pi.last_payment_error.code || "";
+            failureData.error_type = pi.last_payment_error.type || "";
+          }
+        } catch (piError) {
+          log("Error retrieving PaymentIntent for failure details", piError);
+        }
+
+        await completeRef.set(failureData);
       }
 
       // Cancel reader action to clean up
@@ -561,6 +600,11 @@ exports.stripeEventWebhook = onRequest(
 
       log("Stripe Webhook processing error", err.message);
     }
+
+    if (error) {
+      return res.status(500).json({ success: false, message });
+    }
+    return res.status(200).json({ success: true, message: "Webhook processed" });
   }
 );
 
@@ -3885,7 +3929,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
   async (request) => {
     log("newCheckout: initiate payment intent request", request.data);
 
-    const { amount, readerID, paymentIntentID } = request.data;
+    const { amount, readerID, paymentIntentID, tenantID, storeID } = request.data;
 
     if (!amount || typeof amount !== "number") {
       throw new HttpsError(
@@ -3896,6 +3940,13 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
 
     if (!readerID || typeof readerID !== "string") {
       throw new HttpsError("invalid-argument", "Reader ID must be provided.");
+    }
+
+    if (!tenantID || !storeID) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Tenant and store IDs must be provided."
+      );
     }
 
     try {
@@ -3939,6 +3990,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
           payment_method_types: ["card_present"],
           capture_method: "automatic",
           currency: "usd",
+          metadata: { tenantID, storeID },
         });
         finalPaymentIntentID = paymentIntent.id;
       } else {
@@ -3976,6 +4028,9 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
       };
     } catch (error) {
       log("newCheckout: error initiating payment", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
       throw new HttpsError(
         "internal",
         error.message || "Failed to initiate payment"
@@ -4091,6 +4146,9 @@ exports.newCheckoutCancelPaymentCallable = onCall(
       };
     } catch (error) {
       log("newCheckout: error cancelling payment", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
       throw new HttpsError(
         "internal",
         error.message || "Failed to reset reader"

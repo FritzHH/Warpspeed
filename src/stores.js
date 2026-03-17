@@ -68,16 +68,11 @@ export const useTabNamesStore = create((set, get) => ({
   getOptionsTabName: () => get().optionsTabName,
   getInfoTabName: () => get().infoTabName,
 
-  setItems: (obj) => {
-    console.log("[TAB_STORE setItems]", JSON.stringify(obj), new Error().stack?.split("\n")[2]?.trim());
-    set({ ...obj });
-  },
+  setItems: (obj) => set({ ...obj }),
   setInfoTabName: (name) => {
-    console.log("[TAB_STORE setInfoTabName]", JSON.stringify(name), new Error().stack?.split("\n")[2]?.trim());
     set((state) => ({ infoTabName: name }));
   },
   setItemsTabName: (name) => {
-    console.log("[TAB_STORE setItemsTabName]", JSON.stringify(name), new Error().stack?.split("\n")[2]?.trim());
     set((state) => ({ itemsTabName: name }));
   },
   setOptionsTabName: (name) => {

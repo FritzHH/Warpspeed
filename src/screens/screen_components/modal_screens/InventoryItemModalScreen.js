@@ -275,13 +275,13 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
 
 // ─── main component ────────────────────────────────────────────────────────
 
-export const InventoryItemModalScreen = ({ item, handleExit }) => {
+export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   const zSettingsObj = useSettingsStore((state) => state.settings);
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
   const quickButtons = zSettingsObj?.quickItemButtons || [];
 
   const [sItem, _setItem] = useState(() => cloneDeep(item));
-  const [sEditing, _setEditing] = useState(false);
+  const [sEditing, _setEditing] = useState(!!isNew);
   const [sShowQBPicker, _setShowQBPicker] = useState(false);
 
   // debounced inventory save
@@ -438,7 +438,7 @@ export const InventoryItemModalScreen = ({ item, handleExit }) => {
             }}
           >
             <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>
-              Inventory Item
+              {isNew ? "New Inventory Item" : "Inventory Item"}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <TouchableOpacity

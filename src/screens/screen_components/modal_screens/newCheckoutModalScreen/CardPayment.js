@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
 import { TouchableOpacity } from "react-native";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button_, DropdownMenu, SHADOW_RADIUS_PROTO } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
@@ -17,12 +17,35 @@ import {
   newCheckoutListenToPaymentUpdates,
 } from "./newCheckoutFirebaseCalls";
 
+const PAYMENT_TIMEOUT_MS = 120000; // 2 minutes
+
+function formatDeclineCode(code) {
+  const messages = {
+    insufficient_funds: "Insufficient funds on card",
+    lost_card: "This card has been reported lost",
+    stolen_card: "This card has been reported stolen",
+    expired_card: "Card is expired",
+    incorrect_cvc: "Incorrect CVC",
+    card_declined: "Card declined by issuer",
+    processing_error: "Processing error — try again",
+    do_not_honor: "Card declined — customer should contact their bank",
+    generic_decline: "Card declined",
+    card_not_supported: "Card not supported",
+    try_again_later: "Card issuer unavailable — try again",
+    pickup_card: "Card cannot be used — customer should contact their bank",
+    not_permitted: "Payment not permitted on this card",
+    withdrawal_count_limit_exceeded: "Card has exceeded withdrawal limit",
+  };
+  return messages[code] || `Card declined (${code})`;
+}
+
 export function CardPayment({
   amountLeftToPay = 0,
   onPaymentCapture,
   stripeReaders = [],
   settings,
   saleComplete = false,
+  readerError = "",
 }) {
   const [sRequestedAmount, _setRequestedAmount] = useState("");
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState("");
@@ -33,6 +56,21 @@ export function CardPayment({
   const [sSuccessMessage, _setSuccessMessage] = useState("");
   const [sListeners, _setListeners] = useState(null);
   const [sFocused, _setFocused] = useState("");
+
+  const listenersRef = useRef(null);
+  const timeoutRef = useRef(null);
+
+  function cleanupListeners() {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (listenersRef.current) {
+      listenersRef.current.unsubscribe();
+      listenersRef.current = null;
+      _setListeners(null);
+    }
+  }
 
   // Auto-select reader from settings if available
   function getInitialReader() {
@@ -112,6 +150,12 @@ export function CardPayment({
           if (!completionData) return;
           log("newCheckout card completion:", completionData);
 
+          // Clear timeout on any completion response
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+
           if (
             completionData.status === "succeeded" ||
             completionData.payment_intent
@@ -126,25 +170,44 @@ export function CardPayment({
             _setPaymentIntentID("");
 
             // Clean up listener
-            if (sListeners) sListeners.unsubscribe();
-            _setListeners(null);
+            cleanupListeners();
 
             if (onPaymentCapture) onPaymentCapture(payment);
-          } else if (completionData.failure_code) {
-            _setErrorMessage(
-              `Payment failed: ${completionData.failure_code}`
-            );
+          } else if (completionData.status === "failed" || completionData.failure_code) {
+            let errorMsg = "Payment failed";
+            if (completionData.decline_code) {
+              errorMsg = formatDeclineCode(completionData.decline_code);
+            } else if (completionData.failure_message) {
+              errorMsg = completionData.failure_message;
+            } else if (completionData.failure_code) {
+              errorMsg = `Payment failed: ${completionData.failure_code}`;
+            }
+            _setErrorMessage(errorMsg);
             _setSuccessMessage("");
             _setProcessing(false);
+            cleanupListeners();
           }
         }
       );
+
+      listenersRef.current = listener;
       _setListeners(listener);
+
+      // Payment timeout
+      timeoutRef.current = setTimeout(() => {
+        _setErrorMessage(
+          "Payment timed out — card reader may be unresponsive. Try resetting the reader."
+        );
+        _setSuccessMessage("");
+        _setProcessing(false);
+        cleanupListeners();
+      }, PAYMENT_TIMEOUT_MS);
     } catch (error) {
       log("newCheckout card payment error:", error);
       _setErrorMessage(error?.message || "Payment failed");
       _setSuccessMessage("");
       _setProcessing(false);
+      cleanupListeners();
     }
   }
 
@@ -153,14 +216,11 @@ export function CardPayment({
     try {
       _setSuccessMessage("Resetting reader...");
       _setErrorMessage("");
+      cleanupListeners();
       await newCheckoutCancelStripePayment(activeReader.id);
       _setSuccessMessage("Reader reset");
       _setProcessing(false);
       _setPaymentIntentID("");
-      if (sListeners) {
-        sListeners.unsubscribe();
-        _setListeners(null);
-      }
     } catch (error) {
       _setErrorMessage("Failed to reset reader");
       _setSuccessMessage("");
@@ -203,6 +263,19 @@ export function CardPayment({
       >
         CARD SALE
       </Text>
+
+      {/* Reader error message */}
+      {!!readerError && (
+        <Text
+          style={{
+            fontSize: 11,
+            color: C.lightred,
+            fontStyle: "italic",
+          }}
+        >
+          {readerError}
+        </Text>
+      )}
 
       {/* Reader Selection */}
       <View

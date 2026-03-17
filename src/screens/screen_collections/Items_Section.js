@@ -25,7 +25,7 @@ export const Items_Section = React.memo(({}) => {
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
 
   ///////////////////////////////////////////////////////////////////////////
-  console.log("[ITEMS_SECTION] render with itemsTabName:", JSON.stringify(zItemsTabName));
+  // log("Items_Section render");
   function ScreenComponent() {
 
     switch (zItemsTabName) {

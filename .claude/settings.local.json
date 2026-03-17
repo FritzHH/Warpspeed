@@ -5,7 +5,10 @@
       "Bash(xargs grep -l \"BoxContainerOuterComponent\")",
       "Bash(node -e \":*)",
       "Bash(npx react-scripts build)",
-      "Bash(find \"C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\src\\\\screens\\\\screen_components\" -name \"*.js\" -exec grep -l \"quickItemButtons\" {} ;)"
+      "Bash(find \"C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\src\\\\screens\\\\screen_components\" -name \"*.js\" -exec grep -l \"quickItemButtons\" {} ;)",
+      "Bash(xargs grep -l \"face-api\\\\|faceDescriptor\\\\|image\\\\|photo\")",
+      "Bash(xargs grep -l \"WindowInfo\\\\|ViewportInfo\\\\|DeviceContext\")",
+      "Bash(find /c/Users/hiebf/OneDrive/Desktop/warpspeed/src/screens/screen_components/Items_Screen -type f -name \"*.js\" -exec wc -l {} +)"
     ]
   }
 }

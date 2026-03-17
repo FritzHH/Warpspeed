@@ -7,6 +7,7 @@ import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
   useSettingsStore,
   useAlertScreenStore,
+  useCurrentCustomerStore,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
@@ -26,6 +27,7 @@ import {
   newCheckoutFetchWorkordersForSale,
   newCheckoutCompleteSale,
   newCheckoutSaveActiveSale,
+  saveRefundIndex,
 } from "./newCheckoutFirebaseCalls";
 
 import { CashRefund } from "./CashRefund";
@@ -197,6 +199,16 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
 
     // Persist updated sale immediately
     await newCheckoutCompleteSale(sale);
+
+    // Write refund index for reporting
+    const customer = useCurrentCustomerStore.getState().customer;
+    const customerInfo = {
+      first: customer?.first || "",
+      last: customer?.last || "",
+      phone: customer?.cell || "",
+      id: customer?.id || "",
+    };
+    saveRefundIndex(sale, refund, customerInfo);
 
     // Check if fully refunded
     let newLimits = calculateRefundLimits(sale, zSettings);

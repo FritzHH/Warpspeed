@@ -39,6 +39,7 @@ import {
   useTabNamesStore,
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP } from "../../../db_calls_wrapper";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
@@ -61,6 +62,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowCustomerInfoScreen, _setShowCustomerInfoScreen] =
     React.useState(false);
   const [sCustomerScreenTextFocus, _setCustomerScreenTextFocus] = useState("");
+  const [sShowMediaModal, _setShowMediaModal] = useState(null); // null | "upload" | "view"
 
   // Refs for dropdown components
   const bikesRef = useRef();
@@ -604,7 +606,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   outlineWidth: 0,
                   borderRadius: 5,
                 }}
-                value={zOpenWorkorder?.waitTime?.label}
+                value={zOpenWorkorder?.waitTime?.label || ""}
                 editable={false}
               />
               <View
@@ -765,6 +767,70 @@ export const ActiveWorkorderComponent = ({}) => {
           </View>
         </View>
       </View>
+      {/* Media Buttons */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "center",
+          gap: 12,
+          marginVertical: 8,
+        }}
+      >
+        <Button_
+          text="Upload Media"
+          icon={ICONS.camera}
+          iconSize={18}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          onPress={() => _setShowMediaModal("upload")}
+          buttonStyle={{
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 8,
+          }}
+          textStyle={{ fontSize: 14, fontWeight: "500" }}
+        />
+        <View>
+          <Button_
+            text="View Media"
+            icon={ICONS.eyeballs}
+            iconSize={18}
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            onPress={() => _setShowMediaModal("view")}
+            buttonStyle={{
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderRadius: 8,
+            }}
+            textStyle={{ fontSize: 14, fontWeight: "500" }}
+          />
+          {zOpenWorkorder?.media?.length > 0 && (
+            <View
+              style={{
+                position: "absolute",
+                top: -6,
+                right: -6,
+                backgroundColor: C.red,
+                borderRadius: 10,
+                minWidth: 20,
+                height: 20,
+                justifyContent: "center",
+                alignItems: "center",
+                paddingHorizontal: 5,
+              }}
+            >
+              <Text
+                style={{
+                  color: "white",
+                  fontSize: 11,
+                  fontWeight: "700",
+                }}
+              >
+                {zOpenWorkorder.media.length}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
       <View
         style={{
           flexDirection: "row",
@@ -812,6 +878,14 @@ export const ActiveWorkorderComponent = ({}) => {
           onPress={handleWorkorderPrintPress}
         />
       </View>
+      {sShowMediaModal && (
+        <WorkorderMediaModal
+          visible={!!sShowMediaModal}
+          onClose={() => _setShowMediaModal(null)}
+          workorderID={zOpenWorkorder?.id}
+          mode={sShowMediaModal}
+        />
+      )}
     </View>
   );
 };

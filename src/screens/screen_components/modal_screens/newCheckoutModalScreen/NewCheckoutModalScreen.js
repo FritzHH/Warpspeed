@@ -36,6 +36,8 @@ import {
   newCheckoutSaveWorkorder,
   newCheckoutCompleteWorkorder,
   newCheckoutGetStripeReaders,
+  newCheckoutDeleteActiveSale,
+  saveSaleIndex,
 } from "./newCheckoutFirebaseCalls";
 
 import { SaleHeader } from "./SaleHeader";
@@ -64,6 +66,7 @@ export function NewCheckoutModalScreen() {
   const [sAddedItems, _setAddedItems] = useState([]);
   const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
   const [sStripeReaders, _setStripeReaders] = useState([]);
+  const [sReaderError, _setReaderError] = useState("");
   const [sInitialized, _setInitialized] = useState(false);
 
   // ─── Derived Values ───────────────────────────────────────
@@ -141,13 +144,18 @@ export function NewCheckoutModalScreen() {
 
   async function fetchReaders() {
     try {
+      _setReaderError("");
       let result = await newCheckoutGetStripeReaders();
       if (result?.data?.data) {
         let readers = result.data.data.filter((r) => r.status === "online");
         _setStripeReaders(readers);
+        if (readers.length === 0) {
+          _setReaderError("No card readers online");
+        }
       }
     } catch (e) {
       log("Failed to fetch card readers:", e);
+      _setReaderError("Could not connect to card readers");
     }
   }
 
@@ -297,6 +305,19 @@ export function NewCheckoutModalScreen() {
 
     // Save completed sale to Cloud Storage
     await newCheckoutCompleteSale(sale);
+
+    // Write sale index for reporting
+    const customer = useCurrentCustomerStore.getState().customer;
+    const primaryWO = sCombinedWorkorders[0];
+    const customerInfo = {
+      first: customer?.first || primaryWO?.customerFirst || "",
+      last: customer?.last || primaryWO?.customerLast || "",
+      phone: customer?.cell || primaryWO?.customerPhone || "",
+      id: customer?.id || primaryWO?.customerID || "",
+    };
+    const allLines = sCombinedWorkorders.flatMap((wo) => wo.workorderLines || []);
+    const isStandalone = primaryWO?.isStandaloneSale || false;
+    saveSaleIndex(sale, customerInfo, allLines, isStandalone);
   }
 
   function handleCashChange(change) {
@@ -331,11 +352,16 @@ export function NewCheckoutModalScreen() {
   }
 
   function resetAndClose() {
+    // Clean up orphaned active-sale if no payments were made
+    if (sSale?.id && !(sSale?.amountCaptured > 0)) {
+      newCheckoutDeleteActiveSale(sSale.id);
+    }
     _setSale(null);
     _setCombinedWorkorders([]);
     _setAddedItems([]);
     _setCashChangeNeeded(0);
     _setStripeReaders([]);
+    _setReaderError("");
     _setInitialized(false);
     useCheckoutStore.getState().setIsCheckingOut(false);
   }
@@ -404,6 +430,7 @@ export function NewCheckoutModalScreen() {
                 stripeReaders={sStripeReaders}
                 settings={zSettings}
                 saleComplete={saleComplete}
+                readerError={sReaderError}
               />
             </View>
 

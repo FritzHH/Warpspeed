@@ -4,6 +4,10 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
 import { ProtectedRoute } from "./components";
+import { MobileBaseScreen } from "./screens/mobile/MobileBaseScreen";
+import { MobileHomeScreen } from "./screens/mobile/MobileHomeScreen";
+import { MobileWorkorderListScreen } from "./screens/mobile/MobileWorkorderListScreen";
+import { MobileWorkorderDetailScreen } from "./screens/mobile/MobileWorkorderDetailScreen";
 import {
   dbLoginUser,
   onAuthStateChange,
@@ -29,6 +33,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const setIsMobile = useLayoutStore((state) => state.setIsMobile);
+  const isMobile = useLayoutStore((state) => state.isMobile);
 
   // Detect if app is running on mobile device or desktop browser
   useEffect(() => {
@@ -162,15 +167,23 @@ function App() {
           }
         />
 
-        {/* Protected route - Dashboard/Base Screen */}
+        {/* Protected route - Dashboard/Base Screen (desktop) or Mobile UI */}
         <Route
           path={ROUTES.dashboard}
           element={
             <ProtectedRoute user={user}>
-              <BaseScreen />
+              {isMobile ? <MobileBaseScreen /> : <BaseScreen />}
             </ProtectedRoute>
           }
-        />
+        >
+          {isMobile && (
+            <>
+              <Route index element={<MobileHomeScreen />} />
+              <Route path="workorders" element={<MobileWorkorderListScreen />} />
+              <Route path="workorder/:id" element={<MobileWorkorderDetailScreen />} />
+            </>
+          )}
+        </Route>
 
         {/* Catch-all redirect to dashboard for authenticated users, login for unauthenticated */}
         <Route

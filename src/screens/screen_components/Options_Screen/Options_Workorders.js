@@ -223,34 +223,25 @@ export function WorkordersComponent({}) {
         infoTabName: tabStore.infoTabName,
         itemsTabName: tabStore.itemsTabName,
       };
-      console.log("[HOVER ENTER] saved pre-hover tabs: " + JSON.stringify(preHoverTabsRef.current));
-    } else {
-      console.log("[HOVER ENTER] preHoverTabsRef already set: " + JSON.stringify(preHoverTabsRef.current));
     }
     useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems
     });
-    console.log("[HOVER ENTER] set tabs to: " + JSON.stringify({ infoTabName: TAB_NAMES.infoTab.workorder, itemsTabName: TAB_NAMES.itemsTab.workorderItems }));
   }
 
   function onMouseExit(workorder) {
-    console.log("[HOVER EXIT] called");
     useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
     exitTimerRef.current = setTimeout(() => {
-      console.log("[HOVER EXIT timeout] preHoverTabsRef: " + JSON.stringify(preHoverTabsRef.current));
       // Restore the tab state that was active before the hover
       if (preHoverTabsRef.current) {
-        console.log("[HOVER EXIT timeout] restoring tabs to: " + JSON.stringify(preHoverTabsRef.current));
         useTabNamesStore.getState().setItems(preHoverTabsRef.current);
         preHoverTabsRef.current = null;
       } else {
         let store = useOpenWorkordersStore.getState();
         let activeID = store.openWorkorderID;
-        console.log("[HOVER EXIT timeout] no saved tabs, activeID: " + activeID);
         if (!activeID) {
-          console.log("[HOVER EXIT timeout] setting to empty/customer");
           useTabNamesStore.getState().setItems({
             infoTabName: TAB_NAMES.infoTab.customer,
             itemsTabName: TAB_NAMES.itemsTab.empty
@@ -258,13 +249,10 @@ export function WorkordersComponent({}) {
         } else {
           let activeWO = store.workorders.find((o) => o.id === activeID);
           if (activeWO?.isStandaloneSale) {
-            console.log("[HOVER EXIT timeout] setting to checkout/workorderItems (standalone sale)");
             useTabNamesStore.getState().setItems({
               infoTabName: TAB_NAMES.infoTab.checkout,
               itemsTabName: TAB_NAMES.itemsTab.workorderItems
             });
-          } else {
-            console.log("[HOVER EXIT timeout] has activeID but not standalone sale, NO tab change");
           }
         }
       }
@@ -351,38 +339,65 @@ export function WorkordersComponent({}) {
                 >
                   <View
                     style={{
-                      marginVertical: 5,
-                      flexDirection: "row",
+                      marginVertical: 2,
+                      flexDirection: "column",
                       width: "65%",
-                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    <Text
-                      style={{
-                        fontWeight: 500,
-                        color: C.text,
-                      }}
-                    >
-                      {workorder.brand || "Brand"}
-                    </Text>
-                    {!!workorder.description && (
-                      <View
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text
+                        numberOfLines={1}
                         style={{
-                          width: 7,
-                          height: 2,
-                          marginHorizontal: 5,
-                          backgroundColor: "lightgray",
+                          fontSize: 13,
+                          color: "dimgray",
                         }}
-                      />
-                    )}
-                    <Text
-                      style={{
-                        color: C.text,
-                        // fontStyle: "italic"
-                      }}
-                    >
-                      {workorder.description}
-                    </Text>
+                      >
+                        {(workorder.customerFirst || "") + " " + (workorder.customerLast || "")}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text
+                        style={{
+                          fontWeight: 500,
+                          color: C.text,
+                        }}
+                      >
+                        {workorder.brand || "Brand"}
+                      </Text>
+                      {!!workorder.description && (
+                        <View
+                          style={{
+                            width: 7,
+                            height: 2,
+                            marginHorizontal: 5,
+                            backgroundColor: "lightgray",
+                          }}
+                        />
+                      )}
+                      <Text
+                        style={{
+                          color: C.text,
+                        }}
+                      >
+                        {workorder.description}
+                      </Text>
+                      {workorder.workorderLines?.length > 0 && (
+                        <View
+                          style={{
+                            backgroundColor: C.blue,
+                            borderRadius: 10,
+                            paddingHorizontal: 6,
+                            paddingVertical: 1,
+                            marginLeft: 8,
+                          }}
+                        >
+                          <Text style={{ color: "white", fontSize: 11, fontWeight: "600" }}>
+                            {workorder.workorderLines.length}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                   <View
                     style={{

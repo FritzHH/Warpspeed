@@ -26,6 +26,12 @@ import {
   useInventoryStore,
 } from "../../../stores";
 
+function getQuickButtonFontSize(text, baseFontSize) {
+  let len = (text || "").length;
+  if (len <= 8) return baseFontSize;
+  return Math.max(7, Math.round(baseFontSize - (len - 8) * 0.5));
+}
+
 export function InventoryComponent({}) {
   // store setters ///////////////////////////////////////////////////////////////
 
@@ -336,7 +342,7 @@ export function InventoryComponent({}) {
                       : undefined,
                   }}
                   textStyle={{
-                    fontSize: 14,
+                    fontSize: getQuickButtonFontSize(item.name, 14),
                     fontWeight: 400,
                     color: isActive ? "white" : C.textWhite,
                   }}
@@ -465,7 +471,7 @@ export function InventoryComponent({}) {
                         : undefined,
                     }}
                     textStyle={{
-                      fontSize: 13,
+                      fontSize: getQuickButtonFontSize(btn.name, 13),
                       fontWeight: 400,
                       color: isSelected ? "white" : C.textWhite,
                     }}

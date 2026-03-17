@@ -3093,7 +3093,7 @@ const QuickItemButtonsComponent = ({
     (b) => b.parentID === sCurrentParentID
   );
 
-  function renderButtonCard(btn, idx, isDraggable) {
+  function renderButtonCard(btn, idx, isDraggable, isColumn) {
     let isEditing = sEditingID === btn.id;
     let childCount = getChildCount(btn.id);
     return (
@@ -3134,12 +3134,12 @@ const QuickItemButtonsComponent = ({
           e.currentTarget.style.opacity = "1";
         }}
         style={{
-          width: 170,
-          minHeight: 60,
+          width: isColumn ? "100%" : 170,
+          minHeight: isColumn ? 44 : 60,
           margin: 4,
           padding: 8,
           display: "flex",
-          flexDirection: "column",
+          flexDirection: isColumn ? "row" : "column",
           borderWidth: isDraggable && sDragOverIdx === idx ? 2 : 1,
           borderStyle: "solid",
           borderColor:
@@ -3149,7 +3149,7 @@ const QuickItemButtonsComponent = ({
           borderRadius: 8,
           backgroundColor: isEditing ? "rgb(245,166,35)" : C.listItemWhite,
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: isColumn ? "flex-start" : "center",
           position: "relative",
           cursor: isDraggable ? "grab" : "pointer",
           opacity: isDraggable && sDragIdx === idx ? 0.5 : 1,
@@ -3164,11 +3164,12 @@ const QuickItemButtonsComponent = ({
             placeholder="Enter name..."
             placeholderTextColor={gray(0.3)}
             style={{
-              width: "100%",
+              flex: isColumn ? 1 : undefined,
+              width: isColumn ? undefined : "100%",
               paddingHorizontal: 5,
               paddingVertical: 3,
               fontSize: 13,
-              textAlign: "center",
+              textAlign: isColumn ? "left" : "center",
               color: C.text,
               outlineWidth: 0,
               outlineStyle: "none",
@@ -3179,7 +3180,8 @@ const QuickItemButtonsComponent = ({
           <TouchableOpacity
             onPress={() => drillIn(btn)}
             style={{
-              width: "100%",
+              flex: isColumn ? 1 : undefined,
+              width: isColumn ? undefined : "100%",
               cursor: "pointer",
             }}
           >
@@ -3187,7 +3189,7 @@ const QuickItemButtonsComponent = ({
               style={{
                 width: "100%",
                 fontSize: 13,
-                textAlign: "center",
+                textAlign: isColumn ? "left" : "center",
                 color: C.text,
                 paddingHorizontal: 5,
                 paddingVertical: 3,
@@ -3198,13 +3200,14 @@ const QuickItemButtonsComponent = ({
             </Text>
           </TouchableOpacity>
         )}
-        {/* Bottom row: badge + edit + delete */}
+        {/* Controls row: badge + edit + delete */}
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
-            marginTop: 4,
+            marginTop: isColumn ? 0 : 4,
+            marginLeft: isColumn ? 8 : 0,
           }}
         >
           {childCount > 0 && (
@@ -3245,7 +3248,7 @@ const QuickItemButtonsComponent = ({
             icon={ICONS.close1}
           />
         </View>
-        {isDraggable && sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && (
+        {isDraggable && sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
           <Image_
             icon={ICONS.backRed}
             size={14}
@@ -3253,6 +3256,18 @@ const QuickItemButtonsComponent = ({
               position: "absolute",
               bottom: 4,
               left: 4,
+            }}
+          />
+        )}
+        {isDraggable && sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx < idx && (
+          <Image_
+            icon={ICONS.rightArrowBlue}
+            size={14}
+            style={{
+              position: "absolute",
+              bottom: 4,
+              left: isColumn ? 4 : undefined,
+              right: isColumn ? undefined : 4,
             }}
           />
         )}
@@ -3267,20 +3282,26 @@ const QuickItemButtonsComponent = ({
         <BoxContainerInnerComponent
           style={{ width: "100%", alignItems: "center", borderWidth: 0, flex: 1 }}
         >
-          <View style={{ width: "100%" }}>
-            <BoxButton1 onPress={handleAdd} />
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                flexWrap: "wrap",
-                marginTop: 10,
-              }}
-            >
+          <View style={{ width: "100%", alignItems: "flex-start" }}>
+            <BoxButton1 onPress={handleAdd} style={{ marginBottom: 10 }} />
+          </View>
+          <View
+            style={{
+              width: "100%",
+              flex: 1,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.backgroundListWhite,
+              borderRadius: 10,
+              paddingVertical: 10,
+              paddingHorizontal: 10,
+            }}
+          >
+            <ScrollView style={{ width: "100%", flex: 1 }}>
               {topLevelButtons.map((btn, idx) =>
-                renderButtonCard(btn, idx, true)
+                renderButtonCard(btn, idx, true, true)
               )}
-            </div>
+            </ScrollView>
           </View>
         </BoxContainerInnerComponent>
       </BoxContainerOuterComponent>

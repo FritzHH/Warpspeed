@@ -366,9 +366,12 @@ export function InventoryComponent({}) {
                 flexWrap: "wrap",
               }}
             >
-              <TouchableOpacity
+              <Button_
                 onPress={handleBackPress}
-                style={{
+                icon={ICONS.upChevron}
+                iconSize={16}
+                text={"Up"}
+                buttonStyle={{
                   paddingVertical: 4,
                   paddingHorizontal: 8,
                   borderRadius: 5,
@@ -376,11 +379,17 @@ export function InventoryComponent({}) {
                   borderColor: C.buttonLightGreenOutline,
                   marginRight: 8,
                 }}
+                textStyle={{ fontSize: 12, color: C.text }}
+              />
+              <Text
+                style={{
+                  color: gray(0.3),
+                  marginRight: 4,
+                  fontSize: 13,
+                }}
               >
-                <Text style={{ fontSize: 12, color: C.text }}>
-                  {"\u25C0 Back"}
-                </Text>
-              </TouchableOpacity>
+                {"..."}
+              </Text>
               {sMenuPath.map((crumb, i) => (
                 <View
                   key={crumb.id}
@@ -410,7 +419,7 @@ export function InventoryComponent({}) {
                     <Text
                       style={{
                         color:
-                          i === sMenuPath.length - 1 ? C.text : C.blue,
+                          i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
                         fontSize: 13,
                         fontWeight:
                           i === sMenuPath.length - 1 ? "bold" : "normal",

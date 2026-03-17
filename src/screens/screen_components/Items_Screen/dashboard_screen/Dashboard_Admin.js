@@ -29,6 +29,7 @@ import {
   // useDatabaseStore,
   useLoginStore,
   useSettingsStore,
+  useTabNamesStore,
 } from "../../../../stores";
 import {
   Button,
@@ -48,7 +49,7 @@ import { Children, useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
-import { APP_USER, INVENTORY_ITEM_PROTO, CUSTOMER_PROTO, WORKORDER_PROTO, COLORS } from "../../../../data";
+import { APP_USER, INVENTORY_ITEM_PROTO, CUSTOMER_PROTO, WORKORDER_PROTO, WORKORDER_ITEM_PROTO, COLORS } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -84,7 +85,8 @@ export function Dashboard_Admin({}) {
     useState(false);
   const [sPunchClockUserObj, _setPunchClockUserObj] = useState(null);
   const [sShowSalesReportModal, _setShowSalesReportModal] = useState(false);
-  const [sExpand, _setExpand] = useState();
+  const sExpand = useTabNamesStore((state) => state.getDashboardExpand());
+  const _setExpand = useTabNamesStore((state) => state.setDashboardExpand);
   const [sOrderingMenuSelectionName, _setOrderingMenuSelectionName] = useState(
     DROPDOWN_ORDERING_SELECTION_NAMES.importOrder
   );
@@ -2991,8 +2993,17 @@ const QuickItemButtonsComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
 }) => {
-  const [sCurrentParentID, _setCurrentParentID] = useState(null);
-  const [sMenuPath, _setMenuPath] = useState([]);
+  const sCurrentParentID = useTabNamesStore((state) => state.getDashboardQBParentID());
+  const _setCurrentParentID = useTabNamesStore((state) => state.setDashboardQBParentID);
+  const sMenuPath = useTabNamesStore((state) => state.getDashboardQBMenuPath());
+  const _setMenuPath = (valOrFn) => {
+    if (typeof valOrFn === "function") {
+      let current = useTabNamesStore.getState().getDashboardQBMenuPath();
+      useTabNamesStore.getState().setDashboardQBMenuPath(valOrFn(current));
+    } else {
+      useTabNamesStore.getState().setDashboardQBMenuPath(valOrFn);
+    }
+  };
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
   const [sEditingID, _setEditingID] = useState(null);
@@ -3086,7 +3097,7 @@ const QuickItemButtonsComponent = ({
     let isEditing = sEditingID === btn.id;
     let childCount = getChildCount(btn.id);
     return (
-      <View
+      <div
         key={btn.id}
         draggable={isDraggable}
         onDragStart={isDraggable ? () => _setDragIdx(idx) : undefined}
@@ -3127,18 +3138,22 @@ const QuickItemButtonsComponent = ({
           minHeight: 60,
           margin: 4,
           padding: 8,
-          borderWidth:
-            isDraggable && sDragOverIdx === idx ? 2 : 1,
+          display: "flex",
+          flexDirection: "column",
+          borderWidth: isDraggable && sDragOverIdx === idx ? 2 : 1,
+          borderStyle: "solid",
           borderColor:
             isDraggable && sDragOverIdx === idx
               ? C.blue
               : C.buttonLightGreenOutline,
           borderRadius: 8,
-          backgroundColor: isEditing ? C.orange : C.listItemWhite,
+          backgroundColor: isEditing ? "rgb(245,166,35)" : C.listItemWhite,
           alignItems: "center",
           justifyContent: "center",
+          position: "relative",
           cursor: isDraggable ? "grab" : "pointer",
           opacity: isDraggable && sDragIdx === idx ? 0.5 : 1,
+          boxSizing: "border-box",
         }}
       >
         {/* Name area */}
@@ -3230,7 +3245,18 @@ const QuickItemButtonsComponent = ({
             icon={ICONS.close1}
           />
         </View>
-      </View>
+        {isDraggable && sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && (
+          <Image_
+            icon={ICONS.backRed}
+            size={14}
+            style={{
+              position: "absolute",
+              bottom: 4,
+              left: 4,
+            }}
+          />
+        )}
+      </div>
     );
   }
 
@@ -3243,8 +3269,9 @@ const QuickItemButtonsComponent = ({
         >
           <View style={{ width: "100%" }}>
             <BoxButton1 onPress={handleAdd} />
-            <View
+            <div
               style={{
+                display: "flex",
                 flexDirection: "row",
                 flexWrap: "wrap",
                 marginTop: 10,
@@ -3253,7 +3280,7 @@ const QuickItemButtonsComponent = ({
               {topLevelButtons.map((btn, idx) =>
                 renderButtonCard(btn, idx, true)
               )}
-            </View>
+            </div>
           </View>
         </BoxContainerInnerComponent>
       </BoxContainerOuterComponent>
@@ -3360,8 +3387,9 @@ const QuickItemButtonsComponent = ({
           <BoxButton1 onPress={handleAdd} />
 
           {/* Flex-wrap grid of sub-buttons */}
-          <View
+          <div
             style={{
+              display: "flex",
               flexDirection: "row",
               flexWrap: "wrap",
               marginTop: 10,
@@ -3370,7 +3398,7 @@ const QuickItemButtonsComponent = ({
             {currentChildren.map((btn, idx) =>
               renderButtonCard(btn, idx, true)
             )}
-          </View>
+          </div>
         </View>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
@@ -3462,6 +3490,7 @@ const ImportComponent = () => {
   const [sLsImporting, _setLsImporting] = useState("");
   const [sLsResult, _setLsResult] = useState("");
   const [sClearLsData, _setClearLsData] = useState(true);
+  const [sDevWorkorders, _setDevWorkorders] = useState(false);
 
   // --- CSV parsing utilities ---
   function parseCSVLine(line) {
@@ -3779,6 +3808,180 @@ const ImportComponent = () => {
     }
   }
 
+  // --- Dev Import Workorders (fills random inventory items + statuses) ---
+  async function handleImportWorkordersDev() {
+    try {
+      _setImporting("workorders");
+      _setResult("");
+
+      // 1. Load and parse customers for linking
+      let custRes = await fetch(process.env.PUBLIC_URL + "/import_data/customers.csv");
+      let custText = await custRes.text();
+      let custRows = parseCSV(custText);
+      let { deduplicated: customers } = parseCustomers(custRows);
+
+      let nameLookup = new Map();
+      customers.forEach(cust => {
+        let fullName = ((cust.first || "") + " " + (cust.last || "")).trim().toLowerCase();
+        if (fullName) nameLookup.set(fullName, cust);
+      });
+
+      // 2. Load and parse inventory (same rules as handleImportInventory)
+      let invRes = await fetch(process.env.PUBLIC_URL + "/import_data/inventory.csv");
+      let invText = await invRes.text();
+      let invRows = parseCSV(invText);
+
+      let inventoryItems = invRows.map(row => {
+        let item = cloneDeep(INVENTORY_ITEM_PROTO);
+        item.id = generateRandomID();
+        item.formalName = row["Description"] || "";
+        item.price = dollarsToCents(row["Price"]) || 0;
+        item.cost = dollarsToCents(row["Default Cost"]) || 0;
+        item.upc = row["UPC"] || "";
+        item.ean = row["EAN"] || "";
+        item.customSku = row["Custom SKU"] || "";
+        item.manufacturerSku = row["Manufact. SKU"] || "";
+        if ((item.formalName || "").toLowerCase().includes("labor")) {
+          item.category = "Labor";
+        }
+        return item;
+      });
+
+      if (inventoryItems.length === 0) {
+        _setResult("Error: inventory.csv has no items — cannot fill workorder lines");
+        _setImporting("");
+        return;
+      }
+
+      // 3. Load and parse statuses
+      let statusRes = await fetch(process.env.PUBLIC_URL + "/import_data/statuses.csv");
+      let statusText = await statusRes.text();
+      let statusRows = parseCSV(statusText);
+
+      let statusLabels = statusRows.map(row => row["Status"] || "").filter(s => s);
+
+      // 4. Parse workorders and fill missing data
+      let woRes = await fetch(process.env.PUBLIC_URL + "/import_data/workorders.csv");
+      let woText = await woRes.text();
+      let woRows = parseCSV(woText);
+
+      let workorders = woRows.map(row => {
+        let wo = cloneDeep(WORKORDER_PROTO);
+        wo.id = generateRandomID();
+        wo.workorderNumber = row["ID"] || "";
+        wo.description = row["Item"] || "";
+        wo.status = row["Status"] || "";
+
+        // Extract "PRODUCT -SOURCE" pattern
+        let partMatch = (row["Item"] || "").match(/([A-Z][A-Z0-9 /-]*?)\s+-([A-Z][A-Z0-9]+)\s*$/);
+        if (partMatch) {
+          wo.partOrdered = partMatch[1].trim();
+          wo.partSource = partMatch[2].trim();
+        } else {
+          let sourceOnly = (row["Item"] || "").match(/\s+-([A-Z][A-Z0-9]+)\s*$/);
+          if (sourceOnly) {
+            wo.partSource = sourceOnly[1].trim();
+          }
+        }
+
+        // Date In -> startedOnMillis
+        let dateIn = row["Date In"];
+        if (dateIn) {
+          let ms = new Date(dateIn).getTime();
+          if (!isNaN(ms)) wo.startedOnMillis = ms;
+        }
+
+        // Extract colors from Item field
+        let itemText = row["Item"] || "";
+        let foundColors = extractColors(itemText);
+        if (foundColors.length >= 1) {
+          wo.color1 = { textColor: foundColors[0].textColor, backgroundColor: foundColors[0].backgroundColor, label: foundColors[0].label };
+        }
+        if (foundColors.length >= 2) {
+          wo.color2 = { textColor: foundColors[1].textColor, backgroundColor: foundColors[1].backgroundColor, label: foundColors[1].label };
+        }
+
+        // Customer linking
+        let custName = (row["Customer"] || "").trim();
+        if (custName) {
+          let matched = nameLookup.get(custName.toLowerCase());
+          if (matched) {
+            wo.customerID = matched.id;
+            wo.customerFirst = matched.first;
+            wo.customerLast = matched.last;
+            wo.customerPhone = matched.cell;
+          } else {
+            let parts = custName.split(" ");
+            wo.customerFirst = (parts[0] || "").toLowerCase();
+            wo.customerLast = (parts.slice(1).join(" ") || "").toLowerCase();
+          }
+        }
+
+        // --- DEV: Fill missing status from statuses.csv ---
+        if (!wo.status && statusLabels.length > 0) {
+          wo.status = statusLabels[Math.floor(Math.random() * statusLabels.length)];
+        }
+
+        // --- DEV: Fill missing startedOnMillis ---
+        if (!wo.startedOnMillis) {
+          // Random date within the last 90 days
+          wo.startedOnMillis = Date.now() - Math.floor(Math.random() * 90 * 24 * 60 * 60 * 1000);
+        }
+
+        // --- DEV: Add 2-7 random inventory items as workorder lines ---
+        let lineCount = Math.floor(Math.random() * 6) + 2; // 2 to 7
+        let usedIndices = new Set();
+        let lines = [];
+        for (let i = 0; i < lineCount; i++) {
+          let idx;
+          // Pick a unique random item if possible, otherwise allow repeats
+          if (usedIndices.size < inventoryItems.length) {
+            do { idx = Math.floor(Math.random() * inventoryItems.length); } while (usedIndices.has(idx));
+            usedIndices.add(idx);
+          } else {
+            idx = Math.floor(Math.random() * inventoryItems.length);
+          }
+          let line = cloneDeep(WORKORDER_ITEM_PROTO);
+          line.id = generateRandomID();
+          line.qty = 1;
+          line.inventoryItem = cloneDeep(inventoryItems[idx]);
+          lines.push(line);
+        }
+        wo.workorderLines = lines;
+
+        return wo;
+      });
+
+      let linkedCount = workorders.filter(wo => wo.customerID).length;
+
+      console.log("=== DEV IMPORT PREVIEW: WORKORDERS ===");
+      console.log("Total workorders:", workorders.length);
+      console.log("Linked to customers:", linkedCount);
+      console.log("Unlinked:", workorders.length - linkedCount);
+      console.log("Inventory pool size:", inventoryItems.length);
+      console.log("Statuses pool:", statusLabels);
+      console.log(JSON.stringify(workorders.slice(0, 5), null, 2));
+
+      // Clear existing workorders if checked, then save new
+      let clearedCount = 0;
+      if (sClearWorkorders) {
+        let cleared = await dbClearCollection("open-workorders");
+        clearedCount = cleared.deletedCount;
+        console.log("Cleared workorders:", clearedCount, "docs");
+      }
+      for (let i = 0; i < workorders.length; i++) {
+        await dbSaveOpenWorkorder(workorders[i]);
+        if ((i + 1) % 50 === 0) console.log("Saved", i + 1, "/", workorders.length);
+      }
+      _setResult("DEV Imported " + workorders.length + " workorders" + (sClearWorkorders ? " (cleared " + clearedCount + " old)" : " (merged)") + ", " + linkedCount + " linked, each with 2-7 random items");
+    } catch (err) {
+      console.error("Dev import workorders error:", err);
+      _setResult("Error: " + err.message);
+    } finally {
+      _setImporting("");
+    }
+  }
+
   // --- Import Statuses ---
   async function handleImportStatuses() {
     try {
@@ -3981,9 +4184,12 @@ const ImportComponent = () => {
           </View>
           <View style={{ alignItems: "center", margin: 10 }}>
             <TouchableOpacity
-              onPress={handleImportWorkorders}
+              onPress={sDevWorkorders ? handleImportWorkordersDev : handleImportWorkorders}
               disabled={!!sImporting}
-              style={buttonStyle}
+              style={{
+                ...buttonStyle,
+                borderColor: sDevWorkorders ? C.orange : C.buttonLightGreenOutline,
+              }}
             >
               <Image_ icon={ICONS.importIcon} size={30} />
               <Text
@@ -4002,6 +4208,12 @@ const ImportComponent = () => {
               onCheck={() => _setClearWorkorders(!sClearWorkorders)}
               text={"Clear existing"}
               buttonStyle={{ marginTop: 7 }}
+            />
+            <CheckBox_
+              isChecked={sDevWorkorders}
+              onCheck={() => _setDevWorkorders(!sDevWorkorders)}
+              text={"Dev mode (fill random items)"}
+              buttonStyle={{ marginTop: 4 }}
             />
           </View>
           <View style={{ alignItems: "center", margin: 10 }}>

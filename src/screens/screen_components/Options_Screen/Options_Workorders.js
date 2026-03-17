@@ -36,6 +36,7 @@ export function WorkordersComponent({}) {
   const [sAllowPreview, _setAllowPreview] = useState(true);
   const [sItemOptions, _setItemOptions] = useState({});
   const exitTimerRef = useRef(null);
+  const preHoverTabsRef = useRef(null);
   // log('here', zOpenWorkorders)
   useEffect(() => {
     let hour = 3600000;
@@ -215,30 +216,56 @@ export function WorkordersComponent({}) {
       clearTimeout(exitTimerRef.current);
       exitTimerRef.current = null;
     }
+    // Save pre-hover tab state so we can restore on exit
+    if (!preHoverTabsRef.current) {
+      let tabStore = useTabNamesStore.getState();
+      preHoverTabsRef.current = {
+        infoTabName: tabStore.infoTabName,
+        itemsTabName: tabStore.itemsTabName,
+      };
+      console.log("[HOVER ENTER] saved pre-hover tabs: " + JSON.stringify(preHoverTabsRef.current));
+    } else {
+      console.log("[HOVER ENTER] preHoverTabsRef already set: " + JSON.stringify(preHoverTabsRef.current));
+    }
     useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems
     });
+    console.log("[HOVER ENTER] set tabs to: " + JSON.stringify({ infoTabName: TAB_NAMES.infoTab.workorder, itemsTabName: TAB_NAMES.itemsTab.workorderItems }));
   }
 
   function onMouseExit(workorder) {
+    console.log("[HOVER EXIT] called");
     useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
     exitTimerRef.current = setTimeout(() => {
-      let store = useOpenWorkordersStore.getState();
-      let activeID = store.openWorkorderID;
-      if (!activeID) {
-        useTabNamesStore.getState().setItems({
-          infoTabName: TAB_NAMES.infoTab.customer,
-          itemsTabName: TAB_NAMES.itemsTab.empty
-        });
+      console.log("[HOVER EXIT timeout] preHoverTabsRef: " + JSON.stringify(preHoverTabsRef.current));
+      // Restore the tab state that was active before the hover
+      if (preHoverTabsRef.current) {
+        console.log("[HOVER EXIT timeout] restoring tabs to: " + JSON.stringify(preHoverTabsRef.current));
+        useTabNamesStore.getState().setItems(preHoverTabsRef.current);
+        preHoverTabsRef.current = null;
       } else {
-        let activeWO = store.workorders.find((o) => o.id === activeID);
-        if (activeWO?.isStandaloneSale) {
+        let store = useOpenWorkordersStore.getState();
+        let activeID = store.openWorkorderID;
+        console.log("[HOVER EXIT timeout] no saved tabs, activeID: " + activeID);
+        if (!activeID) {
+          console.log("[HOVER EXIT timeout] setting to empty/customer");
           useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.checkout,
-            itemsTabName: TAB_NAMES.itemsTab.workorderItems
+            infoTabName: TAB_NAMES.infoTab.customer,
+            itemsTabName: TAB_NAMES.itemsTab.empty
           });
+        } else {
+          let activeWO = store.workorders.find((o) => o.id === activeID);
+          if (activeWO?.isStandaloneSale) {
+            console.log("[HOVER EXIT timeout] setting to checkout/workorderItems (standalone sale)");
+            useTabNamesStore.getState().setItems({
+              infoTabName: TAB_NAMES.infoTab.checkout,
+              itemsTabName: TAB_NAMES.itemsTab.workorderItems
+            });
+          } else {
+            console.log("[HOVER EXIT timeout] has activeID but not standalone sale, NO tab change");
+          }
         }
       }
       exitTimerRef.current = null;

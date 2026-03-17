@@ -131,6 +131,7 @@ export const ICONS = {
   downChevron: require(ASSETS_PATH + "down-chevron.png"),
   trash: require(ASSETS_PATH + "trash.png"),
   axe: require(ASSETS_PATH + "axe.png"),
+  backRed: require(ASSETS_PATH + "backRed.png"),
   quickItemButton: require(ASSETS_PATH + "quickItemButton.png"),
   userControl: require(ASSETS_PATH + "userControl.png"),
   paymentProcessing: require(ASSETS_PATH + "paymentProcessing.png"),

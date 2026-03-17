@@ -68,16 +68,34 @@ export const useTabNamesStore = create((set, get) => ({
   getOptionsTabName: () => get().optionsTabName,
   getInfoTabName: () => get().infoTabName,
 
-  setItems: (obj) => set({ ...obj }),
+  setItems: (obj) => {
+    console.log("[TAB_STORE setItems]", JSON.stringify(obj), new Error().stack?.split("\n")[2]?.trim());
+    set({ ...obj });
+  },
   setInfoTabName: (name) => {
+    console.log("[TAB_STORE setInfoTabName]", JSON.stringify(name), new Error().stack?.split("\n")[2]?.trim());
     set((state) => ({ infoTabName: name }));
   },
   setItemsTabName: (name) => {
+    console.log("[TAB_STORE setItemsTabName]", JSON.stringify(name), new Error().stack?.split("\n")[2]?.trim());
     set((state) => ({ itemsTabName: name }));
   },
   setOptionsTabName: (name) => {
     set((state) => ({ optionsTabName: name }));
   },
+
+  // Dashboard_Admin persistent navigation state
+  dashboardExpand: null,
+  getDashboardExpand: () => get().dashboardExpand,
+  setDashboardExpand: (val) => set({ dashboardExpand: val }),
+
+  dashboardQBParentID: null,
+  getDashboardQBParentID: () => get().dashboardQBParentID,
+  setDashboardQBParentID: (val) => set({ dashboardQBParentID: val }),
+
+  dashboardQBMenuPath: [],
+  getDashboardQBMenuPath: () => get().dashboardQBMenuPath,
+  setDashboardQBMenuPath: (val) => set({ dashboardQBMenuPath: val }),
 }));
 
 export const useInvModalStore = create((set, get) => ({

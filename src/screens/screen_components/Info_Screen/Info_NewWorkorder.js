@@ -50,7 +50,12 @@ export function NewWorkorderComponent({}) {
     if (zCustomerSearchResults.length > 0) {
       useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.customerList);
     } else {
-      useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
+      // Only clear to empty if items tab is currently showing customerList
+      // (user cleared their search). Don't override other tabs like Dashboard.
+      const currentTab = useTabNamesStore.getState().itemsTabName;
+      if (currentTab === TAB_NAMES.itemsTab.customerList) {
+        useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
+      }
     }
   }, [zCustomerSearchResults]);
 

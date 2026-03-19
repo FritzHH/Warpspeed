@@ -13,6 +13,7 @@ import { COLORS } from "../../data";
 import {
   formatPhoneWithDashes,
   formatMillisForDisplay,
+  resolveStatus,
   formatCurrencyDisp,
   gray,
   log,
@@ -162,25 +163,30 @@ export function MobileWorkorderDetailScreen() {
       </View>
 
       {/* Status */}
-      <View style={{ marginBottom: 16 }}>
-        <Text style={LABEL_STYLE}>Status</Text>
-        <DropdownMenu
-          dataArr={zSettings?.statuses || []}
-          onSelect={(val) => setField("status", val)}
-          buttonStyle={{
-            width: "100%",
-            backgroundColor: zWorkorder.status?.backgroundColor,
-            paddingVertical: 14,
-            borderRadius: 8,
-          }}
-          buttonTextStyle={{
-            color: zWorkorder.status?.textColor,
-            fontWeight: "500",
-            fontSize: 16,
-          }}
-          buttonText={zWorkorder.status?.label || "Select Status"}
-        />
-      </View>
+      {(() => {
+        const rs = resolveStatus(zWorkorder?.status, zSettings?.statuses);
+        return (
+          <View style={{ marginBottom: 16 }}>
+            <Text style={LABEL_STYLE}>Status</Text>
+            <DropdownMenu
+              dataArr={zSettings?.statuses || []}
+              onSelect={(val) => setField("status", val.id)}
+              buttonStyle={{
+                width: "100%",
+                backgroundColor: rs.backgroundColor,
+                paddingVertical: 14,
+                borderRadius: 8,
+              }}
+              buttonTextStyle={{
+                color: rs.textColor,
+                fontWeight: "500",
+                fontSize: 16,
+              }}
+              buttonText={rs.label || "Select Status"}
+            />
+          </View>
+        );
+      })()}
 
       {/* Bike Info Section */}
       <View

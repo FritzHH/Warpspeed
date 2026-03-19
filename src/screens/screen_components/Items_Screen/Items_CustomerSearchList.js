@@ -64,7 +64,7 @@ export function CustomerSearchListComponent({}) {
           customerPhone: customer.cell || customer.landline,
           startedByFirst: useLoginStore.getState().currentUser?.first,
           startedByLast: useLoginStore.getState().currentUser?.last,
-          status: SETTINGS_OBJ.statuses[0],
+          status: SETTINGS_OBJ.statuses[0]?.id || "",
         });
 
     let store = useOpenWorkordersStore.getState();

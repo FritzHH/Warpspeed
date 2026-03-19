@@ -4,7 +4,7 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useNavigate } from "react-router-dom";
 import { C } from "../../styles";
 import { useOpenWorkordersStore, useSettingsStore } from "../../stores";
-import { formatMillisForDisplay } from "../../utils";
+import { formatMillisForDisplay, resolveStatus } from "../../utils";
 
 export function MobileWorkorderListScreen() {
   const navigate = useNavigate();
@@ -50,108 +50,111 @@ export function MobileWorkorderListScreen() {
           </View>
 
           {/* Workorder Cards */}
-          {group.items.map((workorder) => (
-            <TouchableOpacity
-              key={workorder.id}
-              onPress={() => navigate(`/workorder/${workorder.id}`)}
-              activeOpacity={0.7}
-              style={{
-                backgroundColor: workorder.status?.backgroundColor || group.status.backgroundColor,
-                borderRadius: 10,
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                marginBottom: 8,
-              }}
-            >
-              {/* Customer Name */}
-              <Text
-                numberOfLines={1}
+          {group.items.map((workorder) => {
+            const rs = resolveStatus(workorder.status, zSettings?.statuses);
+            return (
+              <TouchableOpacity
+                key={workorder.id}
+                onPress={() => navigate(`/workorder/${workorder.id}`)}
+                activeOpacity={0.7}
                 style={{
-                  fontSize: 17,
-                  fontWeight: "600",
-                  color: workorder.status?.textColor || group.status.textColor,
-                  marginBottom: 4,
+                  backgroundColor: rs.backgroundColor,
+                  borderRadius: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                  marginBottom: 8,
                 }}
               >
-                {(workorder.customerFirst || "") + " " + (workorder.customerLast || "")}
-              </Text>
-
-              {/* Brand + Description */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginBottom: 4,
-                }}
-              >
+                {/* Customer Name */}
                 <Text
                   numberOfLines={1}
                   style={{
-                    fontSize: 15,
-                    fontWeight: "500",
-                    color: workorder.status?.textColor || group.status.textColor,
+                    fontSize: 17,
+                    fontWeight: "600",
+                    color: rs.textColor,
+                    marginBottom: 4,
                   }}
                 >
-                  {workorder.brand || "No Brand"}
+                  {(workorder.customerFirst || "") + " " + (workorder.customerLast || "")}
                 </Text>
-                {!!workorder.description && (
-                  <>
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        color: workorder.status?.textColor || group.status.textColor,
-                        opacity: 0.6,
-                        marginHorizontal: 6,
-                      }}
-                    >
-                      {"\u2022"}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontSize: 15,
-                        color: workorder.status?.textColor || group.status.textColor,
-                        flex: 1,
-                      }}
-                    >
-                      {workorder.description}
-                    </Text>
-                  </>
-                )}
-              </View>
 
-              {/* Intake Date + Time Estimate */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Text
+                {/* Brand + Description */}
+                <View
                   style={{
-                    fontSize: 13,
-                    color: workorder.status?.textColor || group.status.textColor,
-                    opacity: 0.8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 4,
                   }}
                 >
-                  {formatMillisForDisplay(workorder.startedOnMillis)}
-                </Text>
-                {!!workorder.waitTime?.label && (
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "500",
+                      color: rs.textColor,
+                    }}
+                  >
+                    {workorder.brand || "No Brand"}
+                  </Text>
+                  {!!workorder.description && (
+                    <>
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          color: rs.textColor,
+                          opacity: 0.6,
+                          marginHorizontal: 6,
+                        }}
+                      >
+                        {"\u2022"}
+                      </Text>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          fontSize: 15,
+                          color: rs.textColor,
+                          flex: 1,
+                        }}
+                      >
+                        {workorder.description}
+                      </Text>
+                    </>
+                  )}
+                </View>
+
+                {/* Intake Date + Time Estimate */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <Text
                     style={{
                       fontSize: 13,
-                      color: workorder.status?.textColor || group.status.textColor,
+                      color: rs.textColor,
                       opacity: 0.8,
-                      fontStyle: "italic",
                     }}
                   >
-                    est: {workorder.waitTime.label}
+                    {formatMillisForDisplay(workorder.startedOnMillis)}
                   </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))}
+                  {!!workorder.waitTime?.label && (
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: rs.textColor,
+                        opacity: 0.8,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      est: {workorder.waitTime.label}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       ))}
 
@@ -180,7 +183,7 @@ function groupWorkordersByStatus(workorders, statuses) {
   statuses.forEach((status) => {
     const items = filtered.filter((wo) => {
       if (placed.has(wo.id)) return false;
-      if (wo.status?.id === status.id) {
+      if (wo.status === status.id) {
         placed.add(wo.id);
         return true;
       }

@@ -232,7 +232,7 @@ export function NewWorkorderComponent({}) {
       customerPhone: newCustomer.cell || newCustomer.landline,
       startedByFirst: useLoginStore.getCurrentUser().first,
       startedByLast: useLoginStore.getCurrentUser().last,
-      status: SETTINGS_OBJ.statuses[0],
+      status: SETTINGS_OBJ.statuses[0]?.id || "",
     });
 
     // add in the newly created workorder to the customer's file

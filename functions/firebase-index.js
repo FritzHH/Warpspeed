@@ -9,6 +9,7 @@ const functions = require("firebase-functions");
 const { defineSecret } = require("firebase-functions/params");
 const Stripe = require("stripe");
 const { isArray } = require("lodash");
+const nodemailer = require("nodemailer");
 const { onInit } = require("firebase-functions/v2/core");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const fetch = require("node-fetch");
@@ -85,8 +86,8 @@ const stripeSecretKey = defineSecret("stripeSecretKey");
 const twilioSecretKey = defineSecret("twilioSecretKey");
 const twilioSecretAccountNumber = defineSecret("twilioSecretAccountNum");
 const firebaseServiceAccountKey = defineSecret("firebase-service-account-key");
-const lightspeedClientId = defineSecret("lightspeedClientId");
-const lightspeedClientSecret = defineSecret("lightspeedClientSecret");
+const lightspeedClientId = defineSecret("LIGHTSPEED_CLIENT_ID");
+const lightspeedClientSecret = defineSecret("LIGHTSPEED_CLIENT_SECRET");
 
 // initialization
 var stripe;
@@ -438,6 +439,8 @@ exports.stripeEventWebhook = onRequest(
     let readerID;
 
     try {
+      const stripeClient = Stripe(stripeSecretKey.value());
+
       // Extract payment intent ID and action from webhook payload
       action = req.body.data.object.action;
       if (!action || !action.process_payment_intent) {
@@ -465,7 +468,7 @@ exports.stripeEventWebhook = onRequest(
       }
 
       // Extract tenant/store context from payment intent metadata
-      const paymentIntent = await stripe.paymentIntents.retrieve(
+      const paymentIntent = await stripeClient.paymentIntents.retrieve(
         paymentIntentID
       );
       const tenantID = paymentIntent.metadata?.tenantID;
@@ -503,7 +506,7 @@ exports.stripeEventWebhook = onRequest(
         log("Payment attempt succeeded");
 
         try {
-          const paymentIntentComplete = await stripe.paymentIntents.retrieve(
+          const paymentIntentComplete = await stripeClient.paymentIntents.retrieve(
             paymentIntentID
           );
 
@@ -515,7 +518,7 @@ exports.stripeEventWebhook = onRequest(
           log("Payment Intent complete obj", paymentIntentComplete);
           log("Charge ID", chargeID);
 
-          const charge = await stripe.charges.retrieve(chargeID);
+          const charge = await stripeClient.charges.retrieve(chargeID);
 
           // Use Firestore with tenant/store hierarchy for completion
           const completeRef = DB.collection("tenants")
@@ -565,7 +568,7 @@ exports.stripeEventWebhook = onRequest(
 
         // Retrieve PaymentIntent for detailed decline info
         try {
-          const pi = await stripe.paymentIntents.retrieve(paymentIntentID);
+          const pi = await stripeClient.paymentIntents.retrieve(paymentIntentID);
           if (pi.last_payment_error) {
             failureData.decline_code =
               pi.last_payment_error.decline_code || "";
@@ -583,7 +586,7 @@ exports.stripeEventWebhook = onRequest(
 
       // Cancel reader action to clean up
       try {
-        const readerResult = await stripe.terminal.readers.cancelAction(
+        const readerResult = await stripeClient.terminal.readers.cancelAction(
           readerID
         );
         log("Result of canceling reader after payment update", readerResult);
@@ -3906,14 +3909,15 @@ exports.newCheckoutGetAvailableReadersCallable = onCall(
     log("newCheckout: get available readers request", request.data);
 
     try {
-      const readers = await stripe.terminal.readers.list({});
+      const stripeClient = Stripe(stripeSecretKey.value());
+      const readers = await stripeClient.terminal.readers.list({});
       return {
         success: true,
         data: readers,
         message: "Readers retrieved successfully",
       };
     } catch (error) {
-      log("newCheckout: error getting readers", error);
+      log("newCheckout: error getting readers", error.message);
       throw new HttpsError("internal", "Failed to retrieve Stripe readers");
     }
   }
@@ -3950,8 +3954,10 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
     }
 
     try {
+      const stripeClient = Stripe(stripeSecretKey.value());
+
       // Check reader status
-      const reader = await stripe.terminal.readers.retrieve(readerID);
+      const reader = await stripeClient.terminal.readers.retrieve(readerID);
 
       if (reader.status && reader.status !== "online") {
         throw new HttpsError(
@@ -3985,7 +3991,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
       let finalPaymentIntentID;
 
       if (!paymentIntentID) {
-        paymentIntent = await stripe.paymentIntents.create({
+        paymentIntent = await stripeClient.paymentIntents.create({
           amount,
           payment_method_types: ["card_present"],
           capture_method: "automatic",
@@ -3995,12 +4001,12 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
         finalPaymentIntentID = paymentIntent.id;
       } else {
         finalPaymentIntentID = paymentIntentID;
-        paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentID);
+        paymentIntent = await stripeClient.paymentIntents.retrieve(paymentIntentID);
       }
 
       // Process the PaymentIntent with the reader
       const processedIntent =
-        await stripe.terminal.readers.processPaymentIntent(readerID, {
+        await stripeClient.terminal.readers.processPaymentIntent(readerID, {
           payment_intent: paymentIntent.id,
         });
 
@@ -4066,8 +4072,10 @@ exports.newCheckoutProcessRefundCallable = onCall(
     }
 
     try {
+      const stripeClient = Stripe(stripeSecretKey.value());
+
       // Retrieve the PaymentIntent to get the charge
-      const paymentIntent = await stripe.paymentIntents.retrieve(
+      const paymentIntent = await stripeClient.paymentIntents.retrieve(
         paymentIntentID
       );
 
@@ -4080,7 +4088,7 @@ exports.newCheckoutProcessRefundCallable = onCall(
       }
 
       // Create the refund
-      const refund = await stripe.refunds.create({
+      const refund = await stripeClient.refunds.create({
         charge: chargeId,
         ...(amount ? { amount } : {}),
       });
@@ -4125,7 +4133,9 @@ exports.newCheckoutCancelPaymentCallable = onCall(
     }
 
     try {
-      const readerBefore = await stripe.terminal.readers.retrieve(readerID);
+      const stripeClient = Stripe(stripeSecretKey.value());
+
+      const readerBefore = await stripeClient.terminal.readers.retrieve(readerID);
       if (readerBefore.status !== "online") {
         throw new HttpsError(
           "unavailable",
@@ -4133,7 +4143,7 @@ exports.newCheckoutCancelPaymentCallable = onCall(
         );
       }
 
-      const readerAfter = await stripe.terminal.readers.cancelAction(readerID);
+      const readerAfter = await stripeClient.terminal.readers.cancelAction(readerID);
 
       return {
         success: true,
@@ -4161,8 +4171,8 @@ exports.newCheckoutCancelPaymentCallable = onCall(
 // LIGHTSPEED RETAIL R-SERIES API INTEGRATION
 // ============================================================================
 
-const LIGHTSPEED_OAUTH_URL = "https://cloud.lightspeedapp.com/oauth/authorize";
-const LIGHTSPEED_TOKEN_URL = "https://cloud.lightspeedapp.com/oauth/access_token.php";
+const LIGHTSPEED_OAUTH_URL = "https://cloud.lightspeedapp.com/auth/oauth/authorize";
+const LIGHTSPEED_TOKEN_URL = "https://cloud.lightspeedapp.com/auth/oauth/token";
 const LIGHTSPEED_API_BASE = "https://api.lightspeedapp.com/API/V3/Account";
 const LIGHTSPEED_CALLBACK_URL = "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/lightspeedOAuthCallback";
 
@@ -4248,18 +4258,39 @@ async function lightspeedGet(accessToken, accountID, endpoint, params = {}) {
 
 async function lightspeedGetAll(accessToken, accountID, endpoint, params = {}) {
   let allItems = [];
-  let offset = 0;
   const limit = 100;
+  const key = endpoint.replace(/\?.*/g, "");
+
+  // First request uses the normal URL
+  let nextUrl = null;
+  let isFirst = true;
 
   while (true) {
-    const data = await lightspeedGet(accessToken, accountID, endpoint, {
-      ...params,
-      limit: limit.toString(),
-      offset: offset.toString(),
-    });
+    let data;
+    if (isFirst) {
+      data = await lightspeedGet(accessToken, accountID, endpoint, {
+        ...params,
+        limit: limit.toString(),
+      });
+      isFirst = false;
+    } else {
+      // Subsequent requests use the "next" URL directly
+      const res = await fetch(nextUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const bucketLevel = res.headers.get("x-ls-api-bucket-level");
+      if (bucketLevel) {
+        const [current] = bucketLevel.split("/").map(Number);
+        if (current > 80) await new Promise(r => setTimeout(r, 5000));
+        else if (current > 70) await new Promise(r => setTimeout(r, 2000));
+      }
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Lightspeed API error ${res.status}: ${errText}`);
+      }
+      data = await res.json();
+    }
 
-    // Lightspeed wraps results in the endpoint name (e.g. "Customer", "Workorder")
-    const key = endpoint.replace(/\?.*/g, "");
     const items = data[key];
     if (!items) break;
 
@@ -4269,10 +4300,113 @@ async function lightspeedGetAll(accessToken, accountID, endpoint, params = {}) {
     const attrs = data["@attributes"];
     if (!attrs || allItems.length >= parseInt(attrs.count)) break;
 
-    offset += limit;
+    // Use cursor-based "next" URL for pagination
+    if (attrs.next) {
+      nextUrl = attrs.next;
+    } else {
+      break;
+    }
   }
 
   return allItems;
+}
+
+function buildCSV(headers, rows) {
+  function escapeCell(val) {
+    if (val === null || val === undefined) return '""';
+    const str = String(val);
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  const headerLine = headers.map(escapeCell).join(",");
+  const dataLines = rows.map(row => row.map(escapeCell).join(","));
+  return [headerLine, ...dataLines].join("\n");
+}
+
+async function uploadCSVToStorage(csvString, storagePath) {
+  const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+  const file = bucket.file(storagePath);
+  await file.save(csvString, {
+    contentType: "text/csv",
+    metadata: { contentDisposition: `attachment; filename="${storagePath.split("/").pop()}"` },
+  });
+  await file.makePublic();
+  return `https://storage.googleapis.com/warpspeed-bonitabikes.firebasestorage.app/${storagePath}`;
+}
+
+async function streamLightspeedCSVToStorage(accessToken, accountID, endpoint, params, headers, rowMapper, storagePath, lsLog) {
+  const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+  const file = bucket.file(storagePath);
+  const writeStream = file.createWriteStream({
+    contentType: "text/csv",
+    metadata: { contentDisposition: `attachment; filename="${storagePath.split("/").pop()}"` },
+    resumable: false,
+  });
+
+  function escapeCell(val) {
+    if (val === null || val === undefined) return '""';
+    const str = String(val);
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+
+  writeStream.write(headers.map(escapeCell).join(",") + "\n");
+
+  let totalRows = 0;
+  const limit = 1000;
+  const key = endpoint.replace(/\?.*/g, "");
+  let nextUrl = null;
+  let isFirst = true;
+  let pageNum = 0;
+
+  while (true) {
+    let data;
+    if (isFirst) {
+      data = await lightspeedGet(accessToken, accountID, endpoint, { ...params, limit: limit.toString() });
+      isFirst = false;
+    } else {
+      const res = await fetch(nextUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      const bucketLevel = res.headers.get("x-ls-api-bucket-level");
+      if (bucketLevel) {
+        const [current] = bucketLevel.split("/").map(Number);
+        if (current > 80) await new Promise(r => setTimeout(r, 5000));
+        else if (current > 70) await new Promise(r => setTimeout(r, 2000));
+      }
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Lightspeed API error ${res.status}: ${errText}`);
+      }
+      data = await res.json();
+    }
+
+    const items = data[key];
+    if (!items) break;
+
+    const arr = Array.isArray(items) ? items : [items];
+    for (const item of arr) {
+      const row = rowMapper(item);
+      writeStream.write(row.map(escapeCell).join(",") + "\n");
+    }
+    totalRows += arr.length;
+    pageNum++;
+    await lsLog("Page " + pageNum + ": " + arr.length + " rows (" + totalRows + " total)...");
+
+    const attrs = data["@attributes"];
+    if (!attrs || totalRows >= parseInt(attrs.count)) break;
+    if (attrs.next) {
+      nextUrl = attrs.next.replace(/limit=\d+/, "limit=" + limit);
+    } else {
+      break;
+    }
+  }
+
+  await new Promise((resolve, reject) => {
+    writeStream.on("finish", resolve);
+    writeStream.on("error", reject);
+    writeStream.end();
+  });
+
+  await file.makePublic();
+  const url = `https://storage.googleapis.com/warpspeed-bonitabikes.firebasestorage.app/${storagePath}`;
+  return { url, totalRows };
 }
 
 function lsCleanPhone(str) {
@@ -4431,7 +4565,7 @@ exports.lightspeedImportData = onCall(
   },
   async (request) => {
     log("Lightspeed: import data", request.data);
-    const { tenantID, storeID, importType, clearExisting } = request.data;
+    const { tenantID, storeID, importType, saveToDB, resetLogs } = request.data;
     if (!tenantID || !storeID || !importType) {
       throw new HttpsError("invalid-argument", "tenantID, storeID, and importType required");
     }
@@ -4449,13 +4583,57 @@ exports.lightspeedImportData = onCall(
 
     let result = { success: true };
 
-    // --- Import Customers ---
-    if (importType === "customers" || importType === "all") {
-      log("Lightspeed: fetching customers...");
+    // --- Dev logging to Firestore for real-time frontend streaming ---
+    const logDocRef = db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("dev-logs").doc("lightspeed-import");
+    const logDoc = await logDocRef.get();
+    if (!logDoc.exists) {
+      await logDocRef.set({ logs: [], status: "running", startedAt: Date.now() });
+    } else {
+      await logDocRef.update({ status: "running" });
+    }
+
+    async function lsLog(message, type = "info") {
+      try {
+        log("Lightspeed:", message);
+        await logDocRef.update({
+          logs: admin.firestore.FieldValue.arrayUnion({
+            t: Date.now(),
+            msg: message,
+            type,
+          }),
+        });
+      } catch (e) { /* don't let logging errors break the import */ }
+    }
+
+    // Pick N random unique indices from an array, return { indices, items }
+    function pickRandomSample(arr, count = 5) {
+      const indices = [];
+      const max = arr.length;
+      while (indices.length < Math.min(count, max)) {
+        const i = Math.floor(Math.random() * max);
+        if (!indices.includes(i)) indices.push(i);
+      }
+      indices.sort((a, b) => a - b);
+      return { indices, items: indices.map(i => arr[i]) };
+    }
+
+    try {
+
+    // =====================================================================
+    // CUSTOMERS IMPORT
+    // =====================================================================
+    if (importType === "customers") {
+      await lsLog("Fetching customers from Lightspeed API...");
       const lsCustomers = await lightspeedGetAll(accessToken, accountID, "Customer", {
         load_relations: "all",
       });
-      log("Lightspeed: fetched customers", lsCustomers.length);
+      await lsLog("Fetched " + lsCustomers.length + " customers");
+
+      // Sample 5 raw objects for Cloud Console debug
+      const rawSample = pickRandomSample(lsCustomers, 5);
+      log("Lightspeed RAW CUSTOMERS (5 random):", JSON.stringify(rawSample.items, null, 2));
 
       // Map to app proto
       const mapped = [];
@@ -4463,7 +4641,6 @@ exports.lightspeedImportData = onCall(
         let cell = "";
         let landline = "";
 
-        // Extract phones from Contact.Phones.ContactPhone
         if (c.Contact && c.Contact.Phones && c.Contact.Phones.ContactPhone) {
           const phones = Array.isArray(c.Contact.Phones.ContactPhone)
             ? c.Contact.Phones.ContactPhone
@@ -4476,7 +4653,6 @@ exports.lightspeedImportData = onCall(
           }
         }
 
-        // Extract email
         let email = "";
         if (c.Contact && c.Contact.Emails && c.Contact.Emails.ContactEmail) {
           const emails = Array.isArray(c.Contact.Emails.ContactEmail)
@@ -4487,7 +4663,6 @@ exports.lightspeedImportData = onCall(
           }
         }
 
-        // Extract address
         let streetAddress = "", city = "", state = "", zip = "", unit = "";
         if (c.Contact && c.Contact.Addresses && c.Contact.Addresses.ContactAddress) {
           const addrs = Array.isArray(c.Contact.Addresses.ContactAddress)
@@ -4503,7 +4678,7 @@ exports.lightspeedImportData = onCall(
           }
         }
 
-        const id = db.collection("_").doc().id; // generate Firestore ID
+        const id = db.collection("_").doc().id;
 
         mapped.push({
           first: (c.firstName || "").toLowerCase(),
@@ -4546,54 +4721,149 @@ exports.lightspeedImportData = onCall(
       }
       const deduped = [...phoneMap.values(), ...noPhone];
       const duplicatesRemoved = mapped.length - deduped.length;
+      await lsLog("Mapped " + mapped.length + " customers, " + duplicatesRemoved + " duplicates removed, " + deduped.length + " unique");
 
-      // Clear existing if requested
-      if (clearExisting) {
-        const snap = await db.collection(`${basePath}/customers`).get();
-        const batch = db.batch();
-        let count = 0;
-        snap.forEach(doc => { batch.delete(doc.ref); count++; });
-        if (count > 0) await batch.commit();
-        log("Lightspeed: cleared existing customers", count);
-      }
+      // Log the same 5 samples post-mapping
+      log("Lightspeed MAPPED CUSTOMERS (same 5):", JSON.stringify(rawSample.indices.map(i => mapped[i]), null, 2));
 
-      // Save to Firestore
-      for (const cust of deduped) {
-        await db.collection(`${basePath}/customers`).doc(cust.id).set(cust);
+      // Save to Firestore if requested
+      if (saveToDB) {
+        await lsLog("Saving " + deduped.length + " customers to Firestore...");
+        for (const cust of deduped) {
+          await db.collection(`${basePath}/customers`).doc(cust.id).set(cust);
+        }
+        await lsLog("Customers saved to DB", "success");
+      } else {
+        await lsLog("Save to DB not selected — skipping write", "warn");
       }
-      log("Lightspeed: saved customers", deduped.length);
 
       result.customerCount = deduped.length;
       result.duplicatesRemoved = duplicatesRemoved;
-      result.customerMap = deduped; // pass to workorder linking
     }
 
-    // --- Import Workorders ---
-    if (importType === "workorders" || importType === "all") {
-      log("Lightspeed: fetching workorders...");
-      const lsWorkorders = await lightspeedGetAll(accessToken, accountID, "Workorder", {
-        load_relations: '["WorkorderLines","WorkorderStatus","Customer"]',
-      });
-      log("Lightspeed: fetched workorders", lsWorkorders.length);
+    // =====================================================================
+    // WORKORDERS IMPORT (also fetches customers for linking)
+    // =====================================================================
+    if (importType === "workorders") {
+      // === DEV MODE: Fetch specific workorders by ID ===
+      const DEV_WORKORDER_IDS = ["11930"];
+      await lsLog("DEV MODE: Fetching " + DEV_WORKORDER_IDS.length + " workorders...");
 
-      // Build customer name lookup from imported customers (if available)
-      let customerNameMap = new Map();
-      if (result.customerMap) {
-        for (const c of result.customerMap) {
-          const key = (c.first + " " + c.last).trim();
-          if (key) customerNameMap.set(key, c);
+      const lsWorkorders = [];
+      const serializedMap = new Map();
+      const itemMap = new Map();
+      const saleMap = new Map();
+
+      for (const woID of DEV_WORKORDER_IDS) {
+        try {
+          log("--- Fetching workorder " + woID + " ---", "");
+
+          // Fetch workorder
+          const woData = await lightspeedGet(accessToken, accountID, `Workorder/${woID}`, {
+            load_relations: '["WorkorderLines","WorkorderStatus","Customer"]',
+          });
+          const wo = woData.Workorder;
+          lsWorkorders.push(wo);
+          await lsLog("WORKORDER " + woID + ": " + JSON.stringify(wo, null, 2));
+
+          // Fetch its Serialized object
+          let serialized = null;
+          if (wo.serializedID && wo.serializedID !== "0") {
+            const serData = await lightspeedGet(accessToken, accountID, `Serialized/${wo.serializedID}`, {});
+            serialized = serData.Serialized || null;
+            serializedMap.set(wo.serializedID, serialized);
+            await lsLog("SERIALIZED " + woID + ": " + JSON.stringify(serialized, null, 2));
+          } else {
+            await lsLog("No serializedID on workorder " + woID, "warn");
+          }
+
+          // Fetch the Item linked to the Serialized
+          let item = null;
+          if (serialized && serialized.itemID && serialized.itemID !== "0") {
+            const itemData = await lightspeedGet(accessToken, accountID, `Item/${serialized.itemID}`, {});
+            item = itemData.Item || null;
+            itemMap.set(serialized.itemID, item);
+            await lsLog("ITEM " + woID + ": " + JSON.stringify(item, null, 2));
+          } else {
+            await lsLog("No itemID for workorder " + woID, "warn");
+          }
+
+          // Fetch the Sale with SaleLines
+          let sale = null;
+          if (wo.saleID && wo.saleID !== "0") {
+            const saleData = await lightspeedGet(accessToken, accountID, `Sale/${wo.saleID}`, {
+              load_relations: '["SaleLines"]',
+            });
+            sale = saleData.Sale || null;
+            saleMap.set(wo.saleID, sale);
+            await lsLog("SALE " + woID + ": " + JSON.stringify(sale, null, 2));
+          } else {
+            await lsLog("No saleID on workorder " + woID, "warn");
+          }
+
+          // Fetch WorkorderItems (inventory items on the workorder)
+          const woItemsData = await lightspeedGet(accessToken, accountID, "WorkorderItem", {
+            workorderID: woID,
+          });
+          const woItems = woItemsData.WorkorderItem;
+          const woItemsArr = !woItems ? [] : Array.isArray(woItems) ? woItems : [woItems];
+          log("WORKORDER ITEMS " + woID + ":", JSON.stringify(woItemsArr, null, 2));
+          await lsLog("WORKORDER ITEMS " + woID + ": " + JSON.stringify(woItemsArr, null, 2));
+
+          // Fetch each Item referenced by WorkorderItems
+          for (const woItem of woItemsArr) {
+            if (woItem.itemID && woItem.itemID !== "0") {
+              try {
+                const wiItemData = await lightspeedGet(accessToken, accountID, `Item/${woItem.itemID}`, {});
+                const wiItem = wiItemData.Item || null;
+                if (wiItem) itemMap.set(wiItem.itemID, wiItem);
+                log("WORKORDER ITEM -> ITEM " + woItem.itemID + ":", JSON.stringify(wiItem, null, 2));
+                await lsLog("WORKORDER ITEM -> ITEM " + woItem.itemID + ": " + JSON.stringify(wiItem, null, 2));
+              } catch (e) {
+                log("ERROR fetching item " + woItem.itemID + ":", e.message);
+                await lsLog("ERROR fetching item " + woItem.itemID + ": " + e.message, "error");
+              }
+            }
+          }
+
+          // Fetch the full Customer object
+          if (wo.customerID && wo.customerID !== "0") {
+            try {
+              const custData = await lightspeedGet(accessToken, accountID, `Customer/${wo.customerID}`, {
+                load_relations: '["Contact"]',
+              });
+              const customer = custData.Customer || null;
+              log("CUSTOMER " + woID + ":", JSON.stringify(customer, null, 2));
+              await lsLog("CUSTOMER " + woID + ": " + JSON.stringify(customer, null, 2));
+            } catch (e) {
+              log("ERROR fetching customer " + wo.customerID + ":", e.message);
+              await lsLog("ERROR fetching customer " + wo.customerID + ": " + e.message, "error");
+            }
+          } else {
+            await lsLog("No customerID on workorder " + woID, "warn");
+          }
+        } catch (e) {
+          log("ERROR fetching workorder " + woID + ":", e.message);
+          await lsLog("ERROR fetching workorder " + woID + ": " + e.message, "error");
         }
-      } else {
-        // Load existing customers for linking
-        const snap = await db.collection(`${basePath}/customers`).get();
-        snap.forEach(doc => {
-          const c = doc.data();
-          const key = (c.first + " " + c.last).trim();
-          if (key) customerNameMap.set(key, c);
-        });
       }
 
-      // Color labels for extraction
+      // DEV: Customer fetch disabled — empty map so mapping doesn't error
+      const customerNameMap = new Map();
+
+      // Step 5: Load statuses from settings
+      const settingsDoc = await db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("settings").doc("settings").get();
+      const settingsData = settingsDoc.exists ? settingsDoc.data() : {};
+      const appStatuses = settingsData.statuses || [];
+      const statusMap = new Map();
+      for (const s of appStatuses) {
+        if (s.label) statusMap.set(s.label.toLowerCase(), s);
+      }
+      await lsLog("Loaded " + appStatuses.length + " statuses from settings");
+
+      // Color extraction helpers
       const colorLabels = [
         "White", "Blue", "Light-blue", "Red", "Green", "Black", "Yellow",
         "Orange", "Maroon", "Brown", "Silver", "Tan", "Beige", "Pink",
@@ -4618,7 +4888,6 @@ exports.lightspeedImportData = onCall(
         "grey": { textColor: "black", backgroundColor: "grey", label: "Grey" },
         "gray": { textColor: "black", backgroundColor: "grey", label: "Grey" },
       };
-      // Sort longest first to avoid "Blue" matching before "Light-blue"
       colorLabels.sort((a, b) => b.length - a.length);
 
       function extractColors(text) {
@@ -4636,15 +4905,20 @@ exports.lightspeedImportData = onCall(
         return found;
       }
 
-      // Map workorders
+      // Step 6: Filter out archived workorders
+      const lsActive = lsWorkorders.filter(wo => wo.archived !== "true");
+      await lsLog("Filtered out " + (lsWorkorders.length - lsActive.length) + " archived workorders, " + lsActive.length + " remaining");
+
+      // Step 7: Map workorders
+      await lsLog("Mapping workorders to app format...");
       const woMapped = [];
       let linked = 0, unlinked = 0;
 
-      for (const wo of lsWorkorders) {
+      for (const wo of lsActive) {
         const id = db.collection("_").doc().id;
 
-        // Build description from notes
-        let description = wo.note || "";
+        // Build description from internalNote + workorder line notes
+        let description = wo.internalNote || "";
         if (wo.WorkorderLines && wo.WorkorderLines.WorkorderLine) {
           const lines = Array.isArray(wo.WorkorderLines.WorkorderLine)
             ? wo.WorkorderLines.WorkorderLine
@@ -4656,7 +4930,18 @@ exports.lightspeedImportData = onCall(
           }
         }
 
-        // Customer linking
+        // Map customerNotes from wo.note (public-facing note)
+        let customerNotes = [];
+        if (wo.note && wo.note.trim()) {
+          customerNotes.push({ id: db.collection("_").doc().id, text: wo.note.trim(), millis: Date.now() });
+        }
+
+        // Map internalNotes from wo.internalNote
+        let internalNotes = [];
+        if (wo.internalNote && wo.internalNote.trim()) {
+          internalNotes.push({ id: db.collection("_").doc().id, text: wo.internalNote.trim(), millis: Date.now() });
+        }
+
         let customerID = "", customerFirst = "", customerLast = "", customerPhone = "";
         if (wo.Customer) {
           customerFirst = (wo.Customer.firstName || "").toLowerCase();
@@ -4674,27 +4959,71 @@ exports.lightspeedImportData = onCall(
           unlinked++;
         }
 
-        // Status
         let status = "";
+        let lsStatusName = "";
         if (wo.WorkorderStatus) {
-          status = wo.WorkorderStatus.name || "";
+          lsStatusName = (wo.WorkorderStatus.name || "").toLowerCase();
+          const matchedStatus = statusMap.get(lsStatusName);
+          status = matchedStatus ? matchedStatus.id : "";
         }
 
-        // Extract colors and part/source from all item descriptions
         let allItemText = description;
         let partOrdered = "";
         let partSource = "";
-
-        // Check for PRODUCT -SOURCE pattern
         const partMatch = allItemText.match(/([A-Z][A-Z0-9 /-]*?)\s+-([A-Z][A-Z0-9]+)\s*$/);
         if (partMatch) {
           partOrdered = partMatch[1].trim();
           partSource = partMatch[2].trim();
         }
 
-        const colors = extractColors(allItemText);
-        const color1 = colors[0] || { textColor: "", backgroundColor: "", label: "" };
-        const color2 = colors[1] || { textColor: "", backgroundColor: "", label: "" };
+        // Map Serialized fields → brand, model, color1, legacy.description
+        const ser = serializedMap.get(wo.serializedID) || null;
+        let legacyDescription = ser ? (ser.description || "") : "";
+        let brand = "";
+        let model = "";
+        let color1 = { textColor: "", backgroundColor: "", label: "" };
+        const color2 = { textColor: "", backgroundColor: "", label: "" };
+
+        // Start with Serialized.colorName as default color1
+        if (ser && ser.colorName) {
+          const cKey = ser.colorName.toLowerCase();
+          if (colorMap[cKey]) {
+            color1 = { ...colorMap[cKey] };
+          } else {
+            color1 = { textColor: "black", backgroundColor: "whitesmoke", label: ser.colorName };
+          }
+        }
+
+        // Process Serialized.description for brand/model extraction
+        if (legacyDescription) {
+          let working = legacyDescription.trim();
+
+          // Search for color names in description — if found, extract to color1 and remove
+          for (const label of colorLabels) {
+            const regex = new RegExp(`\\b${label}\\b`, "i");
+            const match = working.match(regex);
+            if (match) {
+              const cKey = label.toLowerCase();
+              if (colorMap[cKey]) {
+                color1 = { ...colorMap[cKey] };
+              } else {
+                color1 = { textColor: "black", backgroundColor: "whitesmoke", label: match[0] };
+              }
+              // Remove the color from the working string
+              working = working.replace(regex, "").replace(/\s{2,}/g, " ").trim();
+              break; // only extract first color found
+            }
+          }
+
+          // Split remaining: last word → model, rest → brand
+          const words = working.split(/\s+/).filter(w => w);
+          if (words.length > 1) {
+            model = words[words.length - 1];
+            brand = words.slice(0, -1).join(" ");
+          } else if (words.length === 1) {
+            brand = words[0];
+          }
+        }
 
         woMapped.push({
           workorderNumber: wo.workorderID || "",
@@ -4710,53 +5039,426 @@ exports.lightspeedImportData = onCall(
           customerFirst,
           customerLast,
           customerPhone,
-          model: "",
-          brand: "",
+          model,
+          brand,
           description,
+          legacyDescription,
           color1,
           color2,
           waitTime: "",
           changeLog: [],
-          startedBy: "",
+          startedBy: wo.employeeID || "",
           startedOnMillis: wo.timeIn ? new Date(wo.timeIn).getTime() : "",
           finishedOnMillis: "",
           partOrdered,
           partSource,
-          itemIdArr: [],
           workorderLines: [],
-          internalNotes: [],
-          customerNotes: [],
+          internalNotes,
+          customerNotes,
           status,
-          taxFree: false,
-          archived: false,
+          taxFree: wo.tax === "false",
+          archived: wo.archived === "true",
+          _lsStatusName: lsStatusName, // temp field for sampling, removed before save
         });
       }
 
-      // Clear existing if requested
-      if (clearExisting) {
-        const snap = await db.collection(`${basePath}/open-workorders`).get();
-        const batch = db.batch();
-        let count = 0;
-        snap.forEach(doc => { batch.delete(doc.ref); count++; });
-        if (count > 0) await batch.commit();
-        log("Lightspeed: cleared existing workorders", count);
+      await lsLog("Mapped " + woMapped.length + " workorders (" + linked + " linked to customers, " + unlinked + " unlinked)");
+
+      // Step 8: Log mapped workorders
+      await lsLog("MAPPED WORKORDERS: " + JSON.stringify(woMapped, null, 2));
+
+      // Step 9: Build 25-workorder sample for DB save
+      // 5 "Done & Paid", 5 "Finished - No Auto Text", 5 "Part Ordered", 10 random from remainder
+      const statusBuckets = {
+        "done & paid": [],
+        "finished - no auto text": [],
+        "part ordered": [],
+      };
+      const remainder = [];
+
+      for (const wo of woMapped) {
+        const sName = wo._lsStatusName;
+        if (statusBuckets[sName] && statusBuckets[sName].length < 5) {
+          statusBuckets[sName].push(wo);
+        } else {
+          remainder.push(wo);
+        }
       }
 
-      // Save to Firestore
-      for (const wo of woMapped) {
-        await db.collection(`${basePath}/open-workorders`).doc(wo.id).set(wo);
+      // Shuffle remainder and take up to 10
+      for (let i = remainder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [remainder[i], remainder[j]] = [remainder[j], remainder[i]];
       }
-      log("Lightspeed: saved workorders", woMapped.length);
+      const randomSample = remainder.slice(0, 10);
+
+      const saveSet = [
+        ...statusBuckets["done & paid"],
+        ...statusBuckets["finished - no auto text"],
+        ...statusBuckets["part ordered"],
+        ...randomSample,
+      ];
+
+      await lsLog("Sample breakdown: " +
+        statusBuckets["done & paid"].length + " Done & Paid, " +
+        statusBuckets["finished - no auto text"].length + " Finished - No Auto Text, " +
+        statusBuckets["part ordered"].length + " Part Ordered, " +
+        randomSample.length + " random = " + saveSet.length + " total");
+
+      // Save sampled workorders to Firestore
+      // DEV: always save 25 sample — revert to `if (saveToDB)` for production
+      if (true) {
+        await lsLog("Saving " + saveSet.length + " sampled workorders to Firestore...");
+        for (const wo of saveSet) {
+          const { _lsStatusName, ...woClean } = wo; // remove temp field
+          await db.collection(`${basePath}/open-workorders`).doc(woClean.id).set(woClean);
+        }
+        await lsLog("Workorders saved to DB (" + saveSet.length + " of " + woMapped.length + " total)", "success");
+      } else {
+        await lsLog("Save to DB not selected — skipping write", "warn");
+      }
 
       result.workorderCount = woMapped.length;
+      result.savedCount = saveSet.length;
       result.linked = linked;
       result.unlinked = unlinked;
     }
 
-    // Clean up internal data before returning
-    delete result.customerMap;
+    // =====================================================================
+    // INVENTORY IMPORT (from Lightspeed Item endpoint)
+    // =====================================================================
+    if (importType === "inventory") {
+      await lsLog("Fetching items from Lightspeed API...");
+      const lsItems = await lightspeedGetAll(accessToken, accountID, "Item", {});
+      await lsLog("Fetched " + lsItems.length + " items");
 
+      // Filter out archived items
+      const lsActive = lsItems.filter(item => item.archived !== "true");
+      await lsLog("Filtered out " + (lsItems.length - lsActive.length) + " archived items, " + lsActive.length + " remaining");
+
+      // Log 5 random raw items
+      const rawSample = pickRandomSample(lsActive, 5);
+      log("Lightspeed RAW ITEMS (5 random):", JSON.stringify(rawSample.items, null, 2));
+
+      // Map to app inventory format
+      await lsLog("Mapping items to app inventory format...");
+      const mapped = [];
+      for (const item of lsActive) {
+        const price = Math.round(parseFloat(item.defaultCost || "0") * 100); // dollars to cents
+        const formalName = item.description || "";
+        const isLabor = formalName.toLowerCase().includes("labor");
+
+        mapped.push({
+          formalName,
+          informalName: "",
+          brand: "",
+          price: 0,
+          salePrice: 0,
+          category: isLabor ? "Labor" : "Part",
+          id: db.collection("_").doc().id,
+          cost: price,
+          upc: item.upc || "",
+          ean: item.ean || "",
+          customSku: item.customSku || "",
+          manufacturerSku: item.manufacturerSku || "",
+          minutes: 0,
+        });
+      }
+
+      await lsLog("Mapped " + mapped.length + " inventory items");
+
+      // Log 5 random mapped items
+      log("Lightspeed MAPPED INVENTORY (same 5, post-mapping):", JSON.stringify(rawSample.indices.map(i => mapped[i]), null, 2));
+
+      // Save to Firestore
+      if (saveToDB) {
+        await lsLog("Saving " + mapped.length + " inventory items to Firestore...");
+        for (const item of mapped) {
+          await db.collection(`${basePath}/inventory`).doc(item.id).set(item);
+        }
+        await lsLog("Inventory saved to DB", "success");
+      } else {
+        await lsLog("Save to DB not selected — skipping write", "warn");
+      }
+
+      result.inventoryCount = mapped.length;
+    }
+
+    // =====================================================================
+    // CSV EXPORTS
+    // =====================================================================
+
+    if (importType === "csv-workorders") {
+      await lsLog("Fetching workorders from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "Workorder", {
+        load_relations: '["WorkorderLines","WorkorderStatus","Customer"]',
+      });
+      await lsLog("Fetched " + data.length + " workorders. Building CSV...");
+
+      const headers = ["workorderID", "customerID", "customerFirstName", "customerLastName", "serializedID", "saleID", "saleLineID", "employeeID", "statusName", "statusID", "note", "internalNote", "timeIn", "etaOut", "timeStamp", "tax", "warranty", "archived", "hookIn", "workorderLinesJSON"];
+      const rows = data.map(wo => [
+        wo.workorderID, wo.customerID, wo.Customer?.firstName || "", wo.Customer?.lastName || "",
+        wo.serializedID, wo.saleID, wo.saleLineID, wo.employeeID,
+        wo.WorkorderStatus?.name || "", wo.workorderStatusID,
+        wo.note || "", wo.internalNote || "", wo.timeIn || "", wo.etaOut || "", wo.timeStamp || "",
+        wo.tax, wo.warranty, wo.archived, wo.hookIn || "",
+        JSON.stringify(wo.WorkorderLines?.WorkorderLine || []),
+      ]);
+
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_workorders.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "workorders", url, filename: "lightspeed_workorders.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Workorders CSV exported: " + rows.length + " rows", "success");
+    }
+
+    if (importType === "csv-workorderitems") {
+      await lsLog("Fetching workorder items from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "WorkorderItem", {});
+      await lsLog("Fetched " + data.length + " workorder items. Building CSV...");
+
+      const headers = ["workorderItemID", "workorderID", "itemID", "unitQuantity", "unitPrice", "unitCost", "note", "tax", "approved", "warranty", "isSpecialOrder", "saleLineID", "saleID", "employeeID", "discountID", "timeStamp"];
+      const rows = data.map(wi => [
+        wi.workorderItemID, wi.workorderID, wi.itemID, wi.unitQuantity, wi.unitPrice, wi.unitCost,
+        wi.note || "", wi.tax, wi.approved, wi.warranty, wi.isSpecialOrder,
+        wi.saleLineID, wi.saleID, wi.employeeID, wi.discountID, wi.timeStamp || "",
+      ]);
+
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_workorderitems.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "workorderitems", url, filename: "lightspeed_workorderitems.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("WorkorderItems CSV exported: " + rows.length + " rows", "success");
+    }
+
+    if (importType === "csv-serialized") {
+      await lsLog("Fetching serialized items from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "Serialized", {});
+      await lsLog("Fetched " + data.length + " serialized items. Building CSV...");
+
+      const headers = ["serializedID", "itemID", "description", "serial", "colorName", "sizeName", "customerID", "saleLineID", "timeStamp"];
+      const rows = data.map(s => [
+        s.serializedID, s.itemID, s.description || "", s.serial || "", s.colorName || "", s.sizeName || "",
+        s.customerID, s.saleLineID, s.timeStamp || "",
+      ]);
+
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_serialized.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "serialized", url, filename: "lightspeed_serialized.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Serialized CSV exported: " + rows.length + " rows", "success");
+    }
+
+    if (importType === "csv-items") {
+      await lsLog("Fetching items from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "Item", {});
+      await lsLog("Fetched " + data.length + " items. Building CSV...");
+
+      const headers = ["itemID", "description", "defaultCost", "avgCost", "upc", "ean", "customSku", "manufacturerSku", "categoryID", "taxClassID", "itemType", "archived", "timeStamp"];
+      const rows = data.map(item => [
+        item.itemID, item.description || "", item.defaultCost || "", item.avgCost || "",
+        item.upc || "", item.ean || "", item.customSku || "", item.manufacturerSku || "",
+        item.categoryID, item.taxClassID, item.itemType || "", item.archived, item.timeStamp || "",
+      ]);
+
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_items.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "items", url, filename: "lightspeed_items.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Items CSV exported: " + rows.length + " rows", "success");
+    }
+
+    if (importType === "csv-customers") {
+      await lsLog("Fetching customers from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "Customer", {
+        load_relations: '["Contact"]',
+      });
+      await lsLog("Fetched " + data.length + " customers. Building CSV...");
+
+      const headers = ["customerID", "firstName", "lastName", "title", "company", "createTime", "archived", "phone1", "phone2", "email", "address1", "address2", "city", "state", "zip"];
+      const rows = data.map(c => {
+        let phone1 = "", phone2 = "";
+        if (c.Contact?.Phones?.ContactPhone) {
+          const phones = Array.isArray(c.Contact.Phones.ContactPhone) ? c.Contact.Phones.ContactPhone : [c.Contact.Phones.ContactPhone];
+          for (const p of phones) {
+            const clean = lsCleanPhone(p.number);
+            if (!clean) continue;
+            if (!phone1) phone1 = clean;
+            else if (!phone2) { phone2 = clean; break; }
+          }
+        }
+        let email = "";
+        if (c.Contact?.Emails?.ContactEmail) {
+          const emails = Array.isArray(c.Contact.Emails.ContactEmail) ? c.Contact.Emails.ContactEmail : [c.Contact.Emails.ContactEmail];
+          if (emails.length > 0 && emails[0].address) email = emails[0].address;
+        }
+        let address1 = "", address2 = "", city = "", state = "", zip = "";
+        if (c.Contact?.Addresses?.ContactAddress) {
+          const addrs = Array.isArray(c.Contact.Addresses.ContactAddress) ? c.Contact.Addresses.ContactAddress : [c.Contact.Addresses.ContactAddress];
+          if (addrs.length > 0) {
+            address1 = addrs[0].address1 || "";
+            address2 = addrs[0].address2 || "";
+            city = addrs[0].city || "";
+            state = addrs[0].state || "";
+            zip = addrs[0].zip || "";
+          }
+        }
+        return [c.customerID, c.firstName || "", c.lastName || "", c.title || "", c.company || "", c.createTime || "", c.archived, phone1, phone2, email, address1, address2, city, state, zip];
+      });
+
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_customers.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "customers", url, filename: "lightspeed_customers.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Customers CSV exported: " + rows.length + " rows", "success");
+    }
+
+    if (importType === "csv-sales") {
+      // --- getAll approach (testing for speed) ---
+      await lsLog("Fetching all sales from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "Sale", {});
+      await lsLog("Fetched " + data.length + " sales. Building CSV...");
+      const headers = ["saleID", "customerID", "employeeID", "completed", "completeTime", "createTime", "calcSubtotal", "calcTotal", "calcTax1", "calcTax2", "calcDiscount", "calcPayments", "referenceNumber", "archived", "voided"];
+      const rows = data.map(s => [
+        s.saleID, s.customerID, s.employeeID, s.completed, s.completeTime || "", s.createTime || "",
+        s.calcSubtotal || "", s.calcTotal || "", s.calcTax1 || "", s.calcTax2 || "",
+        s.calcDiscount || "", s.calcPayments || "", s.referenceNumber || "",
+        s.archived, s.voided,
+      ]);
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_sales.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "sales", url, filename: "lightspeed_sales.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Sales CSV exported: " + rows.length + " rows", "success");
+      // --- streamed approach (kept for reference) ---
+      // const rowMapper = (s) => [
+      //   s.saleID, s.customerID, s.employeeID, s.completed, s.completeTime || "", s.createTime || "",
+      //   s.calcSubtotal || "", s.calcTotal || "", s.calcTax1 || "", s.calcTax2 || "",
+      //   s.calcDiscount || "", s.calcPayments || "", s.referenceNumber || "",
+      //   s.archived, s.voided,
+      // ];
+      // const { url, totalRows } = await streamLightspeedCSVToStorage(accessToken, accountID, "Sale", {}, headers, rowMapper, path, lsLog);
+      // await lsLog(JSON.stringify({ csvType: "sales", url, filename: "lightspeed_sales.csv", rowCount: totalRows }), "csv-download");
+      // await lsLog("Sales CSV exported: " + totalRows + " rows", "success");
+    }
+
+    if (importType === "csv-salelines") {
+      // --- getAll approach (testing for speed) ---
+      await lsLog("Fetching all sale lines from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "SaleLine", {});
+      await lsLog("Fetched " + data.length + " sale lines. Building CSV...");
+      const headers = ["saleLineID", "saleID", "itemID", "unitQuantity", "unitPrice", "avgCost", "discountAmount", "discountPercent", "tax", "taxClassID", "note", "isWorkorder", "createTime"];
+      const rows = data.map(sl => [
+        sl.saleLineID, sl.saleID, sl.itemID, sl.unitQuantity || "", sl.unitPrice || "",
+        sl.avgCost || "", sl.discountAmount || "", sl.discountPercent || "",
+        sl.tax || "", sl.taxClassID || "", sl.note || "",
+        sl.isWorkorder || "", sl.createTime || "",
+      ]);
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_salelines.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "salelines", url, filename: "lightspeed_salelines.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Sale Lines CSV exported: " + rows.length + " rows", "success");
+      // --- streamed approach (kept for reference) ---
+      // const rowMapper = (sl) => [
+      //   sl.saleLineID, sl.saleID, sl.itemID, sl.unitQuantity || "", sl.unitPrice || "",
+      //   sl.avgCost || "", sl.discountAmount || "", sl.discountPercent || "",
+      //   sl.tax || "", sl.taxClassID || "", sl.note || "",
+      //   sl.isWorkorder || "", sl.createTime || "",
+      // ];
+      // const { url, totalRows } = await streamLightspeedCSVToStorage(accessToken, accountID, "SaleLine", {}, headers, rowMapper, path, lsLog);
+      // await lsLog(JSON.stringify({ csvType: "salelines", url, filename: "lightspeed_salelines.csv", rowCount: totalRows }), "csv-download");
+      // await lsLog("Sale Lines CSV exported: " + totalRows + " rows", "success");
+    }
+
+    await lsLog("Import complete!", "success");
+    await logDocRef.update({ status: "complete" });
     log("Lightspeed: import complete", result);
     return result;
+
+    } catch (importError) {
+      await lsLog("Import failed: " + (importError.message || "Unknown error"), "error");
+      await logDocRef.update({ status: "error" });
+      throw importError;
+    }
+  }
+);
+
+// ==================== SEND EMAIL ====================
+exports.sendEmailCallable = onCall(
+  {
+    secrets: [firebaseServiceAccountKey],
+  },
+  async (request) => {
+    log("Incoming email callable request", request.data);
+
+    try {
+      const { to, subject, htmlBody, tenantID, storeID } = request.data;
+
+      if (!to || typeof to !== "string" || !to.includes("@")) {
+        throw new HttpsError("invalid-argument", "Valid email address is required");
+      }
+      if (!subject || typeof subject !== "string") {
+        throw new HttpsError("invalid-argument", "Email subject is required");
+      }
+      if (!htmlBody || typeof htmlBody !== "string") {
+        throw new HttpsError("invalid-argument", "Email body is required");
+      }
+      if (!tenantID || typeof tenantID !== "string") {
+        throw new HttpsError("invalid-argument", "Tenant ID is required");
+      }
+      if (!storeID || typeof storeID !== "string") {
+        throw new HttpsError("invalid-argument", "Store ID is required");
+      }
+
+      // Gmail SMTP transport — placeholder credentials, configure later with App Password
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: "support@bonitabikes.com",
+          pass: "PLACEHOLDER_APP_PASSWORD",
+        },
+      });
+
+      const mailOptions = {
+        from: '"Bonita Bikes" <support@bonitabikes.com>',
+        to: to,
+        subject: subject,
+        html: htmlBody,
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+
+      log("Email sent successfully", {
+        messageId: info.messageId,
+        to: to,
+      });
+
+      return {
+        success: true,
+        message: "Email sent successfully",
+        data: {
+          messageId: info.messageId,
+          to: to,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      log("Error in sendEmailCallable", error);
+
+      if (error instanceof HttpsError) throw error;
+
+      throw new HttpsError(
+        "internal",
+        "Failed to send email: " + (error.message || "Unknown error")
+      );
+    }
   }
 );

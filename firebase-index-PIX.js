@@ -1,0 +1,4942 @@
+/* eslint-disable */
+const { logger } = require("firebase-functions");
+const { onRequest } = require("firebase-functions/v2/https");
+// const ftp = require("basic-ftp");cd..
+const fs = require("fs");
+const admin = require("firebase-admin");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const functions = require("firebase-functions");
+const { defineSecret } = require("firebase-functions/params");
+const Stripe = require("stripe");
+const { isArray } = require("lodash");
+const { onInit } = require("firebase-functions/v2/core");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const fetch = require("node-fetch");
+
+// Firebase Admin SDK - initialize once at module load (don't delete/recreate)
+let DB = null;
+let adminInitialized = false;
+
+// Helper function to get initialized Firestore DB with service account credentials
+async function getDB(serviceAccountSecret = null) {
+  try {
+    // Return existing DB if already initialized
+    if (DB && adminInitialized) {
+      return DB;
+    }
+
+    // Initialize only once - NEVER delete the app (breaks Firebase Functions SDK)
+    if (!adminInitialized) {
+      if (serviceAccountSecret) {
+        // Initialize with service account from Secret Manager
+        const serviceAccountJSON = serviceAccountSecret.value();
+        const serviceAccount = JSON.parse(serviceAccountJSON);
+
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com",
+        });
+
+        log("✅ Firebase Admin initialized with service account from Secret Manager");
+      } else {
+        // Fallback to default credentials
+        admin.initializeApp({
+          databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com",
+        });
+        log("⚠️ Firebase Admin initialized with default credentials");
+      }
+
+      adminInitialized = true;
+      DB = admin.firestore();
+      log("DB instance created successfully");
+    }
+
+    return DB;
+  } catch (error) {
+    // If app already exists, just use it
+    if (error.code === "app/duplicate-app") {
+      log("⚠️ Admin app already exists, using existing app");
+      adminInitialized = true;
+      DB = admin.firestore();
+      return DB;
+    }
+
+    log("❌ Error initializing Firebase Admin", {
+      error: error.message,
+      code: error.code,
+      hasSecret: !!serviceAccountSecret,
+      appsLength: admin.apps.length,
+      adminInitialized: adminInitialized,
+    });
+
+    throw error;
+  }
+}
+
+// Check if running in emulator mode
+// const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+
+// If running in emulator, connect to local Firestore emulator
+// if (isEmulator) {
+//   process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+// }
+
+const stripeSecretKey = defineSecret("stripeSecretKey");
+const twilioSecretKey = defineSecret("twilioSecretKey");
+const twilioSecretAccountNumber = defineSecret("twilioSecretAccountNum");
+const firebaseServiceAccountKey = defineSecret("firebase-service-account-key");
+const lightspeedClientId = defineSecret("LIGHTSPEED_CLIENT_ID");
+const lightspeedClientSecret = defineSecret("LIGHTSPEED_CLIENT_SECRET");
+
+// initialization
+var stripe;
+var twilioClient;
+let isAdminInitializedWithCredentials = false;
+
+onInit(async () => {
+  // Note: Admin SDK is already initialized above with default credentials
+  // The onInit can't reinitialize it, but we can log the status
+  log("onInit fired - Admin SDK status", {
+    appsInitialized: admin.apps.length,
+    hasServiceAccountSecret: !!firebaseServiceAccountKey.value(),
+  });
+
+  // stripe = Stripe(stripeSecretKey.value()); // Stripe secret key
+  // try {
+  //   twilioClient = require("twilio")(
+  //     twilioSecretAccountNumber,
+  //     twilioSecretKey
+  //   );
+  // } catch (e) {
+  //   log("error fetching Twilio client", e);
+  // }
+}, [stripeSecretKey, firebaseServiceAccountKey]);
+
+const SMS_PROTO = {
+  firstName: "",
+  lastName: "",
+  phoneNumber: "",
+  canRespond: false,
+  millis: "",
+  message: "",
+  customerID: "",
+  read: false,
+  id: "",
+};
+
+const CLOSED_THREAD_RESPONSE =
+  "Thank you for messaging Bonita Bikes. Due to staffing limitations, we cannot keep messaging open for all return responses. If you need to send a picture, for immediate service please call (239) 291-9396 and we can open the messaging service, or include the picture/video in an email to support@bonitabikes.com. Thank you and we'll chat soon!";
+
+function log(one, two) {
+  let str = "[MY LOG ====>] ";
+
+  if (typeof one === "object") {
+    logger.log(str + JSON.stringify(one) + two || "");
+    return;
+  }
+
+  if (typeof two === "object") {
+    logger.log(str + one + " : " + JSON.stringify(two));
+    return;
+  }
+
+  if (one) {
+    str += one;
+  }
+  if (two) {
+    str += "  :  ";
+    str += two;
+  } else {
+    // str = "log: " + str;
+  }
+  logger.log(str);
+}
+
+// server driven Stripe payments
+
+exports.getAvailableStripeReaders = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    log("Incoming get available Stripe readers body", req.body);
+    const readers = await stripe.terminal.readers.list({});
+    log("available Stripe readers", readers);
+    sendSuccessfulResult(res, readers);
+  }
+);
+
+exports.initiateRefund = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    log("Incoming refund", req.body);
+
+    const paymentIntentId = req.body.paymentIntentId;
+    const amount = req.body.amount; // Optional: refund a specific amount (in cents)
+
+    if (!paymentIntentId || typeof paymentIntentId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "PaymentIntent ID must be provided and must be a string.",
+      });
+    }
+
+    if (amount !== undefined && typeof amount !== "number") {
+      return res.status(400).json({
+        success: false,
+        message: "If provided, refund amount must be a valid number in cents.",
+      });
+    }
+
+    try {
+      // Step 1: Retrieve the PaymentIntent to get its latest charge
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentId
+      );
+
+      const chargeId = paymentIntent.charges?.data?.[0]?.id;
+      if (!chargeId) {
+        return res.status(400).json({
+          success: false,
+          message: "No charge found for the given PaymentIntent.",
+        });
+      }
+
+      // Step 2: Create the refund
+      const refund = await stripe.refunds.create({
+        charge: chargeId,
+        ...(amount ? { amount } : {}), // Optional partial refund
+      });
+
+      // Step 3: Return success response
+      return res.status(200).json({
+        success: true,
+        message: `✅ Refund ${
+          amount ? `$${(amount / 100).toFixed(2)}` : "for full amount"
+        } processed successfully.`,
+        refundId: refund.id,
+        status: refund.status,
+      });
+    } catch (error) {
+      let message;
+
+      switch (error.type) {
+        case "StripeInvalidRequestError":
+          message = `⚠️ Invalid request: ${error.message}`;
+          break;
+        case "StripeAPIError":
+          message = `⚠️ Stripe API error: ${error.message}`;
+          break;
+        case "StripeConnectionError":
+          message = `📡 Network error: Could not connect to Stripe.`;
+          break;
+        case "StripeAuthenticationError":
+          message = `🔐 Authentication error: Please check your Stripe credentials.`;
+          break;
+        case "StripePermissionError":
+          message = `🔒 Permission error: Not allowed to issue this refund.`;
+          break;
+        default:
+          message = `❗ Unexpected error: ${error.message}`;
+          break;
+      }
+
+      return res.status(500).json({ success: false, message });
+    }
+  }
+);
+
+exports.initiatePaymentIntent = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    log("Incoming process Stripe server-driven payment", req.body);
+
+    let amount = req.body.amount;
+    let readerID = req.body.readerID;
+
+    if (!amount || typeof amount !== "number") {
+      return res.status(400).json({
+        success: false,
+        message: "Amount must be a valid number in cents.",
+      });
+    }
+
+    if (!readerID || typeof readerID !== "string") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Reader ID must be provided." });
+    }
+
+    try {
+      // first check to see if the reader is in use. It is possible to override another user's payment intent which causes havoc
+      const reader = await stripe.terminal.readers.retrieve(readerID);
+
+      // Offline/unreachable check
+      if (reader.status && reader.status !== "online") {
+        return res.status(503).send(
+          JSON.stringify({
+            success: false,
+            message: "📴 Terminal is offline or unreachable.",
+            type: "StripeTerminalOfflineError",
+            code: "reader_offline",
+            readerStatus: reader.status,
+          })
+        );
+      }
+
+      // Busy check: reader.action indicates the reader is currently doing something
+      // If it's processing a payment, it will have action.type === "process_payment_intent"
+      const action = reader.action;
+      if (action && action.type) {
+        // Treat ANY in-progress action as busy. For payment specifically, include the current PI ID if present.
+        if (action.type === "process_payment_intent") {
+          const currentPiId =
+            action.process_payment_intent?.payment_intent || null;
+          return res.status(409).send(
+            JSON.stringify({
+              success: false,
+              message: currentPiId
+                ? `⏳ Reader is currently processing a different payment (PaymentIntent ${currentPiId}).`
+                : "⏳ Reader is currently processing a different payment.",
+              type: "StripeTerminalReaderBusyError",
+              code: "reader_busy",
+              currentPaymentIntentId: currentPiId,
+            })
+          );
+        } else {
+          // Could be "install_update", "collect_input", etc. — still busy.
+          return res.status(409).send(
+            JSON.stringify({
+              success: false,
+              message: `⏳ Reader is busy (${action.type}). Please wait or cancel current action on the reader.`,
+              type: "StripeTerminalReaderBusyError",
+              code: "reader_busy",
+              activeActionType: action.type,
+            })
+          );
+        }
+      }
+
+      // 1. Create the PaymentIntent
+      let paymentIntent;
+      // check to see if we are reusing an old payment attempt
+      if (!req.body.paymentIntentID) {
+        // we are not
+        log("Getting a new payment intent");
+        paymentIntent = await stripe.paymentIntents.create({
+          amount,
+          payment_method_types: ["card_present", "card", "link", "cashapp"],
+          capture_method: req.body.captureMethod || "automatic",
+          currency: "usd",
+        });
+        paymentIntentID = paymentIntent.id;
+        log(
+          "Payment intent gathered, processing Stripe server-driven payment intent",
+          paymentIntent
+        );
+      } else {
+        // we are reusing
+        log("Recycling the previous payment intent");
+        paymentIntentID = req.body.paymentIntentID;
+      }
+
+      // 2. Process the PaymentIntent with the reader
+      const processedIntent =
+        await stripe.terminal.readers.processPaymentIntent(readerID, {
+          payment_intent: paymentIntent.id,
+        });
+
+      // 3. Return success with client-side polling configuration
+      const paymentIntentID =
+        processedIntent.action.process_payment_intent.payment_intent;
+      log("Stripe payment successfully started", processedIntent);
+
+      return res.status(200).send(
+        JSON.stringify({
+          success: true,
+          message: `✅ Payment of $${(amount / 100).toFixed(
+            2
+          )} processed successfully.`,
+          paymentIntentID: paymentIntentID,
+          readerID: processedIntent.id,
+          status: processedIntent.status,
+          // Client-side polling configuration
+          pollingConfig: {
+            enabled: true,
+            databasePath: `PAYMENT-PROCESSING/${readerID}/${paymentIntentID}`,
+            pollingInterval: 3000, // 3 seconds
+            maxPollingTime: 300000, // 5 minutes
+            timeoutMessage:
+              "Payment processing timeout - please check reader status",
+            fallbackEnabled: true,
+            // Expected database structure for monitoring
+            expectedNodes: {
+              update: "PAYMENT-PROCESSING/{readerID}/{paymentIntentID}/update/",
+              complete:
+                "PAYMENT-PROCESSING/{readerID}/{paymentIntentID}/complete/",
+            },
+          },
+        })
+      );
+    } catch (error) {
+      let message;
+
+      switch (error.type) {
+        case "StripeCardError":
+          message = `❌ Card error: ${error.message}`;
+          break;
+        case "StripeInvalidRequestError":
+          message = `⚠️ Invalid request: ${error.message}`;
+          break;
+        case "StripeAPIError":
+          message = `⚠️ Stripe API error: ${error.message}`;
+          break;
+        case "StripeConnectionError":
+          message = `📡 Network error: Could not connect to Stripe.`;
+          break;
+        case "StripeAuthenticationError":
+          message = `🔐 Authentication error: Please check your Stripe credentials.`;
+          break;
+        case "StripePermissionError":
+          message = `🔒 Permission error: Not allowed to process this payment.`;
+          break;
+        case "StripeTerminalReaderBusyError":
+          message = `⏳ Reader is busy. Try again in a moment.`;
+          break;
+        case "StripeTerminalOfflineError":
+          message = `📴 Terminal is offline or unreachable.`;
+          break;
+        default:
+          message = `❗ Unexpected error: ${error.message}`;
+          break;
+      }
+      res.status(500).send(JSON.stringify({ success: false, message }));
+    }
+  }
+);
+
+exports.stripeEventWebhook = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    log("Incoming Stripe webhook event body", req.body);
+
+    let message = "";
+    let error = false;
+
+    // Input validation
+    if (!req.body || !req.body.data || !req.body.data.object) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid webhook payload structure.",
+      });
+    }
+
+    let paymentIntentID;
+    let action;
+    let readerID;
+
+    try {
+      const stripeClient = Stripe(stripeSecretKey.value());
+
+      // Extract payment intent ID and action from webhook payload
+      action = req.body.data.object.action;
+      if (!action || !action.process_payment_intent) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid webhook action structure.",
+        });
+      }
+
+      paymentIntentID = action.process_payment_intent.payment_intent;
+      readerID = req.body.data.object.id;
+
+      if (!paymentIntentID || typeof paymentIntentID !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Payment intent ID must be provided and must be a string.",
+        });
+      }
+
+      if (!readerID || typeof readerID !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "Reader ID must be provided and must be a string.",
+        });
+      }
+
+      // Extract tenant/store context from payment intent metadata
+      const paymentIntent = await stripeClient.paymentIntents.retrieve(
+        paymentIntentID
+      );
+      const tenantID = paymentIntent.metadata?.tenantID;
+      const storeID = paymentIntent.metadata?.storeID;
+
+      if (!tenantID || !storeID) {
+        throw new Error(
+          `Payment intent ${paymentIntentID} missing required tenant/store metadata`
+        );
+      }
+
+      // Update database with action data using Firestore
+      const updateRef = DB.collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("payment-processing")
+        .doc(readerID)
+        .collection("payments")
+        .doc(paymentIntentID)
+        .collection("updates")
+        .doc("current");
+
+      await updateRef.set({
+        ...action,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        readerID,
+        paymentIntentID,
+      });
+
+      log("data package to show reader ID", req.body.data);
+
+      // Handle successful payment
+      if (action.status === "succeeded") {
+        log("Payment attempt succeeded");
+
+        try {
+          const paymentIntentComplete = await stripeClient.paymentIntents.retrieve(
+            paymentIntentID
+          );
+
+          if (!paymentIntentComplete.latest_charge) {
+            throw new Error("No charge found for successful payment intent");
+          }
+
+          let chargeID = paymentIntentComplete.latest_charge;
+          log("Payment Intent complete obj", paymentIntentComplete);
+          log("Charge ID", chargeID);
+
+          const charge = await stripeClient.charges.retrieve(chargeID);
+
+          // Use Firestore with tenant/store hierarchy for completion
+          const completeRef = DB.collection("tenants")
+            .doc(tenantID)
+            .collection("stores")
+            .doc(storeID)
+            .collection("payment-processing")
+            .doc(readerID)
+            .collection("payments")
+            .doc(paymentIntentID)
+            .collection("completions")
+            .doc("current");
+
+          await completeRef.set({
+            ...charge,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            readerID,
+            paymentIntentID,
+          });
+          log("Card charge object", charge);
+        } catch (stripeError) {
+          log("Error retrieving payment details", stripeError);
+          // Continue execution - don't fail the webhook for this
+        }
+      } else if (action.status === "failed") {
+        log("Payment attempt failed", action);
+
+        const completeRef = DB.collection("tenants")
+          .doc(tenantID)
+          .collection("stores")
+          .doc(storeID)
+          .collection("payment-processing")
+          .doc(readerID)
+          .collection("payments")
+          .doc(paymentIntentID)
+          .collection("completions")
+          .doc("current");
+
+        let failureData = {
+          status: "failed",
+          failure_code: action.failure_code || "unknown",
+          failure_message: action.failure_message || "Payment failed",
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          readerID,
+          paymentIntentID,
+        };
+
+        // Retrieve PaymentIntent for detailed decline info
+        try {
+          const pi = await stripeClient.paymentIntents.retrieve(paymentIntentID);
+          if (pi.last_payment_error) {
+            failureData.decline_code =
+              pi.last_payment_error.decline_code || "";
+            failureData.error_message =
+              pi.last_payment_error.message || "";
+            failureData.error_code = pi.last_payment_error.code || "";
+            failureData.error_type = pi.last_payment_error.type || "";
+          }
+        } catch (piError) {
+          log("Error retrieving PaymentIntent for failure details", piError);
+        }
+
+        await completeRef.set(failureData);
+      }
+
+      // Cancel reader action to clean up
+      try {
+        const readerResult = await stripeClient.terminal.readers.cancelAction(
+          readerID
+        );
+        log("Result of canceling reader after payment update", readerResult);
+      } catch (cancelError) {
+        log("Error canceling reader action", cancelError);
+        // Continue execution - don't fail the webhook for this
+      }
+    } catch (err) {
+      error = true;
+      message =
+        err instanceof Error
+          ? `Webhook processing error: ${err.message}`
+          : "Webhook processing error: An unknown error occurred.";
+
+      log("Stripe Webhook processing error", err.message);
+    }
+
+    if (error) {
+      return res.status(500).json({ success: false, message });
+    }
+    return res.status(200).json({ success: true, message: "Webhook processed" });
+  }
+);
+
+exports.cancelServerDrivenStripePayment = onRequest(
+  { cors: true, secrets: [stripeSecretKey] },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+
+    const readerId = req.body.readerID;
+
+    if (!readerId || typeof readerId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Reader ID must be provided and must be a string.",
+      });
+    }
+
+    try {
+      // (Optional, but helpful) Verify the reader is online before attempting cancelAction
+      const readerBefore = await stripe.terminal.readers.retrieve(readerId);
+      if (readerBefore.status !== "online") {
+        return res.status(503).json({
+          success: false,
+          message: "📴 Reader is offline or unreachable.",
+          type: "StripeTerminalOfflineError",
+          code: "reader_offline",
+          readerStatus: readerBefore.status,
+        });
+      }
+
+      const activeActionType = readerBefore.action?.type ?? null;
+      log("[cancelServerDrivenStripePayment] Reader status before cancel:", {
+        status: readerBefore.status,
+        activeActionType,
+      });
+
+      // Reset the reader (cancel whatever action it's doing)
+      const readerAfter = await stripe.terminal.readers.cancelAction(readerId);
+
+      log("[cancelServerDrivenStripePayment] Reader reset complete:", {
+        readerId: readerAfter.id,
+        status: readerAfter.status,
+        actionAfter: readerAfter.action?.type ?? null,
+      });
+
+      // Respond success (do NOT cancel the PaymentIntent)
+      return res.status(200).json({
+        success: true,
+        message: `🧹 Reader reset complete!`,
+        readerId,
+        readerStatus: readerAfter.status,
+        reader: readerAfter, // full reader object for client if needed
+      });
+    } catch (error) {
+      let message;
+
+      switch (error.type) {
+        case "StripeInvalidRequestError":
+          message = `⚠️ Invalid request: ${error.message}`;
+          break;
+        case "StripeAPIError":
+          message = `⚠️ Stripe API error: ${error.message}`;
+          break;
+        case "StripeConnectionError":
+          message = "📡 Network error: Could not connect to Stripe.";
+          break;
+        case "StripeAuthenticationError":
+          message =
+            "🔐 Authentication error: Please check your Stripe credentials.";
+          break;
+        case "StripePermissionError":
+          message = "🔒 Permission error: Not allowed to reset this reader.";
+          break;
+        case "StripeTerminalOfflineError":
+          message = "📴 Reader is offline or unreachable.";
+          break;
+        case "StripeTerminalReaderBusyError":
+          message = "⏳ Reader is busy. Try again in a moment.";
+          break;
+        default:
+          message = `❗ Unexpected error: ${error.message}`;
+          break;
+      }
+
+      log("[cancelServerDrivenStripePayment] Error resetting reader:", {
+        errorType: error.type,
+        errorMessage: error.message,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message,
+        type: error.type || "UnknownError",
+      });
+    }
+  }
+);
+
+// users /////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////
+// messaging
+
+/**
+ * Enhanced SMS sending function with comprehensive error handling
+ * HTTPS callable function for sending SMS messages with proper validation and error handling
+ */
+exports.sendSMSEnhanced = onCall(
+  {
+    secrets: [
+      twilioSecretKey,
+      twilioSecretAccountNumber,
+      firebaseServiceAccountKey,
+    ],
+  },
+  async (request) => {
+    log("Incoming enhanced SMS callable request", request.data);
+
+    try {
+      // Initialize Firestore with service account
+      const db = await getDB(firebaseServiceAccountKey);
+      // Input validation
+      const {
+        message,
+        phoneNumber,
+        tenantID,
+        storeID,
+        customerID,
+        messageID,
+        fromNumber = "+12393171234", // Default from number
+      } = request.data;
+
+      // Validate required fields
+      if (
+        !message ||
+        typeof message !== "string" ||
+        message.trim().length === 0
+      ) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Message content is required and must be a non-empty string"
+        );
+      }
+
+      if (!phoneNumber || typeof phoneNumber !== "string") {
+        throw new HttpsError(
+          "invalid-argument",
+          "Phone number is required and must be a string"
+        );
+      }
+
+      // Validate phone number format (US format: 10 digits)
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, ""); // Remove non-digits
+      if (cleanPhoneNumber.length !== 10) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Phone number must be 10 digits (US format)"
+        );
+      }
+
+      if (!tenantID || typeof tenantID !== "string") {
+        throw new HttpsError("invalid-argument", "Tenant ID is required");
+      }
+
+      if (!storeID || typeof storeID !== "string") {
+        throw new HttpsError("invalid-argument", "Store ID is required");
+      }
+
+      // Message length validation (SMS limit)
+      if (message.length > 1600) {
+        // Twilio SMS limit
+        throw new HttpsError(
+          "invalid-argument",
+          "Message exceeds SMS character limit (1600 characters)"
+        );
+      }
+
+      // Initialize Twilio client with secrets
+      if (!twilioClient) {
+        try {
+          twilioClient = require("twilio")(
+            twilioSecretAccountNumber.value(),
+            twilioSecretKey.value()
+          );
+        } catch (twilioInitError) {
+          log("Error initializing Twilio client", twilioInitError);
+          throw new HttpsError("internal", "Failed to initialize SMS service");
+        }
+      }
+
+      // Send SMS via Twilio
+      const twilioResponse = await twilioClient.messages.create({
+        body: message.trim(),
+        to: `+1${cleanPhoneNumber}`,
+        from: fromNumber,
+        // Optional: Add delivery status callback
+        statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback`,
+      });
+
+      log("SMS sent successfully", {
+        messageSid: twilioResponse.sid,
+        to: twilioResponse.to,
+        status: twilioResponse.status,
+      });
+
+      // Store message in Firestore if customerID and messageID provided
+      if (customerID && messageID) {
+        try {
+          // Store outgoing message in customer_phone/{phone}/messages
+          const messageRef = db
+            .collection("customer_phone")
+            .doc(cleanPhoneNumber)
+            .collection("messages")
+            .doc(messageID);
+
+          await messageRef.set({
+            id: messageID,
+            customerID: customerID,
+            message: message.trim(),
+            phoneNumber: cleanPhoneNumber,
+            messageSid: twilioResponse.sid,
+            status: twilioResponse.status,
+            fromNumber: fromNumber,
+            tenantID: tenantID,
+            storeID: storeID,
+            type: "outgoing",
+            millis: Date.now(),
+          });
+
+          log("Outgoing message stored at customer_phone path", {
+            messageID,
+            customerID,
+            phone: cleanPhoneNumber,
+            path: `customer_phone/${cleanPhoneNumber}/messages/${messageID}`,
+          });
+        } catch (firestoreError) {
+          log("Error storing outgoing message in Firestore", {
+            error: firestoreError.message,
+            messageID,
+            customerID,
+          });
+          // Don't fail the entire request if Firestore storage fails
+          // The SMS was sent successfully
+        }
+      }
+
+      // Return success response
+      return {
+        success: true,
+        message: "SMS sent successfully",
+        data: {
+          messageSid: twilioResponse.sid,
+          status: twilioResponse.status,
+          to: twilioResponse.to,
+          from: twilioResponse.from,
+          messageLength: message.length,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      log("Error in sendSMSEnhanced", error);
+
+      // Handle specific Twilio errors
+      let errorMessage = "An unexpected error occurred while sending SMS";
+      let httpsErrorCode = "internal";
+
+      if (error.code) {
+        switch (error.code) {
+          case 21211:
+            errorMessage = "Invalid phone number format";
+            httpsErrorCode = "invalid-argument";
+            break;
+          case 21214:
+            errorMessage = "Phone number is not a valid mobile number";
+            httpsErrorCode = "invalid-argument";
+            break;
+          case 21408:
+            errorMessage = "Permission denied - invalid 'from' phone number";
+            httpsErrorCode = "permission-denied";
+            break;
+          case 21610:
+            errorMessage = "Message cannot be sent to unsubscribed number";
+            httpsErrorCode = "invalid-argument";
+            break;
+          case 21614:
+            errorMessage = "Message body is required";
+            httpsErrorCode = "invalid-argument";
+            break;
+          case 30001:
+            errorMessage = "Queue overflow - too many messages in queue";
+            httpsErrorCode = "resource-exhausted";
+            break;
+          case 30003:
+            errorMessage = "Account suspended";
+            httpsErrorCode = "permission-denied";
+            break;
+          case 30004:
+            errorMessage = "Message sending failed";
+            httpsErrorCode = "internal";
+            break;
+          case 30005:
+            errorMessage = "Unknown error";
+            httpsErrorCode = "internal";
+            break;
+          case 30006:
+            errorMessage = "Message delivery failed - invalid number";
+            httpsErrorCode = "invalid-argument";
+            break;
+          case 30007:
+            errorMessage = "Message delivery failed - carrier violation";
+            httpsErrorCode = "invalid-argument";
+            break;
+          case 30008:
+            errorMessage = "Message delivery failed - unknown error";
+            httpsErrorCode = "internal";
+            break;
+          default:
+            errorMessage = `Twilio error: ${error.message}`;
+            httpsErrorCode = "internal";
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      throw new HttpsError(httpsErrorCode, errorMessage);
+    }
+  }
+);
+
+exports.incomingSMS = onRequest(
+  { cors: true, secrets: [firebaseServiceAccountKey] },
+  async (request, response) => {
+    // Set CORS headers
+    response.set("Access-Control-Allow-Origin", "*");
+    response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.set("Access-Control-Allow-Headers", "Content-Type");
+
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
+
+    let body = request.body;
+    log("incoming sms body", body);
+
+    let incomingPhone = body.From.slice(2, body.From.length);
+    let incomingMessage = body.Body;
+    const messageSid = body.SmsSid;
+    log("phone", incomingPhone);
+    log("message", incomingMessage);
+
+    // get the customer from customer_phone index
+    let customerObj = null;
+    let tenantID = null;
+    let storeID = null;
+
+    try {
+      // Try customer_phone index first
+      const customerPhoneRef = db
+        .collection("customer_phone")
+        .doc(incomingPhone);
+      const customerPhoneDoc = await customerPhoneRef.get();
+
+      if (customerPhoneDoc.exists) {
+        const indexData = customerPhoneDoc.data();
+        const info = indexData.info || indexData;
+
+        customerObj = {
+          id: info.id,
+          first: info.first,
+          last: info.last,
+          cell: info.cell,
+          landline: info.landline,
+          email: info.email,
+        };
+        tenantID = info.tenantID;
+        storeID = info.storeID;
+
+        log("found customer via customer_phone index", {
+          customerObj,
+          tenantID,
+          storeID,
+        });
+      } else {
+        log("no customer found with phone", incomingPhone);
+        return response
+          .status(200)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+    } catch (error) {
+      log("error searching for customer", error);
+      return response
+        .status(200)
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+
+    // get the last message from customer_phone to see if they are allowed to respond
+    let lastOutgoingMessage = null;
+    try {
+      const lastMessageSnapshot = await db
+        .collection("customer_phone")
+        .doc(incomingPhone)
+        .collection("messages")
+        .where("type", "==", "outgoing")
+        .orderBy("millis", "desc")
+        .limit(1)
+        .get();
+
+      if (!lastMessageSnapshot.empty) {
+        lastOutgoingMessage = lastMessageSnapshot.docs[0].data();
+      }
+    } catch (error) {
+      log("error getting last outgoing message", error);
+    }
+
+    log("last outgoing message", lastOutgoingMessage);
+    let canRespond = lastOutgoingMessage
+      ? lastOutgoingMessage.canRespond
+      : null;
+
+    // if not allowed to respond, send a bounceback message
+    if (!canRespond) {
+      log("cannot respond", lastOutgoingMessage?.canRespond);
+
+      // Store the message even though thread is closed
+      try {
+        await db
+          .collection("customer_phone")
+          .doc(incomingPhone)
+          .collection("messages")
+          .doc(messageSid)
+          .set({
+            id: messageSid,
+            customerID: customerObj.id,
+            firstName: customerObj.first,
+            lastName: customerObj.last,
+            millis: Date.now(),
+            phoneNumber: incomingPhone,
+            message: incomingMessage,
+            type: "incoming",
+            threadStatus: "closed",
+            autoResponseSent: true,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            tenantID,
+            storeID,
+          });
+      } catch (error) {
+        log("error storing closed thread message", error);
+      }
+
+      // Send bounceback via TwiML
+      const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${CLOSED_THREAD_RESPONSE}</Message>
+</Response>`;
+
+      return response.status(200).type("text/xml").send(twimlResponse);
+    }
+
+    // if allowed to respond, create and store the message
+    const message = {
+      id: messageSid,
+      firstName: customerObj.first,
+      lastName: customerObj.last,
+      millis: Date.now(),
+      phoneNumber: incomingPhone,
+      message: incomingMessage,
+      customerID: customerObj.id,
+      type: "incoming",
+      threadStatus: "open",
+      read: false,
+      tenantID,
+      storeID,
+    };
+
+    // Store incoming message in customer_phone/{phone}/messages
+    try {
+      const incomingMessageRef = db
+        .collection("customer_phone")
+        .doc(incomingPhone)
+        .collection("messages")
+        .doc(messageSid);
+
+      await incomingMessageRef.set({
+        ...message,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      log("Incoming message stored at customer_phone path", {
+        phone: incomingPhone,
+        messageSid,
+      });
+
+      // Update customer last contact timestamp
+      await db.collection("customer_phone").doc(incomingPhone).update({
+        "info.lastIncomingSMS": admin.firestore.FieldValue.serverTimestamp(),
+        "info.lastIncomingSMSMillis": Date.now(),
+      });
+    } catch (error) {
+      log("error storing incoming message in Firestore", error);
+    }
+
+    // Return empty TwiML response
+    return response
+      .status(200)
+      .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  }
+);
+
+/**
+ * Enhanced incoming SMS webhook handler with comprehensive error handling
+ * Processes incoming SMS messages from Twilio with proper validation and response management
+ *
+ * Features:
+ * - Validates Twilio webhook signature for security
+ * - Comprehensive input validation
+ * - Optimized customer lookup with caching
+ * - Thread management with auto-response handling
+ * - Proper HTTP responses with TwiML
+ * - Complete error tracking and logging
+ * - Message analytics and metadata
+ */
+exports.incomingSMSEnhanced = onRequest(
+  {
+    cors: true,
+    secrets: [
+      twilioSecretKey,
+      twilioSecretAccountNumber,
+      firebaseServiceAccountKey,
+    ],
+  },
+  async (request, response) => {
+    const requestStartTime = Date.now();
+
+    // Set CORS headers
+    response.set("Access-Control-Allow-Origin", "*");
+    response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.set("Access-Control-Allow-Headers", "Content-Type");
+
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
+
+    try {
+      // ============================================================================
+      // STEP 1: VALIDATE TWILIO WEBHOOK & EXTRACT DATA
+      // ============================================================================
+
+      const twilioData = request.body;
+
+      // Validate required Twilio parameters
+      if (
+        !twilioData ||
+        !twilioData.From ||
+        !twilioData.Body ||
+        !twilioData.MessageSid
+      ) {
+        log("Invalid Twilio webhook - missing required parameters", twilioData);
+        return response
+          .status(400)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      // Extract and normalize phone number (remove +1 country code)
+      const rawPhoneNumber = twilioData.From;
+      const normalizedPhone = rawPhoneNumber
+        .replace(/^\+1/, "")
+        .replace(/\D/g, "");
+
+      // Validate phone number format
+      if (normalizedPhone.length !== 10 || !/^\d{10}$/.test(normalizedPhone)) {
+        log("Invalid phone number format", { rawPhoneNumber, normalizedPhone });
+        return response
+          .status(400)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      const incomingMessage = twilioData.Body.trim();
+      const messageSid = twilioData.MessageSid;
+      const messageStatus = twilioData.SmsStatus || "received";
+      const numMedia = parseInt(twilioData.NumMedia || "0", 10);
+
+      log("Processing incoming SMS", {
+        phone: normalizedPhone,
+        messageSid,
+        messageLength: incomingMessage.length,
+        hasMedia: numMedia > 0,
+        status: messageStatus,
+      });
+
+      // ============================================================================
+      // STEP 2: FIND CUSTOMER ACROSS ALL TENANTS/STORES
+      // ============================================================================
+
+      let customerData = null;
+      let tenantID = null;
+      let storeID = null;
+
+      try {
+        // OPTION 1: Try customer_phone index first (most efficient)
+        const db = await getDB(firebaseServiceAccountKey);
+
+        const customerPhoneRef = db
+          .collection("customer_phone")
+          .doc(normalizedPhone);
+        const customerPhoneDoc = await customerPhoneRef.get();
+
+        if (customerPhoneDoc.exists) {
+          const indexData = customerPhoneDoc.data();
+
+          // Extract data from "info" field
+          const info = indexData.info || indexData; // Fallback to root if no "info" field
+
+          customerData = {
+            id: info.id,
+            first: info.first,
+            last: info.last,
+            cell: info.cell,
+            landline: info.landline,
+            email: info.email,
+          };
+          tenantID = info.tenantID;
+          storeID = info.storeID;
+
+          log("Customer found via customer_phone index", {
+            customerID: customerData.id,
+            tenantID,
+            storeID,
+            customerName: `${customerData.first} ${customerData.last}`,
+            lookupBy: "cell",
+          });
+        }
+
+        // OPTION 2: If not in index, fall back to searching all tenants/stores
+        if (!customerData) {
+          log("Customer not in phone index, searching all tenants/stores", {
+            phone: normalizedPhone,
+          });
+
+          // Get all tenants
+          const tenantsSnapshot = await db.collection("tenants").get();
+
+          if (tenantsSnapshot.empty) {
+            log("No tenants found in system");
+            return response
+              .status(404)
+              .send(
+                '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+              );
+          }
+
+          // Search across all tenants and stores
+          let found = false;
+          for (const tenantDoc of tenantsSnapshot.docs) {
+            if (found) break;
+
+            const currentTenantID = tenantDoc.id;
+            const storesSnapshot = await db
+              .collection("tenants")
+              .doc(currentTenantID)
+              .collection("stores")
+              .get();
+
+            for (const storeDoc of storesSnapshot.docs) {
+              if (found) break;
+
+              const currentStoreID = storeDoc.id;
+
+              // Query customers by phone number using Admin SDK
+              try {
+                const customersSnapshot = await db
+                  .collection("tenants")
+                  .doc(currentTenantID)
+                  .collection("stores")
+                  .doc(currentStoreID)
+                  .collection("customers")
+                  .where("cell", "==", normalizedPhone)
+                  .limit(1)
+                  .get();
+
+                if (!customersSnapshot.empty) {
+                  customerData = customersSnapshot.docs[0].data();
+                  tenantID = currentTenantID;
+                  storeID = currentStoreID;
+                  found = true;
+
+                  log("Customer found via tenant/store search", {
+                    customerID: customerData.id,
+                    tenantID,
+                    storeID,
+                    customerName: `${customerData.first} ${customerData.last}`,
+                  });
+
+                  // Create customer_phone index for future fast lookups
+                  try {
+                    await db
+                      .collection("customer_phone")
+                      .doc(normalizedPhone)
+                      .set({
+                        info: {
+                          id: customerData.id,
+                          first: customerData.first || "",
+                          last: customerData.last || "",
+                          cell: customerData.cell || "",
+                          landline: customerData.landline || "",
+                          email: customerData.email || "",
+                          tenantID,
+                          storeID,
+                          lastUpdated: Date.now(),
+                        },
+                      });
+                    log("customer_phone index created for future lookups", {
+                      phone: normalizedPhone,
+                      customerID: customerData.id,
+                    });
+                  } catch (indexError) {
+                    log("Error creating customer_phone index", {
+                      error: indexError.message,
+                    });
+                  }
+                }
+              } catch (queryError) {
+                log("Error querying customers in store", {
+                  error: queryError.message,
+                  errorCode: queryError.code,
+                  tenantID: currentTenantID,
+                  storeID: currentStoreID,
+                });
+                // Continue to next store even if this one fails
+                continue;
+              }
+            }
+          }
+        }
+
+        // Customer not found
+        if (!customerData || !tenantID || !storeID) {
+          log("No customer found for phone number", { phone: normalizedPhone });
+
+          // Log unknown sender for analytics
+          await db
+            .collection("sms-analytics")
+            .doc("unknown-senders")
+            .collection("messages")
+            .add({
+              phoneNumber: normalizedPhone,
+              message: incomingMessage,
+              messageSid,
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              twilioData,
+            });
+
+          // Return empty TwiML response (no auto-reply to unknown numbers)
+          return response
+            .status(200)
+            .send(
+              '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+            );
+        }
+      } catch (error) {
+        log("Error searching for customer", {
+          error: error.message,
+          phone: normalizedPhone,
+        });
+
+        return response
+          .status(500)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      // ============================================================================
+      // STEP 3: CHECK THREAD STATUS & RESPONSE PERMISSIONS
+      // ============================================================================
+
+      let lastOutgoingMessage = null;
+      let canRespond = false;
+      let threadStatus = "closed";
+
+      try {
+        // Check for last outgoing message in customer_phone/{phone}/messages
+        const lastMessageSnapshot = await db
+          .collection("customer_phone")
+          .doc(normalizedPhone)
+          .collection("messages")
+          .where("type", "==", "outgoing")
+          .orderBy("millis", "desc")
+          .limit(1)
+          .get();
+
+        if (!lastMessageSnapshot.empty) {
+          lastOutgoingMessage = lastMessageSnapshot.docs[0].data();
+          canRespond = lastOutgoingMessage.canRespond === true;
+          threadStatus = canRespond ? "open" : "closed";
+
+          log("Last outgoing message retrieved", {
+            messageID: lastOutgoingMessage.id,
+            canRespond,
+            threadStatus,
+            sentAt: lastOutgoingMessage.millis,
+          });
+        } else {
+          log("No previous outgoing messages found for customer", {
+            customerID: customerData.id,
+            phone: normalizedPhone,
+          });
+        }
+      } catch (error) {
+        log("Error retrieving last outgoing message", {
+          error: error.message,
+          errorCode: error.code,
+          customerID: customerData.id,
+        });
+        // Continue processing - default to closed thread
+      }
+
+      // ============================================================================
+      // STEP 4: HANDLE CLOSED THREAD - SEND AUTO-RESPONSE
+      // ============================================================================
+
+      if (!canRespond) {
+        log("Thread closed - sending auto-response", {
+          customerID: customerData.id,
+          threadStatus,
+        });
+
+        // Store the incoming message even though thread is closed
+        try {
+          await db
+            .collection("customer_phone")
+            .doc(normalizedPhone)
+            .collection("messages")
+            .doc(messageSid)
+            .set({
+              id: messageSid,
+              customerID: customerData.id,
+              firstName: customerData.first || "",
+              lastName: customerData.last || "",
+              phoneNumber: normalizedPhone,
+              message: incomingMessage,
+              millis: Date.now(),
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              type: "incoming",
+              threadStatus: "closed",
+              autoResponseSent: true,
+              hasMedia: numMedia > 0,
+              numMedia,
+              messageStatus,
+              tenantID,
+              storeID,
+              messageSid,
+              messageStatus,
+            });
+
+          log("Closed thread message stored at customer_phone path", {
+            phone: normalizedPhone,
+            messageSid,
+          });
+        } catch (error) {
+          log("Error storing closed thread message", {
+            error: error.message,
+            messageSid,
+          });
+        }
+
+        // Send auto-response using TwiML
+        const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${CLOSED_THREAD_RESPONSE}</Message>
+</Response>`;
+
+        // Also send via Twilio client for tracking
+        if (twilioClient) {
+          try {
+            await twilioClient.messages.create({
+              body: CLOSED_THREAD_RESPONSE,
+              to: `+1${normalizedPhone}`,
+              from: twilioData.To || "+12393171234",
+            });
+
+            log("Auto-response sent successfully", {
+              customerID: customerData.id,
+              phone: normalizedPhone,
+            });
+          } catch (twilioError) {
+            log("Error sending auto-response via Twilio", {
+              error: twilioError.message,
+              code: twilioError.code,
+            });
+          }
+        }
+
+        return response.status(200).type("text/xml").send(twimlResponse);
+      }
+
+      // ============================================================================
+      // STEP 5: STORE INCOMING MESSAGE (OPEN THREAD)
+      // ============================================================================
+
+      const incomingMessageData = {
+        id: messageSid,
+        customerID: customerData.id,
+        firstName: customerData.first || "",
+        lastName: customerData.last || "",
+        phoneNumber: normalizedPhone,
+        message: incomingMessage,
+        millis: Date.now(),
+        type: "incoming",
+        threadStatus: "open",
+        read: false,
+        hasMedia: numMedia > 0,
+        numMedia,
+        messageStatus,
+        tenantID,
+        storeID,
+        messageSid,
+        messageStatus,
+        to: twilioData.From,
+        from: twilioData.To,
+      };
+
+      // Handle media attachments if present
+      if (numMedia > 0) {
+        const mediaUrls = [];
+        for (let i = 0; i < numMedia; i++) {
+          const mediaUrl = twilioData[`MediaUrl${i}`];
+          const mediaContentType = twilioData[`MediaContentType${i}`];
+          if (mediaUrl) {
+            mediaUrls.push({
+              url: mediaUrl,
+              contentType: mediaContentType || "unknown",
+            });
+          }
+        }
+        incomingMessageData.mediaUrls = mediaUrls;
+      }
+
+      try {
+        // Store incoming message in customer_phone/{phone}/messages
+        const incomingMessageRef = db
+          .collection("customer_phone")
+          .doc(normalizedPhone)
+          .collection("messages")
+          .doc(messageSid);
+
+        await incomingMessageRef.set(incomingMessageData);
+
+        log("Incoming message stored successfully at customer_phone path", {
+          phone: normalizedPhone,
+          messageSid,
+          customerID: customerData.id,
+          messageLength: incomingMessage.length,
+          hasMedia: numMedia > 0,
+          path: `customer_phone/${normalizedPhone}/messages/${messageSid}`,
+        });
+      } catch (error) {
+        log("Error storing incoming message", {
+          error: error.message,
+          errorCode: error.code,
+          messageSid,
+          customerID: customerData.id,
+        });
+
+        // Still return success to Twilio to avoid retries
+        return response
+          .status(200)
+          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      // ============================================================================
+      // STEP 7: RETURN SUCCESS RESPONSE
+      // ============================================================================
+
+      log("Incoming SMS processed successfully", {
+        messageSid,
+        customerID: customerData.id,
+        processingTimeMs: processingTime,
+        threadStatus: "open",
+        storagePath: `customer_phone/${normalizedPhone}/messages/${messageSid}`,
+      });
+
+      // Return empty TwiML response (no auto-reply for open threads)
+      return response
+        .status(200)
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    } catch (error) {
+      // ============================================================================
+      // GLOBAL ERROR HANDLER
+      // ============================================================================
+
+      log("Unhandled error in incomingSMSEnhanced", {
+        error: error.message,
+        stack: error.stack,
+        requestBody: request.body,
+      });
+
+      // Log critical error for monitoring
+      try {
+        await db.collection("error-logs").add({
+          function: "incomingSMSEnhanced",
+          error: {
+            message: error.message,
+            stack: error.stack,
+            code: error.code || "unknown",
+          },
+          requestData: request.body,
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          severity: "critical",
+        });
+      } catch (logError) {
+        log("Failed to log error to Firestore", logError);
+      }
+
+      // Return success to Twilio to prevent retries
+      return response
+        .status(200)
+        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+    }
+  }
+);
+
+///////////////////////////////////////////////////////////////////////////////
+// utils
+const sendSuccessfulResult = (response, body) =>
+  response.status(200).send(JSON.stringify(body));
+
+const sendUnsuccessfulResult = (response, body) =>
+  response.status(500).send(JSON.stringify(body));
+
+////////////////////////////////////////////////////////////////////////
+
+function ftpReader() {
+  // ftp reader
+  // exports.readFTPFile = onRequest(
+  //   { cors: true, secrets: [stripeSecretKey] },
+  //   async (req, res) => {
+  //     log("Incoming FTP read request");
+  //     const client = new ftp.Client();
+  //     client.ftp.verbose = true; // Optional: for debug logging
+  //     //     Server                   : ftp.jbi.bike
+  //     // Login name         : 121080
+  //     // Password            : g3QX&bn5
+  //     try {
+  //       // Connect to FTP server
+  //       await client.access({
+  //         host: "ftp.jbi.bike",
+  //         user: "121080",
+  //         password: "g3QX&bn5",
+  //         secure: false, // Set to true if using FTPS
+  //       });
+  //       // List files in the root directory
+  //       log("Directory listing for FTP host:");
+  //       const list = await client.list();
+  //       list.forEach((item) => console.log(item.name));
+  //       // Download a file (change 'file.txt' to your file name)
+  //       await client.downloadTo("local-file.txt", "file.txt");
+  //       log("File downloaded!");
+  //       // Read the downloaded file
+  //       const content = fs.readFileSync("local-file.txt", "utf8");
+  //       log("File content for FTP transfer:");
+  //       log(content);
+  //     } catch (err) {
+  //       console.error(err);
+  //     }
+  //     client.close();
+  // );
+  //   }
+}
+
+/**
+ * Login function for app users
+ * Authenticates user with email/password and returns user and tenant information
+ */
+exports.loginAppUser = onRequest({ cors: true }, async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+  log("Incoming login request", req.body);
+
+  // Input validation
+  const { email, password } = req.body.data;
+
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    return res.status(400).json({
+      success: false,
+      message: "Valid email address is required.",
+    });
+  }
+
+  if (!password || typeof password !== "string" || password.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 6 characters long.",
+    });
+  }
+
+  try {
+    // Authenticate user with Firebase Auth
+    const userRecord = await admin.auth().getUserByEmail(email);
+
+    // Verify the user exists and is not disabled
+    if (userRecord.disabled) {
+      return res.status(403).json({
+        success: false,
+        message: "❌ User account has been disabled.",
+      });
+    }
+
+    // Get user ID for Firestore lookup
+    const userID = userRecord.uid;
+
+    // Look up user in the global users index for quick tenant retrieval
+    const userIndexRef = DB.collection("users").doc(userID);
+    const userIndexDoc = await userIndexRef.get();
+
+    if (!userIndexDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "❌ User not found in system.",
+      });
+    }
+
+    const userIndexData = userIndexDoc.data();
+    const tenantID = userIndexData.tenantID;
+    const storeID = userIndexData.storeID;
+
+    if (!tenantID) {
+      return res.status(404).json({
+        success: false,
+        message: "❌ User is not associated with any tenant.",
+      });
+    }
+
+    if (!storeID) {
+      return res.status(404).json({
+        success: false,
+        message: "❌ User is not associated with any store.",
+      });
+    }
+
+    // Retrieve user details from tenant/store-specific collection
+    const userRef = DB.collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .collection("users")
+      .doc(userID);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "❌ User details not found in tenant system.",
+      });
+    }
+
+    const userData = userDoc.data();
+
+    // Retrieve tenant information
+    const tenantRef = DB.collection("tenants").doc(tenantID);
+    const tenantDoc = await tenantRef.get();
+
+    if (!tenantDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "❌ Tenant information not found.",
+      });
+    }
+
+    const tenantData = tenantDoc.data();
+
+    // Update last login timestamp
+    await userRef.update({
+      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      loginCount: admin.firestore.FieldValue.increment(1),
+    });
+
+    log("User login successful", {
+      userID,
+      email,
+      tenantID,
+      storeID,
+      displayName: userData.displayName,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `✅ Login successful for ${email} (Tenant: ${tenantID}, Store: ${storeID})`,
+      user: {
+        id: userID,
+        email: userData.email,
+        displayName: userData.displayName,
+        tenantID: tenantID,
+        storeID: storeID,
+        permissions: userData.permissions,
+        status: userData.status,
+        lastLogin: userData.lastLogin,
+        createdAt: userData.createdAt,
+        metadata: userData.metadata,
+      },
+      tenant: {
+        id: tenantID,
+        name: tenantData.name,
+        status: tenantData.status,
+        settings: tenantData.settings,
+        userCount: tenantData.userCount,
+        createdAt: tenantData.createdAt,
+        subscription: tenantData.subscription,
+      },
+      auth: {
+        uid: userID,
+        email: email,
+        emailVerified: userRecord.emailVerified,
+        disabled: userRecord.disabled,
+      },
+    });
+  } catch (error) {
+    log("Error during login", error);
+
+    let message;
+    let statusCode = 500;
+
+    if (error.code === "auth/user-not-found") {
+      message = "❌ No account found with this email address.";
+      statusCode = 404;
+    } else if (error.code === "auth/wrong-password") {
+      message = "❌ Incorrect password.";
+      statusCode = 401;
+    } else if (error.code === "auth/invalid-email") {
+      message = "❌ Invalid email address format.";
+      statusCode = 400;
+    } else if (error.code === "auth/user-disabled") {
+      message = "❌ This account has been disabled.";
+      statusCode = 403;
+    } else if (error.code === "auth/too-many-requests") {
+      message = "❌ Too many failed login attempts. Please try again later.";
+      statusCode = 429;
+    } else if (error.code === "permission-denied") {
+      message = "❌ Insufficient permissions to access user data.";
+      statusCode = 403;
+    } else if (error.code === "not-found") {
+      message = "❌ User or tenant not found.";
+      statusCode = 404;
+    } else {
+      message = `❗ Unexpected error: ${error.message}`;
+    }
+
+    return res.status(statusCode).json({
+      success: false,
+      message,
+      error: {
+        code: error.code || "unknown",
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * Create a new app user under a tenant
+ * Creates user in Firebase Auth and stores data in Firestore
+ */
+exports.createAppUser = onRequest({ cors: true }, async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+  log("Incoming create app user request", req.body);
+
+  // Input validation
+  const { email, password, tenantID, storeID, permissions } = req.body.data;
+
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    return res.status(400).json({
+      success: false,
+      message: "Valid email address is required.",
+    });
+  }
+
+  if (!password || typeof password !== "string" || password.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 6 characters long.",
+    });
+  }
+
+  if (!tenantID || typeof tenantID !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Tenant ID is required.",
+    });
+  }
+
+  if (!storeID || typeof storeID !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Store ID is required.",
+    });
+  }
+
+  try {
+    // Check if tenant exists
+    const tenantRef = DB.collection("tenants").doc(tenantID);
+    const tenantDoc = await tenantRef.get();
+
+    if (!tenantDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "Tenant not found.",
+      });
+    }
+
+    // Check if user already exists with this email
+    const existingUserQuery = await DB.collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .collection("users")
+      .where("email", "==", email)
+      .get();
+
+    if (!existingUserQuery.empty) {
+      return res.status(409).json({
+        success: false,
+        message: "User with this email already exists in this tenant.",
+      });
+    }
+
+    // Create Firebase Auth user
+    const userRecord = await admin.auth().createUser({
+      email: email,
+      password: password,
+      displayName: email, // Use email as display name
+      emailVerified: false, // Require email verification
+    });
+
+    // Generate unique user ID
+    const userID = userRecord.uid;
+
+    // Create user document in Firestore under tenant
+    const userData = {
+      id: userID,
+      email: email,
+      displayName: email,
+      tenantID: tenantID,
+      permissions: permissions || {
+        level: 1, // Default permission level
+        canCreateUsers: false,
+        canManageInventory: false,
+        canProcessPayments: false,
+        canViewReports: false,
+      },
+      status: "active",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: req.body.createdBy || "system", // Track who created this user
+      lastLogin: null,
+      emailVerified: false,
+      // Additional user metadata
+      metadata: {
+        timezone: req.body.timezone || "America/New_York",
+        language: req.body.language || "en",
+        department: req.body.department || null,
+        role: req.body.role || "user",
+      },
+    };
+
+    // Store user in Firestore under tenant/tenantID/stores/storeID/users/userID
+    await DB.collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .collection("users")
+      .doc(userID)
+      .set(userData);
+
+    // Create user index entry for quick tenant/store lookup
+    await DB.collection("users").doc(userID).set({
+      email: email,
+      tenantID: tenantID,
+      storeID: storeID,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: "active",
+    });
+
+    // Update tenant's user count
+    await tenantRef.update({
+      userCount: admin.firestore.FieldValue.increment(1),
+      lastUserCreated: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    log("App user created successfully", {
+      userID,
+      email,
+      tenantID,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `✅ User ${email} created successfully for tenant ${tenantID}.`,
+      user: {
+        id: userID,
+        email: email,
+        displayName: email,
+        tenantID: tenantID,
+        storeID: storeID,
+        permissions: userData.permissions,
+        status: "active",
+        createdAt: userData.createdAt,
+      },
+    });
+  } catch (error) {
+    log("Error creating app user", error);
+
+    let message;
+    let statusCode = 500;
+
+    if (error.code === "auth/email-already-exists") {
+      message = "❌ User with this email already exists in Firebase Auth.";
+      statusCode = 409;
+    } else if (error.code === "auth/invalid-email") {
+      message = "❌ Invalid email address format.";
+      statusCode = 400;
+    } else if (error.code === "auth/weak-password") {
+      message = "❌ Password is too weak. Please use a stronger password.";
+      statusCode = 400;
+    } else if (error.code === "auth/operation-not-allowed") {
+      message = "❌ Email/password accounts are not enabled.";
+      statusCode = 403;
+    } else if (error.code === "permission-denied") {
+      message = "❌ Insufficient permissions to create user.";
+      statusCode = 403;
+    } else if (error.code === "not-found") {
+      message = "❌ Tenant not found.";
+      statusCode = 404;
+    } else {
+      message = `❗ Unexpected error: ${error.message}`;
+    }
+
+    return res.status(statusCode).json({
+      success: false,
+      message,
+      error: {
+        code: error.code || "unknown",
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * Create a new store subunit under a tenant
+ * Creates store with initial SETTINGS_OBJ data
+ */
+exports.createStore = onRequest({ cors: true }, async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+
+  // return res.status(200).send("complete");
+  // Handle preflight requests
+
+  log("Incoming create store request", req.body);
+  // return res.status(200).send("sup bro");
+
+  // Input validation
+  const { tenantID, storeID, storeName, createdBy } = req.body.data;
+
+  if (!tenantID || typeof tenantID !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Tenant ID is required.",
+    });
+  }
+
+  if (!storeID || typeof storeID !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Store ID is required.",
+    });
+  }
+
+  if (!storeName || typeof storeName !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Store name is required.",
+    });
+  }
+
+  try {
+    // Check if tenant exists
+    const tenantRef = DB.collection("tenants").doc(tenantID);
+    const tenantDoc = await tenantRef.get();
+
+    if (!tenantDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "Tenant not found.",
+      });
+    }
+
+    // Check if store already exists
+    const storeRef = DB.collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID);
+    const storeDoc = await storeRef.get();
+
+    if (storeDoc.exists) {
+      return res.status(409).json({
+        success: false,
+        message: "Store with this ID already exists in this tenant.",
+      });
+    }
+
+    // Create initial SETTINGS_OBJ data
+    const initialSettings = {
+      // Basic store information
+      storeID: storeID,
+      storeName: storeName,
+      tenantID: tenantID,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: createdBy || "system",
+      status: "active",
+
+      // Default statuses
+      statuses: [
+        {
+          id: "1334453",
+          textColor: "white",
+          backgroundColor: "orange",
+          altTextColor: "dimgray",
+          label: "Order Part for Customer",
+          removable: true,
+        },
+        {
+          id: "kerj3krj",
+          altTextColor: "dimgray",
+          textColor: "white",
+          backgroundColor: "orange",
+          label: "Part Ordered",
+          removable: true,
+        },
+        {
+          id: "ek3rkeng",
+          textColor: "white",
+          backgroundColor: "blue",
+          altTextColor: "gray",
+          label: "Messaging Customer",
+          removable: true,
+        },
+      ],
+
+      // Default quick item buttons
+      quickItemButtons: [
+        {
+          id: "38trrneg",
+          name: "Tune-Up",
+          items: [],
+          buttons: [],
+        },
+        {
+          id: "38trrdfdneg",
+          name: "Tube",
+          items: [],
+          buttons: [],
+        },
+        { id: "38trrsdfneg", name: "Tire", items: [], buttons: [] },
+        { id: "38trdfdrneg", name: "Tube & Tire", items: [], buttons: [] },
+        { id: "38trdfadrneg", name: "Brakes", items: [], buttons: [] },
+        {
+          id: "38tradfdrneg",
+          name: "Cable",
+          items: [],
+          buttons: [],
+        },
+        {
+          id: "38trrnebfdgdg",
+          name: "Shifting",
+          items: [],
+          buttons: [],
+        },
+        { id: "38trrnadfvceg", name: "Drivetrain", items: [], buttons: [] },
+        { id: "38trsadgdvdrneg", name: "Spoke", items: [], buttons: [] },
+        { id: "38trerfedgbdrneg", name: "Cleaning", items: [], buttons: [] },
+        { id: "38trrfrdggdneg", name: "Scooter", items: [], buttons: [] },
+        { id: "bnfdeqw", name: "Pickup/Delivery", items: [], buttons: [] },
+        { id: "34trhrg", name: "Diagnostics", items: [], buttons: [] },
+        { id: "labor", name: "$Labor", items: [], buttons: [] },
+        { id: "part", name: "$Part", items: [], buttons: [] },
+      ],
+
+      // Default bike brands
+      bikeBrands: [
+        "Trek",
+        "Specialized",
+        "Sun",
+        "Marin",
+        "Cannondale",
+        "Jamis",
+      ],
+      bikeBrandsName: "Bikes",
+      bikeOptionalBrands: [
+        "Euphree",
+        "Lectric",
+        "Hiboy",
+        "Ridstar",
+        "Velowave",
+      ],
+      bikeOptionalBrandsName: "E-bikes",
+
+      // Default discounts
+      discounts: [
+        {
+          id: "1333k",
+          name: "50% Off Item",
+          value: "50",
+          type: "percent",
+        },
+        {
+          id: "193j3k",
+          name: "10% Off Item",
+          value: "10",
+          type: "percent",
+        },
+        {
+          id: "394393",
+          name: "20% Off Item",
+          value: "20",
+          type: "percent",
+        },
+        {
+          id: "394393d",
+          name: "30% Off Item",
+          value: "30",
+          type: "percent",
+        },
+        {
+          id: "3943933",
+          name: "40% Off Item",
+          value: "40",
+          type: "percent",
+        },
+        {
+          id: "394393343",
+          name: "50% Off Item",
+          value: "50",
+          type: "percent",
+        },
+        {
+          id: "3k3nh",
+          name: "2-bike purchase, $100 Off Each Bike",
+          value: "10000",
+          type: "dollar",
+        },
+        {
+          id: "343gfg",
+          name: "$10 Off",
+          value: "1000",
+          type: "dollar",
+        },
+      ],
+
+      // Default wait times
+      waitTimes: [
+        {
+          id: "34j3kj3dfdfgfkj3",
+          label: "Waiting",
+          maxWaitTimeDays: 0,
+        },
+        {
+          id: "34jngfedde3kj3kj3",
+          label: "Today",
+          maxWaitTimeDays: 0,
+        },
+        {
+          id: "34j3kjdww3kj3",
+          label: "Tomorrow",
+          maxWaitTimeDays: 1,
+        },
+        {
+          id: "34j3kj3",
+          label: "1-2 Days",
+          maxWaitTimeDays: 2,
+        },
+        {
+          id: "34j3kj33",
+          label: "2-3 Days",
+          maxWaitTimeDays: 3,
+        },
+        {
+          id: "34j3kj3kj3",
+          label: "3-5 Days",
+          maxWaitTimeDays: 5,
+        },
+        {
+          id: "34j3kj33kj3n",
+          label: "1 Week",
+          maxWaitTimeDays: 7,
+        },
+        {
+          id: "34j3kj3,rkjk",
+          label: "1-2 Weeks",
+          maxWaitTimeDays: 14,
+        },
+        {
+          id: "34j3kj3vnkd",
+          label: "No Estimate",
+        },
+      ],
+
+      // Default store hours
+      storeHours: {
+        standard: [
+          {
+            name: "Monday",
+            id: "dkfjdkfn",
+            open: "10:00 AM",
+            close: "6:00 PM",
+            isOpen: true,
+          },
+          {
+            name: "Tuesday",
+            id: "dkfjdkf3r3n",
+            open: "10:00 AM",
+            close: "6:00 PM",
+            isOpen: true,
+          },
+          {
+            name: "Wednesday",
+            id: "dkfjdkfdkfjdkn",
+            open: "10:00 AM",
+            close: "6:00 PM",
+            isOpen: true,
+          },
+          {
+            name: "Thursday",
+            id: "dkfjdkf3r3n3",
+            open: "10:00 AM",
+            close: "6:00 PM",
+            isOpen: true,
+          },
+          {
+            name: "Friday",
+            id: "dkfjdkf3r3n4",
+            open: "10:00 AM",
+            close: "6:00 PM",
+            isOpen: true,
+          },
+          {
+            name: "Saturday",
+            id: "dkfjdkf3r3n5",
+            open: "10:00 AM",
+            close: "4:00 PM",
+            isOpen: true,
+          },
+          {
+            name: "Sunday",
+            id: "dkfjdkf3r3n6",
+            open: "Closed",
+            close: "Closed",
+            isOpen: false,
+          },
+        ],
+      },
+
+      // Default shop information
+      shopContactBlurb:
+        "Store Contact Information\nAddress\nPhone\nEmail\nWebsite",
+      shopName: storeName,
+      thankYouBlurb:
+        "Thank you for visiting! We value your business and satisfaction with our services. Please call or email anytime, we look forward to seeing you again.",
+
+      // Default user settings
+      users: [],
+      punchClockArr: [],
+
+      // Default inventory and workorder settings
+      inventory: [],
+      openWorkorders: [],
+      closedWorkorders: [],
+      sales: [],
+      customers: [],
+
+      // Default system settings
+      systemSettings: {
+        taxRate: 6.5,
+        currency: "USD",
+        timezone: "America/New_York",
+        dateFormat: "MM/DD/YYYY",
+        timeFormat: "12h",
+      },
+    };
+
+    // Create store document in Firestore
+    await storeRef.set(initialSettings);
+
+    // Update tenant's store count
+    await tenantRef.update({
+      storeCount: admin.firestore.FieldValue.increment(1),
+      lastStoreCreated: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    log("Store created successfully", {
+      tenantID,
+      storeID,
+      storeName,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `✅ Store ${storeName} created successfully for tenant ${tenantID}.`,
+      store: {
+        id: storeID,
+        name: storeName,
+        tenantID: tenantID,
+        status: "active",
+        createdAt: initialSettings.createdAt,
+        settings: initialSettings,
+      },
+    });
+  } catch (error) {
+    log("Error creating store", error);
+
+    let message;
+    let statusCode = 500;
+
+    if (error.code === "permission-denied") {
+      message = "❌ Insufficient permissions to create store.";
+      statusCode = 403;
+    } else if (error.code === "not-found") {
+      message = "❌ Tenant not found.";
+      statusCode = 404;
+    } else if (error.code === "already-exists") {
+      message = "❌ Store with this ID already exists.";
+      statusCode = 409;
+    } else {
+      message = `❗ Unexpected error: ${error.message}`;
+    }
+
+    return res.status(statusCode).json({
+      success: false,
+      message,
+      error: {
+        code: error.code || "unknown",
+        message: error.message,
+      },
+    });
+  }
+});
+
+/**
+ * Create a new tenant with primary and secondary contacts
+ * Creates Firebase Auth accounts for both emails
+ */
+exports.createTenant = onRequest({ cors: true }, async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With"
+  );
+  res.set("Access-Control-Allow-Credentials", "true");
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    log("Handling preflight request for createTenant");
+    return res.status(200).end();
+  }
+
+  log("Incoming create tenant request", req.body);
+  // return res.status(200).json({ message: "sup bro how u doin" });
+  // Input validation
+  const {
+    tenantDisplayName,
+    primaryEmail,
+    secondaryEmail,
+    phoneNumber,
+    contactFirstName,
+    contactLastName,
+  } = req.body.data;
+  log(tenantDisplayName + primaryEmail);
+  if (!tenantDisplayName || typeof tenantDisplayName !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Tenant display name is required.",
+    });
+  }
+
+  if (
+    !primaryEmail ||
+    typeof primaryEmail !== "string" ||
+    !primaryEmail.includes("@")
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Valid primary email is required.",
+    });
+  }
+
+  if (
+    !secondaryEmail ||
+    typeof secondaryEmail !== "string" ||
+    !secondaryEmail.includes("@")
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Valid secondary email is required.",
+    });
+  }
+
+  if (
+    !phoneNumber ||
+    typeof phoneNumber !== "string" ||
+    phoneNumber.length !== 10 ||
+    !/^\d{10}$/.test(phoneNumber)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Valid 10-digit phone number is required.",
+    });
+  }
+
+  if (!contactFirstName || typeof contactFirstName !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Contact first name is required.",
+    });
+  }
+
+  if (!contactLastName || typeof contactLastName !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "Contact last name is required.",
+    });
+  }
+
+  try {
+    // Generate unique tenant ID (12-digit random number)
+    let tenantID = "1234";
+
+    // Ensure tenant ID is unique
+    let tenantRef = db.collection("tenants").doc(tenantID);
+    let tenantDoc = await tenantRef.get();
+
+    while (tenantDoc.exists) {
+      tenantID = generateTenantID();
+      tenantRef = db.collection("tenants").doc(tenantID);
+      tenantDoc = await tenantRef.get();
+    }
+
+    // Check if primary email already exists
+    try {
+      await admin.auth().getUserByEmail(primaryEmail);
+      return res.status(409).json({
+        success: false,
+        message: "Primary email already exists in the system.",
+      });
+    } catch (error) {
+      // User doesn't exist, which is what we want
+      if (error.code !== "auth/user-not-found") {
+        throw error;
+      }
+    }
+
+    // Check if secondary email already exists
+    try {
+      await admin.auth().getUserByEmail(secondaryEmail);
+      return res.status(409).json({
+        success: false,
+        message: "Secondary email already exists in the system.",
+      });
+    } catch (error) {
+      // User doesn't exist, which is what we want
+      if (error.code !== "auth/user-not-found") {
+        throw error;
+      }
+    }
+
+    // Create Firebase Auth accounts for both emails
+    const primaryUserRecord = await admin.auth().createUser({
+      email: primaryEmail,
+      displayName: `${contactFirstName} ${contactLastName}`,
+      emailVerified: false,
+      disabled: false,
+    });
+
+    const secondaryUserRecord = await admin.auth().createUser({
+      email: secondaryEmail,
+      displayName: `${contactFirstName} ${contactLastName}`,
+      emailVerified: false,
+      disabled: false,
+    });
+
+    // Send password reset emails to both users
+    const primaryPasswordResetLink = await admin
+      .auth()
+      .generatePasswordResetLink(primaryEmail);
+    const secondaryPasswordResetLink = await admin
+      .auth()
+      .generatePasswordResetLink(secondaryEmail);
+
+    // Create tenant document
+    const tenantData = {
+      id: tenantID,
+      displayName: tenantDisplayName,
+      primaryEmail: primaryEmail,
+      secondaryEmail: secondaryEmail,
+      phoneNumber: phoneNumber,
+      contactFirstName: contactFirstName,
+      contactLastName: contactLastName,
+      primaryUserID: primaryUserRecord.uid,
+      secondaryUserID: secondaryUserRecord.uid,
+      status: "active",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: "system",
+      userCount: 0,
+      storeCount: 0,
+      subscription: {
+        plan: "trial",
+        status: "active",
+        startDate: admin.firestore.FieldValue.serverTimestamp(),
+        trialEndDate: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      settings: {
+        timezone: "America/New_York",
+        currency: "USD",
+        dateFormat: "MM/DD/YYYY",
+        timeFormat: "12h",
+      },
+    };
+
+    // Store tenant document in Firestore
+    await tenantRef.set(tenantData);
+
+    // Create user index entries for quick lookup
+    await db.collection("users").doc(primaryUserRecord.uid).set({
+      email: primaryEmail,
+      tenantID: tenantID,
+      role: "primary_contact",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: "active",
+    });
+
+    await db.collection("users").doc(secondaryUserRecord.uid).set({
+      email: secondaryEmail,
+      tenantID: tenantID,
+      role: "secondary_contact",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: "active",
+    });
+
+    log("Tenant created successfully", {
+      tenantID,
+      tenantDisplayName,
+      primaryEmail,
+      secondaryEmail,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `✅ Tenant ${tenantDisplayName} created successfully.`,
+      tenant: {
+        id: tenantID,
+        displayName: tenantDisplayName,
+        primaryEmail: primaryEmail,
+        secondaryEmail: secondaryEmail,
+        phoneNumber: phoneNumber,
+        contactFirstName: contactFirstName,
+        contactLastName: contactLastName,
+        status: "active",
+        createdAt: tenantData.createdAt,
+      },
+      auth: {
+        primaryUserID: primaryUserRecord.uid,
+        secondaryUserID: secondaryUserRecord.uid,
+        primaryPasswordResetLink: primaryPasswordResetLink,
+        secondaryPasswordResetLink: secondaryPasswordResetLink,
+      },
+    });
+  } catch (error) {
+    log("Error creating tenant", error);
+
+    let message;
+    let statusCode = 500;
+
+    if (error.code === "permission-denied") {
+      message = "❌ Insufficient permissions to create tenant.";
+      statusCode = 403;
+    } else if (error.code === "auth/email-already-exists") {
+      message = "❌ One or both emails already exist in the system.";
+      statusCode = 409;
+    } else if (error.code === "auth/invalid-email") {
+      message = "❌ Invalid email address format.";
+      statusCode = 400;
+    } else {
+      message = `❗ Unexpected error: ${error.message}`;
+    }
+
+    return res.status(statusCode).json({
+      success: false,
+      message,
+      error: {
+        code: error.code || "unknown",
+        message: error.message,
+      },
+    });
+  }
+});
+
+function generateUPCBarcode(barcodeType) {
+  // Get current millis since epoch
+  let begins = "0";
+  switch (barcodeType) {
+    case "workorder":
+      begins = "1";
+      break;
+    case "sale":
+      begins = "2";
+      break;
+    case "customer":
+      begins = "3";
+  }
+  const millis = Date.now().toString();
+  const timePart = millis.slice(-8);
+  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+  let upc = timePart + randomPart;
+  upc = upc.replace(/^./, begins);
+  return upc;
+}
+
+// ============================================================================
+// HTTPS CALLABLE VERSIONS OF ALL EXPORTED FUNCTIONS
+// ============================================================================
+
+/**
+ * Callable version of getAvailableStripeReaders
+ */
+exports.getAvailableStripeReadersCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("Incoming get available Stripe readers callable request", request.data);
+
+    try {
+      const readers = await stripe.terminal.readers.list({});
+      log("available Stripe readers", readers);
+
+      return {
+        success: true,
+        data: readers,
+        message: "Stripe readers retrieved successfully",
+      };
+    } catch (error) {
+      log("Error getting Stripe readers", error);
+      throw new HttpsError("internal", "Failed to retrieve Stripe readers");
+    }
+  }
+);
+
+/**
+ * Callable version of initiateRefund
+ */
+exports.initiateRefundCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("Incoming refund callable request", request.data);
+
+    const { paymentIntentId, amount } = request.data;
+
+    if (!paymentIntentId || typeof paymentIntentId !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "PaymentIntent ID must be provided and must be a string."
+      );
+    }
+
+    if (amount !== undefined && typeof amount !== "number") {
+      throw new HttpsError(
+        "invalid-argument",
+        "If provided, refund amount must be a valid number in cents."
+      );
+    }
+
+    try {
+      // Step 1: Retrieve the PaymentIntent to get its latest charge
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentId
+      );
+
+      const chargeId = paymentIntent.charges?.data?.[0]?.id;
+      if (!chargeId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "No charge found for the given PaymentIntent."
+        );
+      }
+
+      // Step 2: Create the refund
+      const refund = await stripe.refunds.create({
+        charge: chargeId,
+        ...(amount ? { amount } : {}), // Optional partial refund
+      });
+
+      return {
+        success: true,
+        message: `✅ Refund ${
+          amount ? `$${(amount / 100).toFixed(2)}` : "for full amount"
+        } processed successfully.`,
+        data: {
+          refundId: refund.id,
+          status: refund.status,
+        },
+      };
+    } catch (error) {
+      log("Error processing refund", error);
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to process refund"
+      );
+    }
+  }
+);
+
+/**
+ * Callable version of initiatePaymentIntent
+ */
+exports.initiatePaymentIntentCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log(
+      "Incoming process Stripe server-driven payment callable request",
+      request.data
+    );
+
+    const { amount, readerID, paymentIntentID, captureMethod } = request.data;
+
+    if (!amount || typeof amount !== "number") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Amount must be a valid number in cents."
+      );
+    }
+
+    if (!readerID || typeof readerID !== "string") {
+      throw new HttpsError("invalid-argument", "Reader ID must be provided.");
+    }
+
+    try {
+      // first check to see if the reader is in use
+      const reader = await stripe.terminal.readers.retrieve(readerID);
+
+      // Offline/unreachable check
+      if (reader.status && reader.status !== "online") {
+        throw new HttpsError(
+          "unavailable",
+          "📴 Terminal is offline or unreachable."
+        );
+      }
+
+      // Busy check
+      const action = reader.action;
+      if (action && action.type) {
+        if (action.type === "process_payment_intent") {
+          const currentPiId =
+            action.process_payment_intent?.payment_intent || null;
+          throw new HttpsError(
+            "resource-exhausted",
+            currentPiId
+              ? `⏳ Reader is currently processing a different payment (PaymentIntent ${currentPiId}).`
+              : "⏳ Reader is currently processing a different payment."
+          );
+        } else {
+          throw new HttpsError(
+            "resource-exhausted",
+            `⏳ Reader is busy (${action.type}). Please wait or cancel current action on the reader.`
+          );
+        }
+      }
+
+      // 1. Create or reuse the PaymentIntent
+      let paymentIntent;
+      let finalPaymentIntentID;
+
+      if (!paymentIntentID) {
+        log("Getting a new payment intent");
+        paymentIntent = await stripe.paymentIntents.create({
+          amount,
+          payment_method_types: ["card_present", "card", "link", "cashapp"],
+          capture_method: captureMethod || "automatic",
+          currency: "usd",
+        });
+        finalPaymentIntentID = paymentIntent.id;
+      } else {
+        log("Recycling the previous payment intent");
+        finalPaymentIntentID = paymentIntentID;
+        paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentID);
+      }
+
+      // 2. Process the PaymentIntent with the reader
+      const processedIntent =
+        await stripe.terminal.readers.processPaymentIntent(readerID, {
+          payment_intent: paymentIntent.id,
+        });
+
+      // 3. Return success with client-side polling configuration
+      const processedPaymentIntentID =
+        processedIntent.action.process_payment_intent.payment_intent;
+      log("Stripe payment successfully started", processedIntent);
+
+      return {
+        success: true,
+        message: `✅ Payment of $${(amount / 100).toFixed(
+          2
+        )} processed successfully.`,
+        data: {
+          paymentIntentID: processedPaymentIntentID,
+          readerID: processedIntent.id,
+          status: processedIntent.status,
+          pollingConfig: {
+            enabled: true,
+            databasePath: `PAYMENT-PROCESSING/${readerID}/${processedPaymentIntentID}`,
+            pollingInterval: 3000,
+            maxPollingTime: 300000,
+            timeoutMessage:
+              "Payment processing timeout - please check reader status",
+            fallbackEnabled: true,
+          },
+        },
+      };
+    } catch (error) {
+      log("Error processing payment intent", error);
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to process payment intent"
+      );
+    }
+  }
+);
+
+/**
+ * Callable version of cancelServerDrivenStripePayment
+ */
+exports.cancelServerDrivenStripePaymentCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log(
+      "Incoming cancel server driven Stripe payment callable request",
+      request.data
+    );
+
+    const { readerID } = request.data;
+
+    if (!readerID || typeof readerID !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Reader ID must be provided and must be a string."
+      );
+    }
+
+    try {
+      // Verify the reader is online before attempting cancelAction
+      const readerBefore = await stripe.terminal.readers.retrieve(readerID);
+      if (readerBefore.status !== "online") {
+        throw new HttpsError(
+          "unavailable",
+          "📴 Reader is offline or unreachable."
+        );
+      }
+
+      const activeActionType = readerBefore.action?.type ?? null;
+      log("Reader status before cancel:", {
+        status: readerBefore.status,
+        activeActionType,
+      });
+
+      // Reset the reader
+      const readerAfter = await stripe.terminal.readers.cancelAction(readerID);
+
+      log("Reader reset complete:", {
+        readerId: readerAfter.id,
+        status: readerAfter.status,
+        actionAfter: readerAfter.action?.type ?? null,
+      });
+
+      return {
+        success: true,
+        message: `🧹 Reader reset complete!`,
+        data: {
+          readerId,
+          readerStatus: readerAfter.status,
+          reader: readerAfter,
+        },
+      };
+    } catch (error) {
+      log("Error resetting reader", error);
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to reset reader"
+      );
+    }
+  }
+);
+
+/**
+ * Callable version of loginAppUser
+ */
+exports.loginAppUserCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("Incoming login callable request", request.data);
+
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
+
+    const { email, password } = request.data;
+
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Valid email address is required."
+      );
+    }
+
+    if (!password || typeof password !== "string" || password.length < 6) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Password must be at least 6 characters long."
+      );
+    }
+
+    try {
+      // Authenticate user with Firebase Auth
+      const userRecord = await admin.auth().getUserByEmail(email);
+
+      if (userRecord.disabled) {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ User account has been disabled."
+        );
+      }
+
+      const userID = userRecord.uid;
+
+      // Look up user in the global users index
+      const userIndexRef = db.collection("users").doc(userID);
+      const userIndexDoc = await userIndexRef.get();
+
+      if (!userIndexDoc.exists) {
+        throw new HttpsError("not-found", "❌ User not found in system.");
+      }
+
+      const userIndexData = userIndexDoc.data();
+      const tenantID = userIndexData.tenantID;
+      const storeID = userIndexData.storeID;
+
+      if (!tenantID) {
+        throw new HttpsError(
+          "not-found",
+          "❌ User is not associated with any tenant."
+        );
+      }
+
+      if (!storeID) {
+        throw new HttpsError(
+          "not-found",
+          "❌ User is not associated with any store."
+        );
+      }
+
+      // Retrieve user details from tenant/store-specific collection
+      const userRef = db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("users")
+        .doc(userID);
+      const userDoc = await userRef.get();
+
+      if (!userDoc.exists) {
+        throw new HttpsError(
+          "not-found",
+          "❌ User details not found in tenant system."
+        );
+      }
+
+      const userData = userDoc.data();
+
+      // Retrieve tenant information
+      const tenantRef = db.collection("tenants").doc(tenantID);
+      const tenantDoc = await tenantRef.get();
+
+      if (!tenantDoc.exists) {
+        throw new HttpsError("not-found", "❌ Tenant information not found.");
+      }
+
+      const tenantData = tenantDoc.data();
+
+      // Update last login timestamp
+      await userRef.update({
+        lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+        loginCount: admin.firestore.FieldValue.increment(1),
+      });
+
+      log("User login successful", {
+        userID,
+        email,
+        tenantID,
+        storeID,
+        displayName: userData.displayName,
+      });
+
+      return {
+        success: true,
+        message: `✅ Login successful for ${email} (Tenant: ${tenantID}, Store: ${storeID})`,
+        data: {
+          user: {
+            id: userID,
+            email: userData.email,
+            displayName: userData.displayName,
+            tenantID: tenantID,
+            storeID: storeID,
+            permissions: userData.permissions,
+            status: userData.status,
+            lastLogin: userData.lastLogin,
+            createdAt: userData.createdAt,
+            metadata: userData.metadata,
+          },
+          tenant: {
+            id: tenantID,
+            name: tenantData.name,
+            status: tenantData.status,
+            settings: tenantData.settings,
+            userCount: tenantData.userCount,
+            createdAt: tenantData.createdAt,
+            subscription: tenantData.subscription,
+          },
+          auth: {
+            uid: userID,
+            email: email,
+            emailVerified: userRecord.emailVerified,
+            disabled: userRecord.disabled,
+          },
+        },
+      };
+    } catch (error) {
+      log("Error during login", error);
+
+      if (error.code === "auth/user-not-found") {
+        throw new HttpsError(
+          "not-found",
+          "❌ No account found with this email address."
+        );
+      } else if (error.code === "auth/wrong-password") {
+        throw new HttpsError("unauthenticated", "❌ Incorrect password.");
+      } else if (error.code === "auth/invalid-email") {
+        throw new HttpsError(
+          "invalid-argument",
+          "❌ Invalid email address format."
+        );
+      } else if (error.code === "auth/user-disabled") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ This account has been disabled."
+        );
+      } else if (error.code === "auth/too-many-requests") {
+        throw new HttpsError(
+          "resource-exhausted",
+          "❌ Too many failed login attempts. Please try again later."
+        );
+      } else if (error.code === "permission-denied") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Insufficient permissions to access user data."
+        );
+      } else if (error.code === "not-found") {
+        throw new HttpsError("not-found", "❌ User or tenant not found.");
+      } else {
+        throw new HttpsError(
+          "internal",
+          `❗ Unexpected error: ${error.message}`
+        );
+      }
+    }
+  }
+);
+
+/**
+ * Callable version of createAppUser
+ */
+exports.createAppUserCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("Incoming create app user callable request", request.data);
+
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
+
+    const { email, password, tenantID, storeID, permissions } = request.data;
+
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Valid email address is required."
+      );
+    }
+
+    if (!password || typeof password !== "string" || password.length < 6) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Password must be at least 6 characters long."
+      );
+    }
+
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new HttpsError("invalid-argument", "Tenant ID is required.");
+    }
+
+    if (!storeID || typeof storeID !== "string") {
+      throw new HttpsError("invalid-argument", "Store ID is required.");
+    }
+
+    try {
+      // Check if tenant exists
+      const tenantRef = db.collection("tenants").doc(tenantID);
+      const tenantDoc = await tenantRef.get();
+
+      if (!tenantDoc.exists) {
+        throw new HttpsError("not-found", "Tenant not found.");
+      }
+
+      // Check if user already exists with this email
+      const existingUserQuery = await db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("users")
+        .where("email", "==", email)
+        .get();
+
+      if (!existingUserQuery.empty) {
+        throw new HttpsError(
+          "already-exists",
+          "User with this email already exists in this tenant."
+        );
+      }
+
+      // Create Firebase Auth user
+      const userRecord = await admin.auth().createUser({
+        email: email,
+        password: password,
+        displayName: email,
+        emailVerified: false,
+      });
+
+      const userID = userRecord.uid;
+
+      // Create user document in Firestore under tenant
+      const userData = {
+        id: userID,
+        email: email,
+        displayName: email,
+        tenantID: tenantID,
+        permissions: permissions || {
+          level: 1,
+          canCreateUsers: false,
+          canManageInventory: false,
+          canProcessPayments: false,
+          canViewReports: false,
+        },
+        status: "active",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: "system",
+        lastLogin: null,
+        emailVerified: false,
+        metadata: {
+          timezone: "America/New_York",
+          language: "en",
+          department: null,
+          role: "user",
+        },
+      };
+
+      await db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("users")
+        .doc(userID)
+        .set(userData);
+
+      // Create user index entry for quick lookup
+      await db.collection("users").doc(userID).set({
+        email: email,
+        tenantID: tenantID,
+        storeID: storeID,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "active",
+      });
+
+      // Update tenant's user count
+      await tenantRef.update({
+        userCount: admin.firestore.FieldValue.increment(1),
+        lastUserCreated: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      log("App user created successfully", {
+        userID,
+        email,
+        tenantID,
+      });
+
+      return {
+        success: true,
+        message: `✅ User ${email} created successfully for tenant ${tenantID}.`,
+        data: {
+          user: {
+            id: userID,
+            email: email,
+            displayName: email,
+            tenantID: tenantID,
+            storeID: storeID,
+            permissions: userData.permissions,
+            status: "active",
+            createdAt: userData.createdAt,
+          },
+        },
+      };
+    } catch (error) {
+      log("Error creating app user", error);
+
+      if (error.code === "auth/email-already-exists") {
+        throw new HttpsError(
+          "already-exists",
+          "❌ User with this email already exists in Firebase Auth."
+        );
+      } else if (error.code === "auth/invalid-email") {
+        throw new HttpsError(
+          "invalid-argument",
+          "❌ Invalid email address format."
+        );
+      } else if (error.code === "auth/weak-password") {
+        throw new HttpsError(
+          "invalid-argument",
+          "❌ Password is too weak. Please use a stronger password."
+        );
+      } else if (error.code === "auth/operation-not-allowed") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Email/password accounts are not enabled."
+        );
+      } else if (error.code === "permission-denied") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Insufficient permissions to create user."
+        );
+      } else if (error.code === "not-found") {
+        throw new HttpsError("not-found", "❌ Tenant not found.");
+      } else {
+        throw new HttpsError(
+          "internal",
+          `❗ Unexpected error: ${error.message}`
+        );
+      }
+    }
+  }
+);
+
+/**
+ * Callable version of createStore
+ */
+exports.createStoreCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("Incoming create store callable request", request.data);
+
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
+
+    const { tenantID, storeID, storeName, createdBy } = request.data;
+
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new HttpsError("invalid-argument", "Tenant ID is required.");
+    }
+
+    if (!storeID || typeof storeID !== "string") {
+      throw new HttpsError("invalid-argument", "Store ID is required.");
+    }
+
+    if (!storeName || typeof storeName !== "string") {
+      throw new HttpsError("invalid-argument", "Store name is required.");
+    }
+
+    try {
+        // Check if tenant exists
+      const tenantRef = db.collection("tenants").doc(tenantID);
+      const tenantDoc = await tenantRef.get();
+
+      if (!tenantDoc.exists) {
+        throw new HttpsError("not-found", "Tenant not found.");
+      }
+
+      // Check if store already exists
+      const storeRef = db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID);
+      const storeDoc = await storeRef.get();
+
+      if (storeDoc.exists) {
+        throw new HttpsError(
+          "already-exists",
+          "Store with this ID already exists in this tenant."
+        );
+      }
+
+      // Create initial SETTINGS_OBJ data (abbreviated for brevity)
+      const initialSettings = {
+        storeID: storeID,
+        storeName: storeName,
+        tenantID: tenantID,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: createdBy || "system",
+        status: "active",
+        // ... other default settings would go here
+      };
+
+      // Create store document in Firestore
+      await storeRef.set(initialSettings);
+
+      // Update tenant's store count
+      await tenantRef.update({
+        storeCount: admin.firestore.FieldValue.increment(1),
+        lastStoreCreated: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      log("Store created successfully", {
+        tenantID,
+        storeID,
+        storeName,
+      });
+
+      return {
+        success: true,
+        message: `✅ Store ${storeName} created successfully for tenant ${tenantID}.`,
+        data: {
+          store: {
+            id: storeID,
+            name: storeName,
+            tenantID: tenantID,
+            status: "active",
+            createdAt: initialSettings.createdAt,
+            settings: initialSettings,
+          },
+        },
+      };
+    } catch (error) {
+      log("Error creating store", error);
+
+      if (error.code === "permission-denied") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Insufficient permissions to create store."
+        );
+      } else if (error.code === "not-found") {
+        throw new HttpsError("not-found", "❌ Tenant not found.");
+      } else if (error.code === "already-exists") {
+        throw new HttpsError(
+          "already-exists",
+          "❌ Store with this ID already exists."
+        );
+      } else {
+        throw new HttpsError(
+          "internal",
+          `❗ Unexpected error: ${error.message}`
+        );
+      }
+    }
+  }
+);
+
+/**
+ * Callable version of createTenant
+ */
+exports.createTenantCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("Incoming create tenant callable request", request.data);
+
+    // Initialize Firestore with service account
+    const db = await getDB(firebaseServiceAccountKey);
+
+    const {
+      tenantDisplayName,
+      primaryEmail,
+      secondaryEmail,
+      phoneNumber,
+      contactFirstName,
+      contactLastName,
+    } = request.data;
+
+    if (!tenantDisplayName || typeof tenantDisplayName !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Tenant display name is required."
+      );
+    }
+
+    if (
+      !primaryEmail ||
+      typeof primaryEmail !== "string" ||
+      !primaryEmail.includes("@")
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Valid primary email is required."
+      );
+    }
+
+    if (
+      !secondaryEmail ||
+      typeof secondaryEmail !== "string" ||
+      !secondaryEmail.includes("@")
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Valid secondary email is required."
+      );
+    }
+
+    if (
+      !phoneNumber ||
+      typeof phoneNumber !== "string" ||
+      phoneNumber.length !== 10 ||
+      !/^\d{10}$/.test(phoneNumber)
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Valid 10-digit phone number is required."
+      );
+    }
+
+    if (!contactFirstName || typeof contactFirstName !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Contact first name is required."
+      );
+    }
+
+    if (!contactLastName || typeof contactLastName !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Contact last name is required."
+      );
+    }
+
+    try {
+      // Generate unique tenant ID
+      let tenantID = "1234";
+
+      // Ensure tenant ID is unique
+      let tenantRef = db.collection("tenants").doc(tenantID);
+      let tenantDoc = await tenantRef.get();
+
+      while (tenantDoc.exists) {
+        tenantID = generateTenantID();
+        tenantRef = db.collection("tenants").doc(tenantID);
+        tenantDoc = await tenantRef.get();
+      }
+
+      // Check if primary email already exists
+      try {
+        await admin.auth().getUserByEmail(primaryEmail);
+        throw new HttpsError(
+          "already-exists",
+          "Primary email already exists in the system."
+        );
+      } catch (error) {
+        if (error.code !== "auth/user-not-found") {
+          throw error;
+        }
+      }
+
+      // Check if secondary email already exists
+      try {
+        await admin.auth().getUserByEmail(secondaryEmail);
+        throw new HttpsError(
+          "already-exists",
+          "Secondary email already exists in the system."
+        );
+      } catch (error) {
+        if (error.code !== "auth/user-not-found") {
+          throw error;
+        }
+      }
+
+      // Create Firebase Auth accounts for both emails
+      const primaryUserRecord = await admin.auth().createUser({
+        email: primaryEmail,
+        displayName: `${contactFirstName} ${contactLastName}`,
+        emailVerified: false,
+        disabled: false,
+      });
+
+      const secondaryUserRecord = await admin.auth().createUser({
+        email: secondaryEmail,
+        displayName: `${contactFirstName} ${contactLastName}`,
+        emailVerified: false,
+        disabled: false,
+      });
+
+      // Send password reset emails to both users
+      const primaryPasswordResetLink = await admin
+        .auth()
+        .generatePasswordResetLink(primaryEmail);
+      const secondaryPasswordResetLink = await admin
+        .auth()
+        .generatePasswordResetLink(secondaryEmail);
+
+      // Create tenant document
+      const tenantData = {
+        id: tenantID,
+        displayName: tenantDisplayName,
+        primaryEmail: primaryEmail,
+        secondaryEmail: secondaryEmail,
+        phoneNumber: phoneNumber,
+        contactFirstName: contactFirstName,
+        contactLastName: contactLastName,
+        primaryUserID: primaryUserRecord.uid,
+        secondaryUserID: secondaryUserRecord.uid,
+        status: "active",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: "system",
+        userCount: 0,
+        storeCount: 0,
+        subscription: {
+          plan: "trial",
+          status: "active",
+          startDate: admin.firestore.FieldValue.serverTimestamp(),
+          trialEndDate: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        settings: {
+          timezone: "America/New_York",
+          currency: "USD",
+          dateFormat: "MM/DD/YYYY",
+          timeFormat: "12h",
+        },
+      };
+
+      // Store tenant document in Firestore
+      await tenantRef.set(tenantData);
+
+      // Create user index entries for quick lookup
+      await db.collection("users").doc(primaryUserRecord.uid).set({
+        email: primaryEmail,
+        tenantID: tenantID,
+        role: "primary_contact",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "active",
+      });
+
+      await db.collection("users").doc(secondaryUserRecord.uid).set({
+        email: secondaryEmail,
+        tenantID: tenantID,
+        role: "secondary_contact",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "active",
+      });
+
+      log("Tenant created successfully", {
+        tenantID,
+        tenantDisplayName,
+        primaryEmail,
+        secondaryEmail,
+      });
+
+      return {
+        success: true,
+        message: `✅ Tenant ${tenantDisplayName} created successfully.`,
+        data: {
+          tenant: {
+            id: tenantID,
+            displayName: tenantDisplayName,
+            primaryEmail: primaryEmail,
+            secondaryEmail: secondaryEmail,
+            phoneNumber: phoneNumber,
+            contactFirstName: contactFirstName,
+            contactLastName: contactLastName,
+            status: "active",
+            createdAt: tenantData.createdAt,
+          },
+          auth: {
+            primaryUserID: primaryUserRecord.uid,
+            secondaryUserID: secondaryUserRecord.uid,
+            primaryPasswordResetLink: primaryPasswordResetLink,
+            secondaryPasswordResetLink: secondaryPasswordResetLink,
+          },
+        },
+      };
+    } catch (error) {
+      log("Error creating tenant", error);
+
+      if (error.code === "permission-denied") {
+        throw new HttpsError(
+          "permission-denied",
+          "❌ Insufficient permissions to create tenant."
+        );
+      } else if (error.code === "auth/email-already-exists") {
+        throw new HttpsError(
+          "already-exists",
+          "❌ One or both emails already exist in the system."
+        );
+      } else if (error.code === "auth/invalid-email") {
+        throw new HttpsError(
+          "invalid-argument",
+          "❌ Invalid email address format."
+        );
+      } else {
+        throw new HttpsError(
+          "internal",
+          `❗ Unexpected error: ${error.message}`
+        );
+      }
+    }
+  }
+);
+
+// Helper function for generating tenant ID
+function generateTenantID() {
+  return Math.floor(100000000000 + Math.random() * 900000000000).toString();
+}
+
+/**
+ * Test callable function - writes test data to customer_phone/test
+ * Used to verify callable functions and permissions are working correctly
+ */
+exports.testCustomerPhoneWrite = onCall(
+  {
+    secrets: [firebaseServiceAccountKey],
+    enforceAppCheck: false, // Allow unauthenticated calls for testing
+  },
+  async (request) => {
+    log("Test customer_phone write callable invoked", {
+      data: request.data,
+      hasAuth: !!request.auth,
+      uid: request.auth?.uid || "none",
+    });
+
+    try {
+      const { testData, timestamp } = request.data;
+
+      // Initialize Admin SDK with service account from Secret Manager
+      const db = await getDB(firebaseServiceAccountKey);
+
+      log("Admin SDK initialized successfully with service account (callable)");
+
+      // Create test document
+      const testDocData = {
+        testData: testData || "Test data from callable function",
+        timestamp: timestamp || Date.now(),
+        calledAt: admin.firestore.FieldValue.serverTimestamp(),
+        calledBy: request.auth?.uid || "anonymous",
+        userEmail: request.auth?.token?.email || "not authenticated",
+        method: "callable",
+        success: true,
+      };
+
+      // Write to customer_phone/test
+      await db.collection("customer_phone").doc("test").set(testDocData);
+
+      log(
+        "Test data written successfully to customer_phone/test (callable)",
+        testDocData
+      );
+
+      return {
+        success: true,
+        message:
+          "✅ Test data written successfully to customer_phone/test via callable",
+        data: testDocData,
+        path: "customer_phone/test",
+      };
+    } catch (error) {
+      log("Error writing test data (callable)", {
+        error: error.message,
+        code: error.code,
+      });
+
+      throw new HttpsError(
+        "internal",
+        `Failed to write test data: ${error.message}`
+      );
+    }
+  }
+);
+
+/**
+ * Test HTTP endpoint - writes test data to customer_phone/test
+ * Used to verify HTTP requests and permissions are working correctly
+ */
+exports.testCustomerPhoneWriteHTTP = onRequest(
+  { cors: true, secrets: [firebaseServiceAccountKey] },
+  async (req, res) => {
+    // Set CORS headers
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    // Handle preflight requests
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+
+    log("Test customer_phone write HTTP endpoint invoked", req.body);
+
+    try {
+      const { testData, timestamp } = req.body;
+
+      // Initialize Admin SDK with service account from Secret Manager
+      const db = await getDB(firebaseServiceAccountKey);
+
+      log("Admin SDK initialized successfully with service account");
+
+      // TEST 1: Try Realtime Database to verify Admin SDK works
+      try {
+        const rtdb = admin.database();
+        await rtdb.ref("test_write").set({
+          testData: "RTDB test",
+          timestamp: Date.now(),
+        });
+        log("✅ TEST 1: Realtime Database write SUCCESS");
+      } catch (rtdbError) {
+        log("❌ TEST 1: Realtime Database write FAILED", {
+          error: rtdbError.message,
+          code: rtdbError.code,
+        });
+      }
+
+      // TEST 2: Try Firestore root collection
+      try {
+        await db.collection("test_writes").doc("test").set({
+          testData: "Root collection test",
+          timestamp: Date.now(),
+        });
+        log("✅ TEST 2: Firestore root collection write SUCCESS");
+      } catch (rootError) {
+        log("❌ TEST 2: Firestore root collection write FAILED", {
+          error: rootError.message,
+          code: rootError.code,
+        });
+      }
+
+      // TEST 3: Try customer_phone collection
+      const testDocData = {
+        testData: testData || "Test data from HTTP endpoint",
+        timestamp: timestamp || Date.now(),
+        calledAt: admin.firestore.FieldValue.serverTimestamp(),
+        method: "http",
+        requestMethod: req.method,
+        success: true,
+      };
+
+      log("TEST 3: Attempting write to customer_phone/test");
+      await db.collection("customer_phone").doc("test").set(testDocData);
+
+      log(
+        "Test data written successfully to customer_phone/test via HTTP",
+        testDocData
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "✅ Test data written successfully to customer_phone/test via HTTP",
+        data: testDocData,
+        path: "customer_phone/test",
+      });
+    } catch (error) {
+      log("Error writing test data via HTTP", {
+        error: error.message,
+        code: error.code,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: `Failed to write test data: ${error.message}`,
+        error: {
+          message: error.message,
+          code: error.code || "unknown",
+        },
+      });
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════
+// NEW CHECKOUT SYSTEM — Cloud Functions
+// Prefix: newCheckout
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * newCheckoutGetAvailableReadersCallable
+ * Lists all Stripe Terminal readers and their status.
+ */
+exports.newCheckoutGetAvailableReadersCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: get available readers request", request.data);
+
+    try {
+      const stripeClient = Stripe(stripeSecretKey.value());
+      const readers = await stripeClient.terminal.readers.list({});
+      return {
+        success: true,
+        data: readers,
+        message: "Readers retrieved successfully",
+      };
+    } catch (error) {
+      log("newCheckout: error getting readers", error.message);
+      throw new HttpsError("internal", "Failed to retrieve Stripe readers");
+    }
+  }
+);
+
+/**
+ * newCheckoutInitiatePaymentIntentCallable
+ * Creates a PaymentIntent and processes it on the specified reader.
+ * Input: { amount (cents), readerID, paymentIntentID? }
+ */
+exports.newCheckoutInitiatePaymentIntentCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: initiate payment intent request", request.data);
+
+    const { amount, readerID, paymentIntentID, tenantID, storeID } = request.data;
+
+    if (!amount || typeof amount !== "number") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Amount must be a valid number in cents."
+      );
+    }
+
+    if (!readerID || typeof readerID !== "string") {
+      throw new HttpsError("invalid-argument", "Reader ID must be provided.");
+    }
+
+    if (!tenantID || !storeID) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Tenant and store IDs must be provided."
+      );
+    }
+
+    try {
+      const stripeClient = Stripe(stripeSecretKey.value());
+
+      // Check reader status
+      const reader = await stripeClient.terminal.readers.retrieve(readerID);
+
+      if (reader.status && reader.status !== "online") {
+        throw new HttpsError(
+          "unavailable",
+          "Terminal is offline or unreachable."
+        );
+      }
+
+      // Check if reader is busy
+      const action = reader.action;
+      if (action && action.type) {
+        if (action.type === "process_payment_intent") {
+          const currentPiId =
+            action.process_payment_intent?.payment_intent || null;
+          throw new HttpsError(
+            "resource-exhausted",
+            currentPiId
+              ? `Reader is currently processing payment ${currentPiId}.`
+              : "Reader is currently processing a different payment."
+          );
+        } else {
+          throw new HttpsError(
+            "resource-exhausted",
+            `Reader is busy (${action.type}). Please wait or cancel current action.`
+          );
+        }
+      }
+
+      // Create or reuse PaymentIntent
+      let paymentIntent;
+      let finalPaymentIntentID;
+
+      if (!paymentIntentID) {
+        paymentIntent = await stripeClient.paymentIntents.create({
+          amount,
+          payment_method_types: ["card_present"],
+          capture_method: "automatic",
+          currency: "usd",
+          metadata: { tenantID, storeID },
+        });
+        finalPaymentIntentID = paymentIntent.id;
+      } else {
+        finalPaymentIntentID = paymentIntentID;
+        paymentIntent = await stripeClient.paymentIntents.retrieve(paymentIntentID);
+      }
+
+      // Process the PaymentIntent with the reader
+      const processedIntent =
+        await stripeClient.terminal.readers.processPaymentIntent(readerID, {
+          payment_intent: paymentIntent.id,
+        });
+
+      const processedPaymentIntentID =
+        processedIntent.action.process_payment_intent.payment_intent;
+
+      log("newCheckout: payment started successfully", processedIntent);
+
+      return {
+        success: true,
+        message: `Payment of $${(amount / 100).toFixed(2)} initiated.`,
+        data: {
+          paymentIntentID: processedPaymentIntentID,
+          readerID: processedIntent.id,
+          status: processedIntent.status,
+          pollingConfig: {
+            enabled: true,
+            pollingInterval: 3000,
+            maxPollingTime: 300000,
+            timeoutMessage:
+              "Payment processing timeout - please check reader status",
+            fallbackEnabled: true,
+          },
+        },
+      };
+    } catch (error) {
+      log("newCheckout: error initiating payment", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to initiate payment"
+      );
+    }
+  }
+);
+
+/**
+ * newCheckoutProcessRefundCallable
+ * Processes a refund for a given PaymentIntent.
+ * Input: { paymentIntentID, amount (cents, optional for partial) }
+ */
+exports.newCheckoutProcessRefundCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: process refund request", request.data);
+
+    const { paymentIntentID, amount } = request.data;
+
+    if (!paymentIntentID || typeof paymentIntentID !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "PaymentIntent ID must be provided."
+      );
+    }
+
+    if (amount !== undefined && typeof amount !== "number") {
+      throw new HttpsError(
+        "invalid-argument",
+        "If provided, refund amount must be a valid number in cents."
+      );
+    }
+
+    try {
+      const stripeClient = Stripe(stripeSecretKey.value());
+
+      // Retrieve the PaymentIntent to get the charge
+      const paymentIntent = await stripeClient.paymentIntents.retrieve(
+        paymentIntentID
+      );
+
+      const chargeId = paymentIntent.charges?.data?.[0]?.id;
+      if (!chargeId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "No charge found for the given PaymentIntent."
+        );
+      }
+
+      // Create the refund
+      const refund = await stripeClient.refunds.create({
+        charge: chargeId,
+        ...(amount ? { amount } : {}),
+      });
+
+      return {
+        success: true,
+        message: `Refund ${
+          amount ? `$${(amount / 100).toFixed(2)}` : "for full amount"
+        } processed successfully.`,
+        data: {
+          refundId: refund.id,
+          status: refund.status,
+        },
+      };
+    } catch (error) {
+      log("newCheckout: error processing refund", error);
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to process refund"
+      );
+    }
+  }
+);
+
+/**
+ * newCheckoutCancelPaymentCallable
+ * Cancels the current action on a Stripe Terminal reader.
+ * Input: { readerID }
+ */
+exports.newCheckoutCancelPaymentCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: cancel payment request", request.data);
+
+    const { readerID } = request.data;
+
+    if (!readerID || typeof readerID !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Reader ID must be provided."
+      );
+    }
+
+    try {
+      const stripeClient = Stripe(stripeSecretKey.value());
+
+      const readerBefore = await stripeClient.terminal.readers.retrieve(readerID);
+      if (readerBefore.status !== "online") {
+        throw new HttpsError(
+          "unavailable",
+          "Reader is offline or unreachable."
+        );
+      }
+
+      const readerAfter = await stripeClient.terminal.readers.cancelAction(readerID);
+
+      return {
+        success: true,
+        message: "Reader reset complete.",
+        data: {
+          readerId: readerAfter.id,
+          readerStatus: readerAfter.status,
+          reader: readerAfter,
+        },
+      };
+    } catch (error) {
+      log("newCheckout: error cancelling payment", error);
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      throw new HttpsError(
+        "internal",
+        error.message || "Failed to reset reader"
+      );
+    }
+  }
+);
+
+// ============================================================================
+// LIGHTSPEED RETAIL R-SERIES API INTEGRATION
+// ============================================================================
+
+const LIGHTSPEED_OAUTH_URL = "https://cloud.lightspeedapp.com/auth/oauth/authorize";
+const LIGHTSPEED_TOKEN_URL = "https://cloud.lightspeedapp.com/auth/oauth/token";
+const LIGHTSPEED_API_BASE = "https://api.lightspeedapp.com/API/V3/Account";
+const LIGHTSPEED_CALLBACK_URL = "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/lightspeedOAuthCallback";
+
+// --- Lightspeed Helpers (internal) ---
+
+async function refreshLightspeedToken(db, tenantID, storeID) {
+  const docRef = db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("integrations").doc("lightspeed");
+  const doc = await docRef.get();
+  if (!doc.exists) throw new Error("No Lightspeed integration found");
+
+  const data = doc.data();
+  const res = await fetch(LIGHTSPEED_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: data.refreshToken,
+      client_id: lightspeedClientId.value(),
+      client_secret: lightspeedClientSecret.value(),
+    }).toString(),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    log("Lightspeed token refresh failed", errText);
+    throw new Error("Token refresh failed: " + errText);
+  }
+
+  const tokens = await res.json();
+  const updated = {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token || data.refreshToken,
+    expiresAt: Date.now() + (tokens.expires_in * 1000),
+  };
+  await docRef.update(updated);
+  return updated.accessToken;
+}
+
+async function getLightspeedToken(db, tenantID, storeID) {
+  const docRef = db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("integrations").doc("lightspeed");
+  const doc = await docRef.get();
+  if (!doc.exists) throw new Error("No Lightspeed integration found");
+
+  const data = doc.data();
+  if (Date.now() >= data.expiresAt - 60000) {
+    return await refreshLightspeedToken(db, tenantID, storeID);
+  }
+  return data.accessToken;
+}
+
+async function lightspeedGet(accessToken, accountID, endpoint, params = {}) {
+  const url = new URL(`${LIGHTSPEED_API_BASE}/${accountID}/${endpoint}.json`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  // Rate limit handling
+  const bucketLevel = res.headers.get("x-ls-api-bucket-level");
+  if (bucketLevel) {
+    const [current, max] = bucketLevel.split("/").map(Number);
+    if (current > 80) {
+      log("Lightspeed rate limit high, waiting 5s", bucketLevel);
+      await new Promise(r => setTimeout(r, 5000));
+    } else if (current > 70) {
+      log("Lightspeed rate limit approaching, waiting 2s", bucketLevel);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Lightspeed API error ${res.status}: ${errText}`);
+  }
+
+  return await res.json();
+}
+
+async function lightspeedGetAll(accessToken, accountID, endpoint, params = {}) {
+  let allItems = [];
+  const limit = 100;
+  const key = endpoint.replace(/\?.*/g, "");
+
+  // First request uses the normal URL
+  let nextUrl = null;
+  let isFirst = true;
+
+  while (true) {
+    let data;
+    if (isFirst) {
+      data = await lightspeedGet(accessToken, accountID, endpoint, {
+        ...params,
+        limit: limit.toString(),
+      });
+      isFirst = false;
+    } else {
+      // Subsequent requests use the "next" URL directly
+      const res = await fetch(nextUrl, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const bucketLevel = res.headers.get("x-ls-api-bucket-level");
+      if (bucketLevel) {
+        const [current] = bucketLevel.split("/").map(Number);
+        if (current > 80) await new Promise(r => setTimeout(r, 5000));
+        else if (current > 70) await new Promise(r => setTimeout(r, 2000));
+      }
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Lightspeed API error ${res.status}: ${errText}`);
+      }
+      data = await res.json();
+    }
+
+    const items = data[key];
+    if (!items) break;
+
+    const arr = Array.isArray(items) ? items : [items];
+    allItems = allItems.concat(arr);
+
+    const attrs = data["@attributes"];
+    if (!attrs || allItems.length >= parseInt(attrs.count)) break;
+
+    // Use cursor-based "next" URL for pagination
+    if (attrs.next) {
+      nextUrl = attrs.next;
+    } else {
+      break;
+    }
+  }
+
+  return allItems;
+}
+
+function lsCleanPhone(str) {
+  if (!str) return "";
+  const digits = str.replace(/\D/g, "");
+  if (digits.length === 11 && digits[0] === "1") return digits.slice(1);
+  return digits.length === 10 ? digits : "";
+}
+
+// --- Lightspeed OAuth: Initiate ---
+
+exports.lightspeedInitiateAuth = onCall(
+  { secrets: [lightspeedClientId, firebaseServiceAccountKey] },
+  async (request) => {
+    log("Lightspeed: initiate auth", request.data);
+    const { tenantID, storeID } = request.data;
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "tenantID and storeID required");
+    }
+
+    const state = Buffer.from(JSON.stringify({ tenantID, storeID })).toString("base64");
+    const authUrl = `${LIGHTSPEED_OAUTH_URL}?response_type=code&client_id=${lightspeedClientId.value()}&scope=employee:all&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(LIGHTSPEED_CALLBACK_URL)}`;
+
+    return { success: true, authUrl };
+  }
+);
+
+// --- Lightspeed OAuth: Callback (HTTP endpoint) ---
+
+exports.lightspeedOAuthCallback = onRequest(
+  { cors: true, secrets: [lightspeedClientId, lightspeedClientSecret, firebaseServiceAccountKey] },
+  async (req, res) => {
+    log("Lightspeed: OAuth callback", { query: req.query });
+
+    const { code, state } = req.query;
+    if (!code || !state) {
+      return res.status(400).send("Missing code or state parameter");
+    }
+
+    let tenantID, storeID;
+    try {
+      const decoded = JSON.parse(Buffer.from(state, "base64").toString("utf8"));
+      tenantID = decoded.tenantID;
+      storeID = decoded.storeID;
+    } catch (e) {
+      return res.status(400).send("Invalid state parameter");
+    }
+
+    // Exchange code for tokens
+    const tokenRes = await fetch(LIGHTSPEED_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        client_id: lightspeedClientId.value(),
+        client_secret: lightspeedClientSecret.value(),
+        redirect_uri: LIGHTSPEED_CALLBACK_URL,
+      }).toString(),
+    });
+
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text();
+      log("Lightspeed: token exchange failed", errText);
+      return res.status(500).send("Token exchange failed: " + errText);
+    }
+
+    const tokens = await tokenRes.json();
+    log("Lightspeed: token exchange success", { hasAccess: !!tokens.access_token });
+
+    // Get account ID from the token response or from an API call
+    let accountID = "";
+    try {
+      const accountRes = await fetch(`${LIGHTSPEED_API_BASE}.json`, {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      const accountData = await accountRes.json();
+      if (accountData.Account) {
+        accountID = Array.isArray(accountData.Account)
+          ? accountData.Account[0].accountID
+          : accountData.Account.accountID;
+      }
+    } catch (e) {
+      log("Lightspeed: could not fetch account ID", e.message);
+    }
+
+    // Save tokens to Firestore
+    const db = await getDB(firebaseServiceAccountKey);
+    await db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("integrations").doc("lightspeed")
+      .set({
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresAt: Date.now() + (tokens.expires_in * 1000),
+        accountID,
+        connectedAt: Date.now(),
+      });
+
+    log("Lightspeed: tokens saved to Firestore", { tenantID, storeID, accountID });
+
+    res.status(200).send(`
+      <html>
+        <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
+          <div style="text-align:center;">
+            <h2>Connected to Lightspeed!</h2>
+            <p>You can close this tab and return to the app.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+);
+
+// --- Lightspeed: Check Connection ---
+
+exports.lightspeedCheckConnection = onCall(
+  { secrets: [lightspeedClientId, lightspeedClientSecret, firebaseServiceAccountKey] },
+  async (request) => {
+    log("Lightspeed: check connection", request.data);
+    const { tenantID, storeID } = request.data;
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "tenantID and storeID required");
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const docRef = db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("integrations").doc("lightspeed");
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return { connected: false, error: "Not connected" };
+    }
+
+    try {
+      const accessToken = await getLightspeedToken(db, tenantID, storeID);
+      const data = doc.data();
+      const accountRes = await lightspeedGet(accessToken, data.accountID, "");
+      const accountName = accountRes.Account ? accountRes.Account.name : "";
+      return { connected: true, accountName };
+    } catch (e) {
+      log("Lightspeed: connection check failed", e.message);
+      return { connected: false, error: e.message };
+    }
+  }
+);
+
+// --- Lightspeed: Import Data ---
+
+exports.lightspeedImportData = onCall(
+  {
+    secrets: [lightspeedClientId, lightspeedClientSecret, firebaseServiceAccountKey],
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async (request) => {
+    log("Lightspeed: import data", request.data);
+    const { tenantID, storeID, importType, saveToDB } = request.data;
+    if (!tenantID || !storeID || !importType) {
+      throw new HttpsError("invalid-argument", "tenantID, storeID, and importType required");
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const docData = (await db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("integrations").doc("lightspeed").get()).data();
+
+    if (!docData) throw new HttpsError("not-found", "Lightspeed not connected");
+
+    const accessToken = await getLightspeedToken(db, tenantID, storeID);
+    const accountID = docData.accountID;
+    const basePath = `tenants/${tenantID}/stores/${storeID}`;
+
+    let result = { success: true };
+
+    // --- Dev logging to Firestore for real-time frontend streaming ---
+    const logDocRef = db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("dev-logs").doc("lightspeed-import");
+    await logDocRef.set({ logs: [], status: "running", startedAt: Date.now() });
+
+    async function lsLog(message, type = "info") {
+      try {
+        log("Lightspeed:", message);
+        await logDocRef.update({
+          logs: admin.firestore.FieldValue.arrayUnion({
+            t: Date.now(),
+            msg: message,
+            type,
+          }),
+        });
+      } catch (e) { /* don't let logging errors break the import */ }
+    }
+
+    // Pick N random unique indices from an array, return { indices, items }
+    function pickRandomSample(arr, count = 5) {
+      const indices = [];
+      const max = arr.length;
+      while (indices.length < Math.min(count, max)) {
+        const i = Math.floor(Math.random() * max);
+        if (!indices.includes(i)) indices.push(i);
+      }
+      indices.sort((a, b) => a - b);
+      return { indices, items: indices.map(i => arr[i]) };
+    }
+
+    try {
+
+    // =====================================================================
+    // CUSTOMERS IMPORT
+    // =====================================================================
+    if (importType === "customers") {
+      await lsLog("Fetching customers from Lightspeed API...");
+      const lsCustomers = await lightspeedGetAll(accessToken, accountID, "Customer", {
+        load_relations: "all",
+      });
+      await lsLog("Fetched " + lsCustomers.length + " customers");
+
+      // Sample 5 raw objects for Cloud Console debug
+      const rawSample = pickRandomSample(lsCustomers, 5);
+      log("Lightspeed RAW CUSTOMERS (5 random):", JSON.stringify(rawSample.items, null, 2));
+
+      // Map to app proto
+      const mapped = [];
+      for (const c of lsCustomers) {
+        let cell = "";
+        let landline = "";
+
+        if (c.Contact && c.Contact.Phones && c.Contact.Phones.ContactPhone) {
+          const phones = Array.isArray(c.Contact.Phones.ContactPhone)
+            ? c.Contact.Phones.ContactPhone
+            : [c.Contact.Phones.ContactPhone];
+          for (const p of phones) {
+            const clean = lsCleanPhone(p.number);
+            if (!clean) continue;
+            if (!cell) { cell = clean; }
+            else if (!landline) { landline = clean; break; }
+          }
+        }
+
+        let email = "";
+        if (c.Contact && c.Contact.Emails && c.Contact.Emails.ContactEmail) {
+          const emails = Array.isArray(c.Contact.Emails.ContactEmail)
+            ? c.Contact.Emails.ContactEmail
+            : [c.Contact.Emails.ContactEmail];
+          if (emails.length > 0 && emails[0].address) {
+            email = emails[0].address;
+          }
+        }
+
+        let streetAddress = "", city = "", state = "", zip = "", unit = "";
+        if (c.Contact && c.Contact.Addresses && c.Contact.Addresses.ContactAddress) {
+          const addrs = Array.isArray(c.Contact.Addresses.ContactAddress)
+            ? c.Contact.Addresses.ContactAddress
+            : [c.Contact.Addresses.ContactAddress];
+          if (addrs.length > 0) {
+            const a = addrs[0];
+            streetAddress = a.address1 || "";
+            unit = a.address2 || "";
+            city = a.city || "";
+            state = a.state || "";
+            zip = a.zip || "";
+          }
+        }
+
+        const id = db.collection("_").doc().id;
+
+        mapped.push({
+          first: (c.firstName || "").toLowerCase(),
+          last: (c.lastName || "").toLowerCase(),
+          cell,
+          landline,
+          contactRestriction: "",
+          email,
+          streetAddress,
+          unit,
+          city,
+          state,
+          zip,
+          addressNotes: "",
+          id,
+          interactionRating: "",
+          workorders: [],
+          previousBikes: [],
+          sales: [],
+          millisCreated: c.createTime ? new Date(c.createTime).getTime() : "",
+        });
+      }
+
+      // Deduplicate by phone
+      const phoneMap = new Map();
+      const noPhone = [];
+      for (const cust of mapped) {
+        if (!cust.cell) { noPhone.push(cust); continue; }
+        if (phoneMap.has(cust.cell)) {
+          const existing = phoneMap.get(cust.cell);
+          const existingFilled = Object.values(existing).filter(v => v !== "" && v !== 0).length;
+          const newFilled = Object.values(cust).filter(v => v !== "" && v !== 0).length;
+          if (newFilled > existingFilled) {
+            cust.id = existing.id;
+            phoneMap.set(cust.cell, cust);
+          }
+        } else {
+          phoneMap.set(cust.cell, cust);
+        }
+      }
+      const deduped = [...phoneMap.values(), ...noPhone];
+      const duplicatesRemoved = mapped.length - deduped.length;
+      await lsLog("Mapped " + mapped.length + " customers, " + duplicatesRemoved + " duplicates removed, " + deduped.length + " unique");
+
+      // Log the same 5 samples post-mapping
+      log("Lightspeed MAPPED CUSTOMERS (same 5):", JSON.stringify(rawSample.indices.map(i => mapped[i]), null, 2));
+
+      // Save to Firestore if requested
+      if (saveToDB) {
+        await lsLog("Saving " + deduped.length + " customers to Firestore...");
+        for (const cust of deduped) {
+          await db.collection(`${basePath}/customers`).doc(cust.id).set(cust);
+        }
+        await lsLog("Customers saved to DB", "success");
+      } else {
+        await lsLog("Save to DB not selected — skipping write", "warn");
+      }
+
+      result.customerCount = deduped.length;
+      result.duplicatesRemoved = duplicatesRemoved;
+    }
+
+    // =====================================================================
+    // SALES IMPORT
+    // =====================================================================
+    if (importType === "sales") {
+      await lsLog("Fetching sales from Lightspeed API...");
+      const lsSales = await lightspeedGetAll(accessToken, accountID, "Sale", {
+        load_relations: '["SaleLines","SalePayments","Customer"]',
+      });
+      await lsLog("Fetched " + lsSales.length + " sales");
+
+      // Sample 5 raw objects for Cloud Console debug
+      const rawSample = pickRandomSample(lsSales, 5);
+      log("Lightspeed RAW SALES (5 random):", JSON.stringify(rawSample.items, null, 2));
+
+      // Minimal mapping — log raw structure for now, refine later
+      const mapped = [];
+      for (const s of lsSales) {
+        const id = db.collection("_").doc().id;
+
+        // Extract sale lines
+        let saleLines = [];
+        if (s.SaleLines && s.SaleLines.SaleLine) {
+          const lines = Array.isArray(s.SaleLines.SaleLine) ? s.SaleLines.SaleLine : [s.SaleLines.SaleLine];
+          saleLines = lines.map(line => ({
+            description: line.Item?.description || line.note || "",
+            qty: parseInt(line.unitQuantity || "1"),
+            unitPrice: parseInt(Math.round(parseFloat(line.unitPrice || "0") * 100)),
+            total: parseInt(Math.round(parseFloat(line.calcTotal || "0") * 100)),
+          }));
+        }
+
+        // Extract payments
+        let payments = [];
+        if (s.SalePayments && s.SalePayments.SalePayment) {
+          const pays = Array.isArray(s.SalePayments.SalePayment) ? s.SalePayments.SalePayment : [s.SalePayments.SalePayment];
+          payments = pays.map(p => ({
+            amount: parseInt(Math.round(parseFloat(p.amount || "0") * 100)),
+            type: p.PaymentType?.name || "",
+          }));
+        }
+
+        // Customer linking
+        let customerFirst = "", customerLast = "";
+        if (s.Customer) {
+          customerFirst = (s.Customer.firstName || "").toLowerCase();
+          customerLast = (s.Customer.lastName || "").toLowerCase();
+        }
+
+        mapped.push({
+          id,
+          lsSaleID: s.saleID || "",
+          completed: s.completed === "true",
+          completedTime: s.completeTime ? new Date(s.completeTime).getTime() : "",
+          subtotal: parseInt(Math.round(parseFloat(s.calcSubtotal || "0") * 100)),
+          tax: parseInt(Math.round(parseFloat(s.calcTax1 || "0") * 100)),
+          total: parseInt(Math.round(parseFloat(s.calcTotal || "0") * 100)),
+          discount: parseInt(Math.round(parseFloat(s.calcDiscount || "0") * 100)),
+          saleLines,
+          payments,
+          customerFirst,
+          customerLast,
+        });
+      }
+      await lsLog("Mapped " + mapped.length + " sales");
+
+      // Log the same 5 samples post-mapping
+      log("Lightspeed MAPPED SALES (same 5):", JSON.stringify(rawSample.indices.map(i => mapped[i]), null, 2));
+
+      if (saveToDB) {
+        await lsLog("Saving " + mapped.length + " sales to Firestore...");
+        for (const sale of mapped) {
+          await db.collection(`${basePath}/completed-sales`).doc(sale.id).set(sale);
+        }
+        await lsLog("Sales saved to DB", "success");
+      } else {
+        await lsLog("Save to DB not selected — skipping write", "warn");
+      }
+
+      result.saleCount = mapped.length;
+    }
+
+    // =====================================================================
+    // WORKORDERS IMPORT (also fetches customers for linking)
+    // =====================================================================
+    if (importType === "workorders") {
+      // Step 1: Fetch customers from API (for linking only — never saved here)
+      await lsLog("Fetching customers from Lightspeed API (for workorder linking)...");
+      const lsCustomers = await lightspeedGetAll(accessToken, accountID, "Customer", {
+        load_relations: "all",
+      });
+      await lsLog("Fetched " + lsCustomers.length + " customers for linking");
+
+      // Step 2: Fetch workorders from API
+      await lsLog("Fetching workorders from Lightspeed API...");
+      const lsWorkorders = await lightspeedGetAll(accessToken, accountID, "Workorder", {
+        load_relations: '["WorkorderLines","WorkorderStatus","Customer"]',
+      });
+      await lsLog("Fetched " + lsWorkorders.length + " workorders");
+
+      // Step 3: Sample 5 raw workorders BEFORE any mapping
+      const rawSample = pickRandomSample(lsWorkorders, 5);
+      log("Lightspeed RAW WORKORDERS (5 random, pre-mapping):", JSON.stringify(rawSample.items, null, 2));
+
+      // Step 4: Map customers (build name lookup)
+      const customerNameMap = new Map();
+      for (const c of lsCustomers) {
+        const first = (c.firstName || "").toLowerCase();
+        const last = (c.lastName || "").toLowerCase();
+        let cell = "";
+        if (c.Contact && c.Contact.Phones && c.Contact.Phones.ContactPhone) {
+          const phones = Array.isArray(c.Contact.Phones.ContactPhone)
+            ? c.Contact.Phones.ContactPhone
+            : [c.Contact.Phones.ContactPhone];
+          for (const p of phones) {
+            const clean = lsCleanPhone(p.number);
+            if (clean) { cell = clean; break; }
+          }
+        }
+        const id = db.collection("_").doc().id;
+        const key = (first + " " + last).trim();
+        if (key) customerNameMap.set(key, { id, first, last, cell });
+      }
+
+      // Step 5: Load statuses from settings
+      const settingsDoc = await db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("settings").doc("settings").get();
+      const settingsData = settingsDoc.exists ? settingsDoc.data() : {};
+      const appStatuses = settingsData.statuses || [];
+      const statusMap = new Map();
+      for (const s of appStatuses) {
+        if (s.label) statusMap.set(s.label.toLowerCase(), s);
+      }
+      await lsLog("Loaded " + appStatuses.length + " statuses from settings");
+
+      // Color extraction helpers
+      const colorLabels = [
+        "White", "Blue", "Light-blue", "Red", "Green", "Black", "Yellow",
+        "Orange", "Maroon", "Brown", "Silver", "Tan", "Beige", "Pink",
+        "Purple", "Grey", "Gray",
+      ];
+      const colorMap = {
+        "white": { textColor: "black", backgroundColor: "whitesmoke", label: "White" },
+        "blue": { textColor: "white", backgroundColor: "blue", label: "Blue" },
+        "light-blue": { textColor: "black", backgroundColor: "lightblue", label: "Light-blue" },
+        "red": { textColor: "white", backgroundColor: "red", label: "Red" },
+        "green": { textColor: "white", backgroundColor: "green", label: "Green" },
+        "black": { textColor: "whitesmoke", backgroundColor: "black", label: "Black" },
+        "yellow": { textColor: "black", backgroundColor: "yellow", label: "Yellow" },
+        "orange": { textColor: "white", backgroundColor: "orange", label: "Orange" },
+        "maroon": { textColor: "white", backgroundColor: "maroon", label: "Maroon" },
+        "brown": { textColor: "white", backgroundColor: "rgb(139,69,19)", label: "Brown" },
+        "silver": { textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Silver" },
+        "tan": { textColor: "black", backgroundColor: "tan", label: "Tan" },
+        "beige": { textColor: "black", backgroundColor: "beige", label: "Beige" },
+        "pink": { textColor: "black", backgroundColor: "pink", label: "Pink" },
+        "purple": { textColor: "white", backgroundColor: "purple", label: "Purple" },
+        "grey": { textColor: "black", backgroundColor: "grey", label: "Grey" },
+        "gray": { textColor: "black", backgroundColor: "grey", label: "Grey" },
+      };
+      colorLabels.sort((a, b) => b.length - a.length);
+
+      function extractColors(text) {
+        if (!text) return [];
+        const found = [];
+        for (const label of colorLabels) {
+          const regex = new RegExp(`\\b${label}\\b`, "i");
+          if (regex.test(text) && found.length < 2) {
+            const key = label.toLowerCase();
+            if (colorMap[key] && !found.find(f => f.label === colorMap[key].label)) {
+              found.push({ ...colorMap[key] });
+            }
+          }
+        }
+        return found;
+      }
+
+      // Step 6: Map workorders
+      await lsLog("Mapping workorders to app format...");
+      const woMapped = [];
+      let linked = 0, unlinked = 0;
+
+      for (const wo of lsWorkorders) {
+        const id = db.collection("_").doc().id;
+
+        let description = wo.note || "";
+        if (wo.WorkorderLines && wo.WorkorderLines.WorkorderLine) {
+          const lines = Array.isArray(wo.WorkorderLines.WorkorderLine)
+            ? wo.WorkorderLines.WorkorderLine
+            : [wo.WorkorderLines.WorkorderLine];
+          for (const line of lines) {
+            if (line.note) {
+              description += (description ? " | " : "") + line.note;
+            }
+          }
+        }
+
+        let customerID = "", customerFirst = "", customerLast = "", customerPhone = "";
+        if (wo.Customer) {
+          customerFirst = (wo.Customer.firstName || "").toLowerCase();
+          customerLast = (wo.Customer.lastName || "").toLowerCase();
+          const nameKey = (customerFirst + " " + customerLast).trim();
+          const match = customerNameMap.get(nameKey);
+          if (match) {
+            customerID = match.id;
+            customerPhone = match.cell || "";
+            linked++;
+          } else {
+            unlinked++;
+          }
+        } else {
+          unlinked++;
+        }
+
+        let status = "";
+        if (wo.WorkorderStatus) {
+          const lsStatusName = (wo.WorkorderStatus.name || "").toLowerCase();
+          const matchedStatus = statusMap.get(lsStatusName);
+          status = matchedStatus ? matchedStatus.id : "";
+        }
+
+        let allItemText = description;
+        let partOrdered = "";
+        let partSource = "";
+        const partMatch = allItemText.match(/([A-Z][A-Z0-9 /-]*?)\s+-([A-Z][A-Z0-9]+)\s*$/);
+        if (partMatch) {
+          partOrdered = partMatch[1].trim();
+          partSource = partMatch[2].trim();
+        }
+
+        const colors = extractColors(allItemText);
+        const color1 = colors[0] || { textColor: "", backgroundColor: "", label: "" };
+        const color2 = colors[1] || { textColor: "", backgroundColor: "", label: "" };
+
+        woMapped.push({
+          workorderNumber: wo.workorderID || "",
+          paymentComplete: false,
+          amountPaid: 0,
+          activeSaleID: "",
+          sales: [],
+          endedOnMillis: "",
+          saleID: "",
+          isStandaloneSale: false,
+          id,
+          customerID,
+          customerFirst,
+          customerLast,
+          customerPhone,
+          model: "",
+          brand: "",
+          description,
+          color1,
+          color2,
+          waitTime: "",
+          changeLog: [],
+          startedBy: "",
+          startedOnMillis: wo.timeIn ? new Date(wo.timeIn).getTime() : "",
+          finishedOnMillis: "",
+          partOrdered,
+          partSource,
+          itemIdArr: [],
+          workorderLines: [],
+          internalNotes: [],
+          customerNotes: [],
+          status,
+          taxFree: false,
+          archived: false,
+        });
+      }
+
+      await lsLog("Mapped " + woMapped.length + " workorders (" + linked + " linked to customers, " + unlinked + " unlinked)");
+
+      // Step 7: Log the same 5 workorders post-mapping
+      log("Lightspeed MAPPED WORKORDERS (same 5, post-mapping):", JSON.stringify(rawSample.indices.map(i => woMapped[i]), null, 2));
+
+      // Save to Firestore if requested
+      if (saveToDB) {
+        await lsLog("Saving " + woMapped.length + " workorders to Firestore...");
+        for (const wo of woMapped) {
+          await db.collection(`${basePath}/open-workorders`).doc(wo.id).set(wo);
+        }
+        await lsLog("Workorders saved to DB", "success");
+      } else {
+        await lsLog("Save to DB not selected — skipping write", "warn");
+      }
+
+      result.workorderCount = woMapped.length;
+      result.linked = linked;
+      result.unlinked = unlinked;
+    }
+
+    await lsLog("Import complete!", "success");
+    await logDocRef.update({ status: "complete" });
+    log("Lightspeed: import complete", result);
+    return result;
+
+    } catch (importError) {
+      await lsLog("Import failed: " + (importError.message || "Unknown error"), "error");
+      await logDocRef.update({ status: "error" });
+      throw importError;
+    }
+  }
+);

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { View, Text, TextInput } from "react-native-web";
+import { View, Text, TextInput, Animated } from "react-native-web";
 import { TouchableOpacity } from "react-native";
 import { useState, useRef } from "react";
 import { Button_, DropdownMenu, SHADOW_RADIUS_PROTO } from "../../../../components";
@@ -9,6 +9,7 @@ import {
   formatCurrencyDisp,
   log,
   gray,
+  localStorageWrapper,
 } from "../../../../utils";
 import { buildCardPayment } from "./newCheckoutUtils";
 import {
@@ -17,7 +18,35 @@ import {
   newCheckoutListenToPaymentUpdates,
 } from "./newCheckoutFirebaseCalls";
 
+function PulsingText({ text }) {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+  const started = useRef(false);
+  if (!started.current) {
+    started.current = true;
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 900, useNativeDriver: false }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 900, useNativeDriver: false }),
+      ])
+    ).start();
+  }
+  return (
+    <Animated.Text
+      style={{
+        fontSize: 11,
+        color: C.lightText,
+        fontStyle: "italic",
+        marginTop: 6,
+        opacity,
+      }}
+    >
+      {text}
+    </Animated.Text>
+  );
+}
+
 const PAYMENT_TIMEOUT_MS = 120000; // 2 minutes
+const LS_CARD_READER_KEY = "warpspeed_selected_card_reader";
 
 function formatDeclineCode(code) {
   const messages = {
@@ -72,16 +101,14 @@ export function CardPayment({
     }
   }
 
-  // Auto-select reader from settings if available
+  // Auto-select reader from localStorage (per-computer)
   function getInitialReader() {
     if (sCardReader) return sCardReader;
-    if (settings?.selectedCardReaderObj?.id) {
-      let match = stripeReaders.find(
-        (r) => r.id === settings.selectedCardReaderObj.id
-      );
+    let saved = localStorageWrapper.getItem(LS_CARD_READER_KEY);
+    if (saved?.id) {
+      let match = stripeReaders.find((r) => r.id === saved.id);
       if (match) return match;
     }
-    if (stripeReaders.length > 0) return stripeReaders[0];
     return null;
   }
 
@@ -97,6 +124,12 @@ export function CardPayment({
     let reader = stripeReaders.find((r) => r.id === item.id);
     _setCardReader(reader || null);
     _setErrorMessage("");
+    if (reader) {
+      localStorageWrapper.setItem(LS_CARD_READER_KEY, {
+        id: reader.id,
+        label: reader.label || reader.id,
+      });
+    }
   }
 
   async function startPayment() {
@@ -237,6 +270,46 @@ export function CardPayment({
   let hasOnlineReaders = readerDropdownData.length > 0;
   let boxEnabled = hasOnlineReaders && !saleComplete;
   let isEnabled = boxEnabled && amountLeftToPay > 0 && !sProcessing;
+
+  if (!hasOnlineReaders) {
+    return (
+      <View
+        style={{
+          alignItems: "center",
+          paddingTop: 20,
+          width: "100%",
+          height: "48%",
+          borderRadius: 15,
+          ...SHADOW_RADIUS_PROTO,
+          justifyContent: "center",
+          paddingBottom: 20,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 25,
+            color: gray(0.6),
+            fontWeight: 500,
+          }}
+        >
+          CARD SALE
+        </Text>
+        {!!readerError && (
+          <Text
+            style={{
+              fontSize: 13,
+              color: C.lightred,
+              fontStyle: "italic",
+              marginTop: 10,
+            }}
+          >
+            {readerError}
+          </Text>
+        )}
+        <PulsingText text="watching for new readers..." />
+      </View>
+    );
+  }
 
   return (
     <View

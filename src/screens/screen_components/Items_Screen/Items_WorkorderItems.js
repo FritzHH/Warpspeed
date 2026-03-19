@@ -249,13 +249,75 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // log("here", zOpenWorkorder);
   if (!zOpenWorkorder) return null;
-  if (!(zOpenWorkorder?.workorderLines.length > 0))
+  let hasItems = zOpenWorkorder?.workorderLines?.length > 0;
+  if (!hasItems)
     return (
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <Text style={{ fontSize: 100, color: gray(0.07), textAlign: "center" }}>
-          {"Empty\n" +
-            (zOpenWorkorder?.isStandaloneSale ? "Sale " : "Workorder")}
-        </Text>
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <Text style={{ fontSize: 100, color: gray(0.07), textAlign: "center" }}>
+            {"Empty\n" +
+              (zOpenWorkorder?.isStandaloneSale ? "Sale " : "Workorder")}
+          </Text>
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-evenly",
+            alignItems: "center",
+            width: "99%",
+            backgroundColor: C.buttonLightGreen,
+            marginVertical: 5,
+            marginHorizontal: 5,
+            borderRadius: 15,
+            borderColor: C.buttonLightGreenOutline,
+            borderWidth: 1,
+            padding: 3,
+            alignSelf: "center",
+          }}
+        >
+          <Tooltip text="Delete workorder" position="top">
+            <Button_
+              icon={ICONS.trash}
+              iconSize={22}
+              onPress={handleDeleteWorkorder}
+            />
+          </Tooltip>
+          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
+          <Text style={{ fontSize: 13, color: gray(0.65) }}>
+            {"SUBTOTAL: "}
+            <Text style={{ fontWeight: 500, fontSize: 14, color: gray(0.65) }}>$0.00</Text>
+          </Text>
+          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
+          <Text style={{ fontSize: 13, color: gray(0.65) }}>
+            {"TAX: "}
+            <Text style={{ fontWeight: 500, fontSize: 14, color: gray(0.65) }}>$0.00</Text>
+          </Text>
+          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
+          <Text
+            style={{
+              fontSize: 13,
+              borderColor: C.buttonLightGreenOutline,
+              borderRadius: 15,
+              borderWidth: 1,
+              paddingHorizontal: 14,
+              paddingVertical: 3,
+              color: gray(0.65),
+            }}
+          >
+            {"TOTAL: "}
+            <Text style={{ fontWeight: 500, fontSize: 15, color: gray(0.65) }}>$0.00</Text>
+          </Text>
+          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
+          <Tooltip text="Check out workorder" position="top">
+            <Button_
+              ref={checkoutBtnRef}
+              icon={ICONS.shoppingCart}
+              iconSize={34}
+              buttonStyle={{ paddingVertical: 0, opacity: 0.3 }}
+              disabled={true}
+            />
+          </Tooltip>
+        </View>
       </View>
     );
 

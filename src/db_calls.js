@@ -533,6 +533,7 @@ export async function callCloudFunction(functionName, data) {
 // Create callable functions
 const sendSMSCallable = httpsCallable(functions, "sendSMS");
 const sendSMSEnhancedCallable = httpsCallable(functions, "sendSMSEnhanced");
+const sendEmailCallable = httpsCallable(functions, "sendEmailCallable");
 
 export const processServerDrivenStripePaymentCallable = httpsCallable(
   functions,
@@ -637,6 +638,50 @@ export function sendSMSEnhanced(smsData) {
           case "functions/resource-exhausted":
             errorMessage = error.message || "Service temporarily unavailable";
             errorCode = "SERVICE_UNAVAILABLE";
+            break;
+          case "functions/internal":
+            errorMessage = error.message || "Internal server error";
+            errorCode = "INTERNAL_ERROR";
+            break;
+          default:
+            errorMessage = error.message || "Unknown error occurred";
+            errorCode = error.code || "UNKNOWN_ERROR";
+        }
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+        code: errorCode,
+        details: {
+          originalError: error,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    });
+}
+
+export function sendEmail(emailData) {
+  return sendEmailCallable(emailData)
+    .then((result) => {
+      log("Email sent successfully", result.data);
+      return {
+        success: true,
+        data: result.data,
+        message: "Email sent successfully",
+      };
+    })
+    .catch((error) => {
+      log("Error sending email", error);
+
+      let errorMessage = "Failed to send email";
+      let errorCode = "UNKNOWN_ERROR";
+
+      if (error.code) {
+        switch (error.code) {
+          case "functions/invalid-argument":
+            errorMessage = error.message || "Invalid arguments provided";
+            errorCode = "INVALID_ARGUMENTS";
             break;
           case "functions/internal":
             errorMessage = error.message || "Internal server error";

@@ -1870,7 +1870,7 @@ export function createNewWorkorder({
   wo.isStandaloneSale = isStandaloneSale;
   wo.id = generateUPCBarcode();
   wo.workorderNumber = extractRandomFourDigits(wo.id);
-  wo.status = SETTINGS_OBJ.statuses[0];
+  wo.status = SETTINGS_OBJ.statuses[0]?.id || "";
   wo.customerFirst = customerFirst;
   wo.customerLast = customerLast;
   wo.customerPhone = customerPhone;
@@ -1881,6 +1881,13 @@ export function createNewWorkorder({
   wo.status = status;
   wo._unsaved = true;
   return wo;
+}
+
+export function resolveStatus(statusId, statuses) {
+  if (!statusId || !statuses?.length)
+    return { id: "", label: "", textColor: "black", backgroundColor: "whitesmoke" };
+  return statuses.find(s => s.id === statusId)
+    || { id: statusId, label: "Unknown", textColor: "black", backgroundColor: "gray" };
 }
 
 /// RECEIPT PRINTING ////////////////////////////////////////////////////////////
@@ -1917,7 +1924,7 @@ function parseWorkorderLines(wo = WORKORDER_PROTO) {
 function createPrintBase(workorder, customer, salesTaxPercent) {
   let r = { ...workorder, ...customer, ...calculateRunningTotals(workorder, salesTaxPercent) }
   r.workorderLines = parseWorkorderLines(workorder);
-  r.status = workorder.status.label;
+  r.status = resolveStatus(workorder.status, SETTINGS_OBJ.statuses).label;
   r.salesTaxPercent = salesTaxPercent;
   r.color1 = workorder.color1.label;
   r.color2 = workorder.color2.label;
@@ -1981,7 +1988,7 @@ function createPrintWorkorder(
   r = { ...r, ...wo, ...customer, ...calculateRunningTotals(wo, salesTaxPercent) };
   r.receiptType = RECEIPT_TYPES.workorder;
   r.workorderLines = parseWorkorderLines(wo);
-  r.status = wo.status.label;
+  r.status = resolveStatus(wo.status, SETTINGS_OBJ.statuses).label;
   r.waitTime = wo.waitTime.label;
   r.salesTaxPercent = salesTaxPercent;
   r.color1 = wo.color1.label;
@@ -2004,7 +2011,7 @@ function createPrintSale(sale = SALE_PROTO, customer, wo = WORKORDER_PROTO, sale
   let r = { ...r, ...wo, ...customer, ...sale, ...calculateRunningTotals(wo, salesTaxPercent) };
   r.receiptType = RECEIPT_TYPES.sales;
   r.workorderLines = parseWorkorderLines(wo);
-  r.status = wo.status.label;
+  r.status = resolveStatus(wo.status, SETTINGS_OBJ.statuses).label;
   r.salesTaxPercent = salesTaxPercent;
   r.color1 = wo.color1.label;
   r.color2 = wo.color2.label;
@@ -2062,3 +2069,147 @@ export const printBuilder = {
     return receipt;
   },
 };
+
+// ============================================================================
+// EMAIL TEMPLATE UTILITIES
+// ============================================================================
+
+export function resolveEmailTemplate(templateStr, data) {
+  if (!templateStr || !data) return templateStr || "";
+  let result = templateStr;
+  Object.keys(data).forEach((key) => {
+    let regex = new RegExp("\\{" + key + "\\}", "g");
+    result = result.replace(regex, data[key] != null ? data[key] : "");
+  });
+  return result;
+}
+
+export function formatStoreHours(storeHours) {
+  if (!storeHours?.standard || storeHours.standard.length === 0) return "";
+  let days = storeHours.standard;
+  let shortNames = { Monday: "Mon", Tuesday: "Tues", Wednesday: "Wed", Thursday: "Thurs", Friday: "Fri", Saturday: "Sat", Sunday: "Sun" };
+  let groups = [];
+  let currentGroup = null;
+  for (let i = 0; i < days.length; i++) {
+    let day = days[i];
+    let key = day.isOpen ? day.open + "-" + day.close : "closed";
+    if (currentGroup && currentGroup.key === key) {
+      currentGroup.end = day.name;
+    } else {
+      currentGroup = { key, start: day.name, end: day.name, isOpen: day.isOpen, open: day.open, close: day.close };
+      groups.push(currentGroup);
+    }
+  }
+  return groups.map((g) => {
+    let label = g.start === g.end ? shortNames[g.start] || g.start : (shortNames[g.start] || g.start) + "-" + (shortNames[g.end] || g.end);
+    return g.isOpen ? label + " " + g.open + " - " + g.close : "Closed " + label;
+  }).join(", ");
+}
+
+export function buildPayrollEmailData(punches, userObj, payPeriodLabel) {
+  if (!punches || !punches.length) {
+    return {
+      employeeName: (userObj?.first || "") + " " + (userObj?.last || ""),
+      payPeriod: payPeriodLabel || "",
+      dailyBreakdown: "No punches found for this period.",
+      totalHours: "0:00",
+      payRate: "$0.00",
+      totalPay: "$0.00",
+    };
+  }
+
+  // Group punches by date
+  let dayMap = {};
+  punches.forEach((p) => {
+    let dateStr = new Date(p.millis).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    if (!dayMap[dateStr]) dayMap[dateStr] = [];
+    dayMap[dateStr].push(p);
+  });
+
+  let totalMinutes = 0;
+  let rows = [];
+
+  Object.keys(dayMap).forEach((dateStr) => {
+    let dayPunches = dayMap[dateStr].sort((a, b) => a.millis - b.millis);
+
+    // Pair in/out punches (same logic as UserClockHistoryModalScreen)
+    let pairs = [];
+    let resObj = {};
+    let lastWasIn = false;
+    let counter = 0;
+
+    dayPunches.forEach((obj) => {
+      if (counter === 0 && obj.option === "out") {
+        resObj.out = obj;
+        pairs.push(resObj);
+        resObj = {};
+        lastWasIn = false;
+        counter++;
+        return;
+      }
+      if (counter === dayPunches.length - 1 && obj.option === "in") {
+        resObj.in = obj;
+        pairs.push(resObj);
+        lastWasIn = true;
+        counter++;
+        return;
+      }
+      if (obj.option === "in" && lastWasIn) {
+        resObj.in = obj;
+        pairs.push(resObj);
+        counter++;
+        return;
+      }
+      if (obj.option === "in") {
+        lastWasIn = true;
+        resObj.in = obj;
+      } else if (obj.option === "out") {
+        lastWasIn = false;
+        resObj.out = obj;
+        pairs.push(resObj);
+        resObj = {};
+      }
+      counter++;
+    });
+
+    // Build punch strings and compute hours
+    let punchStrs = [];
+    let dayMinutes = 0;
+    pairs.forEach((pair) => {
+      let inTime = pair.in ? new Date(pair.in.millis).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "?";
+      let outTime = pair.out ? new Date(pair.out.millis).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "?";
+      punchStrs.push(inTime + " - " + outTime);
+      if (pair.in && pair.out) {
+        dayMinutes += Math.floor((pair.out.millis - pair.in.millis) / 60000);
+      }
+    });
+
+    totalMinutes += dayMinutes;
+    let hrs = Math.floor(dayMinutes / 60);
+    let mins = dayMinutes % 60;
+    rows.push({ date: dateStr, punches: punchStrs.join(", "), hours: hrs + ":" + (mins < 10 ? "0" : "") + mins });
+  });
+
+  // Build HTML table
+  let tableHtml = "<table style='border-collapse:collapse;width:100%;font-family:sans-serif;'>";
+  tableHtml += "<tr style='background:#f0f0f0;'><th style='padding:8px;border:1px solid #ddd;text-align:left;'>Date</th><th style='padding:8px;border:1px solid #ddd;text-align:left;'>Punches</th><th style='padding:8px;border:1px solid #ddd;text-align:right;'>Hours</th></tr>";
+  rows.forEach((r) => {
+    tableHtml += "<tr><td style='padding:8px;border:1px solid #ddd;'>" + r.date + "</td><td style='padding:8px;border:1px solid #ddd;'>" + r.punches + "</td><td style='padding:8px;border:1px solid #ddd;text-align:right;'>" + r.hours + "</td></tr>";
+  });
+  tableHtml += "</table>";
+
+  let totalHrs = Math.floor(totalMinutes / 60);
+  let totalMins = totalMinutes % 60;
+  let totalHoursStr = totalHrs + ":" + (totalMins < 10 ? "0" : "") + totalMins;
+  let wage = Number(userObj?.hourlyWage) || 0;
+  let totalPayNum = trimToTwoDecimals((totalMinutes / 60) * wage);
+
+  return {
+    employeeName: (userObj?.first || "") + " " + (userObj?.last || ""),
+    payPeriod: payPeriodLabel || "",
+    dailyBreakdown: tableHtml,
+    totalHours: totalHoursStr,
+    payRate: "$" + wage.toFixed(2),
+    totalPay: "$" + totalPayNum.toFixed(2),
+  };
+}

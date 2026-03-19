@@ -106,12 +106,6 @@ export function BaseScreen() {
   }, []);
   // }, []);
 
-  // log open workorders on change
-  let workordersLength = useOpenWorkordersStore(s => s.workorders.length)
-  useEffect(() => {
-    let workorders = useOpenWorkordersStore.getState().workorders;
-    log('workorders', workorders)
-  }, [workordersLength])
   ////////// testing   ////////////////////////////////////////////////////////////////////
 
 

@@ -202,11 +202,14 @@ export function InventoryComponent({}) {
   }
 
   function inventoryItemSelected(item) {
+    console.log("inventoryItemSelected:", item?.formalName, item?.id);
     const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
     if (!openWorkorder) {
-      _setModalItem(item);
+      console.log("  -> no open workorder, opening modal, sModalItem was:", sModalItem?.id);
+      _setModalItem({ ...item });
       return;
     }
+    console.log("  -> adding to workorder:", openWorkorder.id);
     let workorderLines = openWorkorder.workorderLines;
     if (!workorderLines) workorderLines = [];
     let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
@@ -219,7 +222,8 @@ export function InventoryComponent({}) {
   }
 
   function handleInventoryInfoPress(item) {
-    _setModalItem(item);
+    console.log("handleInventoryInfoPress:", item?.formalName, item?.id);
+    _setModalItem({ ...item });
   }
 
   function clearSearch() {
@@ -540,6 +544,7 @@ export function InventoryComponent({}) {
                         width: "100%",
                         flexDirection: "row",
                         height: "100%",
+                        alignItems: "center",
                       }}
                     >
                       <Text
@@ -564,7 +569,6 @@ export function InventoryComponent({}) {
                           height: "100%",
                           alignItems: "flex-end",
                           justifyContent: "center",
-                          borderColor: "gray",
                           borderLeftWidth: 1,
                           borderColor: C.listItemBorder,
                           paddingRight: 5,

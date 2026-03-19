@@ -1,5 +1,6 @@
 /* eslint-disable */
 import React, { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { Button_, Image_ } from "../../../components";
@@ -87,8 +88,9 @@ export const WorkorderMediaModal = ({
 
   // Full-size overlay
   if (sFullView) {
-    return (
-      <View
+    return createPortal(
+      <div
+        onClick={() => _setFullView(null)}
         style={{
           position: "fixed",
           top: 0,
@@ -97,15 +99,19 @@ export const WorkorderMediaModal = ({
           bottom: 0,
           backgroundColor: "rgba(0,0,0,0.85)",
           zIndex: 9999,
+          display: "flex",
           justifyContent: "center",
           alignItems: "center",
         }}
       >
-        <View
+        <div
+          onClick={(e) => e.stopPropagation()}
           style={{
             width: "90%",
             maxWidth: 800,
             maxHeight: "90%",
+            display: "flex",
+            flexDirection: "column",
             alignItems: "center",
           }}
         >
@@ -153,13 +159,15 @@ export const WorkorderMediaModal = ({
               buttonStyle={{ paddingHorizontal: 24, paddingVertical: 10 }}
             />
           </View>
-        </View>
-      </View>
+        </div>
+      </div>,
+      document.body
     );
   }
 
-  return (
-    <View
+  return createPortal(
+    <div
+      onClick={onClose}
       style={{
         position: "fixed",
         top: 0,
@@ -168,11 +176,13 @@ export const WorkorderMediaModal = ({
         bottom: 0,
         backgroundColor: "rgba(0,0,0,0.5)",
         zIndex: 9998,
+        display: "flex",
         justifyContent: "center",
         alignItems: "center",
       }}
     >
-      <View
+      <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: MODAL_WIDTH,
           maxHeight: "80%",
@@ -181,6 +191,8 @@ export const WorkorderMediaModal = ({
           borderWidth: 1,
           borderColor: C.buttonLightGreenOutline,
           overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         {/* Header */}
@@ -333,7 +345,8 @@ export const WorkorderMediaModal = ({
             </Text>
           )}
         </ScrollView>
-      </View>
-    </View>
+      </div>
+    </div>,
+    document.body
   );
 };

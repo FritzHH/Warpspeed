@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   ScrollView,
-  Modal,
 } from "react-native-web";
+import { createPortal } from "react-dom";
 import { useState, useRef, useCallback } from "react";
 import { cloneDeep, debounce } from "lodash";
 import {
@@ -91,23 +91,33 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
     _setParentID(path[path.length - 1].id);
   }
 
-  return (
-    <Modal visible={true} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View
-          style={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0,0,0,.4)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <TouchableWithoutFeedback onPress={() => {}}>
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,.4)",
+        zIndex: 9999,
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "45%",
+          maxHeight: "70%",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
             <View
               style={{
-                width: "45%",
-                maxHeight: "70%",
                 backgroundColor: "white",
                 borderRadius: 12,
                 padding: 20,
@@ -266,10 +276,9 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
                 )}
               </ScrollView>
             </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+      </div>
+    </div>,
+    document.body
   );
 };
 
@@ -614,23 +623,36 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     [sItem, sEditing, quickButtons, zShowLoginScreen]
   );
 
-  return (
+  return createPortal(
     <>
-      <Modal visible={true} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={handleExit}>
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              backgroundColor: "rgba(50,50,50,.5)",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Component />
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      <div
+        onClick={handleExit}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(50,50,50,.5)",
+          zIndex: 9998,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: "100vw",
+            height: "100vh",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Component />
+        </div>
+      </div>
       {sShowQBPicker && (
         <QuickButtonPickerModal
           itemID={sItem.id}
@@ -639,6 +661,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           onClose={() => _setShowQBPicker(false)}
         />
       )}
-    </>
+    </>,
+    document.body
   );
 };

@@ -18,6 +18,8 @@ Follow these steps before acting on any user request:
 
 5. **Scope** – Fulfill what was asked without adding unrelated features, refactors, or documentation unless the user requests them.
 
+6. **Deploy commands** – When you modify a Cloud Function and it needs deploying, always provide the deploy command in a standalone code block. Only deploy the specific functions that changed — never `--only functions` (which deploys all). Format: `firebase deploy --only functions:functionName1,functions:functionName2`
+
 **No new `useEffect` without permission.** You are not allowed to create a new `useEffect` under any circumstances without the user's explicit permission. You must explain why you need it first; the user will confirm before you add it. No exceptions unless otherwise stated by the user.
 
 **Use only react-native-web components.** You will use only react-native-web components (and project wrappers that use them) unless the user explicitly gives permission to use a standard React component or feature. No exceptions unless otherwise stated by the user.

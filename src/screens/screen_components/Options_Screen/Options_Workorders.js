@@ -7,6 +7,7 @@ import {
   getWordMonth,
   lightenRGBByPercent,
   log,
+  resolveStatus,
 } from "../../../utils";
 import { TabMenuDivider as Divider, CheckBox_ } from "../../../components";
 import { C, Colors } from "../../../styles";
@@ -193,7 +194,7 @@ export function WorkordersComponent({}) {
         const maxWaitMillis = Number(
           wo.waitTime?.maxWaitTimeDays * NUM_MILLIS_IN_DAY
         );
-        if (wo.status.label == status.label) arr.push(wo);
+        if (wo.status === status.id) arr.push(wo);
       });
 
       // arr = sortBy(arr, "waitTime.maxWaitTimeDays");
@@ -301,6 +302,7 @@ export function WorkordersComponent({}) {
         keyExtractor={(item, index) => index}
         renderItem={(item) => {
           let workorder = item.item;
+          const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);
           return (
             <View>
               <TouchableOpacity
@@ -322,7 +324,7 @@ export function WorkordersComponent({}) {
                     marginBottom: 4,
                     borderRadius: 7,
                     borderLeftWidth: 4,
-                    borderLeftColor: workorder.status?.backgroundColor || C.buttonLightGreenOutline,
+                    borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
                     borderColor: C.buttonLightGreenOutline,
                     opacity: workorder.id === zPreviewID ? 0.6 : 1,
                     backgroundColor: workorder.id === zOpenWorkorderID
@@ -419,24 +421,25 @@ export function WorkordersComponent({}) {
                     >
                       <View
                         style={{
-                          backgroundColor: workorder.status.backgroundColor,
+                          backgroundColor: rs.backgroundColor,
                           flexDirection: "row",
-                          paddingHorizontal: 15,
+                          paddingHorizontal: 11,
                           paddingVertical: 2,
                           alignItems: "center",
-                          borderRadius: 15,
+                          borderRadius: 10,
                           borderColor: "transparent",
 
-                          borderLeftColor: workorder.status.textColor,
+                          borderLeftColor: rs.textColor,
                         }}
                       >
                         <Text
                           style={{
-                            color: workorder.status.textColor,
-                            fontSize: 14,
+                            color: rs.textColor,
+                            fontSize: 12,
+                            fontWeight: "600",
                           }}
                         >
-                          {workorder.status.label}
+                          {rs.label}
                         </Text>
                         {/* </LinearGradient> */}
                       </View>

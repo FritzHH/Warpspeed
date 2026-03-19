@@ -367,7 +367,6 @@ export const WORKORDER_PROTO = {
   finishedOnMillis: "",
   partOrdered: "",
   partSource: "",
-  itemIdArr: [],
   workorderLines: [],
   internalNotes: [],
   customerNotes: [],
@@ -869,6 +868,20 @@ export const SETTINGS_OBJ = {
     },
   },
   textTemplates: [],
+  emailTemplates: [
+    {
+      id: "default_workorder_complete",
+      name: "Workorder Complete",
+      subject: "Your bike is ready! — {storeName}",
+      body: "Hi {firstName},\n\nGreat news — your {brand} {description} is ready for pickup!\n\nItems completed:\n{lineItems}\n\n{customerNotes}\n\nTotal: {totalAmount}\n\n---\n{storeName}\n{storeAddress}\n{storeHours}\n{storePhone}\n\nPlease note: we do not monitor this inbox during the day, so responses may be delayed. You are better off calling the shop directly at {storePhone}.",
+    },
+    {
+      id: "default_payroll_summary",
+      name: "Payroll Summary",
+      subject: "Payroll Summary — {employeeName} — {payPeriod}",
+      body: "Hi {employeeName},\n\nHere is your work summary for {payPeriod}:\n\n{dailyBreakdown}\n\nTotal Hours: {totalHours}\nPay Rate: {payRate}\nTotal Pay: {totalPay}\n\n---\n{storeName}",
+    },
+  ],
 };
 
 // RECEIPT STUFF ////////////////////////////////////////////////////

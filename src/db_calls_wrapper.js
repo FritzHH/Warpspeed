@@ -28,6 +28,7 @@ import {
   retrieveAvailableStripeReadersCallable,
   loginAppUserCallable,
   sendSMSEnhanced,
+  sendEmail,
   uploadFileToStorage,
   storageDelete,
 } from "./db_calls";
@@ -1392,7 +1393,6 @@ export async function dbGetSettings(tenantID, storeID) {
       return null;
     }
 
-    log(tenantID, storeID);
     const settings = await firestoreRead(buildSettingsPath(tenantID, storeID));
 
     if (!settings) {
@@ -2310,6 +2310,18 @@ export function dbListenToInventory(onSnapshot) {
   }
 }
 
+export function dbListenToDevLogs(docName, callback) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return null;
+    const path = `tenants/${tenantID}/stores/${storeID}/dev-logs/${docName}`;
+    return firestoreSubscribe(path, callback);
+  } catch (error) {
+    log("Error setting up dev log listener:", error);
+    return null;
+  }
+}
+
 /**
  * Listen to payment processing reader updates for a specific reader and payment intent
  * @param {string} readerID - Reader ID
@@ -2830,6 +2842,61 @@ export async function dbSendSMS(
         originalError: error,
         timestamp: new Date().toISOString(),
       },
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+export async function dbSendEmail(to, subject, htmlBody) {
+  const { tenantID, storeID } = getTenantAndStore();
+
+  try {
+    if (!to || typeof to !== "string" || !to.includes("@")) {
+      throw new Error("Valid email address is required");
+    }
+    if (!subject || typeof subject !== "string") {
+      throw new Error("Email subject is required");
+    }
+    if (!htmlBody || typeof htmlBody !== "string") {
+      throw new Error("Email body is required");
+    }
+
+    const emailData = {
+      to,
+      subject,
+      htmlBody,
+      tenantID,
+      storeID,
+    };
+
+    log("Sending email with data:", emailData);
+
+    let result = await sendEmail(emailData);
+
+    if (result.success) {
+      log("Email sent successfully:", result.data);
+      return {
+        success: true,
+        message: result.message,
+        data: result.data,
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      log("Email failed:", result.error);
+      return {
+        success: false,
+        error: result.error,
+        code: result.code,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  } catch (error) {
+    log("Error in dbSendEmail:", error);
+
+    return {
+      success: false,
+      error: error.message || "Unknown error occurred",
+      code: "WRAPPER_ERROR",
       timestamp: new Date().toISOString(),
     };
   }

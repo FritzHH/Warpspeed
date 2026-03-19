@@ -13,6 +13,7 @@ import {
   calculateRunningTotals,
   dim,
   formatDateTimeForReceipt,
+  formatStoreHours,
   generateRandomID,
   gray,
   log,
@@ -161,27 +162,6 @@ export function MessagesComponent({}) {
     _setCanRespond(false);
     smsService.send(msg);
     // _zSetOutgoingMessage(msg, true);
-  }
-  function formatStoreHours(storeHours) {
-    if (!storeHours?.standard || storeHours.standard.length === 0) return "";
-    let days = storeHours.standard;
-    let shortNames = { Monday: "Mon", Tuesday: "Tues", Wednesday: "Wed", Thursday: "Thurs", Friday: "Fri", Saturday: "Sat", Sunday: "Sun" };
-    let groups = [];
-    let currentGroup = null;
-    for (let i = 0; i < days.length; i++) {
-      let day = days[i];
-      let key = day.isOpen ? day.open + "-" + day.close : "closed";
-      if (currentGroup && currentGroup.key === key) {
-        currentGroup.end = day.name;
-      } else {
-        currentGroup = { key, start: day.name, end: day.name, isOpen: day.isOpen, open: day.open, close: day.close };
-        groups.push(currentGroup);
-      }
-    }
-    return groups.map((g) => {
-      let label = g.start === g.end ? shortNames[g.start] || g.start : (shortNames[g.start] || g.start) + "-" + (shortNames[g.end] || g.end);
-      return g.isOpen ? label + " " + g.open + " - " + g.close : "Closed " + label;
-    }).join(", ");
   }
   function resolveTemplate(templateMessage) {
     if (!templateMessage) return "";

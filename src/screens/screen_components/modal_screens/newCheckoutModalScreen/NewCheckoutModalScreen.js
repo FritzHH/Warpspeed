@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, ScrollView } from "react-native-web";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cloneDeep } from "lodash";
 import { ScreenModal, SHADOW_RADIUS_PROTO, Button_ } from "../../../../components";
 import { C, Fonts, COLOR_GRADIENTS } from "../../../../styles";
@@ -144,20 +144,34 @@ export function NewCheckoutModalScreen() {
 
   async function fetchReaders() {
     try {
-      _setReaderError("");
       let result = await newCheckoutGetStripeReaders();
-      if (result?.data?.data) {
-        let readers = result.data.data.filter((r) => r.status === "online");
+      let readersArr = result?.data?.data || [];
+      let readers = readersArr.filter((r) => r.status === "online");
+      if (readers.length > 0) {
         _setStripeReaders(readers);
-        if (readers.length === 0) {
-          _setReaderError("No card readers online");
-        }
+        _setReaderError("");
+      } else {
+        _setReaderError("No card readers connected to account");
       }
     } catch (e) {
       log("Failed to fetch card readers:", e);
-      _setReaderError("Could not connect to card readers");
+      _setReaderError("No card readers connected to account");
     }
   }
+
+  // Poll for card readers every 5s when none are detected
+  const readerPollRef = useRef(null);
+  useEffect(() => {
+    if (sStripeReaders.length === 0 && sInitialized) {
+      readerPollRef.current = setInterval(fetchReaders, 5000);
+    }
+    return () => {
+      if (readerPollRef.current) {
+        clearInterval(readerPollRef.current);
+        readerPollRef.current = null;
+      }
+    };
+  }, [sStripeReaders.length, sInitialized]);
 
   // ─── Workorder Combining ──────────────────────────────────
   function handleToggleWorkorder(wo) {

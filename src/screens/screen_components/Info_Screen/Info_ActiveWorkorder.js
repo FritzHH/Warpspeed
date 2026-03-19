@@ -8,6 +8,7 @@ import {
   log,
   printBuilder,
   removeUnusedFields,
+  resolveStatus,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -156,7 +157,7 @@ export const ActiveWorkorderComponent = ({}) => {
     wo.customerPhone = customer.cell || customer.landline;
     wo.id = generateUPCBarcode();
     wo.startedOnMillis = new Date().getTime();
-    wo.status = SETTINGS_OBJ.statuses[0];
+    wo.status = SETTINGS_OBJ.statuses[0]?.id || "";
     useOpenWorkordersStore.getState().setWorkorder(wo, false);
     useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
   }
@@ -639,26 +640,31 @@ export const ActiveWorkorderComponent = ({}) => {
                 </View>
               </View>
             </View>
-            <DropdownMenu
-              dataArr={zSettings.statuses}
-              onSelect={(val) => {
-                useOpenWorkordersStore.getState().setField("status", val, zOpenWorkorder.id);
-              }}
-              buttonStyle={{
-                width: "100%",
-                backgroundColor: zOpenWorkorder?.status.backgroundColor,
-                marginTop: 11,
-              }}
-              buttonTextStyle={{
-                color: zOpenWorkorder?.status.textColor,
-                fontWeight: "normal",
-                fontSize: 14,
-              }}
-              modalCoordX={100}
-              modalCoordY={40}
-              ref={statusRef}
-              buttonText={zOpenWorkorder?.status.label}
-            />
+            {(() => {
+              const rs = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses);
+              return (
+                <DropdownMenu
+                  dataArr={zSettings.statuses}
+                  onSelect={(val) => {
+                    useOpenWorkordersStore.getState().setField("status", val.id, zOpenWorkorder.id);
+                  }}
+                  buttonStyle={{
+                    width: "100%",
+                    backgroundColor: rs.backgroundColor,
+                    marginTop: 11,
+                  }}
+                  buttonTextStyle={{
+                    color: rs.textColor,
+                    fontWeight: "normal",
+                    fontSize: 14,
+                  }}
+                  modalCoordX={100}
+                  modalCoordY={40}
+                  ref={statusRef}
+                  buttonText={rs.label}
+                />
+              );
+            })()}
           </View>
 
           <View

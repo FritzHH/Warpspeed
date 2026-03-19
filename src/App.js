@@ -91,7 +91,7 @@ function App() {
               dbGetSettings(res.tenantID, res.storeID).then((settings) => {
                 // log("settings", settings);
                 useSettingsStore.getState().setSettings(settings, false, false);
-                log("initial data loaded, heading to Main");
+                // log("initial data loaded, heading to Main");
                 setUser(loginResult.user);
                 setIsLoading(false);
               });

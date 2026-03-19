@@ -24,10 +24,12 @@ import {
   NUMS,
   removeDashesFromPhone,
   dollarsToCents,
+  capitalizeFirstLetterOfString,
 } from "../../../../utils";
 import {
   // useDatabaseStore,
   useLoginStore,
+  useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
 } from "../../../../stores";
@@ -49,13 +51,17 @@ import { Children, useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
-import { APP_USER, INVENTORY_ITEM_PROTO, CUSTOMER_PROTO, WORKORDER_PROTO, WORKORDER_ITEM_PROTO, COLORS } from "../../../../data";
+import { APP_USER, INVENTORY_ITEM_PROTO, WORKORDER_PROTO, WORKORDER_ITEM_PROTO, CUSTOMER_PROTO } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
-import { dbSaveInventoryItem, dbSaveCustomer, dbSaveOpenWorkorder, dbClearCollection, dbSaveSettingsField } from "../../../../db_calls_wrapper";
-import { lightspeedInitiateAuthCallable, lightspeedCheckConnectionCallable, lightspeedImportDataCallable } from "../../../../db_calls";
+import { dbSaveInventoryItem, dbClearCollection, dbSaveSettingsField, dbSaveOpenWorkorder, dbCompleteWorkorder, dbSaveCustomer, dbListenToDevLogs } from "../../../../db_calls_wrapper";
+import { lightspeedInitiateAuthCallable, lightspeedCheckConnectionCallable, lightspeedImportDataCallable, firestoreRead } from "../../../../db_calls";
+import workordersCsvUrl from "../../../../assets/import_data/workorders.csv";
+import workordersBySaleCsvUrl from "../../../../assets/import_data/workorders_by_sale.csv";
+import salesCsvUrl from "../../../../assets/import_data/sales.csv";
+import customersCsvUrl from "../../../../assets/import_data/customers.csv";
 
 const TAB_NAMES = {
   users: "User Control",
@@ -68,6 +74,7 @@ const TAB_NAMES = {
   sales: "Sales Reports",
   ordering: "Ordering",
   textTemplates: "Text Templates",
+  emailTemplates: "Email Templates",
   import: "Import",
 };
 
@@ -338,6 +345,25 @@ export function Dashboard_Admin({}) {
               icon={ICONS.notes}
             />
             <VerticalSpacer />
+            {/****************** email templates tab *****************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.emailTemplates}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.emailTemplates
+                    ? null
+                    : TAB_NAMES.emailTemplates
+                )
+              }
+              style={{
+                fontWeight: sExpand === TAB_NAMES.emailTemplates ? 500 : null,
+                color:
+                  sExpand === TAB_NAMES.emailTemplates ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.emailTemplates}
+              icon={ICONS.notes}
+            />
+            <VerticalSpacer />
             {/****************** import tab *****************************/}
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.import}
@@ -426,6 +452,12 @@ export function Dashboard_Admin({}) {
           )}
           {sExpand === TAB_NAMES.textTemplates && (
             <TextTemplatesComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          )}
+          {sExpand === TAB_NAMES.emailTemplates && (
+            <EmailTemplatesComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
@@ -3531,20 +3563,21 @@ const OrderingComponent = ({
   );
 };
 
+let _lsConnectionCache = null;
+
 const ImportComponent = () => {
   const zSettings = useSettingsStore((state) => state.settings);
   const [sImporting, _setImporting] = useState("");
   const [sResult, _setResult] = useState("");
   const [sClearInventory, _setClearInventory] = useState(true);
-  const [sClearCustomers, _setClearCustomers] = useState(true);
-  const [sClearWorkorders, _setClearWorkorders] = useState(true);
   const [sClearStatuses, _setClearStatuses] = useState(true);
-  const [sLsConnected, _setLsConnected] = useState(false);
-  const [sLsAccountName, _setLsAccountName] = useState("");
+  const [sLsConnected, _setLsConnected] = useState(_lsConnectionCache?.connected || false);
+  const [sLsAccountName, _setLsAccountName] = useState(_lsConnectionCache?.accountName || "");
   const [sLsImporting, _setLsImporting] = useState("");
   const [sLsResult, _setLsResult] = useState("");
-  const [sClearLsData, _setClearLsData] = useState(true);
-  const [sDevWorkorders, _setDevWorkorders] = useState(false);
+  const [sLsSaveCust, _setLsSaveCust] = useState(false);
+  const [sLsSaveSales, _setLsSaveSales] = useState(false);
+  const [sLsSaveWo, _setLsSaveWo] = useState(false);
 
   // --- CSV parsing utilities ---
   function parseCSVLine(line) {
@@ -3570,42 +3603,6 @@ const ImportComponent = () => {
       headers.forEach((h, i) => obj[h.trim()] = (values[i] || "").trim());
       return obj;
     });
-  }
-
-  function cleanPhone(str) {
-    if (!str) return "";
-    let digits = str.replace(/\D/g, "");
-    if (digits.length === 11 && digits[0] === "1") digits = digits.slice(1);
-    return digits.length === 10 ? digits : "";
-  }
-
-  // Extract up to 2 colors from item text, case-insensitive
-  // Matches against COLORS labels. Handles "Black/Red", "black", "Blue", etc.
-  function extractColors(text) {
-    if (!text) return [];
-    // Sort labels longest-first so "Light-blue" matches before "Blue"
-    let sortedColors = [...COLORS].sort((a, b) => b.label.length - a.label.length);
-    let found = [];
-    let lowerText = text.toLowerCase();
-    let usedIndices = [];
-
-    for (let colorObj of sortedColors) {
-      if (found.length >= 2) break;
-      let label = colorObj.label.toLowerCase();
-      // Word-boundary match: color must not be embedded in another word
-      let regex = new RegExp("(?:^|[\\s/\\(])(" + label.replace("-", "[-\\s]?") + ")(?=[\\s/\\).,]|$)", "i");
-      let match = regex.exec(lowerText);
-      if (match) {
-        let idx = match.index;
-        // Avoid matching the same position twice
-        let overlaps = usedIndices.some(u => Math.abs(u - idx) < label.length);
-        if (!overlaps) {
-          found.push(colorObj);
-          usedIndices.push(idx);
-        }
-      }
-    }
-    return found;
   }
 
   // --- Import Inventory (preview mode) ---
@@ -3635,7 +3632,7 @@ const ImportComponent = () => {
 
       console.log("=== IMPORT PREVIEW: INVENTORY ===");
       console.log("Total entries:", items.length);
-      console.log(JSON.stringify(items.slice(0, 50), null, 2));
+      console.log("First 25:", JSON.stringify(items.slice(0, 25), null, 2));
 
       // Clear existing inventory if checked, then save new
       let clearedCount = 0;
@@ -3651,385 +3648,6 @@ const ImportComponent = () => {
       _setResult("Imported " + items.length + " inventory items" + (sClearInventory ? " (cleared " + clearedCount + " old)" : " (merged)"));
     } catch (err) {
       console.error("Import inventory error:", err);
-      _setResult("Error: " + err.message);
-    } finally {
-      _setImporting("");
-    }
-  }
-
-  // --- Import Customers with deduplication (preview mode) ---
-  function parseCustomers(rows) {
-    let customers = rows.map(row => {
-      let cust = cloneDeep(CUSTOMER_PROTO);
-      cust.id = generateRandomID();
-      cust.first = (row["First Name"] || "").toLowerCase();
-      cust.last = (row["Last Name"] || "").toLowerCase();
-      cust.email = row["Email"] || "";
-      cust.streetAddress = row["Address1"] || "";
-      cust.unit = row["Address2"] || "";
-      cust.city = row["City"] || "";
-      cust.state = row["State"] || "";
-      cust.zip = row["ZIP"] || "";
-
-      // Phone: try Mobile first, then Home, then Work
-      let mobile = cleanPhone(row["Mobile"] || "");
-      let home = cleanPhone(row["Home"] || "");
-      let work = cleanPhone(row["Work"] || "");
-      cust.cell = mobile || home || work || "";
-      // landline: second valid phone
-      let phones = [mobile, home, work].filter(p => p);
-      if (phones.length > 1) cust.landline = phones[1];
-
-      // Created At
-      let createdAt = row["Created At"];
-      if (createdAt && createdAt !== "0000-00-00") {
-        let ms = new Date(createdAt).getTime();
-        if (!isNaN(ms)) cust.millisCreated = ms;
-      }
-
-      return cust;
-    });
-
-    // Deduplicate by phone number
-    let phoneMap = new Map();
-    let noPhoneCustomers = [];
-
-    customers.forEach(cust => {
-      if (!cust.cell) {
-        noPhoneCustomers.push(cust);
-        return;
-      }
-      if (phoneMap.has(cust.cell)) {
-        // Keep the one with more filled fields
-        let existing = phoneMap.get(cust.cell);
-        let existingFilled = Object.values(existing).filter(v => v && v !== "" && v !== 0).length;
-        let newFilled = Object.values(cust).filter(v => v && v !== "" && v !== 0).length;
-        if (newFilled > existingFilled) {
-          cust.id = existing.id; // keep same ID
-          phoneMap.set(cust.cell, cust);
-        }
-      } else {
-        phoneMap.set(cust.cell, cust);
-      }
-    });
-
-    let deduplicated = [...phoneMap.values(), ...noPhoneCustomers];
-    return { deduplicated, phoneMap };
-  }
-
-  async function handleImportCustomers() {
-    try {
-      _setImporting("customers");
-      _setResult("");
-      let res = await fetch(process.env.PUBLIC_URL + "/import_data/customers.csv");
-      let text = await res.text();
-      let rows = parseCSV(text);
-
-      let { deduplicated } = parseCustomers(rows);
-
-      console.log("=== IMPORT PREVIEW: CUSTOMERS ===");
-      console.log("Total raw rows:", rows.length);
-      console.log("After deduplication:", deduplicated.length);
-      console.log("Removed duplicates:", rows.length - deduplicated.length);
-      console.log(JSON.stringify(deduplicated.slice(0, 50), null, 2));
-
-      // Clear existing customers if checked, then save new
-      let clearedCount = 0;
-      if (sClearCustomers) {
-        let cleared = await dbClearCollection("customers");
-        clearedCount = cleared.deletedCount;
-        console.log("Cleared customers:", clearedCount, "docs");
-      }
-      for (let i = 0; i < deduplicated.length; i++) {
-        await dbSaveCustomer(deduplicated[i]);
-        if ((i + 1) % 50 === 0) console.log("Saved", i + 1, "/", deduplicated.length);
-      }
-      _setResult("Imported " + deduplicated.length + " customers" + (sClearCustomers ? " (cleared " + clearedCount + " old)" : " (merged)") + ", removed " + (rows.length - deduplicated.length) + " duplicates");
-    } catch (err) {
-      console.error("Import customers error:", err);
-      _setResult("Error: " + err.message);
-    } finally {
-      _setImporting("");
-    }
-  }
-
-  // --- Import Workorders with customer linking (preview mode) ---
-  async function handleImportWorkorders() {
-    try {
-      _setImporting("workorders");
-      _setResult("");
-
-      // First parse customers for linking
-      let custRes = await fetch(process.env.PUBLIC_URL + "/import_data/customers.csv");
-      let custText = await custRes.text();
-      let custRows = parseCSV(custText);
-      let { deduplicated: customers } = parseCustomers(custRows);
-
-      // Build name lookup map: "first last" (lowercase) -> customer
-      let nameLookup = new Map();
-      customers.forEach(cust => {
-        let fullName = ((cust.first || "") + " " + (cust.last || "")).trim().toLowerCase();
-        if (fullName) nameLookup.set(fullName, cust);
-      });
-
-      // Parse workorders
-      let woRes = await fetch(process.env.PUBLIC_URL + "/import_data/workorders.csv");
-      let woText = await woRes.text();
-      let woRows = parseCSV(woText);
-
-      let workorders = woRows.map(row => {
-        let wo = cloneDeep(WORKORDER_PROTO);
-        wo.id = generateRandomID();
-        wo.workorderNumber = row["ID"] || "";
-        wo.description = row["Item"] || "";
-        wo.status = row["Status"] || "";
-
-        // Extract "PRODUCT -SOURCE" pattern (always uppercase)
-        // e.g. "BATTERY -ALIEXPRESS", "TOUCH-UP PAINT -HEYBIKE", "FREEWHEEL -JBI"
-        let partMatch = (row["Item"] || "").match(/([A-Z][A-Z0-9 /-]*?)\s+-([A-Z][A-Z0-9]+)\s*$/);
-        if (partMatch) {
-          wo.partOrdered = partMatch[1].trim();
-          wo.partSource = partMatch[2].trim();
-        } else {
-          // Check for just " -SOURCE" with no uppercase product before it (e.g. "(qty 4) -JBI")
-          let sourceOnly = (row["Item"] || "").match(/\s+-([A-Z][A-Z0-9]+)\s*$/);
-          if (sourceOnly) {
-            wo.partSource = sourceOnly[1].trim();
-          }
-        }
-
-        // Date In -> startedOnMillis
-        let dateIn = row["Date In"];
-        if (dateIn) {
-          let ms = new Date(dateIn).getTime();
-          if (!isNaN(ms)) wo.startedOnMillis = ms;
-        }
-
-        // Extract colors from Item field (case-insensitive)
-        let itemText = row["Item"] || "";
-        let foundColors = extractColors(itemText);
-        if (foundColors.length >= 1) {
-          wo.color1 = { textColor: foundColors[0].textColor, backgroundColor: foundColors[0].backgroundColor, label: foundColors[0].label };
-        }
-        if (foundColors.length >= 2) {
-          wo.color2 = { textColor: foundColors[1].textColor, backgroundColor: foundColors[1].backgroundColor, label: foundColors[1].label };
-        }
-
-        // Customer linking
-        let custName = (row["Customer"] || "").trim();
-        if (custName) {
-          let matched = nameLookup.get(custName.toLowerCase());
-          if (matched) {
-            wo.customerID = matched.id;
-            wo.customerFirst = matched.first;
-            wo.customerLast = matched.last;
-            wo.customerPhone = matched.cell;
-          } else {
-            // Split name: first word = first, rest = last
-            let parts = custName.split(" ");
-            wo.customerFirst = (parts[0] || "").toLowerCase();
-            wo.customerLast = (parts.slice(1).join(" ") || "").toLowerCase();
-          }
-        }
-
-        return wo;
-      });
-
-      let linkedCount = workorders.filter(wo => wo.customerID).length;
-
-      console.log("=== IMPORT PREVIEW: WORKORDERS ===");
-      console.log("Total workorders:", workorders.length);
-      console.log("Linked to customers:", linkedCount);
-      console.log("Unlinked:", workorders.length - linkedCount);
-      console.log(JSON.stringify(workorders.slice(0, 50), null, 2));
-      // Clear existing workorders if checked, then save new
-      let clearedCount = 0;
-      if (sClearWorkorders) {
-        let cleared = await dbClearCollection("open-workorders");
-        clearedCount = cleared.deletedCount;
-        console.log("Cleared workorders:", clearedCount, "docs");
-      }
-      for (let i = 0; i < workorders.length; i++) {
-        await dbSaveOpenWorkorder(workorders[i]);
-        if ((i + 1) % 50 === 0) console.log("Saved", i + 1, "/", workorders.length);
-      }
-      _setResult("Imported " + workorders.length + " workorders" + (sClearWorkorders ? " (cleared " + clearedCount + " old)" : " (merged)") + ", " + linkedCount + " linked to customers");
-    } catch (err) {
-      console.error("Import workorders error:", err);
-      _setResult("Error: " + err.message);
-    } finally {
-      _setImporting("");
-    }
-  }
-
-  // --- Dev Import Workorders (fills random inventory items + statuses) ---
-  async function handleImportWorkordersDev() {
-    try {
-      _setImporting("workorders");
-      _setResult("");
-
-      // 1. Load and parse customers for linking
-      let custRes = await fetch(process.env.PUBLIC_URL + "/import_data/customers.csv");
-      let custText = await custRes.text();
-      let custRows = parseCSV(custText);
-      let { deduplicated: customers } = parseCustomers(custRows);
-
-      let nameLookup = new Map();
-      customers.forEach(cust => {
-        let fullName = ((cust.first || "") + " " + (cust.last || "")).trim().toLowerCase();
-        if (fullName) nameLookup.set(fullName, cust);
-      });
-
-      // 2. Load and parse inventory (same rules as handleImportInventory)
-      let invRes = await fetch(process.env.PUBLIC_URL + "/import_data/inventory.csv");
-      let invText = await invRes.text();
-      let invRows = parseCSV(invText);
-
-      let inventoryItems = invRows.map(row => {
-        let item = cloneDeep(INVENTORY_ITEM_PROTO);
-        item.id = generateRandomID();
-        item.formalName = row["Description"] || "";
-        item.price = dollarsToCents(row["Price"]) || 0;
-        item.cost = dollarsToCents(row["Default Cost"]) || 0;
-        item.upc = row["UPC"] || "";
-        item.ean = row["EAN"] || "";
-        item.customSku = row["Custom SKU"] || "";
-        item.manufacturerSku = row["Manufact. SKU"] || "";
-        if ((item.formalName || "").toLowerCase().includes("labor")) {
-          item.category = "Labor";
-        }
-        return item;
-      });
-
-      if (inventoryItems.length === 0) {
-        _setResult("Error: inventory.csv has no items — cannot fill workorder lines");
-        _setImporting("");
-        return;
-      }
-
-      // 3. Load and parse statuses
-      let statusRes = await fetch(process.env.PUBLIC_URL + "/import_data/statuses.csv");
-      let statusText = await statusRes.text();
-      let statusRows = parseCSV(statusText);
-
-      let statusLabels = statusRows.map(row => row["Status"] || "").filter(s => s);
-
-      // 4. Parse workorders and fill missing data
-      let woRes = await fetch(process.env.PUBLIC_URL + "/import_data/workorders.csv");
-      let woText = await woRes.text();
-      let woRows = parseCSV(woText);
-
-      let workorders = woRows.map(row => {
-        let wo = cloneDeep(WORKORDER_PROTO);
-        wo.id = generateRandomID();
-        wo.workorderNumber = row["ID"] || "";
-        wo.description = row["Item"] || "";
-        wo.status = row["Status"] || "";
-
-        // Extract "PRODUCT -SOURCE" pattern
-        let partMatch = (row["Item"] || "").match(/([A-Z][A-Z0-9 /-]*?)\s+-([A-Z][A-Z0-9]+)\s*$/);
-        if (partMatch) {
-          wo.partOrdered = partMatch[1].trim();
-          wo.partSource = partMatch[2].trim();
-        } else {
-          let sourceOnly = (row["Item"] || "").match(/\s+-([A-Z][A-Z0-9]+)\s*$/);
-          if (sourceOnly) {
-            wo.partSource = sourceOnly[1].trim();
-          }
-        }
-
-        // Date In -> startedOnMillis
-        let dateIn = row["Date In"];
-        if (dateIn) {
-          let ms = new Date(dateIn).getTime();
-          if (!isNaN(ms)) wo.startedOnMillis = ms;
-        }
-
-        // Extract colors from Item field
-        let itemText = row["Item"] || "";
-        let foundColors = extractColors(itemText);
-        if (foundColors.length >= 1) {
-          wo.color1 = { textColor: foundColors[0].textColor, backgroundColor: foundColors[0].backgroundColor, label: foundColors[0].label };
-        }
-        if (foundColors.length >= 2) {
-          wo.color2 = { textColor: foundColors[1].textColor, backgroundColor: foundColors[1].backgroundColor, label: foundColors[1].label };
-        }
-
-        // Customer linking
-        let custName = (row["Customer"] || "").trim();
-        if (custName) {
-          let matched = nameLookup.get(custName.toLowerCase());
-          if (matched) {
-            wo.customerID = matched.id;
-            wo.customerFirst = matched.first;
-            wo.customerLast = matched.last;
-            wo.customerPhone = matched.cell;
-          } else {
-            let parts = custName.split(" ");
-            wo.customerFirst = (parts[0] || "").toLowerCase();
-            wo.customerLast = (parts.slice(1).join(" ") || "").toLowerCase();
-          }
-        }
-
-        // --- DEV: Fill missing status from statuses.csv ---
-        if (!wo.status && statusLabels.length > 0) {
-          wo.status = statusLabels[Math.floor(Math.random() * statusLabels.length)];
-        }
-
-        // --- DEV: Fill missing startedOnMillis ---
-        if (!wo.startedOnMillis) {
-          // Random date within the last 90 days
-          wo.startedOnMillis = Date.now() - Math.floor(Math.random() * 90 * 24 * 60 * 60 * 1000);
-        }
-
-        // --- DEV: Add 2-7 random inventory items as workorder lines ---
-        let lineCount = Math.floor(Math.random() * 6) + 2; // 2 to 7
-        let usedIndices = new Set();
-        let lines = [];
-        for (let i = 0; i < lineCount; i++) {
-          let idx;
-          // Pick a unique random item if possible, otherwise allow repeats
-          if (usedIndices.size < inventoryItems.length) {
-            do { idx = Math.floor(Math.random() * inventoryItems.length); } while (usedIndices.has(idx));
-            usedIndices.add(idx);
-          } else {
-            idx = Math.floor(Math.random() * inventoryItems.length);
-          }
-          let line = cloneDeep(WORKORDER_ITEM_PROTO);
-          line.id = generateRandomID();
-          line.qty = 1;
-          line.inventoryItem = cloneDeep(inventoryItems[idx]);
-          lines.push(line);
-        }
-        wo.workorderLines = lines;
-
-        return wo;
-      });
-
-      let linkedCount = workorders.filter(wo => wo.customerID).length;
-
-      console.log("=== DEV IMPORT PREVIEW: WORKORDERS ===");
-      console.log("Total workorders:", workorders.length);
-      console.log("Linked to customers:", linkedCount);
-      console.log("Unlinked:", workorders.length - linkedCount);
-      console.log("Inventory pool size:", inventoryItems.length);
-      console.log("Statuses pool:", statusLabels);
-      console.log(JSON.stringify(workorders.slice(0, 5), null, 2));
-
-      // Clear existing workorders if checked, then save new
-      let clearedCount = 0;
-      if (sClearWorkorders) {
-        let cleared = await dbClearCollection("open-workorders");
-        clearedCount = cleared.deletedCount;
-        console.log("Cleared workorders:", clearedCount, "docs");
-      }
-      for (let i = 0; i < workorders.length; i++) {
-        await dbSaveOpenWorkorder(workorders[i]);
-        if ((i + 1) % 50 === 0) console.log("Saved", i + 1, "/", workorders.length);
-      }
-      _setResult("DEV Imported " + workorders.length + " workorders" + (sClearWorkorders ? " (cleared " + clearedCount + " old)" : " (merged)") + ", " + linkedCount + " linked, each with 2-7 random items");
-    } catch (err) {
-      console.error("Dev import workorders error:", err);
       _setResult("Error: " + err.message);
     } finally {
       _setImporting("");
@@ -4086,7 +3704,298 @@ const ImportComponent = () => {
     }
   }
 
+  // --- Workorder CSV Import ---
+
+  function cleanItemDescription(item) {
+    if (!item) return "";
+    let cleaned = item.trim();
+    // Remove trailing -SOURCE or /SOURCE annotations (e.g., "-EBAY", "/AMAZON", "-JBI")
+    cleaned = cleaned.replace(/\s+[-\/][A-Z][A-Z0-9]*\s*$/, "");
+    // Remove trailing N/N batch numbers (e.g., "1/2", "2/2")
+    cleaned = cleaned.replace(/\s+\d+\/\d+\s*$/, "");
+    // Remove trailing ALL-CAPS words (no lowercase, has uppercase, 2+ chars)
+    let words = cleaned.split(/\s+/);
+    while (words.length > 1) {
+      let last = words[words.length - 1];
+      if (last.length >= 2 && /[A-Z]/.test(last) && !/[a-z]/.test(last)) {
+        words.pop();
+      } else {
+        break;
+      }
+    }
+    return words.join(" ").trim();
+  }
+
+  function mapLightspeedStatus(lsStatus) {
+    if (!lsStatus) return "Newly Created";
+    let map = {
+      "Done & Paid": "Finished",
+      "Finished": "Finished",
+      "Finished - No Auto Text": "Finished",
+      "Finished - Customer Picking Up Part/Accessory": "Finished",
+      "Service": "Service",
+      "Service - Priority": "Service",
+      "Work In Progress": "Service",
+      "Waiting": "Newly Created",
+      "Open": "Newly Created",
+      "Part Ordered": "Part Ordered",
+      "Battery Ordered": "Part Ordered",
+      "Bicycle Ordered": "Part Ordered",
+      "Part in Cart": "Part Ordered",
+      "Texting Customer": "Messaging Customer",
+      "Fritz Work": "Service",
+      "Customer Bringing For Service": "Newly Created",
+    };
+    return map[lsStatus] || "Newly Created";
+  }
+
+  async function handleImportWorkordersFromCSV() {
+    _setImporting("workorders");
+    _setResult("");
+    try {
+      // Step 1: Fetch & parse all 4 CSVs
+      let [woText, wbsText, salesText, custText] = await Promise.all([
+        fetch(workordersCsvUrl).then(r => r.text()),
+        fetch(workordersBySaleCsvUrl).then(r => r.text()),
+        fetch(salesCsvUrl).then(r => r.text()),
+        fetch(customersCsvUrl).then(r => r.text()),
+      ]);
+      let woRows = parseCSV(woText);
+      let wbsRows = parseCSV(wbsText);
+      let salesRows = parseCSV(salesText);
+      let custRows = parseCSV(custText);
+
+      // Step 2: Build lookup maps
+      let customerMap = {};
+      for (let c of custRows) {
+        let key = ((c["First Name"] || "") + " " + (c["Last Name"] || "")).trim().toLowerCase();
+        if (key) customerMap[key] = c;
+      }
+
+      let salesMap = {};
+      for (let s of salesRows) {
+        let orderID = s["Order ID"];
+        if (orderID) salesMap[orderID] = s;
+      }
+
+      let woMap = {};
+      for (let w of woRows) {
+        if (w["ID"]) woMap[w["ID"]] = w;
+      }
+
+      // Step 3: Process workorders_by_sale.csv — group by workorder number
+      let woSaleData = {};
+
+      for (let row of wbsRows) {
+        let desc = row["Description"] || "";
+        let woMatch = desc.match(/Work order #(\d+)/);
+        if (!woMatch) continue;
+
+        let woNum = woMatch[1];
+        if (!woSaleData[woNum]) {
+          woSaleData[woNum] = { saleIDs: new Set(), lineItems: [], internalNotes: [], bikeName: "", customerName: "", noteText: "" };
+        }
+        let data = woSaleData[woNum];
+        data.saleIDs.add(row["ID"]);
+        data.customerName = row["Customer"] || data.customerName;
+
+        // Extract bike name from "Item: XXXX" in header row
+        let itemMatch = desc.match(/Item:\s*([^\n\r)]+)/);
+        if (itemMatch) {
+          data.bikeName = itemMatch[1].trim();
+          // Extract embedded notes (text after first line of description)
+          let afterItem = desc.substring(desc.indexOf(itemMatch[0]) + itemMatch[0].length);
+          let noteLines = afterItem.split(/[\n\r]+/).map(l => l.trim().replace(/^\)$/, "")).filter(l => l && l !== ")");
+          if (noteLines.length > 0) data.noteText = noteLines.join("\n");
+        }
+
+        // Collect internal notes from dedicated column
+        let intNote = row["Work Order Internal Note"] || "";
+        if (intNote.trim() && intNote.trim() !== "'") {
+          data.internalNotes.push(intNote.trim().replace(/^'/, ""));
+        }
+
+        // Non-header rows are line items (services/parts with prices)
+        if (!itemMatch) {
+          let lineDesc = desc.replace(/^\s*\(/, "").replace(/\)\s*$/, "").trim();
+          let retail = row["Retail"] || "$0.00";
+          let qty = parseInt(row["Qty"]) || 1;
+          if (lineDesc) {
+            data.lineItems.push({ description: lineDesc, qty, retail });
+          }
+        }
+      }
+
+      // Step 4: Build and save workorders
+      let savedCount = 0;
+      let archivedCount = 0;
+      let allWoNumbers = new Set([
+        ...Object.keys(woMap),
+        ...Object.keys(woSaleData),
+      ]);
+
+      let woNumArr = [...allWoNumbers];
+      let previewLimit = 25;
+
+      for (let i = 0; i < Math.min(woNumArr.length, previewLimit); i++) {
+        let woNum = woNumArr[i];
+        let woRow = woMap[woNum];
+        let saleData = woSaleData[woNum];
+        let isOpen = !!woRow;
+
+        // Build customer
+        let custName = woRow?.["Customer"] || saleData?.customerName || "";
+        let nameParts = custName.trim().split(/\s+/);
+        let custFirst = capitalizeFirstLetterOfString(nameParts[0] || "");
+        let custLast = capitalizeFirstLetterOfString(nameParts.slice(1).join(" ") || "");
+        let custKey = custName.trim().toLowerCase();
+        let custRow = customerMap[custKey];
+        let custPhone = custRow?.["Mobile"] || custRow?.["Home"] || custRow?.["Work"] || "";
+        custPhone = custPhone.replace(/\D/g, "");
+        let custEmail = custRow?.["Email"] || "";
+
+        let customerID = generateRandomID();
+        let customer = cloneDeep(CUSTOMER_PROTO);
+        customer.id = customerID;
+        customer.first = custFirst;
+        customer.last = custLast;
+        customer.cell = custPhone;
+        customer.email = custEmail;
+        if (custRow) {
+          customer.streetAddress = custRow["Address1"] || "";
+          customer.city = custRow["City"] || "";
+          customer.state = custRow["State"] || "";
+          customer.zip = custRow["ZIP"] || "";
+        }
+        customer.millisCreated = Date.now().toString();
+
+        // Build workorder
+        let wo = cloneDeep(WORKORDER_PROTO);
+        wo.id = generateRandomID();
+        wo.workorderNumber = woNum;
+        wo.customerID = customerID;
+        wo.customerFirst = custFirst;
+        wo.customerLast = custLast;
+        wo.customerPhone = custPhone;
+
+        // Bike description (cleaned)
+        let rawItem = woRow?.["Item"] || saleData?.bikeName || "";
+        wo.description = cleanItemDescription(rawItem);
+
+        // Status — look up by label to get the ID
+        if (isOpen) {
+          const mappedLabel = mapLightspeedStatus(woRow["Status"]);
+          const matchedStatus = zSettings.statuses?.find(
+            s => s.label?.toLowerCase() === mappedLabel.toLowerCase()
+          );
+          wo.status = matchedStatus?.id || "";
+        } else {
+          const finishedStatus = zSettings.statuses?.find(
+            s => s.label?.toLowerCase() === "finished"
+          );
+          wo.status = finishedStatus?.id || "";
+        }
+
+        // Dates
+        let dateStr = woRow?.["Date In"] || "2026-03-01";
+        let dateIn = new Date(dateStr);
+        wo.startedOnMillis = dateIn.getTime().toString();
+        if (!isOpen) wo.endedOnMillis = Date.now().toString();
+
+        // Payment info
+        wo.paymentComplete = woRow?.["Status"] === "Done & Paid" || !isOpen;
+        if (saleData?.saleIDs) {
+          let totalPaid = 0;
+          for (let saleID of saleData.saleIDs) {
+            let saleRow = salesMap[saleID];
+            if (saleRow) {
+              totalPaid += Math.round(parseFloat(saleRow["Amount"] || "0") * 100);
+            }
+          }
+          wo.amountPaid = totalPaid;
+        }
+
+        // Line items
+        if (saleData?.lineItems) {
+          wo.workorderLines = saleData.lineItems.map(li => {
+            let line = cloneDeep(WORKORDER_ITEM_PROTO);
+            line.id = generateRandomID();
+            line.qty = li.qty;
+            let inv = cloneDeep(INVENTORY_ITEM_PROTO);
+            inv.id = generateRandomID();
+            inv.formalName = li.description;
+            inv.price = dollarsToCents(li.retail.replace("$", "").replace(",", ""));
+            line.inventoryItem = inv;
+            return line;
+          });
+        }
+
+        // Internal notes
+        let allNotes = [];
+        if (saleData?.noteText) allNotes.push(saleData.noteText);
+        if (saleData?.internalNotes) allNotes.push(...saleData.internalNotes);
+        wo.internalNotes = allNotes.map(note => ({
+          id: generateRandomID(),
+          text: note,
+          millis: dateIn.getTime().toString(),
+          user: "Lightspeed Import",
+        }));
+
+        // PREVIEW: console.log instead of saving, and add to Zustand store
+        console.log("=== WO #" + woNum + " (" + (isOpen ? "OPEN" : "ARCHIVED") + ") ===");
+        console.log(JSON.stringify(wo, null, 2));
+        useOpenWorkordersStore.getState().setWorkorder(wo, false);
+        savedCount++;
+      }
+
+      _setResult("Preview logged " + savedCount + " of " + woNumArr.length + " workorders to console");
+    } catch (e) {
+      console.error("Import workorders error:", e);
+      _setResult("Error: " + (e.message || "Unknown error"));
+    } finally {
+      _setImporting("");
+    }
+  }
+
   // --- Lightspeed handlers ---
+
+  const lsConnectionPollRef = useRef(null);
+  const lsConnectionTimeoutRef = useRef(null);
+
+  function stopLsConnectionPoll() {
+    if (lsConnectionPollRef.current) {
+      clearInterval(lsConnectionPollRef.current);
+      lsConnectionPollRef.current = null;
+    }
+    if (lsConnectionTimeoutRef.current) {
+      clearTimeout(lsConnectionTimeoutRef.current);
+      lsConnectionTimeoutRef.current = null;
+    }
+  }
+
+  async function checkLsConnection() {
+    const settings = useSettingsStore.getState().settings;
+    const tenantID = settings?.tenantID;
+    const storeID = settings?.storeID;
+    if (!tenantID || !storeID) return;
+    try {
+      const path = `tenants/${tenantID}/stores/${storeID}/integrations/lightspeed`;
+      const lsDoc = await firestoreRead(path);
+      if (lsDoc?.accessToken) {
+        _lsConnectionCache = { connected: true, accountName: lsDoc.accountID || "" };
+        _setLsConnected(true);
+        _setLsAccountName(lsDoc.accountID || "");
+        _setLsResult("Connected to Lightspeed" + (lsDoc.accountID ? ": " + lsDoc.accountID : ""));
+        _setLsImporting("");
+        stopLsConnectionPoll();
+      }
+    } catch (e) {
+      // silently fail
+    }
+  }
+
+  // Check Lightspeed connection once per session (reads Firestore doc directly, no Cloud Function)
+  if (!_lsConnectionCache) { checkLsConnection(); }
 
   async function handleLsConnect() {
     try {
@@ -4102,54 +4011,87 @@ const ImportComponent = () => {
       const res = await lightspeedInitiateAuthCallable({ tenantID, storeID });
       if (res.data?.authUrl) {
         window.open(res.data.authUrl, "_blank");
-        _setLsResult("OAuth window opened. Complete authorization, then click 'Check Connection'.");
+        _setLsResult("Waiting for authorization...");
+        _setLsImporting("checking");
+        // Auto-poll for connection every 5 seconds, give up after 1 minute
+        stopLsConnectionPoll();
+        lsConnectionPollRef.current = setInterval(checkLsConnection, 5000);
+        lsConnectionTimeoutRef.current = setTimeout(() => {
+          stopLsConnectionPoll();
+          _setLsResult("Authorization timed out — try again");
+          _setLsImporting("");
+        }, 60000);
       } else {
         _setLsResult("Error: No auth URL returned");
+        _setLsImporting("");
       }
     } catch (e) {
       _setLsResult("Error: " + (e.message || "Connection failed"));
+      _setLsImporting("");
     }
-    _setLsImporting("");
   }
 
-  async function handleLsCheckConnection() {
+  async function handleLsImportType(importType, saveToDB) {
+    let unsubDevLog = null;
     try {
-      _setLsImporting("checking");
+      _setLsImporting(importType);
       _setLsResult("");
       const tenantID = zSettings?.tenantID;
       const storeID = zSettings?.storeID;
-      const res = await lightspeedCheckConnectionCallable({ tenantID, storeID });
-      if (res.data?.connected) {
-        _setLsConnected(true);
-        _setLsAccountName(res.data.accountName || "");
-        _setLsResult("Connected to Lightspeed" + (res.data.accountName ? ": " + res.data.accountName : ""));
-      } else {
-        _setLsConnected(false);
-        _setLsResult("Not connected" + (res.data?.error ? ": " + res.data.error : ""));
-      }
-    } catch (e) {
-      _setLsConnected(false);
-      _setLsResult("Error: " + (e.message || "Check failed"));
-    }
-    _setLsImporting("");
-  }
 
-  async function handleLsImport() {
-    try {
-      _setLsImporting("importing");
-      _setLsResult("");
-      const tenantID = zSettings?.tenantID;
-      const storeID = zSettings?.storeID;
+      // Start dev log listener for real-time console output
+      let lastLogCount = -1;
+      let logsDone = null;
+      const logsFinished = new Promise((resolve) => { logsDone = resolve; });
+      unsubDevLog = dbListenToDevLogs("lightspeed-import", (data) => {
+        if (!data?.logs) return;
+        // On first callback, skip existing logs so we don't replay previous exports
+        if (lastLogCount === -1) { lastLogCount = data.logs.length; return; }
+        let newEntries = data.logs.slice(lastLogCount);
+        for (let entry of newEntries) {
+          if (entry.type === "csv-download") {
+            try {
+              let csvInfo = JSON.parse(entry.msg);
+              let link = document.createElement("a");
+              link.href = csvInfo.url;
+              link.download = csvInfo.filename || "download.csv";
+              link.target = "_blank";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              console.log("[CSV]", "Downloading:", csvInfo.filename, "(" + csvInfo.rowCount + " rows)");
+            } catch (e) {
+              console.error("[CSV] Failed to parse download info:", e);
+            }
+            continue;
+          }
+          let prefix = entry.type === "error" ? "[ERROR]" : entry.type === "success" ? "[OK]" : entry.type === "warn" ? "[WARN]" : "[INFO]";
+          console.log(prefix, "[LS Import]", entry.msg);
+        }
+        lastLogCount = data.logs.length;
+        if (newEntries.length > 0) {
+          _setLsResult(newEntries[newEntries.length - 1].msg);
+        }
+        if (newEntries.length > 0 && (data.status === "complete" || data.status === "error")) {
+          logsDone();
+        }
+      });
+
       const res = await lightspeedImportDataCallable({
         tenantID,
         storeID,
-        importType: "all",
-        clearExisting: sClearLsData,
+        importType,
+        saveToDB,
       });
+
+      await logsFinished;
+      if (unsubDevLog) { unsubDevLog(); unsubDevLog = null; }
+
       if (res.data?.success) {
-        let msg = "Import complete.";
-        if (res.data.customerCount != null) msg += ` Customers: ${res.data.customerCount} (${res.data.duplicatesRemoved || 0} duplicates removed).`;
-        if (res.data.workorderCount != null) msg += ` Workorders: ${res.data.workorderCount} (${res.data.linked || 0} linked, ${res.data.unlinked || 0} unlinked).`;
+        let msg = importType.charAt(0).toUpperCase() + importType.slice(1) + " import complete.";
+        if (res.data.customerCount != null) msg += ` Customers: ${res.data.customerCount}.`;
+        if (res.data.saleCount != null) msg += ` Sales: ${res.data.saleCount}.`;
+        if (res.data.workorderCount != null) msg += ` Workorders: ${res.data.workorderCount} (${res.data.linked || 0} linked).`;
         _setLsResult(msg);
       } else {
         _setLsResult("Import returned no success flag");
@@ -4157,6 +4099,7 @@ const ImportComponent = () => {
     } catch (e) {
       _setLsResult("Error: " + (e.message || "Import failed"));
     }
+    if (unsubDevLog) unsubDevLog();
     _setLsImporting("");
   }
 
@@ -4213,65 +4156,6 @@ const ImportComponent = () => {
           </View>
           <View style={{ alignItems: "center", margin: 10 }}>
             <TouchableOpacity
-              onPress={handleImportCustomers}
-              disabled={!!sImporting}
-              style={buttonStyle}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.text,
-                  marginTop: 8,
-                  fontWeight: "500",
-                }}
-              >
-                {sImporting === "customers" ? "Importing..." : "Import Customers"}
-              </Text>
-            </TouchableOpacity>
-            <CheckBox_
-              isChecked={sClearCustomers}
-              onCheck={() => _setClearCustomers(!sClearCustomers)}
-              text={"Clear existing"}
-              buttonStyle={{ marginTop: 7 }}
-            />
-          </View>
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
-              onPress={sDevWorkorders ? handleImportWorkordersDev : handleImportWorkorders}
-              disabled={!!sImporting}
-              style={{
-                ...buttonStyle,
-                borderColor: sDevWorkorders ? C.orange : C.buttonLightGreenOutline,
-              }}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.text,
-                  marginTop: 8,
-                  fontWeight: "500",
-                }}
-              >
-                {sImporting === "workorders" ? "Importing..." : "Import Workorders"}
-              </Text>
-            </TouchableOpacity>
-            <CheckBox_
-              isChecked={sClearWorkorders}
-              onCheck={() => _setClearWorkorders(!sClearWorkorders)}
-              text={"Clear existing"}
-              buttonStyle={{ marginTop: 7 }}
-            />
-            <CheckBox_
-              isChecked={sDevWorkorders}
-              onCheck={() => _setDevWorkorders(!sDevWorkorders)}
-              text={"Dev mode (fill random items)"}
-              buttonStyle={{ marginTop: 4 }}
-            />
-          </View>
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
               onPress={handleImportStatuses}
               disabled={!!sImporting}
               style={buttonStyle}
@@ -4295,9 +4179,51 @@ const ImportComponent = () => {
               buttonStyle={{ marginTop: 7 }}
             />
           </View>
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={handleImportWorkordersFromCSV}
+              disabled={!!sImporting}
+              style={buttonStyle}
+            >
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                  textAlign: "center",
+                }}
+              >
+                {sImporting === "workorders" ? "Importing..." : "Import Workorders (CSV)"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={() => {
+                useOpenWorkordersStore.getState().setOpenWorkorders([]);
+                _setResult("Cleared preview workorders from store");
+              }}
+              style={buttonStyle}
+            >
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.red,
+                  marginTop: 8,
+                  fontWeight: "500",
+                  textAlign: "center",
+                }}
+              >
+                Clear Preview
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
         {sResult ? (
-          <Text style={{ fontSize: 13, color: C.green, marginTop: 10, textAlign: "center" }}>
+          <Text style={{ fontSize: 13, color: sResult.startsWith("Error") ? C.red : C.green, marginTop: 10, textAlign: "center" }}>
             {sResult}
           </Text>
         ) : null}
@@ -4317,11 +4243,11 @@ const ImportComponent = () => {
         >
           <View style={{ alignItems: "center", margin: 10 }}>
             <TouchableOpacity
-              onPress={sLsConnected ? handleLsCheckConnection : handleLsConnect}
-              disabled={!!sLsImporting}
+              onPress={handleLsConnect}
+              disabled={!!sLsImporting || sLsConnected}
               style={{
                 ...buttonStyle,
-                opacity: sLsImporting ? 0.5 : 1,
+                opacity: sLsImporting || sLsConnected ? 0.5 : 1,
                 backgroundColor: sLsConnected ? C.green : C.listItemWhite,
               }}
             >
@@ -4345,32 +4271,9 @@ const ImportComponent = () => {
               </Text>
             </TouchableOpacity>
           </View>
-          {!sLsConnected && (
-            <View style={{ alignItems: "center", margin: 10 }}>
-              <TouchableOpacity
-                onPress={handleLsCheckConnection}
-                disabled={!!sLsImporting}
-                style={{
-                  ...buttonStyle,
-                  opacity: sLsImporting ? 0.5 : 1,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: C.text,
-                    fontWeight: "500",
-                    textAlign: "center",
-                  }}
-                >
-                  {sLsImporting === "checking" ? "Checking..." : "Check Connection"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
           <View style={{ alignItems: "center", margin: 10 }}>
             <TouchableOpacity
-              onPress={handleLsImport}
+              onPress={() => handleLsImportType("customers", sLsSaveCust)}
               disabled={!!sLsImporting || !sLsConnected}
               style={{
                 ...buttonStyle,
@@ -4387,17 +4290,116 @@ const ImportComponent = () => {
                   textAlign: "center",
                 }}
               >
-                {sLsImporting === "importing" ? "Importing..." : "Import from Lightspeed"}
+                {sLsImporting === "customers" ? "Importing..." : "Import Customers"}
               </Text>
             </TouchableOpacity>
             <CheckBox_
-              isChecked={sClearLsData}
-              onCheck={() => _setClearLsData(!sClearLsData)}
-              text={"Clear existing data"}
+              isChecked={sLsSaveCust}
+              onCheck={() => _setLsSaveCust(!sLsSaveCust)}
+              text={"Save to DB"}
+              buttonStyle={{ marginTop: 7 }}
+            />
+          </View>
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={() => handleLsImportType("sales", sLsSaveSales)}
+              disabled={!!sLsImporting || !sLsConnected}
+              style={{
+                ...buttonStyle,
+                opacity: sLsImporting || !sLsConnected ? 0.5 : 1,
+              }}
+            >
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                  textAlign: "center",
+                }}
+              >
+                {sLsImporting === "sales" ? "Importing..." : "Import Sales"}
+              </Text>
+            </TouchableOpacity>
+            <CheckBox_
+              isChecked={sLsSaveSales}
+              onCheck={() => _setLsSaveSales(!sLsSaveSales)}
+              text={"Save to DB"}
+              buttonStyle={{ marginTop: 7 }}
+            />
+          </View>
+          <View style={{ alignItems: "center", margin: 10 }}>
+            <TouchableOpacity
+              onPress={() => handleLsImportType("workorders", sLsSaveWo)}
+              disabled={!!sLsImporting || !sLsConnected}
+              style={{
+                ...buttonStyle,
+                opacity: sLsImporting || !sLsConnected ? 0.5 : 1,
+              }}
+            >
+              <Image_ icon={ICONS.importIcon} size={30} />
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: C.text,
+                  marginTop: 8,
+                  fontWeight: "500",
+                  textAlign: "center",
+                }}
+              >
+                {sLsImporting === "workorders" ? "Importing..." : "Import Workorders"}
+              </Text>
+            </TouchableOpacity>
+            <CheckBox_
+              isChecked={sLsSaveWo}
+              onCheck={() => _setLsSaveWo(!sLsSaveWo)}
+              text={"Save to DB"}
               buttonStyle={{ marginTop: 7 }}
             />
           </View>
         </View>
+        {/* --- Lightspeed CSV Exports --- */}
+        <View style={{ width: "100%", height: 1, backgroundColor: C.buttonLightGreenOutline, marginTop: 20, marginBottom: 10 }} />
+        <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 10 }}>
+          Lightspeed CSV Exports
+        </Text>
+        <View style={{ width: "100%", flexDirection: "row", justifyContent: "center", flexWrap: "wrap" }}>
+          {[
+            { type: "csv-workorders", label: "Workorders" },
+            { type: "csv-workorderitems", label: "Workorder Items" },
+            { type: "csv-serialized", label: "Serialized" },
+            { type: "csv-items", label: "Items" },
+            { type: "csv-customers", label: "Customers" },
+            { type: "csv-sales", label: "Sales" },
+            { type: "csv-salelines", label: "Sale Lines" },
+          ].map((btn) => (
+            <View key={btn.type} style={{ alignItems: "center", margin: 10 }}>
+              <TouchableOpacity
+                onPress={() => handleLsImportType(btn.type, false)}
+                disabled={!!sLsImporting || !sLsConnected}
+                style={{
+                  ...buttonStyle,
+                  opacity: sLsImporting || !sLsConnected ? 0.5 : 1,
+                }}
+              >
+                <Image_ icon={ICONS.importIcon} size={30} />
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: C.text,
+                    marginTop: 8,
+                    fontWeight: "500",
+                    textAlign: "center",
+                  }}
+                >
+                  {sLsImporting === btn.type ? "Exporting..." : "Export " + btn.label}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+
         {sLsResult ? (
           <Text style={{ fontSize: 13, color: sLsResult.startsWith("Error") ? C.red : C.green, marginTop: 10, textAlign: "center" }}>
             {sLsResult}
@@ -4634,6 +4636,314 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                       }}
                     >
                       {TEXT_TEMPLATE_VARIABLES.map((v) => (
+                        <TouchableOpacity
+                          key={v.variable}
+                          onPress={() =>
+                            handleInsertVariable(templateObj, v.variable)
+                          }
+                          style={{
+                            backgroundColor: C.buttonLightGreen,
+                            borderWidth: 1,
+                            borderColor: C.buttonLightGreenOutline,
+                            borderRadius: 5,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            marginRight: 5,
+                            marginBottom: 5,
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: C.text }}>
+                            {v.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Save button - only for new unsaved templates */}
+                  {isNewTemplate(templateObj.id) && (
+                    <Button_
+                      colorGradientArr={COLOR_GRADIENTS.greenblue}
+                      text="SAVE"
+                      onPress={() => handleSaveNewTemplate(templateObj)}
+                      textStyle={{ color: C.textWhite, fontSize: 13 }}
+                      buttonStyle={{
+                        alignSelf: "flex-end",
+                        marginTop: 8,
+                        width: 100,
+                      }}
+                    />
+                  )}
+                </View>
+              );
+            }}
+          />
+        </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+const EMAIL_TEMPLATE_VARIABLES = [
+  { label: "First Name", variable: "{firstName}" },
+  { label: "Last Name", variable: "{lastName}" },
+  { label: "Customer Email", variable: "{customerEmail}" },
+  { label: "Brand", variable: "{brand}" },
+  { label: "Description", variable: "{description}" },
+  { label: "Total Amount", variable: "{totalAmount}" },
+  { label: "Line Items", variable: "{lineItems}" },
+  { label: "Customer Notes", variable: "{customerNotes}" },
+  { label: "Store Name", variable: "{storeName}" },
+  { label: "Store Address", variable: "{storeAddress}" },
+  { label: "Store Hours", variable: "{storeHours}" },
+  { label: "Store Phone", variable: "{storePhone}" },
+  { label: "Employee Name", variable: "{employeeName}" },
+  { label: "Pay Period", variable: "{payPeriod}" },
+  { label: "Daily Breakdown", variable: "{dailyBreakdown}" },
+  { label: "Total Hours", variable: "{totalHours}" },
+  { label: "Pay Rate", variable: "{payRate}" },
+  { label: "Total Pay", variable: "{totalPay}" },
+];
+
+const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const [sSelectedTemplateId, _setSelectedTemplateId] = useState(null);
+  const [sLocalEdits, _setLocalEdits] = useState({});
+  const [sNewTemplateIds, _setNewTemplateIds] = useState([]);
+  const [sUnsavedTemplates, _setUnsavedTemplates] = useState([]);
+  const cursorPositionRefs = useRef({});
+  const textInputRefs = useRef({});
+
+  let savedTemplates = zSettingsObj?.emailTemplates || [];
+  let templates = [...sUnsavedTemplates, ...savedTemplates];
+
+  function getLocalValue(templateId, field) {
+    let key = templateId + "_" + field;
+    return key in sLocalEdits ? sLocalEdits[key] : null;
+  }
+
+  function isNewTemplate(templateId) {
+    return sNewTemplateIds.indexOf(templateId) !== -1;
+  }
+
+  function handleAddTemplate() {
+    let newTemplate = {
+      id: generateRandomID(),
+      name: "",
+      subject: "",
+      body: "",
+    };
+    _setUnsavedTemplates([newTemplate, ...sUnsavedTemplates]);
+    _setNewTemplateIds([...sNewTemplateIds, newTemplate.id]);
+    _setSelectedTemplateId(newTemplate.id);
+  }
+
+  function handleSaveNewTemplate(templateObj) {
+    let finalTemplate = {
+      ...templateObj,
+      name: getLocalValue(templateObj.id, "name") ?? templateObj.name,
+      subject: getLocalValue(templateObj.id, "subject") ?? templateObj.subject,
+      body: getLocalValue(templateObj.id, "body") ?? templateObj.body,
+    };
+    let arr = [finalTemplate, ...savedTemplates];
+    handleSettingsFieldChange("emailTemplates", arr);
+    _setUnsavedTemplates(sUnsavedTemplates.filter((t) => t.id !== templateObj.id));
+    _setNewTemplateIds(sNewTemplateIds.filter((id) => id !== templateObj.id));
+    let newEdits = { ...sLocalEdits };
+    delete newEdits[templateObj.id + "_name"];
+    delete newEdits[templateObj.id + "_subject"];
+    delete newEdits[templateObj.id + "_body"];
+    _setLocalEdits(newEdits);
+  }
+
+  function handleDeleteTemplate(templateObj) {
+    if (isNewTemplate(templateObj.id)) {
+      _setUnsavedTemplates(sUnsavedTemplates.filter((t) => t.id !== templateObj.id));
+      _setNewTemplateIds(sNewTemplateIds.filter((id) => id !== templateObj.id));
+    } else {
+      let arr = savedTemplates.filter((t) => t.id !== templateObj.id);
+      handleSettingsFieldChange("emailTemplates", arr);
+    }
+    if (sSelectedTemplateId === templateObj.id) _setSelectedTemplateId(null);
+    let newEdits = { ...sLocalEdits };
+    delete newEdits[templateObj.id + "_name"];
+    delete newEdits[templateObj.id + "_subject"];
+    delete newEdits[templateObj.id + "_body"];
+    _setLocalEdits(newEdits);
+  }
+
+  function handleFieldChange(templateObj, field, val) {
+    if (isNewTemplate(templateObj.id)) {
+      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_" + field]: val });
+    } else {
+      let arr = savedTemplates.map((t) => {
+        if (t.id === templateObj.id) return { ...t, [field]: val };
+        return t;
+      });
+      handleSettingsFieldChange("emailTemplates", arr);
+    }
+  }
+
+  function handleInsertVariable(templateObj, variableStr) {
+    let currentBody = isNewTemplate(templateObj.id)
+      ? (getLocalValue(templateObj.id, "body") ?? templateObj.body)
+      : templateObj.body;
+    let cursorPos =
+      cursorPositionRefs.current[templateObj.id] ?? currentBody.length;
+    let before = currentBody.slice(0, cursorPos);
+    let after = currentBody.slice(cursorPos);
+    let newBody = before + variableStr + after;
+
+    if (isNewTemplate(templateObj.id)) {
+      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_body"]: newBody });
+    } else {
+      let arr = savedTemplates.map((t) => {
+        if (t.id === templateObj.id) return { ...t, body: newBody };
+        return t;
+      });
+      handleSettingsFieldChange("emailTemplates", arr);
+    }
+    cursorPositionRefs.current[templateObj.id] =
+      cursorPos + variableStr.length;
+    textInputRefs.current[templateObj.id]?.focus();
+  }
+
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent
+        style={{ width: "100%", alignItems: "center" }}
+      >
+        {/* Add button */}
+        <View style={{ width: "100%", alignItems: "flex-start" }}>
+          <BoxButton1 onPress={handleAddTemplate} />
+        </View>
+
+        {/* Templates list */}
+        <View style={{ marginTop: 10, width: "100%" }}>
+          <FlatList
+            data={templates}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item: templateObj }) => {
+              let isSelected = sSelectedTemplateId === templateObj.id;
+
+              return (
+                <View
+                  style={{
+                    width: "100%",
+                    marginBottom: 15,
+                    borderWidth: 1,
+                    borderColor: isSelected
+                      ? C.green
+                      : C.buttonLightGreenOutline,
+                    borderRadius: 10,
+                    padding: 10,
+                    backgroundColor: C.backgroundListWhite,
+                  }}
+                >
+                  {/* Row: template name + delete button */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <TextInput
+                      onChangeText={(val) =>
+                        handleFieldChange(templateObj, "name", val)
+                      }
+                      onFocus={() => _setSelectedTemplateId(templateObj.id)}
+                      placeholder="Template name..."
+                      placeholderTextColor={gray(0.3)}
+                      style={{
+                        flex: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderWidth: 1,
+                        borderRadius: 5,
+                        padding: 5,
+                        color: C.text,
+                        outlineWidth: 0,
+                        fontWeight: "500",
+                        fontSize: 14,
+                      }}
+                      value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "name") ?? templateObj.name) : templateObj.name}
+                    />
+                    <Tooltip text="Delete template" position="top">
+                      <BoxButton1
+                        onPress={() => handleDeleteTemplate(templateObj)}
+                        style={{ marginLeft: 10 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                      />
+                    </Tooltip>
+                  </View>
+
+                  {/* Subject line */}
+                  <TextInput
+                    onChangeText={(val) =>
+                      handleFieldChange(templateObj, "subject", val)
+                    }
+                    onFocus={() => _setSelectedTemplateId(templateObj.id)}
+                    placeholder="Email subject..."
+                    placeholderTextColor={gray(0.3)}
+                    style={{
+                      borderColor: C.buttonLightGreenOutline,
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      padding: 5,
+                      color: C.text,
+                      outlineWidth: 0,
+                      fontSize: 14,
+                      marginBottom: 8,
+                    }}
+                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "subject") ?? templateObj.subject) : templateObj.subject}
+                  />
+
+                  {/* Email body */}
+                  <TextInput
+                    ref={(el) => { if (el) textInputRefs.current[templateObj.id] = el; }}
+                    multiline={true}
+                    onChangeText={(val) =>
+                      handleFieldChange(templateObj, "body", val)
+                    }
+                    onFocus={() => _setSelectedTemplateId(templateObj.id)}
+                    onSelectionChange={(event) => {
+                      let { start } = event.nativeEvent.selection;
+                      cursorPositionRefs.current[templateObj.id] = start;
+                    }}
+                    onContentSizeChange={(event) => {
+                      let el = event?.target || event?.nativeEvent?.target;
+                      if (el) {
+                        el.style.height = "auto";
+                        el.style.height = el.scrollHeight + "px";
+                      }
+                    }}
+                    placeholder="Email body (HTML supported)..."
+                    placeholderTextColor={gray(0.3)}
+                    style={{
+                      borderColor: C.buttonLightGreenOutline,
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      padding: 8,
+                      color: C.text,
+                      outlineWidth: 0,
+                      fontSize: 14,
+                      minHeight: 120,
+                      textAlignVertical: "top",
+                      overflow: "hidden",
+                    }}
+                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "body") ?? templateObj.body) : templateObj.body}
+                  />
+
+                  {/* Variable buttons - shown when template is selected */}
+                  {isSelected && (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        marginTop: 8,
+                      }}
+                    >
+                      {EMAIL_TEMPLATE_VARIABLES.map((v) => (
                         <TouchableOpacity
                           key={v.variable}
                           onPress={() =>

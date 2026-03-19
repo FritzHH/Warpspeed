@@ -87,7 +87,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
     wo.color2 = COLORS[Math.floor(Math.random() * 6)];
     wo.description =
       SETTINGS_OBJ.bikeDescriptions[Math.floor(Math.random() * 4)];
-    wo.status = SETTINGS_OBJ.statuses[Math.floor(Math.random() * 5)];
+    wo.status = SETTINGS_OBJ.statuses[Math.floor(Math.random() * 5)]?.id || "";
     wo.customerFirst = "Ricky";
     wo.customerLast = "Bobby";
     wo.customerPhone = "2393369177";

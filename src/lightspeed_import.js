@@ -458,6 +458,7 @@ export function mapWorkorders(
       isStandaloneSale: false,
       media: [],
       _lsSaleID: wo.saleID || "",
+      _importSource: "lightspeed",
     };
 
     workorders.push(mappedWo);

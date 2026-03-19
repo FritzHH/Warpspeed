@@ -203,12 +203,10 @@ export function WorkordersComponent({}) {
   function sortWorkorders(inputArr) {
     // first remove any standalone sales
     inputArr = inputArr.filter((o) => !o.isStandaloneSale);
-    return inputArr;
-    // log('input arr', inputArr)
     let finalArr = [];
     let nowMillis = new Date().getTime();
-    const statuses = useSettingsStore.getState().settings?.statuses;
-    statuses?.statuses?.forEach((status) => {
+    const statuses = useSettingsStore.getState().settings?.statuses || [];
+    statuses.forEach((status) => {
       // log(status)
       let arr = [];
       inputArr.forEach((wo) => {
@@ -219,13 +217,15 @@ export function WorkordersComponent({}) {
         if (wo.status === status.id) arr.push(wo);
       });
 
-      // arr = sortBy(arr, "waitTime.maxWaitTimeDays");
-      arr = sortBy(arr, (wo) => {
-        let millisToCompletion =
-          wo.startedOnMillis +
-          wo.waitTime?.maxWaitTimeDays * NUM_MILLIS_IN_DAY -
-          nowMillis;
-        return millisToCompletion;
+      arr.sort((a, b) => {
+        let aHasWait = !!(a.waitTime?.maxWaitTimeDays && a.startedOnMillis);
+        let bHasWait = !!(b.waitTime?.maxWaitTimeDays && b.startedOnMillis);
+        if (aHasWait && !bHasWait) return -1;
+        if (!aHasWait && bHasWait) return 1;
+        if (!aHasWait && !bHasWait) return 0;
+        let aDue = a.startedOnMillis + a.waitTime.maxWaitTimeDays * NUM_MILLIS_IN_DAY;
+        let bDue = b.startedOnMillis + b.waitTime.maxWaitTimeDays * NUM_MILLIS_IN_DAY;
+        return aDue - bDue;
       });
 
       finalArr = [...finalArr, ...arr];

@@ -701,19 +701,16 @@ export const SETTINGS_OBJ = {
   waitTimes: [
     {
       id: "34j3kj3dfdfgfkj3",
-
       label: "Waiting",
       maxWaitTimeDays: 0,
     },
     {
       id: "34jngfedde3kj3kj3",
-
       label: "Today",
       maxWaitTimeDays: 0,
     },
     {
       id: "34j3kjdww3kj3",
-
       label: "Tomorrow",
       maxWaitTimeDays: 1,
     },

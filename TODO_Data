@@ -1,0 +1,225 @@
+Customer (phone: 2392919396): {
+  "id": "5759",
+  "first": "shop",
+  "last": "buddy",
+  "cell": "2392919396",
+  "landline": "",
+  "contactRestriction": "",
+  "email": "support@bonitabikes.com",
+  "streetAddress": "9102 Bonita Beach RD SE",
+  "unit": "#101",
+  "city": "Bonita Springs, FL",
+  "state": "Florida",
+  "zip": "34135",
+  "addressNotes": "",
+  "interactionRating": "",
+  "workorders": [
+    "C46yHL1ItvgKNw7TTrhn"
+  ],
+  "previousBikes": [],
+  "sales": [],
+  "millisCreated": "1765232596000"
+}
+
+
+
+Workorder 2949: {
+  "workorderNumber": "2949",
+  "id": "2949",
+  "customerID": "2012",
+  "customerFirst": "rob",
+  "customerLast": "trodella",
+  "customerPhone": "9544799052",
+  "model": "",
+  "brand": "J",
+  "description": "Nano",
+  "color1": {
+    "textColor": "white",
+    "backgroundColor": "darkgray",
+    "label": "Gray",
+    "altTextColor": "dimgray"
+  },
+  "color2": {
+    "textColor": "",
+    "backgroundColor": "",
+    "label": "",
+    "altTextColor": ""
+  },
+  "status": "puVa2Yq13SX04f4OMRf5",
+  "taxFree": true,
+  "archived": false,
+  "startedBy": "7",
+  "startedOnMillis": 1709674346000,
+  "finishedOnMillis": 1710612765000,
+  "workorderLines": [
+    {
+      "id": "RRljRd617ETYSMspiobR",
+      "qty": 1,
+      "intakeNotes": "",
+      "receiptNotes": "",
+      "inventoryItem": {
+        "id": "157",
+        "formalName": "Diagnostics - Electric Bike - Labor",
+        "informalName": "",
+        "brand": "",
+        "price": 2500,
+        "salePrice": 0,
+        "cost": 0,
+        "category": "Part",
+        "customPart": false,
+        "customLabor": false,
+        "minutes": 0
+      },
+      "discountObj": null,
+      "useSalePrice": false,
+      "warranty": false
+    },
+    {
+      "id": "AEynQEtqRMtf0bsgVMal",
+      "qty": 1,
+      "intakeNotes": "",
+      "receiptNotes": "",
+      "inventoryItem": {
+        "id": "485",
+        "formalName": "PEDALS SUNLT SPORT NYLON 9/16in BLK",
+        "informalName": "",
+        "brand": "",
+        "price": 1500,
+        "salePrice": 0,
+        "cost": 699,
+        "category": "Part",
+        "customPart": false,
+        "customLabor": false,
+        "minutes": 0
+      },
+      "discountObj": null,
+      "useSalePrice": false,
+      "warranty": false
+    },
+    {
+      "id": "NqcQkxqLKq8Dj7dPphes",
+      "qty": 1,
+      "intakeNotes": "",
+      "receiptNotes": "",
+      "inventoryItem": {
+        "id": "J2RA42KeNoYtjx6jsX2j",
+        "formalName": "Controller (OEM from company)",
+        "informalName": "",
+        "brand": "",
+        "price": 8000,
+        "salePrice": 0,
+        "cost": 0,
+        "category": "Part",
+        "customPart": true,
+        "customLabor": false,
+        "minutes": 0
+      },
+      "discountObj": null,
+      "useSalePrice": false,
+      "warranty": false
+    },
+    {
+      "id": "JW8oM1eWyXVBCp2yHuWR",
+      "qty": 1,
+      "intakeNotes": "",
+      "receiptNotes": "",
+      "inventoryItem": {
+        "id": "RfKOuxwhsLEQ2jMU4V6f",
+        "formalName": "Install new controller",
+        "informalName": "",
+        "brand": "",
+        "price": 8500,
+        "salePrice": 0,
+        "cost": 0,
+        "category": "Labor",
+        "customPart": false,
+        "customLabor": true,
+        "minutes": 60
+      },
+      "discountObj": {
+        "id": "Spy3UEdCISZrZVsdoeYq",
+        "discountName": "Lightspeed Import",
+        "discountValue": 50,
+        "discountType": "%",
+        "newPrice": 4250,
+        "savings": 4250
+      },
+      "useSalePrice": false,
+      "warranty": false
+    }
+  ],
+  "customerNotes": [
+    {
+      "id": "IrR0XplZCwPgYwaiFIXP",
+      "name": "Lightspeed Import",
+      "userID": "",
+      "value": "Problem 1) the controller showed an error-indicating light inside the case. A new controller was ordered, plugged in, connected,  and no error lights occurred.\n\nProblem 2) display connector at handlebars had a broken wire. We ran a separate display connector to the handlebars to fix the problem.\n\nProblem 3) throttle would not work. We thought perhaps the wiring was bad again, however we plugged a couple different throttles directly into the new controller, but no luck. This bike DOES NOT have a working throttle.\n\nWe cannot put any more time into this bike during the busy season. We MAY be able to solve the throttle and lights problem, however we are no longer able to do the work for free. We donated 4+ hours of free labor ($85/hour) to try to solve it, but could not."
+    }
+  ],
+  "internalNotes": [
+    {
+      "id": "ykUF2JtrFSwQSlr6y0UK",
+      "name": "Lightspeed Import",
+      "userID": "",
+      "value": "Nick  (3/14/2024 13:14:36)\nElectrical diagnostic deposit taken \nSupplied new display and wants it installed on the bike \n\nnew pedal"
+    }
+  ],
+  "changeLog": [],
+  "waitTime": "",
+  "partOrdered": "",
+  "partSource": "",
+  "paymentComplete": true,
+  "amountPaid": 17144,
+  "activeSaleID": "",
+  "sales": [
+    "shTUfTs3kexQm2zpUCwF"
+  ],
+  "endedOnMillis": "",
+  "saleID": "shTUfTs3kexQm2zpUCwF",
+  "isStandaloneSale": false,
+  "media": [],
+  "_lsSaleID": "6103"
+}
+Dashboard_Admin.js:3767 [LS Mapping] Sale for WO 2949: {
+  "id": "shTUfTs3kexQm2zpUCwF",
+  "millis": 1710612765000,
+  "subtotal": 20500,
+  "discount": 4250,
+  "tax": 894,
+  "salesTaxPercent": 0.055,
+  "total": 17144,
+  "amountCaptured": 17144,
+  "amountRefunded": 0,
+  "paymentComplete": true,
+  "workorderIDs": [
+    "2949"
+  ],
+  "payments": [
+    {
+      "id": "3424",
+      "saleID": "shTUfTs3kexQm2zpUCwF",
+      "amountCaptured": 17144,
+      "amountTendered": 17144,
+      "cash": false,
+      "check": false,
+      "cardType": "MASTERCARD",
+      "cardIssuer": "Credit Card",
+      "last4": "8674",
+      "authorizationCode": "",
+      "millis": 1710612741000,
+      "isRefund": false,
+      "paymentProcessor": "Lightspeed Import",
+      "chargeID": "st-ch_3Ov1iUFfuIutquDb0DhjP6vY",
+      "paymentIntentID": "f3f9d947-7b2b-4716-b020-6c845a5fde3a",
+      "receiptURL": "",
+      "expMonth": "",
+      "expYear": "",
+      "networkTransactionID": "",
+      "amountRefunded": 0,
+      "isDeposit": false,
+      "_cardFundingSource": "",
+      "_entryMode": ""
+    }
+  ],
+  "refunds": []
+}

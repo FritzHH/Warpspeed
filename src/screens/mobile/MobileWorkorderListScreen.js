@@ -4,7 +4,7 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useNavigate } from "react-router-dom";
 import { C } from "../../styles";
 import { useOpenWorkordersStore, useSettingsStore } from "../../stores";
-import { formatMillisForDisplay, resolveStatus } from "../../utils";
+import { capitalizeFirstLetterOfString, formatMillisForDisplay, resolveStatus } from "../../utils";
 
 export function MobileWorkorderListScreen() {
   const navigate = useNavigate();
@@ -75,7 +75,7 @@ export function MobileWorkorderListScreen() {
                     marginBottom: 4,
                   }}
                 >
-                  {(workorder.customerFirst || "") + " " + (workorder.customerLast || "")}
+                  {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
                 </Text>
 
                 {/* Brand + Description */}

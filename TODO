@@ -1,98 +1,116 @@
-//////// LAYOUT ////////////////////////
-
-
-
-
-
-
-
-
-
-
-
-
-
-/////////// FUNCTION //////////////////////////
- 
- workorder items need to have both Intake Notes and Receipt Notes; if neither are present, show 2 plus buttons; if 1 is present, show that text and the other button. here is how it will work: on item title press, if there are no internal notes then internal notes input will show. if there are internal notes (they will be showing already), show the receipt notes input. if the receipt notes input is already showing, then show the internal notes input.
-
-
-
-
-
-
-
-
-
- ///////////// AI NOTES /////////////////////////////
-
- Analyze this repo and summarize:
-
-- component structure
-- state management
-- navigation pattern
-- where UI screens live
-
-You will give me a plan for the following:
-
-in CheckoutModalScreen.js, i have created a complete checkout screen that has several functions. however, it has become a bit messy and i need a complete redo. i have created a folder called newCheckoutModalScreen. inside this folder, I want you to create a complete self-contained new checkout system, using smaller, separate components for each section of the checkout screen. I want you to write all new firebase functions inside this folder, do not reuse any current code for function calls. I want you to make entirely new Stripe functions to handle the process. you will label these with the prefix "newCheckout" so I can delineate them in the functions file.
-
-You can make entirely new sale objects to store in the db path for each sale, as I have not gotten that far yet with the sale process. However, you must follow the current workorder object setup as that is fairly mature. you can add fields to the workorder object if necessary.
-
-you will review the current checkout screen, and make your own checkout screen with all the features that are currently available there. maintain the currrent modal size. review the current screen, as I have included quite a bit of information for the user. everything that I currently have is required, however you may do as you please with the layout and structural design.
-
-I have created all the zustand stores you will need (settings, workorders, etc). do not edit these unless you clear it with me first.
-
-Here is the general workflow: either the new sale button is pressed opening the modal with no previous information -- this is to make a standalone sale without involving a workorder. inventory items are added by the user and the totals are tallied, then the checkout process commences. If the new sale button has not been pressed, that means the "checkout" button was pressed from the Items_WorkorderItems page. this button opens the checkout modal with the current open workorder in it, for the purposes of completing the workorder and sale.
-
-** DO NOT USE A DEPOSIT SYSTEM (you will see a few deposit-related items in the current file, but that is a previous design)
-
-when the modal opens with a workorder, we also must search for other open workorders the user has, so that we can combine them (user-selectable to if and how many they want to combine). list these clearly with the option to select/deselect them to add to the sale. 
-
-We must be able to:
-- take partial payment on a workorder (sometimes a customer pre-pays a certain portion of a workorder, so we must be able to record a partial payment on the workorder itself)
-- split payments across cash and as many cards as necessary
-- combine workorders as outlined above, while also splitting payment across them using cash and card transactions
-- be network-failure proof --> this means the split transactions need to be stored in the db as completed in real time, in case we have to come back to the sale
-
-also, when a workorder has been opened in the checkout modal, we must also allow the user to search for and add inventory items (by scanning in a upc or typing a search term) to the current sale. on-screen, we want the added items to be differentiated visually from the workorder ticket. however when the sale transaction is complete, the added items will be added to the workorder, as if they were added on in the main workorder edit screen process.
-
-add a selection for if the user is paying by check (but this selection is conditional on the acceptChecks boolean in the settings db node).
-
-take into account the useCardFee boolean in the settings object. add this to the sale if true, and use the percentage in cardFeePercent in settings.
-
-use salesTaxPercent in settings for sales tax calculations.
-
-REFUND DISCUSSION
-For refunds, the user will open up the checkout modal by scanning a ticket in from the main page. you can choose if you want to separate refunds from sales, and if so may create a different modal screen that opens up when scanning in a sale id. include the word "sale" in the sale id so that the app knows that a sale is being scanned (instead of a workorder). 
-
-for refunds, we will allow the user to either: 1) select items from the workorder that they want to refund 2) create a custom refund amount up to and including the total original sale, accounting for any previous refunds already completed. the user cannot start a refund for more than the total original sale under any circumstances. we must account for edge cases such as a previous custom refund, then the user comes back and wants to return an item, but that item exceeds the amount avaialable to refund. implement any other edge cases as you see fit.
-
-use cardFeeRefund in settings to know whether to refund the card fee percentage to the customer or not.
-
-Propose a component structure before writing code.
-
-
-
-
-
-
-
-///////////// ME NOTES ///////////////////////////////
-
-Handling sales:
-- Forget deposit function for now. this is really only needed for distribution as SaaS
-Payments:
-apply the payment to the workorder; in each sale object, record which workorder(s) the sale applied to that were combined at the time.
-
-Refunds:
-scan the sale ticket. all workorders that the original sale applied to will appear. each item will be available for selection to refund, up to and including the total amount on the receipt ticket. (split sales see below)
-
-we will always have a cash refund icon option. if the sale was paid with a card, also show a card refund icon. pressing each button will add the item total (including sales tax) for the card or cash refund amount. 
-
-* when recording a refund for an item, record the amount of the refund on the workorder ticket itself at the item level (as well as record the workorder, item and amount in the sale object). when the system loads the workorder again, it will see this and show the amount of the item refunded onscreen (this will also deal with split payments)
-
-- we need an option to keep the cc surcharge or to refund it on the cash and card payment components (should be create new boxes for the refund sales instead of using the CARD SALE and CASH SALE boxes?)
-
-
-- split sales: if the sale was recorded as a split sale: 
+Workorder 11930: {
+  "workorderNumber": "11930",
+  "id": "oDcymnZTEem4qvAQB6nb",
+  "customerID": "5759",
+  "customerFirst": "shop",
+  "customerLast": "buddy",
+  "customerPhone": "239-291-9396",
+  "model": "Townie",
+  "brand": "Trek",
+  "description": "Trek Townie",
+  "color1": {
+    "textColor": "white",
+    "backgroundColor": "green",
+    "label": "Green",
+    "altTextColor": "dimgray"
+  },
+  "color2": {
+    "textColor": "",
+    "backgroundColor": "",
+    "label": "",
+    "altTextColor": ""
+  },
+  "status": {
+    "textColor": "black",
+    "removable": true,
+    "id": "tsgtNVbxQW0X0AWNVfkV",
+    "label": "Service",
+    "backgroundColor": "rgb(192,192,192)",
+    "altTextColor": "dimgray"
+  },
+  "taxFree": false,
+  "archived": false,
+  "startedBy": "1",
+  "startedOnMillis": "",
+  "finishedOnMillis": "",
+  "workorderLines": [
+    {
+      "id": "ENaYEu82azlmtRJo34Yj",
+      "qty": 1,
+      "intakeNotes": "",
+      "receiptNotes": "",
+      "inventoryItem": {
+        "id": "991",
+        "formalName": "Inner Tube - Standard Sizes - Part",
+        "informalName": "",
+        "brand": "",
+        "price": 1033,
+        "salePrice": 0,
+        "cost": 0,
+        "category": "Part"
+      },
+      "discountObj": null,
+      "useSalePrice": false,
+      "warranty": false
+    },
+    {
+      "id": "n4oEDm9JxjWwEbyse9ob",
+      "qty": 1,
+      "intakeNotes": "",
+      "receiptNotes": "",
+      "inventoryItem": {
+        "id": "1436",
+        "formalName": "Tube or Tire Labor - Standard Wheel",
+        "informalName": "",
+        "brand": "",
+        "price": 1314,
+        "salePrice": 0,
+        "cost": 0,
+        "category": "Labor"
+      },
+      "discountObj": null,
+      "useSalePrice": false,
+      "warranty": false
+    },
+    {
+      "id": "RmSBzZcQphKuETz8rRPO",
+      "qty": 1,
+      "intakeNotes": "",
+      "receiptNotes": "",
+      "inventoryItem": {
+        "id": "906",
+        "formalName": "Tire - Fat - 26 x 4 - BB Brand",
+        "informalName": "",
+        "brand": "",
+        "price": 6000,
+        "salePrice": 0,
+        "cost": 0,
+        "category": "Part"
+      },
+      "discountObj": null,
+      "useSalePrice": false,
+      "warranty": false
+    }
+  ],
+  "customerNotes": [
+    {
+      "id": "GOto7ZFVLXhSluL7Bql8",
+      "name": "Lightspeed Import",
+      "userID": "",
+      "value": "Hey customer, here are some notes for you!"
+    }
+  ],
+  "internalNotes": [],
+  "changeLog": [],
+  "waitTime": "",
+  "partOrdered": "",
+  "partSource": "",
+  "paymentComplete": false,
+  "amountPaid": 0,
+  "activeSaleID": "",
+  "sales": [],
+  "endedOnMillis": "",
+  "saleID": "",
+  "isStandaloneSale": false,
+  "media": []
+}

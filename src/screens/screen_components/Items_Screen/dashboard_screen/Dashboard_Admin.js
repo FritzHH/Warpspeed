@@ -51,16 +51,14 @@ import { Children, useEffect, useRef, useState } from "react";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
-import { APP_USER, INVENTORY_ITEM_PROTO, WORKORDER_PROTO, WORKORDER_ITEM_PROTO, CUSTOMER_PROTO } from "../../../../data";
+import { APP_USER } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
-import { dbSaveInventoryItem, dbClearCollection, dbSaveSettingsField, dbSaveOpenWorkorder, dbCompleteWorkorder, dbSaveCustomer, dbListenToDevLogs } from "../../../../db_calls_wrapper";
-import { lightspeedInitiateAuthCallable, lightspeedCheckConnectionCallable, lightspeedImportDataCallable, firestoreRead } from "../../../../db_calls";
-import workordersCsvUrl from "../../../../assets/import_data/workorders.csv";
-import workordersBySaleCsvUrl from "../../../../assets/import_data/workorders_by_sale.csv";
-import customersCsvUrl from "../../../../assets/import_data/customers.csv";
+import { dbSaveSettingsField, dbListenToDevLogs, dbSaveOpenWorkorder } from "../../../../db_calls_wrapper";
+import { mapCustomers, mapWorkorders } from "../../../../lightspeed_import";
+import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead } from "../../../../db_calls";
 
 const TAB_NAMES = {
   users: "User Control",
@@ -3563,398 +3561,15 @@ const OrderingComponent = ({
 };
 
 let _lsConnectionCache = null;
+let _lsCsvData = null;
 
 const ImportComponent = () => {
-  const zSettings = useSettingsStore((state) => state.settings);
-  const [sImporting, _setImporting] = useState("");
-  const [sResult, _setResult] = useState("");
-  const [sClearInventory, _setClearInventory] = useState(true);
-  const [sClearStatuses, _setClearStatuses] = useState(true);
   const [sLsConnected, _setLsConnected] = useState(_lsConnectionCache?.connected || false);
-  const [sLsAccountName, _setLsAccountName] = useState(_lsConnectionCache?.accountName || "");
   const [sLsImporting, _setLsImporting] = useState("");
   const [sLsResult, _setLsResult] = useState("");
-  const [sLsSaveCust, _setLsSaveCust] = useState(false);
-  const [sLsSaveSales, _setLsSaveSales] = useState(false);
-  const [sLsSaveWo, _setLsSaveWo] = useState(false);
-
-  // --- CSV parsing utilities ---
-  function parseCSVLine(line) {
-    let result = [];
-    let current = "";
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      let ch = line[i];
-      if (ch === '"') { inQuotes = !inQuotes; }
-      else if (ch === ',' && !inQuotes) { result.push(current); current = ""; }
-      else { current += ch; }
-    }
-    result.push(current);
-    return result;
-  }
-
-  function parseCSV(text) {
-    let lines = text.split("\n").filter(l => l.trim());
-    let headers = parseCSVLine(lines[0]);
-    return lines.slice(1).map(line => {
-      let values = parseCSVLine(line);
-      let obj = {};
-      headers.forEach((h, i) => obj[h.trim()] = (values[i] || "").trim());
-      return obj;
-    });
-  }
-
-  // --- Import Inventory (preview mode) ---
-  async function handleImportInventory() {
-    try {
-      _setImporting("inventory");
-      _setResult("");
-      let res = await fetch(process.env.PUBLIC_URL + "/import_data/inventory.csv");
-      let text = await res.text();
-      let rows = parseCSV(text);
-
-      let items = rows.map(row => {
-        let item = cloneDeep(INVENTORY_ITEM_PROTO);
-        item.id = generateRandomID();
-        item.formalName = row["Description"] || "";
-        item.price = dollarsToCents(row["Price"]) || 0;
-        item.cost = dollarsToCents(row["Default Cost"]) || 0;
-        item.upc = row["UPC"] || "";
-        item.ean = row["EAN"] || "";
-        item.customSku = row["Custom SKU"] || "";
-        item.manufacturerSku = row["Manufact. SKU"] || "";
-        if ((item.formalName || "").toLowerCase().includes("labor")) {
-          item.category = "Labor";
-        }
-        return item;
-      });
-
-      console.log("=== IMPORT PREVIEW: INVENTORY ===");
-      console.log("Total entries:", items.length);
-      console.log("First 25:", JSON.stringify(items.slice(0, 25), null, 2));
-
-      // Clear existing inventory if checked, then save new
-      let clearedCount = 0;
-      if (sClearInventory) {
-        let cleared = await dbClearCollection("inventory");
-        clearedCount = cleared.deletedCount;
-        console.log("Cleared inventory:", clearedCount, "docs");
-      }
-      for (let i = 0; i < items.length; i++) {
-        await dbSaveInventoryItem(items[i]);
-        if ((i + 1) % 50 === 0) console.log("Saved", i + 1, "/", items.length);
-      }
-      _setResult("Imported " + items.length + " inventory items" + (sClearInventory ? " (cleared " + clearedCount + " old)" : " (merged)"));
-    } catch (err) {
-      console.error("Import inventory error:", err);
-      _setResult("Error: " + err.message);
-    } finally {
-      _setImporting("");
-    }
-  }
-
-  // --- Import Statuses ---
-  async function handleImportStatuses() {
-    try {
-      _setImporting("statuses");
-      _setResult("");
-      let res = await fetch(process.env.PUBLIC_URL + "/import_data/statuses.csv");
-      let text = await res.text();
-      let rows = parseCSV(text);
-
-      let statuses = rows.map(row => {
-        let bgColor = row["Color"] || "";
-        let textColor = bgColor ? bestForegroundHex(bgColor) : "black";
-        return {
-          id: generateRandomID(),
-          label: row["Status"] || "",
-          textColor: textColor,
-          backgroundColor: bgColor || "rgb(192,192,192)",
-          removable: true,
-        };
-      });
-
-      console.log("=== IMPORT PREVIEW: STATUSES ===");
-      console.log("Total statuses:", statuses.length);
-      console.log(JSON.stringify(statuses, null, 2));
-
-      // Get current settings statuses
-      let currentStatuses = useSettingsStore.getState().getSettings()?.statuses || [];
-      let nonRemovable = currentStatuses.filter(s => s.removable === false);
-
-      let newStatuses;
-      if (sClearStatuses) {
-        // Keep non-removable, replace removable with imported
-        newStatuses = [...nonRemovable, ...statuses];
-        console.log("Kept", nonRemovable.length, "non-removable, replaced removable with", statuses.length, "imported");
-      } else {
-        // Merge: keep existing, add imported
-        newStatuses = [...currentStatuses, ...statuses];
-        console.log("Merged:", currentStatuses.length, "existing +", statuses.length, "imported");
-      }
-
-      await dbSaveSettingsField("statuses", newStatuses);
-      _setResult("Imported " + statuses.length + " statuses" + (sClearStatuses ? " (kept " + nonRemovable.length + " non-removable)" : " (merged)"));
-    } catch (err) {
-      console.error("Import statuses error:", err);
-      _setResult("Error: " + err.message);
-    } finally {
-      _setImporting("");
-    }
-  }
-
-  // --- Workorder CSV Import ---
-
-  function cleanItemDescription(item) {
-    if (!item) return "";
-    let cleaned = item.trim();
-    // Remove trailing -SOURCE or /SOURCE annotations (e.g., "-EBAY", "/AMAZON", "-JBI")
-    cleaned = cleaned.replace(/\s+[-\/][A-Z][A-Z0-9]*\s*$/, "");
-    // Remove trailing N/N batch numbers (e.g., "1/2", "2/2")
-    cleaned = cleaned.replace(/\s+\d+\/\d+\s*$/, "");
-    // Remove trailing ALL-CAPS words (no lowercase, has uppercase, 2+ chars)
-    let words = cleaned.split(/\s+/);
-    while (words.length > 1) {
-      let last = words[words.length - 1];
-      if (last.length >= 2 && /[A-Z]/.test(last) && !/[a-z]/.test(last)) {
-        words.pop();
-      } else {
-        break;
-      }
-    }
-    return words.join(" ").trim();
-  }
-
-  function mapLightspeedStatus(lsStatus) {
-    if (!lsStatus) return "Newly Created";
-    let map = {
-      "Done & Paid": "Finished",
-      "Finished": "Finished",
-      "Finished - No Auto Text": "Finished",
-      "Finished - Customer Picking Up Part/Accessory": "Finished",
-      "Service": "Service",
-      "Service - Priority": "Service",
-      "Work In Progress": "Service",
-      "Waiting": "Newly Created",
-      "Open": "Newly Created",
-      "Part Ordered": "Part Ordered",
-      "Battery Ordered": "Part Ordered",
-      "Bicycle Ordered": "Part Ordered",
-      "Part in Cart": "Part Ordered",
-      "Texting Customer": "Messaging Customer",
-      "Fritz Work": "Service",
-      "Customer Bringing For Service": "Newly Created",
-    };
-    return map[lsStatus] || "Newly Created";
-  }
-
-  async function handleImportWorkordersFromCSV() {
-    _setImporting("workorders");
-    _setResult("");
-    try {
-      // Step 1: Fetch & parse all 4 CSVs
-      let [woText, wbsText, salesText, custText] = await Promise.all([
-        fetch(workordersCsvUrl).then(r => r.text()),
-        fetch(workordersBySaleCsvUrl).then(r => r.text()),
-        Promise.resolve(""),
-        fetch(customersCsvUrl).then(r => r.text()),
-      ]);
-      let woRows = parseCSV(woText);
-      let wbsRows = parseCSV(wbsText);
-      let salesRows = parseCSV(salesText);
-      let custRows = parseCSV(custText);
-
-      // Step 2: Build lookup maps
-      let customerMap = {};
-      for (let c of custRows) {
-        let key = ((c["First Name"] || "") + " " + (c["Last Name"] || "")).trim().toLowerCase();
-        if (key) customerMap[key] = c;
-      }
-
-      let salesMap = {};
-      for (let s of salesRows) {
-        let orderID = s["Order ID"];
-        if (orderID) salesMap[orderID] = s;
-      }
-
-      let woMap = {};
-      for (let w of woRows) {
-        if (w["ID"]) woMap[w["ID"]] = w;
-      }
-
-      // Step 3: Process workorders_by_sale.csv — group by workorder number
-      let woSaleData = {};
-
-      for (let row of wbsRows) {
-        let desc = row["Description"] || "";
-        let woMatch = desc.match(/Work order #(\d+)/);
-        if (!woMatch) continue;
-
-        let woNum = woMatch[1];
-        if (!woSaleData[woNum]) {
-          woSaleData[woNum] = { saleIDs: new Set(), lineItems: [], internalNotes: [], bikeName: "", customerName: "", noteText: "" };
-        }
-        let data = woSaleData[woNum];
-        data.saleIDs.add(row["ID"]);
-        data.customerName = row["Customer"] || data.customerName;
-
-        // Extract bike name from "Item: XXXX" in header row
-        let itemMatch = desc.match(/Item:\s*([^\n\r)]+)/);
-        if (itemMatch) {
-          data.bikeName = itemMatch[1].trim();
-          // Extract embedded notes (text after first line of description)
-          let afterItem = desc.substring(desc.indexOf(itemMatch[0]) + itemMatch[0].length);
-          let noteLines = afterItem.split(/[\n\r]+/).map(l => l.trim().replace(/^\)$/, "")).filter(l => l && l !== ")");
-          if (noteLines.length > 0) data.noteText = noteLines.join("\n");
-        }
-
-        // Collect internal notes from dedicated column
-        let intNote = row["Work Order Internal Note"] || "";
-        if (intNote.trim() && intNote.trim() !== "'") {
-          data.internalNotes.push(intNote.trim().replace(/^'/, ""));
-        }
-
-        // Non-header rows are line items (services/parts with prices)
-        if (!itemMatch) {
-          let lineDesc = desc.replace(/^\s*\(/, "").replace(/\)\s*$/, "").trim();
-          let retail = row["Retail"] || "$0.00";
-          let qty = parseInt(row["Qty"]) || 1;
-          if (lineDesc) {
-            data.lineItems.push({ description: lineDesc, qty, retail });
-          }
-        }
-      }
-
-      // Step 4: Build and save workorders
-      let savedCount = 0;
-      let archivedCount = 0;
-      let allWoNumbers = new Set([
-        ...Object.keys(woMap),
-        ...Object.keys(woSaleData),
-      ]);
-
-      let woNumArr = [...allWoNumbers];
-      let previewLimit = 25;
-
-      for (let i = 0; i < Math.min(woNumArr.length, previewLimit); i++) {
-        let woNum = woNumArr[i];
-        let woRow = woMap[woNum];
-        let saleData = woSaleData[woNum];
-        let isOpen = !!woRow;
-
-        // Build customer
-        let custName = woRow?.["Customer"] || saleData?.customerName || "";
-        let nameParts = custName.trim().split(/\s+/);
-        let custFirst = capitalizeFirstLetterOfString(nameParts[0] || "");
-        let custLast = capitalizeFirstLetterOfString(nameParts.slice(1).join(" ") || "");
-        let custKey = custName.trim().toLowerCase();
-        let custRow = customerMap[custKey];
-        let custPhone = custRow?.["Mobile"] || custRow?.["Home"] || custRow?.["Work"] || "";
-        custPhone = custPhone.replace(/\D/g, "");
-        let custEmail = custRow?.["Email"] || "";
-
-        let customerID = generateRandomID();
-        let customer = cloneDeep(CUSTOMER_PROTO);
-        customer.id = customerID;
-        customer.first = custFirst;
-        customer.last = custLast;
-        customer.cell = custPhone;
-        customer.email = custEmail;
-        if (custRow) {
-          customer.streetAddress = custRow["Address1"] || "";
-          customer.city = custRow["City"] || "";
-          customer.state = custRow["State"] || "";
-          customer.zip = custRow["ZIP"] || "";
-        }
-        customer.millisCreated = Date.now().toString();
-
-        // Build workorder
-        let wo = cloneDeep(WORKORDER_PROTO);
-        wo.id = generateRandomID();
-        wo.workorderNumber = woNum;
-        wo.customerID = customerID;
-        wo.customerFirst = custFirst;
-        wo.customerLast = custLast;
-        wo.customerPhone = custPhone;
-
-        // Bike description (cleaned)
-        let rawItem = woRow?.["Item"] || saleData?.bikeName || "";
-        wo.description = cleanItemDescription(rawItem);
-
-        // Status — look up by label to get the ID
-        if (isOpen) {
-          const mappedLabel = mapLightspeedStatus(woRow["Status"]);
-          const matchedStatus = zSettings.statuses?.find(
-            s => s.label?.toLowerCase() === mappedLabel.toLowerCase()
-          );
-          wo.status = matchedStatus?.id || "";
-        } else {
-          const finishedStatus = zSettings.statuses?.find(
-            s => s.label?.toLowerCase() === "finished"
-          );
-          wo.status = finishedStatus?.id || "";
-        }
-
-        // Dates
-        let dateStr = woRow?.["Date In"] || "2026-03-01";
-        let dateIn = new Date(dateStr);
-        wo.startedOnMillis = dateIn.getTime().toString();
-        if (!isOpen) wo.endedOnMillis = Date.now().toString();
-
-        // Payment info
-        wo.paymentComplete = woRow?.["Status"] === "Done & Paid" || !isOpen;
-        if (saleData?.saleIDs) {
-          let totalPaid = 0;
-          for (let saleID of saleData.saleIDs) {
-            let saleRow = salesMap[saleID];
-            if (saleRow) {
-              totalPaid += Math.round(parseFloat(saleRow["Amount"] || "0") * 100);
-            }
-          }
-          wo.amountPaid = totalPaid;
-        }
-
-        // Line items
-        if (saleData?.lineItems) {
-          wo.workorderLines = saleData.lineItems.map(li => {
-            let line = cloneDeep(WORKORDER_ITEM_PROTO);
-            line.id = generateRandomID();
-            line.qty = li.qty;
-            let inv = cloneDeep(INVENTORY_ITEM_PROTO);
-            inv.id = generateRandomID();
-            inv.formalName = li.description;
-            inv.price = dollarsToCents(li.retail.replace("$", "").replace(",", ""));
-            line.inventoryItem = inv;
-            return line;
-          });
-        }
-
-        // Internal notes
-        let allNotes = [];
-        if (saleData?.noteText) allNotes.push(saleData.noteText);
-        if (saleData?.internalNotes) allNotes.push(...saleData.internalNotes);
-        wo.internalNotes = allNotes.map(note => ({
-          id: generateRandomID(),
-          text: note,
-          millis: dateIn.getTime().toString(),
-          user: "Lightspeed Import",
-        }));
-
-        // PREVIEW: console.log instead of saving, and add to Zustand store
-        console.log("=== WO #" + woNum + " (" + (isOpen ? "OPEN" : "ARCHIVED") + ") ===");
-        console.log(JSON.stringify(wo, null, 2));
-        useOpenWorkordersStore.getState().setWorkorder(wo, false);
-        savedCount++;
-      }
-
-      _setResult("Preview logged " + savedCount + " of " + woNumArr.length + " workorders to console");
-    } catch (e) {
-      console.error("Import workorders error:", e);
-      _setResult("Error: " + (e.message || "Unknown error"));
-    } finally {
-      _setImporting("");
-    }
-  }
+  const [sWoLookup, _setWoLookup] = useState("2949");
+  const [sCustLookup, _setCustLookup] = useState("");
+  const [sLookupLoading, _setLookupLoading] = useState(false);
 
   // --- Lightspeed handlers ---
 
@@ -3983,7 +3598,6 @@ const ImportComponent = () => {
       if (lsDoc?.accessToken) {
         _lsConnectionCache = { connected: true, accountName: lsDoc.accountID || "" };
         _setLsConnected(true);
-        _setLsAccountName(lsDoc.accountID || "");
         _setLsResult("Connected to Lightspeed" + (lsDoc.accountID ? ": " + lsDoc.accountID : ""));
         _setLsImporting("");
         stopLsConnectionPoll();
@@ -4000,8 +3614,9 @@ const ImportComponent = () => {
     try {
       _setLsImporting("connecting");
       _setLsResult("");
-      const tenantID = zSettings?.tenantID;
-      const storeID = zSettings?.storeID;
+      const settings = useSettingsStore.getState().settings;
+      const tenantID = settings?.tenantID;
+      const storeID = settings?.storeID;
       if (!tenantID || !storeID) {
         _setLsResult("Error: tenantID or storeID not found in settings");
         _setLsImporting("");
@@ -4035,8 +3650,9 @@ const ImportComponent = () => {
     try {
       _setLsImporting(importType);
       _setLsResult("");
-      const tenantID = zSettings?.tenantID;
-      const storeID = zSettings?.storeID;
+      const settings = useSettingsStore.getState().settings;
+      const tenantID = settings?.tenantID;
+      const storeID = settings?.storeID;
 
       // Start dev log listener for real-time console output
       let lastLogCount = -1;
@@ -4102,6 +3718,77 @@ const ImportComponent = () => {
     _setLsImporting("");
   }
 
+  // --- Mapping lookup handlers ---
+
+  async function loadAndCacheLightspeedData() {
+    if (_lsCsvData) return _lsCsvData;
+    const [custText, woText, wiText, serText, itemsText, slText] = await Promise.all([
+      fetch("/lightspeed/customers.csv").then(r => r.text()),
+      fetch("/lightspeed/workorders.csv").then(r => r.text()),
+      fetch("/lightspeed/workorderItems.csv").then(r => r.text()),
+      fetch("/lightspeed/serialized.csv").then(r => r.text()),
+      fetch("/lightspeed/items.csv").then(r => r.text()),
+      fetch("/lightspeed/salesLines.csv").then(r => r.text()),
+    ]);
+    const customers = mapCustomers(custText);
+    const customerMap = {};
+    for (const c of customers) customerMap[c.id] = c;
+    const settings = useSettingsStore.getState().settings;
+    const statuses = settings?.statuses || [];
+    const workorders = mapWorkorders(woText, wiText, serText, itemsText, slText, customerMap, statuses);
+    _lsCsvData = { customers, customerMap, workorders };
+    console.log("[LS Mapping] Loaded & cached: " + customers.length + " customers, " + workorders.length + " workorders");
+    return _lsCsvData;
+  }
+
+  async function handleWoLookup() {
+    if (!sWoLookup.trim()) return;
+    _setLookupLoading(true);
+    try {
+      const data = await loadAndCacheLightspeedData();
+      const wo = data.workorders.find(w => w.workorderNumber === sWoLookup.trim());
+      if (wo) {
+        console.log("[LS Mapping] Workorder " + sWoLookup.trim() + ":", JSON.stringify(wo, null, 2));
+        await dbSaveOpenWorkorder(wo);
+        useOpenWorkordersStore.getState().setOpenWorkorders([wo]);
+        useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+        _setLsResult("Workorder " + sWoLookup.trim() + " saved to DB");
+      } else {
+        console.log("[LS Mapping] Workorder " + sWoLookup.trim() + " not found");
+        _setLsResult("Workorder " + sWoLookup.trim() + " not found");
+      }
+    } catch (e) {
+      console.error("[LS Mapping] Error:", e);
+      _setLsResult("Error: " + e.message);
+    }
+    _setLookupLoading(false);
+  }
+
+  async function handleCustLookup() {
+    if (!sCustLookup.trim()) return;
+    _setLookupLoading(true);
+    try {
+      const data = await loadAndCacheLightspeedData();
+      const digits = sCustLookup.trim().replace(/\D/g, "");
+      const cust = data.customers.find(c => {
+        const cellDigits = c.cell.replace(/\D/g, "");
+        const landlineDigits = c.landline.replace(/\D/g, "");
+        return cellDigits === digits || landlineDigits === digits;
+      });
+      if (cust) {
+        console.log("[LS Mapping] Customer (phone: " + sCustLookup.trim() + "):", JSON.stringify(cust, null, 2));
+        _setLsResult("Customer " + capitalizeFirstLetterOfString(cust.first) + " " + capitalizeFirstLetterOfString(cust.last) + " logged to console");
+      } else {
+        console.log("[LS Mapping] No customer with phone " + sCustLookup.trim());
+        _setLsResult("No customer with phone " + sCustLookup.trim());
+      }
+    } catch (e) {
+      console.error("[LS Mapping] Error:", e);
+      _setLsResult("Error: " + e.message);
+    }
+    _setLookupLoading(false);
+  }
+
   let buttonStyle = {
     width: 200,
     height: 80,
@@ -4112,7 +3799,6 @@ const ImportComponent = () => {
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
-    opacity: sImporting ? 0.5 : 1,
   };
 
   return (
@@ -4120,117 +3806,9 @@ const ImportComponent = () => {
       <BoxContainerInnerComponent
         style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
       >
-        <View
-          style={{
-            width: "100%",
-            flexDirection: "row",
-            justifyContent: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
-              onPress={handleImportInventory}
-              disabled={!!sImporting}
-              style={buttonStyle}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.text,
-                  marginTop: 8,
-                  fontWeight: "500",
-                }}
-              >
-                {sImporting === "inventory" ? "Importing..." : "Import Inventory"}
-              </Text>
-            </TouchableOpacity>
-            <CheckBox_
-              isChecked={sClearInventory}
-              onCheck={() => _setClearInventory(!sClearInventory)}
-              text={"Clear existing"}
-              buttonStyle={{ marginTop: 7 }}
-            />
-          </View>
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
-              onPress={handleImportStatuses}
-              disabled={!!sImporting}
-              style={buttonStyle}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.text,
-                  marginTop: 8,
-                  fontWeight: "500",
-                }}
-              >
-                {sImporting === "statuses" ? "Importing..." : "Import Statuses"}
-              </Text>
-            </TouchableOpacity>
-            <CheckBox_
-              isChecked={sClearStatuses}
-              onCheck={() => _setClearStatuses(!sClearStatuses)}
-              text={"Clear existing"}
-              buttonStyle={{ marginTop: 7 }}
-            />
-          </View>
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
-              onPress={handleImportWorkordersFromCSV}
-              disabled={!!sImporting}
-              style={buttonStyle}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.text,
-                  marginTop: 8,
-                  fontWeight: "500",
-                  textAlign: "center",
-                }}
-              >
-                {sImporting === "workorders" ? "Importing..." : "Import Workorders (CSV)"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
-              onPress={() => {
-                useOpenWorkordersStore.getState().setOpenWorkorders([]);
-                _setResult("Cleared preview workorders from store");
-              }}
-              style={buttonStyle}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.red,
-                  marginTop: 8,
-                  fontWeight: "500",
-                  textAlign: "center",
-                }}
-              >
-                Clear Preview
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        {sResult ? (
-          <Text style={{ fontSize: 13, color: sResult.startsWith("Error") ? C.red : C.green, marginTop: 10, textAlign: "center" }}>
-            {sResult}
-          </Text>
-        ) : null}
-
-        {/* --- Lightspeed Import Section --- */}
-        <View style={{ width: "100%", height: 1, backgroundColor: C.buttonLightGreenOutline, marginTop: 20, marginBottom: 10 }} />
+        {/* --- Lightspeed Connection --- */}
         <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 10 }}>
-          Lightspeed Import
+          Lightspeed
         </Text>
         <View
           style={{
@@ -4269,93 +3847,6 @@ const ImportComponent = () => {
                   : "Connect to Lightspeed"}
               </Text>
             </TouchableOpacity>
-          </View>
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
-              onPress={() => handleLsImportType("customers", sLsSaveCust)}
-              disabled={!!sLsImporting || !sLsConnected}
-              style={{
-                ...buttonStyle,
-                opacity: sLsImporting || !sLsConnected ? 0.5 : 1,
-              }}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.text,
-                  marginTop: 8,
-                  fontWeight: "500",
-                  textAlign: "center",
-                }}
-              >
-                {sLsImporting === "customers" ? "Importing..." : "Import Customers"}
-              </Text>
-            </TouchableOpacity>
-            <CheckBox_
-              isChecked={sLsSaveCust}
-              onCheck={() => _setLsSaveCust(!sLsSaveCust)}
-              text={"Save to DB"}
-              buttonStyle={{ marginTop: 7 }}
-            />
-          </View>
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
-              onPress={() => handleLsImportType("sales", sLsSaveSales)}
-              disabled={!!sLsImporting || !sLsConnected}
-              style={{
-                ...buttonStyle,
-                opacity: sLsImporting || !sLsConnected ? 0.5 : 1,
-              }}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.text,
-                  marginTop: 8,
-                  fontWeight: "500",
-                  textAlign: "center",
-                }}
-              >
-                {sLsImporting === "sales" ? "Importing..." : "Import Sales"}
-              </Text>
-            </TouchableOpacity>
-            <CheckBox_
-              isChecked={sLsSaveSales}
-              onCheck={() => _setLsSaveSales(!sLsSaveSales)}
-              text={"Save to DB"}
-              buttonStyle={{ marginTop: 7 }}
-            />
-          </View>
-          <View style={{ alignItems: "center", margin: 10 }}>
-            <TouchableOpacity
-              onPress={() => handleLsImportType("workorders", sLsSaveWo)}
-              disabled={!!sLsImporting || !sLsConnected}
-              style={{
-                ...buttonStyle,
-                opacity: sLsImporting || !sLsConnected ? 0.5 : 1,
-              }}
-            >
-              <Image_ icon={ICONS.importIcon} size={30} />
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: C.text,
-                  marginTop: 8,
-                  fontWeight: "500",
-                  textAlign: "center",
-                }}
-              >
-                {sLsImporting === "workorders" ? "Importing..." : "Import Workorders"}
-              </Text>
-            </TouchableOpacity>
-            <CheckBox_
-              isChecked={sLsSaveWo}
-              onCheck={() => _setLsSaveWo(!sLsSaveWo)}
-              text={"Save to DB"}
-              buttonStyle={{ marginTop: 7 }}
-            />
           </View>
         </View>
         {/* --- Lightspeed CSV Exports --- */}
@@ -4397,6 +3888,92 @@ const ImportComponent = () => {
               </TouchableOpacity>
             </View>
           ))}
+        </View>
+
+        {/* --- Mapping Preview --- */}
+        <View style={{ width: "100%", height: 1, backgroundColor: C.buttonLightGreenOutline, marginTop: 20, marginBottom: 10 }} />
+        <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 10 }}>
+          Mapping Preview
+        </Text>
+        <View style={{ width: "100%", alignItems: "center" }}>
+          {/* Workorder lookup */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+            <Text style={{ fontSize: 13, color: C.text, marginRight: 8, width: 80 }}>Workorder #</Text>
+            <TextInput
+              value={sWoLookup}
+              onChangeText={_setWoLookup}
+              placeholder="e.g. 12345"
+              placeholderTextColor={gray(0.4)}
+              style={{
+                width: 160,
+                borderWidth: 2,
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 10,
+                backgroundColor: C.listItemWhite,
+                paddingVertical: 8,
+                paddingHorizontal: 10,
+                fontSize: 13,
+                color: C.text,
+                outlineStyle: "none",
+                marginRight: 8,
+              }}
+              onSubmitEditing={handleWoLookup}
+            />
+            <TouchableOpacity
+              onPress={handleWoLookup}
+              disabled={sLookupLoading || !sWoLookup.trim()}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 10,
+                backgroundColor: sLookupLoading || !sWoLookup.trim() ? gray(0.7) : C.green,
+                opacity: sLookupLoading || !sWoLookup.trim() ? 0.5 : 1,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: "white", fontWeight: "600" }}>
+                {sLookupLoading ? "..." : "Go"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {/* Customer lookup */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+            <Text style={{ fontSize: 13, color: C.text, marginRight: 8, width: 80 }}>Customer Ph</Text>
+            <TextInput
+              value={sCustLookup}
+              onChangeText={_setCustLookup}
+              placeholder="e.g. 239-291-9396"
+              placeholderTextColor={gray(0.4)}
+              style={{
+                width: 160,
+                borderWidth: 2,
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 10,
+                backgroundColor: C.listItemWhite,
+                paddingVertical: 8,
+                paddingHorizontal: 10,
+                fontSize: 13,
+                color: C.text,
+                outlineStyle: "none",
+                marginRight: 8,
+              }}
+              onSubmitEditing={handleCustLookup}
+            />
+            <TouchableOpacity
+              onPress={handleCustLookup}
+              disabled={sLookupLoading || !sCustLookup.trim()}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 10,
+                backgroundColor: sLookupLoading || !sCustLookup.trim() ? gray(0.7) : C.green,
+                opacity: sLookupLoading || !sCustLookup.trim() ? 0.5 : 1,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: "white", fontWeight: "600" }}>
+                {sLookupLoading ? "..." : "Go"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {sLsResult ? (

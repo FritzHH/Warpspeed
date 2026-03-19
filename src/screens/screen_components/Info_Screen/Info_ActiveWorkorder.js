@@ -2,6 +2,7 @@
 
 import { View, Text, TextInput } from "react-native-web";
 import {
+  capitalizeFirstLetterOfString,
   formatPhoneWithDashes,
   generateUPCBarcode,
   gray,
@@ -75,10 +76,13 @@ export const ActiveWorkorderComponent = ({}) => {
   const statusRef = useRef();
   const partSourcesRef = useRef();
 
+  const isDonePaid = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses)?.label?.toLowerCase() === "done & paid";
+
   ///////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
 
   function setBikeColor(incomingColorVal, fieldName) {
+    if (isDonePaid) return;
     let foundColor = false;
     let newColorObj = {};
     COLORS.forEach((bikeColorObj) => {
@@ -218,7 +222,7 @@ export const ActiveWorkorderComponent = ({}) => {
             modalVisible={sShowCustomerInfoScreen}
             showOuterModal={true}
             buttonLabel={
-              (zCustomer?.first || zOpenWorkorder?.customerFirst) + " " + (zCustomer?.last || zOpenWorkorder?.customerLast)
+              capitalizeFirstLetterOfString(zCustomer?.first || zOpenWorkorder?.customerFirst) + " " + capitalizeFirstLetterOfString(zCustomer?.last || zOpenWorkorder?.customerLast)
             }
             buttonIcon={ICONS.ridingBike}
             buttonIconStyle={{ width: 35, height: 35 }}
@@ -305,7 +309,7 @@ export const ActiveWorkorderComponent = ({}) => {
           </View>
         </View>
 
-        <View>
+        <View pointerEvents={isDonePaid ? "none" : "auto"}>
           <View
             style={{
               marginTop: 20,
@@ -329,6 +333,7 @@ export const ActiveWorkorderComponent = ({}) => {
               {/* <View style={{}}> */}
               <TextInput_
                 placeholder={"Brand"}
+                editable={!isDonePaid}
                 style={{
                   width: "45%",
                   borderWidth: 1,
@@ -368,6 +373,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 >
                   <DropdownMenu
                     dataArr={zSettings.bikeBrands}
+                    enabled={!isDonePaid}
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
                     }}
@@ -391,6 +397,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 >
                   <DropdownMenu
                     dataArr={zSettings.bikeOptionalBrands}
+                    enabled={!isDonePaid}
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
                     }}
@@ -419,6 +426,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInput_
                 placeholder={"Model/Description"}
+                editable={!isDonePaid}
                 style={{
                   width: "45%",
                   borderWidth: 1,
@@ -451,6 +459,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   <DropdownMenu
                     modalCoordX={55}
                     dataArr={zSettings.bikeDescriptions}
+                    enabled={!isDonePaid}
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField(
                         "description",
@@ -483,6 +492,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInput_
                 placeholder={"Color 1"}
+                editable={!isDonePaid}
                 value={zOpenWorkorder?.color1.label}
                 style={{
                   width: "48%",
@@ -504,6 +514,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <View style={{ width: 5 }} />
               <TextInput_
                 placeholder={"Color 2"}
+                editable={!isDonePaid}
                 value={zOpenWorkorder?.color2.label}
                 style={{
                   width: "48%",
@@ -544,6 +555,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     itemSeparatorStyle={{ height: 0 }}
                     dataArr={COLORS}
                     menuBorderColor={"transparent"}
+                    enabled={!isDonePaid}
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("color1", item, zOpenWorkorder.id);
                     }}
@@ -570,9 +582,9 @@ export const ActiveWorkorderComponent = ({}) => {
                   <DropdownMenu
                     itemSeparatorStyle={{ height: 0 }}
                     dataArr={COLORS}
+                    enabled={!isDonePaid}
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("color2", item, zOpenWorkorder.id);
-                      // ''(wo);
                     }}
                     modalCoordX={0}
                     buttonStyle={{
@@ -625,6 +637,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   <DropdownMenu
                     modalCoordX={50}
                     dataArr={zSettings.waitTimes}
+                    enabled={!isDonePaid}
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("waitTime", item, zOpenWorkorder.id);
                     }}
@@ -645,6 +658,7 @@ export const ActiveWorkorderComponent = ({}) => {
               return (
                 <DropdownMenu
                   dataArr={zSettings.statuses}
+                  enabled={!isDonePaid}
                   onSelect={(val) => {
                     useOpenWorkordersStore.getState().setField("status", val.id, zOpenWorkorder.id);
                   }}
@@ -691,6 +705,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInput_
                 placeholder={"Part Ordered"}
+                editable={!isDonePaid}
                 style={{
                   width: "100%",
                   borderWidth: 1,
@@ -724,6 +739,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <TextInput_
                 value={zOpenWorkorder?.partSource}
                 placeholder={"Part Source"}
+                editable={!isDonePaid}
                 style={{
                   width: "50%",
                   borderWidth: 1,
@@ -755,6 +771,7 @@ export const ActiveWorkorderComponent = ({}) => {
               >
                 <DropdownMenu
                   dataArr={zSettings.partSources}
+                  enabled={!isDonePaid}
                   onSelect={(item, idx) => {
                     useOpenWorkordersStore.getState().setField("partSource", item, zOpenWorkorder.id);
                   }}
@@ -783,58 +800,54 @@ export const ActiveWorkorderComponent = ({}) => {
         }}
       >
         <Button_
-          text="Upload Media"
-          icon={ICONS.camera}
-          iconSize={18}
-          colorGradientArr={COLOR_GRADIENTS.green}
+          icon={ICONS.uploadCamera}
+          iconSize={40}
+          disabled={isDonePaid}
           onPress={() => _setShowMediaModal("upload")}
           buttonStyle={{
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            borderRadius: 8,
+            backgroundColor: "transparent",
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+            opacity: isDonePaid ? 0.3 : 1,
           }}
-          textStyle={{ fontSize: 14, fontWeight: "500" }}
         />
         <View>
           <Button_
-            text="View Media"
-            icon={ICONS.eyeballs}
-            iconSize={18}
-            colorGradientArr={COLOR_GRADIENTS.blue}
+            icon={ICONS.viewPhoto}
+            iconSize={50}
             onPress={() => _setShowMediaModal("view")}
             buttonStyle={{
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              borderRadius: 8,
+              backgroundColor: "transparent",
+              paddingHorizontal: 0,
+              paddingVertical: 0,
             }}
-            textStyle={{ fontSize: 14, fontWeight: "500" }}
           />
-          {zOpenWorkorder?.media?.length > 0 && (
+          {/* {zOpenWorkorder?.media?.length > 0 && ( */}
             <View
               style={{
                 position: "absolute",
-                top: -6,
-                right: -6,
-                backgroundColor: C.red,
-                borderRadius: 10,
-                minWidth: 20,
-                height: 20,
+              top: -1,
+              right: -5,
+              // backgroundColor: C.backgroundWhite,
+              borderRadius: 8,
+              minWidth: 16,
+              height: 16,
                 justifyContent: "center",
                 alignItems: "center",
-                paddingHorizontal: 5,
+              paddingHorizontal: 3,
               }}
             >
               <Text
                 style={{
-                  color: "white",
-                  fontSize: 11,
+                color: zOpenWorkorder?.media?.length > 0 ? C.red : 'gray',
+                fontSize: 15,
                   fontWeight: "700",
                 }}
               >
-                {zOpenWorkorder.media.length}
+              {zOpenWorkorder?.media?.length || 0}
               </Text>
             </View>
-          )}
+          {/* )} */}
         </View>
       </View>
       <View
@@ -859,14 +872,11 @@ export const ActiveWorkorderComponent = ({}) => {
           onPress={handleNewWorkorderPress}
         />
         <Button_
-          icon={ICONS.cashRegister}
-          iconSize={35}
-          buttonStyle={{
-            backgroundColor: "transparent",
-            paddingHorizontal: 0,
-            paddingVertical: 0,
-          }}
-          onPress={handleStartStandaloneSalePress}
+          icon={ICONS.workorder}
+          iconSize={30}
+          iconStyle={{ paddingHorizontal: 0 }}
+          buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
+          onPress={handleWorkorderPrintPress}
         />
 
         <Button_
@@ -877,11 +887,14 @@ export const ActiveWorkorderComponent = ({}) => {
           onPress={handleIntakePrintPress}
         />
         <Button_
-          icon={ICONS.workorder}
-          iconSize={30}
-          iconStyle={{ paddingHorizontal: 0 }}
-          buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
-          onPress={handleWorkorderPrintPress}
+          icon={ICONS.cashRegister}
+          iconSize={35}
+          buttonStyle={{
+            backgroundColor: "transparent",
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+          }}
+          onPress={handleStartStandaloneSalePress}
         />
       </View>
       {sShowMediaModal && (

@@ -1,4 +1,4 @@
-import { generateRandomID, formatPhoneWithDashes } from "./utils";
+import { generateRandomID } from "./utils";
 import { COLORS } from "./data";
 
 // ============================================================================
@@ -11,19 +11,48 @@ function parseCSVLine(line) {
   let inQuotes = false;
   for (let i = 0; i < line.length; i++) {
     let ch = line[i];
-    if (ch === '"') { inQuotes = !inQuotes; }
-    else if (ch === ',' && !inQuotes) { result.push(current); current = ""; }
-    else { current += ch; }
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        // "" inside quotes = escaped literal quote
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
   }
   result.push(current);
   return result;
 }
 
+function splitCSVRows(text) {
+  // Split CSV into rows, respecting newlines inside quoted fields
+  let rows = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    let ch = text[i];
+    if (ch === '"') { inQuotes = !inQuotes; current += ch; }
+    else if (ch === '\n' && !inQuotes) {
+      if (current.trim()) rows.push(current);
+      current = "";
+    } else if (ch === '\r') { /* skip */ }
+    else { current += ch; }
+  }
+  if (current.trim()) rows.push(current);
+  return rows;
+}
+
 function parseCSV(text) {
-  let lines = text.split("\n").filter(l => l.trim());
-  let headers = parseCSVLine(lines[0]);
-  return lines.slice(1).map(line => {
-    let values = parseCSVLine(line);
+  let rows = splitCSVRows(text);
+  let headers = parseCSVLine(rows[0]);
+  return rows.slice(1).map(row => {
+    let values = parseCSVLine(row);
     let obj = {};
     headers.forEach((h, i) => obj[h.trim()] = (values[i] || "").trim());
     return obj;
@@ -121,8 +150,7 @@ function extractBrandModel(description) {
 function formatPhone(raw) {
   if (!raw) return "";
   let digits = raw.replace(/\D/g, "");
-  if (!digits) return "";
-  return formatPhoneWithDashes(digits);
+  return digits;
 }
 
 // ============================================================================
@@ -132,6 +160,40 @@ function formatPhone(raw) {
 function dollarsToCents(val) {
   if (!val && val !== 0) return 0;
   return Math.round(parseFloat(val) * 100) || 0;
+}
+
+// ============================================================================
+// Discount Mapping
+// ============================================================================
+
+function buildDiscountObj(saleLine, priceCents) {
+  if (!saleLine) return null;
+  const pct = parseFloat(saleLine.discountPercent) || 0;
+  const amt = parseFloat(saleLine.discountAmount) || 0;
+  if (pct === 0 && amt === 0) return null;
+
+  let savings;
+  let discountType;
+  let discountValue;
+
+  if (pct > 0) {
+    discountType = "%";
+    discountValue = Math.round(pct * 100); // 0.15 → 15
+    savings = Math.round(priceCents * pct);
+  } else {
+    discountType = "$";
+    discountValue = dollarsToCents(amt);
+    savings = dollarsToCents(amt);
+  }
+
+  return {
+    id: generateRandomID(),
+    discountName: "Lightspeed Import",
+    discountValue,
+    discountType,
+    newPrice: priceCents - savings,
+    savings,
+  };
 }
 
 // ============================================================================
@@ -179,6 +241,7 @@ export function mapWorkorders(
   workorderItemsCSVText,
   serializedCSVText,
   itemsCSVText,
+  salesLinesCSVText,
   customerMap,       // { lsCustomerID → customer object } (from mapCustomers output)
   warpspeedStatuses  // array of status objects from settings
 ) {
@@ -186,6 +249,7 @@ export function mapWorkorders(
   const wiRows = parseCSV(workorderItemsCSVText);
   const serRows = parseCSV(serializedCSVText);
   const itemRows = parseCSV(itemsCSVText);
+  const slRows = parseCSV(salesLinesCSVText);
 
   // --- Build lookup maps ---
 
@@ -199,6 +263,12 @@ export function mapWorkorders(
   const itemMap = {};
   for (const row of itemRows) {
     if (row.itemID) itemMap[row.itemID] = row;
+  }
+
+  // saleLineMap: saleLineID → row
+  const saleLineMap = {};
+  for (const row of slRows) {
+    if (row.saleLineID) saleLineMap[row.saleLineID] = row;
   }
 
   // workorderItemsMap: workorderID → [rows]
@@ -242,8 +312,12 @@ export function mapWorkorders(
     // Bike details from serialized
     const ser = wo.serializedID ? serializedMap[wo.serializedID] : null;
     const serDescription = ser ? (ser.description || "") : "";
-    const { brand, model } = extractBrandModel(serDescription);
-    const description = cleanItemDescription(serDescription);
+    const { brand } = extractBrandModel(serDescription);
+    const cleaned = cleanItemDescription(serDescription);
+    // Strip brand from description, leave the rest
+    const description = brand && cleaned.toLowerCase().startsWith(brand.toLowerCase())
+      ? cleaned.slice(brand.length).trim()
+      : cleaned;
     const color1 = ser ? mapColor(ser.colorName) : { ...EMPTY_COLOR };
 
     // Timestamps
@@ -272,7 +346,7 @@ export function mapWorkorders(
       });
     }
 
-    // Workorder lines from workorderItems
+    // Workorder lines from workorderItems (catalog items)
     const woItems = workorderItemsMap[woID] || [];
     const workorderLines = woItems.map(wi => {
       const item = itemMap[wi.itemID] || null;
@@ -286,7 +360,13 @@ export function mapWorkorders(
         salePrice: 0,
         cost: item ? dollarsToCents(item.avgCost || item.defaultCost) : 0,
         category: item && item.itemType === "non_inventory" ? "Labor" : "Part",
+        customPart: false,
+        customLabor: false,
+        minutes: 0,
       };
+
+      const wiSaleLine = wi.saleLineID ? saleLineMap[wi.saleLineID] : null;
+      const discountObj = buildDiscountObj(wiSaleLine, inventoryItem.price);
 
       return {
         id: generateRandomID(),
@@ -294,11 +374,55 @@ export function mapWorkorders(
         intakeNotes: (wi.note || "").trim(),
         receiptNotes: "",
         inventoryItem,
-        discountObj: null,
+        discountObj,
         useSalePrice: false,
         warranty: wi.warranty === "true",
       };
     });
+
+    // Custom lines from workorderLinesJSON (custom part/labor entries)
+    let woLinesParsed = [];
+    try {
+      if (wo.workorderLinesJSON) woLinesParsed = JSON.parse(wo.workorderLinesJSON);
+    } catch (e) {
+      console.error("[LS Mapping] Failed to parse workorderLinesJSON for WO " + woID + ":", e.message, "| Raw:", wo.workorderLinesJSON?.substring(0, 200));
+    }
+    if (!Array.isArray(woLinesParsed)) woLinesParsed = [];
+
+    for (const wl of woLinesParsed) {
+      const totalMinutes = (parseInt(wl.hours) || 0) * 60 + (parseInt(wl.minutes) || 0);
+      const isLabor = totalMinutes > 0;
+
+      // Get actual charged price from salesLines
+      const wlSaleLine = wl.saleLineID ? saleLineMap[wl.saleLineID] : null;
+      const price = wlSaleLine
+        ? dollarsToCents(wlSaleLine.unitPrice)
+        : dollarsToCents(wl.unitPriceOverride);
+      const wlDiscountObj = buildDiscountObj(wlSaleLine, price);
+
+      workorderLines.push({
+        id: generateRandomID(),
+        qty: parseInt(wl.unitQuantity) || 1,
+        intakeNotes: "",
+        receiptNotes: "",
+        inventoryItem: {
+          id: generateRandomID(),
+          formalName: (wl.note || "").trim() || (isLabor ? "Custom Labor" : "Custom Part"),
+          informalName: "",
+          brand: "",
+          price,
+          salePrice: 0,
+          cost: dollarsToCents(wl.unitCost),
+          category: isLabor ? "Labor" : "Part",
+          customPart: !isLabor,
+          customLabor: isLabor,
+          minutes: totalMinutes,
+        },
+        discountObj: wlDiscountObj,
+        useSalePrice: false,
+        warranty: wl.warranty === "true",
+      });
+    }
 
     const mappedWo = {
       workorderNumber: woID,
@@ -307,12 +431,12 @@ export function mapWorkorders(
       customerFirst,
       customerLast,
       customerPhone,
-      model,
+      model: "",
       brand,
       description,
       color1,
       color2: { ...EMPTY_COLOR },
-      status,
+      status: status.id,
       taxFree: wo.tax === "false",
       archived: wo.archived === "true",
       startedBy: wo.employeeID || "",

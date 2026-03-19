@@ -11,6 +11,7 @@ import {
   gray,
   lightenRGBByPercent,
   log,
+  resolveStatus,
 } from "../../../utils";
 import {
   Button,
@@ -20,6 +21,7 @@ import {
   TextInput_,
 } from "../../../components";
 import { InventoryItemModalScreen } from "../modal_screens/InventoryItemModalScreen";
+import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { cloneDeep } from "lodash";
 import {
   useSettingsStore,
@@ -56,6 +58,7 @@ export function InventoryComponent({}) {
   const [sCurrentParentID, _setCurrentParentID] = useState(null);
   const [sMenuPath, _setMenuPath] = useState([]);
   const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
+  const [sCustomItemModal, _setCustomItemModal] = useState(null); // "labor" | "part" | null
 
   // Timeout to batch all store updates and reduce re-renders
   useEffect(() => {
@@ -124,6 +127,16 @@ export function InventoryComponent({}) {
   };
 
   function handleQuickButtonPress(buttonObj) {
+    // Intercept $LABOR and $PART buttons
+    if (buttonObj.id === "labor" || buttonObj.id === "part") {
+      const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
+      if (!openWorkorder) return;
+      const statuses = useSettingsStore.getState().settings?.statuses;
+      if (resolveStatus(openWorkorder.status, statuses)?.label?.toLowerCase() === "done & paid") return;
+      _setCustomItemModal(buttonObj.id);
+      return;
+    }
+
     let children = zQuickItemButtons.filter(
       (b) => b.parentID === buttonObj.id
     );
@@ -204,6 +217,10 @@ export function InventoryComponent({}) {
   function inventoryItemSelected(item) {
     console.log("inventoryItemSelected:", item?.formalName, item?.id);
     const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
+    if (openWorkorder) {
+      const statuses = useSettingsStore.getState().settings?.statuses;
+      if (resolveStatus(openWorkorder.status, statuses)?.label?.toLowerCase() === "done & paid") return;
+    }
     if (!openWorkorder) {
       console.log("  -> no open workorder, opening modal, sModalItem was:", sModalItem?.id);
       _setModalItem({ ...item });
@@ -224,6 +241,14 @@ export function InventoryComponent({}) {
   function handleInventoryInfoPress(item) {
     console.log("handleInventoryInfoPress:", item?.formalName, item?.id);
     _setModalItem({ ...item });
+  }
+
+  function handleCustomItemSave(lineItem) {
+    const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
+    if (!openWorkorder) return;
+    let workorderLines = openWorkorder.workorderLines || [];
+    workorderLines = [...workorderLines, lineItem];
+    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
   }
 
   function clearSearch() {
@@ -628,6 +653,12 @@ export function InventoryComponent({}) {
             handleExit={() => _setModalItem(null)}
           />
         )}
+        <CustomItemModal
+          visible={!!sCustomItemModal}
+          onClose={() => _setCustomItemModal(null)}
+          onSave={handleCustomItemSave}
+          type={sCustomItemModal}
+        />
       </View>
     </View>
   );

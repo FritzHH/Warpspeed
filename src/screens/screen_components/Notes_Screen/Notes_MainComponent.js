@@ -6,11 +6,11 @@ import {
   FlatList,
   TouchableWithoutFeedback,
 } from "react-native-web";
-import { generateRandomID, gray } from "../../../utils";
+import { generateRandomID, gray, resolveStatus } from "../../../utils";
 import { Image_, TouchableOpacity_, TextInput_ } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState, useRef } from "react";
-import { useOpenWorkordersStore, useLoginStore } from "../../../stores";
+import { useOpenWorkordersStore, useLoginStore, useSettingsStore } from "../../../stores";
 
 const DOUBLE_TAP_MS = 350;
 
@@ -53,6 +53,13 @@ export function Notes_MainComponent() {
   );
   const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.workorderPreviewID || s.openWorkorderID);
+  const zWorkorderStatus = useOpenWorkordersStore((state) => {
+    const resolvedID = state.workorderPreviewID || state.openWorkorderID;
+    const workorder = state.workorders.find((wo) => wo.id === resolvedID);
+    return workorder?.status || "";
+  });
+  const zStatuses = useSettingsStore((state) => state.settings?.statuses);
+  const isDonePaid = resolveStatus(zWorkorderStatus, zStatuses)?.label?.toLowerCase() === "done & paid";
 
   /////////////////////////////////////////////////////////////////////////////////
   const [sFocusIdx, _setFocusIdx] = useState(null);
@@ -147,6 +154,7 @@ export function Notes_MainComponent() {
       }}
     >
       <View
+        pointerEvents={isDonePaid ? "none" : "auto"}
         style={{
           paddingTop: 5,
           paddingHorizontal: 5,

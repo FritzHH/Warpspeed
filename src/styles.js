@@ -119,6 +119,8 @@ export const ICONS = {
   internetOfflineGIF: require(ASSETS_PATH + "internedDisconnectedGIF.gif"),
   cashRegister: require(ASSETS_PATH + "cashRegister.png"),
   camera: require(ASSETS_PATH + "camera.png"),
+  uploadCamera: require(ASSETS_PATH + "uploadCamera.png"),
+  viewPhoto: require(ASSETS_PATH + "viewPhoto.png"),
   wifi: require(ASSETS_PATH + "wifi.gif"),
   restricted: require(ASSETS_PATH + "restricted.png"),
   redx: require(ASSETS_PATH + "redx.png"),

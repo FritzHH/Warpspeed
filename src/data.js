@@ -438,14 +438,11 @@ export const INVENTORY_ITEM_PROTO = {
   customSku: "",
   manufacturerSku: "",
   minutes: 0,
+  customPart: false,
+  customLabor: false,
+  minutes: 0,
 };
 
-export const LABOR_ITEM_PROTO = {
-  formalName: "",
-  informalName: "",
-  options: [],
-  price: "",
-};
 
 export const MENU_BUTTON_PROTO = {
   type: "",
@@ -600,6 +597,7 @@ export const FRITZ_USER_OBJ = {
 };
 
 export const SETTINGS_OBJ = {
+  laborRateByHour: 9000,
   statuses: [
     ...NONREMOVABLE_STATUSES,
     {

@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import {
+  capitalizeFirstLetterOfString,
   combine2ArraysOrderByMillis,
   calculateRunningTotals,
   dim,
@@ -186,8 +187,8 @@ export function MessagesComponent({}) {
       storeHoursText = formatStoreHours(zSettings?.storeHours);
     } catch (e) {}
     return templateMessage
-      .replace(/\{firstName\}/g, zCustomer?.first || "")
-      .replace(/\{lastName\}/g, zCustomer?.last || "")
+      .replace(/\{firstName\}/g, capitalizeFirstLetterOfString(zCustomer?.first) || "")
+      .replace(/\{lastName\}/g, capitalizeFirstLetterOfString(zCustomer?.last) || "")
       .replace(/\{brand\}/g, zWorkorderObj?.brand || "")
       .replace(/\{description\}/g, zWorkorderObj?.description || "")
       .replace(/\{totalAmount\}/g, totalAmount)

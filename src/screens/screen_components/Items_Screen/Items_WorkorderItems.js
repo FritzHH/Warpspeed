@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { View, Text, TextInput, FlatList, Image } from "react-native-web";
+import { View, Text, TextInput, FlatList, Image, TouchableOpacity } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
@@ -10,6 +10,7 @@ import {
   lightenRGBByPercent,
   log,
   replaceOrAddToArr,
+  resolveStatus,
   showAlert,
 } from "../../../utils";
 import {
@@ -37,6 +38,7 @@ import {
   useCurrentCustomerStore,
 } from "../../../stores";
 import { dbGetCustomer } from "../../../db_calls_wrapper";
+import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
 
 export const Items_WorkorderItemsTab = ({}) => {
@@ -58,6 +60,9 @@ export const Items_WorkorderItemsTab = ({}) => {
   // Fix 4: subscribe only to the two fields actually used, not the whole settings object
   const zSalesTaxPercent = useSettingsStore((state) => state.settings?.salesTaxPercent);
   const zDiscounts = useSettingsStore((state) => state.settings?.discounts, deepEqual);
+  const zStatuses = useSettingsStore((state) => state.settings?.statuses, deepEqual);
+
+  const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
 
   ///////////////////////////////////////////////////////////////////////////
   const [sTotalDiscount, _setTotalDiscount] = useState("");
@@ -71,6 +76,8 @@ export const Items_WorkorderItemsTab = ({}) => {
   });
   const [sHasCheckedInventoryPrice, _setHasCheckedInventoryPrice] =
     useState(false);
+
+  const [sEditingCustomLine, _setEditingCustomLine] = useState(null);
 
   // dev
   const checkoutBtnRef = useRef();
@@ -168,6 +175,10 @@ export const Items_WorkorderItemsTab = ({}) => {
       undefined,
       saveToDB
     );
+  }
+
+  function handleCustomItemEditSave(updatedLine) {
+    editWorkorderLine(updatedLine);
   }
 
   function applyDiscount(workorderLine, discountObj) {
@@ -329,6 +340,23 @@ export const Items_WorkorderItemsTab = ({}) => {
         justifyContent: "center",
       }}
     >
+      {isDonePaid && (
+        <View
+          style={{
+            backgroundColor: C.red,
+            paddingVertical: 5,
+            paddingHorizontal: 12,
+            marginHorizontal: 8,
+            marginTop: 3,
+            borderRadius: 5,
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ color: "white", fontSize: 12, fontWeight: "600" }}>
+            Finished - No Edits Allowed
+          </Text>
+        </View>
+      )}
       <FlatList
         style={{ marginTop: 3, marginRight: 5 }}
         data={zOpenWorkorder.workorderLines}
@@ -350,6 +378,8 @@ export const Items_WorkorderItemsTab = ({}) => {
               index={idx}
               applyDiscount={applyDiscount}
               zSettingsObj={{ discounts: zDiscounts }}
+              onEditCustomItem={_setEditingCustomLine}
+              isLocked={isDonePaid}
             />
           );
         }}
@@ -374,7 +404,9 @@ export const Items_WorkorderItemsTab = ({}) => {
           <Button_
             icon={ICONS.trash}
             iconSize={22}
+            disabled={isDonePaid}
             onPress={handleDeleteWorkorder}
+            buttonStyle={{ opacity: isDonePaid ? 0.3 : 1 }}
           />
         </Tooltip>
         <View
@@ -486,11 +518,21 @@ export const Items_WorkorderItemsTab = ({}) => {
             textStyle={{ color: C.textWhite, fontSize: 16 }}
             icon={ICONS.shoppingCart}
             iconSize={34}
-            buttonStyle={{ paddingVertical: 0 }}
+            disabled={isDonePaid}
+            buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
             onPress={() => useCheckoutStore.getState().setIsCheckingOut(true)}
           />
         </Tooltip>
       </View>
+      {sEditingCustomLine && (
+        <CustomItemModal
+          visible={!!sEditingCustomLine}
+          onClose={() => _setEditingCustomLine(null)}
+          onSave={handleCustomItemEditSave}
+          type={sEditingCustomLine.inventoryItem?.customLabor ? "labor" : "part"}
+          existingLine={sEditingCustomLine}
+        />
+      )}
     </View>
   );
 };
@@ -505,7 +547,10 @@ export const LineItemComponent = ({
   __splitItems,
   index,
   applyDiscount,
+  onEditCustomItem,
+  isLocked,
 }) => {
+  const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
   const [sTempQtyVal, _setTempQtyVal] = useState(null);
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
 
@@ -535,7 +580,7 @@ export const LineItemComponent = ({
           flexDirection: "row",
           width: "100%",
           alignItems: "center",
-          backgroundColor: C.backgroundListWhite,
+          backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 80) : inventoryItem.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
           paddingVertical: 3,
           paddingRight: 5,
           paddingLeft: 8,
@@ -564,16 +609,23 @@ export const LineItemComponent = ({
                 {workorderLine.discountObj?.name || "discount goes here"}
               </Text>
             )}
-            <Text
-              style={{
-                fontSize: 15,
-                color: C.text,
-                fontWeight: "400",
-              }}
-              numberOfLines={2}
+            <TouchableOpacity
+              disabled={!isCustom}
+              onPress={() => isCustom && onEditCustomItem?.(workorderLine)}
+              activeOpacity={isCustom ? 0.6 : 1}
             >
-              {inventoryItem.formalName}
-            </Text>
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: C.text,
+                  fontWeight: "400",
+                  textDecorationLine: "none",
+                }}
+                numberOfLines={2}
+              >
+                {inventoryItem.formalName || (isCustom ? "(tap to edit)" : "")}
+              </Text>
+            </TouchableOpacity>
             <View
               style={{
                 flexDirection: "column",
@@ -630,17 +682,17 @@ export const LineItemComponent = ({
             }}
           >
             <Button_
+              disabled={isLocked}
               onPress={() => __modQtyPressed(workorderLine, "up", index)}
               buttonStyle={{
                 backgroundColor: "transparent",
                 paddingHorizontal: 3,
-                // width: null,
-                // height: null,
               }}
               icon={ICONS.upArrowOrange}
               iconSize={23}
             />
             <Button_
+              disabled={isLocked}
               onPress={() => __modQtyPressed(workorderLine, "down", index)}
               buttonStyle={{
                 paddingHorizontal: 4,
@@ -658,6 +710,7 @@ export const LineItemComponent = ({
               }}
             >
               <TextInput
+                editable={!isLocked}
                 style={{
                   fontSize: 16,
                   fontWeight: 500,

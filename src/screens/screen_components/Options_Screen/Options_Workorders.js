@@ -355,7 +355,7 @@ export function WorkordersComponent({}) {
                           color: "dimgray",
                         }}
                       >
-                        {(workorder.customerFirst || "") + " " + (workorder.customerLast || "")}
+                        {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
                       </Text>
                     </View>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -445,7 +445,10 @@ export function WorkordersComponent({}) {
                       </View>
                       <View style={{ width: 8 }} />
                       <Text style={{ color: "dimgray", fontSize: 13 }}>
-                        {formatMillisForDisplay(workorder.startedOnMillis)}
+                        {formatMillisForDisplay(
+                          workorder.startedOnMillis,
+                          new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
+                        )}
                       </Text>
                     </View>
                     <View

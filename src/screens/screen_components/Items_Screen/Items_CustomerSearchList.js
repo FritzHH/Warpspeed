@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { View, Text, FlatList } from "react-native-web";
 import {
+  capitalizeFirstLetterOfString,
   formatPhoneForDisplay,
   generateUPCBarcode,
   gray,
@@ -141,7 +142,7 @@ export function CustomerSearchListComponent({}) {
               >
                 <View style={{ width: "92%" }}>
                   <Text style={{ fontSize: 16, color: C.text }}>
-                    {customer?.first + " " + customer?.last}
+                    {capitalizeFirstLetterOfString(customer?.first) + " " + capitalizeFirstLetterOfString(customer?.last)}
                   </Text>
                   <View
                     style={{

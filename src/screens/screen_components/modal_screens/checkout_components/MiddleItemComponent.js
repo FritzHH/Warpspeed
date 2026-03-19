@@ -9,6 +9,7 @@ import {
   Image_,
 } from "../../../../components";
 import {
+  capitalizeFirstLetterOfString,
   formatCurrencyDisp,
   lightenRGBByPercent,
   log,
@@ -96,7 +97,7 @@ export const MiddleItemComponent = ({
             >
               <View>
                 <Text style={{ color: C.text }}>
-                  {zCustomer?.first + " " + zCustomer?.last}
+                  {capitalizeFirstLetterOfString(zCustomer?.first) + " " + capitalizeFirstLetterOfString(zCustomer?.last)}
                   {!!zCustomer?.contactRestriction && (
                     <Text style={{ color: C.red }}>
                       {zCustomer.contactRestriction ===

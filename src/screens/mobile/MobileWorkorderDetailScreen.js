@@ -11,6 +11,7 @@ import { TextInput_, DropdownMenu, Image_, Button_ } from "../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import { COLORS } from "../../data";
 import {
+  capitalizeFirstLetterOfString,
   formatPhoneWithDashes,
   formatMillisForDisplay,
   resolveStatus,
@@ -127,9 +128,9 @@ export function MobileWorkorderDetailScreen() {
             color: C.text,
           }}
         >
-          {(zWorkorder.customerFirst || "") +
+          {capitalizeFirstLetterOfString(zWorkorder.customerFirst) +
             " " +
-            (zWorkorder.customerLast || "")}
+            capitalizeFirstLetterOfString(zWorkorder.customerLast)}
         </Text>
         {!!(zCustomer?.cell || zWorkorder.customerPhone) && (
           <View

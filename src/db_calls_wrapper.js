@@ -15,8 +15,6 @@ import {
   firestoreSubscribe,
   firestoreSubscribeCollection,
   firestoreDelete,
-  storageUploadString,
-  storageGetDownloadURL,
   authSignIn,
   authSignOut,
   getServerTimestamp,
@@ -105,6 +103,14 @@ function buildWorkorderPath(tenantID, storeID, workorderID) {
   // Firestore paths must have even number of segments (collection/document/collection/document...)
   // Format: tenants/{tenantID}/stores/{storeID}/open-workorders/{workorderID}
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${workorderID}`;
+}
+
+function buildCompletedWorkorderPath(tenantID, storeID, workorderID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}/${workorderID}`;
+}
+
+function buildCompletedSalePath(tenantID, storeID, saleID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_SALES}/${saleID}`;
 }
 
 /**
@@ -615,41 +621,20 @@ export async function dbSaveOpenWorkorder(workorder, workorderID = null) {
 export async function dbGetCompletedWorkorder(id) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
-
     if (!tenantID || !storeID) {
-      log(
-        "Error: tenantID and storeID are not configured for dbGetCompletedWorkorder"
-      );
+      log("Error: tenantID and storeID are not configured for dbGetCompletedWorkorder");
       return null;
     }
-
     if (!id) {
       log("Error: id is required for dbGetCompletedWorkorder");
       return null;
     }
-
-    // Build storage path: closed-workorders/{tenantID}/{storeID}/{workorderID}.json
-    const storagePath = `${DB_NODES.STORAGE.CLOSED_WORKORDERS}/${tenantID}/${storeID}/${id}.json`;
-
-    // Get the download URL for the file
-    const downloadURL = await storageGetDownloadURL(storagePath);
-
-    if (!downloadURL) {
+    const path = buildCompletedWorkorderPath(tenantID, storeID, id);
+    const workorder = await firestoreRead(path);
+    if (!workorder) {
       log("Error: Completed workorder not found for dbGetCompletedWorkorder");
       return null;
     }
-
-    // Fetch the JSON content from the download URL
-    const response = await fetch(downloadURL);
-
-    if (!response.ok) {
-      log("Error: Failed to fetch completed workorder content");
-      return null;
-    }
-
-    // Parse the JSON string back to an object
-    const workorder = await response.json();
-
     return workorder;
   } catch (error) {
     log("Error retrieving completed workorder:", error);
@@ -657,178 +642,43 @@ export async function dbGetCompletedWorkorder(id) {
   }
 }
 
-/**
- * Complete a sale by saving it to Cloud Storage
- * @param {Object} sale - Sale object to complete
- * @param {string} saleID - Sale ID (optional, will use sale.id if not provided)
- * @returns {Promise<Object>} Completion result
- */
-export async function dbCompleteSale(sale, saleID = null) {
+export async function dbSaveCompletedWorkorder(workorder) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
-
     if (!tenantID || !storeID) {
-      log("Error: tenantID and storeID are not configured for dbCompleteSale");
-      return {
-        success: false,
-        error: "Configuration Error",
-        message:
-          "tenantID and storeID are not configured. Please check your settings.",
-        sale: null,
-        saleID: null,
-        tenantID,
-        storeID,
-      };
+      log("Error: tenantID and storeID are not configured for dbSaveCompletedWorkorder");
+      return { success: false };
     }
-
-    if (!sale || typeof sale !== "object") {
-      log("Error: sale object is required for dbCompleteSale");
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message: "sale object is required",
-        sale: null,
-        saleID: null,
-        tenantID,
-        storeID,
-      };
+    if (!workorder || !workorder.id) {
+      log("Error: workorder object with id is required for dbSaveCompletedWorkorder");
+      return { success: false };
     }
-
-    // Get sale ID from parameter or sale object
-    const id = saleID || sale.id || sale["id"];
-    if (!id) {
-      log(
-        "Error: saleID must be provided either as parameter, sale.id, or sale['id'] for dbCompleteSale"
-      );
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message:
-          "saleID must be provided either as parameter, sale.id, or sale['id']",
-        sale: null,
-        saleID: null,
-        tenantID,
-        storeID,
-      };
-    }
-
-    let saleToComplete = sale;
-
-    // 1. Save to Cloud Storage as JSON
-    const storagePath = `${DB_NODES.STORAGE.CLOSED_SALES}/${tenantID}/${storeID}/${id}.json`;
-    const saleJson = JSON.stringify(saleToComplete, null, 2);
-
-    await storageUploadString(storagePath, saleJson, "application/json");
-
-    log("Sale completed", {
-      saleID: id,
-      tenantID,
-      storeID,
-      storagePath,
-    });
-
-    return {
-      success: true,
-      sale: saleToComplete,
-      saleID: id,
-      tenantID,
-      storeID,
-      storagePath,
-    };
+    const path = buildCompletedWorkorderPath(tenantID, storeID, workorder.id);
+    await firestoreWrite(path, workorder);
+    return { success: true };
   } catch (error) {
-    log("Error completing sale:", error);
-    return {
-      success: false,
-      error: "Database Error",
-      message: error.message,
-      sale: null,
-      saleID: null,
-      tenantID: null,
-      storeID: null,
-    };
+    log("Error saving completed workorder:", error);
+    return { success: false };
   }
 }
 
-/**
- * Complete a workorder by moving it from Realtime Database to Cloud Storage
- * @param {Object} workorder - Workorder object to complete
- * @returns {Promise<Object>} Completion result
- */
-export async function dbCompleteWorkorder(workorder) {
+export async function dbSaveCompletedSale(sale) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
-
     if (!tenantID || !storeID) {
-      log(
-        "Error: tenantID and storeID are not configured for dbCompleteWorkorder"
-      );
-      return {
-        success: false,
-        error: "Configuration Error",
-        message:
-          "tenantID and storeID are not configured. Please check your settings.",
-        workorder: null,
-        workorderID: null,
-        tenantID,
-        storeID,
-      };
+      log("Error: tenantID and storeID are not configured for dbSaveCompletedSale");
+      return { success: false };
     }
-
-    if (!workorder || !workorder.id) {
-      log(
-        "Error: workorder object with id is required for dbCompleteWorkorder"
-      );
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message: "workorder object with id is required",
-        workorder: null,
-        workorderID: null,
-        tenantID,
-        storeID,
-      };
+    if (!sale || !sale.id) {
+      log("Error: sale object with id is required for dbSaveCompletedSale");
+      return { success: false };
     }
-
-    let workorderToComplete = workorder;
-
-    // 1. Save to Cloud Storage as JSON
-    const storagePath = `${DB_NODES.STORAGE.CLOSED_WORKORDERS}/${tenantID}/${storeID}/${workorder.id}.json`;
-    const workorderJson = JSON.stringify(workorderToComplete, null, 2);
-
-    await storageUploadString(storagePath, workorderJson, "application/json");
-
-    // 2. Remove from Firestore open workorders
-    const firestorePath = buildWorkorderPath(tenantID, storeID, workorder.id);
-    await firestoreDelete(firestorePath);
-
-    log("Workorder completed", {
-      workorderID: workorder.id,
-      tenantID,
-      storeID,
-      storagePath,
-      firestorePath,
-    });
-
-    return {
-      success: true,
-      workorder: workorderToComplete,
-      workorderID: workorder.id,
-      tenantID,
-      storeID,
-      storagePath,
-      firestorePath,
-    };
+    const path = buildCompletedSalePath(tenantID, storeID, sale.id);
+    await firestoreWrite(path, sale);
+    return { success: true };
   } catch (error) {
-    log("Error completing workorder:", error);
-    return {
-      success: false,
-      error: "Database Error",
-      message: error.message,
-      workorder: null,
-      workorderID: null,
-      tenantID: null,
-      storeID: null,
-    };
+    log("Error saving completed sale:", error);
+    return { success: false };
   }
 }
 
@@ -1332,49 +1182,23 @@ export async function dbSavePrintObj(printObj, printerID) {
 }
 
 // getters ///////////////////////////////////////////////////////////////////////////
-/**
- * Get completed sale from Cloud Storage by ID
- * @param {string} id - Sale ID (required)
- * @returns {Promise<Object>} Completed sale object or null
- */
 export async function dbGetCompletedSale(id) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
-
     if (!tenantID || !storeID) {
-      log(
-        "Error: tenantID and storeID are not configured for dbGetCompletedSale"
-      );
+      log("Error: tenantID and storeID are not configured for dbGetCompletedSale");
       return null;
     }
-
     if (!id) {
       log("Error: id is required for dbGetCompletedSale");
       return null;
     }
-
-    // Build storage path: closed-sales/{tenantID}/{storeID}/{saleID}.json
-    const storagePath = `${DB_NODES.STORAGE.CLOSED_SALES}/${tenantID}/${storeID}/${id}.json`;
-
-    // Get the download URL for the file
-    const downloadURL = await storageGetDownloadURL(storagePath);
-
-    if (!downloadURL) {
+    const path = buildCompletedSalePath(tenantID, storeID, id);
+    const sale = await firestoreRead(path);
+    if (!sale) {
       log("Error: Completed sale not found for dbGetCompletedSale");
       return null;
     }
-
-    // Fetch the JSON content from the download URL
-    const response = await fetch(downloadURL);
-
-    if (!response.ok) {
-      log("Error: Failed to fetch completed sale content");
-      return null;
-    }
-
-    // Parse the JSON string back to an object
-    const sale = await response.json();
-
     return sale;
   } catch (error) {
     log("Error retrieving completed sale:", error);

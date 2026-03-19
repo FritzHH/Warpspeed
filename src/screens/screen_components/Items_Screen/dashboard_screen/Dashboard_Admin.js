@@ -56,7 +56,7 @@ import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModal
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
-import { dbSaveSettingsField, dbListenToDevLogs, dbSaveOpenWorkorder } from "../../../../db_calls_wrapper";
+import { dbSaveSettingsField, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveCustomer } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead } from "../../../../db_calls";
 

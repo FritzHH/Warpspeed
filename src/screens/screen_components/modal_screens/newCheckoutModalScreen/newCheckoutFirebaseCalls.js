@@ -5,8 +5,6 @@ import {
   firestoreDelete,
   firestoreSubscribe,
   firestoreQuery,
-  storageUploadString,
-  storageGetDownloadURL,
 } from "../../../../db_calls";
 import { useSettingsStore, useOpenWorkordersStore } from "../../../../stores";
 import { log } from "../../../../utils";
@@ -123,7 +121,7 @@ export async function newCheckoutDeleteActiveSale(saleID) {
   }
 }
 
-// ─── Completed Sale (Cloud Storage) ───────────────────────────
+// ─── Completed Sale (Firestore) ───────────────────────────────
 
 export async function newCheckoutCompleteSale(sale) {
   try {
@@ -132,9 +130,8 @@ export async function newCheckoutCompleteSale(sale) {
       log("newCheckoutCompleteSale: missing tenantID/storeID");
       return { success: false };
     }
-    const storagePath = `closed-sales/${tenantID}/${storeID}/${sale.id}.json`;
-    const saleJson = JSON.stringify(sale, null, 2);
-    await storageUploadString(storagePath, saleJson, "raw");
+    const path = `tenants/${tenantID}/stores/${storeID}/completed-sales/${sale.id}`;
+    await firestoreWrite(path, sale);
 
     // Clean up active-sale from Firestore
     await newCheckoutDeleteActiveSale(sale.id);
@@ -153,14 +150,8 @@ export async function newCheckoutFetchCompletedSale(saleID) {
       log("newCheckoutFetchCompletedSale: missing tenantID/storeID");
       return null;
     }
-    const storagePath = `closed-sales/${tenantID}/${storeID}/${saleID}.json`;
-    const downloadURL = await storageGetDownloadURL(storagePath);
-    if (!downloadURL) return null;
-
-    const response = await fetch(downloadURL);
-    if (!response.ok) return null;
-
-    return await response.json();
+    const path = `tenants/${tenantID}/stores/${storeID}/completed-sales/${saleID}`;
+    return await firestoreRead(path);
   } catch (error) {
     log("newCheckoutFetchCompletedSale error:", error);
     return null;

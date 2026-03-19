@@ -138,38 +138,6 @@ export const build_db_path = {
     file: (path) => path,
     folder: (folderPath) => folderPath,
 
-    // Completed workorder paths with tenantID/storeID structure
-    completedWorkorder: (
-      workorderID,
-      tenantID,
-      storeID,
-      status = "completed",
-      year = null,
-      month = null
-    ) => {
-      const date = new Date();
-      const targetYear = year || date.getFullYear();
-      const targetMonth = month || String(date.getMonth() + 1).padStart(2, "0");
-      const timestamp = Date.now();
-      return `${tenantID}/${storeID}/completed-workorders/${status}/${targetYear}/${targetMonth}/${workorderID}_${timestamp}.json`;
-    },
-
-    // Completed sale paths with tenantID/storeID structure
-    completedSale: (
-      saleID,
-      tenantID,
-      storeID,
-      status = "completed",
-      year = null,
-      month = null
-    ) => {
-      const date = new Date();
-      const targetYear = year || date.getFullYear();
-      const targetMonth = month || String(date.getMonth() + 1).padStart(2, "0");
-      const timestamp = Date.now();
-      return `${tenantID}/${storeID}/completed-sales/${status}/${targetYear}/${targetMonth}/${saleID}_${timestamp}.json`;
-    },
-
     // Punch history paths with tenantID/storeID structure
     punchHistory: (
       punchHistoryID,
@@ -236,13 +204,11 @@ export const DB_NODES = {
     PAYMENT_PROCESSING: "payment-processing",
     OUTGOING_MESSAGES: "outgoing-messages",
     INCOMING_MESSAGES: "incoming-messages",
+    COMPLETED_WORKORDERS: "completed-workorders",
+    COMPLETED_SALES: "completed-sales",
   },
 
   // Realtime Database nodes
   REALTIME: {},
-
-  STORAGE: {
-    CLOSED_WORKORDERS: "closed-workorders",
-  },
 };
 

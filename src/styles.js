@@ -141,6 +141,8 @@ export const ICONS = {
   listsAndOptions: require(ASSETS_PATH + "listsAndOptions.png"),
   storeInfo: require(ASSETS_PATH + "storeInfo.png"),
   ordering: require(ASSETS_PATH + "ordering.png"),
+  letterI: require(ASSETS_PATH + "letter-i.png"),
+  letterR: require(ASSETS_PATH + "letter-r.png"),
 };
 
 // rgb(64, 174, 113)

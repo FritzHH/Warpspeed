@@ -553,6 +553,7 @@ export const LineItemComponent = ({
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
   const [sTempQtyVal, _setTempQtyVal] = useState(null);
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
+  const [sActiveNoteField, _sSetActiveNoteField] = useState(null);
 
   /////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
@@ -596,73 +597,107 @@ export const LineItemComponent = ({
         <View
           style={{
             width: "65%",
-            height: "100%",
-            justifyContent: "flex-start",
-            alignItems: "center",
-            flexDirection: "row",
+            justifyContent: "center",
+            flexDirection: "column",
             // backgroundColor: "blue",
           }}
         >
-          <View style={{ width: "100%", height: "100%" }}>
+          <View style={{ width: "100%" }}>
             {!!workorderLine.discountObj?.name && (
               <Text style={{ color: C.lightred }}>
                 {workorderLine.discountObj?.name || "discount goes here"}
               </Text>
             )}
-            <TouchableOpacity
-              disabled={!isCustom || isLocked}
-              onPress={() => isCustom && onEditCustomItem?.(workorderLine)}
-              activeOpacity={isCustom ? 0.6 : 1}
-            >
-              <Text
-                style={{
-                  fontSize: 15,
-                  color: C.text,
-                  fontWeight: "400",
-                  textDecorationLine: "none",
-                }}
-                numberOfLines={2}
-              >
-                {inventoryItem.formalName || (isCustom ? "(tap to edit)" : "")}
-              </Text>
-            </TouchableOpacity>
-            <View
-              style={{
-                flexDirection: "column",
-                alignItems: "flex-start",
-                width: "100%",
-                // backgroundColor: "green",
-              }}
-            >
-              <TextInput_
-                multiline={true}
-                numberOfLines={5}
-                debounceMs={500}
-                capitalize={true}
-                editable={!isLocked}
-                style={{ outlineWidth: 0, color: 'orange', width: "100%" }}
-                onChangeText={(val) => {
-                  __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
-                }}
-                placeholder="Intake notes..."
-                placeholderTextColor={gray(0.2)}
-                value={workorderLine.intakeNotes || ""}
-              />
-              <TextInput_
-                capitalize
-                multiline={true}
-                numberOfLines={5}
-                debounceMs={500}
-                editable={!isLocked}
-                style={{ outlineWidth: 0, color: 'green', width: "100%" }}
-                onChangeText={(val) => {
-                  __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
-                }}
-                placeholder="Receipt notes..."
-                placeholderTextColor={gray(0.2)}
-                value={workorderLine.receiptNotes || ""}
-              />
-            </View>
+            {(() => {
+              const hasIntake = !!(workorderLine.intakeNotes || "").trim();
+              const hasReceipt = !!(workorderLine.receiptNotes || "").trim();
+              const showIntake = hasIntake || sActiveNoteField === "intake";
+              const showReceipt = hasReceipt || sActiveNoteField === "receipt";
+
+              // Cycle logic for the note button
+              const handleNoteButtonPress = () => {
+                if (!hasIntake && !hasReceipt) {
+                  // Neither has content — cycle: null → intake → receipt → null
+                  if (!sActiveNoteField) _sSetActiveNoteField("intake");
+                  else if (sActiveNoteField === "intake") _sSetActiveNoteField("receipt");
+                  else _sSetActiveNoteField(null);
+                } else if (hasIntake && !hasReceipt) {
+                  // Only intake has content — toggle receipt
+                  _sSetActiveNoteField(sActiveNoteField === "receipt" ? null : "receipt");
+                } else if (!hasIntake && hasReceipt) {
+                  // Only receipt has content — toggle intake
+                  _sSetActiveNoteField(sActiveNoteField === "intake" ? null : "intake");
+                }
+              };
+
+              // Show button unless both fields have content
+              const showButton = !(hasIntake && hasReceipt);
+
+              return (
+                <>
+                  <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+                    {showButton && (
+                      <TouchableOpacity
+                        onPress={handleNoteButtonPress}
+                        style={{ padding: 2, marginRight: 4 }}
+                      >
+                        <Image source={ICONS.letterR} style={{ width: 18, height: 18, opacity: 0.5 }} />
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      disabled={!isCustom || isLocked}
+                      onPress={() => isCustom && onEditCustomItem?.(workorderLine)}
+                      activeOpacity={isCustom ? 0.6 : 1}
+                      style={{ flex: 1 }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 15,
+                          color: C.text,
+                          fontWeight: "400",
+                          textDecorationLine: "none",
+                        }}
+                        numberOfLines={2}
+                      >
+                        {inventoryItem.formalName || (isCustom ? "(tap to edit)" : "")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {showIntake && (
+                    <TextInput_
+                      multiline={true}
+                      numberOfLines={5}
+                      debounceMs={500}
+                      capitalize={true}
+                      editable={!isLocked}
+                      style={{ outlineWidth: 0, color: "orange", width: "100%" }}
+                      onChangeText={(val) => {
+                        __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
+                      }}
+                      placeholder="Intake notes..."
+                      placeholderTextColor={gray(0.2)}
+                      value={workorderLine.intakeNotes || ""}
+                    />
+                  )}
+                  {showReceipt && (
+                    <TextInput_
+                      capitalize
+                      multiline={true}
+                      numberOfLines={5}
+                      debounceMs={500}
+                      editable={!isLocked}
+                      style={{ outlineWidth: 0, color: "green", width: "100%" }}
+                      onChangeText={(val) => {
+                        __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
+                      }}
+                      placeholder="Receipt notes..."
+                      placeholderTextColor={gray(0.2)}
+                      value={workorderLine.receiptNotes || ""}
+                    />
+                  )}
+                </>
+              );
+            })()}
           </View>
         </View>
         <View

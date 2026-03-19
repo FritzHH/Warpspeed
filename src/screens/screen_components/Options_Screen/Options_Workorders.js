@@ -36,18 +36,38 @@ export function WorkordersComponent({}) {
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
   const [sItemOptions, _setItemOptions] = useState({});
+  const itemOptionsRef = useRef({});
   const exitTimerRef = useRef(null);
   const preHoverTabsRef = useRef(null);
-  // log('here', zOpenWorkorders)
+
   useEffect(() => {
-    let hour = 3600000;
     const intervalId = setInterval(() => {
       try {
-        let colorsObj = cloneDeep(sItemOptions);
-        let nowMillis = Number(new Date().getTime());
+        let colorsObj = cloneDeep(itemOptionsRef.current);
+        let nowMillis = Date.now();
         let todayWord = getWordDayOfWeek();
         let tomorrowWord = getWordDayOfWeek(nowMillis + NUM_MILLIS_IN_DAY);
         let nextDayWord = getWordDayOfWeek(nowMillis + NUM_MILLIS_IN_DAY * 2);
+
+        // get closed day names from settings (outside the loop — same for all workorders)
+        let closedDayNamesArr = [];
+        const settings = useSettingsStore.getState().settings;
+        if (settings?.storeHours) {
+          Object.keys(settings.storeHours).forEach((dayName) => {
+            if (!settings.storeHours[dayName]?.isOpen)
+              closedDayNamesArr.push(dayName);
+          });
+        }
+
+        const dayNames = [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ];
 
         /////////////////////////////////////////////////////
         zOpenWorkorders.forEach((wo) => {
@@ -57,63 +77,33 @@ export function WorkordersComponent({}) {
           );
           let endWaitMillis = startedOnMillis + maxWaitMillis;
 
-          // check to see if any shop closed days exist in the quoted wait time
-          // first get all day names that the shop is closed
-          let closedDayNamesArr = [];
-          const settings = useSettingsStore().getState().settings;
-          Object.keys(settings?.storeHours).forEach((dayName) => {
-            if (!settings.storeHours[dayName]?.isOpen)
-              closedDayNamesArr.push(dayName);
-          });
+          // count how many closed days fall within the wait period
+          let closedDaysInRange = 0;
+          if (closedDayNamesArr.length > 0) {
+            let current = new Date(startedOnMillis);
+            current.setHours(0, 0, 0, 0);
+            const end = new Date(endWaitMillis);
+            end.setHours(0, 0, 0, 0);
 
-          // next get list of all day names within the time range quoted
-          const dayNames = [
-            "Sunday",
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-          ];
-          const result = [];
-          let current = new Date(wo.startedOnMillis);
-
-          // Normalize to the start of the day (midnight)
-          current.setHours(0, 0, 0, 0);
-
-          const end = new Date(endWaitMillis);
-          end.setHours(0, 0, 0, 0);
-
-          while (current <= end) {
-            result.push(dayNames[current.getDay()]);
-            // Move to next day
-            current.setDate(current.getDate() + 1);
+            while (current <= end) {
+              if (closedDayNamesArr.includes(dayNames[current.getDay()])) {
+                closedDaysInRange++;
+              }
+              current.setDate(current.getDate() + 1);
+            }
           }
 
-          // last check to see if any of the day names in the wait period coincide with days the shop is closed
-          let daysClosedMillis = closedDayNamesArr.length * NUM_MILLIS_IN_DAY;
-          endWaitMillis = endWaitMillis + daysClosedMillis;
+          // extend deadline by closed days that fall within the range
+          endWaitMillis = endWaitMillis + closedDaysInRange * NUM_MILLIS_IN_DAY;
 
-          // const endDayMillis = startedOnMillis + maxWaitMillis;
           const dayEndWord = getWordDayOfWeek(endWaitMillis);
 
-          let waitEndMonthWord = getWordMonth(endWaitMillis);
-          let todayMonthWord = getWordMonth(nowMillis);
-
-          // check to see if the due day word is same week or upcoming weeks
-          let isDueWithin7Days = true;
-          if (
-            Math.ceil((endWaitMillis - nowMillis) / NUM_MILLIS_IN_DAY) >= 7 ||
-            waitEndMonthWord != todayMonthWord
-          ) {
-            isDueWithin7Days = false;
-          }
+          // check to see if due within 7 days
+          let isDueWithin7Days =
+            Math.ceil((endWaitMillis - nowMillis) / NUM_MILLIS_IN_DAY) < 7;
 
           // check to see if past due
-          let isPastDue = false;
-          if (endWaitMillis < nowMillis && todayWord != dayEndWord)
-            isPastDue = true;
+          let isPastDue = endWaitMillis < nowMillis;
 
           let optionsObj = {
             color: null,
@@ -121,7 +111,7 @@ export function WorkordersComponent({}) {
           };
 
           //////////////////////////
-          if (wo.waitTime.label == "Waiting" || wo.waitTime.label == "Today") {
+          if ((wo.waitTime.label == "Waiting" || wo.waitTime.label == "Today") && !isPastDue) {
             optionsObj.waitEndDay = "Today";
             if (colorsObj[wo.id]?.color == "red") {
               optionsObj.color = null;
@@ -129,17 +119,17 @@ export function WorkordersComponent({}) {
               optionsObj.color = "red";
             }
           } else if (isPastDue) {
-            if (colorsObj[wo.id]?.color == "pink") {
+            if (colorsObj[wo.id]?.color == "red") {
               optionsObj.color = null;
             } else {
-              optionsObj.color = "pink";
+              optionsObj.color = "red";
             }
             optionsObj.waitEndDay = "PAST DUE";
           } else if (dayEndWord == todayWord && isDueWithin7Days) {
             optionsObj.color = "red";
             optionsObj.waitEndDay = dayEndWord;
           } else if (dayEndWord == tomorrowWord && isDueWithin7Days) {
-            optionsObj.waitEndDay = dayEndWord;
+            optionsObj.waitEndDay = "Tomorrow";
             optionsObj.color = "yellow";
           } else if (dayEndWord == nextDayWord && isDueWithin7Days) {
             optionsObj.waitEndDay = dayEndWord;
@@ -149,6 +139,7 @@ export function WorkordersComponent({}) {
         });
         ////////////////////////////////////////////////////////
 
+        itemOptionsRef.current = colorsObj;
         _setItemOptions(colorsObj);
       } catch (e) {}
     }, 750);
@@ -156,7 +147,7 @@ export function WorkordersComponent({}) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [zOpenWorkorders, sItemOptions]);
+  }, [zOpenWorkorders]);
 
   ///////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////

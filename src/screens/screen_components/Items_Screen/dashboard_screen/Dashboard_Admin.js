@@ -57,7 +57,7 @@ import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
 import { dbSaveSettingsField, dbListenToDevLogs, dbSaveOpenWorkorder } from "../../../../db_calls_wrapper";
-import { mapCustomers, mapWorkorders } from "../../../../lightspeed_import";
+import { mapCustomers, mapWorkorders, mapSales } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead } from "../../../../db_calls";
 
 const TAB_NAMES = {
@@ -1744,7 +1744,7 @@ const WaitTimesComponent = ({
         </View>
         <View style={{ marginTop: 10, width: "100%" }}>
           <FlatList
-            data={zSettingsObj?.waitTimes || []}
+            data={[...(zSettingsObj?.waitTimes || [])].sort((a, b) => (Number(a.maxWaitTimeDays) || 0) - (Number(b.maxWaitTimeDays) || 0))}
             style={{ width: "100%" }}
             renderItem={(obj) => {
               let idx = obj.index;
@@ -3722,13 +3722,16 @@ const ImportComponent = () => {
 
   async function loadAndCacheLightspeedData() {
     if (_lsCsvData) return _lsCsvData;
-    const [custText, woText, wiText, serText, itemsText, slText] = await Promise.all([
+    const [custText, woText, wiText, serText, itemsText, slText, salesText, spText, stripeText] = await Promise.all([
       fetch("/lightspeed/customers.csv").then(r => r.text()),
       fetch("/lightspeed/workorders.csv").then(r => r.text()),
       fetch("/lightspeed/workorderItems.csv").then(r => r.text()),
       fetch("/lightspeed/serialized.csv").then(r => r.text()),
       fetch("/lightspeed/items.csv").then(r => r.text()),
       fetch("/lightspeed/salesLines.csv").then(r => r.text()),
+      fetch("/lightspeed/sales.csv").then(r => r.text()),
+      fetch("/lightspeed/salesPayments.csv").then(r => r.text()),
+      fetch("/lightspeed/stripePayments.csv").then(r => r.text()),
     ]);
     const customers = mapCustomers(custText);
     const customerMap = {};
@@ -3736,8 +3739,18 @@ const ImportComponent = () => {
     const settings = useSettingsStore.getState().settings;
     const statuses = settings?.statuses || [];
     const workorders = mapWorkorders(woText, wiText, serText, itemsText, slText, customerMap, statuses);
-    _lsCsvData = { customers, customerMap, workorders };
-    console.log("[LS Mapping] Loaded & cached: " + customers.length + " customers, " + workorders.length + " workorders");
+    // Build workorderMap: lsSaleID → [mapped workorder objects]
+    const workorderMap = {};
+    for (const wo of workorders) {
+      const lsSaleID = wo._lsSaleID;
+      if (lsSaleID && lsSaleID !== "0") {
+        if (!workorderMap[lsSaleID]) workorderMap[lsSaleID] = [];
+        workorderMap[lsSaleID].push(wo);
+      }
+    }
+    const sales = mapSales(salesText, spText, stripeText, workorderMap, customerMap);
+    _lsCsvData = { customers, customerMap, workorders, sales };
+    console.log("[LS Mapping] Loaded & cached: " + customers.length + " customers, " + workorders.length + " workorders, " + sales.length + " sales");
     return _lsCsvData;
   }
 
@@ -3749,6 +3762,12 @@ const ImportComponent = () => {
       const wo = data.workorders.find(w => w.workorderNumber === sWoLookup.trim());
       if (wo) {
         console.log("[LS Mapping] Workorder " + sWoLookup.trim() + ":", JSON.stringify(wo, null, 2));
+        const linkedSale = wo.saleID ? data.sales.find(s => s.id === wo.saleID) : null;
+        if (linkedSale) {
+          console.log("[LS Mapping] Sale for WO " + sWoLookup.trim() + ":", JSON.stringify(linkedSale, null, 2));
+        } else {
+          console.log("[LS Mapping] No sale linked to WO " + sWoLookup.trim());
+        }
         await dbSaveOpenWorkorder(wo);
         useOpenWorkordersStore.getState().setOpenWorkorders([wo]);
         useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
@@ -3789,6 +3808,98 @@ const ImportComponent = () => {
     _setLookupLoading(false);
   }
 
+  async function handleDevImport() {
+    _setLookupLoading(true);
+    _setLsResult("");
+    try {
+      const data = await loadAndCacheLightspeedData();
+      const settings = useSettingsStore.getState().settings;
+      const statuses = settings?.statuses || [];
+
+      // Build status label → status object lookup
+      const statusByLabel = {};
+      for (const s of statuses) statusByLabel[s.label.toLowerCase()] = s;
+
+      const doneAndPaidID = statusByLabel["done & paid"]?.id;
+      const partOrderedID = statusByLabel["part ordered"]?.id;
+      const finNoAutoID = statusByLabel["finished - no auto text"]?.id;
+      const serviceStatus = statusByLabel["service"];
+
+      // Sale lookup for card/cash detection
+      const saleByID = {};
+      for (const s of data.sales) saleByID[s.id] = s;
+
+      // --- Batch 1: 5 "Done & Paid" with 2+ items (3 card, 2 cash) ---
+      const donePaidAll = data.workorders.filter(
+        wo => wo.status === doneAndPaidID && wo.workorderLines.length >= 2
+      );
+      const donePaidCard = [];
+      const donePaidCash = [];
+      for (const wo of donePaidAll) {
+        const sale = wo.saleID ? saleByID[wo.saleID] : null;
+        if (!sale) continue;
+        const hasCash = sale.payments.some(p => p.cash);
+        const hasCard = sale.payments.some(p => !p.cash && !p.check);
+        if (hasCash && !hasCard) donePaidCash.push(wo);
+        else if (hasCard) donePaidCard.push(wo);
+      }
+      const batch1 = [...donePaidCard.slice(0, 3), ...donePaidCash.slice(0, 2)];
+
+      // --- Batch 2: 5 "Part Ordered" ---
+      const batch2 = data.workorders.filter(wo => wo.status === partOrderedID).slice(0, 5);
+
+      // --- Batch 3: 5 "Finished - No Auto Text" ---
+      const finNoAutoAll = data.workorders.filter(wo => wo.status === finNoAutoID);
+      const batch3 = finNoAutoAll.slice(0, 5);
+
+      // --- Batch 4: 9 more "Finished - No Auto Text" → transformed to "Service" w/ wait times ---
+      const waitTimes = settings?.waitTimes || [];
+      const batch4 = finNoAutoAll.slice(5, 14).map((wo, i) => ({
+        ...wo,
+        status: serviceStatus?.id || wo.status,
+        waitTime: waitTimes[i % waitTimes.length] || "",
+      }));
+
+      // --- Hard-coded workorder #11930 ---
+      const wo11930 = data.workorders.find(w => w.workorderNumber === "11930");
+
+      const allWorkorders = [...batch1, ...batch2, ...batch3, ...batch4];
+      if (wo11930 && !allWorkorders.find(w => w.id === wo11930.id)) {
+        allWorkorders.push(wo11930);
+      }
+
+      // Save all to DB
+      for (const wo of allWorkorders) {
+        await dbSaveOpenWorkorder(wo);
+      }
+      useOpenWorkordersStore.getState().setOpenWorkorders(allWorkorders);
+
+      // Log 1 sample from each batch with linked sale
+      const logSample = (label, wo) => {
+        if (!wo) return;
+        const sale = wo.saleID ? saleByID[wo.saleID] : null;
+        console.log("[Dev Import] " + label + " WO:", JSON.stringify(wo, null, 2));
+        if (sale) console.log("[Dev Import] " + label + " Sale:", JSON.stringify(sale, null, 2));
+      };
+      logSample("Done&Paid", batch1[0]);
+      logSample("PartOrdered", batch2[0]);
+      logSample("Finished-NoAuto", batch3[0]);
+      logSample("Service(transformed)", batch4[0]);
+      logSample("WO#11930", wo11930);
+
+      _setLsResult(
+        "Dev Import: " + allWorkorders.length + " workorders saved (" +
+        batch1.length + " Done&Paid, " + batch2.length + " PartOrdered, " +
+        batch3.length + " Finished, " + batch4.length + " Service" +
+        (wo11930 ? ", +WO#11930" : ", WO#11930 not found") + ")"
+      );
+    } catch (e) {
+      console.error("[Dev Import] Error:", e);
+      _setLsResult("Error: " + e.message);
+    }
+    _setLookupLoading(false);
+  }
+
   let buttonStyle = {
     width: 200,
     height: 80,
@@ -3806,6 +3917,31 @@ const ImportComponent = () => {
       <BoxContainerInnerComponent
         style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
       >
+        {/* --- Dev Import --- */}
+        <TouchableOpacity
+          onPress={handleDevImport}
+          disabled={sLookupLoading}
+          style={{
+            width: 300,
+            paddingVertical: 14,
+            borderRadius: 10,
+            borderWidth: 2,
+            borderColor: C.purple,
+            backgroundColor: sLookupLoading ? gray(0.85) : C.purple,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 20,
+            opacity: sLookupLoading ? 0.5 : 1,
+          }}
+        >
+          <Text style={{ fontSize: 15, color: "white", fontWeight: "700" }}>
+            {sLookupLoading ? "Importing..." : "Dev Import"}
+          </Text>
+          <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 3 }}>
+            20 workorders (mixed statuses)
+          </Text>
+        </TouchableOpacity>
+        <View style={{ width: "100%", height: 1, backgroundColor: C.buttonLightGreenOutline, marginBottom: 10 }} />
         {/* --- Lightspeed Connection --- */}
         <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 10 }}>
           Lightspeed
@@ -3863,6 +3999,8 @@ const ImportComponent = () => {
             { type: "csv-customers", label: "Customers" },
             { type: "csv-sales", label: "Sales" },
             { type: "csv-salelines", label: "Sale Lines" },
+            { type: "csv-salepayments", label: "Sale Payments" },
+            { type: "csv-cccharges", label: "CC Charges" },
           ].map((btn) => (
             <View key={btn.type} style={{ alignItems: "center", margin: 10 }}>
               <TouchableOpacity

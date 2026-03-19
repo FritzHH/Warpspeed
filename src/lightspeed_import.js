@@ -426,7 +426,7 @@ export function mapWorkorders(
 
     const mappedWo = {
       workorderNumber: woID,
-      id: generateRandomID(),
+      id: woID,
       customerID: wo.customerID || "",
       customerFirst,
       customerLast,
@@ -457,6 +457,7 @@ export function mapWorkorders(
       saleID: "",
       isStandaloneSale: false,
       media: [],
+      _lsSaleID: wo.saleID || "",
     };
 
     workorders.push(mappedWo);
@@ -468,4 +469,178 @@ export function mapWorkorders(
   }
 
   return workorders;
+}
+
+// ============================================================================
+// mapSales
+// ============================================================================
+
+export function mapSales(
+  salesCSVText,
+  salesPaymentsCSVText,
+  stripePaymentsCSVText,
+  workorderMap,   // { lsSaleID → mapped workorder object(s) }
+  customerMap     // { lsCustomerID → customer object }
+) {
+  const saleRows = parseCSV(salesCSVText);
+  const spRows = parseCSV(salesPaymentsCSVText);
+  const stripeRows = stripePaymentsCSVText ? parseCSV(stripePaymentsCSVText) : [];
+
+  // --- Build lookup maps ---
+
+  // paymentsMap: saleID → [salePayment rows]
+  const paymentsMap = {};
+  for (const sp of spRows) {
+    if (!sp.saleID) continue;
+    if (!paymentsMap[sp.saleID]) paymentsMap[sp.saleID] = [];
+    paymentsMap[sp.saleID].push(sp);
+  }
+
+  // stripeByOrderID: Order ID (= LS saleID) → [stripe rows]
+  const stripeByOrderID = {};
+  for (const sr of stripeRows) {
+    const orderID = sr["Order ID"];
+    if (!orderID) continue;
+    if (!stripeByOrderID[orderID]) stripeByOrderID[orderID] = [];
+    stripeByOrderID[orderID].push(sr);
+  }
+
+  // --- Map sales ---
+  const sales = [];
+
+  for (const row of saleRows) {
+    const lsSaleID = row.saleID;
+    if (!lsSaleID) continue;
+
+    // Skip voided
+    if (row.voided === "true") continue;
+
+    const completed = row.completed === "true";
+    const subtotal = dollarsToCents(row.calcSubtotal);
+    const total = dollarsToCents(row.calcTotal);
+    const tax = dollarsToCents(row.calcTax1) + dollarsToCents(row.calcTax2);
+    const discount = dollarsToCents(row.calcDiscount);
+    const amountCaptured = dollarsToCents(row.calcPayments);
+
+    // Tax percent: derive from subtotal if possible
+    const taxableAmount = subtotal - discount;
+    const salesTaxPercent = taxableAmount > 0 ? Math.round((tax / taxableAmount) * 10000) / 10000 : 0;
+
+    // Timestamp
+    const millis = row.completeTime
+      ? new Date(row.completeTime).getTime()
+      : row.createTime
+        ? new Date(row.createTime).getTime()
+        : "";
+
+    // Workorder linkage
+    const linkedWorkorders = workorderMap[lsSaleID] || [];
+    const workorderIDs = linkedWorkorders.map(wo => wo.id);
+
+    // Customer linkage
+    const customer = row.customerID && row.customerID !== "0"
+      ? customerMap[row.customerID] || null
+      : null;
+
+    // Map payments
+    const paymentRows = paymentsMap[lsSaleID] || [];
+    const saleID = "s" + generateRandomID().substring(1);
+
+    // Stripe records for this sale (matched by Order ID = saleID)
+    const stripeForSale = stripeByOrderID[lsSaleID] || [];
+    // Track which Stripe rows are consumed (for multi-payment matching)
+    const stripeUsed = new Set();
+
+    const payments = paymentRows.map(sp => {
+      const isCash = sp.paymentTypeType === "cash";
+      const isCheck = sp.paymentTypeName === "Check";
+      const isCard = sp.paymentTypeType === "credit card";
+      const amount = dollarsToCents(sp.amount);
+
+      // For card payments, try to match a Stripe record for card details
+      let stripeMatch = null;
+      if (isCard && stripeForSale.length > 0) {
+        // Try exact amount match first (Stripe Amount is in dollars)
+        for (let i = 0; i < stripeForSale.length; i++) {
+          if (stripeUsed.has(i)) continue;
+          const stripeAmountCents = dollarsToCents(stripeForSale[i]["Amount"]);
+          if (stripeAmountCents === amount) {
+            stripeMatch = stripeForSale[i];
+            stripeUsed.add(i);
+            break;
+          }
+        }
+        // Fallback: take first unused Stripe record for this sale
+        if (!stripeMatch) {
+          for (let i = 0; i < stripeForSale.length; i++) {
+            if (stripeUsed.has(i)) continue;
+            stripeMatch = stripeForSale[i];
+            stripeUsed.add(i);
+            break;
+          }
+        }
+      }
+
+      return {
+        id: sp.salePaymentID || generateRandomID(),
+        saleID,
+        amountCaptured: amount,
+        amountTendered: isCash ? amount : "",
+        cash: isCash,
+        check: isCheck,
+        cardType: stripeMatch ? stripeMatch["Card type"] : (sp.cardType || ""),
+        cardIssuer: isCard ? sp.paymentTypeName : "",
+        last4: stripeMatch ? stripeMatch["Card last 4"] : (sp.cardLast4 || ""),
+        authorizationCode: sp.authCode || "",
+        millis: sp.createTime ? new Date(sp.createTime).getTime() : "",
+        isRefund: amount < 0,
+        paymentProcessor: "Stripe",
+        chargeID: stripeMatch ? stripeMatch["ID"] : (sp.ccChargeID && sp.ccChargeID !== "0" ? sp.ccChargeID : ""),
+        paymentIntentID: stripeMatch ? (stripeMatch["Payment ID"] || "") : "",
+        receiptURL: "",
+        expMonth: "",
+        expYear: "",
+        networkTransactionID: "",
+        amountRefunded: stripeMatch ? dollarsToCents(stripeMatch["Refunded amount"]) : 0,
+        isDeposit: false,
+        _cardFundingSource: stripeMatch ? (stripeMatch["Card funding source"] || "") : "",
+        _entryMode: stripeMatch ? (stripeMatch["Entry mode"] || "") : "",
+      };
+    });
+
+    const mappedSale = {
+      id: saleID,
+      millis,
+      subtotal,
+      discount,
+      tax,
+      salesTaxPercent,
+      total,
+      amountCaptured,
+      amountRefunded: 0,
+      paymentComplete: completed,
+      workorderIDs,
+      payments,
+      refunds: [],
+    };
+
+    sales.push(mappedSale);
+
+    // Backfill workorder sales arrays and saleID
+    for (const wo of linkedWorkorders) {
+      wo.sales.push(saleID);
+      wo.saleID = saleID;
+      if (completed) {
+        wo.paymentComplete = true;
+        wo.amountPaid = amountCaptured;
+      }
+    }
+
+    // Backfill customer sales array
+    if (customer) {
+      customer.sales.push(saleID);
+    }
+  }
+
+  return sales;
 }

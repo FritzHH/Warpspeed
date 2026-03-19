@@ -5378,6 +5378,55 @@ exports.lightspeedImportData = onCall(
       // await lsLog("Sale Lines CSV exported: " + totalRows + " rows", "success");
     }
 
+    if (importType === "csv-salepayments") {
+      await lsLog("Fetching all sale payments from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "SalePayment", {
+        load_relations: '["PaymentType","CCCharge"]',
+      });
+      await lsLog("Fetched " + data.length + " sale payments. Building CSV...");
+      const headers = [
+        "salePaymentID", "saleID", "amount", "tipAmount", "createTime",
+        "paymentTypeName", "paymentTypeType",
+        "ccChargeID", "cardType", "cardLast4", "authCode", "entryMethod",
+        "archived"
+      ];
+      const rows = data.map(sp => [
+        sp.salePaymentID, sp.saleID, sp.amount || "", sp.tipAmount || "", sp.createTime || "",
+        sp.PaymentType?.name || "", sp.PaymentType?.type || "",
+        sp.ccChargeID || "", sp.CCCharge?.cardType || "", sp.CCCharge?.xnum || "",
+        sp.CCCharge?.authCode || "", sp.CCCharge?.entryMethod || "",
+        sp.archived,
+      ]);
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_salepayments.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "salepayments", url, filename: "lightspeed_salepayments.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Sale Payments CSV exported: " + rows.length + " rows", "success");
+    }
+
+    if (importType === "csv-cccharges") {
+      await lsLog("Fetching all CC charges from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "CCCharge", {});
+      await lsLog("Fetched " + data.length + " CC charges. Building CSV...");
+      const headers = [
+        "ccChargeID", "saleID", "gatewayTransID", "xnum", "cardType",
+        "amount", "refunded", "authCode", "exp", "entryMethod",
+        "isDebit", "cardholderName", "voided", "declined", "authOnly", "timeStamp"
+      ];
+      const rows = data.map(cc => [
+        cc.ccChargeID, cc.saleID, cc.gatewayTransID || "", cc.xnum || "", cc.cardType || "",
+        cc.amount || "", cc.refunded || "", cc.authCode || "", cc.exp || "", cc.entryMethod || "",
+        cc.isDebit || "", cc.cardholderName || "", cc.voided, cc.declined, cc.authOnly, cc.timeStamp || "",
+      ]);
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_cccharges.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "cccharges", url, filename: "lightspeed_cccharges.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("CC Charges CSV exported: " + rows.length + " rows", "success");
+    }
+
     await lsLog("Import complete!", "success");
     await logDocRef.update({ status: "complete" });
     log("Lightspeed: import complete", result);

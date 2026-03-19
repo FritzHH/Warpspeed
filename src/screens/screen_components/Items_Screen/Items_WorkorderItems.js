@@ -610,7 +610,7 @@ export const LineItemComponent = ({
               </Text>
             )}
             <TouchableOpacity
-              disabled={!isCustom}
+              disabled={!isCustom || isLocked}
               onPress={() => isCustom && onEditCustomItem?.(workorderLine)}
               activeOpacity={isCustom ? 0.6 : 1}
             >
@@ -639,6 +639,7 @@ export const LineItemComponent = ({
                 numberOfLines={5}
                 debounceMs={500}
                 capitalize={true}
+                editable={!isLocked}
                 style={{ outlineWidth: 0, color: 'orange', width: "100%" }}
                 onChangeText={(val) => {
                   __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
@@ -652,6 +653,7 @@ export const LineItemComponent = ({
                 multiline={true}
                 numberOfLines={5}
                 debounceMs={500}
+                editable={!isLocked}
                 style={{ outlineWidth: 0, color: 'green', width: "100%" }}
                 onChangeText={(val) => {
                   __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
@@ -814,6 +816,7 @@ export const LineItemComponent = ({
                 <Button_
                   icon={ICONS.axe}
                   iconSize={23}
+                  disabled={isLocked}
                   onPress={workorderLine.qty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
                   buttonStyle={{
                     backgroundColor: "transparent",
@@ -829,6 +832,7 @@ export const LineItemComponent = ({
                 buttonIconSize={25}
                 modalCoordY={25}
                   modalCoordX={-100}
+                enabled={!isLocked}
                 buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
                 dataArr={[
                   { label: "No Discount" },
@@ -849,6 +853,7 @@ export const LineItemComponent = ({
             </View>
 
             <Button_
+              disabled={isLocked}
               onPress={() => __deleteWorkorderLine(index)}
               icon={ICONS.trash}
               iconSize={21}

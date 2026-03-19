@@ -3926,18 +3926,18 @@ const ImportComponent = () => {
             paddingVertical: 14,
             borderRadius: 10,
             borderWidth: 2,
-            borderColor: C.purple,
-            backgroundColor: sLookupLoading ? gray(0.85) : C.purple,
+            borderColor: C.buttonLightGreenOutline,
+            backgroundColor: sLookupLoading ? gray(0.85) : C.listItemWhite,
             alignItems: "center",
             justifyContent: "center",
             marginBottom: 20,
             opacity: sLookupLoading ? 0.5 : 1,
           }}
         >
-          <Text style={{ fontSize: 15, color: "white", fontWeight: "700" }}>
+          <Text style={{ fontSize: 15, color: C.text, fontWeight: "700" }}>
             {sLookupLoading ? "Importing..." : "Dev Import"}
           </Text>
-          <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 3 }}>
+          <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 3 }}>
             20 workorders (mixed statuses)
           </Text>
         </TouchableOpacity>

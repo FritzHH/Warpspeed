@@ -610,60 +610,42 @@ export const useCurrentCustomerStore = create((set, get) => ({
 
   loadWorkorders: () => {
     set({ workordersLoading: true });
-    let target = get().customer.workorders?.length;
+    const woIDs = get().customer.workorders || [];
+    if (woIDs.length === 0) { set({ workordersLoading: false }); return; }
+    let target = woIDs.length;
     let count = 0;
-    let workorders = useOpenWorkordersStore.getState().getWorkorders();
-    get().customer.workorders?.forEach((workorderID) => {
-      if (workorders.find((wo) => wo.id === workorderID)) {
-        count++;
-        set({
-          workorders: replaceOrAddToArr(
-            get().workorders,
-            workorders.find((wo) => wo.id === workorderID)
-          ),
-        });
+    const openWorkorders = useOpenWorkordersStore.getState().getWorkorders();
+    const done = () => { count++; if (count >= target) set({ workordersLoading: false }); };
+    woIDs.forEach((workorderID) => {
+      const local = openWorkorders.find((wo) => wo.id === workorderID);
+      if (local) {
+        set({ workorders: replaceOrAddToArr(get().workorders, local) });
+        done();
       } else {
-        dbGetCompletedWorkorder(workorderID).then((workorder) => {
-          count++;
-          set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
-          if (count === target) set({ workordersLoading: false });
-        });
+        dbGetCompletedWorkorder(workorderID)
+          .then((workorder) => {
+            if (workorder) set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
+            done();
+          })
+          .catch(() => { done(); });
       }
     });
   },
 
   loadSales: () => {
-    // let sale = {
-    //   amountCaptured: "45654",
-    //   id: 125425652125,
-    //   millis: new Date().getTime(),
-    //   workorderIDs: ["018609309556", "068688807311"],
-    //   payments: [
-    //     {
-    //       amountCaptured: "45434",
-    //       last4: "3454",
-    //       cardType: "Visa (traditional)",
-    //       expMonth: 10,
-    //       expYear: 28,
-    //       millis: new Date().getTime(),
-    //       isRefund: false,
-    //       amountRefunded: 0,
-    //       id: "123652145256",
-    //     },
-    //   ],
-    // };
-
-    // return [sale, sale, sale, sale];
-
     set({ salesLoading: true });
-    let target = get().customer.sales?.length;
+    const saleIDs = get().customer.sales || [];
+    if (saleIDs.length === 0) { set({ salesLoading: false }); return; }
+    let target = saleIDs.length;
     let count = 0;
-    get().customer.sales?.forEach((salesID) => {
-      dbGetCompletedSale(salesID).then((sale) => {
-        count++;
-        set({ sales: replaceOrAddToArr(get().sales, sale) });
-        if (count === target) set({ salesLoading: false });
-      });
+    const done = () => { count++; if (count >= target) set({ salesLoading: false }); };
+    saleIDs.forEach((salesID) => {
+      dbGetCompletedSale(salesID)
+        .then((sale) => {
+          if (sale) set({ sales: replaceOrAddToArr(get().sales, sale) });
+          done();
+        })
+        .catch(() => { done(); });
     });
   },
 }));

@@ -409,7 +409,7 @@ export function WorkordersComponent({}) {
                       {workorder.workorderLines?.length > 0 && (
                         <View
                           style={{
-                            backgroundColor: C.blue,
+                            backgroundColor: "gray",
                             borderRadius: 10,
                             paddingHorizontal: 6,
                             paddingVertical: 1,

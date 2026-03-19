@@ -60,7 +60,6 @@ import { dbSaveInventoryItem, dbClearCollection, dbSaveSettingsField, dbSaveOpen
 import { lightspeedInitiateAuthCallable, lightspeedCheckConnectionCallable, lightspeedImportDataCallable, firestoreRead } from "../../../../db_calls";
 import workordersCsvUrl from "../../../../assets/import_data/workorders.csv";
 import workordersBySaleCsvUrl from "../../../../assets/import_data/workorders_by_sale.csv";
-import salesCsvUrl from "../../../../assets/import_data/sales.csv";
 import customersCsvUrl from "../../../../assets/import_data/customers.csv";
 
 const TAB_NAMES = {
@@ -3757,7 +3756,7 @@ const ImportComponent = () => {
       let [woText, wbsText, salesText, custText] = await Promise.all([
         fetch(workordersCsvUrl).then(r => r.text()),
         fetch(workordersBySaleCsvUrl).then(r => r.text()),
-        fetch(salesCsvUrl).then(r => r.text()),
+        Promise.resolve(""),
         fetch(customersCsvUrl).then(r => r.text()),
       ]);
       let woRows = parseCSV(woText);

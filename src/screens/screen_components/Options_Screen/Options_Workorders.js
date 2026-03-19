@@ -12,8 +12,8 @@ import {
 import { TabMenuDivider as Divider, CheckBox_ } from "../../../components";
 import { C, Colors } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
-import React, { useEffect, useRef, useState } from "react";
-import { cloneDeep, sortBy } from "lodash";
+import React, { useRef, useState } from "react";
+import { sortBy } from "lodash";
 import {
   useCurrentCustomerStore,
   useOpenWorkordersStore,
@@ -25,6 +25,148 @@ import {
 import { dbGetCustomer } from "../../../db_calls_wrapper";
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
+
+const dayNamesArr = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function computeWaitInfo(workorder) {
+  const nowMillis = Date.now();
+
+  const startedOnMillis = Number(workorder.startedOnMillis);
+  const maxWaitDays = Number(workorder.waitTime?.maxWaitTimeDays);
+  if (!maxWaitDays || !startedOnMillis) return { color: null, waitEndDay: "", textColor: null };
+
+  let endWaitMillis = startedOnMillis + maxWaitDays * NUM_MILLIS_IN_DAY;
+
+  // get closed day names from settings
+  let closedDayNamesArr = [];
+  const settings = useSettingsStore.getState().settings;
+  if (settings?.storeHours) {
+    Object.keys(settings.storeHours).forEach((dayName) => {
+      if (!settings.storeHours[dayName]?.isOpen) closedDayNamesArr.push(dayName);
+    });
+  }
+
+  // count closed days within wait period
+  let closedDaysInRange = 0;
+  if (closedDayNamesArr.length > 0) {
+    let current = new Date(startedOnMillis);
+    current.setHours(0, 0, 0, 0);
+    const end = new Date(endWaitMillis);
+    end.setHours(0, 0, 0, 0);
+    while (current <= end) {
+      if (closedDayNamesArr.includes(dayNamesArr[current.getDay()])) closedDaysInRange++;
+      current.setDate(current.getDate() + 1);
+    }
+  }
+
+  endWaitMillis = endWaitMillis + closedDaysInRange * NUM_MILLIS_IN_DAY;
+
+  // compare dates at midnight for day-level precision
+  let endDate = new Date(endWaitMillis);
+  endDate.setHours(0, 0, 0, 0);
+  let today = new Date(nowMillis);
+  today.setHours(0, 0, 0, 0);
+  let yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  let tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  let dayAfterTomorrow = new Date(today);
+  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+
+  let endTime = endDate.getTime();
+  let todayTime = today.getTime();
+  let yesterdayTime = yesterday.getTime();
+  let tomorrowTime = tomorrow.getTime();
+  let dayAfterTomorrowTime = dayAfterTomorrow.getTime();
+
+  let result = { color: null, waitEndDay: "", textColor: null };
+
+  if (endTime === todayTime) {
+    // due today
+    result.waitEndDay = "Today";
+    result.color = "red";
+    result.textColor = C.text;
+  } else if (endTime === yesterdayTime) {
+    // due yesterday
+    result.waitEndDay = "Yesterday";
+    result.color = "red";
+    result.textColor = "red";
+  } else if (endTime < yesterdayTime) {
+    // past due before yesterday — show short date in red
+    let shortDay = getWordDayOfWeek(endWaitMillis, true);
+    let month = getWordMonth(endWaitMillis);
+    let day = endDate.getDate();
+    let suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
+    result.waitEndDay = shortDay + ", " + month + " " + day + suffix;
+    result.color = "red";
+    result.textColor = "red";
+  } else if (endTime === tomorrowTime) {
+    // due tomorrow
+    result.waitEndDay = "Tomorrow";
+    result.color = "yellow";
+    result.textColor = C.text;
+  } else if (endTime === dayAfterTomorrowTime) {
+    // due day after tomorrow
+    result.waitEndDay = getWordDayOfWeek(endWaitMillis);
+    result.color = "green";
+    result.textColor = C.text;
+  } else {
+    // future — more than 2 days out
+    let daysOut = Math.ceil((endTime - todayTime) / NUM_MILLIS_IN_DAY);
+    if (daysOut <= 6) {
+      result.waitEndDay = getWordDayOfWeek(endWaitMillis);
+    } else {
+      let shortDay = getWordDayOfWeek(endWaitMillis, true);
+      let month = getWordMonth(endWaitMillis);
+      let day = endDate.getDate();
+      let suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
+      result.waitEndDay = shortDay + " " + month + " " + day + suffix;
+    }
+    result.textColor = C.text;
+  }
+
+  return result;
+}
+
+const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
+  const info = computeWaitInfo(workorder);
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        height: "100%",
+        width: 100,
+        paddingRight: 2,
+        backgroundColor: C.buttonLightGreen,
+        borderWidth: 1,
+        borderColor: C.buttonLightGreenOutline,
+        borderRadius: 5,
+        marginLeft: 5,
+      }}
+    >
+      <View style={{ flexDirection: "column", alignItems: "flex-end" }}>
+        {!!info.waitEndDay && (
+          <Text style={{ color: info.textColor || C.text, fontSize: 13, fontWeight: "600", textAlign: "right" }}>
+            {capitalizeFirstLetterOfString(info.waitEndDay)}
+          </Text>
+        )}
+      </View>
+      {/* <View
+        style={{
+          backgroundColor: info.color,
+          width: 13,
+          height: 13,
+          borderRadius: 100,
+          marginLeft: 7,
+        }}
+      /> */}
+    </View>
+  );
+});
+
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
@@ -35,119 +177,8 @@ export function WorkordersComponent({}) {
 
   ///////////////////////////////////////////////////////////////////////////////////
   const [sAllowPreview, _setAllowPreview] = useState(true);
-  const [sItemOptions, _setItemOptions] = useState({});
-  const itemOptionsRef = useRef({});
   const exitTimerRef = useRef(null);
   const preHoverTabsRef = useRef(null);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      try {
-        let colorsObj = cloneDeep(itemOptionsRef.current);
-        let nowMillis = Date.now();
-        let todayWord = getWordDayOfWeek();
-        let tomorrowWord = getWordDayOfWeek(nowMillis + NUM_MILLIS_IN_DAY);
-        let nextDayWord = getWordDayOfWeek(nowMillis + NUM_MILLIS_IN_DAY * 2);
-
-        // get closed day names from settings (outside the loop — same for all workorders)
-        let closedDayNamesArr = [];
-        const settings = useSettingsStore.getState().settings;
-        if (settings?.storeHours) {
-          Object.keys(settings.storeHours).forEach((dayName) => {
-            if (!settings.storeHours[dayName]?.isOpen)
-              closedDayNamesArr.push(dayName);
-          });
-        }
-
-        const dayNames = [
-          "Sunday",
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
-        ];
-
-        /////////////////////////////////////////////////////
-        zOpenWorkorders.forEach((wo) => {
-          const startedOnMillis = Number(wo.startedOnMillis);
-          let maxWaitMillis = Number(
-            wo.waitTime?.maxWaitTimeDays * NUM_MILLIS_IN_DAY
-          );
-          let endWaitMillis = startedOnMillis + maxWaitMillis;
-
-          // count how many closed days fall within the wait period
-          let closedDaysInRange = 0;
-          if (closedDayNamesArr.length > 0) {
-            let current = new Date(startedOnMillis);
-            current.setHours(0, 0, 0, 0);
-            const end = new Date(endWaitMillis);
-            end.setHours(0, 0, 0, 0);
-
-            while (current <= end) {
-              if (closedDayNamesArr.includes(dayNames[current.getDay()])) {
-                closedDaysInRange++;
-              }
-              current.setDate(current.getDate() + 1);
-            }
-          }
-
-          // extend deadline by closed days that fall within the range
-          endWaitMillis = endWaitMillis + closedDaysInRange * NUM_MILLIS_IN_DAY;
-
-          const dayEndWord = getWordDayOfWeek(endWaitMillis);
-
-          // check to see if due within 7 days
-          let isDueWithin7Days =
-            Math.ceil((endWaitMillis - nowMillis) / NUM_MILLIS_IN_DAY) < 7;
-
-          // check to see if past due
-          let isPastDue = endWaitMillis < nowMillis;
-
-          let optionsObj = {
-            color: null,
-            waitEndDay: maxWaitMillis && isDueWithin7Days ? dayEndWord : "",
-          };
-
-          //////////////////////////
-          if ((wo.waitTime.label == "Waiting" || wo.waitTime.label == "Today") && !isPastDue) {
-            optionsObj.waitEndDay = "Today";
-            if (colorsObj[wo.id]?.color == "red") {
-              optionsObj.color = null;
-            } else {
-              optionsObj.color = "red";
-            }
-          } else if (isPastDue) {
-            if (colorsObj[wo.id]?.color == "red") {
-              optionsObj.color = null;
-            } else {
-              optionsObj.color = "red";
-            }
-            optionsObj.waitEndDay = "PAST DUE";
-          } else if (dayEndWord == todayWord && isDueWithin7Days) {
-            optionsObj.color = "red";
-            optionsObj.waitEndDay = dayEndWord;
-          } else if (dayEndWord == tomorrowWord && isDueWithin7Days) {
-            optionsObj.waitEndDay = "Tomorrow";
-            optionsObj.color = "yellow";
-          } else if (dayEndWord == nextDayWord && isDueWithin7Days) {
-            optionsObj.waitEndDay = dayEndWord;
-            optionsObj.color = "green";
-          }
-          colorsObj[wo.id] = optionsObj;
-        });
-        ////////////////////////////////////////////////////////
-
-        itemOptionsRef.current = colorsObj;
-        _setItemOptions(colorsObj);
-      } catch (e) {}
-    }, 750);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [zOpenWorkorders]);
 
   ///////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////
@@ -442,68 +473,7 @@ export function WorkordersComponent({}) {
                         )}
                       </Text>
                     </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "flex-start",
-                        height: "100%",
-                        paddingRight: 2,
-                        backgroundColor: C.buttonLightGreen,
-                        borderWidth: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        borderRadius: 5,
-                        marginLeft: 5,
-                      }}
-                    >
-                      <View style={{ flexDirection: "" }}>
-                        <Text
-                          style={{
-                            color: "dimgray",
-                            fontSize: 12,
-                            width: 100,
-                            textAlign: "right",
-                          }}
-                        >
-                          {"est: "}
-                          <Text
-                            style={{
-                              color: C.text,
-                              fontSize: 14,
-                              fontStyle: "italic",
-                            }}
-                          >
-                            {workorder.waitTime.label}
-                          </Text>
-                        </Text>
-                        {!!sItemOptions[workorder.id]?.waitEndDay && (
-                          <Text
-                            style={{
-                              paddingLeft: 10,
-                              color: "gray",
-                              fontSize: 13,
-                              alignSelf: "flex-end",
-                            }}
-                          >
-                            {"due: "}{" "}
-                            <Text style={{ color: C.text }}>
-                              {capitalizeFirstLetterOfString(
-                                sItemOptions[workorder.id].waitEndDay
-                              )}
-                            </Text>
-                          </Text>
-                        )}
-                      </View>
-                      <View
-                        style={{
-                          backgroundColor: sItemOptions[workorder.id]?.color,
-                          width: 13,
-                          height: 13,
-                          borderRadius: 100,
-                          marginLeft: 7,
-                        }}
-                      />
-                    </View>
+                    <WaitTimeIndicator workorder={workorder} />
 
                     {/* </View> */}
                   </View>

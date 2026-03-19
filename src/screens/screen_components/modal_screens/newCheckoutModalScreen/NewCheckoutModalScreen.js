@@ -47,6 +47,52 @@ import { SaleTotals } from "./SaleTotals";
 import { PaymentsList } from "./PaymentsList";
 import { WorkorderCombiner } from "./WorkorderCombiner";
 import { InventorySearch } from "./InventorySearch";
+import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
+
+function broadcastSaleToDisplay(sale, combinedWOs, addedItems, customerFirst, customerLast) {
+  if (!sale) return;
+  broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
+    customerFirst: customerFirst || "",
+    customerLast: customerLast || "",
+    combinedWorkorders: (combinedWOs || []).map((wo) => ({
+      brand: wo.brand || "",
+      model: wo.model || "",
+      description: wo.description || "",
+      workorderLines: (wo.workorderLines || []).map((line) => ({
+        id: line.id,
+        qty: line.qty,
+        inventoryItem: {
+          formalName: line.inventoryItem?.formalName || "",
+          price: line.inventoryItem?.price || 0,
+        },
+        discountObj: line.discountObj
+          ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
+          : null,
+      })),
+    })),
+    addedItems: (addedItems || []).map((item) => ({
+      id: item.id,
+      qty: item.qty,
+      inventoryItem: {
+        formalName: item.inventoryItem?.formalName || "",
+        price: item.inventoryItem?.price || 0,
+      },
+      discountObj: item.discountObj
+        ? { name: item.discountObj.name, savings: item.discountObj.savings || 0, newPrice: item.discountObj.newPrice || 0 }
+        : null,
+    })),
+    sale: {
+      subtotal: sale.subtotal || 0,
+      discount: sale.discount || 0,
+      tax: sale.tax || 0,
+      cardFee: sale.cardFee || 0,
+      cardFeePercent: sale.cardFeePercent || 0,
+      total: sale.total || 0,
+      amountCaptured: sale.amountCaptured || 0,
+      paymentComplete: sale.paymentComplete || false,
+    },
+  });
+}
 
 export function NewCheckoutModalScreen() {
   // ─── Zustand Store Access ─────────────────────────────────
@@ -74,6 +120,8 @@ export function NewCheckoutModalScreen() {
   let saleComplete = sSale?.paymentComplete || false;
   let amountLeftToPay = (sSale?.total || 0) - (sSale?.amountCaptured || 0);
   if (amountLeftToPay < 0) amountLeftToPay = 0;
+  let custFirst = zCustomer?.first || zOpenWorkorder?.customerFirst || "";
+  let custLast = zCustomer?.last || zOpenWorkorder?.customerLast || "";
 
   // ─── Initialization ──────────────────────────────────────
   // Called once when the modal opens. We use a flag to avoid
@@ -111,6 +159,7 @@ export function NewCheckoutModalScreen() {
         }
 
         _setSale(existingSale);
+        broadcastSaleToDisplay(existingSale, combined, existingSale.addedItems || [], custFirst, custLast);
         fetchReaders();
         return;
       }
@@ -134,6 +183,7 @@ export function NewCheckoutModalScreen() {
     }
 
     _setSale(sale);
+    broadcastSaleToDisplay(sale, zOpenWorkorder ? [cloneDeep(zOpenWorkorder)] : [], [], custFirst, custLast);
 
     // Persist immediately for network resilience
     newCheckoutSaveActiveSale(sale);
@@ -190,6 +240,7 @@ export function NewCheckoutModalScreen() {
     let updated = updateSaleWithTotals(sSale, newArr, sAddedItems, zSettings);
     updated.workorderIDs = newArr.map((o) => o.id);
     _setSale(updated);
+    broadcastSaleToDisplay(updated, newArr, sAddedItems, custFirst, custLast);
     newCheckoutSaveActiveSale(updated);
   }
 
@@ -202,6 +253,7 @@ export function NewCheckoutModalScreen() {
 
     let updated = updateSaleWithTotals(sSale, newArr, sAddedItems, zSettings);
     _setSale(updated);
+    broadcastSaleToDisplay(updated, newArr, sAddedItems, custFirst, custLast);
     newCheckoutSaveActiveSale(updated);
   }
 
@@ -237,6 +289,7 @@ export function NewCheckoutModalScreen() {
       zSettings
     );
     _setSale(updated);
+    broadcastSaleToDisplay(updated, sCombinedWorkorders, newAddedItems, custFirst, custLast);
     newCheckoutSaveActiveSale(updated);
   }
 
@@ -251,6 +304,7 @@ export function NewCheckoutModalScreen() {
       zSettings
     );
     _setSale(updated);
+    broadcastSaleToDisplay(updated, sCombinedWorkorders, newAddedItems, custFirst, custLast);
     newCheckoutSaveActiveSale(updated);
   }
 
@@ -277,6 +331,7 @@ export function NewCheckoutModalScreen() {
     }
 
     _setSale(sale);
+    broadcastSaleToDisplay(sale, sCombinedWorkorders, sAddedItems, custFirst, custLast);
 
     // Persist immediately — network-failure-proof
     newCheckoutSaveActiveSale(sale);
@@ -370,6 +425,7 @@ export function NewCheckoutModalScreen() {
     if (sSale?.id && !(sSale?.amountCaptured > 0)) {
       newCheckoutDeleteActiveSale(sSale.id);
     }
+    broadcastClear();
     _setSale(null);
     _setCombinedWorkorders([]);
     _setAddedItems([]);

@@ -18,6 +18,8 @@ import {
   replaceOrAddToArr,
 } from "./utils";
 import { cloneDeep, debounce } from "lodash";
+import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "./broadcastChannel";
+import { calculateRunningTotals } from "./utils";
 
 import {
   dbDeleteWorkorder,
@@ -684,6 +686,35 @@ const debouncedSaveWorkorder = debounce((workorder) => {
   dbSaveOpenWorkorder(workorder);
 }, 500);
 
+function broadcastWorkorderToDisplay(wo) {
+  if (!wo || wo.isStandaloneSale) return;
+  let totals = calculateRunningTotals(wo, 0);
+  broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
+    customerFirst: wo.customerFirst || "",
+    customerLast: wo.customerLast || "",
+    brand: wo.brand || "",
+    model: wo.model || "",
+    description: wo.description || "",
+    workorderLines: (wo.workorderLines || []).map((line) => ({
+      id: line.id,
+      qty: line.qty,
+      inventoryItem: {
+        formalName: line.inventoryItem?.formalName || "",
+        price: line.inventoryItem?.price || 0,
+      },
+      discountObj: line.discountObj
+        ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
+        : null,
+    })),
+    totals: {
+      runningSubtotal: totals.runningSubtotal,
+      runningDiscount: totals.runningDiscount,
+      runningTotal: totals.runningTotal,
+      runningQty: totals.runningQty,
+    },
+  });
+}
+
 export const useOpenWorkordersStore = create((set, get) => ({
   workorders: [],
   openWorkorder: null,
@@ -702,12 +733,21 @@ export const useOpenWorkordersStore = create((set, get) => ({
   getWorkorderPreviewID: () => get().workorderPreviewID,
 
   setWorkorderPreviewID: (workorderPreviewID) => set({ workorderPreviewID }), 
-  setOpenWorkorderID: (openWorkorderID) => set({ openWorkorderID }),
+  setOpenWorkorderID: (openWorkorderID) => {
+    set({ openWorkorderID });
+    if (openWorkorderID) {
+      let wo = get().workorders.find((o) => o.id === openWorkorderID);
+      if (wo) broadcastWorkorderToDisplay(wo);
+    } else {
+      broadcastClear();
+    }
+  },
   setOpenWorkorders: (workorders) => set({ workorders }),
   setWorkorder: (wo, saveToDB = true, batch = true) => {
     if (wo.isStandaloneSale) wo = { ...wo, lastInteractionMillis: Date.now() };
     set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
     if (saveToDB && !wo.isStandaloneSale) dbSaveOpenWorkorder(wo);
+    if (wo.id === get().openWorkorderID) broadcastWorkorderToDisplay(wo);
   },
   setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
     if (!workorderID) workorderID = get().openWorkorderID;
@@ -718,6 +758,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
 
     set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
     if (saveToDB && !workorder.isStandaloneSale) debouncedSaveWorkorder(workorder);
+    if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
   },
 
   removeWorkorder: (workorderID, saveToDB = true, batch = true) => {

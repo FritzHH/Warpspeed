@@ -3868,11 +3868,43 @@ const ImportComponent = () => {
         allWorkorders.push(wo11930);
       }
 
-      // Save all to DB
+      // Collect unique customers from all workorders
+      const customersSaved = new Set();
       for (const wo of allWorkorders) {
-        await dbSaveOpenWorkorder(wo);
+        if (wo.customerID && !customersSaved.has(wo.customerID)) {
+          const cust = data.customerMap[wo.customerID];
+          if (cust) {
+            await dbSaveCustomer(cust);
+            customersSaved.add(wo.customerID);
+          }
+        }
       }
-      useOpenWorkordersStore.getState().setOpenWorkorders(allWorkorders);
+
+      // Save workorders + sales to correct Firestore collections
+      const openWorkorders = [];
+      const completedWorkorders = [];
+      const salesSaved = new Set();
+
+      for (const wo of allWorkorders) {
+        if (wo.status === doneAndPaidID) {
+          await dbSaveCompletedWorkorder(wo);
+          completedWorkorders.push(wo);
+          // Save linked sale to completed-sales
+          if (wo.saleID && !salesSaved.has(wo.saleID)) {
+            const sale = saleByID[wo.saleID];
+            if (sale) {
+              await dbSaveCompletedSale(sale);
+              salesSaved.add(wo.saleID);
+            }
+          }
+        } else {
+          await dbSaveOpenWorkorder(wo);
+          openWorkorders.push(wo);
+        }
+      }
+
+      // Update local store with open workorders only
+      useOpenWorkordersStore.getState().setOpenWorkorders(openWorkorders);
 
       // Log 1 sample from each batch with linked sale
       const logSample = (label, wo) => {
@@ -3888,10 +3920,9 @@ const ImportComponent = () => {
       logSample("WO#11930", wo11930);
 
       _setLsResult(
-        "Dev Import: " + allWorkorders.length + " workorders saved (" +
-        batch1.length + " Done&Paid, " + batch2.length + " PartOrdered, " +
-        batch3.length + " Finished, " + batch4.length + " Service" +
-        (wo11930 ? ", +WO#11930" : ", WO#11930 not found") + ")"
+        "Dev Import: " + allWorkorders.length + " workorders (" +
+        completedWorkorders.length + " completed, " + openWorkorders.length + " open), " +
+        salesSaved.size + " sales, " + customersSaved.size + " customers"
       );
     } catch (e) {
       console.error("[Dev Import] Error:", e);

@@ -8,6 +8,7 @@ export const ROUTES = {
   login: "/login",
   dashboard: "/",
   home: "/",
+  display: "/display",
   mobile: {
     home: "/",
     workorders: "/workorders",

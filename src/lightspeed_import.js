@@ -48,6 +48,10 @@ function splitCSVRows(text) {
   return rows;
 }
 
+function sanitize(str) {
+  return str.replace(/'\//g, "'");
+}
+
 function parseCSV(text) {
   let rows = splitCSVRows(text);
   let headers = parseCSVLine(rows[0]);
@@ -332,7 +336,7 @@ export function mapWorkorders(
         id: generateRandomID(),
         name: "Lightspeed Import",
         userID: "",
-        value: wo.note.trim(),
+        value: sanitize(wo.note.trim()),
       });
     }
 
@@ -342,7 +346,7 @@ export function mapWorkorders(
         id: generateRandomID(),
         name: "Lightspeed Import",
         userID: "",
-        value: wo.internalNote.trim(),
+        value: sanitize(wo.internalNote.trim()),
       });
     }
 
@@ -371,7 +375,7 @@ export function mapWorkorders(
       return {
         id: generateRandomID(),
         qty: parseInt(wi.unitQuantity) || 1,
-        intakeNotes: (wi.note || "").trim(),
+        intakeNotes: sanitize((wi.note || "").trim()),
         receiptNotes: "",
         inventoryItem,
         discountObj,
@@ -407,7 +411,7 @@ export function mapWorkorders(
         receiptNotes: "",
         inventoryItem: {
           id: generateRandomID(),
-          formalName: (wl.note || "").trim() || (isLabor ? "Custom Labor" : "Custom Part"),
+          formalName: sanitize((wl.note || "").trim()) || (isLabor ? "Custom Labor" : "Custom Part"),
           informalName: "",
           brand: "",
           price,

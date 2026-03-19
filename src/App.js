@@ -8,6 +8,7 @@ import { MobileBaseScreen } from "./screens/mobile/MobileBaseScreen";
 import { MobileHomeScreen } from "./screens/mobile/MobileHomeScreen";
 import { MobileWorkorderListScreen } from "./screens/mobile/MobileWorkorderListScreen";
 import { MobileWorkorderDetailScreen } from "./screens/mobile/MobileWorkorderDetailScreen";
+import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import {
   dbLoginUser,
   onAuthStateChange,
@@ -184,6 +185,9 @@ function App() {
             </>
           )}
         </Route>
+
+        {/* Public route - Customer Display */}
+        <Route path={ROUTES.display} element={<CustomerDisplayScreen />} />
 
         {/* Catch-all redirect to dashboard for authenticated users, login for unauthenticated */}
         <Route

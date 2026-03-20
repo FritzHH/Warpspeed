@@ -1842,12 +1842,16 @@ export const TabMenuButton = ({
   isSelected,
   onLongPress,
   height,
+  icon,
+  iconSize,
 }) => {
   return (
     <Button_
       onLongPress={onLongPress}
       onPress={onPress}
       text={text}
+      icon={icon}
+      iconSize={iconSize}
       textStyle={{
         // textColor: Colors.tabMenuButtonText,
         color: isSelected ? C.textWhite : "white",

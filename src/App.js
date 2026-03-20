@@ -9,6 +9,9 @@ import { MobileHomeScreen } from "./screens/mobile/MobileHomeScreen";
 import { MobileWorkorderListScreen } from "./screens/mobile/MobileWorkorderListScreen";
 import { MobileWorkorderDetailScreen } from "./screens/mobile/MobileWorkorderDetailScreen";
 import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
+import { TranslateScreen } from "./screens/TranslateScreen";
+import { IntakeScreen } from "./screens/IntakeScreen";
+import { HomeScreen } from "./screens/HomeScreen";
 import {
   dbLoginUser,
   onAuthStateChange,
@@ -186,8 +189,24 @@ function App() {
           )}
         </Route>
 
+        {/* Public route - Home (links to all routes) */}
+        <Route path={ROUTES.home} element={<HomeScreen />} />
+
         {/* Public route - Customer Display */}
         <Route path={ROUTES.display} element={<CustomerDisplayScreen />} />
+
+        {/* Public route - Translation Display */}
+        <Route path={ROUTES.translate} element={<TranslateScreen />} />
+
+        {/* Protected route - Intake Screen */}
+        <Route
+          path={ROUTES.intake}
+          element={
+            <ProtectedRoute user={user}>
+              <IntakeScreen />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Catch-all redirect to dashboard for authenticated users, login for unauthenticated */}
         <Route

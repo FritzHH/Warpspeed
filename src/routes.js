@@ -7,8 +7,10 @@
 export const ROUTES = {
   login: "/login",
   dashboard: "/",
-  home: "/",
+  home: "/home",
   display: "/display",
+  translate: "/translate",
+  intake: "/intake",
   mobile: {
     home: "/",
     workorders: "/workorders",

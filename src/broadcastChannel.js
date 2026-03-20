@@ -31,3 +31,37 @@ export function onDisplayMessage(callback) {
 export function broadcastClear() {
   broadcastToDisplay(DISPLAY_MSG_TYPES.CLEAR, null);
 }
+
+// ============================================================================
+// Translate Display Channel
+// ============================================================================
+const TRANSLATE_CHANNEL_NAME = "warpspeed-translate-display";
+
+export const TRANSLATE_MSG_TYPES = {
+  TRANSLATE: "translate",
+  CLEAR: "clear",
+};
+
+let _translateChannel = null;
+function getTranslateChannel() {
+  if (!_translateChannel) {
+    _translateChannel = new BroadcastChannel(TRANSLATE_CHANNEL_NAME);
+  }
+  return _translateChannel;
+}
+
+export function broadcastToTranslateDisplay(type, payload) {
+  getTranslateChannel().postMessage({ type, payload, timestamp: Date.now() });
+}
+
+export function onTranslateMessage(callback) {
+  const channel = getTranslateChannel();
+  channel.onmessage = (event) => callback(event.data);
+  return () => {
+    channel.onmessage = null;
+  };
+}
+
+export function broadcastTranslateClear() {
+  broadcastToTranslateDisplay(TRANSLATE_MSG_TYPES.CLEAR, null);
+}

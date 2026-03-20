@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { View, Text, TouchableOpacity } from "react-native-web";
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 
 import { TAB_NAMES } from "../../data";
@@ -15,12 +15,13 @@ import {
   useOpenWorkordersStore,
   useCustomerSearchStore,
   useTabNamesStore,
+  useSettingsStore,
 } from "../../stores";
-import { C, ICONS, Fonts } from "../../styles";
+import { C, ICONS, Fonts, COLOR_GRADIENTS } from "../../styles";
 import { ROUTES } from "../../routes";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 import { log, gray } from "../../utils";
-import { translateText } from "../../db_calls";
+import { useTranslation } from "../../useTranslation";
 import {
   broadcastToTranslateDisplay,
   broadcastTranslateClear,
@@ -69,72 +70,67 @@ export const Items_Section = React.memo(({}) => {
   );
 });
 
+const EMPTY_STARTERS = [];
 const TranslateModal = ({ visible, onClose }) => {
   const [sInputText, _sSetInputText] = useState("");
-  const [sTranslatedText, _sSetTranslatedText] = useState("");
-  const [sIsEnToEs, _sSetIsEnToEs] = useState(true); // true = EN→ES, false = ES→EN
-  const [sLoading, _sSetLoading] = useState(false);
-  const debounceRef = useRef(null);
+  const zTranslateStarters = useSettingsStore((state) => state.settings?.translateStarters) || EMPTY_STARTERS;
 
-  const sourceLabel = sIsEnToEs ? "English" : "Spanish";
-  const targetLabel = sIsEnToEs ? "Spanish" : "English";
-  const sourceLang = sIsEnToEs ? "en" : "es";
-  const targetLang = sIsEnToEs ? "es" : "en";
-
-  const doTranslate = useCallback(
-    async (text, target) => {
-      if (!text.trim()) {
-        _sSetTranslatedText("");
-        broadcastTranslateClear();
-        return;
-      }
-      _sSetLoading(true);
-      const result = await translateText({
-        text,
+  const {
+    translatedText, isEnToEs, isLoading, sourceLabel, targetLabel, targetLang,
+    doTranslate, debouncedTranslate, flipDirection, clearTranslation,
+  } = useTranslation({
+    defaultDirection: "en-to-es",
+    onTranslated: (translated, text, target) => {
+      broadcastToTranslateDisplay(TRANSLATE_MSG_TYPES.TRANSLATE, {
+        translatedText: translated,
+        originalText: text,
         targetLanguage: target,
       });
-      _sSetLoading(false);
-      if (result.success) {
-        const translated = result.data?.data?.translatedText || result.data?.translatedText || "";
-        _sSetTranslatedText(translated);
-        broadcastToTranslateDisplay(TRANSLATE_MSG_TYPES.TRANSLATE, {
-          translatedText: translated,
-          originalText: text,
-          targetLanguage: target,
-        });
-      } else {
-        _sSetTranslatedText("Translation error");
-      }
     },
-    []
-  );
+    onCleared: () => broadcastTranslateClear(),
+  });
 
   const handleTextChange = useCallback(
     (text) => {
       _sSetInputText(text);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        doTranslate(text, targetLang);
-      }, 600);
+      debouncedTranslate(text, targetLang);
     },
-    [targetLang, doTranslate]
+    [targetLang, debouncedTranslate]
   );
 
   const handleFlip = useCallback(() => {
-    const newIsEnToEs = !sIsEnToEs;
-    _sSetIsEnToEs(newIsEnToEs);
-    const newTarget = newIsEnToEs ? "es" : "en";
+    flipDirection();
+    let newTarget = isEnToEs ? "en" : "es";
     if (sInputText.trim()) {
       doTranslate(sInputText, newTarget);
     }
-  }, [sIsEnToEs, sInputText, doTranslate]);
+  }, [isEnToEs, sInputText, doTranslate, flipDirection]);
 
   const handleClose = useCallback(() => {
     _sSetInputText("");
-    _sSetTranslatedText("");
-    broadcastTranslateClear();
+    clearTranslation();
     onClose();
-  }, [onClose]);
+  }, [onClose, clearTranslation]);
+
+  function handleStarterPress(starter) {
+    _sSetInputText(starter.text);
+    // Set direction based on starter language — if starter is Spanish, translate to English
+    let starterIsEnToEs = starter.language === "en";
+    if (starterIsEnToEs !== isEnToEs) flipDirection();
+    let target = starter.language === "es" ? "en" : "es";
+    doTranslate(starter.text, target);
+  }
+
+  // Auto-close after 60 seconds — ref avoids timer reset on parent re-renders
+  const handleCloseRef = useRef(null);
+  handleCloseRef.current = handleClose;
+  useEffect(() => {
+    if (!visible) return;
+    let timer = setTimeout(() => {
+      if (handleCloseRef.current) handleCloseRef.current();
+    }, 60000);
+    return () => clearTimeout(timer);
+  }, [visible]);
 
   if (!visible) return null;
 
@@ -243,6 +239,28 @@ const TranslateModal = ({ visible, onClose }) => {
             </Text>
           </View>
 
+          {/* Starter buttons */}
+          {zTranslateStarters.length > 0 && (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                marginBottom: 10,
+              }}
+            >
+              {zTranslateStarters.map((starter) => (
+                <Button_
+                  key={starter.id}
+                  text={starter.label}
+                  onPress={() => handleStarterPress(starter)}
+                  colorGradientArr={COLOR_GRADIENTS.lightBlue}
+                  buttonStyle={{ marginRight: 6, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 4 }}
+                  textStyle={{ fontSize: 12 }}
+                />
+              ))}
+            </View>
+          )}
+
           {/* Input */}
           <TextInput_
             value={sInputText}
@@ -277,13 +295,13 @@ const TranslateModal = ({ visible, onClose }) => {
               minHeight: 80,
             }}
           >
-            {sLoading ? (
+            {isLoading ? (
               <Text style={{ fontSize: 14, color: gray(0.5), fontStyle: "italic" }}>
                 Translating...
               </Text>
             ) : (
               <Text style={{ fontSize: 16, color: C.text }}>
-                {sTranslatedText}
+                {translatedText}
               </Text>
             )}
           </View>

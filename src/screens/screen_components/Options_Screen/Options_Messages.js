@@ -26,8 +26,10 @@ import {
   CheckBox_,
   Button_,
   DropdownMenu,
+  Image_,
 } from "../../../components";
-import { C, COLOR_GRADIENTS, Colors } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
+import { useTranslation } from "../../../useTranslation";
 import {
   SMS_PROTO,
   WORKORDER_PROTO,
@@ -86,10 +88,16 @@ export function MessagesComponent({}) {
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);
   const [sInputHeight, _setInputHeight] = useState(36);
+  const [sTranslateActive, _setTranslateActive] = useState(false);
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const cursorPositionRef = useRef(0);
+
+  const {
+    translatedText, isEnToEs, isLoading: sTranslateLoading,
+    targetLang, debouncedTranslate, flipDirection, doTranslate, clearTranslation,
+  } = useTranslation({ defaultDirection: "es-to-en" });
 
   // Debounced handler for message input
   const handleMessageChange = useCallback((val) => {
@@ -101,12 +109,17 @@ export function MessagesComponent({}) {
     // Update state immediately for responsive UI
     _setNewMessage(val);
 
+    // Trigger translation if active
+    if (sTranslateActive) {
+      debouncedTranslate(val, targetLang);
+    }
+
     // Debounce any side effects (if needed in future)
     debounceTimerRef.current = setTimeout(() => {
       // Any debounced logic can go here
       // Currently just using for debouncing the state update itself
     }, DEBOUNCE_DELAY);
-  }, []);
+  }, [sTranslateActive, debouncedTranslate, targetLang]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -147,6 +160,20 @@ export function MessagesComponent({}) {
     _setNewMessage(newMessage);
     cursorPositionRef.current = cursorPos + variableStr.length;
     textInputRef.current?.focus();
+    if (sTranslateActive) debouncedTranslate(newMessage, targetLang);
+  }
+
+  function handleToggleTranslate() {
+    let newActive = !sTranslateActive;
+    _setTranslateActive(newActive);
+    if (newActive && sNewMessage.trim()) debouncedTranslate(sNewMessage, targetLang);
+    if (!newActive) clearTranslation();
+  }
+
+  function handleFlipDirection() {
+    flipDirection();
+    let newTarget = isEnToEs ? "en" : "es";
+    if (sTranslateActive && sNewMessage.trim()) doTranslate(sNewMessage, newTarget);
   }
 
   async function sendMessage(text) {
@@ -165,6 +192,7 @@ export function MessagesComponent({}) {
     msg.senderUserObj = zCurrentUserObj;
     _setNewMessage("");
     _setCanRespond(false);
+    clearTranslation();
     let result = await smsService.send(msg);
     if (!result.success) {
       useAlertScreenStore.getState().setValues({
@@ -353,6 +381,17 @@ export function MessagesComponent({}) {
               // height: "20%",
           }}
         >
+          {sTranslateActive && (translatedText || sTranslateLoading) ? (
+            <View style={{
+              padding: 6, marginBottom: 4, backgroundColor: "rgb(245,245,220)",
+              borderRadius: 5, borderWidth: 1, borderColor: gray(0.15),
+            }}>
+              {sTranslateLoading
+                ? <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
+                : <Text style={{ fontSize: 14, color: C.text }}>{translatedText}</Text>
+              }
+            </View>
+          ) : null}
           <View style={{ width: "100%" }}>
             <TextInput
               onChangeText={handleMessageChange}
@@ -406,7 +445,11 @@ export function MessagesComponent({}) {
             />
             <DropdownMenu
               dataArr={(zSettings?.textTemplates || []).map((t) => ({ label: t.name || "Untitled", message: t.message }))}
-              onSelect={(item) => _setNewMessage(resolveTemplate(item.message))}
+              onSelect={(item) => {
+                let resolved = resolveTemplate(item.message);
+                _setNewMessage(resolved);
+                if (sTranslateActive) debouncedTranslate(resolved, targetLang);
+              }}
               buttonText={"Templates"}
               buttonStyle={{ paddingVertical: 5 }}
               openUpward={true}
@@ -424,8 +467,20 @@ export function MessagesComponent({}) {
               isChecked={sCanRespond}
               onCheck={() => _setCanRespond(!sCanRespond)}
             />
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <CheckBox_
+                text={"Translate"}
+                isChecked={sTranslateActive}
+                onCheck={handleToggleTranslate}
+              />
+              {sTranslateActive && (
+                <TouchableOpacity onPress={handleFlipDirection} style={{ marginLeft: 4, paddingHorizontal: 6 }}>
+                  <Image_ icon={isEnToEs ? ICONS.exportIcon : ICONS.importIcon} size={18} />
+                </TouchableOpacity>
+              )}
+            </View>
             <Button_
-              onPress={() => { _setNewMessage(""); _setInputHeight(36); }}
+              onPress={() => { _setNewMessage(""); _setInputHeight(36); clearTranslation(); }}
               text={"Clear"}
               colorGradientArr={COLOR_GRADIENTS.red}
               buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}

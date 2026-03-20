@@ -881,6 +881,14 @@ export const SETTINGS_OBJ = {
   textTemplates: [],
   workorderTicketMessage: "Hi {firstName}, here is your workorder ticket for your {brand} {description}: {link}",
   saleReceiptMessage: "Hi {firstName}, here is your receipt: {link}",
+  translateStarters: [
+    {
+      id: "greeting_1",
+      label: "Greeting",
+      text: "Hello, welcome to our store. If you have a translation app on your phone, we can use it together to help you with whatever you need. Please show us your screen and we will type here.",
+      language: "en",
+    },
+  ],
   emailTemplates: [
     {
       id: "default_workorder_complete",

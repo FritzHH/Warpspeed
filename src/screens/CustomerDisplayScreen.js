@@ -1,7 +1,12 @@
 /* eslint-disable */
 import { View, Text, ScrollView, Image } from "react-native-web";
 import { useState, useEffect } from "react";
-import { onDisplayMessage, DISPLAY_MSG_TYPES } from "../broadcastChannel";
+import {
+  onDisplayMessage,
+  DISPLAY_MSG_TYPES,
+  onTranslateMessage,
+  TRANSLATE_MSG_TYPES,
+} from "../broadcastChannel";
 import { formatCurrencyDisp, gray } from "../utils";
 import { C, Fonts } from "../styles";
 
@@ -356,12 +361,39 @@ function SaleDisplay({ data }) {
 // Main display screen
 ////////////////////////////////////////////////////////////////////////////////
 
+function TranslateDisplay({ text }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: C.backgroundWhite,
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 40,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 48,
+          color: C.text,
+          fontWeight: Fonts.weight.textHeavy,
+          textAlign: "center",
+          lineHeight: 64,
+        }}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+}
+
 export function CustomerDisplayScreen() {
   const [sDisplayData, _setDisplayData] = useState(null);
   const [sType, _setType] = useState(null);
+  const [sTranslateText, _setTranslateText] = useState("");
 
   useEffect(() => {
-    const unsubscribe = onDisplayMessage((msg) => {
+    const unsubDisplay = onDisplayMessage((msg) => {
       if (msg.type === DISPLAY_MSG_TYPES.CLEAR) {
         _setDisplayData(null);
         _setType(null);
@@ -370,8 +402,23 @@ export function CustomerDisplayScreen() {
         _setType(msg.type);
       }
     });
-    return unsubscribe;
+    const unsubTranslate = onTranslateMessage((msg) => {
+      if (msg.type === TRANSLATE_MSG_TYPES.CLEAR) {
+        _setTranslateText("");
+      } else if (msg.type === TRANSLATE_MSG_TYPES.TRANSLATE) {
+        _setTranslateText(msg.payload.translatedText || "");
+      }
+    });
+    return () => {
+      unsubDisplay();
+      unsubTranslate();
+    };
   }, []);
+
+  // Translation takes priority over regular display
+  if (sTranslateText) {
+    return <TranslateDisplay text={sTranslateText} />;
+  }
 
   if (!sDisplayData || !sType) {
     return <IdleScreen />;

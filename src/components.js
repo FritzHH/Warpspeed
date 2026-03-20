@@ -2640,7 +2640,7 @@ export const Tooltip = ({
         <View style={portalStyle}>
           <View
             style={{
-              backgroundColor: "rgba(30,30,30,0.88)",
+              backgroundColor: "rgba(105,105,105,0.88)",
               borderRadius: 6,
               paddingHorizontal: 9,
               paddingVertical: 5,

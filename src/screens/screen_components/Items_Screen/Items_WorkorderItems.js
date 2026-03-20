@@ -584,7 +584,7 @@ export const LineItemComponent = ({
           backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 80) : inventoryItem.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
           paddingVertical: 3,
           paddingRight: 5,
-          paddingLeft: 8,
+          paddingLeft: 4,
           marginVertical: 3,
           marginHorizontal: 8,
           borderColor: C.listItemBorder,
@@ -603,10 +603,17 @@ export const LineItemComponent = ({
           }}
         >
           <View style={{ width: "100%" }}>
-            {!!workorderLine.discountObj?.name && (
-              <Text style={{ color: C.lightred }}>
-                {workorderLine.discountObj?.name || "discount goes here"}
-              </Text>
+            {!!workorderLine.discountObj?.discountName && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={{ color: C.green, fontSize: 12, marginRight: 5 }}>
+                  {workorderLine.discountObj.discountName}
+                </Text>
+                {!!workorderLine.discountObj?.savings && (
+                  <Text style={{ color: C.green, fontSize: 12 }}>
+                    {"$" + formatCurrencyDisp(workorderLine.discountObj.savings)}
+                  </Text>
+                )}
+              </View>
             )}
             {(() => {
               const hasIntake = !!(workorderLine.intakeNotes || "").trim();
@@ -633,16 +640,28 @@ export const LineItemComponent = ({
               // Show button unless both fields have content
               const showButton = !(hasIntake && hasReceipt);
 
+              // Determine which note field the next click will show
+              let nextNoteLabel = "Intake notes";
+              if (!hasIntake && !hasReceipt) {
+                nextNoteLabel = sActiveNoteField === "intake" ? "Receipt notes" : "Intake notes";
+              } else if (hasIntake && !hasReceipt) {
+                nextNoteLabel = "Receipt notes";
+              } else if (!hasIntake && hasReceipt) {
+                nextNoteLabel = "Intake notes";
+              }
+
               return (
                 <>
                   <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
                     {showButton && (
-                      <TouchableOpacity
-                        onPress={handleNoteButtonPress}
-                        style={{ padding: 2, marginRight: 4 }}
-                      >
-                        <Image source={ICONS.letterR} style={{ width: 18, height: 18, opacity: 0.5 }} />
-                      </TouchableOpacity>
+                      <Tooltip text={nextNoteLabel} position="top">
+                        <TouchableOpacity
+                          onPress={handleNoteButtonPress}
+                          style={{ marginRight: 4 }}
+                        >
+                          <Image source={ICONS.letterR} style={{ width: 18, height: 18, opacity: 0.5 }} />
+                        </TouchableOpacity>
+                      </Tooltip>
                     )}
                     <TouchableOpacity
                       disabled={!isCustom || isLocked}
@@ -670,11 +689,11 @@ export const LineItemComponent = ({
                       debounceMs={500}
                       capitalize={true}
                       editable={!isLocked}
-                      style={{ outlineWidth: 0, color: "orange", width: "100%" }}
+                      style={{ outlineWidth: 0, color: "orange", width: "100%", paddingHorizontal: 3 }}
                       onChangeText={(val) => {
                         __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
                       }}
-                      placeholder="Intake notes..."
+                      placeholder="      Intake notes..."
                       placeholderTextColor={gray(0.2)}
                       value={workorderLine.intakeNotes || ""}
                     />
@@ -686,11 +705,11 @@ export const LineItemComponent = ({
                       numberOfLines={5}
                       debounceMs={500}
                       editable={!isLocked}
-                      style={{ outlineWidth: 0, color: "green", width: "100%" }}
+                      style={{ outlineWidth: 0, color: "green", width: "100%", paddingHorizontal: 3 }}
                       onChangeText={(val) => {
                         __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
                       }}
-                      placeholder="Receipt notes..."
+                      placeholder="      Receipt notes..."
                       placeholderTextColor={gray(0.2)}
                       value={workorderLine.receiptNotes || ""}
                     />
@@ -790,6 +809,7 @@ export const LineItemComponent = ({
                 style={{
                   paddingHorizontal: 0,
                   color: C.text,
+                  textDecorationLine: workorderLine.discountObj?.newPrice ? "line-through" : "none",
                 }}
               >
                 {"$ " +
@@ -800,7 +820,7 @@ export const LineItemComponent = ({
                   )}
               </Text>
             )}
-            {!!workorderLine.discountObj?.savings && (
+            {/* {!!workorderLine.discountObj?.savings && (
               <Text
                 style={{
                   paddingHorizontal: 0,
@@ -810,7 +830,7 @@ export const LineItemComponent = ({
               >
                 {"$ -" + formatCurrencyDisp(workorderLine.discountObj?.savings)}
               </Text>
-            )}
+            )} */}
             <Text
               style={{
                 fontWeight: "500",
@@ -887,16 +907,18 @@ export const LineItemComponent = ({
               </Tooltip>
             </View>
 
-            <Button_
-              disabled={isLocked}
-              onPress={() => __deleteWorkorderLine(index)}
-              icon={ICONS.trash}
-              iconSize={21}
-              buttonStyle={{
-                paddingRight: 2,
-                marginLeft: -8,
-              }}
-            />
+            <Tooltip text="Remove" position="top">
+              <Button_
+                disabled={isLocked}
+                onPress={() => __deleteWorkorderLine(index)}
+                icon={ICONS.trash}
+                iconSize={21}
+                buttonStyle={{
+                  paddingRight: 2,
+                  marginLeft: -8,
+                }}
+              />
+            </Tooltip>
           </View>
         </View>
       </View>

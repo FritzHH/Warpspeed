@@ -192,7 +192,7 @@ function buildDiscountObj(saleLine, priceCents) {
 
   return {
     id: generateRandomID(),
-    discountName: "Lightspeed Import",
+    discountName: pct > 0 ? `${Math.round(pct * 100)}% Off` : `$${amt} Off`,
     discountValue,
     discountType,
     newPrice: priceCents - savings,

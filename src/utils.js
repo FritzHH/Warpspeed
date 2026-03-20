@@ -258,157 +258,211 @@ export const FileInputComponent = ({
   );
 };
 
-export function fuzzySearch(searchTerms, items) {
-  // --- Helpers ---
-  function normalize(str) {
-    return str ? str.toString().toLowerCase().trim() : "";
+/**
+ * searchInventory(query, items)
+ *
+ * Multi-algorithm inventory search combining exact, substring, and fuzzy
+ * matching with field-weighted scoring. Accepts a query string and an array
+ * of inventory item objects. Returns results sorted by relevance with _score.
+ *
+ * Scoring tiers:
+ *   Tier 1 — Exact field match                          → 1.0
+ *   Tier 2 — Field starts with term                     → 0.92
+ *   Tier 3 — Word-boundary substring (term matches a word start) → 0.85
+ *   Tier 4 — General substring (includes)               → 0.75
+ *   Tier 5 — Fuzzy (Levenshtein + Jaro-Winkler + Dice)  → 0–0.65
+ *
+ * Field weights:
+ *   formalName: 1.0 | brand: 0.7 | category: 0.5 | informalName: 0.4
+ *   upc/ean/customSku/manufacturerSku: exact-only at 0.95
+ */
+export function searchInventory(query, items) {
+  if (!query || !items || !items.length) return [];
+  const queryNorm = query.toString().toLowerCase().trim();
+  if (!queryNorm) return [];
+
+  // Normalize common patterns so variations match consistently
+  function normalizePatterns(str) {
+    return str
+      // Tire sizes: "700 x 38", "700X38", "700 X 38" → "700x38"
+      .replace(/(\d+)\s*[xX×]\s*(\d)/g, "$1x$2")
+      // Fractions with spaces: "1 / 2" → "1/2"
+      .replace(/(\d+)\s*\/\s*(\d)/g, "$1/$2")
+      // Hyphenated compounds: "tune-up" / "tune up" → "tuneup"
+      .replace(/\b(\w+)[\s-]+(up|in|on|out|off|over)\b/g, "$1$2")
+      // Collapse multiple spaces
+      .replace(/\s{2,}/g, " ");
   }
 
-  // Levenshtein distance similarity
+  const normalizedQuery = normalizePatterns(queryNorm);
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+
+  // --- Helpers ---
+  function norm(str) {
+    return str ? normalizePatterns(str.toString().toLowerCase().trim()) : "";
+  }
+
   function levenshteinSim(a, b) {
+    if (a === b) return 1;
+    const al = a.length, bl = b.length;
+    if (!al || !bl) return 0;
+    if (Math.abs(al - bl) > Math.max(al, bl) * 0.6) return 0;
     const m = [];
-    for (let i = 0; i <= b.length; i++) m[i] = [i];
-    for (let j = 0; j <= a.length; j++) m[0][j] = j;
-    for (let i = 1; i <= b.length; i++) {
-      for (let j = 1; j <= a.length; j++) {
-        if (b.charAt(i - 1) === a.charAt(j - 1)) {
-          m[i][j] = m[i - 1][j - 1];
-        } else {
-          m[i][j] = Math.min(
-            m[i - 1][j - 1] + 1,
-            m[i][j - 1] + 1,
-            m[i - 1][j] + 1
-          );
-        }
+    for (let i = 0; i <= bl; i++) m[i] = [i];
+    for (let j = 0; j <= al; j++) m[0][j] = j;
+    for (let i = 1; i <= bl; i++) {
+      for (let j = 1; j <= al; j++) {
+        m[i][j] = b[i - 1] === a[j - 1]
+          ? m[i - 1][j - 1]
+          : Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1);
       }
     }
-    const distance = m[b.length][a.length];
-    const maxLen = Math.max(a.length, b.length);
-    return maxLen ? 1 - distance / maxLen : 1;
+    return 1 - m[bl][al] / Math.max(al, bl);
   }
 
-  // Jaro–Winkler similarity
   function jaroWinklerSim(s1, s2) {
-    s1 = normalize(s1);
-    s2 = normalize(s2);
-    const m = getMatchingCharacters(s1, s2);
-    if (!m.matches) return 0;
-    let t = 0;
-    for (let i = 0; i < m.matches; i++) {
-      if (m.s1Matches[i] !== m.s2Matches[i]) t++;
+    if (s1 === s2) return 1;
+    const l1 = s1.length, l2 = s2.length;
+    if (!l1 || !l2) return 0;
+    const window = Math.floor(Math.max(l1, l2) / 2) - 1;
+    const f1 = Array(l1).fill(false);
+    const f2 = Array(l2).fill(false);
+    let matches = 0, transpositions = 0;
+    for (let i = 0; i < l1; i++) {
+      const lo = Math.max(0, i - window);
+      const hi = Math.min(i + window + 1, l2);
+      for (let j = lo; j < hi; j++) {
+        if (!f2[j] && s1[i] === s2[j]) { f1[i] = true; f2[j] = true; matches++; break; }
+      }
     }
-    t = t / 2;
-    const jaro =
-      (m.matches / s1.length +
-        m.matches / s2.length +
-        (m.matches - t) / m.matches) /
-      3;
-    // Winkler adjustment
+    if (!matches) return 0;
+    let k = 0;
+    for (let i = 0; i < l1; i++) {
+      if (!f1[i]) continue;
+      while (!f2[k]) k++;
+      if (s1[i] !== s2[k]) transpositions++;
+      k++;
+    }
+    const jaro = (matches / l1 + matches / l2 + (matches - transpositions / 2) / matches) / 3;
     let prefix = 0;
-    for (let i = 0; i < Math.min(4, s1.length, s2.length); i++) {
-      if (s1[i] === s2[i]) prefix++;
-      else break;
+    for (let i = 0; i < Math.min(4, l1, l2); i++) {
+      if (s1[i] === s2[i]) prefix++; else break;
     }
     return jaro + prefix * 0.1 * (1 - jaro);
   }
 
-  function getMatchingCharacters(s1, s2) {
-    const matchWindow = Math.floor(Math.max(s1.length, s2.length) / 2) - 1;
-    const s1Matches = [];
-    const s2Matches = [];
-    const s1Flags = Array(s1.length).fill(false);
-    const s2Flags = Array(s2.length).fill(false);
-
-    let matches = 0;
-    for (let i = 0; i < s1.length; i++) {
-      const start = Math.max(0, i - matchWindow);
-      const end = Math.min(i + matchWindow + 1, s2.length);
-      for (let j = start; j < end; j++) {
-        if (!s2Flags[j] && s1[i] === s2[j]) {
-          s1Flags[i] = true;
-          s2Flags[j] = true;
-          s1Matches.push(s1[i]);
-          s2Matches.push(s2[j]);
-          matches++;
-          break;
-        }
-      }
-    }
-    return { matches, s1Matches, s2Matches };
-  }
-
-  // Dice coefficient (bigram similarity)
   function diceCoefficient(a, b) {
-    a = normalize(a);
-    b = normalize(b);
-    if (!a.length || !b.length) return 0;
     if (a === b) return 1;
-    const bigrams = (str) => {
-      const res = [];
-      for (let i = 0; i < str.length - 1; i++) {
-        res.push(str.slice(i, i + 2));
-      }
-      return res;
-    };
-    const aBigrams = bigrams(a);
-    const bBigrams = bigrams(b);
-    const aMap = {};
-    aBigrams.forEach((bg) => (aMap[bg] = (aMap[bg] || 0) + 1));
-    let intersection = 0;
-    bBigrams.forEach((bg) => {
-      if (aMap[bg]) {
-        intersection++;
-        aMap[bg]--;
-      }
-    });
-    return (2.0 * intersection) / (aBigrams.length + bBigrams.length);
-  }
-
-  // Combined match score
-  function matchScore(term, field) {
-    const t = normalize(term);
-    const f = normalize(field);
-    if (!t || !f) return 0;
-
-    // Direct equality or includes
-    if (t === f) return 1;
-    if (f.includes(t)) return 0.9;
-
-    // Combine three algorithms
-    const lev = levenshteinSim(t, f);
-    const jw = jaroWinklerSim(t, f);
-    const dice = diceCoefficient(t, f);
-    return (lev + jw + dice) / 3; // average score
-  }
-
-  // Score an item
-  function itemScore(item) {
-    let totalScore = 0;
-    for (let term of searchTerms) {
-      const fields = [item.formalName, item["informal name"], item.brand];
-      let bestFieldScore = 0;
-      for (let field of fields) {
-        const score = matchScore(term, field);
-        if (score > bestFieldScore) bestFieldScore = score;
-      }
-      totalScore += bestFieldScore; // accumulate for each term
+    if (a.length < 2 || b.length < 2) return 0;
+    const bigramsA = {};
+    for (let i = 0; i < a.length - 1; i++) {
+      const bg = a.slice(i, i + 2);
+      bigramsA[bg] = (bigramsA[bg] || 0) + 1;
     }
-    // Normalize by number of terms
-    return totalScore / searchTerms.length;
+    let intersection = 0;
+    for (let i = 0; i < b.length - 1; i++) {
+      const bg = b.slice(i, i + 2);
+      if (bigramsA[bg] > 0) { intersection++; bigramsA[bg]--; }
+    }
+    return (2 * intersection) / (a.length - 1 + b.length - 1);
   }
 
-  // Compute and sort
-  const scoredItems = items.map((item) => ({
-    item,
-    score: itemScore(item),
-  }));
-  const filtered = scoredItems.filter((s) => s.score > 0.25); // threshold
-  filtered.sort((a, b) => b.score - a.score);
+  // Weighted fields for text matching
+  const FIELDS = [
+    { key: "formalName", weight: 1.0 },
+    { key: "brand", weight: 1.0 },
+    { key: "category", weight: 1.0 },
+    { key: "informalName", weight: 1.0 },
+  ];
 
-  return filtered.map((s) => ({
-    ...s.item,
-    _score: s.score,
-  }));
+  // Identifier fields — exact match only
+  const ID_FIELDS = ["upc", "ean", "customSku", "manufacturerSku"];
+
+  // Score a single term against a single field value
+  function scoreTerm(term, fieldVal) {
+    if (!fieldVal) return 0;
+
+    // Tier 1: exact match
+    if (term === fieldVal) return 1.0;
+
+    // Tier 2: field starts with term
+    if (fieldVal.startsWith(term)) return 0.92;
+
+    // Tier 3: word-boundary match (term matches start of any word)
+    const words = fieldVal.split(/[\s\-\/\(\)]+/);
+    for (const word of words) {
+      if (word.startsWith(term)) return 0.85;
+    }
+
+    // Tier 4: general substring
+    if (fieldVal.includes(term)) return 0.75;
+
+    // Tier 5: fuzzy — only for terms 3+ chars
+    if (term.length >= 3) {
+      let bestFuzzy = 0;
+      for (const word of words) {
+        if (word.length < 2) continue;
+        const lev = levenshteinSim(term, word);
+        const jw = jaroWinklerSim(term, word);
+        const dice = diceCoefficient(term, word);
+        const fuzzy = lev * 0.4 + jw * 0.35 + dice * 0.25;
+        if (fuzzy > bestFuzzy) bestFuzzy = fuzzy;
+      }
+      // Also score against full field for multi-word names
+      const levFull = levenshteinSim(term, fieldVal);
+      const jwFull = jaroWinklerSim(term, fieldVal);
+      const diceFull = diceCoefficient(term, fieldVal);
+      const fuzzyFull = levFull * 0.4 + jwFull * 0.35 + diceFull * 0.25;
+      if (fuzzyFull > bestFuzzy) bestFuzzy = fuzzyFull;
+
+      // Cap fuzzy at 0.55 so it never outranks substring matches
+      return Math.min(bestFuzzy, 0.55);
+    }
+
+    return 0;
+  }
+
+  // Score an entire item
+  function scoreItem(item) {
+    // Check identifier fields first — exact match is an instant high score
+    const queryNoSpaces = queryNorm.replace(/\s/g, "");
+    for (const key of ID_FIELDS) {
+      const val = norm(item[key]);
+      if (val && val === queryNoSpaces) return 0.95;
+    }
+
+    // Score each term across weighted fields
+    let totalScore = 0;
+    for (const term of terms) {
+      let bestWeightedScore = 0;
+      for (const { key, weight } of FIELDS) {
+        const val = norm(item[key]);
+        const raw = scoreTerm(term, val);
+        const weighted = raw * weight;
+        if (weighted > bestWeightedScore) bestWeightedScore = weighted;
+      }
+      totalScore += bestWeightedScore;
+    }
+
+    return totalScore / terms.length;
+  }
+
+  // Score all items, filter, sort
+  const scored = [];
+  for (let i = 0; i < items.length; i++) {
+    const score = scoreItem(items[i]);
+    if (score > 0.4) scored.push({ idx: i, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, 50).map(s => ({ ...items[s.idx], _score: s.score }));
+}
+
+// Legacy wrapper
+export function fuzzySearch(searchTerms, items) {
+  const query = Array.isArray(searchTerms) ? searchTerms.join(" ") : searchTerms;
+  return searchInventory(query, items);
 }
 
 export function getRgbFromNamedColor(colorName) {

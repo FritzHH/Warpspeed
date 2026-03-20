@@ -10,7 +10,15 @@
       "Bash(xargs grep -l \"WindowInfo\\\\|ViewportInfo\\\\|DeviceContext\")",
       "Bash(find /c/Users/hiebf/OneDrive/Desktop/warpspeed/src/screens/screen_components/Items_Screen -type f -name \"*.js\" -exec wc -l {} +)",
       "Bash(find \"C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\src\" -name \"*.js\" -type f -exec grep -l \"payroll\\\\|wage\\\\|salary\" {} ;)",
-      "Bash(python3 -c \":*)"
+      "Bash(python3 -c \":*)",
+      "Bash(xargs grep -l \"printBuilder.sale\\\\|Info_StandaloneSale\")",
+      "Bash(git checkout -- src/screens/screen_components/Info_Screen/Info_ActiveWorkorder.js)",
+      "Bash(grep -n \"RECEIPT_TYPES\\\\|RECEIPT_CONSTS\" /c/Users/hiebf/OneDrive/Desktop/warpspeed/src/*.js)",
+      "Bash(grep -n \"RECEIPT_PROTO\" /c/Users/hiebf/OneDrive/Desktop/warpspeed/src/*.js)",
+      "Bash(npm run build)",
+      "mcp__claude-terminal__session_list",
+      "Bash(xargs grep -l \"data_service_modules\\\\|smsService\")",
+      "Bash(npm install @google-cloud/translate)"
     ]
   }
 }

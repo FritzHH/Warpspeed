@@ -24,6 +24,7 @@ import {
   useAlertScreenStore,
   useTabNamesStore,
   useCurrentCustomerStore,
+  useCustMessagesStore,
 } from "../stores";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
@@ -35,6 +36,7 @@ import {
   dbListenToCurrentPunchClock,
   dbListenToInventory,
   dbGetCustomer,
+  dbListenToCustomerMessages,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES } from "../data";
 import { clog, log } from "../utils";
@@ -48,6 +50,7 @@ export function BaseScreen() {
     (state) => state.runBackgroundRecognition
   );
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
+  const zCustomerCell = useCurrentCustomerStore((state) => state.customer?.cell);
 
   const throttledSetLastAction = useRef(throttle(() => {
     useLoginStore.getState().setLastActionMillis();
@@ -135,6 +138,24 @@ export function BaseScreen() {
       useOpenWorkordersStore.getState().setOpenWorkorders(data);
     });
   }, []);
+
+  // message listener — subscribes to customer_phone/{phone}/messages when active customer has a cell
+  useEffect(() => {
+    if (!zCustomerCell) {
+      useCustMessagesStore.getState().clearMessages();
+      return;
+    }
+    let unsubscribe = dbListenToCustomerMessages(zCustomerCell, (messages) => {
+      let incoming = messages.filter((m) => m.type === "incoming");
+      let outgoing = messages.filter((m) => m.type === "outgoing");
+      useCustMessagesStore.getState().setIncomingMessages(incoming);
+      useCustMessagesStore.getState().setOutgoingMessages(outgoing);
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+      useCustMessagesStore.getState().clearMessages();
+    };
+  }, [zCustomerCell]);
 
 
   return (

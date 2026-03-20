@@ -122,6 +122,14 @@ export const NONREMOVABLE_STATUSES = [
     removable: false,
   },
   {
+    id: "34kttdkfekj",
+    label: "On the Stand",
+    textColor: "white",
+
+    backgroundColor: "pink",
+    removable: false,
+  },
+  {
     id: "383rne3kj",
 
     textColor: "black",
@@ -247,6 +255,8 @@ export const SMS_PROTO = {
   type: "",
   deliverySuccess: false,
   senderUserObj: "",
+  status: "",
+  errorMessage: "",
 };
 
 // payments stuff ///////////////////////////////////////////////////////////
@@ -451,6 +461,12 @@ export const MENU_BUTTON_PROTO = {
   buttons: [],
 };
 
+export const INTAKE_BUTTON_PROTO = {
+  id: "",
+  label: "",
+  itemsToAdd: [/*inventory item IDs*/],
+};
+
 // Objects with initial data /////////////////////////////////////////
 export const FRITZ_USER_OBJ = {
   first: "Fritz",
@@ -625,7 +641,7 @@ export const SETTINGS_OBJ = {
       removable: true,
     },
   ],
-
+  intakeButtons: [/*{ ...INTAKE_BUTTON_PROTO }*/],
   quickItemButtons: [
     { id: "38trrneg", name: "Tune-Up", parentID: null, items: [] },
     { id: "38trrdfdneg", name: "Tube", parentID: null, items: ["3Rh6JaP75v1esbywt18E", "9xCMXA89wZeAt1IBfLoU"] },
@@ -863,6 +879,8 @@ export const SETTINGS_OBJ = {
     },
   },
   textTemplates: [],
+  workorderTicketMessage: "Hi {firstName}, here is your workorder ticket for your {brand} {description}: {link}",
+  saleReceiptMessage: "Hi {firstName}, here is your receipt: {link}",
   emailTemplates: [
     {
       id: "default_workorder_complete",

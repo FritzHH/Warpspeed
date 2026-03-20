@@ -85,7 +85,7 @@ function computeWaitInfo(workorder) {
     // due today
     result.waitEndDay = "Today";
     result.color = "red";
-    result.textColor = C.text;
+    result.textColor = C.orange;
   } else if (endTime === yesterdayTime) {
     // due yesterday
     result.waitEndDay = "Yesterday";

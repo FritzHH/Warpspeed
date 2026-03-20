@@ -88,6 +88,7 @@ const twilioSecretAccountNumber = defineSecret("twilioSecretAccountNum");
 const firebaseServiceAccountKey = defineSecret("firebase-service-account-key");
 const lightspeedClientId = defineSecret("LIGHTSPEED_CLIENT_ID");
 const lightspeedClientSecret = defineSecret("LIGHTSPEED_CLIENT_SECRET");
+const googleTranslateApiKey = defineSecret("GOOGLE_TRANSLATE_API_KEY");
 
 // initialization
 var stripe;
@@ -5507,6 +5508,223 @@ exports.sendEmailCallable = onCall(
       throw new HttpsError(
         "internal",
         "Failed to send email: " + (error.message || "Unknown error")
+      );
+    }
+  }
+);
+
+// ============================================================================
+// Upload PDF to Cloud Storage and Send SMS with link
+// ============================================================================
+exports.uploadPDFAndSendSMSCallable = onCall(
+  {
+    secrets: [
+      twilioSecretKey,
+      twilioSecretAccountNumber,
+      firebaseServiceAccountKey,
+    ],
+  },
+  async (request) => {
+    log("Incoming uploadPDFAndSendSMS request");
+
+    try {
+      const db = await getDB(firebaseServiceAccountKey);
+
+      const {
+        base64,
+        storagePath,
+        message,
+        phoneNumber,
+        tenantID,
+        storeID,
+        customerID,
+        messageID,
+        fromNumber = "+12393171234",
+      } = request.data;
+
+      // Validate required fields
+      if (!base64 || typeof base64 !== "string") {
+        throw new HttpsError("invalid-argument", "base64 PDF content is required");
+      }
+      if (!storagePath || typeof storagePath !== "string") {
+        throw new HttpsError("invalid-argument", "storagePath is required");
+      }
+      if (!message || typeof message !== "string") {
+        throw new HttpsError("invalid-argument", "message is required");
+      }
+      if (!phoneNumber || typeof phoneNumber !== "string") {
+        throw new HttpsError("invalid-argument", "phoneNumber is required");
+      }
+      if (!tenantID || typeof tenantID !== "string") {
+        throw new HttpsError("invalid-argument", "tenantID is required");
+      }
+      if (!storeID || typeof storeID !== "string") {
+        throw new HttpsError("invalid-argument", "storeID is required");
+      }
+
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, "");
+      if (cleanPhoneNumber.length !== 10) {
+        throw new HttpsError("invalid-argument", "Phone number must be 10 digits");
+      }
+
+      // Upload PDF to Cloud Storage
+      const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+      const file = bucket.file(storagePath);
+      await file.save(Buffer.from(base64, "base64"), {
+        contentType: "application/pdf",
+        metadata: { contentType: "application/pdf" },
+      });
+      await file.makePublic();
+      const pdfURL = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+
+      log("PDF uploaded to Cloud Storage", { storagePath, pdfURL });
+
+      // Replace {link} placeholder in message
+      const finalMessage = message.replace(/\{link\}/g, pdfURL);
+
+      // Initialize Twilio
+      if (!twilioClient) {
+        try {
+          twilioClient = require("twilio")(
+            twilioSecretAccountNumber.value(),
+            twilioSecretKey.value()
+          );
+        } catch (twilioInitError) {
+          log("Error initializing Twilio client", twilioInitError);
+          throw new HttpsError("internal", "Failed to initialize SMS service");
+        }
+      }
+
+      // Send SMS
+      const twilioResponse = await twilioClient.messages.create({
+        body: finalMessage.trim(),
+        to: `+1${cleanPhoneNumber}`,
+        from: fromNumber,
+        statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback`,
+      });
+
+      log("PDF SMS sent successfully", {
+        messageSid: twilioResponse.sid,
+        to: twilioResponse.to,
+        status: twilioResponse.status,
+      });
+
+      // Store outgoing message in Firestore
+      if (customerID && messageID) {
+        try {
+          const messageRef = db
+            .collection("customer_phone")
+            .doc(cleanPhoneNumber)
+            .collection("messages")
+            .doc(messageID);
+
+          await messageRef.set({
+            id: messageID,
+            customerID: customerID,
+            message: finalMessage.trim(),
+            phoneNumber: cleanPhoneNumber,
+            messageSid: twilioResponse.sid,
+            status: twilioResponse.status,
+            fromNumber: fromNumber,
+            tenantID: tenantID,
+            storeID: storeID,
+            type: "outgoing",
+            millis: Date.now(),
+          });
+        } catch (firestoreError) {
+          log("Error storing outgoing message in Firestore", firestoreError.message);
+        }
+      }
+
+      return {
+        success: true,
+        url: pdfURL,
+        data: {
+          messageSid: twilioResponse.sid,
+          status: twilioResponse.status,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      log("Error in uploadPDFAndSendSMSCallable", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "Failed to upload PDF and send SMS: " + (error.message || "Unknown error"));
+    }
+  }
+);
+
+// ============================================================================
+// Google Cloud Translation
+// ============================================================================
+exports.translateTextCallable = onCall(
+  {
+    secrets: [googleTranslateApiKey],
+  },
+  async (request) => {
+    log("Incoming translateText callable request", request.data);
+
+    try {
+      const { text, targetLanguage, sourceLanguage } = request.data;
+
+      if (!text || typeof text !== "string" || text.trim().length === 0) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Text is required and must be a non-empty string"
+        );
+      }
+
+      if (
+        !targetLanguage ||
+        typeof targetLanguage !== "string" ||
+        targetLanguage.trim().length === 0
+      ) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Target language is required (e.g., 'es', 'fr', 'de')"
+        );
+      }
+
+      const { Translate } = require("@google-cloud/translate").v2;
+      const translate = new Translate({
+        key: googleTranslateApiKey.value(),
+      });
+
+      const options = { to: targetLanguage };
+      if (sourceLanguage) {
+        options.from = sourceLanguage;
+      }
+
+      const [translatedText, apiResponse] = await translate.translate(
+        text,
+        options
+      );
+
+      const detectedSourceLanguage =
+        apiResponse?.data?.translations?.[0]?.detectedSourceLanguage ||
+        sourceLanguage ||
+        null;
+
+      log("Translation successful", {
+        targetLanguage,
+        detectedSourceLanguage,
+        inputLength: text.length,
+        outputLength: translatedText.length,
+      });
+
+      return {
+        success: true,
+        data: {
+          translatedText,
+          detectedSourceLanguage,
+          targetLanguage,
+        },
+      };
+    } catch (error) {
+      log("Error in translateTextCallable", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError(
+        "internal",
+        "Failed to translate text: " + (error.message || "Unknown error")
       );
     }
   }

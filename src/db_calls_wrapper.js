@@ -29,6 +29,7 @@ import {
   sendEmail,
   uploadFileToStorage,
   storageDelete,
+  uploadPDFAndSendSMS,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
 import { useSettingsStore, useLoginStore } from "./stores";
@@ -37,7 +38,7 @@ import {
   sendPasswordResetEmail,
   updatePassword,
 } from "firebase/auth";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, query, orderBy, onSnapshot } from "firebase/firestore";
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -228,23 +229,9 @@ function buildPaymentCompletionPath(
  * @param {string} messageID - Message ID
  * @returns {string} Full Firestore path for outgoing message
  */
-function buildOutgoingMessagePath(tenantID, storeID, customerID, messageID) {
-  // Format: tenants/{tenantID}/stores/{storeID}/outgoing-messages/{customerID}/messages/{messageID}
-  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OUTGOING_MESSAGES}/${customerID}/messages/${messageID}`;
-}
-
-/**
- * Build Firestore path for incoming message
- * @param {string} tenantID - Tenant ID
- * @param {string} storeID - Store ID
- * @param {string} customerID - Customer ID
- * @param {string} messageID - Message ID
- * @returns {string} Full Firestore path for incoming message
- */
-function buildIncomingMessagePath(tenantID, storeID, customerID, messageID) {
-  // Format: tenants/{tenantID}/stores/{storeID}/incoming-messages/{customerID}/messages/{messageID}
-  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INCOMING_MESSAGES}/${customerID}/messages/${messageID}`;
-}
+// LEGACY — unused. All messages now stored at customer_phone/{phone}/messages via Cloud Functions.
+// function buildOutgoingMessagePath(tenantID, storeID, customerID, messageID) {}
+// function buildIncomingMessagePath(tenantID, storeID, customerID, messageID) {}
 
 /**
  * Build Firestore collection path for customers
@@ -2608,8 +2595,12 @@ export async function dbSendSMS(
   const { tenantID, storeID } = getTenantAndStore();
 
   try {
-    if (!message || typeof message !== "string") {
-      throw new Error("Message is required and must be a string");
+    if (!message || typeof message !== "object") {
+      throw new Error("Message object is required");
+    }
+
+    if (!message.message || typeof message.message !== "string") {
+      throw new Error("Message text is required and must be a string");
     }
 
     if (!message.phoneNumber || typeof message.phoneNumber !== "string") {
@@ -2626,7 +2617,7 @@ export async function dbSendSMS(
 
     // Prepare SMS data object
     const smsData = {
-      message: message.trim(),
+      message: (message.message || "").trim(),
       phoneNumber: message.phoneNumber,
       tenantID: tenantID,
       storeID: storeID,
@@ -2946,6 +2937,61 @@ export async function dbGetCustomerMessages(
   }
 }
 
+export function dbListenToCustomerMessages(customerPhone, callback) {
+  try {
+    if (!customerPhone || typeof customerPhone !== "string") {
+      log("Error: customerPhone is required for dbListenToCustomerMessages");
+      return null;
+    }
+    const cleanPhone = customerPhone.replace(/\D/g, "");
+    if (cleanPhone.length !== 10) {
+      log("Error: phone must be 10 digits for dbListenToCustomerMessages");
+      return null;
+    }
+    const messagesRef = collection(DB, "customer_phone", cleanPhone, "messages");
+    const messagesQuery = query(messagesRef, orderBy("millis", "asc"));
+    const unsubscribe = onSnapshot(
+      messagesQuery,
+      (querySnapshot) => {
+        const messages = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          messages.push({
+            id: doc.id,
+            customerID: data.customerID,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phoneNumber: data.phoneNumber,
+            message: data.message,
+            type: data.type,
+            millis: data.millis,
+            timestamp: data.timestamp,
+            threadStatus: data.threadStatus,
+            read: data.read,
+            tenantID: data.tenantID,
+            storeID: data.storeID,
+            messageSid: data.messageSid,
+            status: data.status || data.messageStatus,
+            hasMedia: data.hasMedia || false,
+            mediaUrls: data.mediaUrls || [],
+            autoResponseSent: data.autoResponseSent || false,
+            canRespond: data.canRespond,
+          });
+        });
+        callback(messages);
+      },
+      (error) => {
+        log("Customer messages listener error", { phone: cleanPhone, error });
+        callback([]);
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    log("Error setting up customer messages listener:", error);
+    return null;
+  }
+}
+
 // ============================================================================
 // WORKORDER MEDIA
 // ============================================================================
@@ -2992,5 +3038,25 @@ export async function dbDeleteWorkorderMedia(storagePath) {
   } catch (error) {
     log("Error in dbDeleteWorkorderMedia:", error);
     return { success: false, error: error.message };
+  }
+}
+
+export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phoneNumber, customerID, messageID }) {
+  const { tenantID, storeID } = getTenantAndStore();
+  try {
+    let result = await uploadPDFAndSendSMS({
+      base64,
+      storagePath,
+      message,
+      phoneNumber,
+      tenantID,
+      storeID,
+      customerID,
+      messageID,
+    });
+    return result;
+  } catch (error) {
+    log("Error in dbUploadPDFAndSendSMS:", error);
+    return { success: false, error: error.message || "Failed to upload PDF and send SMS" };
   }
 }

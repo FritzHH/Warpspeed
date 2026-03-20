@@ -1,5 +1,5 @@
-import { generateRandomID } from "./utils";
-import { COLORS } from "./data";
+import { generateRandomID, bestForegroundHex } from "./utils";
+import { COLORS, NONREMOVABLE_STATUSES } from "./data";
 
 // ============================================================================
 // CSV Parsing
@@ -61,6 +61,38 @@ function parseCSV(text) {
     headers.forEach((h, i) => obj[h.trim()] = (values[i] || "").trim());
     return obj;
   });
+}
+
+// ============================================================================
+// Status Mapping
+// ============================================================================
+
+/**
+ * Parse statuses.csv and merge with NONREMOVABLE_STATUSES.
+ * NONREMOVABLE_STATUSES come first; CSV statuses are added if their label
+ * doesn't already exist in the nonremovable list.
+ */
+export function mapStatuses(statusesCSVText) {
+  const rows = parseCSV(statusesCSVText);
+  const nonremovableLabels = new Set(
+    NONREMOVABLE_STATUSES.map(s => s.label.toLowerCase())
+  );
+
+  const csvStatuses = rows
+    .filter(row => row.Status && !nonremovableLabels.has(row.Status.toLowerCase()))
+    .map(row => {
+      const bgColor = row.Color || "#B8B8B8";
+      const textColor = bestForegroundHex(bgColor);
+      return {
+        id: generateRandomID(),
+        label: row.Status.trim(),
+        textColor,
+        backgroundColor: bgColor,
+        removable: true,
+      };
+    });
+
+  return [...NONREMOVABLE_STATUSES, ...csvStatuses];
 }
 
 // ============================================================================

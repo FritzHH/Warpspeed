@@ -42,7 +42,7 @@ import {
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP } from "../../../db_calls_wrapper";
+import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia } from "../../../db_calls_wrapper";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -65,6 +65,19 @@ export const ActiveWorkorderComponent = ({}) => {
     React.useState(false);
   const [sCustomerScreenTextFocus, _setCustomerScreenTextFocus] = useState("");
   const [sShowMediaModal, _setShowMediaModal] = useState(null); // null | "upload" | "view"
+  const uploadInputRef = useRef(null);
+
+  async function handleDirectUpload(e) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    let newMedia = [...(zOpenWorkorder?.media || [])];
+    for (let i = 0; i < files.length; i++) {
+      const result = await dbUploadWorkorderMedia(zOpenWorkorder.id, files[i]);
+      if (result.success) newMedia.push(result.mediaItem);
+    }
+    useOpenWorkordersStore.getState().setField("media", newMedia, zOpenWorkorder.id);
+    if (uploadInputRef.current) uploadInputRef.current.value = "";
+  }
 
   // Refs for dropdown components
   const bikesRef = useRef();
@@ -791,6 +804,14 @@ export const ActiveWorkorderComponent = ({}) => {
         </View>
       </View>
       {/* Media Buttons */}
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        onChange={handleDirectUpload}
+        style={{ display: "none" }}
+      />
       <View
         style={{
           flexDirection: "row",
@@ -803,7 +824,7 @@ export const ActiveWorkorderComponent = ({}) => {
           icon={ICONS.uploadCamera}
           iconSize={40}
           disabled={isDonePaid}
-          onPress={() => _setShowMediaModal("upload")}
+          onPress={() => !isDonePaid && uploadInputRef.current?.click()}
           buttonStyle={{
             backgroundColor: "transparent",
             paddingHorizontal: 0,

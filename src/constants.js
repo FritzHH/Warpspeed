@@ -180,6 +180,14 @@ export const build_db_path = {
       const finalFileName = fileName || `${attachmentType}_${timestamp}`;
       return `${tenantID}/${storeID}/workorders/${workorderID}/attachments/${attachmentType}/${timestamp}_${finalFileName}`;
     },
+
+    // PDF receipt/ticket paths
+    saleReceiptPDF: (saleID, tenantID, storeID) => {
+      return `${tenantID}/${storeID}/receipts/${saleID}.pdf`;
+    },
+    workorderTicketPDF: (workorderID, tenantID, storeID) => {
+      return `${tenantID}/${storeID}/workorder-tickets/${workorderID}.pdf`;
+    },
   },
 };
 
@@ -202,8 +210,8 @@ export const DB_NODES = {
     PUNCH_CLOCK: "punch_clock",
     PRINTERS: "printers",
     PAYMENT_PROCESSING: "payment-processing",
-    OUTGOING_MESSAGES: "outgoing-messages",
-    INCOMING_MESSAGES: "incoming-messages",
+    OUTGOING_MESSAGES: "outgoing-messages", // LEGACY — messages now at customer_phone/{phone}/messages
+    INCOMING_MESSAGES: "incoming-messages", // LEGACY — messages now at customer_phone/{phone}/messages
     COMPLETED_WORKORDERS: "completed-workorders",
     COMPLETED_SALES: "completed-sales",
   },

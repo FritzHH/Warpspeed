@@ -14,6 +14,8 @@ import {
   bestForegroundHex,
   checkInputForNumbersOnly,
   clog,
+  formatCurrencyDisp,
+  searchInventory,
   generateRandomID,
   generateTimesForListDisplay,
   generateUPCBarcode,
@@ -28,6 +30,7 @@ import {
 } from "../../../../utils";
 import {
   // useDatabaseStore,
+  useInventoryStore,
   useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
@@ -48,16 +51,17 @@ import {
 } from "../../../../components";
 import { cloneDeep, set, debounce } from "lodash";
 import { Children, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
-import { APP_USER } from "../../../../data";
+import { APP_USER, INTAKE_BUTTON_PROTO, SETTINGS_OBJ } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
-import { dbSaveSettingsField, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveCustomer } from "../../../../db_calls_wrapper";
-import { mapCustomers, mapWorkorders, mapSales } from "../../../../lightspeed_import";
+import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveCustomer } from "../../../../db_calls_wrapper";
+import { mapCustomers, mapWorkorders, mapSales, mapStatuses } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead } from "../../../../db_calls";
 
 const TAB_NAMES = {
@@ -68,6 +72,7 @@ const TAB_NAMES = {
   waitTimes: "Wait Times",
   storeInfo: "Store Info",
   quickItems: "Quick Item Buttons",
+  intakeButtons: "Intake Buttons",
   sales: "Sales Reports",
   ordering: "Ordering",
   textTemplates: "Text Templates",
@@ -94,6 +99,7 @@ export function Dashboard_Admin({}) {
   const [sOrderingMenuSelectionName, _setOrderingMenuSelectionName] = useState(
     DROPDOWN_ORDERING_SELECTION_NAMES.importOrder
   );
+  const [sIntakeEditButtonObj, _setIntakeEditButtonObj] = useState(null);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -179,6 +185,19 @@ export function Dashboard_Admin({}) {
       {!!sShowSalesReportModal && (
         <SalesReportsModal handleExit={() => _setShowSalesReportModal(false)} />
       )}
+      {!!sIntakeEditButtonObj && (
+        <IntakeButtonEditModal
+          buttonObj={sIntakeEditButtonObj}
+          onClose={() => _setIntakeEditButtonObj(null)}
+          onSave={(updatedBtn) => {
+            let updated = (zSettingsObj?.intakeButtons || []).map((o) =>
+              o.id === updatedBtn.id ? updatedBtn : o
+            );
+            handleSettingsFieldChange("intakeButtons", updated);
+            _setIntakeEditButtonObj(null);
+          }}
+        />
+      )}
 
       <View
         style={{
@@ -217,6 +236,24 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.quickItems ? 500 : null,
                 color: sExpand === TAB_NAMES.quickItems ? C.green : gray(0.6),
+              }}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.intakeButtons}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.intakeButtons
+                    ? null
+                    : TAB_NAMES.intakeButtons
+                )
+              }
+              text={TAB_NAMES.intakeButtons}
+              icon={ICONS.bicycle}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.intakeButtons ? 500 : null,
+                color:
+                  sExpand === TAB_NAMES.intakeButtons ? C.green : gray(0.6),
               }}
             />
             <VerticalSpacer />
@@ -388,17 +425,45 @@ export function Dashboard_Admin({}) {
             flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
           }}
         >
-          <Text
-            style={{
-              borderColor: C.buttonLightGreenOutline,
-              color: gray(0.6),
-              marginBottom: 10,
-              fontSize: 17,
-              fontWeight: 500,
-            }}
-          >
-            {sExpand?.toUpperCase()}
-          </Text>
+          {!sExpand && (
+            <TouchableOpacity
+              onPress={async () => {
+                const statusesText = await fetch("/import_data/statuses.csv").then(r => r.text());
+                const statuses = mapStatuses(statusesText);
+                const settings = { ...cloneDeep(SETTINGS_OBJ), statuses };
+                await dbSaveSettings(settings);
+                useSettingsStore.getState().setSettings(settings);
+              }}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                borderWidth: 2,
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.listItemWhite,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 20,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+                Inject Settings
+              </Text>
+            </TouchableOpacity>
+          )}
+          {!!sExpand && (
+            <Text
+              style={{
+                borderColor: C.buttonLightGreenOutline,
+                color: gray(0.6),
+                marginBottom: 10,
+                fontSize: 17,
+                fontWeight: 500,
+              }}
+            >
+              {sExpand?.toUpperCase()}
+            </Text>
+          )}
           {sExpand === TAB_NAMES.payments && (
             <PaymentProcessingComponent
               zSettingsObj={zSettingsObj}
@@ -439,6 +504,13 @@ export function Dashboard_Admin({}) {
             <QuickItemButtonsComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          )}
+          {sExpand === TAB_NAMES.intakeButtons && (
+            <IntakeButtonsComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+              _setIntakeEditButtonObj={_setIntakeEditButtonObj}
             />
           )}
           {sExpand === TAB_NAMES.ordering && (
@@ -3485,6 +3557,517 @@ const QuickItemButtonsComponent = ({
         </View>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Intake Buttons Component
+////////////////////////////////////////////////////////////////////////////////
+
+const IntakeButtonsComponent = ({ zSettingsObj, handleSettingsFieldChange, _setIntakeEditButtonObj }) => {
+  const [sDragIdx, _setDragIdx] = useState(null);
+  const [sDragOverIdx, _setDragOverIdx] = useState(null);
+
+  let intakeButtons = zSettingsObj?.intakeButtons || [];
+
+  function handleAdd() {
+    let newBtn = {
+      ...cloneDeep(INTAKE_BUTTON_PROTO),
+      id: generateRandomID(),
+      label: "",
+      itemsToAdd: [],
+    };
+    let updated = [...intakeButtons, newBtn];
+    handleSettingsFieldChange("intakeButtons", updated);
+  }
+
+  function handleDelete(btn) {
+    let updated = intakeButtons.filter((o) => o.id !== btn.id);
+    handleSettingsFieldChange("intakeButtons", updated);
+  }
+
+  function handleLabelChange(btn, val) {
+    let updated = intakeButtons.map((o) =>
+      o.id === btn.id ? { ...o, label: val } : o
+    );
+    handleSettingsFieldChange("intakeButtons", updated);
+  }
+
+  function handleReorder(fromIdx, toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+    let arr = [...intakeButtons];
+    let [dragged] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, dragged);
+    handleSettingsFieldChange("intakeButtons", arr);
+  }
+
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent
+        style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+      >
+        <View style={{ width: "100%" }}>
+          <BoxButton1 onPress={handleAdd} style={{ marginBottom: 10 }} />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "wrap",
+              marginTop: 10,
+            }}
+          >
+            {intakeButtons.map((btn, idx) => (
+              <IntakeButtonCard
+                key={btn.id}
+                btn={btn}
+                idx={idx}
+                sDragIdx={sDragIdx}
+                sDragOverIdx={sDragOverIdx}
+                _setDragIdx={_setDragIdx}
+                _setDragOverIdx={_setDragOverIdx}
+                handleReorder={handleReorder}
+                handleLabelChange={handleLabelChange}
+                handleDelete={handleDelete}
+                handleEditPress={() => _setIntakeEditButtonObj(btn)}
+              />
+            ))}
+          </div>
+          {intakeButtons.length === 0 && (
+            <Text
+              style={{
+                color: gray(0.4),
+                fontSize: 13,
+                textAlign: "center",
+                paddingVertical: 20,
+              }}
+            >
+              No intake buttons yet. Click + to add one.
+            </Text>
+          )}
+        </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+const IntakeButtonCard = ({
+  btn,
+  idx,
+  sDragIdx,
+  sDragOverIdx,
+  _setDragIdx,
+  _setDragOverIdx,
+  handleReorder,
+  handleLabelChange,
+  handleDelete,
+  handleEditPress,
+}) => {
+  const [sIsEditingLabel, _setIsEditingLabel] = useState(!btn.label);
+
+  return (
+    <div
+      draggable
+      onDragStart={() => _setDragIdx(idx)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        _setDragOverIdx(idx);
+      }}
+      onDragEnd={() => {
+        _setDragIdx(null);
+        _setDragOverIdx(null);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        handleReorder(sDragIdx, idx);
+        _setDragIdx(null);
+        _setDragOverIdx(null);
+      }}
+      onMouseEnter={(e) => {
+        if (!sIsEditingLabel) e.currentTarget.style.opacity = "0.7";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.opacity = "1";
+      }}
+      style={{
+        width: 170,
+        minHeight: 60,
+        margin: 4,
+        padding: 8,
+        display: "flex",
+        flexDirection: "column",
+        borderWidth: sDragOverIdx === idx ? 2 : 1,
+        borderStyle: "solid",
+        borderColor:
+          sDragOverIdx === idx ? C.blue : C.buttonLightGreenOutline,
+        borderRadius: 8,
+        backgroundColor: C.listItemWhite,
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+        cursor: "grab",
+        opacity: sDragIdx === idx ? 0.5 : 1,
+        boxSizing: "border-box",
+      }}
+    >
+      {/* Label area */}
+      {sIsEditingLabel ? (
+        <TextInput_
+          autoFocus={true}
+          onChangeText={(val) => handleLabelChange(btn, val)}
+          placeholder="Enter label..."
+          placeholderTextColor={gray(0.3)}
+          style={{
+            width: "100%",
+            paddingHorizontal: 5,
+            paddingVertical: 3,
+            fontSize: 13,
+            textAlign: "center",
+            color: C.text,
+            outlineWidth: 0,
+            outlineStyle: "none",
+          }}
+          value={btn.label}
+        />
+      ) : (
+        <Text
+          style={{
+            width: "100%",
+            fontSize: 13,
+            textAlign: "center",
+            color: C.text,
+            paddingHorizontal: 5,
+            paddingVertical: 3,
+          }}
+          numberOfLines={1}
+        >
+          {btn.label || "(unnamed)"}
+        </Text>
+      )}
+
+      {/* Controls row: badge + edit + items + delete */}
+      <div
+        draggable={false}
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          marginTop: 4,
+        }}
+      >
+        {(btn.itemsToAdd?.length || 0) > 0 && (
+          <View
+            style={{
+              backgroundColor: C.blue,
+              borderRadius: 8,
+              minWidth: 16,
+              height: 16,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 6,
+            }}
+          >
+            <Text
+              style={{
+                color: C.textWhite,
+                fontSize: 10,
+                fontWeight: "bold",
+                paddingHorizontal: 4,
+              }}
+            >
+              {btn.itemsToAdd.length}
+            </Text>
+          </View>
+        )}
+        <BoxButton1
+          onPress={() => _setIsEditingLabel(!sIsEditingLabel)}
+          iconSize={sIsEditingLabel ? 37 : 17}
+          icon={sIsEditingLabel ? ICONS.clickHere : ICONS.editPencil}
+        />
+        <BoxButton1
+          onPress={handleEditPress}
+          style={{ marginLeft: 6 }}
+          iconSize={17}
+          icon={ICONS.search}
+        />
+        <BoxButton1
+          onPress={() => handleDelete(btn)}
+          style={{ marginLeft: 6 }}
+          iconSize={17}
+          icon={ICONS.close1}
+        />
+      </div>
+
+      {/* Drag direction indicators */}
+      {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
+        <Image_
+          icon={ICONS.backRed}
+          size={14}
+          style={{ position: "absolute", bottom: 4, left: 4 }}
+        />
+      )}
+      {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx < idx && (
+        <Image_
+          icon={ICONS.rightArrowBlue}
+          size={14}
+          style={{ position: "absolute", bottom: 4, right: 4 }}
+        />
+      )}
+    </div>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Intake Button Edit Modal — inventory search to add items to itemsToAdd
+////////////////////////////////////////////////////////////////////////////////
+
+const IntakeButtonEditModal = ({ buttonObj, onClose, onSave }) => {
+  const zInventory = useInventoryStore((state) => state.inventoryArr);
+  const [sItemsToAdd, _setItemsToAdd] = useState(buttonObj.itemsToAdd || []);
+  const [sSearchString, _setSearchString] = useState("");
+  const [sSearchResults, _setSearchResults] = useState([]);
+
+  function handleSearch(val) {
+    _setSearchString(val);
+    if (!val || val.length < 3) {
+      _setSearchResults([]);
+      return;
+    }
+    _setSearchResults(searchInventory(val, zInventory));
+  }
+
+  function handleAddItem(invItem) {
+    if (!sItemsToAdd.includes(invItem.id)) {
+      _setItemsToAdd([...sItemsToAdd, invItem.id]);
+    }
+    _setSearchString("");
+    _setSearchResults([]);
+  }
+
+  function handleRemoveItem(itemId) {
+    _setItemsToAdd(sItemsToAdd.filter((id) => id !== itemId));
+  }
+
+  function resolveItem(itemId) {
+    return zInventory.find((o) => o.id === itemId);
+  }
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 550,
+          height: "85vh",
+          backgroundColor: "white",
+          borderRadius: 12,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: gray(0.15),
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.text,
+            }}
+          >
+            {buttonObj.label || "(unnamed)"} — Items
+          </Text>
+          <TouchableOpacity onPress={onClose}>
+            <Image_ icon={ICONS.close1} size={18} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Search Input */}
+        <View style={{ padding: 16, paddingBottom: 8 }}>
+          <TextInput
+            style={{
+              borderBottomColor: gray(0.3),
+              borderBottomWidth: 1,
+              width: "100%",
+              fontSize: 15,
+              color: C.text,
+              paddingVertical: 6,
+              outlineWidth: 0,
+              outlineStyle: "none",
+            }}
+            value={sSearchString}
+            onChangeText={handleSearch}
+            placeholder="Search inventory..."
+            placeholderTextColor={gray(0.3)}
+            autoFocus
+          />
+        </View>
+
+        {/* Added Items */}
+        <View style={{ padding: 16, paddingTop: 12, maxHeight: "40%" }}>
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.blue,
+              marginBottom: 6,
+            }}
+          >
+            ITEMS ({sItemsToAdd.length})
+          </Text>
+          <ScrollView>
+            {sItemsToAdd.map((itemId, idx) => {
+              let item = resolveItem(itemId);
+              let name = item
+                ? item.formalName || item.informalName || "Unknown"
+                : itemId;
+              return (
+                <View
+                  key={itemId + idx}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingVertical: 5,
+                    paddingHorizontal: 8,
+                    marginBottom: 3,
+                    backgroundColor: "rgb(230, 240, 252)",
+                    borderRadius: 4,
+                    borderLeftWidth: 3,
+                    borderLeftColor: C.blue,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, color: C.text }}>{name}</Text>
+                    {!!item && (
+                      <Text style={{ fontSize: 11, color: C.lightText }}>
+                        ${formatCurrencyDisp(item.price || 0)}
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveItem(itemId)}
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      backgroundColor: gray(0.08),
+                      borderRadius: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, color: C.lightred }}>
+                      Remove
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+            {sItemsToAdd.length === 0 && (
+              <Text style={{ fontSize: 12, color: gray(0.4), textAlign: "center", paddingVertical: 20 }}>
+                No items added yet. Search above to add inventory items.
+              </Text>
+            )}
+          </ScrollView>
+        </View>
+
+        {/* Search Results */}
+        {sSearchResults.length > 0 && (
+          <ScrollView
+            style={{
+              flex: 1,
+              marginHorizontal: 16,
+              marginBottom: 8,
+              borderWidth: 1,
+              borderColor: gray(0.1),
+              borderRadius: 4,
+              backgroundColor: "white",
+            }}
+          >
+            {sSearchResults.map((item, idx) => (
+              <TouchableOpacity
+                key={item.id || idx}
+                onPress={() => handleAddItem(item)}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: gray(0.08),
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, color: C.text }}>
+                    {item.formalName || item.informalName || "Unknown"}
+                  </Text>
+                  {!!item.brand && (
+                    <Text style={{ fontSize: 11, color: gray(0.5) }}>
+                      {item.brand}
+                    </Text>
+                  )}
+                </View>
+                <Text style={{ fontSize: 13, color: C.text }}>
+                  ${formatCurrencyDisp(item.price || 0)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Footer */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "flex-end",
+            padding: 16,
+            borderTopWidth: 1,
+            borderTopColor: gray(0.15),
+          }}
+        >
+          <Button_
+            text="Cancel"
+            onPress={onClose}
+            buttonStyle={{
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              marginRight: 10,
+              backgroundColor: gray(0.15),
+            }}
+            textStyle={{ color: C.text }}
+          />
+          <Button_
+            text="Save"
+            colorGradientArr={COLOR_GRADIENTS.green}
+            onPress={() => onSave({ ...buttonObj, itemsToAdd: sItemsToAdd })}
+            buttonStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
+          />
+        </View>
+      </div>
+    </div>,
+    document.body
   );
 };
 

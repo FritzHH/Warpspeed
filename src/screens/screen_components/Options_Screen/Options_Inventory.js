@@ -12,6 +12,7 @@ import {
   lightenRGBByPercent,
   log,
   resolveStatus,
+  searchInventory,
 } from "../../../utils";
 import {
   Button,
@@ -79,51 +80,23 @@ export function InventoryComponent({}) {
 
   function search(searchTerm) {
     _setSearchTerm(searchTerm);
-    if (searchTerm.length == 0) {
+    if (!searchTerm || searchTerm.length === 0) {
       _setSearchResults([]);
       return;
     }
     if (searchTerm.length < 2) return;
-    let res = {};
-    let keys = Object.keys(INVENTORY_ITEM_PROTO);
-    zInventoryArr.forEach((invItem) => {
-      keys.forEach((key) => {
-        if (
-          invItem[key]
-            .toString()
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
-        )
-          res[invItem.id] = invItem;
-      });
-    });
-    res = Object.values(res);
-    _setSearchResults(res);
+    _setSearchResults(searchInventory(searchTerm, zInventoryArr));
   }
 
   // Search function (now called by debounced TextInput_)
   const handleSearch = (searchTerm) => {
     _setSelectedButtonID(null);
-    if (searchTerm.length == 0) {
+    if (!searchTerm || searchTerm.length === 0) {
       _setSearchResults([]);
       return;
     }
     if (searchTerm.length < 2) return;
-    let res = {};
-    let keys = Object.keys(INVENTORY_ITEM_PROTO);
-    zInventoryArr.forEach((invItem) => {
-      keys.forEach((key) => {
-        if (
-          invItem[key]
-            .toString()
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase())
-        )
-          res[invItem.id] = invItem;
-      });
-    });
-    res = Object.values(res);
-    _setSearchResults(res);
+    _setSearchResults(searchInventory(searchTerm, zInventoryArr));
   };
 
   function handleQuickButtonPress(buttonObj) {

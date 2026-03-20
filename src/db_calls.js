@@ -534,6 +534,8 @@ export async function callCloudFunction(functionName, data) {
 const sendSMSCallable = httpsCallable(functions, "sendSMS");
 const sendSMSEnhancedCallable = httpsCallable(functions, "sendSMSEnhanced");
 const sendEmailCallable = httpsCallable(functions, "sendEmailCallable");
+const uploadPDFAndSendSMSCallableRef = httpsCallable(functions, "uploadPDFAndSendSMSCallable");
+const translateTextCallableRef = httpsCallable(functions, "translateTextCallable");
 
 export const processServerDrivenStripePaymentCallable = httpsCallable(
   functions,
@@ -661,6 +663,22 @@ export function sendSMSEnhanced(smsData) {
     });
 }
 
+export function uploadPDFAndSendSMS(data) {
+  return uploadPDFAndSendSMSCallableRef(data)
+    .then((result) => {
+      log("PDF upload + SMS sent successfully", result.data);
+      return { success: true, data: result.data };
+    })
+    .catch((error) => {
+      log("Error in uploadPDFAndSendSMS", error);
+      return {
+        success: false,
+        error: error.message || "Failed to upload PDF and send SMS",
+        code: error.code || "UNKNOWN_ERROR",
+      };
+    });
+}
+
 export function sendEmail(emailData) {
   return sendEmailCallable(emailData)
     .then((result) => {
@@ -675,6 +693,46 @@ export function sendEmail(emailData) {
       log("Error sending email", error);
 
       let errorMessage = "Failed to send email";
+      let errorCode = "UNKNOWN_ERROR";
+
+      if (error.code) {
+        switch (error.code) {
+          case "functions/invalid-argument":
+            errorMessage = error.message || "Invalid arguments provided";
+            errorCode = "INVALID_ARGUMENTS";
+            break;
+          case "functions/internal":
+            errorMessage = error.message || "Internal server error";
+            errorCode = "INTERNAL_ERROR";
+            break;
+          default:
+            errorMessage = error.message || "Unknown error occurred";
+            errorCode = error.code || "UNKNOWN_ERROR";
+        }
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+        code: errorCode,
+        details: {
+          originalError: error,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    });
+}
+
+export function translateText(translateData) {
+  return translateTextCallableRef(translateData)
+    .then((result) => {
+      log("Translation successful", result.data);
+      return { success: true, data: result.data };
+    })
+    .catch((error) => {
+      log("Error translating text", error);
+
+      let errorMessage = "Failed to translate text";
       let errorCode = "UNKNOWN_ERROR";
 
       if (error.code) {

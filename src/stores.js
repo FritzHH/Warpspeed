@@ -655,8 +655,11 @@ export const useCurrentCustomerStore = create((set, get) => ({
 export const useCustMessagesStore = create((set, get) => ({
   incomingMessages: [],
   outgoingMessages: [],
+  messagesLoading: false,
   getIncomingMessages: () => get().incomingMessages,
   getOutgoingMessages: () => get().outgoingMessages,
+  getMessagesLoading: () => get().messagesLoading,
+  setMessagesLoading: (messagesLoading) => set({ messagesLoading }),
   setOutgoingMessages: (outgoingMessages) => set({ outgoingMessages }),
   setIncomingMessages: (incomingMessages) => set({ incomingMessages }),
   setIncomingMessage: (obj) => {
@@ -667,19 +670,20 @@ export const useCustMessagesStore = create((set, get) => ({
     }));
   },
   setOutgoingMessage: (message) => {
-
-    let messages = get().outgoingMessagesArr;
+    let messages = get().outgoingMessages;
     if (checkArr(messages, message)) return;
-    // log("out", obj);
     set((state) => ({
-      outgoingMessagesArr: [...state.outgoingMessagesArr, message],
+      outgoingMessages: [...state.outgoingMessages, message],
     }));
-    if (sendIt) {
-      dbSendSMS(message)
-    }
-
   },
-
+  updateMessageStatus: (messageId, status, errorMessage) => {
+    set((state) => ({
+      outgoingMessages: state.outgoingMessages.map((msg) =>
+        msg.id === messageId ? { ...msg, status, errorMessage: errorMessage || "" } : msg
+      ),
+    }));
+  },
+  clearMessages: () => set({ incomingMessages: [], outgoingMessages: [] }),
 }));
 
 const debouncedSaveWorkorder = debounce((workorder) => {

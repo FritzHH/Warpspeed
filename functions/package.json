@@ -13,6 +13,7 @@
   },
   "main": "firebase-index.js",
   "dependencies": {
+    "@google-cloud/translate": "^9.3.0",
     "@vonage/server-sdk": "^3.21.0",
     "basic-ftp": "^5.0.5",
     "dotenv": "^16.5.0",

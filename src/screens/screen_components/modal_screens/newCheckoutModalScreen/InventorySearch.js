@@ -4,7 +4,7 @@ import { TouchableOpacity } from "react-native";
 import { useState } from "react";
 import { C, Fonts } from "../../../../styles";
 import {
-  fuzzySearch,
+  searchInventory,
   formatCurrencyDisp,
   gray,
 } from "../../../../utils";
@@ -116,7 +116,7 @@ export function InventorySearch({
     }
 
     // Fuzzy search
-    let results = fuzzySearch(val, inventory);
+    let results = searchInventory(val, inventory);
     _setSearchResults(results?.slice(0, 15) || []);
   }
 

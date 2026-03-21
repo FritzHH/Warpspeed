@@ -71,7 +71,7 @@ export const WorkorderMediaModal = ({
       btn2Text: "Cancel",
       handleBtn1Press: async () => {
         useAlertScreenStore.getState().setValues({ showAlert: false });
-        await dbDeleteWorkorderMedia(mediaItem.storagePath);
+        await dbDeleteWorkorderMedia(mediaItem);
         const updated = zMedia.filter((m) => m.id !== mediaItem.id);
         useOpenWorkordersStore
           .getState()
@@ -324,7 +324,7 @@ export const WorkorderMediaModal = ({
                     </View>
                   ) : (
                     <Image
-                      source={{ uri: item.url }}
+                      source={{ uri: item.thumbnailUrl || item.url }}
                       style={{ width: "100%", height: "100%" }}
                       resizeMode="cover"
                     />

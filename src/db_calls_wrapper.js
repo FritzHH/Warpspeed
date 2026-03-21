@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { generateRandomID, log, removeEmptyFields, stringifyAllObjectFields, stringifyObject } from "./utils";
+import { generateRandomID, log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage } from "./utils";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
@@ -3014,10 +3014,26 @@ export async function dbUploadWorkorderMedia(workorderID, file) {
       return { success: false, error: "Upload failed" };
     }
 
+    let thumbnailUrl = null;
+    let thumbnailStoragePath = null;
+    const thumbBlob = await compressImage(file);
+    if (thumbBlob) {
+      const thumbPath = build_db_path.cloudStorage.workorderAttachment(
+        workorderID, "thumbnails", tenantID, storeID, file.name
+      );
+      const thumbResult = await uploadFileToStorage(thumbBlob, thumbPath);
+      if (thumbResult.success) {
+        thumbnailUrl = thumbResult.downloadURL;
+        thumbnailStoragePath = thumbResult.path;
+      }
+    }
+
     const mediaItem = {
       id: generateRandomID(),
       url: result.downloadURL,
       storagePath: result.path,
+      thumbnailUrl,
+      thumbnailStoragePath,
       type: file.type.startsWith("video") ? "video" : "image",
       filename: file.name,
       uploadedAt: Date.now(),
@@ -3031,9 +3047,12 @@ export async function dbUploadWorkorderMedia(workorderID, file) {
   }
 }
 
-export async function dbDeleteWorkorderMedia(storagePath) {
+export async function dbDeleteWorkorderMedia(mediaItem) {
   try {
-    await storageDelete(storagePath);
+    await storageDelete(mediaItem.storagePath || mediaItem);
+    if (mediaItem.thumbnailStoragePath) {
+      try { await storageDelete(mediaItem.thumbnailStoragePath); } catch (e) {}
+    }
     return { success: true };
   } catch (error) {
     log("Error in dbDeleteWorkorderMedia:", error);

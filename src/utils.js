@@ -2267,3 +2267,38 @@ export function buildPayrollEmailData(punches, userObj, payPeriodLabel) {
     totalPay: "$" + totalPayNum.toFixed(2),
   };
 }
+
+export function compressImage(file, maxDimension = 400, quality = 0.7) {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith("image")) return resolve(null);
+    if (file.size < 100000) return resolve(null);
+    let img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width <= maxDimension && height <= maxDimension) {
+        URL.revokeObjectURL(img.src);
+        return resolve(null);
+      }
+      let ratio = Math.min(maxDimension / width, maxDimension / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+      let canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(img.src);
+          resolve(blob);
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      resolve(null);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}

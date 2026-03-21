@@ -18,7 +18,10 @@
       "Bash(npm run build)",
       "mcp__claude-terminal__session_list",
       "Bash(xargs grep -l \"data_service_modules\\\\|smsService\")",
-      "Bash(npm install @google-cloud/translate)"
+      "Bash(npm install @google-cloud/translate)",
+      "Bash(ls -la \"C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\functions\"\" | grep -E \"env)",
+      "Bash(config)",
+      "Bash(package \")"
     ]
   }
 }

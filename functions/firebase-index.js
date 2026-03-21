@@ -89,6 +89,7 @@ const firebaseServiceAccountKey = defineSecret("firebase-service-account-key");
 const lightspeedClientId = defineSecret("LIGHTSPEED_CLIENT_ID");
 const lightspeedClientSecret = defineSecret("LIGHTSPEED_CLIENT_SECRET");
 const googleTranslateApiKey = defineSecret("GOOGLE_TRANSLATE_API_KEY");
+const gmailAppPassword = defineSecret("GMAIL_APP_PASSWORD");
 
 // initialization
 var stripe;
@@ -738,6 +739,7 @@ exports.sendSMSEnhanced = onCall(
         storeID,
         customerID,
         messageID,
+        canRespond: canRespondParam = false,
         fromNumber = "+12393171234", // Default from number
       } = request.data;
 
@@ -843,6 +845,17 @@ exports.sendSMSEnhanced = onCall(
             customerID,
             phone: cleanPhoneNumber,
             path: `customer_phone/${cleanPhoneNumber}/messages/${messageID}`,
+          });
+
+          // Update canRespond and lastMessageMillis on conversation root doc
+          await db.collection("customer_phone").doc(cleanPhoneNumber).set({
+            canRespond: !!canRespondParam,
+            lastMessageMillis: Date.now(),
+          }, { merge: true });
+
+          log("Conversation root updated", {
+            phone: cleanPhoneNumber,
+            canRespond: !!canRespondParam,
           });
         } catch (firestoreError) {
           log("Error storing outgoing message in Firestore", {
@@ -1341,9 +1354,9 @@ exports.incomingSMSEnhanced = onRequest(
           }
         }
 
-        // Customer not found
+        // Customer not found — allow unknown numbers through
         if (!customerData || !tenantID || !storeID) {
-          log("No customer found for phone number", { phone: normalizedPhone });
+          log("No customer found for phone number — creating conversation for unknown sender", { phone: normalizedPhone });
 
           // Log unknown sender for analytics
           await db
@@ -1358,12 +1371,48 @@ exports.incomingSMSEnhanced = onRequest(
               twilioData,
             });
 
-          // Return empty TwiML response (no auto-reply to unknown numbers)
-          return response
-            .status(200)
-            .send(
-              '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
-            );
+          // Use the first available tenant/store
+          if (!tenantID || !storeID) {
+            const tenantsSnap = await db.collection("tenants").get();
+            if (!tenantsSnap.empty) {
+              const firstTenant = tenantsSnap.docs[0];
+              tenantID = firstTenant.id;
+              const storesSnap = await db.collection("tenants").doc(tenantID).collection("stores").get();
+              if (!storesSnap.empty) {
+                storeID = storesSnap.docs[0].id;
+              }
+            }
+          }
+
+          // Create customer_phone root doc for this unknown number
+          customerData = {
+            id: "",
+            first: "Unknown",
+            last: "",
+            cell: normalizedPhone,
+          };
+
+          try {
+            await db.collection("customer_phone").doc(normalizedPhone).set({
+              info: {
+                id: "",
+                first: "Unknown",
+                last: "",
+                cell: normalizedPhone,
+                tenantID: tenantID || "",
+                storeID: storeID || "",
+                lastUpdated: Date.now(),
+              },
+              canRespond: false,
+              lastMessageMillis: Date.now(),
+            }, { merge: true });
+
+            log("Created customer_phone entry for unknown sender", { phone: normalizedPhone });
+          } catch (indexError) {
+            log("Error creating customer_phone for unknown sender", { error: indexError.message });
+          }
+
+          // Fall through to Step 3+ (will be treated as closed thread)
         }
       } catch (error) {
         log("Error searching for customer", {
@@ -1377,43 +1426,79 @@ exports.incomingSMSEnhanced = onRequest(
       }
 
       // ============================================================================
-      // STEP 3: CHECK THREAD STATUS & RESPONSE PERMISSIONS
+      // STEP 3: CHECK THREAD STATUS, TIMEOUT, & BLOCKLIST
       // ============================================================================
 
-      let lastOutgoingMessage = null;
       let canRespond = false;
       let threadStatus = "closed";
 
       try {
-        // Check for last outgoing message in customer_phone/{phone}/messages
-        const lastMessageSnapshot = await db
+        // Fetch settings for timeout and blocklist
+        const settingsDoc = await db
+          .collection("tenants")
+          .doc(tenantID)
+          .collection("stores")
+          .doc(storeID)
+          .collection("settings")
+          .doc("settings")
+          .get();
+        const storeSettings = settingsDoc.exists ? settingsDoc.data() : {};
+
+        // Check blocklist
+        const blockedNumbers = storeSettings.smsBlockedNumbers || [];
+        if (blockedNumbers.includes(normalizedPhone)) {
+          log("Blocked number detected", { phone: normalizedPhone, tenantID, storeID });
+
+          // Log to analytics
+          await db.collection("sms-analytics").doc("blocked-numbers").collection("messages").add({
+            phoneNumber: normalizedPhone,
+            message: incomingMessage,
+            messageSid,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            tenantID,
+            storeID,
+          });
+
+          // Send auto-response and return
+          const blockedResponse = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>This number is no longer able to receive messages at this number. If you believe this is an error, please call us directly.</Message>
+</Response>`;
+          return response.status(200).type("text/xml").send(blockedResponse);
+        }
+
+        // Read canRespond and lastMessageMillis from conversation root doc
+        const conversationDoc = await db
           .collection("customer_phone")
           .doc(normalizedPhone)
-          .collection("messages")
-          .where("type", "==", "outgoing")
-          .orderBy("millis", "desc")
-          .limit(1)
           .get();
+        const conversationData = conversationDoc.exists ? conversationDoc.data() : {};
 
-        if (!lastMessageSnapshot.empty) {
-          lastOutgoingMessage = lastMessageSnapshot.docs[0].data();
-          canRespond = lastOutgoingMessage.canRespond === true;
-          threadStatus = canRespond ? "open" : "closed";
+        canRespond = conversationData.canRespond === true;
+        const lastMessageMillis = conversationData.lastMessageMillis || 0;
 
-          log("Last outgoing message retrieved", {
-            messageID: lastOutgoingMessage.id,
-            canRespond,
-            threadStatus,
-            sentAt: lastOutgoingMessage.millis,
-          });
-        } else {
-          log("No previous outgoing messages found for customer", {
-            customerID: customerData.id,
-            phone: normalizedPhone,
+        // Apply timeout check — auto-close if last message is older than lockTimeout
+        const lockTimeoutDays = storeSettings.smsConversationLockTimeout || 2;
+        const lockTimeoutMs = lockTimeoutDays * 86400000;
+        if (canRespond && lastMessageMillis > 0 && (lastMessageMillis + lockTimeoutMs < Date.now())) {
+          canRespond = false;
+          log("Conversation auto-closed due to timeout", {
+            lastMessageMillis,
+            lockTimeoutDays,
+            elapsed: Date.now() - lastMessageMillis,
           });
         }
+
+        threadStatus = canRespond ? "open" : "closed";
+
+        log("Thread status determined", {
+          canRespond,
+          threadStatus,
+          lastMessageMillis,
+          lockTimeoutDays,
+        });
       } catch (error) {
-        log("Error retrieving last outgoing message", {
+        log("Error checking thread status", {
           error: error.message,
           errorCode: error.code,
           customerID: customerData.id,
@@ -1551,6 +1636,11 @@ exports.incomingSMSEnhanced = onRequest(
           .doc(messageSid);
 
         await incomingMessageRef.set(incomingMessageData);
+
+        // Update lastMessageMillis on conversation root
+        await db.collection("customer_phone").doc(normalizedPhone).set({
+          lastMessageMillis: Date.now(),
+        }, { merge: true });
 
         log("Incoming message stored successfully at customer_phone path", {
           phone: normalizedPhone,
@@ -5462,7 +5552,7 @@ exports.lightspeedImportData = onCall(
 // ==================== SEND EMAIL ====================
 exports.sendEmailCallable = onCall(
   {
-    secrets: [firebaseServiceAccountKey],
+    secrets: [firebaseServiceAccountKey, gmailAppPassword],
   },
   async (request) => {
     log("Incoming email callable request", request.data);
@@ -5486,12 +5576,11 @@ exports.sendEmailCallable = onCall(
         throw new HttpsError("invalid-argument", "Store ID is required");
       }
 
-      // Gmail SMTP transport — placeholder credentials, configure later with App Password
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
           user: "support@bonitabikes.com",
-          pass: "PLACEHOLDER_APP_PASSWORD",
+          pass: gmailAppPassword.value(),
         },
       });
 

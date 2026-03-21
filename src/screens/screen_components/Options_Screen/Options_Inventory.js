@@ -20,6 +20,7 @@ import {
   ScreenModal,
   TouchableOpacity_,
   TextInput_,
+  Tooltip,
 } from "../../../components";
 import { InventoryItemModalScreen } from "../modal_screens/InventoryItemModalScreen";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
@@ -207,7 +208,7 @@ export function InventoryComponent({}) {
       let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
       lineItem.inventoryItem = item;
       lineItem.id = generateUPCBarcode();
-      workorderLines.push(lineItem);
+      workorderLines = [...workorderLines, lineItem];
       useOpenWorkordersStore
         .getState()
         .setField("workorderLines", workorderLines);
@@ -219,11 +220,15 @@ export function InventoryComponent({}) {
         let customerNotes = openWorkorder.customerNotes || [];
         const alreadyHasNote = customerNotes.some((n) => n.autoNoteItemID === item.id);
         if (!alreadyHasNote) {
+          let currentUser = useLoginStore.getState().currentUser;
+          let userName = currentUser
+            ? "(" + currentUser.first + " " + (currentUser.last?.[0] || "") + ")  "
+            : "(Auto)";
           customerNotes = [
             ...customerNotes,
             {
-              name: "(Auto)",
-              userID: "",
+              name: userName,
+              userID: currentUser?.id || "",
               value: autoNote.text,
               id: generateRandomID(),
               autoNoteItemID: item.id,
@@ -316,6 +321,7 @@ export function InventoryComponent({}) {
             fontSize: 18,
             color: C.text,
             outlineWidth: 0,
+            outlineStyle: "none",
             width: "80%",
             marginLeft: 20,
             marginRight: 30,
@@ -325,7 +331,7 @@ export function InventoryComponent({}) {
           value={sSearchTerm}
           onChangeText={(val) => handleSearch(val)}
         />
-        <View title="New Item">
+        <Tooltip text="New Item" position="bottom">
           <Button_
             icon={ICONS.new}
             iconSize={25}
@@ -336,7 +342,7 @@ export function InventoryComponent({}) {
               _setModalItem(newItem);
             }}
           />
-        </View>
+        </Tooltip>
       </View>
       <View
         style={{

@@ -18,6 +18,7 @@ import {
 import {
   Image_,
   Button_,
+  TextInput_,
   DropdownMenu,
   LoginModalScreen,
   SHADOW_RADIUS_PROTO,
@@ -322,8 +323,27 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   function handleFieldChange(fieldName, value) {
     let updated = { ...sItem, [fieldName]: value };
     _setItem(updated);
-    useInventoryStore.getState().setItem(updated, false);
-    debouncedInvSaveRef.current(updated);
+    if (!isNew) {
+      useInventoryStore.getState().setItem(updated, false);
+      debouncedInvSaveRef.current(updated);
+    }
+  }
+
+  function handleSaveNewItem() {
+    useInventoryStore.getState().setItem(sItem, false);
+    dbSaveInventoryItem(sItem);
+    // save auto note if set
+    if (sAutoNoteText && sAutoNoteText.trim()) {
+      let updatedArr = [...zAutoNoteTexts];
+      let idx = updatedArr.findIndex((n) => n.inventoryItemID === sItem.id);
+      if (idx >= 0) {
+        updatedArr[idx] = { ...updatedArr[idx], text: sAutoNoteText };
+      } else {
+        updatedArr.push({ inventoryItemID: sItem.id, text: sAutoNoteText });
+      }
+      useSettingsStore.getState().setField("autoCustomerNoteTexts", updatedArr);
+    }
+    handleExit();
   }
 
   function handlePriceChange(fieldName, rawInput) {
@@ -364,6 +384,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
 
   function handleAutoNoteChange(text) {
     _setAutoNoteText(text);
+    if (isNew) return; // save handled by handleSaveNewItem
     let updatedArr = [...zAutoNoteTexts];
     if (!text || text.trim() === "") {
       updatedArr = updatedArr.filter((n) => n.inventoryItemID !== sItem.id);
@@ -411,7 +432,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
 
   // ─── render helpers ────────────────────────────────────────────────────
 
-  const labelStyle = { fontStyle: "italic", color: gray(0.45), fontSize: 13, marginTop: 14 };
+  const labelStyle = { fontStyle: "italic", color: gray(0.45), fontSize: 13, marginTop: 8 };
   const valueStyle = { fontSize: 15, color: C.text, marginTop: 2 };
   const inputStyle = {
     fontSize: 15,
@@ -472,12 +493,13 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
       <View
         style={{
           width: "55%",
-          height: "80%",
+          maxHeight: "calc(100vh - 40px)",
           backgroundColor: "white",
           borderRadius: 15,
           padding: 20,
           ...SHADOW_RADIUS_PROTO,
           shadowOffset: { width: 3, height: 3 },
+          flexDirection: "column",
         }}
       >
           <LoginModalScreen modalVisible={zShowLoginScreen} />
@@ -497,48 +519,47 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <TouchableOpacity
                 onPress={() => _setEditing(!sEditing)}
-                style={{
-                  padding: 6,
-                  marginRight: 10,
-                  borderRadius: 6,
-                  backgroundColor: sEditing ? C.green : "transparent",
-                }}
+                style={{ padding: 6, marginRight: 10 }}
               >
-                <Image_
-                  icon={ICONS.editPencil}
-                  size={30}
-                  style={sEditing ? { tintColor: "white" } : {}}
-                />
+                <Image_ icon={ICONS.editPencil} size={30} />
               </TouchableOpacity>
             </View>
           </View>
 
-          <ScrollView
-            style={{ flex: 1 }}
-            showsVerticalScrollIndicator={true}
-          >
+          <View>
             {/* SECTION 1: Item Details */}
+            <View>
             {renderField("Catalog Name", "formalName")}
             {renderField("Descriptive Name", "informalName")}
-            {renderField("Brand", "brand")}
-
-            {/* Category */}
-            <Text style={labelStyle}>Category</Text>
-            {sEditing ? (
-              <DropdownMenu
-                dataArr={CATEGORIES}
-                buttonText={sItem.category || "Part"}
-                buttonStyle={{
-                  width: 120,
-                  marginTop: 4,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                }}
-                onSelect={(cat) => handleFieldChange("category", cat)}
-              />
-            ) : (
-              <Text style={valueStyle}>{sItem.category || "Part"}</Text>
-            )}
+            {/* Brand + Category + Minutes row */}
+            <View style={{ flexDirection: "row", marginTop: 4, gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                {renderField("Brand", "brand")}
+              </View>
+              <View style={{ width: 120 }}>
+                <Text style={labelStyle}>Category</Text>
+                {sEditing ? (
+                  <DropdownMenu
+                    dataArr={CATEGORIES}
+                    buttonText={sItem.category || "Part"}
+                    buttonStyle={{
+                      width: 120,
+                      marginTop: 4,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                    }}
+                    onSelect={(cat) => handleFieldChange("category", cat)}
+                  />
+                ) : (
+                  <Text style={valueStyle}>{sItem.category || "Part"}</Text>
+                )}
+              </View>
+              {sItem.category === "Labor" && (
+                <View style={{ width: 80 }}>
+                  {renderField("Minutes", "minutes", { numeric: true })}
+                </View>
+              )}
+            </View>
 
             {/* Prices row */}
             <View style={{ flexDirection: "row", marginTop: 4 }}>
@@ -546,14 +567,6 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               {renderField("Sale Price", "salePrice", { currency: true, flex: 1 })}
               {renderField("Cost", "cost", { currency: true, flex: 1, last: true })}
             </View>
-
-            {/* Minutes — only if Labor */}
-            {sItem.category === "Labor" && (
-              <View style={{ flexDirection: "row", marginTop: 4 }}>
-                {renderField("Minutes", "minutes", { numeric: true, flex: 1 })}
-                <View style={{ flex: 2 }} />
-              </View>
-            )}
 
             {/* SKU / Barcode row */}
             <View style={{ flexDirection: "row", marginTop: 4 }}>
@@ -564,8 +577,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               {renderField("Custom SKU", "customSku", { flex: 1 })}
               {renderField("Manufacturer SKU", "manufacturerSku", { flex: 1, last: true })}
             </View>
+            </View>
 
-            {/* DIVIDER */}
             {/* SECTION 2: Quick Button Placement */}
             <View style={{ marginTop: 20, borderWidth: 1, borderColor: gray(0.15), borderRadius: 10, backgroundColor: gray(0.03), padding: 12 }}>
               <TouchableOpacity
@@ -579,7 +592,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   Quick Button Placement
                 </Text>
                 <Text style={{ fontSize: 17, color: gray(0.4), marginLeft: 8 }}>
-                  {sShowQBSection ? "▲" : "▼"}
+                  {sShowQBSection ? "▲" : "▶"}
                 </Text>
               </TouchableOpacity>
               {sShowQBSection && (
@@ -614,16 +627,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                         <Text style={{ fontSize: 13, color: C.text }}>{p.path}</Text>
                         <TouchableOpacity
                           onPress={() => handleRemoveFromButton(p.buttonID)}
-                          style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 3,
-                            borderRadius: 4,
-                            backgroundColor: C.red,
-                          }}
+                          style={{ padding: 4 }}
                         >
-                          <Text style={{ fontSize: 11, color: "white", fontWeight: "600" }}>
-                            Remove
-                          </Text>
+                          <Image_ icon={ICONS.trash} size={18} />
                         </TouchableOpacity>
                       </View>
                     ))
@@ -645,7 +651,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   Auto Customer Note
                 </Text>
                 <Text style={{ fontSize: 17, color: gray(0.4), marginLeft: 8 }}>
-                  {sShowAutoNote ? "▲" : "▼"}
+                  {sShowAutoNote ? "▲" : "▶"}
                 </Text>
               </TouchableOpacity>
               {sShowAutoNote && (
@@ -653,41 +659,54 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 6 }}>
                     When this item is added to a workorder, this note will automatically appear in Customer Notes.
                   </Text>
-                  {sEditing ? (
-                    <TextInput
-                      style={{
-                        borderBottomWidth: 2,
-                        borderBottomColor: C.green,
-                        fontSize: 14,
-                        paddingVertical: 6,
-                        paddingHorizontal: 4,
-                        outlineWidth: 0,
-                        color: C.text,
-                        minHeight: 40,
-                      }}
-                      multiline={true}
-                      value={sAutoNoteText}
-                      onChangeText={handleAutoNoteChange}
-                      placeholder="Leave empty for no auto-note"
-                      placeholderTextColor={gray(0.3)}
-                    />
-                  ) : (
-                    <Text style={{ fontSize: 14, color: sAutoNoteText ? C.text : gray(0.4) }}>
-                      {sAutoNoteText || "None"}
-                    </Text>
-                  )}
+                  <TextInput_
+                    multiline={true}
+                    numberOfLines={10}
+                    debounceMs={0}
+                    onChangeText={handleAutoNoteChange}
+                    value={sAutoNoteText}
+                    placeholder="Leave empty for no auto-note"
+                    placeholderTextColor={gray(0.3)}
+                    style={{
+                      fontSize: 14,
+                      lineHeight: 18,
+                      paddingVertical: 6,
+                      paddingHorizontal: 4,
+                      outlineWidth: 0,
+                      outlineStyle: "none",
+                      color: C.text,
+                      width: "100%",
+                    }}
+                  />
                 </View>
               )}
             </View>
 
-          </ScrollView>
+          </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-            <TouchableOpacity
-              onPress={handleDeleteItem}
-              style={{ padding: 6, borderRadius: 6 }}
-            >
-              <Image_ icon={ICONS.trash} size={40} />
-            </TouchableOpacity>
+            {isNew ? (
+              <View style={{ flex: 1 }} />
+            ) : (
+              <TouchableOpacity
+                onPress={handleDeleteItem}
+                style={{ padding: 6, borderRadius: 6 }}
+              >
+                <Image_ icon={ICONS.trash} size={40} />
+              </TouchableOpacity>
+            )}
+            {isNew && (
+              <TouchableOpacity
+                onPress={handleSaveNewItem}
+                style={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 6,
+                  backgroundColor: C.green,
+                }}
+              >
+                <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Save</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={handleExit}
               style={{ padding: 6, borderRadius: 6 }}

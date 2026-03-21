@@ -2621,6 +2621,9 @@ export async function dbSendSMS(
       phoneNumber: message.phoneNumber,
       tenantID: tenantID,
       storeID: storeID,
+      customerID: message.customerID || "",
+      messageID: message.id || "",
+      canRespond: !!message.canRespond,
     };
 
     log("Sending SMS with data:", smsData);

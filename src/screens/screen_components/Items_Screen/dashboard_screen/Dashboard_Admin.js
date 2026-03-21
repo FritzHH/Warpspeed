@@ -78,6 +78,7 @@ const TAB_NAMES = {
   ordering: "Ordering",
   textTemplates: "Text Templates",
   emailTemplates: "Email Templates",
+  blockedNumbers: "Blocked Numbers",
   import: "Import",
 };
 
@@ -399,6 +400,25 @@ export function Dashboard_Admin({}) {
               icon={ICONS.notes}
             />
             <VerticalSpacer />
+            {/****************** blocked numbers tab *****************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.blockedNumbers}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.blockedNumbers
+                    ? null
+                    : TAB_NAMES.blockedNumbers
+                )
+              }
+              style={{
+                fontWeight: sExpand === TAB_NAMES.blockedNumbers ? 500 : null,
+                color:
+                  sExpand === TAB_NAMES.blockedNumbers ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.blockedNumbers}
+              icon={ICONS.notes}
+            />
+            <VerticalSpacer />
             {/****************** import tab *****************************/}
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.import}
@@ -528,6 +548,12 @@ export function Dashboard_Admin({}) {
           )}
           {sExpand === TAB_NAMES.emailTemplates && (
             <EmailTemplatesComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+          )}
+          {sExpand === TAB_NAMES.blockedNumbers && (
+            <BlockedNumbersComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
@@ -5398,6 +5424,101 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
             }}
           />
         </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+const BlockedNumbersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const [sNewNumber, _setNewNumber] = useState("");
+
+  let blockedNumbers = zSettingsObj?.smsBlockedNumbers || [];
+
+  function handleAddNumber() {
+    let cleaned = (sNewNumber || "").replace(/\D/g, "");
+    if (cleaned.length !== 10) return;
+    if (blockedNumbers.includes(cleaned)) return;
+    let arr = [...blockedNumbers, cleaned];
+    handleSettingsFieldChange("smsBlockedNumbers", arr);
+    _setNewNumber("");
+  }
+
+  function handleRemoveNumber(phone) {
+    let arr = blockedNumbers.filter((n) => n !== phone);
+    handleSettingsFieldChange("smsBlockedNumbers", arr);
+  }
+
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent>
+        <Text style={{ fontSize: 16, fontWeight: "500", color: C.text, marginBottom: 10, alignSelf: "flex-start" }}>
+          Blocked Phone Numbers
+        </Text>
+        <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 15, alignSelf: "flex-start" }}>
+          Blocked numbers will receive an auto-response and their messages will not be stored.
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", width: "100%", marginBottom: 15 }}>
+          <TextInput
+            value={sNewNumber}
+            onChangeText={(val) => {
+              let cleaned = val.replace(/[^0-9\-]/g, "");
+              _setNewNumber(cleaned);
+            }}
+            placeholder="Phone number (10 digits)"
+            placeholderTextColor={gray(0.4)}
+            style={{
+              flex: 1,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              borderRadius: 10,
+              backgroundColor: C.listItemWhite,
+              paddingVertical: 10,
+              paddingHorizontal: 10,
+              fontSize: 15,
+              color: C.text,
+              marginRight: 10,
+            }}
+          />
+          <Button_
+            onPress={handleAddNumber}
+            text={"Add"}
+            enabled={sNewNumber.replace(/\D/g, "").length === 10}
+            colorGradientArr={COLOR_GRADIENTS.green}
+            buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+          />
+        </View>
+        {blockedNumbers.length === 0 && (
+          <Text style={{ fontSize: 14, color: gray(0.4), fontStyle: "italic", alignSelf: "flex-start" }}>
+            No blocked numbers
+          </Text>
+        )}
+        {blockedNumbers.map((phone) => (
+          <View
+            key={phone}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              width: "100%",
+              paddingVertical: 8,
+              paddingHorizontal: 5,
+              borderBottomWidth: 1,
+              borderBottomColor: gray(0.1),
+            }}
+          >
+            <Text style={{ fontSize: 15, color: C.text }}>
+              {formatPhoneWithDashes(phone)}
+            </Text>
+            <Button_
+              onPress={() => handleRemoveNumber(phone)}
+              text={"Remove"}
+              colorGradientArr={COLOR_GRADIENTS.red}
+              buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+            />
+          </View>
+        ))}
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );

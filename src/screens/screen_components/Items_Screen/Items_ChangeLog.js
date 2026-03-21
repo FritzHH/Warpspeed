@@ -32,15 +32,14 @@ function describeEntry(entry) {
   return "changed " + fieldLabel + (entry.from ? " from '" + entry.from + "'" : "") + " to '" + entry.to + "'";
 }
 
-function ChangeLogRow({ entry }) {
+function ChangeLogRow({ entry, index }) {
   return (
     <View
       style={{
         flexDirection: "row",
         paddingVertical: 6,
         paddingHorizontal: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: gray(0.88),
+        backgroundColor: index % 2 === 0 ? C.listItemWhite : gray(0.94),
         alignItems: "flex-start",
       }}
     >
@@ -104,7 +103,7 @@ export function Items_ChangeLog() {
       <FlatList
         data={sorted}
         keyExtractor={(item, index) => item.timestamp + "-" + index}
-        renderItem={({ item }) => <ChangeLogRow entry={item} />}
+        renderItem={({ item, index }) => <ChangeLogRow entry={item} index={index} />}
       />
     </View>
   );

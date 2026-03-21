@@ -390,13 +390,21 @@ export function searchInventory(query, items) {
     if (fieldVal.startsWith(term)) return 0.92;
 
     // Tier 3: word-boundary match (term matches start of any word)
+    // Earlier position = higher score (0.89 for word 1, down to 0.81 for later words)
     const words = fieldVal.split(/[\s\-\/\(\)]+/);
-    for (const word of words) {
-      if (word.startsWith(term)) return 0.85;
+    for (let wi = 0; wi < words.length; wi++) {
+      if (words[wi].startsWith(term)) {
+        let positionBonus = Math.max(0, 0.04 - wi * 0.01);
+        return 0.85 + positionBonus;
+      }
     }
 
-    // Tier 4: general substring
-    if (fieldVal.includes(term)) return 0.75;
+    // Tier 4: general substring — earlier position scores higher
+    const subIdx = fieldVal.indexOf(term);
+    if (subIdx >= 0) {
+      let positionBonus = Math.max(0, 0.04 * (1 - subIdx / fieldVal.length));
+      return 0.75 + positionBonus;
+    }
 
     // Tier 5: fuzzy — only for terms 3+ chars
     if (term.length >= 3) {
@@ -2300,5 +2308,14 @@ export function compressImage(file, maxDimension = 400, quality = 0.7) {
       resolve(null);
     };
     img.src = URL.createObjectURL(file);
+  });
+}
+
+// ==================== EMAIL TEMPLATE ====================
+
+export function populateEmailTemplate(templateStr, data) {
+  if (!templateStr || typeof templateStr !== "string") return "";
+  return templateStr.replace(/\{(\w+)\}/g, (match, key) => {
+    return data[key] !== undefined && data[key] !== null ? String(data[key]) : match;
   });
 }

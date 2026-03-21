@@ -617,6 +617,19 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               </TouchableOpacity>
             </View>
           </ScrollView>
+          <View style={{ alignItems: "flex-end", marginTop: 10 }}>
+            <TouchableOpacity
+              onPress={handleExit}
+              style={{
+                paddingHorizontal: 20,
+                paddingVertical: 8,
+                borderRadius: 6,
+                backgroundColor: gray(0.15),
+              }}
+            >
+              <Text style={{ fontSize: 14, color: C.text, fontWeight: "600" }}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableWithoutFeedback>
     ),
@@ -640,16 +653,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           alignItems: "center",
         }}
       >
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            width: "100vw",
-            height: "100vh",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <div onClick={(e) => e.stopPropagation()}>
           <Component />
         </div>
       </div>

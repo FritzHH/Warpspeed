@@ -1,24 +1,107 @@
 /* eslint-disable */
-import { View, Text, ScrollView, Image } from "react-native-web";
+import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native-web";
 import { useState, useEffect } from "react";
 import {
   onDisplayMessage,
   DISPLAY_MSG_TYPES,
   onTranslateMessage,
   TRANSLATE_MSG_TYPES,
+  broadcastDisplayStatus,
+  DISPLAY_STATUS,
 } from "../broadcastChannel";
-import { formatCurrencyDisp, gray } from "../utils";
+import { formatCurrencyDisp, formatPhoneForDisplay, gray } from "../utils";
 import { C, Fonts } from "../styles";
 
 const logo = require("../resources/bblogo_trans_high.png");
 
+const DEV_SHOW_OVERLAY = false;
+
 ////////////////////////////////////////////////////////////////////////////////
 // Shared sub-components
 ////////////////////////////////////////////////////////////////////////////////
+const textColor = gray(0.7);
+const discountTextColor = C.red;
 
-function DisplayTotalRow({ label, value, labelStyle, valueStyle }) {
+function OverlayLineItemRow({ item }) {
+  let name = item.inventoryItem?.formalName || "Item";
+  let qty = item.qty || 1;
+  let unitPrice = item.inventoryItem?.price || 0;
+  let hasDiscount = item.discountObj && item.discountObj.savings > 0;
+  let regularTotal = unitPrice * qty;
+  let discountedTotal = hasDiscount ? (item.discountObj.newPrice || 0) * qty : regularTotal;
+  let savingsTotal = hasDiscount ? (item.discountObj.savings || 0) * qty : 0;
+
+
+  return (
+    <View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingVertical: 12,
+          paddingHorizontal: 20,
+        }}
+      >
+      <Text
+        style={{
+          fontSize: 18,
+          color: textColor,
+          width: 30,
+        }}
+      >
+        {qty}
+      </Text>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontSize: 18,
+            color: textColor,
+          }}
+          numberOfLines={1}
+        >
+          {name}
+        </Text>
+        {hasDiscount && (
+          <Text style={{ fontSize: 13, color: discountTextColor }}>
+            {item.discountObj.name}
+          </Text>
+        )}
+      </View>
+      <View style={{ alignItems: "flex-end", marginLeft: 12 }}>
+        {hasDiscount ? (
+          <>
+            <Text
+              style={{
+                fontSize: 14,
+                color: textColor,
+                textDecorationLine: "line-through",
+              }}
+            >
+              ${formatCurrencyDisp(regularTotal)}
+            </Text>
+            <Text style={{ fontSize: 13, color: discountTextColor }}>
+              -${formatCurrencyDisp(savingsTotal)}
+            </Text>
+            <Text style={{ fontSize: 18, color: textColor }}>
+              ${formatCurrencyDisp(discountedTotal)}
+            </Text>
+          </>
+        ) : (
+          <Text style={{ fontSize: 18, color: textColor }}>
+            ${formatCurrencyDisp(regularTotal)}
+          </Text>
+        )}
+      </View>
+      </View>
+      <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.08)", marginHorizontal: 20 }} />
+    </View>
+  );
+}
+
+function OverlayTotalRow({ label, value, bold, color }) {
   let displayValue =
-    typeof value === "number" ? formatCurrencyDisp(value) : value;
+    typeof value === "number" ? "$" + formatCurrencyDisp(value) : value;
+  let rowColor = color || textColor;
 
   return (
     <View
@@ -26,224 +109,175 @@ function DisplayTotalRow({ label, value, labelStyle, valueStyle }) {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        width: "100%",
         paddingVertical: 4,
-      }}
-    >
-      <Text style={{ fontSize: 20, color: gray(0.5), ...labelStyle }}>
-        {label}
-      </Text>
-      <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-        <Text style={{ fontSize: 18, color: C.green, marginRight: 6 }}>$</Text>
-        <Text style={{ fontSize: 22, color: gray(0.4), ...valueStyle }}>
-          {displayValue}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function DisplayDivider() {
-  return (
-    <View
-      style={{
-        width: "100%",
-        height: 1,
-        marginVertical: 8,
-        backgroundColor: C.buttonLightGreenOutline,
-      }}
-    />
-  );
-}
-
-function LineItemRow({ item, index }) {
-  let name = item.inventoryItem?.formalName || "Item";
-  let qty = item.qty || 1;
-  let unitPrice = item.inventoryItem?.price || 0;
-  let hasDiscount = item.discountObj && item.discountObj.savings > 0;
-  let lineTotal = hasDiscount
-    ? (item.discountObj.newPrice || 0) * qty
-    : unitPrice * qty;
-
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: C.buttonLightGreenOutline,
+        paddingHorizontal: 20,
       }}
     >
       <Text
         style={{
-          fontSize: 18,
-          color: gray(0.5),
-          width: 30,
-          textAlign: "center",
+          fontSize: bold ? 28 : 18,
+          color: rowColor,
+          fontWeight: bold ? "700" : "400",
         }}
       >
-        {index + 1}
+        {label}
       </Text>
-      <View style={{ flex: 1, marginLeft: 10 }}>
-        <Text style={{ fontSize: 20, color: C.text }}>{name}</Text>
-        {qty > 1 && (
-          <Text style={{ fontSize: 15, color: gray(0.5), marginTop: 2 }}>
-            Qty: {qty} x ${formatCurrencyDisp(unitPrice)}
-          </Text>
-        )}
-        {hasDiscount && (
-          <Text style={{ fontSize: 15, color: C.green, marginTop: 2 }}>
-            Discount: {item.discountObj.name}
-          </Text>
-        )}
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-        <Text style={{ fontSize: 16, color: C.green, marginRight: 4 }}>$</Text>
-        <Text style={{ fontSize: 20, color: C.text }}>
-          {formatCurrencyDisp(lineTotal)}
-        </Text>
-      </View>
+      <Text
+        style={{
+          fontSize: bold ? 28 : 18,
+          color: rowColor,
+          fontWeight: bold ? "700" : "400",
+        }}
+      >
+        {displayValue}
+      </Text>
     </View>
   );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Idle screen
+// Right-side overlay panel (content only — positioning handled by AnimatedOverlay)
 ////////////////////////////////////////////////////////////////////////////////
 
-function IdleScreen() {
+function OverlayPanel({ children, header }) {
   return (
     <View
       style={{
         flex: 1,
-        backgroundColor: C.backgroundWhite,
-        alignItems: "center",
-        justifyContent: "center",
+        backgroundColor: "rgba(255,255,255,0.88)",
+        justifyContent: "space-between",
       }}
     >
-      <Image
-        source={logo}
-        style={{ width: 200, height: 200, resizeMode: "contain" }}
-      />
-      <Text
-        style={{
-          fontSize: 32,
-          color: gray(0.4),
-          marginTop: 30,
-          fontWeight: "300",
-        }}
-      >
-        Welcome
-      </Text>
+      {/* Header */}
+      <View>
+        <View
+          style={{
+            paddingVertical: 14,
+            alignItems: "center",
+          }}
+        >
+        <Text
+          style={{
+            fontSize: 20,
+            color: textColor,
+            fontWeight: "400",
+          }}
+        >
+          {header}
+        </Text>
+        </View>
+        <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.08)", marginHorizontal: 20 }} />
+      </View>
+      {children}
     </View>
   );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Workorder display
+// Workorder display (overlay)
 ////////////////////////////////////////////////////////////////////////////////
 
-function WorkorderDisplay({ data }) {
-  let lines = data.workorderLines || [];
-  let totals = data.totals || {};
+function CustomerInfoSection({ customer }) {
+  if (!customer) return null;
+  let name = [customer.first, customer.last].filter(Boolean).join(" ");
+  let cell = formatPhoneForDisplay(customer.cell);
+  let landline = formatPhoneForDisplay(customer.landline);
+  let addressParts = [
+    [customer.streetAddress, customer.unit].filter(Boolean).join(" "),
+    [customer.city, customer.state].filter(Boolean).join(", "),
+    customer.zip,
+  ].filter(Boolean);
+
+  if (!name && !cell && !landline && !customer.email && !addressParts.length) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
-      {/* Header */}
-      <View
-        style={{
-          paddingVertical: 20,
-          paddingHorizontal: 30,
-          borderBottomWidth: 2,
-          borderBottomColor: C.buttonLightGreenOutline,
-          backgroundColor: C.listItemWhite,
-        }}
-      >
-        <Text style={{ fontSize: 28, color: C.text, fontWeight: "600" }}>
-          {[data.customerFirst, data.customerLast].filter(Boolean).join(" ") ||
-            "Workorder"}
+    <View style={{ paddingHorizontal: 20, paddingVertical: 10 }}>
+      {!!name && (
+        <Text style={{ fontSize: 16, color: textColor, fontWeight: "600", marginBottom: 4 }}>
+          {name}
         </Text>
-        {(data.brand || data.model) && (
-          <Text style={{ fontSize: 20, color: gray(0.5), marginTop: 4 }}>
-            {[data.brand, data.model].filter(Boolean).join(" ")}
-          </Text>
-        )}
-        {data.description && (
-          <Text style={{ fontSize: 16, color: gray(0.6), marginTop: 2 }}>
-            {data.description}
-          </Text>
-        )}
-      </View>
-
-      {/* Line items */}
-      <ScrollView style={{ flex: 1 }}>
-        {lines.map((line, i) => (
-          <LineItemRow key={line.id || i} item={line} index={i} />
-        ))}
-        {lines.length === 0 && (
-          <View
-            style={{ alignItems: "center", justifyContent: "center", flex: 1, paddingTop: 60 }}
-          >
-            <Text style={{ fontSize: 20, color: gray(0.6) }}>
-              No items yet
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Totals */}
-      {lines.length > 0 && (
-        <View
-          style={{
-            borderTopWidth: 2,
-            borderTopColor: C.buttonLightGreenOutline,
-            backgroundColor: C.listItemWhite,
-            paddingHorizontal: 30,
-            paddingVertical: 16,
-          }}
-        >
-          <DisplayTotalRow
-            label="SUBTOTAL"
-            value={totals.runningSubtotal || 0}
-          />
-          {(totals.runningDiscount || 0) > 0 && (
-            <DisplayTotalRow
-              label="DISCOUNT"
-              value={`- ${formatCurrencyDisp(totals.runningDiscount)}`}
-            />
-          )}
-          <DisplayDivider />
-          <DisplayTotalRow
-            label="TOTAL"
-            value={totals.runningTotal || 0}
-            labelStyle={{ fontSize: 24, fontWeight: "600" }}
-            valueStyle={{ fontSize: 28, fontWeight: "600" }}
-          />
-        </View>
+      )}
+      {!!cell && (
+        <Text style={{ fontSize: 14, color: textColor }}>{cell}</Text>
+      )}
+      {!!landline && (
+        <Text style={{ fontSize: 14, color: textColor }}>{landline}</Text>
+      )}
+      {!!customer.email && (
+        <Text style={{ fontSize: 14, color: textColor }}>{customer.email}</Text>
+      )}
+      {addressParts.length > 0 && (
+        <Text style={{ fontSize: 14, color: textColor, marginTop: 2 }}>
+          {addressParts.join(" ")}
+        </Text>
       )}
     </View>
   );
 }
 
+function WorkorderOverlay({ data }) {
+  let lines = data?.workorderLines || [];
+  let totals = data?.totals || {};
+  let customer = data?.customer || null;
+  let isStandalone = !customer || (!customer.first && !customer.last);
+
+  let header = data
+    ? [data.customerFirst, data.customerLast].filter(Boolean).join(" ") || "Workorder"
+    : "Workorder";
+
+  return (
+    <OverlayPanel header={header}>
+      {!isStandalone && (
+        <>
+          <CustomerInfoSection customer={customer} />
+          <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.08)", marginHorizontal: 20 }} />
+        </>
+      )}
+      <ScrollView style={{ flex: 1 }}>
+        {lines.map((line, i) => (
+          <OverlayLineItemRow key={line.id || i} item={line} />
+        ))}
+      </ScrollView>
+
+      {lines.length > 0 && (
+        <View style={{ paddingVertical: 12 }}>
+          <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.12)", marginHorizontal: 20, marginBottom: 12 }} />
+          <OverlayTotalRow label="Subtotal" value={totals.runningSubtotal || 0} />
+          {(totals.runningDiscount || 0) > 0 && (
+            <OverlayTotalRow
+              label="Total Discounts"
+              value={`-$${formatCurrencyDisp(totals.runningDiscount)}`}
+              color={discountTextColor}
+            />
+          )}
+          <OverlayTotalRow
+            label={`Sales Tax (${totals.salesTaxPercent || 0}%)`}
+            value={totals.runningTax || 0}
+          />
+          <View style={{ height: 8, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.12)", marginHorizontal: 20 }} />
+          <View style={{ height: 8 }} />
+          <OverlayTotalRow label="Total:" value={totals.runningTotal || 0} bold />
+        </View>
+      )}
+    </OverlayPanel>
+  );
+}
+
 ////////////////////////////////////////////////////////////////////////////////
-// Sale display
+// Sale display (overlay)
 ////////////////////////////////////////////////////////////////////////////////
 
-function SaleDisplay({ data }) {
-  let sale = data.sale || {};
+function SaleOverlay({ data }) {
+  let sale = data?.sale || {};
   let allLines = [];
 
-  // Collect lines from combined workorders
-  (data.combinedWorkorders || []).forEach((wo) => {
+  (data?.combinedWorkorders || []).forEach((wo) => {
     (wo.workorderLines || []).forEach((line) => {
       allLines.push(line);
     });
   });
 
-  // Collect added items
-  (data.addedItems || []).forEach((item) => {
+  (data?.addedItems || []).forEach((item) => {
     allLines.push(item);
   });
 
@@ -253,120 +287,86 @@ function SaleDisplay({ data }) {
   if (amountRemaining < 0) amountRemaining = 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
-      {/* Header */}
-      <View
-        style={{
-          paddingVertical: 20,
-          paddingHorizontal: 30,
-          borderBottomWidth: 2,
-          borderBottomColor: C.buttonLightGreenOutline,
-          backgroundColor: C.listItemWhite,
-        }}
-      >
-        <Text style={{ fontSize: 28, color: C.text, fontWeight: "600" }}>
-          {[data.customerFirst, data.customerLast].filter(Boolean).join(" ") ||
-            "Checkout"}
-        </Text>
-      </View>
-
-      {/* Line items */}
+    <OverlayPanel header="Checkout">
       <ScrollView style={{ flex: 1 }}>
         {allLines.map((line, i) => (
-          <LineItemRow key={line.id || i} item={line} index={i} />
+          <OverlayLineItemRow key={line.id || i} item={line} />
         ))}
-        {allLines.length === 0 && (
-          <View
-            style={{ alignItems: "center", justifyContent: "center", flex: 1, paddingTop: 60 }}
-          >
-            <Text style={{ fontSize: 20, color: gray(0.6) }}>
-              No items yet
-            </Text>
-          </View>
-        )}
       </ScrollView>
 
-      {/* Totals */}
-      <View
-        style={{
-          borderTopWidth: 2,
-          borderTopColor: C.buttonLightGreenOutline,
-          backgroundColor: C.listItemWhite,
-          paddingHorizontal: 30,
-          paddingVertical: 16,
-        }}
-      >
-        <DisplayTotalRow label="SUBTOTAL" value={sale.subtotal || 0} />
+      <View style={{ paddingVertical: 12 }}>
+        <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.12)", marginHorizontal: 20, marginBottom: 12 }} />
+        <OverlayTotalRow label="Subtotal" value={sale.subtotal || 0} />
 
-        {hasDiscount && <DisplayDivider />}
         {hasDiscount && (
-          <DisplayTotalRow
-            label="DISCOUNT"
-            value={`- ${formatCurrencyDisp(sale.discount)}`}
+          <OverlayTotalRow
+            label="Total Discounts"
+            value={`-$${formatCurrencyDisp(sale.discount)}`}
+            color={discountTextColor}
           />
         )}
 
-        <DisplayTotalRow label="SALES TAX" value={sale.tax || 0} />
+        <OverlayTotalRow label={`Sales Tax (${sale.taxRate || ""}%)`} value={sale.tax || 0} />
 
         {hasCardFee && (
-          <DisplayTotalRow
-            label={`CARD FEE (${sale.cardFeePercent || 0}%)`}
+          <OverlayTotalRow
+            label={`Card Fee (${sale.cardFeePercent || 0}%)`}
             value={sale.cardFee}
           />
         )}
 
-        <DisplayDivider />
-        <DisplayTotalRow
-          label="TOTAL"
-          value={sale.total || 0}
-          labelStyle={{ fontSize: 24, fontWeight: "600" }}
-          valueStyle={{ fontSize: 28, fontWeight: "600" }}
-        />
+        <View style={{ height: 8, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.12)", marginHorizontal: 20 }} />
+        <View style={{ height: 8 }} />
+        <OverlayTotalRow label="Total:" value={sale.total || 0} bold />
 
-        {/* Payment status */}
         {sale.amountCaptured > 0 && !sale.paymentComplete && (
-          <View style={{ marginTop: 12, alignItems: "flex-end" }}>
-            <Text style={{ fontSize: 20, fontWeight: "500", color: gray(0.5) }}>
-              AMOUNT PAID: ${formatCurrencyDisp(sale.amountCaptured)}
-            </Text>
-            <Text
-              style={{ fontSize: 20, fontWeight: "500", color: gray(0.5), marginTop: 4 }}
-            >
-              REMAINING: ${formatCurrencyDisp(amountRemaining)}
-            </Text>
+          <View style={{ marginTop: 8, paddingHorizontal: 20 }}>
+            <OverlayTotalRow
+              label="Paid"
+              value={sale.amountCaptured}
+            />
+            <OverlayTotalRow
+              label="Remaining"
+              value={amountRemaining}
+            />
           </View>
         )}
 
         {sale.paymentComplete && (
           <View
             style={{
-              marginTop: 16,
+              marginTop: 12,
+              marginHorizontal: 20,
               alignItems: "center",
               backgroundColor: C.green,
-              borderRadius: 10,
-              paddingVertical: 14,
+              borderRadius: 8,
+              paddingVertical: 12,
             }}
           >
-            <Text style={{ fontSize: 28, fontWeight: "600", color: "white" }}>
+            <Text style={{ fontSize: 24, fontWeight: "600", color: "white" }}>
               PAID
             </Text>
           </View>
         )}
       </View>
-    </View>
+    </OverlayPanel>
   );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Main display screen
+// Translate display
 ////////////////////////////////////////////////////////////////////////////////
 
 function TranslateDisplay({ text }) {
   return (
     <View
       style={{
-        flex: 1,
-        backgroundColor: C.backgroundWhite,
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.7)",
         justifyContent: "center",
         alignItems: "center",
         padding: 40,
@@ -375,7 +375,7 @@ function TranslateDisplay({ text }) {
       <Text
         style={{
           fontSize: 48,
-          color: C.text,
+          color: "white",
           fontWeight: Fonts.weight.textHeavy,
           textAlign: "center",
           lineHeight: 64,
@@ -387,10 +387,20 @@ function TranslateDisplay({ text }) {
   );
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Main display screen
+////////////////////////////////////////////////////////////////////////////////
+
 export function CustomerDisplayScreen() {
   const [sDisplayData, _setDisplayData] = useState(null);
   const [sType, _setType] = useState(null);
   const [sTranslateText, _setTranslateText] = useState("");
+  // "hidden" | "visible" | "exiting" — controls slide animation lifecycle
+  const [sOverlayPhase, _setOverlayPhase] = useState("hidden");
+  const [sOverlayKey, _setOverlayKey] = useState(0);
+  // Aspect ratio detection — tall/skinny vs wide layout
+  const [sIsTall, _setIsTall] = useState(window.innerHeight > window.innerWidth);
+  const [sIsFullscreen, _setIsFullscreen] = useState(!!document.fullscreenElement);
 
   useEffect(() => {
     const unsubDisplay = onDisplayMessage((msg) => {
@@ -409,28 +419,138 @@ export function CustomerDisplayScreen() {
         _setTranslateText(msg.payload.translatedText || "");
       }
     });
+    function handleResize() {
+      _setIsTall(window.innerHeight > window.innerWidth);
+    }
+    function handleFullscreenChange() {
+      let isFs = !!document.fullscreenElement;
+      _setIsFullscreen(isFs);
+      broadcastDisplayStatus(isFs ? DISPLAY_STATUS.FULLSCREEN : DISPLAY_STATUS.WINDOWED);
+    }
+    function handleVisibilityChange() {
+      broadcastDisplayStatus(
+        document.visibilityState === "visible" ? DISPLAY_STATUS.VISIBLE : DISPLAY_STATUS.HIDDEN
+      );
+    }
+    function handleBeforeUnload() {
+      broadcastDisplayStatus(DISPLAY_STATUS.CLOSED);
+    }
+    // Broadcast that display window is open
+    broadcastDisplayStatus(DISPLAY_STATUS.OPEN);
+    window.addEventListener("resize", handleResize);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       unsubDisplay();
       unsubTranslate();
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
-  // Translation takes priority over regular display
-  if (sTranslateText) {
-    return <TranslateDisplay text={sTranslateText} />;
-  }
+  let hasOverlayData =
+    !sTranslateText &&
+    sDisplayData &&
+    (sType === DISPLAY_MSG_TYPES.WORKORDER || sType === DISPLAY_MSG_TYPES.SALE);
+  let shouldShowOverlay = hasOverlayData;
 
-  if (!sDisplayData || !sType) {
-    return <IdleScreen />;
-  }
+  // Slide animation lifecycle — needed for exit animation before unmount
+  useEffect(() => {
+    if (shouldShowOverlay && sOverlayPhase === "hidden") {
+      _setOverlayPhase("visible");
+      _setOverlayKey((k) => k + 1);
+    } else if (shouldShowOverlay && sOverlayPhase === "exiting") {
+      _setOverlayPhase("visible");
+      _setOverlayKey((k) => k + 1);
+    } else if (!shouldShowOverlay && sOverlayPhase === "visible") {
+      _setOverlayPhase("exiting");
+      let timer = setTimeout(() => _setOverlayPhase("hidden"), 450);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldShowOverlay, sOverlayPhase]);
 
-  if (sType === DISPLAY_MSG_TYPES.WORKORDER) {
-    return <WorkorderDisplay data={sDisplayData} />;
-  }
-
+  let overlayContent = null;
   if (sType === DISPLAY_MSG_TYPES.SALE) {
-    return <SaleDisplay data={sDisplayData} />;
+    overlayContent = <SaleOverlay data={sDisplayData} />;
+  } else if (sType === DISPLAY_MSG_TYPES.WORKORDER) {
+    overlayContent = <WorkorderOverlay data={sDisplayData} />;
   }
 
-  return <IdleScreen />;
+  return (
+    <View style={{ width: "100vw", height: "100vh", backgroundColor: "black", overflow: "hidden" }}>
+      {/* Keyframe animations for overlay slide */}
+      <style>{`
+        @keyframes displaySlideIn {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
+        @keyframes displaySlideOut {
+          from { transform: translateX(0); }
+          to { transform: translateX(100%); }
+        }
+      `}</style>
+
+      {/* Logo background — always visible */}
+      <Image
+        source={logo}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          resizeMode: "contain",
+        }}
+      />
+
+      {/* Translation overlay */}
+      {sTranslateText ? <TranslateDisplay text={sTranslateText} /> : null}
+
+      {/* Line items / sale overlay — animated */}
+      {sOverlayPhase !== "hidden" && (
+        <div
+          key={sOverlayKey}
+          style={{
+            position: "absolute",
+            top: 15,
+            right: 15,
+            bottom: 15,
+            left: sIsTall ? "10%" : undefined,
+            width: sIsTall ? undefined : "40%",
+            minWidth: sIsTall ? undefined : 380,
+            display: "flex",
+            animation:
+              sOverlayPhase === "visible"
+                ? "displaySlideIn 0.4s ease forwards"
+                : "displaySlideOut 0.4s ease forwards",
+          }}
+        >
+          {overlayContent}
+        </div>
+      )}
+
+      {/* Fullscreen button — hidden when already fullscreen */}
+      {!sIsFullscreen && (
+        <TouchableOpacity
+          onPress={() => document.documentElement.requestFullscreen().catch(() => { })}
+          style={{
+            position: "absolute",
+            bottom: 12,
+            left: 12,
+            backgroundColor: "rgba(255, 255, 255, 0.25)",
+            paddingVertical: 6,
+            paddingHorizontal: 14,
+            borderRadius: 6,
+          }}
+        >
+          <Text style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: 12 }}>
+            Full-Screen
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
 }

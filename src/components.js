@@ -1217,95 +1217,195 @@ export const InventoryItemScreeenModalComponent = ({
 };
 
 export const LoginModalScreen = ({ modalVisible }) => {
-  // getters ////////////////////////////////////////////////////////////
   const zAdminPrivilege = useLoginStore((state) => state.adminPrivilege);
-  let zSettingsObj = SETTINGS_OBJ;
-  zSettingsObj = useSettingsStore((state) => state.settings);
-  /////////////////////////////////////////////////////////////////////
-  const [sBackgroundColor, _setBackgroundColor] = useState("green");
-  const [sInput, _setInput] = useState("");
+  const zSettingsObj = useSettingsStore((state) => state.settings);
+  const [sPin, _setPin] = useState("");
+  const [sError, _setError] = useState("");
+  const [sSuccess, _setSuccess] = useState(false);
 
-  function checkUserInput(input) {
-    _setInput(input);
-    let userObj;
-    userObj = zSettingsObj.users.find((user) => user.pin == input);
-    if (!userObj)
-      userObj = zSettingsObj.users.find((user) => user.alternatePin == input);
-
-    let failedAccessCheck = true;
-    if (zAdminPrivilege && userObj) {
-      hasAccess = false;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.owner &&
-        userObj.permissions == PRIVILEDGE_LEVELS.owner
-      ) {
-      }
-      failedAccessCheck = false;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.admin &&
-        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
-          userObj.permissions == PRIVILEDGE_LEVELS.admin)
-      )
-        failedAccessCheck = false;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.superUser &&
-        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
-          userObj.permissions == PRIVILEDGE_LEVELS.admin ||
-          userObj.permissions == PRIVILEDGE_LEVELS.superUser)
-      )
-        failedAccessCheck = false;
-    }
-
-    if (!zAdminPrivilege) failedAccessCheck = false;
-
-    // log("user", userObj);
-    // log("check", failedAccessCheck.toString());
-    if (userObj && zAdminPrivilege && failedAccessCheck) {
-      useLoginStore.getState().setCurrentUser(userObj);
-      _setInput("");
-      _setBackgroundColor("red");
-      setTimeout(() => {
-        _setInput("");
-        useLoginStore.getState().setShowLoginScreen(false);
-      }, 500);
-      userObj = null;
-    }
-
-    if (userObj && !failedAccessCheck) {
-      useLoginStore.getState().setCurrentUser(userObj);
-      useLoginStore.getState().setShowLoginScreen(false);
-      _setInput("");
-      useLoginStore.getState().runPostLoginFunction();
-    }
+  function handleClose() {
+    _setPin("");
+    _setError("");
+    _setSuccess(false);
+    useLoginStore.getState().setShowLoginScreen(false);
   }
 
-  return (
-    <ScreenModal
-      modalVisible={modalVisible}
-      showOuterModal={true}
-      outerModalStyle={{
-        backgroundColor: "rgba(50,50,50,.5)",
+  function handlePinChange(input) {
+    _setPin(input);
+    _setError("");
+
+    let userObj = zSettingsObj?.users?.find((u) => u.pin == input);
+    if (!userObj) userObj = zSettingsObj?.users?.find((u) => u.alternatePin == input);
+    if (!userObj) return;
+
+    // Check privilege level if required
+    if (zAdminPrivilege) {
+      let level = zAdminPrivilege;
+      let perm = userObj.permissions?.name || userObj.permissions;
+      let hasAccess = false;
+      if (level === PRIVILEDGE_LEVELS.user) hasAccess = true;
+      if (level === PRIVILEDGE_LEVELS.superUser &&
+        (perm === PRIVILEDGE_LEVELS.superUser || perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
+        hasAccess = true;
+      if (level === PRIVILEDGE_LEVELS.admin &&
+        (perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
+        hasAccess = true;
+      if (level === PRIVILEDGE_LEVELS.owner && perm === PRIVILEDGE_LEVELS.owner)
+        hasAccess = true;
+
+      if (!hasAccess) {
+        _setError("Insufficient permissions");
+        return;
+      }
+    }
+
+    // Success
+    _setSuccess(true);
+    useLoginStore.getState().setCurrentUser(userObj);
+    useLoginStore.getState().setLastActionMillis();
+    useLoginStore.getState().setLastEditMillis();
+    setTimeout(() => {
+      _setPin("");
+      _setError("");
+      _setSuccess(false);
+      useLoginStore.getState().setShowLoginScreen(false);
+      useLoginStore.getState().runPostLoginFunction();
+    }, 400);
+  }
+
+  function handleUserSelect(userObj) {
+    useLoginStore.getState().setCurrentUser(userObj);
+    useLoginStore.getState().setLastActionMillis();
+    useLoginStore.getState().setLastEditMillis();
+    _setPin("");
+    _setError("");
+    _setSuccess(true);
+    setTimeout(() => {
+      _setSuccess(false);
+      useLoginStore.getState().setShowLoginScreen(false);
+      useLoginStore.getState().runPostLoginFunction();
+    }, 400);
+  }
+
+  if (!modalVisible) return null;
+
+  let users = zSettingsObj?.users || [];
+  let showUserList = !zAdminPrivilege && users.length > 0;
+
+  return ReactDOM.createPortal(
+    <View
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
       }}
-      buttonVisible={false}
-      Component={() => (
-        <View
-          style={{
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: sBackgroundColor,
-            width: 500,
-            height: 500,
-          }}
-        >
-          <TextInput
-            autoFocus={true}
-            style={{ outlineWidth: 0, borderWidth: 1, width: 200, height: 40 }}
-            value={sInput}
-            onChangeText={(val) => checkUserInput(val)}
-          />
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={handleClose}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      <View
+        style={{
+          width: 360,
+          backgroundColor: sSuccess ? C.green : C.backgroundWhite,
+          borderRadius: 12,
+          borderWidth: 2,
+          borderColor: sSuccess ? C.green : C.buttonLightGreenOutline,
+          padding: 24,
+        }}
+      >
+        {/* Header */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <Text style={{ fontSize: 18, fontWeight: Fonts.weight.textHeavy, color: sSuccess ? "white" : C.text }}>
+            {sSuccess ? "Welcome!" : zAdminPrivilege ? "Authorization Required" : "Login"}
+          </Text>
+          <TouchableOpacity onPress={handleClose} style={{ padding: 4 }}>
+            <Image_ icon={ICONS.close1} size={16} />
+          </TouchableOpacity>
         </View>
-      )}
-    />
+
+        {/* Privilege badge */}
+        {!!zAdminPrivilege && !sSuccess && (
+          <View style={{ backgroundColor: gray(0.05), borderRadius: 6, padding: 8, marginBottom: 14 }}>
+            <Text style={{ fontSize: 12, color: gray(0.5) }}>
+              Requires: <Text style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>{zAdminPrivilege}</Text> or higher
+            </Text>
+          </View>
+        )}
+
+        {/* PIN input */}
+        {!sSuccess && (
+          <View>
+            <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 6 }}>Enter PIN</Text>
+            <TextInput
+              autoFocus={true}
+              secureTextEntry={true}
+              value={sPin}
+              onChangeText={handlePinChange}
+              placeholder="PIN"
+              style={{
+                borderWidth: 2,
+                borderColor: sError ? C.red : C.buttonLightGreenOutline,
+                borderRadius: 10,
+                backgroundColor: C.listItemWhite,
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                fontSize: 20,
+                textAlign: "center",
+                letterSpacing: 8,
+                outlineStyle: "none",
+              }}
+            />
+            {!!sError && (
+              <Text style={{ fontSize: 12, color: C.red, marginTop: 6, textAlign: "center" }}>{sError}</Text>
+            )}
+          </View>
+        )}
+
+        {/* User list — only for non-privileged login */}
+        {showUserList && !sSuccess && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 8 }}>Or select a user</Text>
+            <ScrollView style={{ maxHeight: 200 }}>
+              {users.map((u) => (
+                <TouchableOpacity
+                  key={u.id}
+                  onPress={() => handleUserSelect(u)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                    marginBottom: 4,
+                    backgroundColor: gray(0.04),
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: gray(0.1),
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: C.text, flex: 1 }}>
+                    {u.first} {u.last}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: gray(0.5) }}>{u.permissions?.name || u.permissions}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Success state */}
+        {sSuccess && (
+          <View style={{ alignItems: "center", paddingVertical: 10 }}>
+            <Image_ icon={ICONS.check} size={30} style={{ tintColor: "white" }} />
+          </View>
+        )}
+      </View>
+    </View>,
+    document.body
   );
 };
 

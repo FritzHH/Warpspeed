@@ -169,7 +169,7 @@ export const TabBar = ({
         />
       </View>
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        {!!zCurrentUser && (
+        {zCurrentUser ? (
           <Button_
             onPress={() => handleUserPress(zCurrentUser)}
             icon={isClockedIn ? ICONS.check : ICONS.redx}
@@ -181,6 +181,23 @@ export const TabBar = ({
             }
             textStyle={{ fontSize: 13, color: C.text }}
             iconSize={13}
+            buttonStyle={{
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+              marginRight: 5,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.buttonLightGreen,
+              borderRadius: 15,
+            }}
+          />
+        ) : (
+          <Button_
+            onPress={() => useLoginStore.getState().setShowLoginScreen(true)}
+            icon={ICONS.userControl}
+            iconSize={13}
+            text="Login"
+            textStyle={{ fontSize: 13, color: C.text }}
             buttonStyle={{
               paddingHorizontal: 7,
               paddingVertical: 2,

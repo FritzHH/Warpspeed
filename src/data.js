@@ -211,6 +211,7 @@ export const APP_USER = {
   pin: "",
   faceDescriptor: "",
   hourlyWage: "",
+  preview: true,
 };
 
 export const TIME_PUNCH_PROTO = {
@@ -466,6 +467,21 @@ export const INTAKE_BUTTON_PROTO = {
   label: "",
   itemsToAdd: [/*inventory item IDs*/],
 };
+
+export const AUTO_CUSTOMER_NOTE_PROTO = {
+  inventoryItemID: "",
+  text: "",
+}
+
+export const AUTO_CUSTOMER_NOTE_TEXTS = [
+
+]
+
+export const QUICK_TEXT_PROTO = {
+  id: "",
+  buttonLabel: "",
+  text: "",
+}
 
 // Objects with initial data /////////////////////////////////////////
 export const FRITZ_USER_OBJ = {
@@ -838,6 +854,7 @@ export const SETTINGS_OBJ = {
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   activeLoginTimeoutSeconds: 15,
+  userInactivityTimeout: 60,
   idleLoginTimeoutHours: 24,
   salesTaxPercent: 6.5,
   acceptChecks: true,

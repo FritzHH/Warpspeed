@@ -5,11 +5,12 @@ import { View, Text, TouchableOpacity } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../styles";
 import { Button_ } from "../components";
 import { ROUTES } from "../routes";
+import { useSettingsStore } from "../stores";
 
 const LINK_ITEMS = [
   { label: "Dashboard", path: ROUTES.dashboard, icon: ICONS.home },
   { label: "Login", path: ROUTES.login, icon: ICONS.userControl },
-  { label: "Customer Display", path: ROUTES.display, icon: ICONS.eyeballs },
+  { label: "Customer Display", path: ROUTES.display, icon: ICONS.eyeballs, popup: true },
   { label: "Translate", path: ROUTES.translate, icon: ICONS.letterI },
 ];
 
@@ -37,7 +38,42 @@ export function HomeScreen() {
         {LINK_ITEMS.map((item) => (
           <Button_
             key={item.path + item.label}
-            onPress={() => (window.location.href = item.path)}
+            onPress={async () => {
+              if (item.popup) {
+                let storeName = useSettingsStore.getState().getSettings()?.storeInfo?.displayName || "";
+                let title = storeName ? `${storeName} Checkout Display` : "Checkout Display";
+                let screenDetails = null;
+                let secondScreen = null;
+
+                // Try to detect second screen via Multi-Screen Window Placement API
+                if (window.getScreenDetails) {
+                  try {
+                    screenDetails = await window.getScreenDetails();
+                    // Find the current screen the browser is on
+                    let currentScreen = screenDetails.currentScreen;
+                    // Pick a different screen (any screen that isn't the one the browser is on)
+                    secondScreen = screenDetails.screens.find(
+                      (s) => s.label !== currentScreen.label
+                    );
+                  } catch (e) {
+                    // Permission denied or API error — fall back to single screen
+                  }
+                }
+
+                let features = secondScreen
+                  ? `popup,left=${secondScreen.left},top=${secondScreen.top},width=${secondScreen.width},height=${secondScreen.height}`
+                  : "popup,width=1024,height=768";
+
+                let win = window.open(item.path, "customerDisplay", features);
+                if (win) {
+                  win.addEventListener("load", () => {
+                    win.document.title = title;
+                  });
+                }
+              } else {
+                window.location.href = item.path;
+              }
+            }}
             text={item.label}
             icon={item.icon}
             iconSize={20}

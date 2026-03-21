@@ -1,8 +1,7 @@
 /* eslint-disable */
 
 import React, { useEffect, useRef, useState } from "react";
-import { View } from "react-native-web";
-import { Button } from "react-native-web";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native-web";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
 
 import {
@@ -25,7 +24,12 @@ import {
   useTabNamesStore,
   useCurrentCustomerStore,
   useCustMessagesStore,
+  broadcastWorkorderToDisplay,
 } from "../stores";
+import {
+  onDisplayStatusMessage,
+  DISPLAY_STATUS,
+} from "../broadcastChannel";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
@@ -41,6 +45,7 @@ import {
 import { SETTINGS_OBJ, TAB_NAMES } from "../data";
 import { clog, log } from "../utils";
 import { cloneDeep, throttle } from "lodash";
+import { ROUTES } from "../routes";
 
 export function BaseScreen() {
   // store getters /////////////////////////////////////////////////////////////////
@@ -55,6 +60,10 @@ export function BaseScreen() {
   const throttledSetLastAction = useRef(throttle(() => {
     useLoginStore.getState().setLastActionMillis();
   }, 5000)).current;
+
+  // display window status — "closed" until display broadcasts otherwise
+  const [sDisplayStatus, _setDisplayStatus] = useState(DISPLAY_STATUS.CLOSED);
+  const [sDisplayLoading, _setDisplayLoading] = useState(false);
 
   // new checkout refund modal state
   const [sRefundModalVisible, _setRefundModalVisible] = useState(false);
@@ -86,6 +95,19 @@ export function BaseScreen() {
     return () => {
       window.removeEventListener("resize", handleResize);
     };
+  }, []);
+
+  // display status listener — re-broadcast current workorder when display window opens
+  useEffect(() => {
+    let unsub = onDisplayStatusMessage((msg) => {
+      _setDisplayStatus(msg.status);
+      if (msg.status === DISPLAY_STATUS.OPEN || msg.status === DISPLAY_STATUS.VISIBLE) {
+        _setDisplayLoading(false);
+        let wo = useOpenWorkordersStore.getState().getOpenWorkorder();
+        if (wo) broadcastWorkorderToDisplay(wo);
+      }
+    });
+    return () => unsub();
   }, []);
 
   ////////  testing    //////////////////////////////////////////////////////////////////////
@@ -200,6 +222,80 @@ export function BaseScreen() {
           justifyContent: "space-around",
         }}
       >
+        {(sDisplayStatus === DISPLAY_STATUS.CLOSED ||
+          sDisplayStatus === DISPLAY_STATUS.HIDDEN) && (
+            <View
+              style={{
+                height: 25,
+                width: "95%",
+                alignSelf: 'center',
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: 'center',
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                backgroundColor: C.red,
+                borderRadius: 5,
+                // marginBottom: 10,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 17,
+                  color: C.textWhite,
+                  fontWeight: "600",
+                }}
+              >
+                Customer screen is closed
+              </Text>
+              <TouchableOpacity
+                disabled={sDisplayLoading}
+                onPress={async () => {
+                  if (sDisplayLoading) return;
+                  _setDisplayLoading(true);
+                  let storeName = useSettingsStore.getState().getSettings()?.storeInfo?.displayName || "";
+                  let title = storeName ? `${storeName} Checkout Display` : "Checkout Display";
+                  let screenDetails = null;
+                  let secondScreen = null;
+                  if (window.getScreenDetails) {
+                    try {
+                      screenDetails = await window.getScreenDetails();
+                      let currentScreen = screenDetails.currentScreen;
+                      secondScreen = screenDetails.screens.find(
+                        (s) => s.label !== currentScreen.label
+                      );
+                    } catch (e) { }
+                  }
+                  let features = secondScreen
+                    ? `popup,left=${secondScreen.left},top=${secondScreen.top},width=${secondScreen.width},height=${secondScreen.height}`
+                    : "popup,width=1024,height=768";
+                  let win = window.open(ROUTES.display, "customerDisplay", features);
+                  if (win) {
+                    win.addEventListener("load", () => {
+                      win.document.title = title;
+                    });
+                  } else {
+                    _setDisplayLoading(false);
+                  }
+                }}
+                style={{ marginLeft: 10, paddingHorizontal: 12, paddingVertical: 2, backgroundColor: C.green, borderRadius: 5, opacity: sDisplayLoading ? 0.5 : 1 }}
+              >
+                {sDisplayLoading ? (
+                  <ActivityIndicator size="small" color={C.textWhite} />
+                ) : (
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      color: C.textWhite,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Open
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
         <View
           style={{
             width: "100%",

@@ -28,6 +28,7 @@ import {
   useSettingsStore,
   useOpenWorkordersStore,
   useInventoryStore,
+  useLoginStore,
 } from "../../../stores";
 
 function getQuickButtonFontSize(text, baseFontSize) {
@@ -199,16 +200,18 @@ export function InventoryComponent({}) {
       _setModalItem({ ...item });
       return;
     }
-    console.log("  -> adding to workorder:", openWorkorder.id);
-    let workorderLines = openWorkorder.workorderLines;
-    if (!workorderLines) workorderLines = [];
-    let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-    lineItem.inventoryItem = item;
-    lineItem.id = generateUPCBarcode();
-    workorderLines.push(lineItem);
-    useOpenWorkordersStore
-      .getState()
-      .setField("workorderLines", workorderLines);
+    useLoginStore.getState().requireLogin(() => {
+      console.log("  -> adding to workorder:", openWorkorder.id);
+      let workorderLines = openWorkorder.workorderLines;
+      if (!workorderLines) workorderLines = [];
+      let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
+      lineItem.inventoryItem = item;
+      lineItem.id = generateUPCBarcode();
+      workorderLines.push(lineItem);
+      useOpenWorkordersStore
+        .getState()
+        .setField("workorderLines", workorderLines);
+    });
   }
 
   function handleInventoryInfoPress(item) {
@@ -219,9 +222,11 @@ export function InventoryComponent({}) {
   function handleCustomItemSave(lineItem) {
     const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
     if (!openWorkorder) return;
-    let workorderLines = openWorkorder.workorderLines || [];
-    workorderLines = [...workorderLines, lineItem];
-    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+    useLoginStore.getState().requireLogin(() => {
+      let workorderLines = openWorkorder.workorderLines || [];
+      workorderLines = [...workorderLines, lineItem];
+      useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+    });
   }
 
   function clearSearch() {
@@ -298,16 +303,18 @@ export function InventoryComponent({}) {
           value={sSearchTerm}
           onChangeText={(val) => handleSearch(val)}
         />
-        <Button_
-          icon={ICONS.new}
-          iconSize={25}
-          useColorGradient={false}
-          onPress={() => {
-            let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-            newItem.id = generateRandomID();
-            _setModalItem(newItem);
-          }}
-        />
+        <View title="New Item">
+          <Button_
+            icon={ICONS.new}
+            iconSize={25}
+            useColorGradient={false}
+            onPress={() => {
+              let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
+              newItem.id = generateRandomID();
+              _setModalItem(newItem);
+            }}
+          />
+        </View>
       </View>
       <View
         style={{

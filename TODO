@@ -1,0 +1,20 @@
+
+
+
+
+----------------------
+
+several unrelated tasks to accomplish:
+
+the customer name needs to be uppercased in the checkout screen, and the phone number formatted to (xxx) xxx-xxxx
+
+i want the inventory search bar to auto-focus in Options_Inventory. also auto-focus the text input in Options_Messages.
+
+
+in the Options tab bar, when the camera is connected there is a camera icon. add a tooltip that says "Camera on and identifying"
+
+currently the workorder preview toggle in Options_Workorders is held in state. I want that to be user-specific, stored in the db in their settings object.
+
+----
+
+when we are importing/mapping the workorder in Dashboard_Admin -> IMPORTS, both customer note and internal notes show "Lightspeed Import" as the user who entered the note. I know that that information exists in the data somewhere, because we have that information in our standard Lightspeed app. can you see if we can locate and implement it, for better record-keeping?

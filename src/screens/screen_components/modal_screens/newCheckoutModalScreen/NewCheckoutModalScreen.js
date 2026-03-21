@@ -51,6 +51,17 @@ import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../
 
 function broadcastSaleToDisplay(sale, combinedWOs, addedItems, customerFirst, customerLast) {
   if (!sale) return;
+  let mapLine = (line) => ({
+    id: line.id,
+    qty: line.qty,
+    inventoryItem: {
+      formalName: line.inventoryItem?.formalName || "",
+      price: line.inventoryItem?.price || 0,
+    },
+    discountObj: line.discountObj
+      ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
+      : null,
+  });
   broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
     customerFirst: customerFirst || "",
     customerLast: customerLast || "",
@@ -58,36 +69,17 @@ function broadcastSaleToDisplay(sale, combinedWOs, addedItems, customerFirst, cu
       brand: wo.brand || "",
       model: wo.model || "",
       description: wo.description || "",
-      workorderLines: (wo.workorderLines || []).map((line) => ({
-        id: line.id,
-        qty: line.qty,
-        inventoryItem: {
-          formalName: line.inventoryItem?.formalName || "",
-          price: line.inventoryItem?.price || 0,
-        },
-        discountObj: line.discountObj
-          ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
-          : null,
-      })),
+      workorderLines: (wo.workorderLines || []).map(mapLine),
     })),
-    addedItems: (addedItems || []).map((item) => ({
-      id: item.id,
-      qty: item.qty,
-      inventoryItem: {
-        formalName: item.inventoryItem?.formalName || "",
-        price: item.inventoryItem?.price || 0,
-      },
-      discountObj: item.discountObj
-        ? { name: item.discountObj.name, savings: item.discountObj.savings || 0, newPrice: item.discountObj.newPrice || 0 }
-        : null,
-    })),
+    addedItems: (addedItems || []).map(mapLine),
     sale: {
-      subtotal: sale.subtotal || 0,
+      subtotal: sale.subtotal,
       discount: sale.discount || 0,
-      tax: sale.tax || 0,
+      tax: sale.tax,
+      taxRate: sale.salesTaxPercent,
       cardFee: sale.cardFee || 0,
       cardFeePercent: sale.cardFeePercent || 0,
-      total: sale.total || 0,
+      total: sale.total,
       amountCaptured: sale.amountCaptured || 0,
       paymentComplete: sale.paymentComplete || false,
     },

@@ -65,3 +65,37 @@ export function onTranslateMessage(callback) {
 export function broadcastTranslateClear() {
   broadcastToTranslateDisplay(TRANSLATE_MSG_TYPES.CLEAR, null);
 }
+
+// ============================================================================
+// Display Status Channel — display window broadcasts its state to dashboard
+// ============================================================================
+const STATUS_CHANNEL_NAME = "warpspeed-display-status";
+
+export const DISPLAY_STATUS = {
+  OPEN: "open",           // display window loaded
+  CLOSED: "closed",       // display window closing
+  FULLSCREEN: "fullscreen", // entered fullscreen
+  WINDOWED: "windowed",   // exited fullscreen (still open)
+  VISIBLE: "visible",     // tab/window is visible
+  HIDDEN: "hidden",       // tab/window is minimized or hidden
+};
+
+let _statusChannel = null;
+function getStatusChannel() {
+  if (!_statusChannel) {
+    _statusChannel = new BroadcastChannel(STATUS_CHANNEL_NAME);
+  }
+  return _statusChannel;
+}
+
+export function broadcastDisplayStatus(status) {
+  getStatusChannel().postMessage({ status, timestamp: Date.now() });
+}
+
+export function onDisplayStatusMessage(callback) {
+  const channel = getStatusChannel();
+  channel.onmessage = (event) => callback(event.data);
+  return () => {
+    channel.onmessage = null;
+  };
+}

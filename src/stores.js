@@ -16,6 +16,7 @@ import {
   log,
   removeFieldFromObj,
   replaceOrAddToArr,
+  resolveStatus,
 } from "./utils";
 import { cloneDeep, debounce } from "lodash";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "./broadcastChannel";
@@ -439,6 +440,7 @@ export const useLoginStore = create((set, get) => ({
   punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
   lastActionMillis: 0,
+  lastEditMillis: 0,
   postLoginFunctionCallback: () => {},
   showLoginScreen: false,
 
@@ -496,8 +498,31 @@ export const useLoginStore = create((set, get) => ({
   setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
 
   setLastActionMillis: () => set({ lastActionMillis: new Date().getTime() }),
+  setLastEditMillis: () => set({ lastEditMillis: new Date().getTime() }),
   setShowLoginScreen: (showLoginScreen) => {
     set((state) => ({ showLoginScreen }));
+  },
+
+  requireLogin: (callback) => {
+    let lastEdit = get().lastEditMillis;
+    let now = new Date().getTime();
+    let diffSeconds = (now - lastEdit) / 1000;
+    let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
+    let userObj = get().currentUser;
+
+    if (!userObj || diffSeconds > timeout) {
+      set({
+        postLoginFunctionCallback: () => {
+          get().setLastEditMillis();
+          callback();
+        },
+        showLoginScreen: true,
+        adminPrivilege: "",
+      });
+      return;
+    }
+    get().setLastEditMillis();
+    callback();
   },
 
   execute: (postLoginFunctionCallback, priviledgeLevel) => {
@@ -532,12 +557,14 @@ export const useLoginStore = create((set, get) => ({
     // log("user in login store", userObj);
     // log("diff", diff);
     // log(get().loginTimeout);
-    if (diff > get().loginTimeout || !hasAccess || !userObj) {
+    let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
+    if (diff > timeout || !hasAccess || !userObj) {
       set((state) => ({ postLoginFunctionCallback }));
       set((state) => ({ showLoginScreen: true }));
       set((state) => ({ adminPrivilege: priviledgeLevel }));
       return;
     } else if (hasAccess) {
+      get().setLastEditMillis();
       postLoginFunctionCallback();
     }
   },
@@ -690,33 +717,212 @@ const debouncedSaveWorkorder = debounce((workorder) => {
   dbSaveOpenWorkorder(workorder);
 }, 500);
 
-function broadcastWorkorderToDisplay(wo) {
-  if (!wo || wo.isStandaloneSale) return;
-  let totals = calculateRunningTotals(wo, 0);
+export function broadcastWorkorderToDisplay(wo) {
+  if (!wo) return;
+
+  if (!wo.workorderLines || wo.workorderLines.length === 0) {
+    broadcastClear();
+    return;
+  }
+
+  let lines = (wo.workorderLines || []).map((line) => ({
+    id: line.id,
+    qty: line.qty,
+    inventoryItem: {
+      formalName: line.inventoryItem?.formalName || "",
+      price: line.inventoryItem?.price || 0,
+    },
+    discountObj: line.discountObj
+      ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
+      : null,
+  }));
+
+  let salesTaxPercent = useSettingsStore.getState().getSettings()?.salesTaxPercent || 0;
+
+  // Standalone sales broadcast as SALE/Checkout type
+  if (wo.isStandaloneSale) {
+    let totals = calculateRunningTotals(wo, salesTaxPercent);
+    broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
+      customerFirst: wo.customerFirst || "",
+      customerLast: wo.customerLast || "",
+      combinedWorkorders: [],
+      addedItems: lines,
+      sale: {
+        subtotal: totals.runningSubtotal,
+        discount: totals.runningDiscount,
+        tax: totals.runningTax,
+        taxRate: salesTaxPercent,
+        total: totals.finalTotal,
+        amountCaptured: 0,
+        paymentComplete: false,
+      },
+    });
+    return;
+  }
+
+  // Regular workorders — only show if created within last 5 minutes
+  let startedOn = Number(wo.startedOnMillis) || 0;
+  if (startedOn && Date.now() - startedOn > 300000) return;
+
+  let totals = calculateRunningTotals(wo, salesTaxPercent);
+  let customer = useCurrentCustomerStore.getState().getCustomer();
   broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
     customerFirst: wo.customerFirst || "",
     customerLast: wo.customerLast || "",
     brand: wo.brand || "",
     model: wo.model || "",
     description: wo.description || "",
-    workorderLines: (wo.workorderLines || []).map((line) => ({
-      id: line.id,
-      qty: line.qty,
-      inventoryItem: {
-        formalName: line.inventoryItem?.formalName || "",
-        price: line.inventoryItem?.price || 0,
-      },
-      discountObj: line.discountObj
-        ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
-        : null,
-    })),
+    workorderLines: lines,
+    customer: {
+      first: customer.first || "",
+      last: customer.last || "",
+      cell: customer.cell || "",
+      landline: customer.landline || "",
+      email: customer.email || "",
+      streetAddress: customer.streetAddress || "",
+      unit: customer.unit || "",
+      city: customer.city || "",
+      state: customer.state || "",
+      zip: customer.zip || "",
+    },
     totals: {
       runningSubtotal: totals.runningSubtotal,
       runningDiscount: totals.runningDiscount,
-      runningTotal: totals.runningTotal,
+      runningTax: totals.runningTax,
+      runningTotal: totals.finalTotal,
       runningQty: totals.runningQty,
+      salesTaxPercent: salesTaxPercent,
     },
   });
+}
+
+// changelog helpers /////////////////////////////////////////////////////
+const NEWLY_CREATED_STATUS_ID = "34kttekj";
+const CHANGELOG_TEXT_FIELDS = ["brand", "description", "partOrdered", "partSource"];
+const CHANGELOG_DISCRETE_FIELDS = ["status", "color1", "color2", "waitTime", "workorderLines", "taxFree"];
+const CHANGELOG_TRACKED_FIELDS = [...CHANGELOG_TEXT_FIELDS, ...CHANGELOG_DISCRETE_FIELDS];
+const changeLogDebounceMap = {};
+
+function getChangeLogUser() {
+  return useLoginStore.getState().currentUser?.first || "System";
+}
+
+function getItemName(item) {
+  return item?.formalName || item?.informalName || "item";
+}
+
+function diffWorkorderLines(oldLines, newLines) {
+  let entries = [];
+  let oldMap = {};
+  let newMap = {};
+  (oldLines || []).forEach((l) => { oldMap[l.id] = l; });
+  (newLines || []).forEach((l) => { newMap[l.id] = l; });
+
+  // added
+  for (let id in newMap) {
+    if (!oldMap[id]) {
+      entries.push({ action: "added", field: "workorderLines", to: getItemName(newMap[id].inventoryItem || newMap[id]) });
+    }
+  }
+  // removed
+  for (let id in oldMap) {
+    if (!newMap[id]) {
+      entries.push({ action: "removed", field: "workorderLines", from: getItemName(oldMap[id].inventoryItem || oldMap[id]) });
+    }
+  }
+  // changed qty or discount
+  for (let id in newMap) {
+    if (oldMap[id]) {
+      let oldL = oldMap[id];
+      let newL = newMap[id];
+      let name = getItemName(newL.inventoryItem || newL);
+      if (oldL.qty !== newL.qty) {
+        entries.push({ action: "changed", field: "workorderLines", detail: "qty", item: name, from: String(oldL.qty), to: String(newL.qty) });
+      }
+      if (oldL.discountObj?.name !== newL.discountObj?.name || oldL.discountObj?.value !== newL.discountObj?.value) {
+        let oldDisc = oldL.discountObj?.name || "none";
+        let newDisc = newL.discountObj?.name || "none";
+        entries.push({ action: "changed", field: "workorderLines", detail: "discount", item: name, from: oldDisc, to: newDisc });
+      }
+    }
+  }
+  return entries;
+}
+
+function formatFieldValue(fieldName, value) {
+  if (fieldName === "color1" || fieldName === "color2") return value?.label || "";
+  if (fieldName === "status") {
+    let statuses = useSettingsStore.getState().settings?.statuses || [];
+    return resolveStatus(value, statuses)?.label || value || "";
+  }
+  if (fieldName === "taxFree") return value ? "Yes" : "No";
+  return String(value ?? "");
+}
+
+function buildChangeLogEntries(workorder, fieldName, oldVal, newVal) {
+  // skip if not tracked or workorder is in Newly Created status
+  if (!CHANGELOG_TRACKED_FIELDS.includes(fieldName)) return [];
+
+  // special case: when status changes FROM Newly Created, we DO log it
+  // but skip all other fields while status IS Newly Created
+  if (fieldName === "status" && oldVal === NEWLY_CREATED_STATUS_ID) {
+    // log the status change away from Newly Created
+  } else if (workorder.status === NEWLY_CREATED_STATUS_ID) {
+    return [];
+  }
+
+  let user = getChangeLogUser();
+  let timestamp = Date.now();
+
+  if (fieldName === "workorderLines") {
+    let lineEntries = diffWorkorderLines(oldVal, newVal);
+    return lineEntries.map((e) => ({ ...e, timestamp, user }));
+  }
+
+  let fromStr = formatFieldValue(fieldName, oldVal);
+  let toStr = formatFieldValue(fieldName, newVal);
+  if (fromStr === toStr) return [];
+
+  return [{ timestamp, user, field: fieldName, action: "changed", from: fromStr, to: toStr }];
+}
+
+function appendToChangeLog(workorder, fieldName, oldVal, newVal) {
+  if (fieldName === "changeLog") return null; // prevent recursion
+
+  if (CHANGELOG_TEXT_FIELDS.includes(fieldName)) {
+    // debounced — capture original value, log after 2s of inactivity
+    let key = workorder.id + "::" + fieldName;
+    let existing = changeLogDebounceMap[key];
+    if (existing) {
+      clearTimeout(existing.timer);
+    } else {
+      // first keystroke — capture original value
+      changeLogDebounceMap[key] = { originalValue: oldVal };
+      existing = changeLogDebounceMap[key];
+    }
+    existing.timer = setTimeout(() => {
+      let currentWo = useOpenWorkordersStore.getState().workorders.find((o) => o.id === workorder.id);
+      if (!currentWo) { delete changeLogDebounceMap[key]; return; }
+      let currentVal = currentWo[fieldName];
+      let entries = buildChangeLogEntries(
+        { ...currentWo, status: currentWo.status },
+        fieldName,
+        existing.originalValue,
+        currentVal
+      );
+      delete changeLogDebounceMap[key];
+      if (entries.length === 0) return;
+      let updatedLog = [...(currentWo.changeLog || []), ...entries];
+      let updatedWo = { ...currentWo, changeLog: updatedLog };
+      useOpenWorkordersStore.getState().setWorkorder(updatedWo);
+    }, 2000);
+    return null; // don't append immediately
+  }
+
+  // discrete fields — log immediately
+  let entries = buildChangeLogEntries(workorder, fieldName, oldVal, newVal);
+  if (entries.length === 0) return null;
+  return entries;
 }
 
 export const useOpenWorkordersStore = create((set, get) => ({
@@ -746,7 +952,10 @@ export const useOpenWorkordersStore = create((set, get) => ({
       broadcastClear();
     }
   },
-  setOpenWorkorders: (workorders) => set({ workorders }),
+  setOpenWorkorders: (workorders) => {
+    let localOnly = get().workorders.filter((wo) => wo.isStandaloneSale);
+    set({ workorders: [...workorders, ...localOnly] });
+  },
   setWorkorder: (wo, saveToDB = true, batch = true) => {
     if (wo.isStandaloneSale) wo = { ...wo, lastInteractionMillis: Date.now() };
     set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
@@ -756,7 +965,14 @@ export const useOpenWorkordersStore = create((set, get) => ({
   setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
     if (!workorderID) workorderID = get().openWorkorderID;
     let workorder = get().workorders.find((o) => o.id === workorderID);
+
+    // changelog: append entries for discrete fields, debounce text fields
+    let logEntries = appendToChangeLog(workorder, fieldName, workorder[fieldName], fieldVal);
+
     workorder = { ...workorder, [fieldName]: fieldVal };
+    if (logEntries && logEntries.length > 0) {
+      workorder.changeLog = [...(workorder.changeLog || []), ...logEntries];
+    }
     if (workorder.isStandaloneSale) workorder.lastInteractionMillis = Date.now();
     if (workorder._unsaved) delete workorder._unsaved;
 

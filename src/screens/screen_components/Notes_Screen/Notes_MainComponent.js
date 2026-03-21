@@ -72,24 +72,26 @@ export function Notes_MainComponent() {
   }
 
   function outsideClicked(option) {
-    let notesArr;
-    let fieldName;
-    if (option == "customer") {
-      notesArr = zCustomerNotes;
-      fieldName = "customerNotes";
-    } else {
-      notesArr = zInternalNotes;
-      fieldName = "internalNotes";
-    }
+    useLoginStore.getState().requireLogin(() => {
+      let notesArr;
+      let fieldName;
+      if (option == "customer") {
+        notesArr = zCustomerNotes;
+        fieldName = "customerNotes";
+      } else {
+        notesArr = zInternalNotes;
+        fieldName = "internalNotes";
+      }
 
-    notesArr.unshift({
-      name: formatUserShowName(),
-      userID: zCurrentUser.id,
-      value: "",
-      id: generateRandomID(),
+      notesArr.unshift({
+        name: formatUserShowName(),
+        userID: zCurrentUser.id,
+        value: "",
+        id: generateRandomID(),
+      });
+
+      useOpenWorkordersStore.getState().setField(fieldName, notesArr);
     });
-
-    useOpenWorkordersStore.getState().setField(fieldName, notesArr);
   }
 
   function handleRowPress(item, index, option) {

@@ -20,6 +20,7 @@ import {
 import { C, ICONS, Fonts, COLOR_GRADIENTS } from "../../styles";
 import { ROUTES } from "../../routes";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
+import { Items_ChangeLog } from "../screen_components/Items_Screen/Items_ChangeLog";
 import { log, gray } from "../../utils";
 import { useTranslation } from "../../useTranslation";
 import {
@@ -41,7 +42,7 @@ export const Items_Section = React.memo(({}) => {
 
     switch (zItemsTabName) {
       case TAB_NAMES.itemsTab.changeLog:
-        return <Text>Change Log Tab</Text>;
+        return <Items_ChangeLog />;
       case TAB_NAMES.itemsTab.customerList:
         return <CustomerSearchListComponent />;
       case TAB_NAMES.itemsTab.dashboard:

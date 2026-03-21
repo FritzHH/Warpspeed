@@ -36,6 +36,7 @@ import {
   useSettingsStore,
   useTabNamesStore,
   useCurrentCustomerStore,
+  useLoginStore,
 } from "../../../stores";
 import { dbGetCustomer } from "../../../db_calls_wrapper";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
@@ -141,40 +142,46 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   ////////////////////////////////////////////////////////////////////////
   function deleteWorkorderLineItem(index) {
-    let workorderLines = zOpenWorkorder.workorderLines.filter(
-      (o, idx) => idx != index
-    );
-    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+    useLoginStore.getState().requireLogin(() => {
+      let workorderLines = zOpenWorkorder.workorderLines.filter(
+        (o, idx) => idx != index
+      );
+      useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+    });
   }
 
   function modifyQtyPressed(workorderLine, option) {
-    let newWOLine = cloneDeep(workorderLine);
-    if (option === "up") {
-      newWOLine.qty = newWOLine.qty + 1;
-    } else {
-      let qty = newWOLine.qty - 1;
-      if (qty <= 0) return;
-      newWOLine.qty = qty;
-    }
+    useLoginStore.getState().requireLogin(() => {
+      let newWOLine = cloneDeep(workorderLine);
+      if (option === "up") {
+        newWOLine.qty = newWOLine.qty + 1;
+      } else {
+        let qty = newWOLine.qty - 1;
+        if (qty <= 0) return;
+        newWOLine.qty = qty;
+      }
 
-    if (newWOLine.discountObj?.name) {
-      let newLine = applyDiscountToWorkorderItem(newWOLine);
-      if (newLine.discountObj?.newPrice > 0) newWOLine = newLine;
-    }
+      if (newWOLine.discountObj?.name) {
+        let newLine = applyDiscountToWorkorderItem(newWOLine);
+        if (newLine.discountObj?.newPrice > 0) newWOLine = newLine;
+      }
 
-    useOpenWorkordersStore.getState().setField(
-      "workorderLines",
-      replaceOrAddToArr(zOpenWorkorder.workorderLines, newWOLine)
-    );
+      useOpenWorkordersStore.getState().setField(
+        "workorderLines",
+        replaceOrAddToArr(zOpenWorkorder.workorderLines, newWOLine)
+      );
+    });
   }
 
   function editWorkorderLine(workorderLine, saveToDB = true) {
-    useOpenWorkordersStore.getState().setField(
-      "workorderLines",
-      replaceOrAddToArr(zOpenWorkorder.workorderLines, workorderLine),
-      undefined,
-      saveToDB
-    );
+    useLoginStore.getState().requireLogin(() => {
+      useOpenWorkordersStore.getState().setField(
+        "workorderLines",
+        replaceOrAddToArr(zOpenWorkorder.workorderLines, workorderLine),
+        undefined,
+        saveToDB
+      );
+    });
   }
 
   function handleCustomItemEditSave(updatedLine) {
@@ -182,39 +189,43 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   function applyDiscount(workorderLine, discountObj) {
-    let workorderLines = zOpenWorkorder.workorderLines.map((o) => {
-      if (o.id === workorderLine.id) {
-        workorderLine = { ...workorderLine, discountObj };
-        let discountedWorkorderLine =
-          applyDiscountToWorkorderItem(workorderLine);
-        // log("discounted", discountedWorkorderLine);
-        return discountedWorkorderLine;
-      }
-      return o;
-    });
+    useLoginStore.getState().requireLogin(() => {
+      let workorderLines = zOpenWorkorder.workorderLines.map((o) => {
+        if (o.id === workorderLine.id) {
+          workorderLine = { ...workorderLine, discountObj };
+          let discountedWorkorderLine =
+            applyDiscountToWorkorderItem(workorderLine);
+          return discountedWorkorderLine;
+        }
+        return o;
+      });
 
-    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+      useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+    });
   }
 
   function splitItems(workorderLine, index) {
-    let num = workorderLine.qty;
-    let workorderLines = cloneDeep(zOpenWorkorder.workorderLines);
-    for (let i = 0; i <= num - 1; i++) {
-      let newLine = cloneDeep(workorderLine);
-      newLine.qty = 1;
-      newLine.id = generateUPCBarcode();
-      newLine.discountObj = null;
-      if (i === 0) {
-        workorderLines[index] = newLine;
-        continue;
+    useLoginStore.getState().requireLogin(() => {
+      let num = workorderLine.qty;
+      let workorderLines = cloneDeep(zOpenWorkorder.workorderLines);
+      for (let i = 0; i <= num - 1; i++) {
+        let newLine = cloneDeep(workorderLine);
+        newLine.qty = 1;
+        newLine.id = generateUPCBarcode();
+        newLine.discountObj = null;
+        if (i === 0) {
+          workorderLines[index] = newLine;
+          continue;
+        }
+        workorderLines.splice(index + 1, 0, newLine);
       }
-      workorderLines.splice(index + 1, 0, newLine);
-    }
 
-    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+      useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+    });
   }
 
   function handleDeleteWorkorder() {
+    useLoginStore.getState().requireLogin(() => {
     const deleteFun = () => {
       const store = useOpenWorkordersStore.getState();
       const isStandalone = zOpenWorkorder.isStandaloneSale;
@@ -255,6 +266,7 @@ export const Items_WorkorderItemsTab = ({}) => {
         : "Confirm Delete Workorder",
       btn1Icon: ICONS.trash,
       handleBtn1Press: deleteFun,
+    });
     });
   }
 
@@ -691,7 +703,9 @@ export const LineItemComponent = ({
                       editable={!isLocked}
                       style={{ outlineWidth: 0, color: "orange", width: "100%", paddingHorizontal: 3 }}
                       onChangeText={(val) => {
-                        __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
+                        useLoginStore.getState().requireLogin(() => {
+                          __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
+                        });
                       }}
                       placeholder="      Intake notes..."
                       placeholderTextColor={gray(0.2)}
@@ -707,7 +721,9 @@ export const LineItemComponent = ({
                       editable={!isLocked}
                       style={{ outlineWidth: 0, color: "green", width: "100%", paddingHorizontal: 3 }}
                       onChangeText={(val) => {
-                        __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
+                        useLoginStore.getState().requireLogin(() => {
+                          __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
+                        });
                       }}
                       placeholder="      Receipt notes..."
                       placeholderTextColor={gray(0.2)}

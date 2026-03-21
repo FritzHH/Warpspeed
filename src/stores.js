@@ -130,13 +130,21 @@ export const useInvModalStore = create((set, get) => ({
 export const useCustomerSearchStore = create((set, get) => ({
   selectedItem: null,
   searchResults: [],
+  searchQuery: "",
+  searchType: "phone", // "phone" | "name" | "email"
+  isSearching: false,
   getSearchResults: () => get().searchResults,
   getSelectedItem: () => get().selectedItem,
+  getSearchQuery: () => get().searchQuery,
+  getSearchType: () => get().searchType,
+  getIsSearching: () => get().isSearching,
+  setIsSearching: (isSearching) => set({ isSearching }),
   setSelectedItem: (item) =>
     set({
       selectedItem: item,
     }),
   setSearchResults: (searchResults) => set({ searchResults }),
+  setSearchQuery: (searchQuery, searchType) => set({ searchQuery, searchType }),
   addToSearchResults: (searchResults) => {
     let storeSearchResults = get().searchResults;
     searchResults.forEach((searchResult) => {
@@ -145,7 +153,7 @@ export const useCustomerSearchStore = create((set, get) => ({
     });
     set({ searchResults: storeSearchResults });
   },
-  reset: () => set({ searchResults: [], selectedItem: null }),
+  reset: () => set({ searchResults: [], selectedItem: null, searchQuery: "", searchType: "phone", isSearching: false }),
 }));
 
 export const useCheckoutStore = create((set, get) => ({
@@ -440,7 +448,6 @@ export const useLoginStore = create((set, get) => ({
   punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
   lastActionMillis: 0,
-  lastEditMillis: 0,
   postLoginFunctionCallback: () => {},
   showLoginScreen: false,
 
@@ -498,22 +505,46 @@ export const useLoginStore = create((set, get) => ({
   setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
 
   setLastActionMillis: () => set({ lastActionMillis: new Date().getTime() }),
-  setLastEditMillis: () => set({ lastEditMillis: new Date().getTime() }),
   setShowLoginScreen: (showLoginScreen) => {
     set((state) => ({ showLoginScreen }));
   },
 
   requireLogin: (callback) => {
-    let lastEdit = get().lastEditMillis;
+    let lastAction = get().lastActionMillis;
     let now = new Date().getTime();
-    let diffSeconds = lastEdit === 0 ? 0 : (now - lastEdit) / 1000;
+    let diffSeconds = (now - lastAction) / 1000;
     let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
     let userObj = get().currentUser;
 
     if (!userObj || diffSeconds > timeout) {
+      // If we know who the user is (face recognized) but they're not clocked in,
+      // offer clock-in as a way to authenticate — clocking in counts as logging in
+      if (userObj && !get().punchClock[userObj.id]) {
+        useAlertScreenStore.getState().setValues({
+          title: "PUNCH CLOCK",
+          message: "Hi " + userObj.first + ", you are not clocked in. Would you like to punch in now?",
+          btn1Text: "CLOCK IN",
+          btn2Text: "CANCEL",
+          handleBtn1Press: () => {
+            get().setCreateUserClock(userObj.id, new Date().getTime(), "in");
+            get().setLastActionMillis();
+            callback();
+          },
+          handleBtn2Press: () => {
+            // Declined clock-in, show regular login modal
+            set({
+              postLoginFunctionCallback: () => { callback(); },
+              showLoginScreen: true,
+              adminPrivilege: "",
+            });
+          },
+          showAlert: true,
+        });
+        return;
+      }
+
       set({
         postLoginFunctionCallback: () => {
-          get().setLastEditMillis();
           callback();
         },
         showLoginScreen: true,
@@ -521,7 +552,6 @@ export const useLoginStore = create((set, get) => ({
       });
       return;
     }
-    get().setLastEditMillis();
     callback();
   },
 
@@ -529,7 +559,7 @@ export const useLoginStore = create((set, get) => ({
     let lastMillis = get().lastActionMillis;
     let cur = new Date().getTime();
     let diff = (cur - lastMillis) / 1000;
-    let userObj = get().currentUserObj;
+    let userObj = get().currentUser;
     // log("diff", diff);
     let hasAccess = true;
     if (priviledgeLevel && userObj) {
@@ -564,7 +594,6 @@ export const useLoginStore = create((set, get) => ({
       set((state) => ({ adminPrivilege: priviledgeLevel }));
       return;
     } else if (hasAccess) {
-      get().setLastEditMillis();
       postLoginFunctionCallback();
     }
   },

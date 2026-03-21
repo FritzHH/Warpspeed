@@ -530,8 +530,7 @@ export function InventoryComponent({}) {
               flex: 1,
             }}
             data={[...sSearchResults]}
-            renderItem={(item) => {
-              item = item.item;
+            renderItem={({ item, index }) => {
               return (
                 <View
                   style={{
@@ -543,8 +542,10 @@ export function InventoryComponent({}) {
                     flexDirection: "row",
                     alignItems: "center",
                     height: "100%",
-                    backgroundColor: C.backgroundListWhite,
+                    backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
                     paddingRight: 3,
+                    paddingVertical: 1,
+                    marginBottom: 2,
                   }}
                 >
                   {!!zOpenWorkorderID && (
@@ -577,15 +578,16 @@ export function InventoryComponent({}) {
                       <Text
                         style={{
                           width: "85%",
-                          fontSize: 14,
+                          fontSize: 15,
                           paddingLeft: 7,
                           paddingRight: 5,
+                          color: C.text,
                         }}
                       >
-                        {item.formalName}
+                        {item.informalName || item.formalName}
                         {!!item.informalName && (
                           <Text style={{ fontSize: 12, color: "gray" }}>
-                            {"\n" + item.informalName}
+                            {"\n" + item.formalName}
                           </Text>
                         )}
                       </Text>

@@ -30,6 +30,7 @@ import {
 } from "../../../../utils";
 import {
   // useDatabaseStore,
+  useAlertScreenStore,
   useInventoryStore,
   useLoginStore,
   useOpenWorkordersStore,
@@ -728,6 +729,61 @@ function DropdownComponent({
 
 ////////////////////////////////////////////////////////////////////////////////////
 
+function UserQuickCard({ userObj, isClockedIn }) {
+  const [sHover, _setHover] = useState(false);
+  return (
+    <TouchableOpacity
+      onPress={() => { }}
+      onMouseEnter={() => _setHover(true)}
+      onMouseLeave={() => _setHover(false)}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: C.listItemWhite,
+        borderWidth: 1,
+        borderColor: isClockedIn ? C.green : C.buttonLightGreenOutline,
+        borderRadius: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        opacity: sHover ? 0.7 : 1,
+      }}
+    >
+      <View style={{ marginRight: 8 }}>
+        <Text style={{ fontSize: 13, color: C.text, fontWeight: "500" }}>
+          {capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last)}
+        </Text>
+      </View>
+      <TouchableOpacity
+        onPress={() => {
+          let option = isClockedIn ? "out" : "in";
+          let name = capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last);
+          useAlertScreenStore.getState().setValues({
+            title: "PUNCH CLOCK",
+            message: (option === "in" ? "Clock in " : "Clock out ") + name + "?",
+            btn1Text: option === "in" ? "CLOCK IN" : "CLOCK OUT",
+            btn2Text: "CANCEL",
+            handleBtn1Press: () => {
+              useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), option);
+            },
+            handleBtn2Press: () => null,
+            showAlert: true,
+          });
+        }}
+        style={{
+          backgroundColor: isClockedIn ? C.lightred : C.green,
+          borderRadius: 5,
+          paddingVertical: 3,
+          paddingHorizontal: 8,
+        }}
+      >
+        <Text style={{ fontSize: 11, color: C.textWhite, fontWeight: "600" }}>
+          {isClockedIn ? "Clock Out" : "Clock In"}
+        </Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
+
 const AppUserListComponent = ({
   zSettingsObj,
   commitUserInfoChange,
@@ -741,6 +797,11 @@ const AppUserListComponent = ({
   const [sShowWageIndex, _setShowWageIndex] = useState(false);
   const [sNewUserObj, _setNewUserObj] = useState(null);
   const [sExpand, _setExpand] = useState(false);
+  const [sShowUserList, _setShowUserList] = useState(true);
+  const [sLoginTimeout, _setLoginTimeout] = useState(zSettingsObj?.activeLoginTimeoutSeconds || "");
+  const [sLockHours, _setLockHours] = useState(zSettingsObj?.idleLoginTimeoutHours ? String(Math.round(zSettingsObj.idleLoginTimeoutHours)) : "");
+  const [sPinLength, _setPinLength] = useState(zSettingsObj?.userPinStrength || "");
+  const zPunchClock = useLoginStore((state) => state.punchClock);
 
   const userListItemRefs = useRef([]);
 
@@ -754,11 +815,40 @@ const AppUserListComponent = ({
   }
 
   return (
-    <BoxContainerOuterComponent>
+    <BoxContainerOuterComponent style={{}}>
+      {/*User quick list with clock in/out*/}
+      <BoxContainerInnerComponent
+        style={{
+          backgroundColor: C.backgroundListWhite,
+          borderWidth: 0,
+          marginBottom: 10,
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => _setShowUserList(!sShowUserList)}
+          style={{ flexDirection: "row", alignItems: "center", marginBottom: sShowUserList ? 8 : 0 }}
+        >
+          <Text style={{ fontSize: 13, color: gray(0.5), fontWeight: "600" }}>
+            {sShowUserList ? "Hide Users  ▲" : "Show Users  ▼"}
+          </Text>
+        </TouchableOpacity>
+        {sShowUserList && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            {[...(zSettingsObj?.users || [])].sort((a, b) => {
+              let aIn = zPunchClock[a.id] ? 0 : 1;
+              let bIn = zPunchClock[b.id] ? 0 : 1;
+              return aIn - bIn;
+            }).map((userObj) => (
+              <UserQuickCard key={userObj.id} userObj={userObj} isClockedIn={!!zPunchClock[userObj.id]} />
+            ))}
+          </View>
+        )}
+      </BoxContainerInnerComponent>
       {/**Flatlist showing all app users, edit functions. sPunchClockUserObj */}
       <BoxContainerInnerComponent
         style={{
           backgroundColor: C.backgroundListWhite,
+          borderWidth: 0
           // width: "100%",
         }}
       >
@@ -773,6 +863,7 @@ const AppUserListComponent = ({
             </Text>
             <TextInput
               onChangeText={(val) => {
+                _setLoginTimeout(val);
                 handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
               }}
               style={{
@@ -785,7 +876,7 @@ const AppUserListComponent = ({
                 outlineWidth: 0,
                 color: C.text,
               }}
-              value={zSettingsObj?.activeLoginTimeoutSeconds}
+              value={String(sLoginTimeout)}
             />
           </View>
         </View>
@@ -807,6 +898,7 @@ const AppUserListComponent = ({
             </Text>
             <TextInput
               onChangeText={(val) => {
+                _setLockHours(val);
                 handleSettingsFieldChange("idleLoginTimeoutHours", val);
               }}
               style={{
@@ -819,7 +911,7 @@ const AppUserListComponent = ({
                 color: C.text,
                 outlineWidth: 0,
               }}
-              value={Math.round(zSettingsObj?.idleLoginTimeoutHours)}
+              value={String(sLockHours)}
             />
           </View>
           <View style={{ width: "100%", justifyContent: "flex-end" }}>
@@ -834,6 +926,7 @@ const AppUserListComponent = ({
               </Text>
               <TextInput
                 onChangeText={(val) => {
+                  _setPinLength(val);
                   handleSettingsFieldChange("userPinStrength", val);
                 }}
                 style={{
@@ -846,7 +939,7 @@ const AppUserListComponent = ({
                   outlineWidth: 0,
                   color: C.text,
                 }}
-                value={zSettingsObj?.userPinStrength}
+                value={String(sPinLength)}
               />
             </View>
           </View>
@@ -943,38 +1036,23 @@ const AppUserListComponent = ({
                 >
                   <View
                     style={{
-                      paddingLeft: 0,
-                      marginRight: 5,
                       justifyContent: "space-around",
-                      width: "22%",
+                      marginRight: 5,
+                      width: "12%",
                     }}
                   >
-                    <Button_
-                      text={sEditUserIndex === idx ? "Close Edit" : "Edit User"}
+                    <TouchableOpacity
                       onPress={() => {
                         _setEditUserIndex(sEditUserIndex != null ? null : idx);
                         _setShowPinIndex(null);
                         _setShowWageIndex(null);
                       }}
-                      buttonStyle={{
-                        borderWidth: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        backgroundColor: editable
-                          ? C.lightred
-                          : C.buttonLightGreen,
-                        borderRadius: 5,
-                        paddingHorizontal: 0,
-                        paddingVertical: 2,
-                        width: "100%",
-                      }}
-                      mouseOverOptions={{ opacity: 0.7 }}
-                      textStyle={{
-                        color: editable ? C.textWhite : C.text,
-                        fontSize: 12,
-                      }}
-                    />
+                      style={{ marginLeft: 10 }}
+                    >
+                      <Image_ icon={editable ? ICONS.close1 : ICONS.editPencil} size={20} />
+                    </TouchableOpacity>
                     <Button_
-                      text={"Face Enroll"}
+                      text={"Enroll"}
                       onPress={() => {
                         _setFacialRecognitionModalUserObj(userObj);
                       }}
@@ -984,48 +1062,19 @@ const AppUserListComponent = ({
                         borderColor: C.buttonLightGreenOutline,
                         backgroundColor: C.buttonLightGreen,
                         paddingVertical: 2,
-
-                        paddingHorizontal: 0,
-                        marginRight: 4,
-                        width: "100%",
-
+                        paddingHorizontal: 4,
                         borderRadius: 5,
-                      }}
-                      mouseOverOptions={{ opacity: 0.7 }}
-                      textStyle={{ fontSize: 12 }}
-                    />
-                    <Button_
-                      text={
-                        sEditUserIndex === idx ? "Delete User" : "Punch Clock"
-                      }
-                      onPress={() => {
-                        if (sEditUserIndex === idx) {
-                          handleRemoveUserPress(userObj);
-                        } else {
-                          _setPunchClockUserObj(userObj);
-                        }
-                      }}
-                      mouseOverOptions={{ opacity: 0.7 }}
-                      buttonStyle={{
-                        borderWidth: 1,
-                        paddingVertical: 2,
-
-                        borderColor: C.buttonLightGreenOutline,
-                        backgroundColor: C.buttonLightGreen,
-                        borderRadius: 5,
-                        paddingHorizontal: 0,
                         width: "100%",
                       }}
-                      textStyle={{ fontSize: 12 }}
+                      mouseOverOptions={{ opacity: 0.7 }}
+                      textStyle={{ fontSize: 11, color: C.text, fontWeight: "600", numLines: 2, width: '100%', textAlign: "center" }}
                     />
                   </View>
                   <View
                     style={{
                       justifyContent: "center",
-                      // backgroundColor: "red",
                       marginTop: 2,
-                      width: "78%",
-                      // paddingRight: 5,
+                      width: "88%",
                     }}
                   >
                     <View
@@ -1104,71 +1153,49 @@ const AppUserListComponent = ({
                         editable={editable}
                         style={{
                           paddingHorizontal: 5,
-                          // marginTop: 5,
                           padding: 1,
                           borderColor: editable
                             ? C.buttonLightGreenOutline
                             : "transparent",
                           outlineWidth: 0,
-                          width: "49%",
-                          // marginRight: 10,
+                          width: 120,
                           borderWidth: 1,
                           height: 25,
-
                           fontSize: 14,
                         }}
                       />
-                      <View style={{ width: "49%", alignItems: "center" }}>
-                        <DropdownMenu
-                          enabled={editable}
-                          ref={userListItemRefs.current[idx]}
-                          dataArr={Object.values(PERMISSION_LEVELS).map(
-                            (o) => o.name
-                          )}
-                          onSelect={(item) => {
-                            if (!editable) return;
-                            let perm = Object.values(PERMISSION_LEVELS).find(
-                              (o) => o.name === item
-                            );
-                            userObj.permissions = perm;
-                            // clog(userObj);
-                            commitUserInfoChange(userObj);
-                          }}
-                          buttonStyle={{
-                            paddingHorizontal: 5,
-                            // marginTop: 5,
-                            padding: 1,
-                            borderColor: C.buttonLightGreenOutline,
-                            outlineWidth: 0,
-                            borderRadius: 5,
-                            minWidth: 120,
-                            height: 25,
-                            // marginRight: 10,
-                            borderWidth: 1,
-                            backgroundColor: "transparent",
-                            alignItems: "flex-start",
-                            backgroundColor: editable
-                              ? C.buttonLightGreen
-                              : "transparent",
-                            paddingVertical: 2,
-                          }}
-                          buttonText={userObj.permissions.name}
-                          buttonTextStyle={{
-                            color: C.text,
-                            fontSize: 14,
-                          }}
-                        />
-                      </View>
+                      <TextInput
+                        value={userObj.email || ""}
+                        onChangeText={(value) => {
+                          userObj.email = value;
+                          commitUserInfoChange(userObj);
+                        }}
+                        placeholder="Email"
+                        placeholderTextColor={"lightgray"}
+                        editable={editable}
+                        style={{
+                          paddingHorizontal: 5,
+                          padding: 1,
+                          borderColor: editable
+                            ? C.buttonLightGreenOutline
+                            : "transparent",
+                          backgroundColor: "transparent",
+                          outlineWidth: 0,
+                          flex: 1,
+                          marginLeft: 5,
+                          borderWidth: 1,
+                          height: 25,
+                          fontSize: 14,
+                        }}
+                      />
                     </View>
                     <View
                       style={{
                         flexDirection: "row",
-                        justifyContent: "space-between",
+                        justifyContent: "space-around",
                         width: "100%",
-                        // backgroundColor: "red",
                         marginTop: 7,
                         alignItems: "center",
-                        // height: 25,
                       }}
                     >
                       <View
@@ -1177,17 +1204,14 @@ const AppUserListComponent = ({
                           borderColor: editable
                             ? C.buttonLightGreenOutline
                             : "transparent",
-                          width: "49%",
-                          // marginRight: 10,
+                          width: "22%",
                           borderWidth: 1,
-                          // marginTop: 5,
                           justifyContent: "space-between",
                           alignItems: "center",
                           height: 25,
                         }}
                       >
                         <TextInput
-                          // focusable={sShowPinIndex === idx ? true : false}
                           caretHidden={sShowPinIndex != idx}
                           focused={sShowPinIndex === idx}
                           value={sShowPinIndex === idx ? userObj.pin : ""}
@@ -1203,7 +1227,7 @@ const AppUserListComponent = ({
                             paddingHorizontal: 5,
                             padding: 1,
                             fontSize: 14,
-                            width: "90%",
+                            width: "80%",
                           }}
                         />
                         {editable ? (
@@ -1226,7 +1250,7 @@ const AppUserListComponent = ({
                           borderColor: editable
                             ? C.buttonLightGreenOutline
                             : "transparent",
-                          width: "49%",
+                          width: "22%",
                           borderWidth: 1,
                           justifyContent: "space-between",
                           alignItems: "center",
@@ -1252,7 +1276,7 @@ const AppUserListComponent = ({
                             paddingHorizontal: 5,
                             padding: 1,
                             fontSize: 14,
-                            width: "90%",
+                            width: "80%",
                           }}
                         />
                         {editable ? (
@@ -1269,6 +1293,63 @@ const AppUserListComponent = ({
                           <View style={{ width: 15 }} />
                         )}
                       </View>
+                      <View style={{ width: "40%", alignItems: "center" }}>
+                        <DropdownMenu
+                          enabled={editable}
+                          ref={userListItemRefs.current[idx]}
+                          dataArr={Object.values(PERMISSION_LEVELS).map(
+                            (o) => o.name
+                          )}
+                          onSelect={(item) => {
+                            if (!editable) return;
+                            let perm = Object.values(PERMISSION_LEVELS).find(
+                              (o) => o.name === item
+                            );
+                            userObj.permissions = perm;
+                            commitUserInfoChange(userObj);
+                          }}
+                          buttonStyle={{
+                            paddingHorizontal: 5,
+                            padding: 1,
+                            borderColor: C.buttonLightGreenOutline,
+                            outlineWidth: 0,
+                            borderRadius: 5,
+                            minWidth: 100,
+                            height: 25,
+                            borderWidth: 1,
+                            alignItems: "flex-start",
+                            backgroundColor: editable
+                              ? C.buttonLightGreen
+                              : "transparent",
+                            paddingVertical: 2,
+                          }}
+                          buttonText={userObj.permissions.name}
+                          buttonTextStyle={{
+                            color: C.text,
+                            fontSize: 14,
+                          }}
+                        />
+                      </View>
+                      {editable && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            useAlertScreenStore.getState().setValues({
+                              title: "DELETE USER",
+                              message: "Are you sure you want to delete " + capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last) + "?",
+                              btn1Text: "DELETE",
+                              btn2Text: "CANCEL",
+                              handleBtn1Press: () => {
+                                handleRemoveUserPress(userObj);
+                                _setEditUserIndex(null);
+                              },
+                              handleBtn2Press: () => null,
+                              showAlert: true,
+                            });
+                          }}
+                        >
+                          <Image_ icon={ICONS.trash} size={18} />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 </View>

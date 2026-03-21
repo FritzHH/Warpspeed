@@ -14,6 +14,7 @@ import {
   Button,
   Button_,
   ScreenModal,
+  SmallLoadingIndicator,
   TouchableOpacity_,
 } from "../../../components";
 import { cloneDeep } from "lodash";
@@ -31,55 +32,64 @@ import { C, ICONS } from "../../../styles";
 export function CustomerSearchListComponent({}) {
   // store getters //////////////////////////////////////////////////////////////////////
   const zSearchResults = useCustomerSearchStore((state) => state.searchResults);
+  const zSearchQuery = useCustomerSearchStore((state) => state.searchQuery);
+  const zSearchType = useCustomerSearchStore((state) => state.searchType);
+  const zIsSearching = useCustomerSearchStore((state) => state.isSearching);
 
+  const filteredResults = useMemo(() => {
+    if (!zSearchQuery) return zSearchResults;
+
+    if (zSearchType === "phone") {
+      const digits = zSearchQuery.replace(/\D/g, "");
+      if (!digits) return zSearchResults;
+      return zSearchResults.filter((c) => {
+        const cellDigits = (c.cell || "").replace(/\D/g, "");
+        const landDigits = (c.landline || c.land || "").replace(/\D/g, "");
+        return cellDigits.includes(digits) || landDigits.includes(digits);
+      });
+    } else if (zSearchType === "email") {
+      const emailQ = zSearchQuery.toLowerCase();
+      return zSearchResults.filter((c) =>
+        (c.email || "").toLowerCase().includes(emailQ)
+      );
+    } else {
+      // name search — each word must match either first or last
+      const words = zSearchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+      return zSearchResults.filter((c) => {
+        const first = (c.first || "").toLowerCase();
+        const last = (c.last || "").toLowerCase();
+        return words.every((w) => first.includes(w) || last.includes(w));
+      });
+    }
+  }, [zSearchResults, zSearchQuery, zSearchType]);
   ////////////////////////////////////////////////////////////////////////////////////////
   const [sCustomerInfo, _setCustomerInfo] = useState();
 
   function handleCustomerSelected(customer) {
-    // #region agent log
-    (function () {
-      var u = useLoginStore.getState().getCurrentUser();
-      fetch("http://127.0.0.1:7294/ingest/14603333-b1b8-4a19-8543-f609c335e2a8", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "1a100b" },
-        body: JSON.stringify({
-          sessionId: "1a100b",
-          location: "Items_CustomerSearchList.js:handleCustomerSelected",
-          message: "handleCustomerSelected entry",
-          data: {
-            currentUserIsNull: u === null,
-            currentUserFirst: u?.first,
-            customerId: customer?.id,
-            hasCustomer: !!customer,
-          },
-          timestamp: Date.now(),
-          hypothesisId: "H1",
-        }),
-      }).catch(function () {});
-    })();
-    // #endregion
-        let wo = createNewWorkorder({
-          customerID: customer.id,
-          customerFirst: customer.first,
-          customerLast: customer.last,
-          customerPhone: customer.cell || customer.landline,
-          startedByFirst: useLoginStore.getState().currentUser?.first,
-          startedByLast: useLoginStore.getState().currentUser?.last,
-          status: SETTINGS_OBJ.statuses[0]?.id || "",
-        });
+    useLoginStore.getState().requireLogin(() => {
+      let wo = createNewWorkorder({
+        customerID: customer.id,
+        customerFirst: customer.first,
+        customerLast: customer.last,
+        customerPhone: customer.cell || customer.landline,
+        startedByFirst: useLoginStore.getState().currentUser?.first,
+        startedByLast: useLoginStore.getState().currentUser?.last,
+        status: SETTINGS_OBJ.statuses[0]?.id || "",
+      });
 
-    let store = useOpenWorkordersStore.getState();
-    store.setWorkorderPreviewID(null);
-    store.setWorkorder(wo, false);
-    store.setOpenWorkorderID(wo.id);
-    useCurrentCustomerStore.getState().setCustomer(customer);
-    useTabNamesStore.getState().setItems({
-      infoTabName: TAB_NAMES.infoTab.workorder,
-      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-      optionsTabName: TAB_NAMES.optionsTab.inventory,
+      let store = useOpenWorkordersStore.getState();
+      store.setWorkorderPreviewID(null);
+      store.setWorkorder(wo, false);
+      store.setOpenWorkorderID(wo.id);
+      useCurrentCustomerStore.getState().setCustomer(customer);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.workorder,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+        optionsTabName: TAB_NAMES.optionsTab.inventory,
+      });
+      _setCustomerInfo();
+      useCustomerSearchStore.getState().reset();
     });
-    _setCustomerInfo();
-    useCustomerSearchStore.getState().reset();
   }
 
   return (
@@ -103,7 +113,16 @@ export function CustomerSearchListComponent({}) {
           flexGrow: 1,
           minHeight: "100%",
         }}
-        data={zSearchResults}
+        data={filteredResults}
+        ListEmptyComponent={() => (
+          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>
+            {zIsSearching ? (
+              <SmallLoadingIndicator />
+            ) : (
+              <Text style={{ color: gray(0.4), fontSize: 14 }}>No customers found</Text>
+            )}
+          </View>
+        )}
         renderItem={(obj) => {
           let customer = obj.item;
           return (

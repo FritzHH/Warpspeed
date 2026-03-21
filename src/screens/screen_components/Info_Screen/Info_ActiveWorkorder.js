@@ -161,24 +161,23 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleCustomerNewWorkorderPress(customer) {
-    // log("here");
-    // log("cust", zCurrentUser);
-    // return;
-    _setShowCustomerInfoScreen();
-    let wo = cloneDeep(WORKORDER_PROTO);
-    wo.customerID = customer.id;
-    let _currentUser = useLoginStore.getState().currentUser;
-    wo.changeLog = wo.changeLog.push(
-      "Started by: " + _currentUser?.first + " " + _currentUser?.last?.[0]
-    );
-    wo.customerFirst = customer.first;
-    wo.customerLast = customer.last;
-    wo.customerPhone = customer.cell || customer.landline;
-    wo.id = generateUPCBarcode();
-    wo.startedOnMillis = new Date().getTime();
-    wo.status = SETTINGS_OBJ.statuses[0]?.id || "";
-    useOpenWorkordersStore.getState().setWorkorder(wo, false);
-    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+    useLoginStore.getState().requireLogin(() => {
+      _setShowCustomerInfoScreen();
+      let wo = cloneDeep(WORKORDER_PROTO);
+      wo.customerID = customer.id;
+      let _currentUser = useLoginStore.getState().currentUser;
+      wo.changeLog = wo.changeLog.push(
+        "Started by: " + _currentUser?.first + " " + _currentUser?.last?.[0]
+      );
+      wo.customerFirst = customer.first;
+      wo.customerLast = customer.last;
+      wo.customerPhone = customer.cell || customer.landline;
+      wo.id = generateUPCBarcode();
+      wo.startedOnMillis = new Date().getTime();
+      wo.status = SETTINGS_OBJ.statuses[0]?.id || "";
+      useOpenWorkordersStore.getState().setWorkorder(wo, false);
+      useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+    });
   }
 
   function handleWorkorderPrintPress() {

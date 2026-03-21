@@ -1264,20 +1264,19 @@ export const LoginModalScreen = ({ modalVisible }) => {
     _setSuccess(true);
     useLoginStore.getState().setCurrentUser(userObj);
     useLoginStore.getState().setLastActionMillis();
-    useLoginStore.getState().setLastEditMillis();
     setTimeout(() => {
       _setPin("");
       _setError("");
       _setSuccess(false);
       useLoginStore.getState().setShowLoginScreen(false);
       useLoginStore.getState().runPostLoginFunction();
+      promptClockInIfNeeded(userObj);
     }, 400);
   }
 
   function handleUserSelect(userObj) {
     useLoginStore.getState().setCurrentUser(userObj);
     useLoginStore.getState().setLastActionMillis();
-    useLoginStore.getState().setLastEditMillis();
     _setPin("");
     _setError("");
     _setSuccess(true);
@@ -1285,7 +1284,24 @@ export const LoginModalScreen = ({ modalVisible }) => {
       _setSuccess(false);
       useLoginStore.getState().setShowLoginScreen(false);
       useLoginStore.getState().runPostLoginFunction();
+      promptClockInIfNeeded(userObj);
     }, 400);
+  }
+
+  function promptClockInIfNeeded(userObj) {
+    let punchClock = useLoginStore.getState().punchClock;
+    if (punchClock[userObj.id]) return; // already clocked in
+    useAlertScreenStore.getState().setValues({
+      title: "PUNCH CLOCK",
+      message: "Hi " + userObj.first + ", you are not clocked in. Would you like to punch in now?",
+      btn1Text: "CLOCK IN",
+      btn2Text: "NOT NOW",
+      handleBtn1Press: () => {
+        useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), "in");
+      },
+      handleBtn2Press: () => null,
+      showAlert: true,
+    });
   }
 
   if (!modalVisible) return null;

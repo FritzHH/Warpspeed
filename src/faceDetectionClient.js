@@ -170,6 +170,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         // log(userObj);
         if (user) {
           useLoginStore.getState().setCurrentUser(user) // set app user on recognition
+          useLoginStore.getState().setLastActionMillis();
 
           // check to see if user asked to not clock in within period of time
           // log("punch clock arr in facedetectionclient", zPunchClockArr);
@@ -211,11 +212,8 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
                 user.first +
                 ", you are not clocked in. Would you like to punch in now?",
               handleBtn1Press: () => {
-                useLoginStore.getState().setCreateUserClock(user.id, millis, 'in')
-                // dbCreateUserPunchAction({
-                //   userID: userObj.id,
-                //   millisIn: millis,
-                // });
+                useLoginStore.getState().setCreateUserClock(user.id, millis, 'in');
+                useLoginStore.getState().setLastActionMillis();
                 _setPauseBackgroundRecognition(false);
               },
               handleBtn2Press: () => {

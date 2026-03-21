@@ -14,7 +14,7 @@ import {
 } from "../../../utils";
 import { ScreenModal, Button_, PhoneNumberInput } from "../../../components";
 import { CUSTOMER_PROTO, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
@@ -39,6 +39,7 @@ export function NewWorkorderComponent({}) {
   const [sSearchFieldName, _setSearchFieldName] = React.useState("phone");
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
   const [buttonVisible, setButtonVisible] = React.useState(false);
+  const searchTimerRef = useRef(null);
 
   // dev ////////////////////////////////////
   useEffect(() => {
@@ -81,7 +82,7 @@ export function NewWorkorderComponent({}) {
     }
     // let searchStr = "";
 
-    const searchFun = async (searchStrings, options) => {
+    const searchFun = async (searchStrings, options, displayQuery) => {
       //dev
       let funs = [];
       options.forEach((option) => {
@@ -95,12 +96,28 @@ export function NewWorkorderComponent({}) {
         });
       });
 
-      funs.forEach((fun) => {
-        fun().then((res) => {
-          // log("res", res);
-          useCustomerSearchStore.getState().addToSearchResults(res);
+      // Update the store with the full search query for display filtering (immediate)
+      const primaryType = options.includes("phone") ? "phone" : options.includes("email") ? "email" : "name";
+      useCustomerSearchStore.getState().setSearchQuery(displayQuery || searchStrings.join(" "), primaryType);
+
+      // Debounce the actual DB calls (300ms)
+      useCustomerSearchStore.getState().setIsSearching(true);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = setTimeout(() => {
+        let pending = funs.length;
+        if (pending === 0) {
+          useCustomerSearchStore.getState().setIsSearching(false);
+          return;
+        }
+        funs.forEach((fun) => {
+          fun().then((res) => {
+            useCustomerSearchStore.getState().addToSearchResults(res);
+          }).finally(() => {
+            pending--;
+            if (pending === 0) useCustomerSearchStore.getState().setIsSearching(false);
+          });
         });
-      });
+      }, 300);
     };
 
     if (rawText.length <= 2) {
@@ -118,9 +135,7 @@ export function NewWorkorderComponent({}) {
         searchStr = rawText;
         _setTextInput(formatPhoneWithDashes(searchStr));
       }
-      searchFun([searchStr], ["phone", "email"]);
-      // searchFun(searchStr, "phone");
-      // searchFun(searchStr, "email"); // email search in case begins with numbers
+      searchFun([searchStr], ["phone"]);
       return;
     } else if (
       isNumeric &&
@@ -148,14 +163,16 @@ export function NewWorkorderComponent({}) {
       // run email search
       searchFun([incomingText], ["email"]);
     } else {
-      // name search
+      // name search — only query the last word (most recent/narrowest term)
+      // previous words' results are already cached in the store
       let split;
       if (incomingText.includes("  ")) {
         split = incomingText.split("  ");
       } else {
         split = incomingText.split(" ");
       }
-      searchFun(split, ["name"]);
+      let lastWord = split.filter(Boolean).pop();
+      if (lastWord) searchFun([lastWord], ["name"], incomingText);
     }
   }
 

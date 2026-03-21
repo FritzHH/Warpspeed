@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native-web";
 import { createPortal } from "react-dom";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { cloneDeep, debounce } from "lodash";
 import {
   useSettingsStore,
@@ -29,6 +29,7 @@ import {
   generateRandomID,
   gray,
   log,
+  showAlert,
 } from "../../../utils";
 import {
   dbSaveInventoryItem,
@@ -62,34 +63,81 @@ function getButtonsContainingItem(itemID, allButtons) {
 
 // ─── Quick Button Picker Modal ─────────────────────────────────────────────
 
+const SubMenuRow = ({ parentID, itemID, quickButtons, onToggle, expandedIDs, toggleExpanded, depth }) => {
+  let children = quickButtons.filter((b) => b.parentID === parentID);
+  if (children.length === 0) return null;
+  let expandedChildren = children.filter((c) => expandedIDs.includes(c.id));
+  return (
+    <View style={{ marginTop: 6, marginLeft: depth * 8 }}>
+      {/* All chips on the same row */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+        {children.map((child) => {
+          let childIsIn = (child.items || []).includes(itemID);
+          let hasGrandchildren = quickButtons.some((b) => b.parentID === child.id);
+          let isExpanded = expandedIDs.includes(child.id);
+          return (
+            <TouchableOpacity
+              key={child.id}
+              onPress={() => {
+                if (hasGrandchildren) toggleExpanded(child.id);
+                else onToggle(child.id);
+              }}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 5,
+                backgroundColor: isExpanded ? "rgb(245,166,35)" : childIsIn ? C.green : gray(0.1),
+                borderWidth: (isExpanded || childIsIn) ? 0 : 1,
+                borderColor: gray(0.15),
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: (isExpanded || childIsIn) ? "white" : C.text,
+                  fontWeight: (isExpanded || childIsIn) ? "600" : "400",
+                }}
+              >
+                {child.name || "(unnamed)"}
+              </Text>
+              {hasGrandchildren && (
+                <Text style={{ fontSize: 11, color: (isExpanded || childIsIn) ? "white" : gray(0.4), marginLeft: 4 }}>
+                  {isExpanded ? "\u25BC" : "\u25B6"}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {/* Expanded sub-menus rendered below the row */}
+      {expandedChildren.map((child) => (
+        <SubMenuRow
+          key={child.id}
+          parentID={child.id}
+          itemID={itemID}
+          quickButtons={quickButtons}
+          onToggle={onToggle}
+          expandedIDs={expandedIDs}
+          toggleExpanded={toggleExpanded}
+          depth={depth + 1}
+        />
+      ))}
+    </View>
+  );
+};
+
 const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => {
-  const [sParentID, _setParentID] = useState(null);
-  const [sMenuPath, _setMenuPath] = useState([]);
+  const [sExpandedIDs, _setExpandedIDs] = useState([]);
 
-  let currentButtons = quickButtons.filter((b) => b.parentID === sParentID);
-
-  function drillIn(btn) {
-    _setMenuPath((prev) => [...prev, { id: btn.id, name: btn.name }]);
-    _setParentID(btn.id);
+  function toggleExpanded(id) {
+    _setExpandedIDs((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   }
 
-  function handleBack() {
-    let path = [...sMenuPath];
-    path.pop();
-    _setMenuPath(path);
-    _setParentID(path.length > 0 ? path[path.length - 1].id : null);
-  }
-
-  function jumpTo(idx) {
-    if (idx < 0) {
-      _setParentID(null);
-      _setMenuPath([]);
-      return;
-    }
-    let path = sMenuPath.slice(0, idx + 1);
-    _setMenuPath(path);
-    _setParentID(path[path.length - 1].id);
-  }
+  let rootButtons = quickButtons.filter((b) => !b.parentID);
 
   return createPortal(
     <div
@@ -111,7 +159,7 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "45%",
-          maxHeight: "70%",
+          maxHeight: "calc(100vh - 40px)",
           display: "flex",
           flexDirection: "column",
         }}
@@ -142,78 +190,21 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
                 </TouchableOpacity>
               </View>
 
-              {/* Breadcrumb */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  marginBottom: 10,
-                  paddingBottom: 10,
-                  borderBottomWidth: 1,
-                  borderBottomColor: gray(0.1),
-                }}
-              >
-                <TouchableOpacity onPress={() => jumpTo(-1)}>
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      color: C.blue,
-                      fontWeight: sMenuPath.length === 0 ? "600" : "400",
-                    }}
-                  >
-                    Root
-                  </Text>
-                </TouchableOpacity>
-                {sMenuPath.map((seg, idx) => (
-                  <View key={seg.id} style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ fontSize: 14, color: gray(0.4), marginHorizontal: 6 }}>
-                      {">"}
-                    </Text>
-                    <TouchableOpacity onPress={() => jumpTo(idx)}>
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          color: C.blue,
-                          fontWeight: idx === sMenuPath.length - 1 ? "600" : "400",
-                        }}
-                      >
-                        {seg.name}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-
-              {/* Back button */}
-              {sParentID && (
-                <TouchableOpacity
-                  onPress={handleBack}
-                  style={{ marginBottom: 8 }}
-                >
-                  <Text style={{ fontSize: 14, color: C.blue }}>{"< Back"}</Text>
-                </TouchableOpacity>
-              )}
-
               {/* Button list */}
-              <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={true}>
-                {currentButtons.length === 0 ? (
+              <ScrollView showsVerticalScrollIndicator={true} style={{ flex: 1 }}>
+                {rootButtons.length === 0 ? (
                   <Text style={{ fontSize: 14, color: gray(0.5), paddingVertical: 10 }}>
-                    No buttons at this level
+                    No quick buttons configured
                   </Text>
                 ) : (
-                  currentButtons.map((btn) => {
-                    let childCount = quickButtons.filter(
-                      (b) => b.parentID === btn.id
-                    ).length;
+                  rootButtons.map((btn) => {
+                    let hasChildren = quickButtons.some((b) => b.parentID === btn.id);
                     let isIn = (btn.items || []).includes(itemID);
+                    let isExpanded = sExpandedIDs.includes(btn.id);
                     return (
                       <View
                         key={btn.id}
                         style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "space-between",
                           paddingVertical: 8,
                           paddingHorizontal: 10,
                           marginBottom: 4,
@@ -223,53 +214,59 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
                           borderColor: isIn ? C.green : "transparent",
                         }}
                       >
-                        <TouchableOpacity
-                          onPress={() => {
-                            if (childCount > 0) drillIn(btn);
-                          }}
+                        <View
                           style={{
-                            flex: 1,
                             flexDirection: "row",
                             alignItems: "center",
+                            justifyContent: "space-between",
                           }}
                         >
-                          <Text style={{ fontSize: 15, color: C.text }}>
-                            {btn.name || "(unnamed)"}
-                          </Text>
-                          {childCount > 0 && (
-                            <View
-                              style={{
-                                marginLeft: 8,
-                                backgroundColor: C.blue,
-                                borderRadius: 10,
-                                paddingHorizontal: 7,
-                                paddingVertical: 2,
-                              }}
-                            >
-                              <Text style={{ fontSize: 11, color: "white", fontWeight: "600" }}>
-                                {childCount}
-                              </Text>
-                            </View>
-                          )}
-                          {childCount > 0 && (
-                            <Text style={{ fontSize: 13, color: gray(0.4), marginLeft: 4 }}>
-                              {">"}
+                          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                            <Text style={{ fontSize: 15, color: C.text }}>
+                              {btn.name || "(unnamed)"}
                             </Text>
-                          )}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => onToggle(btn.id)}
-                          style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 6,
-                            borderRadius: 5,
-                            backgroundColor: isIn ? C.red : C.green,
-                          }}
-                        >
-                          <Text style={{ fontSize: 13, color: "white", fontWeight: "600" }}>
-                            {isIn ? "Remove" : "Add"}
-                          </Text>
-                        </TouchableOpacity>
+                            {hasChildren && (
+                              <TouchableOpacity
+                                onPress={() => toggleExpanded(btn.id)}
+                                style={{
+                                  marginLeft: 8,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  borderRadius: 4,
+                                  backgroundColor: isExpanded ? "rgb(245,166,35)" : gray(0.12),
+                                }}
+                              >
+                                <Text style={{ fontSize: 12, color: isExpanded ? "white" : gray(0.5) }}>
+                                  {isExpanded ? "\u25BC" : "\u25B6"}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => onToggle(btn.id)}
+                            style={{
+                              paddingHorizontal: 14,
+                              paddingVertical: 6,
+                              borderRadius: 5,
+                              backgroundColor: isIn ? C.red : C.green,
+                            }}
+                          >
+                            <Text style={{ fontSize: 13, color: "white", fontWeight: "600" }}>
+                              {isIn ? "Remove" : "Add"}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                        {isExpanded && (
+                          <SubMenuRow
+                            parentID={btn.id}
+                            itemID={itemID}
+                            quickButtons={quickButtons}
+                            onToggle={onToggle}
+                            expandedIDs={sExpandedIDs}
+                            toggleExpanded={toggleExpanded}
+                            depth={0}
+                          />
+                        )}
                       </View>
                     );
                   })
@@ -292,6 +289,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   const [sItem, _setItem] = useState(() => cloneDeep(item));
   const [sEditing, _setEditing] = useState(!!isNew);
   const [sShowQBPicker, _setShowQBPicker] = useState(false);
+  const [sShowQBSection, _setShowQBSection] = useState(true);
+  const [sShowAutoNote, _setShowAutoNote] = useState(true);
 
   // debounced inventory save
   const debouncedInvSaveRef = useRef(
@@ -340,17 +339,25 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   // ─── delete ────────────────────────────────────────────────────────────
 
   function handleDeleteItem() {
-    useLoginStore.getState().execute(() => {
-      // clean up auto customer note from settings
-      const autoNotes = useSettingsStore.getState().settings?.autoCustomerNoteTexts || [];
-      const filtered = autoNotes.filter((n) => n.inventoryItemID !== sItem.id);
-      if (filtered.length !== autoNotes.length) {
-        useSettingsStore.getState().setField("autoCustomerNoteTexts", filtered);
-      }
-      useInventoryStore.getState().removeItem(sItem);
-      dbDeleteInventoryItem(sItem.id);
-      handleExit();
-    }, "Admin");
+    showAlert({
+      title: "Delete Item",
+      message: `Are you sure you want to delete "${sItem.formalName || sItem.informalName || "this item"}"?`,
+      btn1Text: "Cancel",
+      btn2Text: "Delete",
+      handleBtn2Press: () => {
+        useLoginStore.getState().execute(() => {
+          // clean up auto customer note from settings
+          const autoNotes = useSettingsStore.getState().settings?.autoCustomerNoteTexts || [];
+          const filtered = autoNotes.filter((n) => n.inventoryItemID !== sItem.id);
+          if (filtered.length !== autoNotes.length) {
+            useSettingsStore.getState().setField("autoCustomerNoteTexts", filtered);
+          }
+          useInventoryStore.getState().removeItem(sItem);
+          dbDeleteInventoryItem(sItem.id);
+          handleExit();
+        }, "Admin");
+      },
+    });
   }
 
   // ─── auto customer note handler ─────────────────────────────────────────
@@ -460,20 +467,19 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
 
   // ─── main render ───────────────────────────────────────────────────────
 
-  const Component = useCallback(
-    () => (
-      <TouchableWithoutFeedback onPress={() => {}}>
-        <View
-          style={{
-            width: "55%",
-            height: "80%",
-            backgroundColor: "white",
-            borderRadius: 15,
-            padding: 20,
-            ...SHADOW_RADIUS_PROTO,
-            shadowOffset: { width: 3, height: 3 },
-          }}
-        >
+  const modalContent = (
+    <TouchableWithoutFeedback onPress={() => {}}>
+      <View
+        style={{
+          width: "55%",
+          height: "80%",
+          backgroundColor: "white",
+          borderRadius: 15,
+          padding: 20,
+          ...SHADOW_RADIUS_PROTO,
+          shadowOffset: { width: 3, height: 3 },
+        }}
+      >
           <LoginModalScreen modalVisible={zShowLoginScreen} />
 
           {/* HEADER */}
@@ -500,12 +506,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               >
                 <Image_
                   icon={ICONS.editPencil}
-                  size={20}
+                  size={30}
                   style={sEditing ? { tintColor: "white" } : {}}
                 />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleExit} style={{ padding: 6 }}>
-                <Image_ icon={ICONS.close1} size={18} />
               </TouchableOpacity>
             </View>
           </View>
@@ -516,7 +519,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           >
             {/* SECTION 1: Item Details */}
             {renderField("Catalog Name", "formalName")}
-            {renderField("Keyword/Short Name", "informalName")}
+            {renderField("Descriptive Name", "informalName")}
             {renderField("Brand", "brand")}
 
             {/* Category */}
@@ -563,148 +566,137 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
             </View>
 
             {/* DIVIDER */}
-            <View
-              style={{
-                width: "100%",
-                height: 1,
-                backgroundColor: gray(0.15),
-                marginTop: 22,
-                marginBottom: 4,
-              }}
-            />
-
             {/* SECTION 2: Quick Button Placement */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginTop: 20,
-                marginBottom: 6,
-              }}
-            >
-              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
-                Quick Button Placement
-              </Text>
+            <View style={{ marginTop: 20, borderWidth: 1, borderColor: gray(0.15), borderRadius: 10, backgroundColor: gray(0.03), padding: 12 }}>
               <TouchableOpacity
-                onPress={() => _setShowQBPicker(true)}
+                onPress={() => _setShowQBSection(!sShowQBSection)}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 5,
-                  backgroundColor: C.green,
                 }}
               >
-                <Text style={{ fontSize: 12, color: "white", fontWeight: "600" }}>
-                  Add to Quick Button
+                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                  Quick Button Placement
+                </Text>
+                <Text style={{ fontSize: 17, color: gray(0.4), marginLeft: 8 }}>
+                  {sShowQBSection ? "▲" : "▼"}
                 </Text>
               </TouchableOpacity>
-            </View>
-            {placements.length === 0 ? (
-              <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 6 }}>
-                Not assigned to any quick button menu
-              </Text>
-            ) : (
-              placements.map((p) => (
-                <View
-                  key={p.buttonID}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    paddingVertical: 5,
-                    paddingHorizontal: 8,
-                    marginBottom: 4,
-                    backgroundColor: gray(0.04),
-                    borderRadius: 6,
-                  }}
-                >
-                  <Text style={{ fontSize: 13, color: C.text }}>{p.path}</Text>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveFromButton(p.buttonID)}
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
-                      borderRadius: 4,
-                      backgroundColor: C.red,
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, color: "white", fontWeight: "600" }}>
-                      Remove
+              {sShowQBSection && (
+                <View style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 6 }}>
+                    <TouchableOpacity
+                      onPress={() => _setShowQBPicker(true)}
+                      style={{ padding: 4 }}
+                    >
+                      <Image_ icon={ICONS.add} size={40} style={{ tintColor: C.green }} />
+                    </TouchableOpacity>
+                  </View>
+                  {placements.length === 0 ? (
+                    <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 6 }}>
+                      Not assigned to any quick button menu
                     </Text>
-                  </TouchableOpacity>
+                  ) : (
+                    placements.map((p) => (
+                      <View
+                        key={p.buttonID}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          paddingVertical: 5,
+                          paddingHorizontal: 8,
+                          marginBottom: 4,
+                          backgroundColor: "white",
+                          borderRadius: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, color: C.text }}>{p.path}</Text>
+                        <TouchableOpacity
+                          onPress={() => handleRemoveFromButton(p.buttonID)}
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 4,
+                            backgroundColor: C.red,
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, color: "white", fontWeight: "600" }}>
+                            Remove
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  )}
                 </View>
-              ))
-            )}
+              )}
+            </View>
 
             {/* SECTION 3: Auto Customer Note */}
-            <View style={{ width: "100%", height: 1, backgroundColor: gray(0.15), marginTop: 22, marginBottom: 4 }} />
-            <Text style={{ fontSize: 15, fontWeight: "600", color: C.text, marginBottom: 2, marginTop: 10 }}>
-              Auto Customer Note
-            </Text>
-            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 6 }}>
-              When this item is added to a workorder, this note will automatically appear in Customer Notes.
-            </Text>
-            {sEditing ? (
-              <TextInput
-                style={{
-                  borderBottomWidth: 2,
-                  borderBottomColor: C.green,
-                  fontSize: 14,
-                  paddingVertical: 6,
-                  paddingHorizontal: 4,
-                  outlineWidth: 0,
-                  color: C.text,
-                  minHeight: 40,
-                }}
-                multiline={true}
-                value={sAutoNoteText}
-                onChangeText={handleAutoNoteChange}
-                placeholder="Leave empty for no auto-note"
-                placeholderTextColor={gray(0.3)}
-              />
-            ) : (
-              <Text style={{ fontSize: 14, color: sAutoNoteText ? C.text : gray(0.4) }}>
-                {sAutoNoteText || "None"}
-              </Text>
-            )}
-
-            {/* SECTION 4: Delete */}
-            <View style={{ marginTop: 30, marginBottom: 20, alignItems: "center" }}>
+            <View style={{ marginTop: 14, borderWidth: 1, borderColor: gray(0.15), borderRadius: 10, backgroundColor: gray(0.03), padding: 12 }}>
               <TouchableOpacity
-                onPress={handleDeleteItem}
+                onPress={() => _setShowAutoNote(!sShowAutoNote)}
                 style={{
-                  paddingHorizontal: 20,
-                  paddingVertical: 10,
-                  borderRadius: 6,
-                  backgroundColor: C.red,
+                  flexDirection: "row",
+                  alignItems: "center",
                 }}
               >
-                <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>
-                  Delete Item
+                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                  Auto Customer Note
+                </Text>
+                <Text style={{ fontSize: 17, color: gray(0.4), marginLeft: 8 }}>
+                  {sShowAutoNote ? "▲" : "▼"}
                 </Text>
               </TouchableOpacity>
+              {sShowAutoNote && (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 6 }}>
+                    When this item is added to a workorder, this note will automatically appear in Customer Notes.
+                  </Text>
+                  {sEditing ? (
+                    <TextInput
+                      style={{
+                        borderBottomWidth: 2,
+                        borderBottomColor: C.green,
+                        fontSize: 14,
+                        paddingVertical: 6,
+                        paddingHorizontal: 4,
+                        outlineWidth: 0,
+                        color: C.text,
+                        minHeight: 40,
+                      }}
+                      multiline={true}
+                      value={sAutoNoteText}
+                      onChangeText={handleAutoNoteChange}
+                      placeholder="Leave empty for no auto-note"
+                      placeholderTextColor={gray(0.3)}
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 14, color: sAutoNoteText ? C.text : gray(0.4) }}>
+                      {sAutoNoteText || "None"}
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
+
           </ScrollView>
-          <View style={{ alignItems: "flex-end", marginTop: 10 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+            <TouchableOpacity
+              onPress={handleDeleteItem}
+              style={{ padding: 6, borderRadius: 6 }}
+            >
+              <Image_ icon={ICONS.trash} size={40} />
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={handleExit}
-              style={{
-                paddingHorizontal: 20,
-                paddingVertical: 8,
-                borderRadius: 6,
-                backgroundColor: gray(0.15),
-              }}
+              style={{ padding: 6, borderRadius: 6 }}
             >
-              <Text style={{ fontSize: 14, color: C.text, fontWeight: "600" }}>Close</Text>
+              <Image_ icon={ICONS.close1} size={36} />
             </TouchableOpacity>
           </View>
         </View>
       </TouchableWithoutFeedback>
-    ),
-    [sItem, sEditing, quickButtons, zShowLoginScreen, sAutoNoteText]
   );
 
   return createPortal(
@@ -724,8 +716,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           alignItems: "center",
         }}
       >
-        <div onClick={(e) => e.stopPropagation()}>
-          <Component />
+        <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+          {modalContent}
         </div>
       </div>
       {sShowQBPicker && (

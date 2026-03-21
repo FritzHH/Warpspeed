@@ -2096,7 +2096,7 @@ function createPrintSale(sale = SALE_PROTO, customer, wo = WORKORDER_PROTO, sale
 export const printBuilder = {
   test: () => {
     return {
-      ...RECEIPT_CONSTS,
+      ...RECEIPT_PROTO,
       id: generateRandomID(),
       receiptType: RECEIPT_TYPES.test,
     };

@@ -548,7 +548,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             iconSize={34}
             disabled={isDonePaid}
             buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
-            onPress={() => useCheckoutStore.getState().setIsCheckingOut(true)}
+            onPress={() => useLoginStore.getState().requireLogin(() => useCheckoutStore.getState().setIsCheckingOut(true))}
           />
         </Tooltip>
       </View>

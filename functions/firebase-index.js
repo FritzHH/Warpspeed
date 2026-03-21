@@ -5057,7 +5057,9 @@ exports.lightspeedImportData = onCall(
           internalNotes,
           customerNotes,
           status,
-          taxFree: wo.tax === "false",
+          taxFree: wo.saleID && saleMap.has(wo.saleID)
+            ? (parseFloat(saleMap.get(wo.saleID).calcTax1 || "0") + parseFloat(saleMap.get(wo.saleID).calcTax2 || "0")) === 0
+            : false,
           archived: wo.archived === "true",
           _lsStatusName: lsStatusName, // temp field for sampling, removed before save
         });
@@ -5404,6 +5406,22 @@ exports.lightspeedImportData = onCall(
       const url = await uploadCSVToStorage(csv, path);
       await lsLog(JSON.stringify({ csvType: "salepayments", url, filename: "lightspeed_salepayments.csv", rowCount: rows.length }), "csv-download");
       await lsLog("Sale Payments CSV exported: " + rows.length + " rows", "success");
+    }
+
+    if (importType === "csv-employees") {
+      await lsLog("Fetching employees from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "Employee", {});
+      await lsLog("Fetched " + data.length + " employees. Building CSV...");
+      const headers = ["employeeID", "firstName", "lastName"];
+      const rows = data.map(e => [
+        e.employeeID, e.firstName || "", e.lastName || "",
+      ]);
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_employees.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "employees", url, filename: "lightspeed_employees.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Employees CSV exported: " + rows.length + " rows", "success");
     }
 
     if (importType === "csv-cccharges") {

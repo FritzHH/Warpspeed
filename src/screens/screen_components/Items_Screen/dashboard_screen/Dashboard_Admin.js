@@ -4305,7 +4305,7 @@ const ImportComponent = () => {
 
   async function loadAndCacheLightspeedData() {
     if (_lsCsvData) return _lsCsvData;
-    const [custText, woText, wiText, serText, itemsText, slText, salesText, spText, stripeText] = await Promise.all([
+    const [custText, woText, wiText, serText, itemsText, slText, salesText, spText, stripeText, empText] = await Promise.all([
       fetch("/lightspeed/customers.csv").then(r => r.text()),
       fetch("/lightspeed/workorders.csv").then(r => r.text()),
       fetch("/lightspeed/workorderItems.csv").then(r => r.text()),
@@ -4315,13 +4315,14 @@ const ImportComponent = () => {
       fetch("/lightspeed/sales.csv").then(r => r.text()),
       fetch("/lightspeed/salesPayments.csv").then(r => r.text()),
       fetch("/lightspeed/stripePayments.csv").then(r => r.text()),
+      fetch("/lightspeed/employees.csv").then(r => r.ok ? r.text() : "").catch(() => ""),
     ]);
     const customers = mapCustomers(custText);
     const customerMap = {};
     for (const c of customers) customerMap[c.id] = c;
     const settings = useSettingsStore.getState().settings;
     const statuses = settings?.statuses || [];
-    const workorders = mapWorkorders(woText, wiText, serText, itemsText, slText, customerMap, statuses);
+    const workorders = mapWorkorders(woText, wiText, serText, itemsText, slText, customerMap, statuses, empText, salesText);
     // Build workorderMap: lsSaleID → [mapped workorder objects]
     const workorderMap = {};
     for (const wo of workorders) {
@@ -4614,6 +4615,7 @@ const ImportComponent = () => {
             { type: "csv-sales", label: "Sales" },
             { type: "csv-salelines", label: "Sale Lines" },
             { type: "csv-salepayments", label: "Sale Payments" },
+            { type: "csv-employees", label: "Employees" },
             { type: "csv-cccharges", label: "CC Charges" },
           ].map((btn) => (
             <View key={btn.type} style={{ alignItems: "center", margin: 10 }}>

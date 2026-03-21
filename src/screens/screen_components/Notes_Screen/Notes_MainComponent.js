@@ -108,18 +108,20 @@ export function Notes_MainComponent() {
   }
 
   function deleteItem(item, index, option) {
-    let notesArr;
-    let fieldName;
-    if (option == "customer") {
-      notesArr = zCustomerNotes;
-      fieldName = "customerNotes";
-    } else {
-      notesArr = zInternalNotes;
-      fieldName = "internalNotes";
-    }
+    useLoginStore.getState().requireLogin(() => {
+      let notesArr;
+      let fieldName;
+      if (option == "customer") {
+        notesArr = zCustomerNotes;
+        fieldName = "customerNotes";
+      } else {
+        notesArr = zInternalNotes;
+        fieldName = "internalNotes";
+      }
 
-    notesArr = notesArr.filter((o) => o.id != item.id);
-    useOpenWorkordersStore.getState().setField(fieldName, notesArr);
+      notesArr = notesArr.filter((o) => o.id != item.id);
+      useOpenWorkordersStore.getState().setField(fieldName, notesArr);
+    });
   }
 
   function textChanged(value, index, option) {

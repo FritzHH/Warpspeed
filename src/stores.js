@@ -506,7 +506,7 @@ export const useLoginStore = create((set, get) => ({
   requireLogin: (callback) => {
     let lastEdit = get().lastEditMillis;
     let now = new Date().getTime();
-    let diffSeconds = (now - lastEdit) / 1000;
+    let diffSeconds = lastEdit === 0 ? 0 : (now - lastEdit) / 1000;
     let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
     let userObj = get().currentUser;
 
@@ -855,7 +855,9 @@ function formatFieldValue(fieldName, value) {
     let statuses = useSettingsStore.getState().settings?.statuses || [];
     return resolveStatus(value, statuses)?.label || value || "";
   }
+  if (fieldName === "waitTime") return value?.label || "";
   if (fieldName === "taxFree") return value ? "Yes" : "No";
+  if (value && typeof value === "object") return value.label || value.name || "";
   return String(value ?? "");
 }
 
@@ -887,7 +889,7 @@ function buildChangeLogEntries(workorder, fieldName, oldVal, newVal) {
 }
 
 function appendToChangeLog(workorder, fieldName, oldVal, newVal) {
-  if (fieldName === "changeLog") return null; // prevent recursion
+  if (!workorder || fieldName === "changeLog") return null; // prevent recursion / null guard
 
   if (CHANGELOG_TEXT_FIELDS.includes(fieldName)) {
     // debounced — capture original value, log after 2s of inactivity

@@ -896,6 +896,7 @@ export const SETTINGS_OBJ = {
     },
   },
   textTemplates: [],
+  autoCustomerNoteTexts: [],
   workorderTicketMessage: "Hi {firstName}, here is your workorder ticket for your {brand} {description}: {link}",
   saleReceiptMessage: "Hi {firstName}, here is your receipt: {link}",
   translateStarters: [

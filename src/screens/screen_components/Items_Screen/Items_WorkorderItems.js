@@ -143,10 +143,26 @@ export const Items_WorkorderItemsTab = ({}) => {
   ////////////////////////////////////////////////////////////////////////
   function deleteWorkorderLineItem(index) {
     useLoginStore.getState().requireLogin(() => {
+      let deletedLine = zOpenWorkorder.workorderLines[index];
       let workorderLines = zOpenWorkorder.workorderLines.filter(
         (o, idx) => idx != index
       );
       useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+
+      // remove auto customer note if no other line references the same item
+      if (deletedLine?.inventoryItem?.id) {
+        const itemID = deletedLine.inventoryItem.id;
+        const stillHasItem = workorderLines.some(
+          (line) => line.inventoryItem?.id === itemID
+        );
+        if (!stillHasItem) {
+          let customerNotes = zOpenWorkorder.customerNotes || [];
+          let filtered = customerNotes.filter((n) => n.autoNoteItemID !== itemID);
+          if (filtered.length !== customerNotes.length) {
+            useOpenWorkordersStore.getState().setField("customerNotes", filtered);
+          }
+        }
+      }
     });
   }
 

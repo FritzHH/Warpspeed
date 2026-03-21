@@ -78,6 +78,7 @@ export const DISPLAY_STATUS = {
   WINDOWED: "windowed",   // exited fullscreen (still open)
   VISIBLE: "visible",     // tab/window is visible
   HIDDEN: "hidden",       // tab/window is minimized or hidden
+  PING: "ping",           // main screen asking if display is open
 };
 
 let _statusChannel = null;

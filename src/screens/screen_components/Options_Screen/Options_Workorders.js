@@ -12,10 +12,11 @@ import {
 import { TabMenuDivider as Divider, CheckBox_ } from "../../../components";
 import { C, Colors } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { sortBy } from "lodash";
 import {
   useCurrentCustomerStore,
+  useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
@@ -172,13 +173,26 @@ export function WorkordersComponent({}) {
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zOpenWorkorderID = useOpenWorkordersStore((state) => state.openWorkorderID);
   const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
+  const zSettings = useSettingsStore((state) => state.settings);
 
   ///////////////////////////////////////////////////////////////////
 
   ///////////////////////////////////////////////////////////////////////////////////
-  const [sAllowPreview, _setAllowPreview] = useState(true);
+  let sAllowPreview = zCurrentUser?.preview !== false; // default true
   const exitTimerRef = useRef(null);
   const preHoverTabsRef = useRef(null);
+
+  function handleTogglePreview() {
+    if (!zCurrentUser) return;
+    let newVal = !sAllowPreview;
+    let userArr = (zSettings?.users || []).map((u) => {
+      if (u.id === zCurrentUser.id) return { ...u, preview: newVal };
+      return u;
+    });
+    useLoginStore.getState().setCurrentUser({ ...zCurrentUser, preview: newVal });
+    useSettingsStore.getState().setField("users", userArr);
+  }
 
   ///////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////
@@ -301,7 +315,7 @@ export function WorkordersComponent({}) {
       >
         <CheckBox_
           isChecked={sAllowPreview}
-          onCheck={() => _setAllowPreview(!sAllowPreview)}
+          onCheck={handleTogglePreview}
           viewStyle={{ alignSelf: "flex-end" }}
           text={"Preview On"}
           iconSize={10}

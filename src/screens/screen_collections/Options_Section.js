@@ -211,7 +211,9 @@ export const TabBar = ({
         )}
 
         {!!webcamDetected && (
-          <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
+          <View title="Camera on and identifying">
+            <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
+          </View>
         )}
         <View style={{ width: 5 }} />
         <Image_

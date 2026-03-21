@@ -178,37 +178,39 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleStartStandaloneSalePress() {
-    let store = useOpenWorkordersStore.getState();
-    store.setWorkorderPreviewID(null);
-    let existing = store.workorders.find((o) => o.isStandaloneSale);
+    useLoginStore.getState().requireLogin(() => {
+      let store = useOpenWorkordersStore.getState();
+      store.setWorkorderPreviewID(null);
+      let existing = store.workorders.find((o) => o.isStandaloneSale);
 
-    if (existing) {
-      let elapsed = Date.now() - (existing.lastInteractionMillis || existing.startedOnMillis || 0);
-      if (elapsed > 5 * 60 * 1000) {
-        store.removeWorkorder(existing.id);
-      } else {
-        store.setOpenWorkorderID(existing.id);
-        useTabNamesStore.getState().setItems({
-          infoTabName: TAB_NAMES.infoTab.checkout,
-          itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-          optionsTabName: TAB_NAMES.optionsTab.inventory,
-        });
-        return;
+      if (existing) {
+        let elapsed = Date.now() - (existing.lastInteractionMillis || existing.startedOnMillis || 0);
+        if (elapsed > 5 * 60 * 1000) {
+          store.removeWorkorder(existing.id);
+        } else {
+          store.setOpenWorkorderID(existing.id);
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.checkout,
+            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+            optionsTabName: TAB_NAMES.optionsTab.inventory,
+          });
+          return;
+        }
       }
-    }
 
-    let wo = createNewWorkorder({
-      startedByFirst: useLoginStore.getState().currentUser?.first,
-      startedByLast: useLoginStore.getState().currentUser?.last,
-      isStandaloneSale: true,
-    });
+      let wo = createNewWorkorder({
+        startedByFirst: useLoginStore.getState().currentUser?.first,
+        startedByLast: useLoginStore.getState().currentUser?.last,
+        isStandaloneSale: true,
+      });
 
-    useOpenWorkordersStore.getState().setWorkorder(wo);
-    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
-    useTabNamesStore.getState().setItems({
-      infoTabName: TAB_NAMES.infoTab.checkout,
-      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-      optionsTabName: TAB_NAMES.optionsTab.inventory,
+      useOpenWorkordersStore.getState().setWorkorder(wo);
+      useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.checkout,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+        optionsTabName: TAB_NAMES.optionsTab.inventory,
+      });
     });
   }
 
@@ -219,36 +221,36 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleCreateNewCustomerPressed() {
-    // first create new customer
-    let newCustomer = cloneDeep(sCustomerInfo);
-    newCustomer.id = generateUPCBarcode();
-    newCustomer.millisCreated = new Date().getTime();
+    useLoginStore.getState().requireLogin(() => {
+      // first create new customer
+      let newCustomer = cloneDeep(sCustomerInfo);
+      newCustomer.id = generateUPCBarcode();
+      newCustomer.millisCreated = new Date().getTime();
 
-    // next create new empty workorder for automatic population of next screen
-    let newWorkorder = createNewWorkorder({
-      customerID: newCustomer.id,
-      customerFirst: newCustomer.first,
-      customerLast: newCustomer.last,
-      customerPhone: newCustomer.cell || newCustomer.landline,
-      startedByFirst: useLoginStore.getCurrentUser().first,
-      startedByLast: useLoginStore.getCurrentUser().last,
-      status: SETTINGS_OBJ.statuses[0]?.id || "",
+      // next create new empty workorder for automatic population of next screen
+      let newWorkorder = createNewWorkorder({
+        customerID: newCustomer.id,
+        customerFirst: newCustomer.first,
+        customerLast: newCustomer.last,
+        customerPhone: newCustomer.cell || newCustomer.landline,
+        startedByFirst: useLoginStore.getCurrentUser().first,
+        startedByLast: useLoginStore.getCurrentUser().last,
+        status: SETTINGS_OBJ.statuses[0]?.id || "",
+      });
+
+      // add in the newly created workorder to the customer's file
+      newCustomer.workorders.push(newWorkorder.id);
+      _setCustomerInfo(newCustomer);
+      useCurrentCustomerStore.getState().setCustomer(newCustomer);
+      useOpenWorkordersStore.getState().setWorkorder(newWorkorder, false)
+      useOpenWorkordersStore.getState().setOpenWorkorderID(newWorkorder.id)
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.workorder,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+        optionsTabName: TAB_NAMES.optionsTab.inventory,
+      });
+      useCustomerSearchStore.getState().reset();
     });
-
-    // add in the newly created workorder to the customer's file
-    newCustomer.workorders.push(newWorkorder.id);
-    _setCustomerInfo(newCustomer);
-    useCurrentCustomerStore.getState().setCustomer(newCustomer);
-    useOpenWorkordersStore.getState().setWorkorder(newWorkorder, false)
-    useOpenWorkordersStore.getState().setOpenWorkorderID(newWorkorder.id)
-    useTabNamesStore.getState().setItems({
-      infoTabName: TAB_NAMES.infoTab.workorder,
-      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-      optionsTabName: TAB_NAMES.optionsTab.inventory,
-    });
-    useCustomerSearchStore.getState().reset();
-
-
   }
 
   //////////////////////////////////////////////////////////////////////

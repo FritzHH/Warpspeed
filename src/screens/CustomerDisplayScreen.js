@@ -7,6 +7,7 @@ import {
   onTranslateMessage,
   TRANSLATE_MSG_TYPES,
   broadcastDisplayStatus,
+  onDisplayStatusMessage,
   DISPLAY_STATUS,
 } from "../broadcastChannel";
 import { formatCurrencyDisp, formatPhoneForDisplay, gray } from "../utils";
@@ -435,6 +436,14 @@ export function CustomerDisplayScreen() {
     function handleBeforeUnload() {
       broadcastDisplayStatus(DISPLAY_STATUS.CLOSED);
     }
+    // Respond to PING from main screen
+    let unsubStatus = onDisplayStatusMessage((msg) => {
+      if (msg.status === DISPLAY_STATUS.PING) {
+        broadcastDisplayStatus(
+          document.visibilityState === "visible" ? DISPLAY_STATUS.VISIBLE : DISPLAY_STATUS.HIDDEN
+        );
+      }
+    });
     // Broadcast that display window is open
     broadcastDisplayStatus(DISPLAY_STATUS.OPEN);
     window.addEventListener("resize", handleResize);
@@ -444,6 +453,7 @@ export function CustomerDisplayScreen() {
     return () => {
       unsubDisplay();
       unsubTranslate();
+      unsubStatus();
       window.removeEventListener("resize", handleResize);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);

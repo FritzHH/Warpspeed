@@ -178,32 +178,34 @@ export function MessagesComponent({}) {
 
   async function sendMessage(text) {
     if (!text || !text.trim()) return;
-    let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-    let msg = { ...SMS_PROTO };
-    msg.message = text;
-    msg.phoneNumber = zCustomer.cell;
-    msg.firstName = zCustomer.first;
-    msg.lastName = zCustomer.last;
-    msg.canRespond = sCanRespond ? new Date().getTime() : null;
-    msg.millis = new Date().getTime();
-    msg.customerID = zCustomer.id;
-    msg.id = generateRandomID();
-    msg.type = "outgoing";
-    msg.senderUserObj = zCurrentUserObj;
-    _setNewMessage("");
-    _setCanRespond(false);
-    clearTranslation();
-    let result = await smsService.send(msg);
-    if (!result.success) {
-      useAlertScreenStore.getState().setValues({
-        title: "Message Failed",
-        message: result.error || "Failed to send message",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
-      });
-    }
+    useLoginStore.getState().requireLogin(async () => {
+      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+      let msg = { ...SMS_PROTO };
+      msg.message = text;
+      msg.phoneNumber = zCustomer.cell;
+      msg.firstName = zCustomer.first;
+      msg.lastName = zCustomer.last;
+      msg.canRespond = sCanRespond ? new Date().getTime() : null;
+      msg.millis = new Date().getTime();
+      msg.customerID = zCustomer.id;
+      msg.id = generateRandomID();
+      msg.type = "outgoing";
+      msg.senderUserObj = zCurrentUserObj;
+      _setNewMessage("");
+      _setCanRespond(false);
+      clearTranslation();
+      let result = await smsService.send(msg);
+      if (!result.success) {
+        useAlertScreenStore.getState().setValues({
+          title: "Message Failed",
+          message: result.error || "Failed to send message",
+          btn1Text: "OK",
+          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+          showAlert: true,
+          canExitOnOuterClick: true,
+        });
+      }
+    });
   }
   function resolveTemplate(templateMessage) {
     if (!templateMessage) return "";
@@ -241,67 +243,71 @@ export function MessagesComponent({}) {
   }
   async function handleSendWorkorderTicket() {
     if (!zWorkorderObj || !zCustomer?.cell) return;
-    let { tenantID, storeID } = useSettingsStore.getState().getSettings();
-    let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, zSettings?.salesTaxPercent);
-    let { generateWorkorderTicketPDF } = await import("../../../pdfGenerator");
-    let base64 = generateWorkorderTicketPDF(receiptData);
-    let storagePath = build_db_path.cloudStorage.workorderTicketPDF(zWorkorderObj.id, tenantID, storeID);
-    let messageTemplate = zSettings?.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
-    let message = resolveTemplate(messageTemplate);
-    let messageID = generateRandomID();
-    let result = await dbUploadPDFAndSendSMS({
-      base64,
-      storagePath,
-      message,
-      phoneNumber: zCustomer.cell,
-      customerID: zCustomer.id,
-      messageID,
-    });
-    if (result && result.success) {
-      sendMessage(message.replace(/\{link\}/g, "[PDF link]"));
-    } else {
-      useAlertScreenStore.getState().setValues({
-        title: "Workorder Send Failed",
-        message: result?.error || "Failed to upload and send workorder ticket",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
+    useLoginStore.getState().requireLogin(async () => {
+      let { tenantID, storeID } = useSettingsStore.getState().getSettings();
+      let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, zSettings?.salesTaxPercent);
+      let { generateWorkorderTicketPDF } = await import("../../../pdfGenerator");
+      let base64 = generateWorkorderTicketPDF(receiptData);
+      let storagePath = build_db_path.cloudStorage.workorderTicketPDF(zWorkorderObj.id, tenantID, storeID);
+      let messageTemplate = zSettings?.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
+      let message = resolveTemplate(messageTemplate);
+      let messageID = generateRandomID();
+      let result = await dbUploadPDFAndSendSMS({
+        base64,
+        storagePath,
+        message,
+        phoneNumber: zCustomer.cell,
+        customerID: zCustomer.id,
+        messageID,
       });
-    }
+      if (result && result.success) {
+        sendMessage(message.replace(/\{link\}/g, "[PDF link]"));
+      } else {
+        useAlertScreenStore.getState().setValues({
+          title: "Workorder Send Failed",
+          message: result?.error || "Failed to upload and send workorder ticket",
+          btn1Text: "OK",
+          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+          showAlert: true,
+          canExitOnOuterClick: true,
+        });
+      }
+    });
   }
 
   async function handleSendSaleReceipt() {
     if (!zWorkorderObj || !zCustomer?.cell) return;
-    let { tenantID, storeID } = useSettingsStore.getState().getSettings();
-    let sale = zWorkorderObj;
-    let receiptData = printBuilder.sale(sale, sale.payments || [], zCustomer, zWorkorderObj, zSettings?.salesTaxPercent);
-    let { generateSaleReceiptPDF } = await import("../../../pdfGenerator");
-    let base64 = generateSaleReceiptPDF(receiptData);
-    let storagePath = build_db_path.cloudStorage.saleReceiptPDF(zWorkorderObj.id, tenantID, storeID);
-    let messageTemplate = zSettings?.saleReceiptMessage || "Hi {firstName}, here is your receipt: {link}";
-    let message = resolveTemplate(messageTemplate);
-    let messageID = generateRandomID();
-    let result = await dbUploadPDFAndSendSMS({
-      base64,
-      storagePath,
-      message,
-      phoneNumber: zCustomer.cell,
-      customerID: zCustomer.id,
-      messageID,
-    });
-    if (result && result.success) {
-      sendMessage(message.replace(/\{link\}/g, "[PDF link]"));
-    } else {
-      useAlertScreenStore.getState().setValues({
-        title: "Receipt Send Failed",
-        message: result?.error || "Failed to upload and send receipt",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
+    useLoginStore.getState().requireLogin(async () => {
+      let { tenantID, storeID } = useSettingsStore.getState().getSettings();
+      let sale = zWorkorderObj;
+      let receiptData = printBuilder.sale(sale, sale.payments || [], zCustomer, zWorkorderObj, zSettings?.salesTaxPercent);
+      let { generateSaleReceiptPDF } = await import("../../../pdfGenerator");
+      let base64 = generateSaleReceiptPDF(receiptData);
+      let storagePath = build_db_path.cloudStorage.saleReceiptPDF(zWorkorderObj.id, tenantID, storeID);
+      let messageTemplate = zSettings?.saleReceiptMessage || "Hi {firstName}, here is your receipt: {link}";
+      let message = resolveTemplate(messageTemplate);
+      let messageID = generateRandomID();
+      let result = await dbUploadPDFAndSendSMS({
+        base64,
+        storagePath,
+        message,
+        phoneNumber: zCustomer.cell,
+        customerID: zCustomer.id,
+        messageID,
       });
-    }
+      if (result && result.success) {
+        sendMessage(message.replace(/\{link\}/g, "[PDF link]"));
+      } else {
+        useAlertScreenStore.getState().setValues({
+          title: "Receipt Send Failed",
+          message: result?.error || "Failed to upload and send receipt",
+          btn1Text: "OK",
+          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+          showAlert: true,
+          canExitOnOuterClick: true,
+        });
+      }
+    });
   }
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////

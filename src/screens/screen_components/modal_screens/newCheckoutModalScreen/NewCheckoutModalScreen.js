@@ -22,6 +22,7 @@ import {
   gray,
   replaceOrAddToArr,
   formatPhoneWithDashes,
+  formatPhoneForDisplay,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS } from "../../../../data";
 import {
@@ -161,6 +162,7 @@ export function NewCheckoutModalScreen() {
     let sale = createNewSale(zSettings, createdBy);
 
     if (zOpenWorkorder) {
+      console.log("WORKORDER FIELDS:", JSON.stringify(zOpenWorkorder, null, 2));
       // Checkout with workorder
       sale.customerID = zOpenWorkorder.customerID || "";
       let combined = [cloneDeep(zOpenWorkorder)];
@@ -525,7 +527,7 @@ export function NewCheckoutModalScreen() {
                         }}
                       >
                         <View>
-                          <Text style={{ color: C.text }}>
+                          <Text style={{ color: C.text, textTransform: "uppercase" }}>
                             {zCustomer.first} {zCustomer.last}
                             {!!zCustomer.contactRestriction && (
                               <Text style={{ color: C.red }}>
@@ -545,13 +547,13 @@ export function NewCheckoutModalScreen() {
                           {!!zCustomer.cell && (
                             <Text style={{ color: C.text }}>
                               <Text>{"cell: "}</Text>
-                              {formatPhoneWithDashes(zCustomer.cell)}
+                              {formatPhoneForDisplay(zCustomer.cell)}
                             </Text>
                           )}
                           {!!zCustomer.land && (
                             <Text style={{ color: C.text, fontSize: 13 }}>
                               <Text>{"land: "}</Text>
-                              {formatPhoneWithDashes(zCustomer.land)}
+                              {formatPhoneForDisplay(zCustomer.land)}
                             </Text>
                           )}
                         </View>

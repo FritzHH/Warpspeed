@@ -211,6 +211,27 @@ export function InventoryComponent({}) {
       useOpenWorkordersStore
         .getState()
         .setField("workorderLines", workorderLines);
+
+      // auto customer note
+      const autoNoteTexts = useSettingsStore.getState().settings?.autoCustomerNoteTexts || [];
+      const autoNote = autoNoteTexts.find((n) => n.inventoryItemID === item.id);
+      if (autoNote && autoNote.text) {
+        let customerNotes = openWorkorder.customerNotes || [];
+        const alreadyHasNote = customerNotes.some((n) => n.autoNoteItemID === item.id);
+        if (!alreadyHasNote) {
+          customerNotes = [
+            ...customerNotes,
+            {
+              name: "(Auto)",
+              userID: "",
+              value: autoNote.text,
+              id: generateRandomID(),
+              autoNoteItemID: item.id,
+            },
+          ];
+          useOpenWorkordersStore.getState().setField("customerNotes", customerNotes);
+        }
+      }
     });
   }
 
@@ -288,6 +309,7 @@ export function InventoryComponent({}) {
           useColorGradient={false}
         />
         <TextInput_
+          autoFocus={true}
           style={{
             borderBottomWidth: 1,
             borderBottomColor: gray(0.2),

@@ -114,37 +114,39 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleStartStandaloneSalePress() {
-    let store = useOpenWorkordersStore.getState();
-    store.setWorkorderPreviewID(null);
-    let existing = store.workorders.find((o) => o.isStandaloneSale);
+    useLoginStore.getState().requireLogin(() => {
+      let store = useOpenWorkordersStore.getState();
+      store.setWorkorderPreviewID(null);
+      let existing = store.workorders.find((o) => o.isStandaloneSale);
 
-    if (existing) {
-      let elapsed = Date.now() - (existing.lastInteractionMillis || existing.startedOnMillis || 0);
-      if (elapsed > 5 * 60 * 1000) {
-        store.removeWorkorder(existing.id);
-      } else {
-        store.setOpenWorkorderID(existing.id);
-        useTabNamesStore.getState().setItems({
-          infoTabName: TAB_NAMES.infoTab.checkout,
-          itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-          optionsTabName: TAB_NAMES.optionsTab.inventory,
-        });
-        return;
+      if (existing) {
+        let elapsed = Date.now() - (existing.lastInteractionMillis || existing.startedOnMillis || 0);
+        if (elapsed > 5 * 60 * 1000) {
+          store.removeWorkorder(existing.id);
+        } else {
+          store.setOpenWorkorderID(existing.id);
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.checkout,
+            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+            optionsTabName: TAB_NAMES.optionsTab.inventory,
+          });
+          return;
+        }
       }
-    }
 
-    let wo = cloneDeep(WORKORDER_PROTO);
-    wo.isStandaloneSale = true;
-    wo.id = generateUPCBarcode();
-    wo.startedBy = useLoginStore.getState().currentUser?.id;
-    wo.startedOnMillis = new Date().getTime();
+      let wo = cloneDeep(WORKORDER_PROTO);
+      wo.isStandaloneSale = true;
+      wo.id = generateUPCBarcode();
+      wo.startedBy = useLoginStore.getState().currentUser?.id;
+      wo.startedOnMillis = new Date().getTime();
 
-    useOpenWorkordersStore.getState().setWorkorder(wo);
-    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
-    useTabNamesStore.getState().setItems({
-      infoTabName: TAB_NAMES.infoTab.checkout,
-      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-      optionsTabName: TAB_NAMES.optionsTab.inventory,
+      useOpenWorkordersStore.getState().setWorkorder(wo);
+      useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.checkout,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+        optionsTabName: TAB_NAMES.optionsTab.inventory,
+      });
     });
   }
 

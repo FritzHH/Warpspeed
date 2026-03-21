@@ -942,11 +942,12 @@ export const InventoryItemScreeenModalComponent = ({
     useInvModalStore.getState().setFocus(focusName);
     _setItem(item);
 
-    if (!sNewItem)
-      // useLoginStore.getState().execute(() => {
-      useInventoryStore.getState().modItem(item, "change");
-    dbSaveInventoryItem(item);
-    // }, PRIVILEDGE_LEVELS.superUser);
+    if (!sNewItem) {
+      useLoginStore.getState().requireLogin(() => {
+        useInventoryStore.getState().modItem(item, "change");
+        dbSaveInventoryItem(item);
+      });
+    }
   }
 
   function handleQuickButtonRemove(qBItemToRemove, objIdx) {

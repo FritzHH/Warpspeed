@@ -28,6 +28,7 @@ import {
 } from "../stores";
 import {
   onDisplayStatusMessage,
+  broadcastDisplayStatus,
   DISPLAY_STATUS,
 } from "../broadcastChannel";
 import { FaceDetectionClientComponent } from "../faceDetectionClient";
@@ -107,6 +108,8 @@ export function BaseScreen() {
         if (wo) broadcastWorkorderToDisplay(wo);
       }
     });
+    // Ping to discover if display is already open
+    broadcastDisplayStatus(DISPLAY_STATUS.PING);
     return () => unsub();
   }, []);
 

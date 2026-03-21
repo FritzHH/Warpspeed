@@ -81,9 +81,9 @@ export function calculateSaleTotals(combinedWorkorders, addedItems, settings) {
 
   // Calculate base totals — pass 0 tax to calculateRunningTotals
   // so we can handle tax ourselves per-workorder.
+  let totalSubtotal = 0;
   let taxFreeTotal = 0;
   let taxableTotal = 0;
-  let totalSubtotal = 0;
   let totalDiscount = 0;
   let totalQty = 0;
 

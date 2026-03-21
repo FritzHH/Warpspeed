@@ -307,6 +307,17 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     }, 500)
   );
 
+  // auto customer note
+  const zAutoNoteTexts = zSettingsObj?.autoCustomerNoteTexts || [];
+  const [sAutoNoteText, _setAutoNoteText] = useState(
+    () => zAutoNoteTexts.find((n) => n.inventoryItemID === item.id)?.text || ""
+  );
+  const debouncedAutoNoteSaveRef = useRef(
+    debounce((updatedArr) => {
+      useSettingsStore.getState().setField("autoCustomerNoteTexts", updatedArr);
+    }, 500)
+  );
+
   // ─── field change handler ──────────────────────────────────────────────
 
   function handleFieldChange(fieldName, value) {
@@ -330,10 +341,38 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
 
   function handleDeleteItem() {
     useLoginStore.getState().execute(() => {
+      // clean up auto customer note from settings
+      const autoNotes = useSettingsStore.getState().settings?.autoCustomerNoteTexts || [];
+      const filtered = autoNotes.filter((n) => n.inventoryItemID !== sItem.id);
+      if (filtered.length !== autoNotes.length) {
+        useSettingsStore.getState().setField("autoCustomerNoteTexts", filtered);
+      }
       useInventoryStore.getState().removeItem(sItem);
       dbDeleteInventoryItem(sItem.id);
       handleExit();
     }, "Admin");
+  }
+
+  // ─── auto customer note handler ─────────────────────────────────────────
+
+  function handleAutoNoteChange(text) {
+    _setAutoNoteText(text);
+    let updatedArr = [...zAutoNoteTexts];
+    if (!text || text.trim() === "") {
+      updatedArr = updatedArr.filter((n) => n.inventoryItemID !== sItem.id);
+    } else {
+      let idx = updatedArr.findIndex((n) => n.inventoryItemID === sItem.id);
+      if (idx >= 0) {
+        updatedArr[idx] = { ...updatedArr[idx], text: text };
+      } else {
+        updatedArr.push({
+          inventoryItemID: sItem.id,
+          text: text,
+        });
+      }
+    }
+    useSettingsStore.getState().setField("autoCustomerNoteTexts", updatedArr, false);
+    debouncedAutoNoteSaveRef.current(updatedArr);
   }
 
   // ─── quick button helpers ──────────────────────────────────────────────
@@ -600,7 +639,39 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               ))
             )}
 
-            {/* SECTION 3: Delete */}
+            {/* SECTION 3: Auto Customer Note */}
+            <View style={{ width: "100%", height: 1, backgroundColor: gray(0.15), marginTop: 22, marginBottom: 4 }} />
+            <Text style={{ fontSize: 15, fontWeight: "600", color: C.text, marginBottom: 2, marginTop: 10 }}>
+              Auto Customer Note
+            </Text>
+            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 6 }}>
+              When this item is added to a workorder, this note will automatically appear in Customer Notes.
+            </Text>
+            {sEditing ? (
+              <TextInput
+                style={{
+                  borderBottomWidth: 2,
+                  borderBottomColor: C.green,
+                  fontSize: 14,
+                  paddingVertical: 6,
+                  paddingHorizontal: 4,
+                  outlineWidth: 0,
+                  color: C.text,
+                  minHeight: 40,
+                }}
+                multiline={true}
+                value={sAutoNoteText}
+                onChangeText={handleAutoNoteChange}
+                placeholder="Leave empty for no auto-note"
+                placeholderTextColor={gray(0.3)}
+              />
+            ) : (
+              <Text style={{ fontSize: 14, color: sAutoNoteText ? C.text : gray(0.4) }}>
+                {sAutoNoteText || "None"}
+              </Text>
+            )}
+
+            {/* SECTION 4: Delete */}
             <View style={{ marginTop: 30, marginBottom: 20, alignItems: "center" }}>
               <TouchableOpacity
                 onPress={handleDeleteItem}
@@ -633,7 +704,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
         </View>
       </TouchableWithoutFeedback>
     ),
-    [sItem, sEditing, quickButtons, zShowLoginScreen]
+    [sItem, sEditing, quickButtons, zShowLoginScreen, sAutoNoteText]
   );
 
   return createPortal(

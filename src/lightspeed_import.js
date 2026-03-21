@@ -279,13 +279,37 @@ export function mapWorkorders(
   itemsCSVText,
   salesLinesCSVText,
   customerMap,       // { lsCustomerID → customer object } (from mapCustomers output)
-  warpspeedStatuses  // array of status objects from settings
+  warpspeedStatuses, // array of status objects from settings
+  employeesCSVText,  // optional — employees.csv text for note author names
+  salesCSVText       // optional — sales.csv text for taxFree detection
 ) {
   const woRows = parseCSV(workorderCSVText);
   const wiRows = parseCSV(workorderItemsCSVText);
   const serRows = parseCSV(serializedCSVText);
   const itemRows = parseCSV(itemsCSVText);
   const slRows = parseCSV(salesLinesCSVText);
+
+  // employeeMap: employeeID → "First Last"
+  const employeeMap = {};
+  if (employeesCSVText) {
+    const empRows = parseCSV(employeesCSVText);
+    for (const row of empRows) {
+      if (row.employeeID) {
+        const first = (row.firstName || "").trim();
+        const last = (row.lastName || "").trim();
+        employeeMap[row.employeeID] = (first + " " + last).trim() || "Lightspeed Import";
+      }
+    }
+  }
+
+  // saleMap: saleID → sale row (for taxFree detection via calcTax1/calcTax2)
+  const saleMap = {};
+  if (salesCSVText) {
+    const saleRows = parseCSV(salesCSVText);
+    for (const row of saleRows) {
+      if (row.saleID) saleMap[row.saleID] = row;
+    }
+  }
 
   // --- Build lookup maps ---
 
@@ -361,12 +385,13 @@ export function mapWorkorders(
     const isFinished = statusLabel.includes("finished") || statusLabel === "done & paid" || statusLabel === "sales bonus";
     const finishedOnMillis = isFinished && wo.timeStamp ? new Date(wo.timeStamp).getTime() : "";
 
-    // Notes
+    // Notes — use employee name if available, otherwise fall back to "Lightspeed Import"
+    const noteName = employeeMap[wo.employeeID] || "Lightspeed Import";
     const customerNotes = [];
     if (wo.note && wo.note.trim()) {
       customerNotes.push({
         id: generateRandomID(),
-        name: "Lightspeed Import",
+        name: noteName,
         userID: "",
         value: sanitize(wo.note.trim()),
       });
@@ -376,7 +401,7 @@ export function mapWorkorders(
     if (wo.internalNote && wo.internalNote.trim()) {
       internalNotes.push({
         id: generateRandomID(),
-        name: "Lightspeed Import",
+        name: noteName,
         userID: "",
         value: sanitize(wo.internalNote.trim()),
       });
@@ -473,7 +498,9 @@ export function mapWorkorders(
       color1,
       color2: { ...EMPTY_COLOR },
       status: status.id,
-      taxFree: wo.tax === "false",
+      taxFree: wo.saleID && saleMap[wo.saleID]
+        ? (parseFloat(saleMap[wo.saleID].calcTax1 || "0") + parseFloat(saleMap[wo.saleID].calcTax2 || "0")) === 0
+        : false,
       archived: wo.archived === "true",
       startedBy: wo.employeeID || "",
       startedOnMillis,

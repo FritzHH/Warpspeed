@@ -2920,7 +2920,7 @@ export const StatusPickerModal = ({
             style={{
               width: "100%",
               height: "100%",
-              backgroundColor: "rgba(0,0,0,0.3)",
+              backgroundColor: "transparent",
             }}
           >
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>

@@ -322,6 +322,8 @@ export const SALE_PROTO = {
   workorderIDs: [],
   payments: [],
   refunds: [],
+  textToPay: false,
+  checkoutSessionID: "",
 };
 
 export const SALE_INDEX_PROTO = {

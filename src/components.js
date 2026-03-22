@@ -2778,5 +2778,189 @@ export const Tooltip = ({
   );
 };
 
+const StatusPickerRow = ({ status, idx, total, onPress }) => {
+  const [sHovered, _setHovered] = useState(false);
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onMouseEnter={() => _setHovered(true)}
+      onMouseLeave={() => _setHovered(false)}
+      style={{
+        height: 40,
+        justifyContent: "center",
+        paddingHorizontal: 10,
+        backgroundColor: status.backgroundColor || C.listItemWhite,
+        borderBottomWidth: idx < total - 1 ? 1 : 0,
+        borderBottomColor: "rgba(0,0,0,0.08)",
+        opacity: sHovered ? 0.8 : 1,
+      }}
+    >
+      <Text
+        style={{
+          color: status.textColor || C.text,
+          fontSize: 13,
+          fontWeight: "500",
+        }}
+        numberOfLines={1}
+      >
+        {status.label}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
+/**
+ * StatusPickerModal — reusable status selector with colored rows.
+ * Opens a modal list of statuses, grows to fill viewport, scrolls overflow.
+ * Uses fade-in / slide-out animation matching ScreenModal.
+ *
+ * Props:
+ *   statuses       — array of status objects ({ id, label, backgroundColor, textColor })
+ *   onSelect       — (statusObj) => void
+ *   enabled        — boolean, default true
+ *   buttonText     — string shown on the trigger button
+ *   buttonStyle    — override trigger button style
+ *   buttonTextStyle — override trigger button text style
+ *   modalCoordX    — horizontal offset from button (default 0)
+ *   modalCoordY    — vertical offset from button (default 30)
+ */
+export const StatusPickerModal = ({
+  statuses = [],
+  onSelect = () => {},
+  enabled = true,
+  buttonText = "+ Status",
+  buttonStyle: buttonStyleProp = {},
+  buttonTextStyle: buttonTextStyleProp = {},
+  modalCoordX = 0,
+  modalCoordY = 30,
+}) => {
+  const [sVisible, _setVisible] = useState(false);
+  const [sAnimation, _setAnimation] = useState("fade");
+  const [sCoords, _setCoords] = useState({ x: 0, y: 0, height: 0 });
+  const ref = useRef();
+
+  useEffect(() => {
+    if (sVisible) {
+      _setAnimation("fade");
+    } else {
+      _setAnimation("slide");
+    }
+  }, [sVisible]);
+
+  useEffect(() => {
+    const el = ref?.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      _setCoords({ x: rect.x, y: rect.y, height: rect.height });
+    }
+  }, [ref]);
+
+  const MENU_WIDTH = 320;
+  const ITEM_HEIGHT = 40;
+  const VIEWPORT_PADDING = 10;
+  const anchorLeft = sCoords.x + modalCoordX;
+  const buttonCenterY = sCoords.y + (sCoords.height || 25) / 2;
+  const listHeight = Math.min(
+    statuses.length * ITEM_HEIGHT,
+    window.innerHeight - VIEWPORT_PADDING * 2
+  );
+  const anchorTop = Math.max(
+    VIEWPORT_PADDING,
+    Math.min(
+      buttonCenterY - listHeight / 2,
+      window.innerHeight - listHeight - VIEWPORT_PADDING
+    )
+  );
+  const maxHeight = listHeight;
+
+  const defaultButtonStyle = {
+    backgroundColor: C.buttonLightGreen,
+    borderColor: C.buttonLightGreenOutline,
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    height: 25,
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
+  const defaultTextStyle = {
+    fontSize: 12,
+    color: C.text,
+    fontWeight: "500",
+  };
+
+  return (
+    <View ref={ref}>
+      <TouchableOpacity
+        onPress={() => {
+          if (!enabled) return;
+          const el = ref?.current;
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            _setCoords({ x: rect.x, y: rect.y, height: rect.height });
+          }
+          _setVisible(true);
+        }}
+        style={{ ...defaultButtonStyle, ...buttonStyleProp }}
+      >
+        <Text style={{ ...defaultTextStyle, ...buttonTextStyleProp }}>
+          {buttonText}
+        </Text>
+      </TouchableOpacity>
+
+      <Modal
+        animationType={sAnimation}
+        visible={sVisible}
+        transparent
+      >
+        <TouchableWithoutFeedback onPress={() => _setVisible(false)}>
+          <View
+            style={{
+              width: "100%",
+              height: "100%",
+              backgroundColor: "rgba(0,0,0,0.3)",
+            }}
+          >
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View
+                style={{
+                  position: "absolute",
+                  top: anchorTop,
+                  left: anchorLeft,
+                  width: MENU_WIDTH,
+                  maxHeight,
+                  borderRadius: 5,
+                  overflow: "hidden",
+                  backgroundColor: "#FFFFFF",
+                }}
+              >
+                <ScrollView
+                  style={{ maxHeight }}
+                  showsVerticalScrollIndicator={true}
+                >
+                  {statuses.map((status, idx) => (
+                    <StatusPickerRow
+                      key={status.id || idx}
+                      status={status}
+                      idx={idx}
+                      total={statuses.length}
+                      onPress={() => {
+                        onSelect(status);
+                        _setVisible(false);
+                      }}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
+  );
+};
+
 // Export ProtectedRoute for routing
 export { ProtectedRoute } from "./components/ProtectedRoute";

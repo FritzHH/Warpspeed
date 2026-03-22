@@ -54,6 +54,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     },
     deepEqual
   );
+  const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
 
   // Fix 3: deepEqual prevents re-renders from unrelated inventory changes
   const zInventoryArr = useInventoryStore((state) => state.inventoryArr, deepEqual);
@@ -366,6 +367,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       style={{
         flex: 1,
         justifyContent: "center",
+        backgroundColor: zIsPreview ? lightenRGBByPercent(C.lightred, 80) : undefined,
       }}
     >
       {isDonePaid && (

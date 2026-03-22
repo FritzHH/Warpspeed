@@ -13,29 +13,42 @@ import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import {
-  dbLoginUser,
   onAuthStateChange,
-  dbGetSettings,
-  dbGetTenantById,
+  loadTenantAndSettings,
+  dbLogout,
 } from "./db_calls_wrapper";
 import { log } from "./utils";
-import { useSettingsStore, useLayoutStore } from "./stores";
+import { useLayoutStore } from "./stores";
 import { ROUTES } from "./routes";
+import { BUILD_VERSION } from "./buildVersion";
 
 // Re-export ROUTES for backward compatibility
 export { ROUTES };
 
-// Development auto-login credentials
-const DEVELOPMENT_AUTO_LOGIN = {
-  enabled: true,
-  email: "fritz@bonitabikes.com",
-  password: "BonitaBikes.1236",
+// Auto-update: force reload when a newer version is deployed.
+// Runs on page load, tab refocus, and every 5 minutes.
+const checkForAppUpdate = async () => {
+  try {
+    const res = await fetch("/version.json?t=" + Date.now());
+    const { version } = await res.json();
+    if (version && version !== BUILD_VERSION) {
+      window.location.reload();
+    }
+  } catch (e) {
+    // Network error — skip silently
+  }
 };
+checkForAppUpdate();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") checkForAppUpdate();
+});
+setInterval(checkForAppUpdate, 5 * 60 * 1000);
 
 /////////////////////////////////////
 function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionError, setSessionError] = useState("");
   const setIsMobile = useLayoutStore((state) => state.setIsMobile);
   const isMobile = useLayoutStore((state) => state.isMobile);
 
@@ -75,62 +88,30 @@ function App() {
   }, [setIsMobile]);
 
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        if (DEVELOPMENT_AUTO_LOGIN.enabled) {
-          // Auto-login for development
-          // console.log("Auto-logging in for development...");
-          const loginResult = await dbLoginUser(
-            DEVELOPMENT_AUTO_LOGIN.email,
-            DEVELOPMENT_AUTO_LOGIN.password
-          );
-
-          if (loginResult.success) {
-            console.log(
-              "Auto-login successful, loading initial data:",
-              loginResult.user.email
-            );
-            dbGetTenantById(loginResult.user.uid).then((res) => {
-              // log("tenatn", res);
-              dbGetSettings(res.tenantID, res.storeID).then((settings) => {
-                // log("settings", settings);
-                useSettingsStore.getState().setSettings(settings, false, false);
-                // log("initial data loaded, heading to Main");
-                setUser(loginResult.user);
-                setIsLoading(false);
-              });
-            });
-          } else {
-            throw new Error("Auto-login failed");
-          }
-        } else {
-          // Listen for authentication state changes
-          const unsubscribe = onAuthStateChange((user) => {
-            setUser(user);
-            setIsLoading(false);
+    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          await loadTenantAndSettings(firebaseUser.uid);
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            emailVerified: firebaseUser.emailVerified,
+            displayName: firebaseUser.displayName,
           });
-
-          return () => unsubscribe();
+        } catch (error) {
+          console.error("Failed to load tenant/settings:", error);
+          setSessionError("Your session has expired. Please sign in again.");
+          await dbLogout();
+          setUser(null);
         }
-      } catch (error) {
-        console.error("Auto-login error:", error);
-        setIsLoading(false);
-        // Fall back to normal auth flow on error
-        const unsubscribe = onAuthStateChange((user) => {
-          setUser(user);
-          setIsLoading(false);
-        });
-
-        return () => unsubscribe();
+      } else {
+        setUser(null);
       }
-    };
+      setIsLoading(false);
+    });
 
-    initializeApp();
+    return () => unsubscribe();
   }, []);
-
-  const handleLoginSuccess = (user) => {
-    setUser(user);
-  };
 
   if (isLoading) {
     return (
@@ -166,7 +147,7 @@ function App() {
             user ? (
               <Navigate to={ROUTES.dashboard} replace />
             ) : (
-              <LoginScreen onLoginSuccess={handleLoginSuccess} />
+              <LoginScreen sessionError={sessionError} onClearError={() => setSessionError("")} />
             )
           }
         />

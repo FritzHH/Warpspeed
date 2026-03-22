@@ -3,17 +3,24 @@ import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { Button_, Image_ } from "../../../components";
+import { Button_, Image_, CheckBox_ } from "../../../components";
 import { gray, generateRandomID, log } from "../../../utils";
 import {
   useOpenWorkordersStore,
   useAlertScreenStore,
   useLayoutStore,
+  useCurrentCustomerStore,
+  useSettingsStore,
+  useLoginStore,
 } from "../../../stores";
 import {
   dbUploadWorkorderMedia,
   dbDeleteWorkorderMedia,
+  dbSendEmail,
 } from "../../../db_calls_wrapper";
+import { smsService } from "../../../data_service_modules";
+import { SMS_PROTO } from "../../../data";
+import { cloneDeep } from "lodash";
 
 export const WorkorderMediaModal = ({
   visible,
@@ -30,9 +37,131 @@ export const WorkorderMediaModal = ({
   const [sUploading, _setUploading] = useState(false);
   const [sUploadMsg, _setUploadMsg] = useState("");
   const [sFullView, _setFullView] = useState(null); // media item for full-size overlay
+  const [sSelectedIds, _setSelectedIds] = useState(new Set());
+  const [sSending, _setSending] = useState(false);
   const fileInputRef = useRef(null);
 
   if (!visible) return null;
+
+  const zCustomer = useCurrentCustomerStore.getState().customer;
+  const zSettings = useSettingsStore.getState().settings;
+  const storeName = zSettings?.storeInfo?.displayName || "Our store";
+  const hasCell = !!zCustomer?.cell?.length;
+  const hasEmail = !!zCustomer?.email?.length;
+
+  function toggleSelection(itemId) {
+    _setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  async function handleSendMedia() {
+    const selectedItems = zMedia.filter((m) => sSelectedIds.has(m.id));
+    if (!selectedItems.length) return;
+    if (!hasCell && !hasEmail) return;
+
+    _setSending(true);
+
+    const hasImages = selectedItems.some((m) => m.type === "image");
+    const hasVideos = selectedItems.some((m) => m.type === "video");
+    let noun = hasImages && hasVideos
+      ? "photo(s) and video(s)"
+      : hasImages
+        ? selectedItems.filter((m) => m.type === "image").length === 1 ? "photo" : "photos"
+        : selectedItems.filter((m) => m.type === "video").length === 1 ? "video" : "videos";
+
+    const links = selectedItems.map((m) => m.url).join("\n");
+    const messageText = `${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:\n\n${links}`;
+
+    let smsSuccess = false;
+    let emailSuccess = false;
+
+    // Send SMS
+    if (hasCell) {
+      let msg = cloneDeep(SMS_PROTO);
+      msg.message = messageText;
+      msg.phoneNumber = zCustomer.cell;
+      msg.firstName = zCustomer.first || "";
+      msg.lastName = zCustomer.last || "";
+      msg.canRespond = new Date().getTime();
+      msg.millis = new Date().getTime();
+      msg.customerID = zCustomer.id || "";
+      msg.id = generateRandomID();
+      msg.type = "outgoing";
+      msg.senderUserObj = useLoginStore.getState().currentUser || "";
+
+      let result = await smsService.send(msg);
+      smsSuccess = result.success;
+      if (smsSuccess) {
+        // Flag all customer workorders so the sender's list prioritizes them
+        let senderUser = useLoginStore.getState().currentUser;
+        let allWOs = useOpenWorkordersStore.getState().workorders;
+        allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
+          useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", senderUser?.id || "", wo.id);
+        });
+      }
+    }
+
+    // Send Email
+    if (hasEmail) {
+      const linksHtml = selectedItems
+        .map((m) => {
+          const label = m.type === "video" ? "View Video" : "View Photo";
+          return `<p><a href="${m.url}">${label}: ${m.filename}</a></p>`;
+        })
+        .join("");
+      const htmlBody = `<p>${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:</p>${linksHtml}`;
+      const subject = `Media from ${storeName}`;
+
+      let result = await dbSendEmail(zCustomer.email, subject, htmlBody);
+      emailSuccess = result.success;
+    }
+
+    // Update sentToCustomer metadata on each selected media item
+    if (smsSuccess || emailSuccess) {
+      const updatedMedia = zMedia.map((m) => {
+        if (!sSelectedIds.has(m.id)) return m;
+        return {
+          ...m,
+          sentToCustomer: {
+            sms: smsSuccess || !!(m.sentToCustomer?.sms),
+            email: emailSuccess || !!(m.sentToCustomer?.email),
+            sentAt: Date.now(),
+          },
+        };
+      });
+      useOpenWorkordersStore
+        .getState()
+        .setField("media", updatedMedia, workorderID);
+      _setSelectedIds(new Set());
+    }
+
+    _setSending(false);
+
+    // Show result alert
+    let resultParts = [];
+    if (smsSuccess) resultParts.push("SMS");
+    if (emailSuccess) resultParts.push("Email");
+    let failParts = [];
+    if (hasCell && !smsSuccess) failParts.push("SMS");
+    if (hasEmail && !emailSuccess) failParts.push("Email");
+
+    let alertMsg = "";
+    if (resultParts.length) alertMsg += `Sent via ${resultParts.join(" & ")}.`;
+    if (failParts.length) alertMsg += `${alertMsg ? " " : ""}Failed to send via ${failParts.join(" & ")}.`;
+
+    useAlertScreenStore.getState().setValues({
+      title: "Send Media",
+      message: alertMsg,
+      btn1Text: "OK",
+      handleBtn1Press: () => {
+        useAlertScreenStore.getState().setValues({ showAlert: false });
+      },
+    });
+  }
 
   async function handleFilesSelected(e) {
     const files = Array.from(e.target.files);
@@ -85,6 +214,7 @@ export const WorkorderMediaModal = ({
   }
 
   const MODAL_WIDTH = isMobile ? "95%" : 600;
+  const selectedCount = sSelectedIds.size;
 
   // Full-size overlay
   if (sFullView) {
@@ -280,57 +410,96 @@ export const WorkorderMediaModal = ({
                 gap: 8,
               }}
             >
-              {zMedia.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => _setFullView(item)}
-                  style={{
-                    width: isMobile ? "31%" : 120,
-                    height: isMobile ? 100 : 120,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: gray(0.85),
-                    overflow: "hidden",
-                    backgroundColor: gray(0.95),
-                  }}
-                >
-                  {item.type === "video" ? (
-                    <View
+              {zMedia.map((item) => {
+                const isSelected = sSelectedIds.has(item.id);
+                const wasSent = !!(item.sentToCustomer?.sms || item.sentToCustomer?.email);
+                return (
+                  <View
+                    key={item.id}
+                    style={{
+                      width: isMobile ? "31%" : 120,
+                      height: isMobile ? 100 : 120,
+                      borderRadius: 8,
+                      borderWidth: isSelected ? 2 : 1,
+                      borderColor: isSelected ? C.green : gray(0.85),
+                      overflow: "hidden",
+                      backgroundColor: gray(0.95),
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => _setFullView(item)}
+                      style={{ flex: 1 }}
+                    >
+                      {item.type === "video" ? (
+                        <View
+                          style={{
+                            flex: 1,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            backgroundColor: gray(0.2),
+                          }}
+                        >
+                          <Text style={{ color: "white", fontSize: 28 }}>
+                            ▶
+                          </Text>
+                          <Text
+                            style={{ color: "white", fontSize: 10, marginTop: 2 }}
+                            numberOfLines={1}
+                          >
+                            {item.filename}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Image
+                          source={{ uri: item.thumbnailUrl || item.url }}
+                          style={{ width: "100%", height: "100%" }}
+                          resizeMode="cover"
+                        />
+                      )}
+                    </TouchableOpacity>
+
+                    {/* Selection checkbox — top-left */}
+                    <TouchableOpacity
+                      onPress={() => toggleSelection(item.id)}
                       style={{
-                        flex: 1,
+                        position: "absolute",
+                        top: 4,
+                        left: 4,
+                        width: 24,
+                        height: 24,
+                        borderRadius: 4,
+                        backgroundColor: "rgba(255,255,255,0.85)",
                         justifyContent: "center",
                         alignItems: "center",
-                        backgroundColor: gray(0.2),
                       }}
                     >
-                      <Text
+                      <Image_
+                        icon={isSelected ? ICONS.checkbox : ICONS.checkoxEmpty}
+                        size={16}
+                      />
+                    </TouchableOpacity>
+
+                    {/* Sent badge — bottom-right */}
+                    {wasSent && (
+                      <View
                         style={{
-                          color: "white",
-                          fontSize: 28,
+                          position: "absolute",
+                          bottom: 4,
+                          right: 4,
+                          backgroundColor: C.green,
+                          borderRadius: 4,
+                          paddingHorizontal: 5,
+                          paddingVertical: 2,
                         }}
                       >
-                        ▶
-                      </Text>
-                      <Text
-                        style={{
-                          color: "white",
-                          fontSize: 10,
-                          marginTop: 2,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {item.filename}
-                      </Text>
-                    </View>
-                  ) : (
-                    <Image
-                      source={{ uri: item.thumbnailUrl || item.url }}
-                      style={{ width: "100%", height: "100%" }}
-                      resizeMode="cover"
-                    />
-                  )}
-                </TouchableOpacity>
-              ))}
+                        <Text style={{ color: "white", fontSize: 9, fontWeight: "600" }}>
+                          Sent
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           ) : (
             <Text
@@ -345,6 +514,42 @@ export const WorkorderMediaModal = ({
             </Text>
           )}
         </ScrollView>
+
+        {/* Footer — Send Media button */}
+        {zMedia.length > 0 && (hasCell || hasEmail) && (
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              padding: 12,
+              borderTopWidth: 1,
+              borderTopColor: gray(0.9),
+              gap: 10,
+            }}
+          >
+            {selectedCount > 0 && (
+              <Text style={{ color: C.lightText, fontSize: 13 }}>
+                {selectedCount} selected
+              </Text>
+            )}
+            <Button_
+              text={sSending ? "Sending..." : "Send Media"}
+              colorGradientArr={COLOR_GRADIENTS.green}
+              icon={ICONS.paperPlane}
+              iconSize={16}
+              onPress={handleSendMedia}
+              enabled={selectedCount > 0 && !sSending}
+              buttonStyle={{
+                paddingHorizontal: 20,
+                paddingVertical: 10,
+                borderRadius: 8,
+                opacity: selectedCount > 0 && !sSending ? 1 : 0.4,
+              }}
+              textStyle={{ fontSize: 14, fontWeight: "500" }}
+            />
+          </View>
+        )}
       </div>
     </div>,
     document.body

@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { generateRandomID, log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage } from "./utils";
+import { generateRandomID, log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage, localStorageWrapper } from "./utils";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
@@ -30,6 +30,7 @@ import {
   uploadFileToStorage,
   storageDelete,
   uploadPDFAndSendSMS,
+  rehydrateFromArchiveCallable,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
 import { useSettingsStore, useLoginStore } from "./stores";
@@ -2253,6 +2254,48 @@ export function dbListenToPaymentReaderUpdates(
 }
 
 // auth /////////////////////////////////////////////////////////////////////////////////
+
+const TENANT_CACHE_KEY = "warpspeed_tenant";
+
+/**
+ * Load tenant info and settings for a Firebase user.
+ * Uses localStorage cache for instant restore on persisted sessions,
+ * falls back to Firestore query on cache miss.
+ * @param {string} uid - Firebase Auth user UID
+ * @returns {Promise<Object>} { tenantID, storeID, settings }
+ */
+export async function loadTenantAndSettings(uid) {
+  // 1. Try localStorage cache first for instant restore
+  const cached = localStorageWrapper.getItem(TENANT_CACHE_KEY);
+  if (cached?.tenantID && cached?.storeID) {
+    const settings = await dbGetSettings(cached.tenantID, cached.storeID);
+    if (settings) {
+      useSettingsStore.getState().setSettings(settings, false, false);
+      return { tenantID: cached.tenantID, storeID: cached.storeID, settings };
+    }
+  }
+
+  // 2. Cache miss or stale — fetch tenant from Firestore
+  const tenant = await dbGetTenantById(uid);
+  if (!tenant?.tenantID || !tenant?.storeID) {
+    throw new Error("User is not associated with any tenant/store");
+  }
+
+  const settings = await dbGetSettings(tenant.tenantID, tenant.storeID);
+  if (!settings) {
+    throw new Error("Settings not found for tenant/store");
+  }
+
+  // 3. Cache for next restore & populate store
+  localStorageWrapper.setItem(TENANT_CACHE_KEY, {
+    tenantID: tenant.tenantID,
+    storeID: tenant.storeID,
+  });
+  useSettingsStore.getState().setSettings(settings, false, false);
+
+  return { tenantID: tenant.tenantID, storeID: tenant.storeID, settings };
+}
+
 /**
  * Login user with email and password using Firebase Cloud Function
  * @param {string} email - User email
@@ -2304,22 +2347,12 @@ export async function dbLoginUser(email, password, options = {}) {
  * @returns {Promise<Object>} Sign out result
  */
 export async function dbLogout(options = {}) {
-  const signOutFromAuth = true;
-
   try {
     log("Starting sign out process");
-
-    // Sign out from Firebase Auth if requested
-    if (signOutFromAuth) {
-      await authSignOut();
-    }
-
+    localStorageWrapper.removeItem(TENANT_CACHE_KEY);
+    await authSignOut();
     log("Sign out successful");
-
-    return {
-      success: true,
-      message: "User signed out successfully",
-    };
+    return { success: true, message: "User signed out successfully" };
   } catch (error) {
     log("Sign out failed:", error);
     throw error;
@@ -3080,5 +3113,25 @@ export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phon
   } catch (error) {
     log("Error in dbUploadPDFAndSendSMS:", error);
     return { success: false, error: error.message || "Failed to upload PDF and send SMS" };
+  }
+}
+
+/**
+ * Emergency rehydration — restores Firestore collections from Cloud Storage archives.
+ * @param {string[]} collections - Array of collection names to restore
+ * @returns {Promise<Object>} { success, results: { collectionName: { success, docCount } } }
+ */
+export async function dbRehydrateFromArchive(collections) {
+  const { tenantID, storeID } = getTenantAndStore();
+  try {
+    const result = await rehydrateFromArchiveCallable({
+      tenantID,
+      storeID,
+      collections,
+    });
+    return result.data;
+  } catch (error) {
+    log("Error in dbRehydrateFromArchive:", error);
+    return { success: false, error: error.message || "Rehydration failed" };
   }
 }

@@ -208,10 +208,13 @@ export const APP_USER = {
   id: "",
   permissions: "",
   phone: "",
+  email: "",
   pin: "",
   faceDescriptor: "",
   hourlyWage: "",
   preview: true,
+  forwardSMS: false,
+  statuses: [/*status id's go in here*/],
 };
 
 export const TIME_PUNCH_PROTO = {
@@ -306,6 +309,7 @@ export const REFUND_PROTO = {
 
 export const SALE_PROTO = {
   id: "",
+  barcode: "",
   millis: "",
   subtotal: 0,
   discount: 0,
@@ -346,6 +350,7 @@ export const SALE_INDEX_PROTO = {
 // workorder stuff ////////////////////////////////////////////////////
 export const WORKORDER_PROTO = {
   workorderNumber: "",
+  hasNewSMS: false,
   paymentComplete: false,
   amountPaid: 0,
   activeSaleID: "",
@@ -378,6 +383,8 @@ export const WORKORDER_PROTO = {
   finishedOnMillis: "",
   partOrdered: "",
   partSource: "",
+  partOrderEstimateMillis: "",
+  partOrderedMillis: "",
   workorderLines: [],
   internalNotes: [],
   customerNotes: [],
@@ -873,6 +880,10 @@ export const SETTINGS_OBJ = {
   selectedCardReaderObj: {
     label: "Front Right Desk",
     id: "tmr_GFKNEgYkwcsIFF",
+  },
+  defaultPayrollTimeFrame: {
+    "begin": 'lastFriday',
+    "end": 'thisThursday',
   },
   autoConnectToCardReader: "true",
   amazonExtension: {

@@ -40,6 +40,7 @@ export function NewWorkorderComponent({}) {
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
   const [buttonVisible, setButtonVisible] = React.useState(false);
   const searchTimerRef = useRef(null);
+  const containerRef = useRef(null);
 
   // dev ////////////////////////////////////
   useEffect(() => {
@@ -274,6 +275,11 @@ export function NewWorkorderComponent({}) {
   //////////////////////////////////////////////////////////////////////
   return (
     <View
+      ref={containerRef}
+      onMouseEnter={() => {
+        let input = containerRef.current?.querySelector("input");
+        if (input) input.focus();
+      }}
       style={{
         width: "100%",
         height: "100%",

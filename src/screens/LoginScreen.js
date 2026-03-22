@@ -1,18 +1,14 @@
 /* eslint-disable */
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native-web";
-import { useNavigate } from "react-router-dom";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
-import { sendPasswordReset } from "../db_calls_wrapper";
-import { dbLoginUser } from "../db_calls_wrapper";
-import { ROUTES } from "../routes";
+import { sendPasswordReset, dbLoginUser } from "../db_calls_wrapper";
 
-export function LoginScreen({ onLoginSuccess }) {
-  const navigate = useNavigate();
+export function LoginScreen({ sessionError, onClearError }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(sessionError || "");
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -22,16 +18,14 @@ export function LoginScreen({ onLoginSuccess }) {
 
     setIsLoading(true);
     setError("");
+    if (onClearError) onClearError();
 
     try {
       const result = await dbLoginUser(email, password);
-      if (result.success) {
-        // The settings have already been set in the Zustand store
-        // Pass the user data to the success callback
-        onLoginSuccess(result.user);
-        // Navigate to dashboard
-        navigate(ROUTES.dashboard);
+      if (!result.success) {
+        setError("Login failed. Please try again.");
       }
+      // onAuthStateChanged in App.js handles tenant/settings load + navigation
     } catch (error) {
       setError(getErrorMessage(error.message || error.code));
     } finally {

@@ -12,6 +12,7 @@ const { isArray } = require("lodash");
 const nodemailer = require("nodemailer");
 const { onInit } = require("firebase-functions/v2/core");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const fetch = require("node-fetch");
 
 // Firebase Admin SDK - initialize once at module load (don't delete/recreate)
@@ -1662,6 +1663,92 @@ exports.incomingSMSEnhanced = onRequest(
         return response
           .status(200)
           .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      // ============================================================================
+      // STEP 6: FLAG WORKORDERS & FORWARD SMS
+      // ============================================================================
+
+      try {
+        // 6a: Set hasNewSMS on all open workorders for this customer
+        const woQuery = await db
+          .collection("tenants")
+          .doc(tenantID)
+          .collection("stores")
+          .doc(storeID)
+          .collection("open-workorders")
+          .where("customerID", "==", customerData.id)
+          .get();
+
+        if (!woQuery.empty) {
+          const batch = db.batch();
+          woQuery.docs.forEach((doc) => {
+            batch.update(doc.ref, { hasNewSMS: true, lastSMSSenderUserID: "" });
+          });
+          await batch.commit();
+          log("Flagged workorders with hasNewSMS", {
+            count: woQuery.size,
+            customerID: customerData.id,
+          });
+        }
+
+        // 6b: Forward SMS to last sender if they have forwardSMS enabled
+        const lastOutgoing = await db
+          .collection("customer_phone")
+          .doc(normalizedPhone)
+          .collection("messages")
+          .where("type", "==", "outgoing")
+          .orderBy("millis", "desc")
+          .limit(1)
+          .get();
+
+        if (!lastOutgoing.empty) {
+          const lastMsg = lastOutgoing.docs[0].data();
+          const senderID = lastMsg.senderUserObj?.id;
+
+          if (senderID) {
+            // Fetch settings to get current user data
+            const settingsSnap = await db
+              .collection("tenants")
+              .doc(tenantID)
+              .collection("stores")
+              .doc(storeID)
+              .collection("settings")
+              .doc("settings")
+              .get();
+            const settings = settingsSnap.exists ? settingsSnap.data() : {};
+            const users = settings.users || [];
+            const senderUser = users.find((u) => u.id === senderID);
+
+            if (senderUser && senderUser.forwardSMS && senderUser.phone) {
+              // Lazy-init Twilio client if needed
+              if (!twilioClient) {
+                twilioClient = require("twilio")(
+                  twilioSecretAccountNumber.value(),
+                  twilioSecretKey.value()
+                );
+              }
+
+              const forwardBody = `New SMS from ${customerData.first || ""} ${customerData.last || ""}: ${incomingMessage}`;
+              await twilioClient.messages.create({
+                body: forwardBody,
+                to: `+1${senderUser.phone}`,
+                from: twilioData.To || "+12393171234",
+              });
+
+              log("Forwarded SMS to staff user", {
+                userID: senderID,
+                userName: `${senderUser.first} ${senderUser.last}`,
+              });
+            }
+          }
+        }
+      } catch (step6Error) {
+        // Non-blocking — don't fail the incoming SMS response
+        log("Error in STEP 6 (flag/forward)", {
+          error: step6Error.message,
+          customerID: customerData.id,
+        });
       }
 
       // ============================================================================
@@ -5834,5 +5921,382 @@ exports.translateTextCallable = onCall(
         "Failed to translate text: " + (error.message || "Unknown error")
       );
     }
+  }
+);
+
+// ============================================================================
+// NIGHTLY ARCHIVE & CLEANUP
+// ============================================================================
+
+const ARCHIVE_COLLECTIONS = [
+  "completed-workorders",
+  "completed-sales",
+  "customers",
+  "sales-index",
+];
+
+/**
+ * Archive all documents in a collection to Cloud Storage as a JSON file.
+ * Returns { success, docCount, error? } for each collection.
+ */
+async function archiveTenantStore(db, bucket, tenantID, storeID) {
+  const results = {};
+
+  for (const collectionName of ARCHIVE_COLLECTIONS) {
+    try {
+      const snapshot = await db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection(collectionName)
+        .get();
+
+      const docs = snapshot.docs.map((doc) => ({
+        _firestoreDocID: doc.id,
+        ...doc.data(),
+      }));
+
+      const jsonString = JSON.stringify(docs);
+      const storagePath = `${tenantID}/${storeID}/archives/${collectionName}/latest.json`;
+      const file = bucket.file(storagePath);
+
+      await file.save(jsonString, {
+        contentType: "application/json",
+        resumable: false,
+        metadata: {
+          customMetadata: {
+            archivedAt: new Date().toISOString(),
+            docCount: String(docs.length),
+            tenantID,
+            storeID,
+          },
+        },
+      });
+
+      results[collectionName] = { success: true, docCount: docs.length };
+      log(
+        "nightlyArchive: Archived " + collectionName,
+        { tenantID, storeID, docCount: docs.length, path: storagePath }
+      );
+    } catch (err) {
+      log(
+        "nightlyArchive: Error archiving " + collectionName + " for " + tenantID + "/" + storeID,
+        err.message
+      );
+      results[collectionName] = { success: false, docCount: 0, error: err.message };
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Delete Cloud Storage media files on completed workorders older than 3 months.
+ * Clears the media array on the Firestore doc after deleting files.
+ * Returns { success, workordersProcessed, mediaFilesDeleted, error? }.
+ */
+async function cleanupOldMedia(db, bucket, tenantID, storeID) {
+  const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+  const cutoffMillis = Date.now() - THREE_MONTHS_MS;
+
+  try {
+    const snapshot = await db
+      .collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .collection("completed-workorders")
+      .where("endedOnMillis", "<", cutoffMillis)
+      .get();
+
+    let deletedMediaCount = 0;
+    let processedWoCount = 0;
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const media = data.media;
+
+      if (!media || !Array.isArray(media) || media.length === 0) continue;
+
+      processedWoCount++;
+
+      for (const item of media) {
+        if (item.storagePath) {
+          try {
+            await bucket.file(item.storagePath).delete();
+            deletedMediaCount++;
+          } catch (err) {
+            if (err.code !== 404) {
+              log("nightlyArchive: Error deleting media file", {
+                path: item.storagePath,
+                error: err.message,
+              });
+            }
+          }
+        }
+
+        if (item.thumbnailStoragePath) {
+          try {
+            await bucket.file(item.thumbnailStoragePath).delete();
+          } catch (err) {
+            // skip — not critical
+          }
+        }
+      }
+
+      await doc.ref.update({ media: [] });
+    }
+
+    if (processedWoCount > 0) {
+      log("nightlyArchive: Media cleanup complete", {
+        tenantID,
+        storeID,
+        workordersProcessed: processedWoCount,
+        mediaFilesDeleted: deletedMediaCount,
+      });
+    }
+
+    return {
+      success: true,
+      workordersProcessed: processedWoCount,
+      mediaFilesDeleted: deletedMediaCount,
+    };
+  } catch (err) {
+    log("nightlyArchive: Error in media cleanup for " + tenantID + "/" + storeID, err.message);
+    return { success: false, workordersProcessed: 0, mediaFilesDeleted: 0, error: err.message };
+  }
+}
+
+/**
+ * Nightly scheduled function — runs at 1:00 AM Eastern every day.
+ * Archives 4 Firestore collections to Cloud Storage and cleans up old media.
+ * Writes an audit log document per tenant/store.
+ */
+exports.nightlyArchiveAndCleanup = onSchedule(
+  {
+    schedule: "0 1 * * *",
+    timeZone: "America/New_York",
+    secrets: [firebaseServiceAccountKey],
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async (event) => {
+    log("nightlyArchiveAndCleanup: Starting nightly archive run");
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const bucket = admin
+      .storage()
+      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+
+    let tenantsSnapshot;
+    try {
+      tenantsSnapshot = await db.collection("tenants").get();
+    } catch (err) {
+      log("nightlyArchive: Failed to enumerate tenants", err.message);
+      return;
+    }
+
+    if (tenantsSnapshot.empty) {
+      log("nightlyArchive: No tenants found, exiting");
+      return;
+    }
+
+    for (const tenantDoc of tenantsSnapshot.docs) {
+      const tenantID = tenantDoc.id;
+      let storesSnapshot;
+
+      try {
+        storesSnapshot = await db
+          .collection("tenants")
+          .doc(tenantID)
+          .collection("stores")
+          .get();
+      } catch (err) {
+        log("nightlyArchive: Error fetching stores for tenant " + tenantID, err.message);
+        continue;
+      }
+
+      for (const storeDoc of storesSnapshot.docs) {
+        const storeID = storeDoc.id;
+
+        try {
+          const archiveResults = await archiveTenantStore(db, bucket, tenantID, storeID);
+          const mediaResults = await cleanupOldMedia(db, bucket, tenantID, storeID);
+
+          // Write audit log
+          const now = Date.now();
+          const dateStr = new Date(now).toISOString().split("T")[0];
+          await db
+            .collection("tenants")
+            .doc(tenantID)
+            .collection("stores")
+            .doc(storeID)
+            .collection("archive-logs")
+            .doc(String(now))
+            .set({
+              millis: now,
+              date: dateStr,
+              type: "nightly-archive",
+              archive: archiveResults,
+              mediaCleanup: mediaResults,
+            });
+
+          log("nightlyArchive: Completed " + tenantID + "/" + storeID, {
+            archive: archiveResults,
+            mediaCleanup: mediaResults,
+          });
+        } catch (err) {
+          log(
+            "nightlyArchive: Error processing " + tenantID + "/" + storeID,
+            err.message
+          );
+        }
+      }
+    }
+
+    log("nightlyArchiveAndCleanup: Nightly archive run complete");
+  }
+);
+
+/**
+ * Emergency rehydration — restores Firestore collections from Cloud Storage archives.
+ * Called from the app by admin users in case of database corruption.
+ */
+exports.rehydrateFromArchive = onCall(
+  {
+    secrets: [firebaseServiceAccountKey],
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async (request) => {
+    log("rehydrateFromArchive: Request received", request.data);
+
+    const { tenantID, storeID, collections } = request.data;
+
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new HttpsError("invalid-argument", "tenantID is required");
+    }
+    if (!storeID || typeof storeID !== "string") {
+      throw new HttpsError("invalid-argument", "storeID is required");
+    }
+    if (!collections || !Array.isArray(collections) || collections.length === 0) {
+      throw new HttpsError("invalid-argument", "collections must be a non-empty array");
+    }
+
+    for (const c of collections) {
+      if (!ARCHIVE_COLLECTIONS.includes(c)) {
+        throw new HttpsError("invalid-argument", "Invalid collection name: " + c);
+      }
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const bucket = admin
+      .storage()
+      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+
+    const results = {};
+
+    for (const collectionName of collections) {
+      try {
+        const storagePath = `${tenantID}/${storeID}/archives/${collectionName}/latest.json`;
+        const file = bucket.file(storagePath);
+
+        const [exists] = await file.exists();
+        if (!exists) {
+          results[collectionName] = {
+            success: false,
+            error: "Archive file not found",
+            docCount: 0,
+          };
+          continue;
+        }
+
+        const [buffer] = await file.download();
+        const docs = JSON.parse(buffer.toString("utf8"));
+
+        if (!Array.isArray(docs)) {
+          results[collectionName] = {
+            success: false,
+            error: "Archive is not a valid array",
+            docCount: 0,
+          };
+          continue;
+        }
+
+        const collectionRef = db
+          .collection("tenants")
+          .doc(tenantID)
+          .collection("stores")
+          .doc(storeID)
+          .collection(collectionName);
+
+        let batch = db.batch();
+        let batchCount = 0;
+        let totalWritten = 0;
+
+        for (const doc of docs) {
+          const docID = doc._firestoreDocID;
+          if (!docID) {
+            log("rehydrate: Skipping doc without _firestoreDocID in " + collectionName);
+            continue;
+          }
+
+          const docData = { ...doc };
+          delete docData._firestoreDocID;
+
+          batch.set(collectionRef.doc(docID), docData);
+          batchCount++;
+          totalWritten++;
+
+          if (batchCount >= 500) {
+            await batch.commit();
+            batch = db.batch();
+            batchCount = 0;
+          }
+        }
+
+        if (batchCount > 0) {
+          await batch.commit();
+        }
+
+        results[collectionName] = { success: true, docCount: totalWritten };
+        log("rehydrate: Restored " + collectionName, {
+          tenantID,
+          storeID,
+          docCount: totalWritten,
+        });
+      } catch (err) {
+        log("rehydrate: Error restoring " + collectionName, err.message);
+        results[collectionName] = {
+          success: false,
+          error: err.message,
+          docCount: 0,
+        };
+      }
+    }
+
+    // Write audit log for rehydration
+    try {
+      const now = Date.now();
+      const dateStr = new Date(now).toISOString().split("T")[0];
+      await db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("archive-logs")
+        .doc(String(now))
+        .set({
+          millis: now,
+          date: dateStr,
+          type: "rehydration",
+          collections: results,
+        });
+    } catch (err) {
+      log("rehydrate: Failed to write audit log", err.message);
+    }
+
+    return { success: true, results };
   }
 );

@@ -367,7 +367,7 @@ function TranslateDisplay({ text }) {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.7)",
+        backgroundColor: "rgb(30,30,30)",
         justifyContent: "center",
         alignItems: "center",
         padding: 40,
@@ -376,7 +376,7 @@ function TranslateDisplay({ text }) {
       <Text
         style={{
           fontSize: 48,
-          color: "white",
+          color: C.textWhite,
           fontWeight: Fonts.weight.textHeavy,
           textAlign: "center",
           lineHeight: 64,
@@ -503,18 +503,20 @@ export function CustomerDisplayScreen() {
         }
       `}</style>
 
-      {/* Logo background — always visible */}
-      <Image
-        source={logo}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          resizeMode: "contain",
-        }}
-      />
+      {/* Logo background — hidden during translation mode */}
+      {!sTranslateText && (
+        <Image
+          source={logo}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            resizeMode: "contain",
+          }}
+        />
+      )}
 
       {/* Translation overlay */}
       {sTranslateText ? <TranslateDisplay text={sTranslateText} /> : null}

@@ -1,4 +1,84 @@
 
 
-we need to be able to let through messages from outside numbers, for 2-factor authentication purposes. we also need to add block capabilities to phone numbers. what do you propose?
+Email hours for employee and from payroll
+
+
+
+Auto print email and ssms and print receipt 
+
+Same for intake ticket and estimate. The intake ticket will send all 3
+
+Create an estimate flag somewhere in Info to flag it for printing differently
+
+
+
+
+ Check login system
+
+
+
+Install force new version check on page load 
+
+
+
+Install text to pay and email to pay functionality  with receipts. Must load the payment just like a register sale. Text and email to pay also send us a text or email when it succeeds.
+
+
+
+
+
+Add an inactivity marker for certain status, use a checkbox for that for each status whether we want to report it. Have a report generator to tell us about static work orders
+
+
+
+
+Search for sales by name or phone number   Do we have that info attached to sales?
+
+
+
+Add tax free checkbox to workorder and sale screen, adding this information to the sale and workorder for taxes 
+
+
+
+Debouncinf for all legacy texts in admin 
+
+
+
+Create phone optimized system for: new workorder, workorder list, messages, workers view focusing on media upload, workorder editing m. No listeners except on the active viewing workorder
+
+
+
+Persist login on user device. Cancel the auto logout and only have them enter their pin once
+
+
+
+In preview mode, maybe an indicator of some king 
+
+
+
+Display screen in translate mode should not have logo background 
+
+
+
+Do we have oil register command in hub?add it to sale info panel, record the action, to new db node, add it to sales that need change me
+
+
+
+Check the Vera or of the webcam loading implementation. Also check over the face recognition file for issues
+
+
+
+
+
+
+
+
+
+
+
+ Order some damn webcams
+
+
+
+
 

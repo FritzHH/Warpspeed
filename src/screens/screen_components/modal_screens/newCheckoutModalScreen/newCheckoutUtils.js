@@ -16,7 +16,7 @@ import {
 
 export function generateSaleID() {
   const base = generateUPCBarcode("sale"); // 12 digits starting with "2"
-  return "s" + base.substring(1); // "s" + last 11 digits
+  return { id: "s" + base.substring(1), barcode: base };
 }
 
 export function isSaleID(id) {
@@ -30,7 +30,9 @@ export function isSaleID(id) {
 
 export function createNewSale(settings, createdBy = "") {
   let sale = cloneDeep(SALE_PROTO);
-  sale.id = generateSaleID();
+  const { id, barcode } = generateSaleID();
+  sale.id = id;
+  sale.barcode = barcode;
   sale.millis = Date.now();
   sale.salesTaxPercent = settings?.salesTaxPercent || 0;
   sale.status = "active";

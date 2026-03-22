@@ -1,11 +1,13 @@
 /* eslint-disable */
 
-import { View, Text, TextInput } from "react-native-web";
+import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
+  formatMillisForDisplay,
   formatPhoneWithDashes,
   generateUPCBarcode,
   gray,
+  lightenRGBByPercent,
   log,
   printBuilder,
   removeUnusedFields,
@@ -19,6 +21,7 @@ import {
   Image_,
   TextInput_,
   PrinterButton,
+  StatusPickerModal,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -31,6 +34,7 @@ import {
   CONTACT_RESTRICTIONS,
   RECEIPT_TYPES,
 } from "../../../data";
+import { MILLIS_IN_DAY } from "../../../constants";
 import React, { useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -56,6 +60,7 @@ export const ActiveWorkorderComponent = ({}) => {
     let id = state.workorderPreviewID || state.openWorkorderID;
     return state.workorders.find((o) => o.id === id) || null;
   });
+  const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
   const zCustomer = useCurrentCustomerStore((state) => state.customer);
   var zSettings = SETTINGS_OBJ;
   zSettings = useSettingsStore((state) => state.settings);
@@ -210,7 +215,7 @@ export const ActiveWorkorderComponent = ({}) => {
         paddingBottom: 11,
         paddingTop: 5,
         paddingHorizontal: 5,
-        backgroundColor: C.backgroundWhite,
+        backgroundColor: zIsPreview ? lightenRGBByPercent(C.lightred, 80) : C.backgroundWhite,
         borderRadius: 7,
       }}
     >
@@ -323,7 +328,7 @@ export const ActiveWorkorderComponent = ({}) => {
           </View>
         </View>
 
-        <View pointerEvents={isDonePaid ? "none" : "auto"}>
+        <View pointerEvents={isDonePaid ? "none" : "auto"} style={{ width: "100%" }}>
           <View
             style={{
               marginTop: 20,
@@ -670,8 +675,8 @@ export const ActiveWorkorderComponent = ({}) => {
             {(() => {
               const rs = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses);
               return (
-                <DropdownMenu
-                  dataArr={zSettings.statuses}
+                <StatusPickerModal
+                  statuses={zSettings.statuses}
                   enabled={!isDonePaid}
                   onSelect={(val) => {
                     useOpenWorkordersStore.getState().setField("status", val.id, zOpenWorkorder.id);
@@ -688,7 +693,6 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                   modalCoordX={100}
                   modalCoordY={40}
-                  ref={statusRef}
                   buttonText={rs.label}
                 />
               );
@@ -697,7 +701,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
           <View
             style={{
-              marginTop: 50,
+              marginTop: 11,
               width: "100%",
 
               borderColor: gray(0.05),
@@ -734,9 +738,10 @@ export const ActiveWorkorderComponent = ({}) => {
                   backgroundColor: C.backgroundWhite,
                 }}
                 value={zOpenWorkorder?.partOrdered}
-                onChangeText={(val) =>
-                  useOpenWorkordersStore.getState().setField("partOrdered", val, zOpenWorkorder.id)
-                }
+                onChangeText={(val) => {
+                  useOpenWorkordersStore.getState().setField("partOrdered", val, zOpenWorkorder.id);
+                  useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
+                }}
               />
             </View>
 
@@ -769,6 +774,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
                 onChangeText={(val) => {
                   useOpenWorkordersStore.getState().setField("partSource", val, zOpenWorkorder.id);
+                  useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
                 }}
               />
               <View
@@ -788,6 +794,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   enabled={!isDonePaid}
                   onSelect={(item, idx) => {
                     useOpenWorkordersStore.getState().setField("partSource", item, zOpenWorkorder.id);
+                    useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
                   }}
                   modalCoordX={20}
                   buttonStyle={{
@@ -800,6 +807,89 @@ export const ActiveWorkorderComponent = ({}) => {
                   buttonText={"Part Sources"}
                 />
               </View>
+            </View>
+
+            {/* Estimated wait days picker */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                width: "100%",
+                marginTop: 11,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>
+                  Estimated wait
+                </Text>
+                <TouchableOpacity
+                  disabled={isDonePaid}
+                  onPress={() => {
+                    let currentDays = 0;
+                    if (zOpenWorkorder?.partOrderEstimateMillis && zOpenWorkorder?.partOrderedMillis) {
+                      currentDays = Math.round((zOpenWorkorder.partOrderEstimateMillis - zOpenWorkorder.partOrderedMillis) / MILLIS_IN_DAY);
+                    }
+                    let newDays = Math.max(0, currentDays - 1);
+                    let now = Date.now();
+                    useOpenWorkordersStore.getState().setField("partOrderedMillis", now, zOpenWorkorder.id, false);
+                    useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), zOpenWorkorder.id);
+                  }}
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 4,
+                    backgroundColor: isDonePaid ? gray(0.85) : C.blue,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ color: "white", fontSize: 13, fontWeight: "700", marginTop: -1 }}>−</Text>
+                </TouchableOpacity>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "600",
+                    color: C.text,
+                    minWidth: 50,
+                    textAlign: "center",
+                  }}
+                >
+                  {(() => {
+                    if (!zOpenWorkorder?.partOrderEstimateMillis || !zOpenWorkorder?.partOrderedMillis) return "0";
+                    return Math.max(0, Math.round((zOpenWorkorder.partOrderEstimateMillis - zOpenWorkorder.partOrderedMillis) / MILLIS_IN_DAY));
+                  })()}
+                  {" days"}
+                </Text>
+                <TouchableOpacity
+                  disabled={isDonePaid}
+                  onPress={() => {
+                    let currentDays = 0;
+                    if (zOpenWorkorder?.partOrderEstimateMillis && zOpenWorkorder?.partOrderedMillis) {
+                      currentDays = Math.round((zOpenWorkorder.partOrderEstimateMillis - zOpenWorkorder.partOrderedMillis) / MILLIS_IN_DAY);
+                    }
+                    let newDays = currentDays + 1;
+                    let now = Date.now();
+                    useOpenWorkordersStore.getState().setField("partOrderedMillis", now, zOpenWorkorder.id, false);
+                    useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), zOpenWorkorder.id);
+                  }}
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 4,
+                    backgroundColor: isDonePaid ? gray(0.85) : C.blue,
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ color: "white", fontSize: 13, fontWeight: "700", marginTop: -1 }}>+</Text>
+                </TouchableOpacity>
+              </View>
+              {!!zOpenWorkorder?.partOrderEstimateMillis && (
+                <Text style={{ fontSize: 14, color: gray(0.45), textAlign: "right", marginLeft: "auto" }}>
+                  {formatMillisForDisplay(zOpenWorkorder.partOrderedMillis) + " → " + formatMillisForDisplay(zOpenWorkorder.partOrderEstimateMillis)}
+                </Text>
+              )}
             </View>
           </View>
         </View>

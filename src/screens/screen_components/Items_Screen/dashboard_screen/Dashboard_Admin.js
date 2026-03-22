@@ -15,6 +15,7 @@ import {
   checkInputForNumbersOnly,
   clog,
   formatCurrencyDisp,
+  formatMillisForDisplay,
   searchInventory,
   generateRandomID,
   generateTimesForListDisplay,
@@ -49,6 +50,7 @@ import {
   TextInput_,
   TimeSpinner,
   Tooltip,
+  StatusPickerModal,
 } from "../../../../components";
 import { cloneDeep, set, debounce } from "lodash";
 import { Children, useEffect, useRef, useState } from "react";
@@ -56,14 +58,16 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
-import { APP_USER, INTAKE_BUTTON_PROTO, SETTINGS_OBJ } from "../../../../data";
+import { APP_USER, INTAKE_BUTTON_PROTO, SETTINGS_OBJ, TIME_PUNCH_PROTO } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
-import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveCustomer } from "../../../../db_calls_wrapper";
+import { PayrollModal } from "../../modal_screens/PayrollModal";
+import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveCustomer, dbRehydrateFromArchive, dbSavePunchObject } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses } from "../../../../lightspeed_import";
-import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead } from "../../../../db_calls";
+import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery } from "../../../../db_calls";
+import { DB_NODES } from "../../../../constants";
 
 const TAB_NAMES = {
   users: "User Control",
@@ -75,11 +79,13 @@ const TAB_NAMES = {
   quickItems: "Quick Item Buttons",
   intakeButtons: "Intake Buttons",
   sales: "Sales Reports",
+  payroll: "Payroll",
   ordering: "Ordering",
   textTemplates: "Text Templates",
   emailTemplates: "Email Templates",
   blockedNumbers: "Blocked Numbers",
   import: "Import",
+  backup: "Backup & Recovery",
 };
 
 const DROPDOWN_ORDERING_SELECTION_NAMES = {
@@ -96,6 +102,7 @@ export function Dashboard_Admin({}) {
     useState(false);
   const [sPunchClockUserObj, _setPunchClockUserObj] = useState(null);
   const [sShowSalesReportModal, _setShowSalesReportModal] = useState(false);
+  const [sShowPayrollModal, _setShowPayrollModal] = useState(false);
   const sExpand = useTabNamesStore((state) => state.getDashboardExpand());
   const _setExpand = useTabNamesStore((state) => state.setDashboardExpand);
   const [sOrderingMenuSelectionName, _setOrderingMenuSelectionName] = useState(
@@ -186,6 +193,9 @@ export function Dashboard_Admin({}) {
       )}
       {!!sShowSalesReportModal && (
         <SalesReportsModal handleExit={() => _setShowSalesReportModal(false)} />
+      )}
+      {!!sShowPayrollModal && (
+        <PayrollModal handleExit={() => _setShowPayrollModal(false)} />
       )}
       {!!sIntakeEditButtonObj && (
         <IntakeButtonEditModal
@@ -346,6 +356,19 @@ export function Dashboard_Admin({}) {
               iconSize={25}
             />
             <VerticalSpacer />
+            {/****************** payroll modal *****************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.payroll}
+              handleExpandPress={() => _setShowPayrollModal(true)}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.payroll ? 500 : null,
+                color: sExpand === TAB_NAMES.payroll ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.payroll}
+              icon={ICONS.greenDollar}
+              iconSize={25}
+            />
+            <VerticalSpacer />
             {/****************** ordering tab***********************************/}
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.ordering}
@@ -434,6 +457,22 @@ export function Dashboard_Admin({}) {
               text={TAB_NAMES.import}
               icon={ICONS.importIcon}
             />
+            <VerticalSpacer />
+            {/****************** backup & recovery tab *****************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.backup}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.backup ? null : TAB_NAMES.backup
+                )
+              }
+              style={{
+                fontWeight: sExpand === TAB_NAMES.backup ? 500 : null,
+                color: sExpand === TAB_NAMES.backup ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.backup}
+              icon={ICONS.tools}
+            />
           </View>
         </View>
 
@@ -446,7 +485,7 @@ export function Dashboard_Admin({}) {
             flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
           }}
         >
-          {!sExpand && (
+          {!sExpand && (<>
             <TouchableOpacity
               onPress={async () => {
                 const statusesText = await fetch("/import_data/statuses.csv").then(r => r.text());
@@ -471,7 +510,84 @@ export function Dashboard_Admin({}) {
                 Inject Settings
               </Text>
             </TouchableOpacity>
-          )}
+            <TouchableOpacity
+              onPress={async () => {
+                let dayjs = (await import("dayjs")).default;
+                let userID = "1234";
+                let now = dayjs();
+                let startDate = now.subtract(3, "month").startOf("day");
+                let endDate = now.startOf("day");
+                let current = startDate;
+                let allPunches = [];
+
+                while (current.isBefore(endDate) || current.isSame(endDate, "day")) {
+                  // 3-7 punch pairs per day
+                  let pairCount = 3 + Math.floor(Math.random() * 5);
+                  // Spread pairs across 10am-7pm (600 min window)
+                  let windowStart = 600; // 10:00 AM in minutes from midnight
+                  let windowEnd = 1140;  // 7:00 PM in minutes from midnight
+                  let slotSize = Math.floor((windowEnd - windowStart) / pairCount);
+
+                  for (let i = 0; i < pairCount; i++) {
+                    let slotStart = windowStart + (i * slotSize);
+                    let slotEnd = slotStart + slotSize;
+                    // Random in time within first 60% of slot
+                    let inMinutes = slotStart + Math.floor(Math.random() * (slotSize * 0.5));
+                    // Random out time in last 40% of slot, at least 10 min after in
+                    let outMinutes = Math.min(
+                      inMinutes + 10 + Math.floor(Math.random() * (slotSize * 0.4)),
+                      slotEnd - 1
+                    );
+                    if (outMinutes > windowEnd) outMinutes = windowEnd;
+                    if (outMinutes <= inMinutes) outMinutes = inMinutes + 10;
+
+                    let inMillis = current.add(inMinutes, "minute").valueOf();
+                    let outMillis = current.add(outMinutes, "minute").valueOf();
+
+                    allPunches.push({
+                      ...TIME_PUNCH_PROTO,
+                      userID,
+                      id: generateRandomID(),
+                      millis: inMillis,
+                      option: "in",
+                    });
+                    allPunches.push({
+                      ...TIME_PUNCH_PROTO,
+                      userID,
+                      id: generateRandomID(),
+                      millis: outMillis,
+                      option: "out",
+                    });
+                  }
+                  current = current.add(1, "day");
+                }
+
+                log("Injecting " + allPunches.length + " punches for user 1234...");
+                let batchSize = 20;
+                for (let i = 0; i < allPunches.length; i += batchSize) {
+                  let batch = allPunches.slice(i, i + batchSize);
+                  await Promise.all(batch.map((p) => dbSavePunchObject(p)));
+                }
+                log("Done! Injected " + allPunches.length + " punches.");
+                alert("Injected " + allPunches.length + " punches for user 1234 (3 months).");
+              }}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                borderWidth: 2,
+                borderColor: C.orange,
+                backgroundColor: C.listItemWhite,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 10,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: C.orange, fontWeight: "700" }}>
+                Inject Test Punches (1234)
+              </Text>
+            </TouchableOpacity>
+          </>)}
           {!!sExpand && (
             <Text
               style={{
@@ -559,6 +675,7 @@ export function Dashboard_Admin({}) {
             />
           )}
           {sExpand === TAB_NAMES.import && <ImportComponent />}
+          {sExpand === TAB_NAMES.backup && <BackupRecoveryComponent />}
         </View>
       </View>
     </OuterWrapper>
@@ -887,7 +1004,7 @@ const AppUserListComponent = ({
             >
               {"Seconds to log user out: "}
             </Text>
-            <TextInput
+            <TextInput_
               onChangeText={(val) => {
                 _setLoginTimeout(val);
                 handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
@@ -922,7 +1039,7 @@ const AppUserListComponent = ({
             >
               {"Hours to lock app: "}
             </Text>
-            <TextInput
+            <TextInput_
               onChangeText={(val) => {
                 _setLockHours(val);
                 handleSettingsFieldChange("idleLoginTimeoutHours", val);
@@ -950,7 +1067,7 @@ const AppUserListComponent = ({
               >
                 {"User login PIN length: "}
               </Text>
-              <TextInput
+              <TextInput_
                 onChangeText={(val) => {
                   _setPinLength(val);
                   handleSettingsFieldChange("userPinStrength", val);
@@ -1111,7 +1228,7 @@ const AppUserListComponent = ({
                         // backgroundColor: "red",
                       }}
                     >
-                      <TextInput
+                      <TextInput_
                         value={userObj.first}
                         placeholder="First name"
                         placeholderTextColor={"lightgray"}
@@ -1134,7 +1251,7 @@ const AppUserListComponent = ({
                           commitUserInfoChange(userObj);
                         }}
                       />
-                      <TextInput
+                      <TextInput_
                         value={userObj.last}
                         onChangeText={(value) => {
                           userObj.last = value;
@@ -1190,7 +1307,7 @@ const AppUserListComponent = ({
                           fontSize: 14,
                         }}
                       />
-                      <TextInput
+                      <TextInput_
                         value={userObj.email || ""}
                         onChangeText={(value) => {
                           userObj.email = value;
@@ -1237,7 +1354,7 @@ const AppUserListComponent = ({
                           height: 25,
                         }}
                       >
-                        <TextInput
+                        <TextInput_
                           caretHidden={sShowPinIndex != idx}
                           focused={sShowPinIndex === idx}
                           value={sShowPinIndex === idx ? userObj.pin : ""}
@@ -1283,7 +1400,7 @@ const AppUserListComponent = ({
                           height: 25,
                         }}
                       >
-                        <TextInput
+                        <TextInput_
                           caretHidden={sShowWageIndex != idx}
                           value={
                             sShowWageIndex === idx ? userObj.hourlyWage : ""
@@ -1377,6 +1494,96 @@ const AppUserListComponent = ({
                         </TouchableOpacity>
                       )}
                     </View>
+                    {/* ROW 4: Statuses */}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        marginTop: 7,
+                        flexWrap: "wrap",
+                        gap: 5,
+                      }}
+                    >
+                      {editable && (
+                        <StatusPickerModal
+                          statuses={zSettingsObj.statuses}
+                          onSelect={(item) => {
+                            if (!item) return;
+                            let currentStatuses = userObj.statuses || [];
+                            if (currentStatuses.includes(item.id)) return;
+                            userObj.statuses = [...currentStatuses, item.id];
+                            commitUserInfoChange(userObj);
+                          }}
+                          buttonText="+ Status"
+                          modalCoordX={80}
+                          modalCoordY={0}
+                          buttonStyle={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderColor: C.buttonLightGreenOutline,
+                            borderRadius: 5,
+                            height: 25,
+                            borderWidth: 1,
+                            alignItems: "center",
+                            backgroundColor: C.buttonLightGreen,
+                          }}
+                          buttonTextStyle={{
+                            color: C.text,
+                            fontSize: 12,
+                          }}
+                        />
+                      )}
+                      {(userObj.statuses || []).map((statusId) => {
+                        let status = zSettingsObj.statuses.find(
+                          (s) => s.id === statusId
+                        );
+                        if (!status) return null;
+                        return (
+                          <View
+                            key={statusId}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: status.backgroundColor,
+                              borderRadius: 4,
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: status.textColor,
+                                fontSize: 12,
+                                fontWeight: "600",
+                              }}
+                            >
+                              {status.label}
+                            </Text>
+                            {editable && (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  userObj.statuses = (
+                                    userObj.statuses || []
+                                  ).filter((id) => id !== statusId);
+                                  commitUserInfoChange(userObj);
+                                }}
+                                style={{ marginLeft: 4 }}
+                              >
+                                <Text
+                                  style={{
+                                    color: status.textColor,
+                                    fontSize: 14,
+                                    fontWeight: "700",
+                                  }}
+                                >
+                                  ×
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
                   </View>
                 </View>
               );
@@ -1438,7 +1645,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           }}
         >
           <Text style={{ color: C.text }}>Category Name:</Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -1478,7 +1685,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     justifyContent: "center",
                   }}
                 >
-                  <TextInput
+                  <TextInput_
                     onChangeText={(val) => {
                       let brandsArr = zSettingsObj.bikeBrands;
                       brandsArr[idx] = val;
@@ -1532,7 +1739,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           }}
         >
           <Text style={{ color: C.text }}>Category Name:</Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -1572,7 +1779,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     justifyContent: "center",
                   }}
                 >
-                  <TextInput
+                  <TextInput_
                     onChangeText={(val) => {
                       let brandsArr = zSettingsObj.bikeOptionalBrands;
                       brandsArr[idx] = val;
@@ -1654,7 +1861,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     justifyContent: "center",
                   }}
                 >
-                  <TextInput
+                  <TextInput_
                     onChangeText={(val) => {
                       let descriptionsArr = zSettingsObj.bikeDescriptions;
                       descriptionsArr[idx] = val;
@@ -1766,7 +1973,7 @@ const DiscountsComponent = ({
                     // backgroundColor: "blue",
                   }}
                 >
-                  <TextInput
+                  <TextInput_
                     onChangeText={(val) => {
                       let discountsArr = zSettingsObj.discounts.map((o) => {
                         if (o.id === item.id) return { ...o, name: val };
@@ -1938,7 +2145,7 @@ const WaitTimesComponent = ({
                     marginBottom: 10,
                   }}
                 >
-                  <TextInput
+                  <TextInput_
                     onChangeText={(val) => {
                       let arr = zSettingsObj.waitTimes.map((o) => {
                         if (o.id === item.id) return { ...o, label: val };
@@ -1963,7 +2170,7 @@ const WaitTimesComponent = ({
                     }}
                     value={item.label}
                   />
-                  <TextInput
+                  <TextInput_
                     onChangeText={(val) => {
                       let arr = zSettingsObj.waitTimes.map((o) => {
                         if (o.id === item.id)
@@ -2060,7 +2267,7 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     justifyContent: "center",
                   }}
                 >
-                  <TextInput
+                  <TextInput_
                     onChangeText={(val) => {
                       let partSourcesArr = zSettingsObj.partSources;
                       partSourcesArr[idx] = val;
@@ -2128,7 +2335,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             Display Name:
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -2226,7 +2433,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             Street:
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -2274,7 +2481,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             Unit:
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -2322,7 +2529,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             City:
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -2370,7 +2577,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             State or Abbrev.
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -2418,7 +2625,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             Zip Code:
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -2801,7 +3008,7 @@ const PaymentProcessingComponent = ({
                       <Text style={{ color: gray(0.55), marginRight: 10 }}>
                         ID:
                       </Text>
-                      <TextInput
+                      <TextInput_
                         style={{ outlineWidth: 0 }}
                         editable={true}
                         value={item.id}
@@ -2820,7 +3027,7 @@ const PaymentProcessingComponent = ({
                           );
                         }}
                       />
-                      <TextInput
+                      <TextInput_
                         value={item.label}
                         onChangeText={(val) => {
                           let cardReaderArr = zSettingsObj.cardReaders?.map(
@@ -3054,7 +3261,7 @@ const WorkorderStatusesComponent = ({
                     {!item.removable && (
                       <View style={{ width: "10%" }} />
                     )}
-                    <TextInput
+                    <TextInput_
                       style={{
                         width: "100%",
                         textAlign: "center",
@@ -4015,7 +4222,7 @@ const IntakeButtonEditModal = ({ buttonObj, onClose, onSave }) => {
 
         {/* Search Input */}
         <View style={{ padding: 16, paddingBottom: 8 }}>
-          <TextInput
+          <TextInput_
             style={{
               borderBottomColor: gray(0.3),
               borderBottomWidth: 1,
@@ -4997,7 +5204,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                       marginBottom: 8,
                     }}
                   >
-                    <TextInput
+                    <TextInput_
                       onChangeText={(val) =>
                         handleTemplateNameChange(templateObj, val)
                       }
@@ -5284,7 +5491,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                       marginBottom: 8,
                     }}
                   >
-                    <TextInput
+                    <TextInput_
                       onChangeText={(val) =>
                         handleFieldChange(templateObj, "name", val)
                       }
@@ -5315,7 +5522,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                   </View>
 
                   {/* Subject line */}
-                  <TextInput
+                  <TextInput_
                     onChangeText={(val) =>
                       handleFieldChange(templateObj, "subject", val)
                     }
@@ -5460,7 +5667,7 @@ const BlockedNumbersComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
           Blocked numbers will receive an auto-response and their messages will not be stored.
         </Text>
         <View style={{ flexDirection: "row", alignItems: "center", width: "100%", marginBottom: 15 }}>
-          <TextInput
+          <TextInput_
             value={sNewNumber}
             onChangeText={(val) => {
               let cleaned = val.replace(/[^0-9\-]/g, "");
@@ -5523,3 +5730,359 @@ const BlockedNumbersComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
     </BoxContainerOuterComponent>
   );
 };
+
+////////////////////////////////////////////////////////////////////////////////
+// BACKUP & RECOVERY COMPONENT
+////////////////////////////////////////////////////////////////////////////////
+
+const ARCHIVE_COLLECTION_NAMES = [
+  "completed-workorders",
+  "completed-sales",
+  "customers",
+  "sales-index",
+];
+
+const MILLIS_IN_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+function BackupRecoveryComponent() {
+  const zSettings = useSettingsStore((state) => state.settings);
+  const tenantID = zSettings?.tenantID;
+  const storeID = zSettings?.storeID;
+
+  const [sLogs, _setLogs] = useState([]);
+  const [sLoading, _setLoading] = useState(false);
+  const [sRehydrating, _setRehydrating] = useState(false);
+  const [sConfirmStep, _setConfirmStep] = useState(0); // 0=idle, 1=first confirm, 2=second confirm
+  const [sRehydrateResult, _setRehydrateResult] = useState(null);
+  const [sWeeksLoaded, _setWeeksLoaded] = useState(1);
+
+  async function loadLogs(weeksBack) {
+    if (!tenantID || !storeID) return;
+    _setLoading(true);
+    try {
+      const endMillis = Date.now();
+      const startMillis = endMillis - weeksBack * MILLIS_IN_WEEK;
+      const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.ARCHIVE_LOGS}`;
+      const results = await firestoreQuery(
+        collectionPath,
+        [
+          { field: "millis", operator: ">=", value: startMillis },
+          { field: "millis", operator: "<=", value: endMillis },
+        ],
+        { orderBy: { field: "millis", direction: "desc" } }
+      );
+      _setLogs(results);
+    } catch (err) {
+      log("BackupRecovery: Error loading logs", err);
+    }
+    _setLoading(false);
+  }
+
+  function handleLoadInitial() {
+    _setWeeksLoaded(1);
+    loadLogs(1);
+  }
+
+  function handleLoadMore() {
+    const next = sWeeksLoaded + 1;
+    _setWeeksLoaded(next);
+    loadLogs(next);
+  }
+
+  async function handleRehydrate() {
+    _setRehydrating(true);
+    _setRehydrateResult(null);
+    try {
+      const result = await dbRehydrateFromArchive(ARCHIVE_COLLECTION_NAMES);
+      _setRehydrateResult(result);
+    } catch (err) {
+      _setRehydrateResult({ success: false, error: err.message });
+    }
+    _setRehydrating(false);
+    _setConfirmStep(0);
+  }
+
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent style={{ alignItems: "center" }}>
+        {/*** REHYDRATE SECTION ***/}
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: "700",
+            color: C.text,
+            marginBottom: 10,
+            alignSelf: "flex-start",
+          }}
+        >
+          EMERGENCY DATA RESTORE
+        </Text>
+        <Text
+          style={{
+            fontSize: 12,
+            color: gray(0.5),
+            marginBottom: 15,
+            alignSelf: "flex-start",
+          }}
+        >
+          Restores all archived data from Cloud Storage back to Firestore. Only
+          use this if the database has been corrupted or data is missing.
+        </Text>
+
+        {sConfirmStep === 0 && (
+          <Button_
+            text="Restore from Backup"
+            onPress={() => _setConfirmStep(1)}
+            colorGradientArr={COLOR_GRADIENTS.red}
+            buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+            disabled={sRehydrating}
+          />
+        )}
+
+        {sConfirmStep === 1 && (
+          <View style={{ alignItems: "center" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: C.red,
+                marginBottom: 10,
+              }}
+            >
+              This will overwrite current Firestore data with the latest nightly
+              backup. Are you sure?
+            </Text>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button_
+                text="Yes, Continue"
+                onPress={() => _setConfirmStep(2)}
+                colorGradientArr={COLOR_GRADIENTS.red}
+                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+              />
+              <Button_
+                text="Cancel"
+                onPress={() => _setConfirmStep(0)}
+                colorGradientArr={COLOR_GRADIENTS.grey}
+                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+              />
+            </View>
+          </View>
+        )}
+
+        {sConfirmStep === 2 && (
+          <View style={{ alignItems: "center" }}>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: C.red,
+                marginBottom: 10,
+              }}
+            >
+              FINAL CONFIRMATION: This action cannot be undone. Restore all data
+              from the last nightly backup?
+            </Text>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Button_
+                text={sRehydrating ? "Restoring..." : "CONFIRM RESTORE"}
+                onPress={handleRehydrate}
+                colorGradientArr={COLOR_GRADIENTS.red}
+                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                disabled={sRehydrating}
+                loading={sRehydrating}
+              />
+              <Button_
+                text="Cancel"
+                onPress={() => _setConfirmStep(0)}
+                colorGradientArr={COLOR_GRADIENTS.grey}
+                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                disabled={sRehydrating}
+              />
+            </View>
+          </View>
+        )}
+
+        {!!sRehydrateResult && (
+          <View
+            style={{
+              marginTop: 15,
+              padding: 10,
+              borderRadius: 8,
+              backgroundColor: sRehydrateResult.success
+                ? "rgba(0,180,0,0.08)"
+                : "rgba(220,0,0,0.08)",
+              width: "100%",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: sRehydrateResult.success ? C.green : C.red,
+                marginBottom: 5,
+              }}
+            >
+              {sRehydrateResult.success
+                ? "Restore Complete"
+                : "Restore Failed"}
+            </Text>
+            {sRehydrateResult.success &&
+              sRehydrateResult.results &&
+              Object.entries(sRehydrateResult.results).map(([name, r]) => (
+                <Text
+                  key={name}
+                  style={{ fontSize: 12, color: C.text, marginBottom: 2 }}
+                >
+                  {name}: {r.success ? r.docCount + " docs restored" : "FAILED — " + r.error}
+                </Text>
+              ))}
+            {!sRehydrateResult.success && sRehydrateResult.error && (
+              <Text style={{ fontSize: 12, color: C.red }}>
+                {sRehydrateResult.error}
+              </Text>
+            )}
+          </View>
+        )}
+      </BoxContainerInnerComponent>
+
+      {/*** ARCHIVE LOGS SECTION ***/}
+      <View style={{ height: 20 }} />
+      <BoxContainerInnerComponent style={{ alignItems: "center" }}>
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: "700",
+            color: C.text,
+            marginBottom: 10,
+            alignSelf: "flex-start",
+          }}
+        >
+          NIGHTLY BACKUP LOGS
+        </Text>
+
+        {sLogs.length === 0 && !sLoading && (
+          <Button_
+            text="Load Logs"
+            onPress={handleLoadInitial}
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+          />
+        )}
+
+        {sLoading && (
+          <Text style={{ fontSize: 12, color: gray(0.5), marginVertical: 10 }}>
+            Loading...
+          </Text>
+        )}
+
+        {sLogs.length > 0 &&
+          sLogs.map((logEntry) => (
+            <View
+              key={logEntry.id}
+              style={{
+                width: "100%",
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 8,
+                padding: 10,
+                marginBottom: 8,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "700", color: C.text }}>
+                  {logEntry.date || "—"}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: gray(0.5),
+                  }}
+                >
+                  {logEntry.millis
+                    ? formatMillisForDisplay(logEntry.millis)
+                    : ""}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "600",
+                  color: logEntry.type === "rehydration" ? C.orange : C.green,
+                  marginBottom: 4,
+                }}
+              >
+                {logEntry.type === "rehydration"
+                  ? "REHYDRATION"
+                  : "NIGHTLY ARCHIVE"}
+              </Text>
+
+              {logEntry.archive &&
+                Object.entries(logEntry.archive).map(([name, r]) => (
+                  <Text
+                    key={name}
+                    style={{ fontSize: 11, color: C.text, marginBottom: 1 }}
+                  >
+                    {name}:{" "}
+                    {r.success
+                      ? r.docCount + " docs"
+                      : "FAILED — " + (r.error || "unknown")}
+                  </Text>
+                ))}
+
+              {logEntry.mediaCleanup && (
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: logEntry.mediaCleanup.success ? C.text : C.red,
+                    marginTop: 2,
+                  }}
+                >
+                  Media cleanup:{" "}
+                  {logEntry.mediaCleanup.success
+                    ? logEntry.mediaCleanup.workordersProcessed +
+                      " workorders, " +
+                      logEntry.mediaCleanup.mediaFilesDeleted +
+                      " files deleted"
+                    : "FAILED — " + (logEntry.mediaCleanup.error || "unknown")}
+                </Text>
+              )}
+
+              {logEntry.collections &&
+                Object.entries(logEntry.collections).map(([name, r]) => (
+                  <Text
+                    key={name}
+                    style={{ fontSize: 11, color: C.text, marginBottom: 1 }}
+                  >
+                    {name}:{" "}
+                    {r.success
+                      ? r.docCount + " docs restored"
+                      : "FAILED — " + (r.error || "unknown")}
+                  </Text>
+                ))}
+            </View>
+          ))}
+
+        {sLogs.length > 0 && (
+          <Button_
+            text={"Load Another Week (Week " + (sWeeksLoaded + 1) + ")"}
+            onPress={handleLoadMore}
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            buttonStyle={{
+              borderRadius: 5,
+              paddingHorizontal: 20,
+              marginTop: 5,
+            }}
+            loading={sLoading}
+            disabled={sLoading}
+          />
+        )}
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+}

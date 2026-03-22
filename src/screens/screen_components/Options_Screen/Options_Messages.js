@@ -85,6 +85,12 @@ export function MessagesComponent({}) {
     (state) => state.outgoingMessages
   );
   //////////////////////////////////////////////////////////////////////////
+
+  // Clear hasNewSMS flag when messages are viewed
+  if (zWorkorderObj?.hasNewSMS) {
+    useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
+  }
+
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);
   const [sInputHeight, _setInputHeight] = useState(36);
@@ -195,6 +201,13 @@ export function MessagesComponent({}) {
       _setCanRespond(false);
       clearTranslation();
       let result = await smsService.send(msg);
+      if (result.success) {
+        // Flag all customer workorders so the sender's list prioritizes them
+        let allWOs = useOpenWorkordersStore.getState().workorders;
+        allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
+          useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
+        });
+      }
       if (!result.success) {
         useAlertScreenStore.getState().setValues({
           title: "Message Failed",

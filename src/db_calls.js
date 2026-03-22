@@ -585,6 +585,10 @@ export const lightspeedImportDataCallable = httpsCallable(
   functions,
   "lightspeedImportData"
 );
+export const rehydrateFromArchiveCallable = httpsCallable(
+  functions,
+  "rehydrateFromArchive"
+);
 
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)

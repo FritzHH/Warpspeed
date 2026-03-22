@@ -269,7 +269,7 @@ const TranslateModal = ({ visible, onClose }) => {
             debounceMs={0}
             placeholder={`Type in ${sourceLabel}...`}
             multiline={true}
-            numberOfLines={4}
+            numberOfLines={10}
             autoFocus={true}
             style={{
               borderColor: C.buttonLightGreenOutline,
@@ -279,7 +279,6 @@ const TranslateModal = ({ visible, onClose }) => {
               paddingVertical: 10,
               paddingHorizontal: 10,
               fontSize: 16,
-              minHeight: 80,
               marginBottom: 14,
             }}
           />

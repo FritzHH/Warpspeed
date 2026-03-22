@@ -155,6 +155,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   const zIcon2Size = useAlertScreenStore((state) => state.icon2Size);
   const zIcon3Size = useAlertScreenStore((state) => state.icon3Size);
   const zAlertBoxStyle = useAlertScreenStore((state) => state.alertBoxStyle);
+  const zFullScreen = useAlertScreenStore((state) => state.fullScreen);
   let zUseCancelButton = useAlertScreenStore((state) => state.useCancelButton);
 
   // Animation state ///////////////////////////////////////////////////////////
@@ -221,10 +222,10 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
             style={{
               justifyContent: "center",
               alignItems: "center",
-              minWidth: "40%",
-              minHeight: "40%",
+              minWidth: zFullScreen ? "100%" : "40%",
+              minHeight: zFullScreen ? "100%" : "40%",
               backgroundColor: "rgba(0, 0, 0, 0.4)",
-              borderRadius: 15,
+              borderRadius: zFullScreen ? 0 : 15,
             }}
           >
             <View
@@ -233,12 +234,12 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                 borderRadius: 15,
                 alignItems: "center",
                 justifyContent: "space-around",
-                minWidth: "80%",
-                minHeight: "60%",
+                minWidth: zFullScreen ? "32%" : "80%",
+                minHeight: zFullScreen ? "24%" : "60%",
                 ...zAlertBoxStyle,
               }}
             >
-              <View>
+              <View style={{ alignItems: "center", width: "100%" }}>
                 {!!zTitle && (
                   <Text
                     numberOfLines={3}
@@ -248,6 +249,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                       color: Colors.darkText,
                       fontSize: 25,
                       color: "red",
+                      textAlign: "center",
                     }}
                   >
                     {zTitle || "Alert:"}

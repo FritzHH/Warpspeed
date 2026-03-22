@@ -114,7 +114,8 @@ export function calculateRunningTotals(
   workorders,
   salesTaxRatePercent,
   workorderlinesArr = [],
-  isRefund
+  isRefund,
+  taxFree = false
 ) {
   let runningTotal = 0;
   let runningDiscount = 0;
@@ -155,12 +156,13 @@ export function calculateRunningTotals(
   });
   // log(salesTaxRatePercent);
   // log("run", runningDiscount);
+  let runningTax = taxFree ? 0 : runningTotal * (salesTaxRatePercent / 100);
   let obj = {
-    finalTotal: runningTotal + runningTotal * (salesTaxRatePercent / 100),
+    finalTotal: runningTotal + runningTax,
     runningTotal,
     runningSubtotal, // total before discounts, so can be more than running total
     runningDiscount,
-    runningTax: runningTotal * (salesTaxRatePercent / 100),
+    runningTax,
     runningQty,
   };
   // clog(obj);
@@ -1984,7 +1986,7 @@ function parseWorkorderLines(wo = WORKORDER_PROTO) {
 }
 
 function createPrintBase(workorder, customer, salesTaxPercent) {
-  let r = { ...workorder, ...customer, ...calculateRunningTotals(workorder, salesTaxPercent) }
+  let r = { ...workorder, ...customer, ...calculateRunningTotals(workorder, salesTaxPercent, [], false, !!workorder.taxFree) }
   r.workorderLines = parseWorkorderLines(workorder);
   r.status = resolveStatus(workorder.status, SETTINGS_OBJ.statuses).label;
   r.salesTaxPercent = salesTaxPercent;
@@ -2047,7 +2049,7 @@ function createPrintWorkorder(
   salesTaxPercent
 ) {
   let r = {};
-  r = { ...r, ...wo, ...customer, ...calculateRunningTotals(wo, salesTaxPercent) };
+  r = { ...r, ...wo, ...customer, ...calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree) };
   r.receiptType = RECEIPT_TYPES.workorder;
   r.workorderLines = parseWorkorderLines(wo);
   r.status = resolveStatus(wo.status, SETTINGS_OBJ.statuses).label;
@@ -2070,7 +2072,7 @@ function createPrintWorkorder(
 }
 
 function createPrintSale(sale = SALE_PROTO, customer, wo = WORKORDER_PROTO, salesTaxPercent) {
-  let r = { ...r, ...wo, ...customer, ...sale, ...calculateRunningTotals(wo, salesTaxPercent) };
+  let r = { ...r, ...wo, ...customer, ...sale, ...calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree) };
   r.receiptType = RECEIPT_TYPES.sales;
   r.workorderLines = parseWorkorderLines(wo);
   r.status = resolveStatus(wo.status, SETTINGS_OBJ.statuses).label;
@@ -2128,6 +2130,9 @@ export const printBuilder = {
     receipt = { ...receipt, ...sale }
     receipt.receiptType = RECEIPT_TYPES.sales;
     receipt.payments = payments;
+    receipt.popCashRegister = (payments || []).some(
+      p => p.cash && p.amountTendered > p.amountCaptured
+    );
     return receipt;
   },
 };

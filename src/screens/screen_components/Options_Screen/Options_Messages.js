@@ -224,7 +224,7 @@ export function MessagesComponent({}) {
     if (!templateMessage) return "";
     let totalAmount = "";
     try {
-      let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent);
+      let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent, [], false, !!zWorkorderObj.taxFree);
       totalAmount = "$" + (totals.finalTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     } catch (e) {
       totalAmount = "$0.00";

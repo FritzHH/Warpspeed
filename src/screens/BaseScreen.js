@@ -31,7 +31,7 @@ import {
   broadcastDisplayStatus,
   DISPLAY_STATUS,
 } from "../broadcastChannel";
-import { FaceDetectionClientComponent } from "../faceDetectionClient";
+import { FaceDetectionClientComponent } from "../faceDetection";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { isSaleID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";

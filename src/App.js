@@ -8,6 +8,8 @@ import { MobileBaseScreen } from "./screens/mobile/MobileBaseScreen";
 import { MobileHomeScreen } from "./screens/mobile/MobileHomeScreen";
 import { MobileWorkorderListScreen } from "./screens/mobile/MobileWorkorderListScreen";
 import { MobileWorkorderDetailScreen } from "./screens/mobile/MobileWorkorderDetailScreen";
+import { MobileItemEditScreen } from "./screens/mobile/MobileItemEditScreen";
+import { MobileMessagesScreen } from "./screens/mobile/MobileMessagesScreen";
 import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
@@ -166,6 +168,8 @@ function App() {
               <Route index element={<MobileHomeScreen />} />
               <Route path="workorders" element={<MobileWorkorderListScreen />} />
               <Route path="workorder/:id" element={<MobileWorkorderDetailScreen />} />
+              <Route path="workorder/:id/items" element={<MobileItemEditScreen />} />
+              <Route path="workorder/:id/messages" element={<MobileMessagesScreen />} />
             </>
           )}
         </Route>

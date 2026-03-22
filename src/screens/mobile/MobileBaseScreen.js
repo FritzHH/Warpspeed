@@ -6,17 +6,13 @@ import { C, ICONS } from "../../styles";
 import { AlertBox_, Image_ } from "../../components";
 import {
   useOpenWorkordersStore,
-  useSettingsStore,
   useInventoryStore,
-  useLoginStore,
   useAlertScreenStore,
   useLayoutStore,
 } from "../../stores";
 import {
-  dbListenToSettings,
-  dbListenToOpenWorkorders,
-  dbListenToCurrentPunchClock,
-  dbListenToInventory,
+  dbGetOpenWorkorders,
+  dbGetInventoryItems,
 } from "../../db_calls_wrapper";
 import { log } from "../../utils";
 
@@ -28,21 +24,32 @@ export function MobileBaseScreen() {
 
   const isHome = location.pathname === "/";
 
-  // Firebase real-time listeners — mirrors BaseScreen.js:119-143
+  // Fetch fresh data on mount and when app returns to foreground
+  // Replaces the 4 real-time listeners that were here before
   useEffect(() => {
-    dbListenToSettings((data) => {
-      useSettingsStore.getState().setSettings(data, false, false);
-    });
-    dbListenToCurrentPunchClock((data) => {
-      useLoginStore.getState().setPunchClock(data);
-    });
-    dbListenToInventory((data) => {
-      useInventoryStore.getState().setItems(data);
-    });
-    dbListenToOpenWorkorders((data) => {
-      useOpenWorkordersStore.getState().setOpenWorkorders(data);
-    });
+    fetchFreshData();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchFreshData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, []);
+
+  async function fetchFreshData() {
+    try {
+      const [workorders, inventory] = await Promise.all([
+        dbGetOpenWorkorders(),
+        dbGetInventoryItems(),
+      ]);
+      if (workorders) useOpenWorkordersStore.getState().setOpenWorkorders(workorders);
+      if (inventory) useInventoryStore.getState().setItems(inventory);
+    } catch (e) {
+      log("Mobile data refresh failed:", e);
+    }
+  }
 
   return (
     <View

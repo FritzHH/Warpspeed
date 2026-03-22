@@ -5,6 +5,7 @@ import {
   capitalizeFirstLetterOfString,
   formatMillisForDisplay,
   formatPhoneWithDashes,
+  generateRandomID,
   generateUPCBarcode,
   gray,
   lightenRGBByPercent,
@@ -22,6 +23,7 @@ import {
   TextInput_,
   PrinterButton,
   StatusPickerModal,
+  Tooltip,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -43,10 +45,11 @@ import {
   useLoginStore,
   useSettingsStore,
   useTabNamesStore,
+  useAlertScreenStore,
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia } from "../../../db_calls_wrapper";
+import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia, dbSendSMS, dbSendEmail } from "../../../db_calls_wrapper";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -204,7 +207,76 @@ export const ActiveWorkorderComponent = ({}) => {
 
   }
 
-  function handleIntakePrintPress() {}
+  function handleIntakePrintPress() {
+    const settings = useSettingsStore.getState().getSettings();
+    const customer = useCurrentCustomerStore.getState().customer;
+
+    const willSMS = settings?.autoSMSIntakeReceipt && customer?.cell;
+    const willEmail = settings?.autoEmailIntakeReceipt && customer?.email;
+
+    if (!willSMS && !willEmail) return;
+
+    let channels = [];
+    if (willSMS) channels.push("SMS");
+    if (willEmail) channels.push("email");
+    const channelText = channels.join(" and ");
+
+    useAlertScreenStore.getState().setValues({
+      title: "SEND INTAKE RECEIPT",
+      message: "This will " + channelText + " the Intake Receipt to the customer. Are you sure?",
+      btn1Text: "SEND",
+      btn2Text: "CANCEL",
+      handleBtn1Press: () => {
+        sendIntakeReceipt(settings, customer, zOpenWorkorder);
+      },
+      handleBtn2Press: () => {},
+      showAlert: true,
+    });
+  }
+
+  function sendIntakeReceipt(settings, customer, workorder) {
+    const firstName = customer?.first || "Customer";
+    const storeName = settings?.storeName || "our store";
+    const brand = workorder?.brand || "";
+    const description = workorder?.model || workorder?.description || "";
+    const vars = { firstName, storeName, brand, description };
+
+    function applyTemplate(template, v) {
+      let result = template;
+      for (const [key, val] of Object.entries(v)) {
+        result = result.replace(new RegExp("\\{" + key + "\\}", "g"), val || "");
+      }
+      return result;
+    }
+
+    if (settings.autoSMSIntakeReceipt && customer?.cell) {
+      const msg = applyTemplate(
+        settings.intakeReceiptMessage || "Hi {firstName}, your intake receipt for your {brand} {description} is ready. Thank you for choosing {storeName}!",
+        vars
+      );
+      dbSendSMS({
+        message: msg,
+        phoneNumber: customer.cell,
+        customerID: customer.id || "",
+        id: generateRandomID(),
+        canRespond: false,
+      });
+      log("Sent intake receipt SMS to", customer.cell);
+    }
+
+    if (settings.autoEmailIntakeReceipt && customer?.email) {
+      const subject = applyTemplate(
+        settings.intakeReceiptEmailSubject || "Your intake receipt from {storeName}",
+        vars
+      );
+      const html = applyTemplate(
+        settings.intakeReceiptEmailTemplate || "<div style='font-family:Arial,sans-serif;max-width:500px;margin:0 auto'><p>Hi {firstName},</p><p>Your intake receipt for your {brand} {description} is ready.</p><p>Thank you for choosing {storeName}!</p></div>",
+        vars
+      );
+      dbSendEmail(customer.email, subject, html);
+      log("Sent intake receipt email to", customer.email);
+    }
+  }
 
   return (
     <View
@@ -974,40 +1046,47 @@ export const ActiveWorkorderComponent = ({}) => {
           paddingHorizontal: 10,
         }}
       >
-        <Button_
-          icon={ICONS.bicycle}
-          iconSize={50}
-          buttonStyle={{
-            paddingHorizontal: 0,
-            paddingVertical: 0,
-          }}
-          onPress={handleNewWorkorderPress}
-        />
-        <Button_
-          icon={ICONS.workorder}
-          iconSize={30}
-          iconStyle={{ paddingHorizontal: 0 }}
-          buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
-          onPress={handleWorkorderPrintPress}
-        />
-
-        <Button_
-          icon={ICONS.receipt}
-          iconSize={35}
-          iconStyle={{ paddingHorizontal: 0 }}
-          buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
-          onPress={handleIntakePrintPress}
-        />
-        <Button_
-          icon={ICONS.cashRegister}
-          iconSize={35}
-          buttonStyle={{
-            backgroundColor: "transparent",
-            paddingHorizontal: 0,
-            paddingVertical: 0,
-          }}
-          onPress={handleStartStandaloneSalePress}
-        />
+        <Tooltip text="New Workorder" position="top">
+          <Button_
+            icon={ICONS.bicycle}
+            iconSize={50}
+            buttonStyle={{
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+            }}
+            onPress={handleNewWorkorderPress}
+          />
+        </Tooltip>
+        <Tooltip text="Print Workorder" position="top">
+          <Button_
+            icon={ICONS.workorder}
+            iconSize={30}
+            iconStyle={{ paddingHorizontal: 0 }}
+            buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
+            onPress={handleWorkorderPrintPress}
+          />
+        </Tooltip>
+        <Tooltip text="Print intake receipt" position="top">
+          <Button_
+            icon={ICONS.receipt}
+            iconSize={35}
+            iconStyle={{ paddingHorizontal: 0 }}
+            buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
+            onPress={handleIntakePrintPress}
+          />
+        </Tooltip>
+        <Tooltip text="Standalone Sale" position="top">
+          <Button_
+            icon={ICONS.cashRegister}
+            iconSize={35}
+            buttonStyle={{
+              backgroundColor: "transparent",
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+            }}
+            onPress={handleStartStandaloneSalePress}
+          />
+        </Tooltip>
       </View>
       {sShowMediaModal && (
         <WorkorderMediaModal

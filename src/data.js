@@ -393,7 +393,7 @@ export const WORKORDER_PROTO = {
   status: "",
   taxFree: false,
   archived: false,
-  media: [],
+  media: [], taxFreeReceiptNote: "No items on this workorder were taxable. All items must be labor-only, and no shop parts or material left the shop with the customer.",
 };
 
 export const WORKORDER_ITEM_PROTO = {
@@ -875,6 +875,10 @@ export const SETTINGS_OBJ = {
   cardFeePercent: 3,
   cardFeeRefund: false,
   lockScreenWhenUserLogsOut: false,
+  autoSMSSalesReceipt: true,
+  autoEmailSalesReceipt: true,
+  autoSMSIntakeReceipt: true,
+  autoEmailIntakeReceipt: true,
   tenantID: "1234",
   storeID: "999",
   users: [FRITZ_USER_OBJ],
@@ -913,7 +917,12 @@ export const SETTINGS_OBJ = {
   textTemplates: [],
   autoCustomerNoteTexts: [],
   workorderTicketMessage: "Hi {firstName}, here is your workorder ticket for your {brand} {description}: {link}",
-  saleReceiptMessage: "Hi {firstName}, here is your receipt: {link}",
+  saleReceiptMessage: "Hi {firstName}, here is your receipt from {storeName} for {total}: {link}",
+  intakeReceiptMessage: "Hi {firstName}, your intake receipt for your {brand} {description} is ready. Thank you for choosing {storeName}!",
+  saleReceiptEmailSubject: "Your receipt from {storeName}",
+  intakeReceiptEmailSubject: "Your intake receipt from {storeName}",
+  saleReceiptEmailTemplate: "<div style='font-family:Arial,sans-serif;max-width:500px;margin:0 auto'><p>Hi {firstName},</p><p>Thank you for your purchase! Your total was <strong>{total}</strong>.</p>{receiptLink}<p>&mdash; {storeName}</p></div>",
+  intakeReceiptEmailTemplate: "<div style='font-family:Arial,sans-serif;max-width:500px;margin:0 auto'><p>Hi {firstName},</p><p>Your intake receipt for your {brand} {description} is ready.</p><p>Thank you for choosing {storeName}!</p></div>",
   translateStarters: [
     {
       id: "greeting_1",

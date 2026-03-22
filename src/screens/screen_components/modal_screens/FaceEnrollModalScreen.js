@@ -3,7 +3,7 @@
 import { Modal, TouchableWithoutFeedback, View } from "react-native-web";
 import { useLoginStore, useSettingsStore } from "../../../stores";
 import { Button_, ScreenModal } from "../../../components";
-import { FaceDetectionClientComponent } from "../../../faceDetectionClient";
+import { FaceDetectionClientComponent } from "../../../faceDetection";
 import { log } from "../../../utils";
 import { COLOR_GRADIENTS } from "../../../styles";
 import { useEffect } from "react";

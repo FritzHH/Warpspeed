@@ -660,7 +660,7 @@ const WorkordersList = ({ workorders, onSelect }) => {
         renderItem={(obj) => {
           const workorder = obj.item;
           const rs = resolveStatus(workorder.status, statuses);
-          const totals = calculateRunningTotals(workorder, taxPercent);
+          const totals = calculateRunningTotals(workorder, taxPercent, [], false, !!workorder.taxFree);
           const itemCount = workorder.workorderLines?.length || 0;
 
           return (
@@ -997,7 +997,7 @@ const WorkorderDetailView = ({ workorder, sales, onClose }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
   const rs = resolveStatus(workorder.status, statuses);
-  const totals = calculateRunningTotals(workorder, taxPercent);
+  const totals = calculateRunningTotals(workorder, taxPercent, [], false, !!workorder.taxFree);
   const lines = workorder.workorderLines || [];
   const mediaCount = workorder.media?.length || 0;
 

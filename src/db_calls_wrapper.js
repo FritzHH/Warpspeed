@@ -1991,6 +1991,27 @@ export function dbListenToOpenWorkorders(onSnapshot) {
 }
 
 /**
+ * Listen to changes on a single workorder document
+ * @param {string} workorderID
+ * @param {Function} callback - called with workorder data (or null)
+ * @returns {Function} unsubscribe function
+ */
+export function dbListenToSingleWorkorder(workorderID, callback) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !workorderID) return null;
+    const path = buildOpenWorkordersCollectionPath(tenantID, storeID) + "/" + workorderID;
+    const unsubscribe = firestoreSubscribe(path, (data) => {
+      callback(data ? { ...data, id: workorderID } : null);
+    });
+    return unsubscribe;
+  } catch (error) {
+    log("Error setting up single workorder listener:", error);
+    return null;
+  }
+}
+
+/**
  * Listen to changes in settings document for a tenant/store
  * @param {Function} onChange - Callback function called when settings change
  * @returns {Function} Unsubscribe function to stop listening

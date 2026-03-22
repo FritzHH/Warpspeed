@@ -12,7 +12,7 @@ import {
   capitalizeAllWordsInSentence,
   extractRandomFiveDigits,
 } from "../../../utils";
-import { ScreenModal, Button_, PhoneNumberInput } from "../../../components";
+import { ScreenModal, Button_, PhoneNumberInput, Tooltip } from "../../../components";
 import { CUSTOMER_PROTO, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { cloneDeep } from "lodash";
@@ -395,11 +395,13 @@ export function NewWorkorderComponent({}) {
           marginBottom: 20,
         }}
       >
-        <Button_
-          onPress={handleStartStandaloneSalePress}
-          icon={ICONS.cashRegister}
-          iconSize={35}
-        />
+        <Tooltip text="Standalone Sale" position="top">
+          <Button_
+            onPress={handleStartStandaloneSalePress}
+            icon={ICONS.cashRegister}
+            iconSize={35}
+          />
+        </Tooltip>
       </View>
 
       {/** customer info modal */}

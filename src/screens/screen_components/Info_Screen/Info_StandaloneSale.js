@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { FlatList, View, Text, TextInput } from "react-native-web";
-import { TAB_NAMES } from "../../../data";
+import { TAB_NAMES, RECEIPT_TYPES } from "../../../data";
 import {
   useOpenWorkordersStore,
   useTabNamesStore,
@@ -14,9 +14,11 @@ import {
   SHADOW_RADIUS_PROTO,
   Button_,
   SmallLoadingIndicator,
+  Tooltip,
 } from "../../../components";
 import {
   calculateRunningTotals,
+  generateUPCBarcode,
   gray,
   log,
   printBuilder,
@@ -231,25 +233,41 @@ export const StandaloneSaleComponent = ({}) => {
           alignItems: "center",
         }}
       >
-        <Button_
-          onPress={() => {
-            useTabNamesStore.getState().setItems({
-              infoTabName: TAB_NAMES.infoTab.customer,
-              itemsTabName: TAB_NAMES.itemsTab.empty,
-              optionsTabName: TAB_NAMES.optionsTab.workorders,
-            });
-          }}
-          icon={ICONS.bicycle}
-          iconSize={55}
-          buttonStyle={{ marginBottom: 0, paddingLeft: 15 }}
-        />
-        <Button_
-          icon={ICONS.receipt}
-          iconSize={40}
-          onPress={() =>
-            dbSavePrintObj(printBuilder.test(), "8C:77:3B:60:33:22")
-          }
-        />
+        <Tooltip text="Back to Customer" position="top">
+          <Button_
+            onPress={() => {
+              useTabNamesStore.getState().setItems({
+                infoTabName: TAB_NAMES.infoTab.customer,
+                itemsTabName: TAB_NAMES.itemsTab.empty,
+                optionsTabName: TAB_NAMES.optionsTab.workorders,
+              });
+            }}
+            icon={ICONS.bicycle}
+            iconSize={55}
+            buttonStyle={{ marginBottom: 0, paddingLeft: 15 }}
+          />
+        </Tooltip>
+        <Tooltip text="Pop register" position="top">
+          <Button_
+            icon={ICONS.cashRegister}
+            iconSize={40}
+            onPress={() =>
+              dbSavePrintObj(
+                { id: generateUPCBarcode(), receiptType: RECEIPT_TYPES.register },
+                "8C:77:3B:60:33:22"
+              )
+            }
+          />
+        </Tooltip>
+        <Tooltip text="Test Print" position="top">
+          <Button_
+            icon={ICONS.receipt}
+            iconSize={40}
+            onPress={() =>
+              dbSavePrintObj(printBuilder.test(), "8C:77:3B:60:33:22")
+            }
+          />
+        </Tooltip>
       </View>
     </View>
   );

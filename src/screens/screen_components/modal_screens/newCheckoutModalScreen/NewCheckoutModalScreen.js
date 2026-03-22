@@ -2,8 +2,8 @@
 import { View, Text, ScrollView } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_ } from "../../../../components";
-import { C, Fonts, COLOR_GRADIENTS } from "../../../../styles";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, Tooltip } from "../../../../components";
+import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   useCheckoutStore,
   useOpenWorkordersStore,
@@ -24,11 +24,13 @@ import {
   formatPhoneWithDashes,
   formatPhoneForDisplay,
 } from "../../../../utils";
-import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS } from "../../../../data";
+import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO } from "../../../../data";
+import { dbSavePrintObj } from "../../../../db_calls_wrapper";
 import {
   createNewSale,
   updateSaleWithTotals,
   calculateSaleTotals,
+  sendAutoSaleReceipt,
 } from "./newCheckoutUtils";
 import {
   newCheckoutSaveActiveSale,
@@ -381,6 +383,10 @@ export function NewCheckoutModalScreen() {
     const allLines = sCombinedWorkorders.flatMap((wo) => wo.workorderLines || []);
     const isStandalone = primaryWO?.isStandaloneSale || false;
     saveSaleIndex(sale, customerInfo, allLines, isStandalone);
+
+    // Auto-send receipt via SMS/email
+    const settings = useSettingsStore.getState().getSettings();
+    sendAutoSaleReceipt(sale, customer, settings);
   }
 
   function handleCashChange(change) {
@@ -441,6 +447,58 @@ export function NewCheckoutModalScreen() {
     );
     // dbSavePrintObj would be called here if printing is needed
     log("Reprint receipt:", toPrint);
+  }
+
+  function handlePopRegister() {
+    let printObj = { id: generateUPCBarcode(), receiptType: RECEIPT_TYPES.register };
+    dbSavePrintObj(printObj, zSettings?.printerCloudId || "8C:77:3B:60:33:22");
+  }
+
+  function handleTaxFreeToggle() {
+    const primaryWO = sCombinedWorkorders[0];
+    if (!primaryWO) return;
+    const currentlyTaxFree = !!primaryWO.taxFree;
+
+    const applyTaxFree = (newVal) => {
+      let newCombined = sCombinedWorkorders.map((wo) => ({
+        ...wo,
+        taxFree: newVal,
+      }));
+      _setCombinedWorkorders(newCombined);
+
+      // Persist to each workorder
+      newCombined.forEach((wo) => {
+        useOpenWorkordersStore.getState().setField("taxFree", newVal, wo.id);
+      });
+
+      // Recalculate sale totals
+      let updated = updateSaleWithTotals(sSale, newCombined, sAddedItems, zSettings);
+      _setSale(updated);
+      broadcastSaleToDisplay(updated, newCombined, sAddedItems, custFirst, custLast);
+      newCheckoutSaveActiveSale(updated);
+    };
+
+    if (currentlyTaxFree) {
+      // Unchecking — no confirmation needed
+      applyTaxFree(false);
+    } else {
+      // Checking — confirm with user
+      useAlertScreenStore.getState().setValues({
+        showAlert: true,
+        fullScreen: true,
+        title: "Tax-Free Confirmation",
+        message: "No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.",
+        btn1Text: "Confirm Tax-Free",
+        handleBtn1Press: () => {
+          useAlertScreenStore.getState().setValues({ showAlert: false });
+          applyTaxFree(true);
+        },
+        btn2Text: "Cancel",
+        handleBtn2Press: () => {
+          useAlertScreenStore.getState().setValues({ showAlert: false });
+        },
+      });
+    }
   }
 
   // ─── Render ───────────────────────────────────────────────
@@ -588,6 +646,24 @@ export function NewCheckoutModalScreen() {
                 </ScrollView>
               </View>
 
+              {/* Tax-Free Checkbox */}
+              {sCombinedWorkorders.length > 0 && !saleComplete && (
+                <View
+                  style={{
+                    width: "100%",
+                    alignItems: "center",
+                    paddingTop: 8,
+                  }}
+                >
+                  <CheckBox_
+                    text="Tax-Free"
+                    isChecked={!!sCombinedWorkorders[0]?.taxFree}
+                    onCheck={handleTaxFreeToggle}
+                    textStyle={{ fontSize: 13, color: gray(0.5) }}
+                  />
+                </View>
+              )}
+
               {/* Bottom Buttons: Cancel/Close + Reprint */}
               <View
                 style={{
@@ -609,6 +685,13 @@ export function NewCheckoutModalScreen() {
                   textStyle={{ color: C.textWhite }}
                   buttonStyle={{ width: 150 }}
                 />
+                <Tooltip text="Pop register" position="top">
+                  <Button_
+                    onPress={handlePopRegister}
+                    icon={ICONS.cashRegister}
+                    iconSize={30}
+                  />
+                </Tooltip>
                 {saleComplete && (
                   <Button_
                     colorGradientArr={COLOR_GRADIENTS.greenblue}

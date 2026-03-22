@@ -253,6 +253,7 @@ export const useAlertScreenStore = create((set, get) => ({
   canExitOnOuterClick: true,
   pauseOnBaseComponent: false,
   useCancelButton: false,
+  fullScreen: false,
 
   getPauseOnBaseComponent: () => get().pauseOnBaseComponent,
   getMessage: () => get().message,
@@ -295,6 +296,7 @@ export const useAlertScreenStore = create((set, get) => ({
     showAlert = true,
     pauseOnBaseComponent = false,
     useCancelButton,
+    fullScreen = false,
   }) => {
     set(() => ({
       title,
@@ -317,6 +319,7 @@ export const useAlertScreenStore = create((set, get) => ({
       showAlert,
       pauseOnBaseComponent,
       useCancelButton,
+      fullScreen,
     }));
   },
   setMessage: (message) => {
@@ -382,6 +385,7 @@ export const useAlertScreenStore = create((set, get) => ({
       canExitOnOuterClick: true,
       pauseOnBaseComponent: false,
       useCancelButton: false,
+      fullScreen: false,
     }));
   },
 }));
@@ -770,7 +774,7 @@ export function broadcastWorkorderToDisplay(wo) {
 
   // Standalone sales broadcast as SALE/Checkout type
   if (wo.isStandaloneSale) {
-    let totals = calculateRunningTotals(wo, salesTaxPercent);
+    let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
     broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
       customerFirst: wo.customerFirst || "",
       customerLast: wo.customerLast || "",
@@ -793,7 +797,7 @@ export function broadcastWorkorderToDisplay(wo) {
   let startedOn = Number(wo.startedOnMillis) || 0;
   if (startedOn && Date.now() - startedOn > 300000) return;
 
-  let totals = calculateRunningTotals(wo, salesTaxPercent);
+  let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
   let customer = useCurrentCustomerStore.getState().getCustomer();
   broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
     customerFirst: wo.customerFirst || "",

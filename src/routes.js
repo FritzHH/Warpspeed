@@ -15,6 +15,8 @@ export const ROUTES = {
     home: "/",
     workorders: "/workorders",
     workorderDetail: "/workorder/:id",
+    itemEdit: "/workorder/:id/items",
+    messages: "/workorder/:id/messages",
   },
 };
 

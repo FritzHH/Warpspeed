@@ -16,6 +16,7 @@ import {
 import {
   GradientView,
   Button_,
+  CheckBox_,
   DropdownMenu,
   TextInput_,
   Tooltip,
@@ -37,6 +38,7 @@ import {
   useTabNamesStore,
   useCurrentCustomerStore,
   useLoginStore,
+  useAlertScreenStore,
 } from "../../../stores";
 import { dbGetCustomer } from "../../../db_calls_wrapper";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
@@ -137,7 +139,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   useEffect(() => {
     if (!(zOpenWorkorder?.workorderLines?.length > 0)) return;
     _setTotals(
-      calculateRunningTotals(zOpenWorkorder, zSalesTaxPercent)
+      calculateRunningTotals(zOpenWorkorder, zSalesTaxPercent, [], false, !!zOpenWorkorder.taxFree)
     );
   }, [zOpenWorkorder]);
 
@@ -287,6 +289,31 @@ export const Items_WorkorderItemsTab = ({}) => {
     });
   }
 
+  function handleTaxFreeToggle() {
+    useLoginStore.getState().requireLogin(() => {
+      const currentlyTaxFree = !!zOpenWorkorder.taxFree;
+      if (currentlyTaxFree) {
+        useOpenWorkordersStore.getState().setField("taxFree", false);
+      } else {
+        useAlertScreenStore.getState().setValues({
+          showAlert: true,
+          fullScreen: true,
+          title: "Tax-Free Confirmation",
+          message: "No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.",
+          btn1Text: "Confirm Tax-Free",
+          handleBtn1Press: () => {
+            useAlertScreenStore.getState().setValues({ showAlert: false });
+            useOpenWorkordersStore.getState().setField("taxFree", true);
+          },
+          btn2Text: "Cancel",
+          handleBtn2Press: () => {
+            useAlertScreenStore.getState().setValues({ showAlert: false });
+          },
+        });
+      }
+    });
+  }
+
   // log("here", zOpenWorkorder);
   if (!zOpenWorkorder) return null;
   let hasItems = zOpenWorkorder?.workorderLines?.length > 0;
@@ -322,6 +349,13 @@ export const Items_WorkorderItemsTab = ({}) => {
               onPress={handleDeleteWorkorder}
             />
           </Tooltip>
+          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
+          <CheckBox_
+            text="Tax-Free"
+            isChecked={!!zOpenWorkorder.taxFree}
+            onCheck={handleTaxFreeToggle}
+            textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : gray(0.5) }}
+          />
           <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
           <Text style={{ fontSize: 13, color: gray(0.65) }}>
             {"SUBTOTAL: "}
@@ -446,6 +480,20 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
+        <CheckBox_
+          text="Tax-Free"
+          isChecked={!!zOpenWorkorder.taxFree}
+          onCheck={handleTaxFreeToggle}
+          enabled={!isDonePaid}
+          textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : gray(0.5) }}
+        />
+        <View
+          style={{
+            width: 1,
+            height: "100%",
+            backgroundColor: C.buttonLightGreenOutline,
+          }}
+        />
 
         <Text style={{ fontSize: 13, color: "gray" }}>
           {"SUBTOTAL: "}
@@ -497,8 +545,9 @@ export const Items_WorkorderItemsTab = ({}) => {
             style={{
               marginRight: 10,
               fontWeight: 500,
-              color: C.text,
+              color: zOpenWorkorder.taxFree ? C.lightText : C.text,
               fontSize: 14,
+              textDecorationLine: zOpenWorkorder.taxFree ? "line-through" : "none",
             }}
           >
             {"$" + formatCurrencyDisp(sTotals.runningTax)}

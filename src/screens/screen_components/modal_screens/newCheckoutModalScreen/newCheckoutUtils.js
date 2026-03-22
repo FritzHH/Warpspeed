@@ -1,9 +1,12 @@
 import { cloneDeep } from "lodash";
 import {
   generateUPCBarcode,
+  generateRandomID,
   calculateRunningTotals,
   formatCurrencyDisp,
+  log,
 } from "../../../../utils";
+import { dbSendSMS, dbSendEmail } from "../../../../db_calls_wrapper";
 import {
   SALE_PROTO,
   PAYMENT_OBJECT_PROTO,
@@ -302,4 +305,57 @@ export function splitWorkorderLinesToSingleQty(workorders) {
     newWO.workorderLines = singleLines;
     return newWO;
   });
+}
+
+// ─── Auto-send sale receipt via SMS/email ─────────────────────
+function applyTemplate(template, vars) {
+  let result = template;
+  for (const [key, val] of Object.entries(vars)) {
+    result = result.replace(new RegExp("\\{" + key + "\\}", "g"), val || "");
+  }
+  return result;
+}
+
+export function sendAutoSaleReceipt(sale, customer, settings) {
+  if (!sale || !settings) return;
+
+  const firstName = customer?.first || "Customer";
+  const storeName = settings?.storeName || "our store";
+  const total = formatCurrencyDisp(sale.total, true);
+  const receiptURL = sale.payments?.find((p) => p.receiptURL)?.receiptURL || "";
+
+  const vars = { firstName, storeName, total, link: receiptURL };
+
+  // SMS
+  if (settings.autoSMSSalesReceipt && customer?.cell) {
+    const msg = applyTemplate(
+      settings.saleReceiptMessage || "Hi {firstName}, here is your receipt from {storeName} for {total}: {link}",
+      vars
+    );
+    dbSendSMS({
+      message: msg,
+      phoneNumber: customer.cell,
+      customerID: customer.id || "",
+      id: generateRandomID(),
+      canRespond: false,
+    });
+    log("Auto-sent sale receipt SMS to", customer.cell);
+  }
+
+  // Email
+  if (settings.autoEmailSalesReceipt && customer?.email) {
+    const subject = applyTemplate(
+      settings.saleReceiptEmailSubject || "Your receipt from {storeName}",
+      vars
+    );
+    const receiptLink = receiptURL
+      ? "<p style='margin:24px 0'><a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Receipt</a></p>"
+      : "";
+    const html = applyTemplate(
+      settings.saleReceiptEmailTemplate || "<div style='font-family:Arial,sans-serif;max-width:500px;margin:0 auto'><p>Hi {firstName},</p><p>Thank you for your purchase! Your total was <strong>{total}</strong>.</p>{receiptLink}<p>&mdash; {storeName}</p></div>",
+      { ...vars, receiptLink }
+    );
+    dbSendEmail(customer.email, subject, html);
+    log("Auto-sent sale receipt email to", customer.email);
+  }
 }

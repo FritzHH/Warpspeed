@@ -2840,11 +2840,7 @@ export const StatusPickerModal = ({
   const ref = useRef();
 
   useEffect(() => {
-    if (sVisible) {
-      _setAnimation("fade");
-    } else {
-      _setAnimation("slide");
-    }
+    _setAnimation("fade");
   }, [sVisible]);
 
   useEffect(() => {

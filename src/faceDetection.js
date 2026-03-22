@@ -99,6 +99,16 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       // skip detection while clock-in prompt is showing
       if (pauseRef.current) return;
 
+      // re-acquire stream if tracks died (e.g. after hibernate/sleep)
+      if (!isStreamAlive()) {
+        try {
+          await startVideo();
+          log("Webcam stream re-acquired after sleep/hibernate.");
+        } catch (e) {
+          return; // camera not available yet, try again next interval
+        }
+      }
+
       const descriptor = await getFaceDescriptor();
       const matchedUser = descriptor ? findMatchingUser(descriptor) : null;
 
@@ -127,31 +137,34 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
   // helpers ////////////////////////////////////////////////////////////////
 
-  function startVideo() {
-    return new Promise(async (resolve, reject) => {
-      // if video already has a stream, capture the ref and resolve
-      if (videoRef.current?.srcObject) {
-        streamRef.current = videoRef.current.srcObject;
-        resolve();
-        return;
-      }
+  function isStreamAlive() {
+    const stream = streamRef.current;
+    if (!stream) return false;
+    const tracks = stream.getVideoTracks();
+    return tracks.length > 0 && tracks.every((t) => t.readyState === "live");
+  }
 
-      if (!navigator.mediaDevices?.getUserMedia) {
-        reject(new Error("getUserMedia not supported"));
-        return;
-      }
+  async function startVideo() {
+    // if video already has a live stream, just capture the ref
+    if (videoRef.current?.srcObject && isStreamAlive()) {
+      streamRef.current = videoRef.current.srcObject;
+      return;
+    }
 
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        resolve();
-      } catch (e) {
-        reject(e);
-      }
-    });
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("getUserMedia not supported");
+    }
+
+    // stop any dead tracks before re-acquiring
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    streamRef.current = stream;
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
   }
 
   async function getFaceDescriptor() {

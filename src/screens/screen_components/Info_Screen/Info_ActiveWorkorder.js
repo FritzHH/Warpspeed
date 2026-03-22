@@ -64,14 +64,20 @@ export const ActiveWorkorderComponent = ({}) => {
     return state.workorders.find((o) => o.id === id) || null;
   });
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
-  const zCustomer = useCurrentCustomerStore((state) => state.customer);
+  const zCustomer = {
+    first: zOpenWorkorder?.customerFirst || "",
+    last: zOpenWorkorder?.customerLast || "",
+    cell: zOpenWorkorder?.customerPhone || "",
+    landline: zOpenWorkorder?.customerLandline || "",
+    email: zOpenWorkorder?.customerEmail || "",
+    contactRestriction: zOpenWorkorder?.customerContactRestriction || "",
+  };
   var zSettings = SETTINGS_OBJ;
   zSettings = useSettingsStore((state) => state.settings);
 
   ///////////////////////////////////////////////////////////////////////////////
   const [sShowCustomerInfoScreen, _setShowCustomerInfoScreen] =
     React.useState(false);
-  const [sCustomerScreenTextFocus, _setCustomerScreenTextFocus] = useState("");
   const [sShowMediaModal, _setShowMediaModal] = useState(null); // null | "upload" | "view"
   const uploadInputRef = useRef(null);
 
@@ -180,6 +186,9 @@ export const ActiveWorkorderComponent = ({}) => {
       wo.customerFirst = customer.first;
       wo.customerLast = customer.last;
       wo.customerPhone = customer.cell || customer.landline;
+      wo.customerLandline = customer.landline || "";
+      wo.customerEmail = customer.email || "";
+      wo.customerContactRestriction = customer.contactRestriction || "";
       wo.id = generateUPCBarcode();
       wo.startedOnMillis = new Date().getTime();
       wo.status = SETTINGS_OBJ.statuses[0]?.id || "";
@@ -332,8 +341,6 @@ export const ActiveWorkorderComponent = ({}) => {
             }}
             Component={() => (
               <CustomerInfoScreenModalComponent
-                focus={sCustomerScreenTextFocus}
-                setFocus={_setCustomerScreenTextFocus}
                 incomingCustomer={useCurrentCustomerStore.getState().customer}
                 button1Text={"New Workorder"}
                 button2Text={"Close"}

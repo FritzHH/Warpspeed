@@ -1925,6 +1925,9 @@ export function createNewWorkorder({
   customerFirst,
   customerLast,
   customerPhone,
+  customerLandline,
+  customerEmail,
+  customerContactRestriction,
   startedByFirst,
   startedByLast,
   isStandaloneSale,
@@ -1938,6 +1941,9 @@ export function createNewWorkorder({
   wo.customerFirst = customerFirst;
   wo.customerLast = customerLast;
   wo.customerPhone = customerPhone;
+  wo.customerLandline = customerLandline || "";
+  wo.customerEmail = customerEmail || "";
+  wo.customerContactRestriction = customerContactRestriction || "";
   wo.customerID = customerID;
   (wo.startedBy = startedByFirst + " " + startedByLast),
     wo.changeLog.push("Started by: " + startedByFirst + " " + startedByLast);

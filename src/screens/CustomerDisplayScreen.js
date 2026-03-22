@@ -423,9 +423,17 @@ export function CustomerDisplayScreen() {
     function handleResize() {
       _setIsTall(window.innerHeight > window.innerWidth);
     }
+    function writeDisplayHeartbeat() {
+      localStorage.setItem("warpspeed_display_heartbeat", JSON.stringify({
+        open: true,
+        fullscreen: !!document.fullscreenElement,
+        timestamp: Date.now(),
+      }));
+    }
     function handleFullscreenChange() {
       let isFs = !!document.fullscreenElement;
       _setIsFullscreen(isFs);
+      writeDisplayHeartbeat();
       broadcastDisplayStatus(isFs ? DISPLAY_STATUS.FULLSCREEN : DISPLAY_STATUS.WINDOWED);
     }
     function handleVisibilityChange() {
@@ -434,7 +442,19 @@ export function CustomerDisplayScreen() {
       );
     }
     function handleBeforeUnload() {
+      localStorage.removeItem("warpspeed_display_heartbeat");
       broadcastDisplayStatus(DISPLAY_STATUS.CLOSED);
+    }
+    function handleWindowBlur() {
+      let isFs = !!document.fullscreenElement;
+      console.log("[CustomerDisplay] window lost focus — possibly obscured by another window | fullscreen:", isFs);
+      if (!isFs) {
+        console.log("[CustomerDisplay] WARNING: display is NOT in full-screen mode");
+      }
+    }
+    function handleWindowFocus() {
+      let isFs = !!document.fullscreenElement;
+      console.log("[CustomerDisplay] window regained focus | fullscreen:", isFs);
     }
     // Respond to PING from main screen
     let unsubStatus = onDisplayStatusMessage((msg) => {
@@ -445,12 +465,17 @@ export function CustomerDisplayScreen() {
       }
     });
     // Broadcast that display window is open
+    writeDisplayHeartbeat();
+    let heartbeatInterval = setInterval(writeDisplayHeartbeat, 2000);
     broadcastDisplayStatus(DISPLAY_STATUS.OPEN);
     window.addEventListener("resize", handleResize);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
     return () => {
+      clearInterval(heartbeatInterval);
       unsubDisplay();
       unsubTranslate();
       unsubStatus();
@@ -458,6 +483,8 @@ export function CustomerDisplayScreen() {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, []);
 

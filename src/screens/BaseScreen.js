@@ -64,7 +64,62 @@ export function BaseScreen() {
 
   // display window status — "closed" until display broadcasts otherwise
   const [sDisplayStatus, _setDisplayStatus] = useState(DISPLAY_STATUS.CLOSED);
-  const [sDisplayLoading, _setDisplayLoading] = useState(false);
+  const [sDisplayLoading, _setDisplayLoading] = useState(
+    localStorage.getItem("warpspeed_has_secondary_display") === "true"
+  );
+  const [sDisplayFullscreen, _setDisplayFullscreen] = useState(false);
+  const [sDisplayHeartbeatAlive, _setDisplayHeartbeatAlive] = useState(false);
+
+  // Poll display heartbeat from localStorage
+  useEffect(() => {
+    function checkHeartbeat() {
+      let raw = localStorage.getItem("warpspeed_display_heartbeat");
+      if (!raw) {
+        _setDisplayFullscreen(false);
+        _setDisplayHeartbeatAlive(false);
+        return;
+      }
+      try {
+        let hb = JSON.parse(raw);
+        let stale = Date.now() - hb.timestamp > 10000;
+        _setDisplayFullscreen(!stale && hb.fullscreen === true);
+        _setDisplayHeartbeatAlive(!stale && hb.open === true);
+      } catch (e) {
+        _setDisplayFullscreen(false);
+        _setDisplayHeartbeatAlive(false);
+      }
+    }
+    checkHeartbeat();
+    let interval = setInterval(checkHeartbeat, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  async function openDisplayWindow() {
+    _setDisplayLoading(true);
+    let storeName = useSettingsStore.getState().getSettings()?.storeInfo?.displayName || "";
+    let title = storeName ? `${storeName} Checkout Display` : "Checkout Display";
+    let screenDetails = null;
+    let secondScreen = null;
+    if (window.getScreenDetails) {
+      try {
+        screenDetails = await window.getScreenDetails();
+        let currentScreen = screenDetails.currentScreen;
+        secondScreen = screenDetails.screens.find((s) => s.label !== currentScreen.label);
+      } catch (e) { }
+    }
+    let features = secondScreen
+      ? `popup,left=${secondScreen.left},top=${secondScreen.top},width=${secondScreen.width},height=${secondScreen.height}`
+      : "popup,width=1024,height=768";
+    let win = window.open(ROUTES.display, "customerDisplay", features);
+    if (win) {
+      win.focus();
+      win.addEventListener("load", () => { win.document.title = title; });
+      return true;
+    } else {
+      _setDisplayLoading(false);
+      return false;
+    }
+  }
 
   // new checkout refund modal state
   const [sRefundModalVisible, _setRefundModalVisible] = useState(false);
@@ -99,18 +154,58 @@ export function BaseScreen() {
   }, []);
 
   // display status listener — re-broadcast current workorder when display window opens
+  // auto-open + auto-reopen when "secondary display attached" is enabled in localStorage
   useEffect(() => {
+    let popupBlocked = false;
+    const hasSecondary = localStorage.getItem("warpspeed_has_secondary_display") === "true";
+
     let unsub = onDisplayStatusMessage((msg) => {
+      console.log("[Dashboard] display status received:", msg.status);
       _setDisplayStatus(msg.status);
+      if (msg.status === DISPLAY_STATUS.WINDOWED) {
+        console.log("[Dashboard] WARNING: display is NOT in full-screen mode");
+      }
       if (msg.status === DISPLAY_STATUS.OPEN || msg.status === DISPLAY_STATUS.VISIBLE) {
         _setDisplayLoading(false);
+        popupBlocked = false;
         let wo = useOpenWorkordersStore.getState().getOpenWorkorder();
         if (wo) broadcastWorkorderToDisplay(wo);
       }
+      // Auto-reopen on close if secondary display is configured
+      if (msg.status === DISPLAY_STATUS.CLOSED && hasSecondary && !popupBlocked) {
+        openDisplayWindow().then((success) => {
+          if (!success) popupBlocked = true;
+        });
+      }
     });
+
     // Ping to discover if display is already open
     broadcastDisplayStatus(DISPLAY_STATUS.PING);
-    return () => unsub();
+
+    // Auto-open on mount if secondary display is configured and display is not already open
+    let autoOpenTimer = null;
+    if (hasSecondary) {
+      autoOpenTimer = setTimeout(() => {
+        let raw = localStorage.getItem("warpspeed_display_heartbeat");
+        let alive = false;
+        if (raw) {
+          try {
+            let hb = JSON.parse(raw);
+            alive = hb.open === true && (Date.now() - hb.timestamp) < 10000;
+          } catch (e) {}
+        }
+        if (!popupBlocked && !alive) {
+          openDisplayWindow().then((success) => {
+            if (!success) popupBlocked = true;
+          });
+        }
+      }, 1500);
+    }
+
+    return () => {
+      unsub();
+      if (autoOpenTimer) clearTimeout(autoOpenTimer);
+    };
   }, []);
 
   ////////  testing    //////////////////////////////////////////////////////////////////////
@@ -200,6 +295,12 @@ export function BaseScreen() {
         style={{ width: "100%", height: 0 }}
       />
 
+      <style>{`
+        @keyframes bannerPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
       <NewCheckoutModalScreen />
       <NewRefundModalScreen
         visible={sRefundModalVisible}
@@ -225,7 +326,8 @@ export function BaseScreen() {
           justifyContent: "space-around",
         }}
       >
-        {(sDisplayStatus === DISPLAY_STATUS.CLOSED ||
+        {localStorage.getItem("warpspeed_has_secondary_display") === "true" &&
+          (sDisplayStatus === DISPLAY_STATUS.CLOSED ||
           sDisplayStatus === DISPLAY_STATUS.HIDDEN) && (
             <View
               style={{
@@ -238,8 +340,7 @@ export function BaseScreen() {
                 paddingHorizontal: 10,
                 paddingVertical: 4,
                 backgroundColor: C.red,
-                borderRadius: 5,
-                // marginBottom: 10,
+              borderRadius: 5,
               }}
             >
               <Text
@@ -253,34 +354,7 @@ export function BaseScreen() {
               </Text>
               <TouchableOpacity
                 disabled={sDisplayLoading}
-                onPress={async () => {
-                  if (sDisplayLoading) return;
-                  _setDisplayLoading(true);
-                  let storeName = useSettingsStore.getState().getSettings()?.storeInfo?.displayName || "";
-                  let title = storeName ? `${storeName} Checkout Display` : "Checkout Display";
-                  let screenDetails = null;
-                  let secondScreen = null;
-                  if (window.getScreenDetails) {
-                    try {
-                      screenDetails = await window.getScreenDetails();
-                      let currentScreen = screenDetails.currentScreen;
-                      secondScreen = screenDetails.screens.find(
-                        (s) => s.label !== currentScreen.label
-                      );
-                    } catch (e) { }
-                  }
-                  let features = secondScreen
-                    ? `popup,left=${secondScreen.left},top=${secondScreen.top},width=${secondScreen.width},height=${secondScreen.height}`
-                    : "popup,width=1024,height=768";
-                  let win = window.open(ROUTES.display, "customerDisplay", features);
-                  if (win) {
-                    win.addEventListener("load", () => {
-                      win.document.title = title;
-                    });
-                  } else {
-                    _setDisplayLoading(false);
-                  }
-                }}
+              onPress={() => openDisplayWindow()}
                 style={{ marginLeft: 10, paddingHorizontal: 12, paddingVertical: 2, backgroundColor: C.green, borderRadius: 5, opacity: sDisplayLoading ? 0.5 : 1 }}
               >
                 {sDisplayLoading ? (
@@ -299,6 +373,36 @@ export function BaseScreen() {
               </TouchableOpacity>
             </View>
           )}
+        {!sDisplayFullscreen && sDisplayStatus !== DISPLAY_STATUS.CLOSED && sDisplayStatus !== DISPLAY_STATUS.HIDDEN && (
+          <div
+            style={{
+              height: 25,
+              width: "95%",
+              alignSelf: 'center',
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: 'center',
+              paddingLeft: 10,
+              paddingRight: 10,
+              paddingTop: 4,
+              paddingBottom: 4,
+              backgroundColor: 'yellow',
+              borderRadius: 5,
+              animation: "bannerPulse 1.5s ease-in-out infinite",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 15,
+                color: 'red',
+                fontWeight: "600",
+              }}
+            >
+              Please press the Full-Screen button on the Customer Display!
+            </Text>
+          </div>
+        )}
         <View
           style={{
             width: "100%",

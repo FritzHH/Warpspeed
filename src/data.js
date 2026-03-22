@@ -365,6 +365,9 @@ export const WORKORDER_PROTO = {
   customerFirst: "",
   customerLast: "",
   customerPhone: "",
+  customerLandline: "",
+  customerEmail: "",
+  customerContactRestriction: "",
   model: "",
   brand: "",
   description: "",
@@ -946,6 +949,7 @@ export const SETTINGS_OBJ = {
     },
   ],
 };
+
 
 // RECEIPT STUFF ////////////////////////////////////////////////////
 

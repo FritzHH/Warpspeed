@@ -1,9 +1,9 @@
 /* eslint-disable */
 
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../styles";
-import { Button_ } from "../components";
+import { Button_, CheckBox_ } from "../components";
 import { ROUTES } from "../routes";
 import { useSettingsStore } from "../stores";
 
@@ -15,6 +15,10 @@ const LINK_ITEMS = [
 ];
 
 export function HomeScreen() {
+  const [sHasDisplay, _setHasDisplay] = useState(
+    localStorage.getItem("warpspeed_has_secondary_display") === "true"
+  );
+
   return (
     <View
       style={{
@@ -89,6 +93,17 @@ export function HomeScreen() {
           />
         ))}
       </View>
+      <CheckBox_
+        text="Secondary display attached"
+        isChecked={sHasDisplay}
+        onCheck={() => {
+          let newVal = !sHasDisplay;
+          _setHasDisplay(newVal);
+          localStorage.setItem("warpspeed_has_secondary_display", String(newVal));
+        }}
+        textStyle={{ fontSize: 14, color: C.lightText }}
+        buttonStyle={{ marginTop: 20 }}
+      />
     </View>
   );
 }

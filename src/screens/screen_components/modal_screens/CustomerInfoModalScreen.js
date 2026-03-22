@@ -4,7 +4,6 @@ import {
   Text,
   FlatList,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
 } from "react-native-web";
@@ -24,11 +23,12 @@ import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useState } from "react";
 import {
   useCurrentCustomerStore,
+  useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
 } from "../../../stores";
 import { CONTACT_RESTRICTIONS, CUSTOMER_PROTO } from "../../../data";
-import { Button_, CheckBox_, SmallLoadingIndicator } from "../../../components";
+import { Button_, CheckBox_, SmallLoadingIndicator, TextInput_ } from "../../../components";
 import {
   dbSaveCustomer,
   dbGetCompletedWorkorder,
@@ -43,8 +43,6 @@ export const CustomerInfoScreenModalComponent = ({
   button2Text,
   handleButton1Press,
   handleButton2Press,
-  focus,
-  setFocus = () => {},
 }) => {
   const [sCustomerInfo, _setCustomerInfo] = useState(incomingCustomer);
   const [sWorkorders, _sSetWorkorders] = useState([]);
@@ -158,6 +156,41 @@ export const CustomerInfoScreenModalComponent = ({
     _setCustomerInfo({ ...sCustomerInfo, [fieldName]: fieldVal });
   }
 
+  const CUSTOMER_TO_WORKORDER_FIELDS = {
+    first: "customerFirst",
+    last: "customerLast",
+    cell: "customerPhone",
+    landline: "customerLandline",
+    email: "customerEmail",
+    contactRestriction: "customerContactRestriction",
+  };
+
+  function saveField(fieldName, val) {
+    useLoginStore.getState().requireLogin(() => {
+      _setCustomerInfo((prev) => {
+        const updated = { ...prev, [fieldName]: val };
+        if (!isNewCustomer) {
+          if (isCurrentCustomer) {
+            useCurrentCustomerStore.getState().setCustomerField(fieldName, val, prev.id);
+          }
+          dbSaveCustomer(updated);
+
+          // Sync duplicated fields to open workorders
+          const woField = CUSTOMER_TO_WORKORDER_FIELDS[fieldName];
+          if (woField) {
+            const allWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+            allWOs
+              .filter((wo) => wo.customerID === prev.id)
+              .forEach((wo) => {
+                useOpenWorkordersStore.getState().setField(woField, val, wo.id);
+              });
+          }
+        }
+        return updated;
+      });
+    });
+  }
+
   const TEXT_INPUT_STYLE = {
     width: "100%",
     height: 40,
@@ -203,23 +236,8 @@ export const CustomerInfoScreenModalComponent = ({
                 sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.call
               }
               onCheck={() => {
-                let val;
-                if (
-                  sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call
-                ) {
-                  val = "";
-                } else {
-                  val = CONTACT_RESTRICTIONS.call;
-                }
-                setCustomerField("contactRestriction", val);
-                if (isNewCustomer) return;
-                if (isCurrentCustomer) {
-                  useCurrentCustomerStore
-                    .getState()
-                    .setCustomerField("contactRestriction", val);
-                  return;
-                }
-                dbSaveCustomer({ ...sCustomerInfo, contactRestriction: val });
+                let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call ? "" : CONTACT_RESTRICTIONS.call;
+                saveField("contactRestriction", val);
               }}
             />
             <CheckBox_
@@ -228,24 +246,8 @@ export const CustomerInfoScreenModalComponent = ({
                 sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.email
               }
               onCheck={() => {
-                let val;
-                if (
-                  sCustomerInfo.contactRestriction ===
-                  CONTACT_RESTRICTIONS.email
-                ) {
-                  val = "";
-                } else {
-                  val = CONTACT_RESTRICTIONS.email;
-                }
-                setCustomerField("contactRestriction", val);
-                if (isNewCustomer) return;
-                if (isCurrentCustomer) {
-                  useCurrentCustomerStore
-                    .getState()
-                    .setCustomerField("contactRestriction", val);
-                  return;
-                }
-                dbSaveCustomer({ ...sCustomerInfo, contactRestriction: val });
+                let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.email ? "" : CONTACT_RESTRICTIONS.email;
+                saveField("contactRestriction", val);
               }}
             />
           </View>
@@ -255,250 +257,88 @@ export const CustomerInfoScreenModalComponent = ({
                 Cell
               </Text>
             )}
-            <TextInput
+            <TextInput_
               onChangeText={(val) => {
                 val = removeDashesFromPhone(val);
                 if (val.length > 10) return;
-                setCustomerField("cell", val);
-                if (isNewCustomer) return;
-                if (isCurrentCustomer) {
-                  useCurrentCustomerStore
-                    .getState()
-                    .setCustomerField("cell", val, sCustomerInfo.id);
-                }
-                dbSaveCustomer({ ...sCustomerInfo, cell: val });
+                saveField("cell", val);
               }}
-              onFocus={() => setFocus("cell")}
-              autoFocus={focus === "cell"}
-              placeholderTextColor="darkgray"
               placeholder="Cell phone"
               style={{
                 ...TEXT_INPUT_STYLE,
                 marginTop: sCustomerInfo.cell ? 1 : TEXT_INPUT_STYLE.marginTop,
               }}
               value={formatPhoneWithDashes(sCustomerInfo.cell)}
-              autoComplete="none"
             />
           </View>
 
-          <TextInput
+          <TextInput_
             onChangeText={(val) => {
               val = removeDashesFromPhone(val);
               if (val.length > 10) return;
-              setCustomerField("landline", val);
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField("landline", val);
-                return;
-              }
-              dbSaveCustomer({
-                ...sCustomerInfo,
-                landline: val,
-              });
+              saveField("landline", val);
             }}
-            onFocus={() => setFocus("landline")}
-            autoFocus={focus === "landline"}
-            placeholderTextColor="darkgray"
             placeholder="Landline"
             style={{ ...TEXT_INPUT_STYLE }}
             value={formatPhoneWithDashes(sCustomerInfo.landline)}
-            autoComplete="none"
           />
-          <TextInput
-            onChangeText={(val) => {
-              setCustomerField("first", capitalizeFirstLetterOfString(val));
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField(
-                    "first",
-                    capitalizeFirstLetterOfString(val)
-                  );
-                return;
-              }
-              dbSaveCustomer({
-                ...sCustomerInfo,
-                first: capitalizeFirstLetterOfString(val),
-              });
-            }}
-            onFocus={() => setFocus("first")}
-            autoFocus={focus === "first"}
-            placeholderTextColor="darkgray"
+          <TextInput_
+            onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
             placeholder="First name"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.first}
-            autoComplete="none"
           />
-          <TextInput
-            onChangeText={(val) => {
-              setCustomerField("last", capitalizeFirstLetterOfString(val));
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField("last", capitalizeFirstLetterOfString(val));
-                return;
-              }
-              dbSaveCustomer({
-                ...sCustomerInfo,
-                last: capitalizeFirstLetterOfString(val),
-              });
-            }}
-            onFocus={() => setFocus("last")}
-            autoFocus={focus === "last"}
-            placeholderTextColor="darkgray"
+          <TextInput_
+            onChangeText={(val) => saveField("last", capitalizeFirstLetterOfString(val))}
             placeholder="Last name"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.last}
-            autoComplete="none"
           />
-          <TextInput
-            onChangeText={(val) => {
-              setCustomerField("email", val);
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField("email", val);
-                return;
-              }
-              dbSaveCustomer({ ...sCustomerInfo, email: val });
-            }}
-            onFocus={() => setFocus("email")}
-            autoFocus={focus === "email"}
-            placeholderTextColor="darkgray"
+          <TextInput_
+            onChangeText={(val) => saveField("email", val)}
             placeholder="Email address"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.email}
-            autoComplete="none"
           />
-          <TextInput
-            onChangeText={(val) => {
-              setCustomerField("streetAddress", val);
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField("streetAddress", val);
-                return;
-              }
-              dbSaveCustomer({ ...sCustomerInfo, streetAddress: val });
-            }}
-            onFocus={() => setFocus("streetAddress")}
-            autoFocus={focus === "streetAddress"}
-            placeholderTextColor="darkgray"
+          <TextInput_
+            onChangeText={(val) => saveField("streetAddress", val)}
             placeholder="Street address"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.streetAddress}
-            autoComplete="none"
           />
-          <TextInput
-            onChangeText={(val) => {
-              setCustomerField("unit", val);
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField("unit", val);
-                return;
-              }
-              dbSaveCustomer({ ...sCustomerInfo, unit: val });
-            }}
-            onFocus={() => setFocus("unit")}
-            autoFocus={focus === "unit"}
-            placeholderTextColor="darkgray"
+          <TextInput_
+            onChangeText={(val) => saveField("unit", val)}
             placeholder="Unit"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.unit}
-            autoComplete="none"
           />
-          <TextInput
-            onChangeText={(val) => {
-              setCustomerField("city", capitalizeFirstLetterOfString(val));
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField("city", capitalizeFirstLetterOfString(val));
-                return;
-              }
-              dbSaveCustomer({
-                ...sCustomerInfo,
-                city: capitalizeFirstLetterOfString(val),
-              });
-            }}
-            onFocus={() => setFocus("city")}
-            autoFocus={focus === "city"}
-            placeholderTextColor="darkgray"
+          <TextInput_
+            onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
             placeholder="City"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.city}
-            autoComplete="none"
           />
-          <TextInput
-            onChangeText={(val) => {
-              setCustomerField("state", val.toUpperCase());
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField("state", val.toUpperCase());
-                return;
-              }
-              dbSaveCustomer({ ...sCustomerInfo, state: val.toUpperCase() });
-            }}
-            onFocus={() => setFocus("state")}
-            autoFocus={focus === "state"}
-            placeholderTextColor="darkgray"
+          <TextInput_
+            onChangeText={(val) => saveField("state", val.toUpperCase())}
             placeholder="State"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.state}
-            autoComplete="none"
           />
-          <TextInput
+          <TextInput_
             onChangeText={(val) => {
-              if (!checkInputForNumbersOnly) return;
-              setCustomerField("zip", val);
-              if (isCurrentCustomer) {
-                if (isNewCustomer) return;
-                useCurrentCustomerStore.getState().setCustomerField("zip", val);
-                return;
-              }
-              dbSaveCustomer({ ...sCustomerInfo, zip: val });
+              if (!checkInputForNumbersOnly(val)) return;
+              saveField("zip", val);
             }}
-            onFocus={() => setFocus("zip")}
-            autoFocus={focus === "zip"}
-            placeholderTextColor="darkgray"
             placeholder="Zip code"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.zip}
-            autoComplete="none"
           />
-          <TextInput
-            onChangeText={(val) => {
-              setCustomerField("notes", capitalizeFirstLetterOfString(val));
-              if (isNewCustomer) return;
-              if (isCurrentCustomer) {
-                useCurrentCustomerStore
-                  .getState()
-                  .setCustomerField(
-                    "notes",
-                    capitalizeFirstLetterOfString(val)
-                  );
-                return;
-              }
-              dbSaveCustomer({ ...sCustomerInfo, notes: val });
-            }}
-            onFocus={() => setFocus("notes")}
-            autoFocus={focus === "notes"}
-            placeholderTextColor="darkgray"
+          <TextInput_
+            onChangeText={(val) => saveField("notes", capitalizeFirstLetterOfString(val))}
             placeholder="Address notes"
             style={{ ...TEXT_INPUT_STYLE }}
             value={sCustomerInfo.notes}
-            autoComplete="none"
+            multiline
             numberOfLines={3}
           />
 

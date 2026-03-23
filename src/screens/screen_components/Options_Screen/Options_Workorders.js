@@ -16,12 +16,14 @@ import { TAB_NAMES } from "../../../data";
 import React, { useRef } from "react";
 import { sortBy } from "lodash";
 import {
+  useCurrentCustomerStore,
   useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../../stores";
+import { dbGetCustomer } from "../../../db_calls_wrapper";
 
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
@@ -204,8 +206,14 @@ export function WorkordersComponent({}) {
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,
       optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
-    useWorkorderPreviewStore;
     useWorkorderPreviewStore.getState().setPreviewObj(null);
+
+    // Background-fetch customer so it's ready when the customer info modal opens
+    if (obj.customerID) {
+      dbGetCustomer(obj.customerID).then((customer) => {
+        if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
+      });
+    }
   }
 
   function sortWorkorders(inputArr) {

@@ -3202,6 +3202,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   const selectedPrinterID = zSettingsObj?.selectedPrinterID || "";
 
   return (
+    <>
     <BoxContainerOuterComponent style={{ marginTop: 20 }}>
       <BoxContainerInnerComponent>
         <View style={{ width: "100%", marginBottom: 10 }}>
@@ -3241,6 +3242,75 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
         ))}
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
+    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
+      <BoxContainerInnerComponent>
+        <View style={{ width: "100%", marginBottom: 10 }}>
+          <Text style={{ fontSize: 12, color: gray(0.6) }}>INTAKE RECEIPTS</Text>
+        </View>
+        <CheckBox_
+          isChecked={zSettingsObj?.autoPrintIntakeReceipt}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{ backgroundColor: "transparent" }}
+          text={"Auto print intake receipt"}
+          onCheck={() =>
+            handleSettingsFieldChange("autoPrintIntakeReceipt", !zSettingsObj?.autoPrintIntakeReceipt)
+          }
+        />
+        <CheckBox_
+          isChecked={zSettingsObj?.autoSMSIntakeReceipt}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{ backgroundColor: "transparent" }}
+          text={"Auto SMS intake receipt"}
+          onCheck={() =>
+            handleSettingsFieldChange("autoSMSIntakeReceipt", !zSettingsObj?.autoSMSIntakeReceipt)
+          }
+        />
+        <CheckBox_
+          isChecked={zSettingsObj?.autoEmailIntakeReceipt}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{ backgroundColor: "transparent" }}
+          text={"Auto email intake receipt"}
+          onCheck={() =>
+            handleSettingsFieldChange("autoEmailIntakeReceipt", !zSettingsObj?.autoEmailIntakeReceipt)
+          }
+        />
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
+      <BoxContainerInnerComponent>
+        <View style={{ width: "100%", marginBottom: 10 }}>
+          <Text style={{ fontSize: 12, color: gray(0.6) }}>SALES RECEIPTS</Text>
+        </View>
+        <CheckBox_
+          isChecked={zSettingsObj?.autoPrintSalesReceipt}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{ backgroundColor: "transparent" }}
+          text={"Auto print sales receipt"}
+          onCheck={() =>
+            handleSettingsFieldChange("autoPrintSalesReceipt", !zSettingsObj?.autoPrintSalesReceipt)
+          }
+        />
+        <CheckBox_
+          isChecked={zSettingsObj?.autoSMSSalesReceipt}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{ backgroundColor: "transparent" }}
+          text={"Auto SMS sales receipt"}
+          onCheck={() =>
+            handleSettingsFieldChange("autoSMSSalesReceipt", !zSettingsObj?.autoSMSSalesReceipt)
+          }
+        />
+        <CheckBox_
+          isChecked={zSettingsObj?.autoEmailSalesReceipt}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{ backgroundColor: "transparent" }}
+          text={"Auto email sales receipt"}
+          onCheck={() =>
+            handleSettingsFieldChange("autoEmailSalesReceipt", !zSettingsObj?.autoEmailSalesReceipt)
+          }
+        />
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+    </>
   );
 };
 

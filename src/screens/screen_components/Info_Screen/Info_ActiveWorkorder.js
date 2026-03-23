@@ -255,6 +255,15 @@ export const ActiveWorkorderComponent = ({}) => {
       id: zOpenWorkorder?.customerID || "",
     };
 
+    // Always print
+    let toPrint = printBuilder.intake(
+      zOpenWorkorder,
+      zCustomer,
+      settings?.salesTaxPercent
+    );
+    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Star MCP31");
+
+    // Optionally send SMS/email
     const willSMS = settings?.autoSMSIntakeReceipt && customer?.cell;
     const willEmail = settings?.autoEmailIntakeReceipt && customer?.email;
 

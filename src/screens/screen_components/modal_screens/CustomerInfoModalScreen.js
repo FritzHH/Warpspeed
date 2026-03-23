@@ -46,8 +46,20 @@ export const CustomerInfoScreenModalComponent = ({
   handleButton1Press,
   handleButton2Press,
 }) => {
-  const [sCustomerInfo, _setCustomerInfo] = useState(incomingCustomer || CUSTOMER_PROTO);
-  const [sCustomerLoading, _setCustomerLoading] = useState(!incomingCustomer && !!customerID && !isNewCustomer);
+  // Use cached customer from store if available and matching, otherwise fall back to proto
+  const getInitialCustomer = () => {
+    if (incomingCustomer) return incomingCustomer;
+    if (customerID) {
+      let storeCustomer = useCurrentCustomerStore.getState().getCustomer();
+      if (storeCustomer?.id === customerID) return storeCustomer;
+    }
+    return CUSTOMER_PROTO;
+  };
+  const initialCustomer = getInitialCustomer();
+  const hasCachedCustomer = initialCustomer !== CUSTOMER_PROTO;
+
+  const [sCustomerInfo, _setCustomerInfo] = useState(initialCustomer);
+  const [sCustomerLoading, _setCustomerLoading] = useState(false);
   const [sCustomerLoadError, _setCustomerLoadError] = useState(false);
   const [sWorkorders, _sSetWorkorders] = useState([]);
   const [sSales, _sSetSales] = useState([]);
@@ -56,18 +68,22 @@ export const CustomerInfoScreenModalComponent = ({
   const [sDetailView, _sSetDetailView] = useState(null);
   const mountedRef = useRef(true);
 
-  // Fetch customer on mount when customerID is provided (no incomingCustomer)
+  // Fetch fresh customer on mount (background refresh even if we have cached data)
   useEffect(() => {
     mountedRef.current = true;
     if (incomingCustomer || !customerID || isNewCustomer) return;
-    _setCustomerLoading(true);
-    _setCustomerLoadError(false);
+
+    // Only show loading if we don't have cached data
+    if (!hasCachedCustomer) _setCustomerLoading(true);
+
     dbGetCustomer(customerID).then((customer) => {
       if (!mountedRef.current) return;
       if (customer) {
         _setCustomerInfo(customer);
-        useCurrentCustomerStore.getState().setCustomer(customer);
+        useCurrentCustomerStore.getState().setCustomer(customer, false);
         _setCustomerLoading(false);
+        // Auto-load workorders and sales once fresh customer arrives
+        autoLoadWorkordersAndSales(customer);
       } else {
         _setCustomerLoadError(true);
         _setCustomerLoading(false);
@@ -77,14 +93,18 @@ export const CustomerInfoScreenModalComponent = ({
       _setCustomerLoadError(true);
       _setCustomerLoading(false);
     });
+
+    // If we have cached data, start loading workorders/sales immediately
+    if (hasCachedCustomer) autoLoadWorkordersAndSales(initialCustomer);
+
     return () => { mountedRef.current = false; };
   }, []);
 
-  async function handleLoadWorkorders() {
-    const woIDs = sCustomerInfo.workorders || [];
+  async function loadWorkorders(customer) {
+    const woIDs = (customer || sCustomerInfo).workorders || [];
     if (woIDs.length === 0) {
       _sSetWorkorders([]);
-      return;
+      return [];
     }
     _sSetWoLoading(true);
     try {
@@ -100,16 +120,20 @@ export const CustomerInfoScreenModalComponent = ({
           }
         })
       );
-      _sSetWorkorders(results.filter(Boolean));
+      let loaded = results.filter(Boolean);
+      if (mountedRef.current) _sSetWorkorders(loaded);
+      return loaded;
     } catch (e) {
       console.log("Error loading workorders:", e);
-      _sSetWorkorders([]);
+      if (mountedRef.current) _sSetWorkorders([]);
+      return [];
+    } finally {
+      if (mountedRef.current) _sSetWoLoading(false);
     }
-    _sSetWoLoading(false);
   }
 
-  async function handleLoadSales() {
-    const saleIDs = sCustomerInfo.sales || [];
+  async function loadSales(customer, loadedWorkorders) {
+    const saleIDs = (customer || sCustomerInfo).sales || [];
     if (saleIDs.length === 0) {
       _sSetSales([]);
       return;
@@ -133,9 +157,9 @@ export const CustomerInfoScreenModalComponent = ({
         (sale.workorderIDs || []).forEach((id) => allWoIDs.add(id));
       });
 
-      // Build a map from already-loaded workorders (via LOAD WORKORDERS button)
+      // Build a map from already-loaded workorders
       const woMap = {};
-      sWorkorders.forEach((wo) => { woMap[wo.id] = wo; });
+      (loadedWorkorders || sWorkorders).forEach((wo) => { woMap[wo.id] = wo; });
 
       // Fetch any workorder IDs not already loaded
       const missingIDs = [...allWoIDs].filter((id) => !woMap[id]);
@@ -163,12 +187,17 @@ export const CustomerInfoScreenModalComponent = ({
           .filter(Boolean),
       }));
 
-      _sSetSales(salesWithWOs);
+      if (mountedRef.current) _sSetSales(salesWithWOs);
     } catch (e) {
       console.log("Error loading sales:", e);
-      _sSetSales([]);
+      if (mountedRef.current) _sSetSales([]);
     }
-    _sSetSalesLoading(false);
+    if (mountedRef.current) _sSetSalesLoading(false);
+  }
+
+  async function autoLoadWorkordersAndSales(customer) {
+    let loadedWOs = await loadWorkorders(customer);
+    await loadSales(customer, loadedWOs);
   }
 
   function setCustomerInfo(customerInfo) {
@@ -423,7 +452,7 @@ export const CustomerInfoScreenModalComponent = ({
               textStyle={{ color: gray(0.45), fontSize: 13 }}
               text={"LOAD WORKORDERS"}
               buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
-              onPress={handleLoadWorkorders}
+              onPress={() => loadWorkorders()}
             />
             {sWoLoading && <LoadingOverlay text="Loading workorders..." />}
             {!sWoLoading && sWorkorders.length > 0 && (
@@ -455,7 +484,7 @@ export const CustomerInfoScreenModalComponent = ({
               text={"LOAD SALES"}
               textStyle={{ color: gray(0.45), fontSize: 13 }}
               buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
-              onPress={handleLoadSales}
+              onPress={() => loadSales()}
             />
             {sSalesLoading && <LoadingOverlay text="Loading sales..." />}
             {!sSalesLoading && sSales.length > 0 && (

@@ -2015,6 +2015,10 @@ function createPrintBase(workorder, customer, salesTaxPercent) {
   r.intakeBlurb = INTAKE_BLURB;
   r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
 
+  delete r.changeLog;
+  delete r.media;
+  delete r.shopContactBlurb;
+
   return r;
 }
 

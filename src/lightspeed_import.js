@@ -485,9 +485,11 @@ export function mapWorkorders(
       });
     }
 
+    const newID = generateUPCBarcode();
     const mappedWo = {
-      workorderNumber: woID,
-      id: woID,
+      workorderNumber: extractRandomFourDigits(newID),
+      id: newID,
+      lightspeed_id: woID,
       customerID: wo.customerID || "",
       customerFirst,
       customerLast,

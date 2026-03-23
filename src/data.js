@@ -419,6 +419,11 @@ export const CUSTOMER_PREVIOUS_BIKE_PROTO = {
   color2: "",
 };
 
+export const CUSTOMER_LANGUAGES = {
+  spanish: "Spanish",
+  english: "English"
+}
+
 export const CUSTOMER_PROTO = {
   first: "",
   last: "",
@@ -438,6 +443,7 @@ export const CUSTOMER_PROTO = {
   previousBikes: [],
   sales: [],
   millisCreated: "",
+  language: ""
 };
 
 export const CUSTOMER_PREVIEW_PROTO = {
@@ -876,6 +882,12 @@ export const SETTINGS_OBJ = {
   printers: {
 
   },
+  autoSMSIntakeReceipt: true,
+  autoEmailIntakeReceipt: true,
+  autoPrintIntakeReceipt: true,
+  autoSMSSalesReceipt: true,
+  autoEmailSalesReceipt: true,
+  autoPrintSalesReceipt: true,
   selectedPrinterID: "",
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],

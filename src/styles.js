@@ -144,6 +144,7 @@ export const ICONS = {
   ordering: require(ASSETS_PATH + "ordering.png"),
   letterI: require(ASSETS_PATH + "letter-i.png"),
   letterR: require(ASSETS_PATH + "letter-r.png"),
+  airplane: require(ASSETS_PATH + "airplane.png"),
 };
 
 // rgb(64, 174, 113)

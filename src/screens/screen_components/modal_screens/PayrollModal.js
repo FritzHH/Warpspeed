@@ -7,7 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native-web";
-import { Button_, DropdownMenu, Image_ } from "../../../components";
+import { Button_, DropdownMenu, Image_, TextInput_ } from "../../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
@@ -25,7 +25,7 @@ import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
 import { cloneDeep, sortBy } from "lodash";
-import { useSettingsStore } from "../../../stores";
+import { useSettingsStore, useAlertScreenStore } from "../../../stores";
 import {
   dbGetPunchesByTimeFrame,
   dbSavePunchObject,
@@ -203,7 +203,7 @@ export const PayrollModal = ({ handleExit }) => {
   // date state — default to settings range
   const [sStartDate, _setStartDate] = useState(defaultRange.start);
   const [sEndDate, _setEndDate] = useState(defaultRange.end);
-  const [sActiveShortcut, _setActiveShortcut] = useState("Default Range");
+  const [sActiveShortcut, _setActiveShortcut] = useState("Pay Period");
   const [sPendingStart, _setPendingStart] = useState(null);
   const [sPendingEnd, _setPendingEnd] = useState(null);
   const [sEndCalMonth, _setEndCalMonth] = useState(dayjs().month());
@@ -222,16 +222,16 @@ export const PayrollModal = ({ handleExit }) => {
   // track which punch IDs have been modified
   const modifiedPunchIdsRef = useRef(new Set());
   const queryIdRef = useRef(0);
-  const hasUserSelected = useRef(false);
 
-  // Fetch punches when user + dates change
-  useEffect(() => {
+  // Manual fetch — called by Go button and shortcut buttons
+  function fetchPunches(overrideStart, overrideEnd) {
     if (!sSelectedUser) return;
-    if (!hasUserSelected.current) return;
-    if (!sStartDate || !sEndDate) return;
+    let start = overrideStart || sStartDate;
+    let end = overrideEnd || sEndDate;
+    if (!start || !end) return;
 
-    let startMillis = dayjs(sStartDate).startOf("day").valueOf();
-    let endMillis = dayjs(sEndDate).endOf("day").valueOf();
+    let startMillis = dayjs(start).startOf("day").valueOf();
+    let endMillis = dayjs(end).endOf("day").valueOf();
     let thisQueryId = ++queryIdRef.current;
 
     _setLoading(true);
@@ -255,7 +255,7 @@ export const PayrollModal = ({ handleExit }) => {
         _setFilteredArr([]);
         _setLoading(false);
       });
-  }, [sSelectedUser, sStartDate, sEndDate]);
+  }
 
   // Compute paired display data from raw punches
   let { displayArr, runningTotalMinutes } = pairPunches(sFilteredArr);
@@ -268,8 +268,7 @@ export const PayrollModal = ({ handleExit }) => {
   function handleDefaultRangeShortcut() {
     let curTf = zSettingsObj?.defaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
     let range = getTimeFrameRange(curTf);
-    hasUserSelected.current = true;
-    _setActiveShortcut("Default Range");
+    _setActiveShortcut("Pay Period");
     _setPendingStart(null);
     _setPendingEnd(null);
     _setStartDate(range.start);
@@ -277,10 +276,10 @@ export const PayrollModal = ({ handleExit }) => {
     _setEndCalMonth(range.end.month());
     _setEndCalYear(range.end.year());
     _setCalKey((prev) => prev + 1);
+    fetchPunches(range.start, range.end);
   }
 
   function handleShortcut(shortcut) {
-    hasUserSelected.current = true;
     let start = shortcut.start();
     let end = shortcut.end();
     _setActiveShortcut(shortcut.label);
@@ -291,30 +290,31 @@ export const PayrollModal = ({ handleExit }) => {
     _setEndCalMonth(end.month());
     _setEndCalYear(end.year());
     _setCalKey((prev) => prev + 1);
+    fetchPunches(start, end);
   }
 
   function handleGoButton() {
-    if (!sPendingStart || !sPendingEnd) return;
-    hasUserSelected.current = true;
-    _setActiveShortcut(null);
-    _setStartDate(sPendingStart);
-    _setEndDate(sPendingEnd);
-    _setEndCalMonth(sPendingEnd.month());
-    _setEndCalYear(sPendingEnd.year());
-    _setCalKey((prev) => prev + 1);
-    _setPendingStart(null);
-    _setPendingEnd(null);
+    let start = sStartDate;
+    let end = sEndDate;
+    // If there's a pending calendar range, apply it first
+    if (sPendingStart && sPendingEnd) {
+      start = sPendingStart;
+      end = sPendingEnd;
+      _setActiveShortcut(null);
+      _setStartDate(start);
+      _setEndDate(end);
+      _setEndCalMonth(end.month());
+      _setEndCalYear(end.year());
+      _setCalKey((prev) => prev + 1);
+      _setPendingStart(null);
+      _setPendingEnd(null);
+    }
+    fetchPunches(start, end);
   }
 
   function handleUserSelect(userObj) {
-    if (!hasUserSelected.current) {
-      hasUserSelected.current = true;
-      let curTf = zSettingsObj?.defaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
-      let range = getTimeFrameRange(curTf);
-      _setStartDate(range.start);
-      _setEndDate(range.end);
-    }
     _setSelectedUser(userObj);
+    _setFilteredArr([]);
     _setEditableRowIdx(null);
     _setHasUnsavedChanges(false);
     modifiedPunchIdsRef.current = new Set();
@@ -399,6 +399,66 @@ export const PayrollModal = ({ handleExit }) => {
     punchObj = cloneDeep(punchObj);
     punchObj.millis = millis;
     filteredArr[idx] = punchObj;
+    _setFilteredArr(filteredArr);
+    _setHasUnsavedChanges(true);
+    modifiedPunchIdsRef.current.add(punchObj.id);
+  }
+
+  function handleDirectTimeEdit(item, prefix, field, value) {
+    let punch = prefix === "in" ? item.in : item.out;
+    if (!punch) return;
+    let numVal = parseInt(value, 10);
+    if (isNaN(numVal)) return;
+
+    let date = new Date(punch.millis);
+
+    if (field === "hour") {
+      if (numVal < 1 || numVal > 12) return;
+      let hours24;
+      if (punch.amPM === "AM") {
+        hours24 = numVal === 12 ? 0 : numVal;
+      } else {
+        hours24 = numVal === 12 ? 12 : numVal + 12;
+      }
+      date.setHours(hours24);
+    } else if (field === "minutes") {
+      if (numVal < 0 || numVal > 59) return;
+      date.setMinutes(numVal);
+    }
+
+    let newMillis = date.getTime();
+
+    let idx = sFilteredArr.findIndex((o) => o.id === punch.id);
+    if (idx === -1) return;
+
+    let otherPunch = prefix === "in" ? item.out : item.in;
+    if (prefix === "in" && otherPunch && newMillis >= otherPunch.millis) return;
+    if (prefix === "out" && otherPunch && newMillis <= otherPunch.millis) return;
+
+    let filteredArr = cloneDeep(sFilteredArr);
+    filteredArr[idx] = { ...filteredArr[idx], millis: newMillis };
+    _setFilteredArr(filteredArr);
+    _setHasUnsavedChanges(true);
+    modifiedPunchIdsRef.current.add(punch.id);
+  }
+
+  function handleCreateMissingPunch(displayItem, option) {
+    let referencePunch = option === "in" ? displayItem.out : displayItem.in;
+    if (!referencePunch) return;
+
+    let newMillis = option === "in"
+      ? referencePunch.millis - MILLIS_IN_HOUR
+      : referencePunch.millis + MILLIS_IN_HOUR;
+
+    let punchObj = { ...TIME_PUNCH_PROTO };
+    punchObj.userID = sSelectedUser.id;
+    punchObj.id = generateRandomID();
+    punchObj.millis = newMillis;
+    punchObj.option = option;
+
+    let filteredArr = cloneDeep(sFilteredArr);
+    filteredArr.push(punchObj);
+    filteredArr = sortBy(filteredArr, "millis");
     _setFilteredArr(filteredArr);
     _setHasUnsavedChanges(true);
     modifiedPunchIdsRef.current.add(punchObj.id);
@@ -549,6 +609,7 @@ export const PayrollModal = ({ handleExit }) => {
   let displayStart = sPendingStart || sStartDate;
   let displayEnd = sPendingEnd || sEndDate;
   let hasPendingRange = !!sPendingStart && !!sPendingEnd;
+  let canGo = !!sSelectedUser && (hasPendingRange || (!!sStartDate && !!sEndDate));
   let dateChips = generateDateChips(displayStart, displayEnd);
 
   let calendarStyles = {
@@ -587,10 +648,10 @@ export const PayrollModal = ({ handleExit }) => {
         >
           {/* ═══ LEFT COLUMN: Users + Shortcuts ═══ */}
           <ScrollView
-            style={{ width: 120 }}
+            style={{ width: 60 }}
             contentContainerStyle={{
               paddingVertical: 8,
-              paddingHorizontal: 5,
+              paddingHorizontal: 3,
               flexGrow: 1,
               justifyContent: "space-between",
             }}
@@ -657,12 +718,12 @@ export const PayrollModal = ({ handleExit }) => {
               />
 
               {/* Quick Buttons */}
-              {/* Default Range button */}
+              {/* Pay Period button */}
               <TouchableOpacity
                 onPress={handleDefaultRangeShortcut}
                 style={{
                   backgroundColor:
-                    sActiveShortcut === "Default Range" ? C.orange : C.blue,
+                    sActiveShortcut === "Pay Period" ? C.orange : C.blue,
                   borderRadius: 4,
                   paddingVertical: 5,
                   marginBottom: 3,
@@ -676,7 +737,7 @@ export const PayrollModal = ({ handleExit }) => {
                     fontWeight: "600",
                   }}
                 >
-                  Default Range
+                  Pay Period
                 </Text>
               </TouchableOpacity>
 
@@ -790,7 +851,7 @@ export const PayrollModal = ({ handleExit }) => {
 
           {/* ═══ MIDDLE COLUMN: Date Selectors ═══ */}
           <ScrollView
-            style={{ flex: 1, maxWidth: "34%" }}
+            style={{ flex: 1 }}
             contentContainerStyle={{ padding: 8 }}
           >
             <View>
@@ -879,7 +940,9 @@ export const PayrollModal = ({ handleExit }) => {
                 {(() => {
                   let beginMonth = dayjs(displayStart).month();
                   let beginYear = dayjs(displayStart).year();
+                  let beginIsCurrentMonth = beginMonth === dayjs().month() && beginYear === dayjs().year();
                   let endSameAsBegin =
+                    beginIsCurrentMonth &&
                     sEndCalMonth === beginMonth &&
                     sEndCalYear === beginYear;
 
@@ -899,6 +962,8 @@ export const PayrollModal = ({ handleExit }) => {
                     _setEndCalMonth(d.month());
                     _setEndCalYear(d.year());
                   }
+
+                  if (endSameAsBegin) return null;
 
                   return (
                     <View
@@ -921,59 +986,7 @@ export const PayrollModal = ({ handleExit }) => {
                       >
                         End Date
                       </Text>
-                      {endSameAsBegin ? (
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            width: "100%",
-                            paddingVertical: 8,
-                            paddingHorizontal: 12,
-                          }}
-                        >
-                          <TouchableOpacity
-                            onPress={handleEndCalPrev}
-                            style={{ padding: 4 }}
-                          >
-                            <Text
-                              style={{
-                                color: "white",
-                                fontSize: 16,
-                                fontWeight: "700",
-                              }}
-                            >
-                              {"<"}
-                            </Text>
-                          </TouchableOpacity>
-                          <Text
-                            style={{
-                              color: "white",
-                              fontSize: 13,
-                              fontWeight: "600",
-                            }}
-                          >
-                            {dayjs()
-                              .month(sEndCalMonth)
-                              .year(sEndCalYear)
-                              .format("MMMM YYYY")}
-                          </Text>
-                          <TouchableOpacity
-                            onPress={handleEndCalNext}
-                            style={{ padding: 4 }}
-                          >
-                            <Text
-                              style={{
-                                color: "white",
-                                fontSize: 16,
-                                fontWeight: "700",
-                              }}
-                            >
-                              {">"}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      ) : (
+                      {(
                         <CalendarPicker
                           key={
                             "end-" +
@@ -1004,12 +1017,12 @@ export const PayrollModal = ({ handleExit }) => {
                   <Button_
                     text="GO"
                     colorGradientArr={
-                      hasPendingRange
+                      canGo
                         ? COLOR_GRADIENTS.green
                         : COLOR_GRADIENTS.grey
                     }
                     onPress={handleGoButton}
-                    disabled={!hasPendingRange}
+                    disabled={!canGo}
                     buttonStyle={{
                       paddingLeft: 40,
                       paddingRight: 40,
@@ -1249,6 +1262,9 @@ export const PayrollModal = ({ handleExit }) => {
                                 onEdit={(opt) =>
                                   handleTimeEdit(item, opt)
                                 }
+                                onDirectEdit={(prefix, field, val) =>
+                                  handleDirectTimeEdit(item, prefix, field, val)
+                                }
                                 iconSize={iconSize}
                               />
                             ) : (
@@ -1267,6 +1283,29 @@ export const PayrollModal = ({ handleExit }) => {
                               </Text>
                             )}
                           </View>
+                        ) : editable ? (
+                          <TouchableOpacity
+                            onPress={() => handleCreateMissingPunch(item, "in")}
+                          >
+                            <View
+                              style={{
+                                backgroundColor: lightenRGBByPercent(C.green, 60),
+                                borderRadius: 4,
+                                paddingVertical: 3,
+                                paddingHorizontal: 8,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  color: C.green,
+                                  fontWeight: "600",
+                                }}
+                              >
+                                + Add
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
                         ) : (
                           <Text
                             style={{
@@ -1308,6 +1347,9 @@ export const PayrollModal = ({ handleExit }) => {
                                 onEdit={(opt) =>
                                   handleTimeEdit(item, opt)
                                 }
+                                onDirectEdit={(prefix, field, val) =>
+                                  handleDirectTimeEdit(item, prefix, field, val)
+                                }
                                 iconSize={iconSize}
                               />
                             ) : (
@@ -1326,6 +1368,29 @@ export const PayrollModal = ({ handleExit }) => {
                               </Text>
                             )}
                           </View>
+                        ) : editable ? (
+                          <TouchableOpacity
+                            onPress={() => handleCreateMissingPunch(item, "out")}
+                          >
+                            <View
+                              style={{
+                                backgroundColor: lightenRGBByPercent(C.lightred, 60),
+                                borderRadius: 4,
+                                paddingVertical: 3,
+                                paddingHorizontal: 8,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  color: C.lightred,
+                                  fontWeight: "600",
+                                }}
+                              >
+                                + Add
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
                         ) : (
                           <Text
                             style={{
@@ -1390,10 +1455,23 @@ export const PayrollModal = ({ handleExit }) => {
                         {editable && (
                           <TouchableOpacity
                             onPress={() => {
-                              handleDeletePunchPress(
-                                item.in || item.out
-                              );
-                              _setEditableRowIdx(null);
+                              useAlertScreenStore.getState().setValues({
+                                title: "Delete Punch",
+                                message: "Are you sure you want to delete this entry?",
+                                btn1Text: "Delete",
+                                btn2Text: "Cancel",
+                                handleBtn1Press: () => {
+                                  handleDeletePunchPress(
+                                    item.in || item.out
+                                  );
+                                  _setEditableRowIdx(null);
+                                  useAlertScreenStore.getState().setShowAlert(false);
+                                },
+                                handleBtn2Press: () => {
+                                  useAlertScreenStore.getState().setShowAlert(false);
+                                },
+                                canExitOnOuterClick: true,
+                              });
                             }}
                             style={{ padding: 2, marginLeft: 4 }}
                           >
@@ -1576,7 +1654,19 @@ export const PayrollModal = ({ handleExit }) => {
 };
 
 /** Reusable editable time cell with up/down chevrons */
-const EditableTimeCell = ({ timeObj, prefix, onEdit, iconSize }) => (
+const timeInputStyle = {
+  fontSize: 12,
+  textAlign: "center",
+  width: 24,
+  paddingVertical: 1,
+  paddingHorizontal: 2,
+  borderWidth: 1,
+  borderColor: gray(0.8),
+  borderRadius: 3,
+  outlineWidth: 0,
+};
+
+const EditableTimeCell = ({ timeObj, prefix, onEdit, onDirectEdit, iconSize }) => (
   <View style={{ flexDirection: "row", alignItems: "center" }}>
     {/* Date adjust */}
     <View style={{ alignItems: "center" }}>
@@ -1604,9 +1694,12 @@ const EditableTimeCell = ({ timeObj, prefix, onEdit, iconSize }) => (
         onPress={() => onEdit(prefix + "-hour-up")}
         buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
       />
-      <Text style={{ fontSize: 12, textAlign: "center", width: 20 }}>
-        {timeObj.hour}
-      </Text>
+      <TextInput_
+        value={String(timeObj.hour)}
+        onChangeText={(val) => onDirectEdit(prefix, "hour", val)}
+        style={timeInputStyle}
+        debounceMs={800}
+      />
       <Button_
         icon={ICONS.downChevron}
         iconSize={iconSize}
@@ -1623,9 +1716,12 @@ const EditableTimeCell = ({ timeObj, prefix, onEdit, iconSize }) => (
         onPress={() => onEdit(prefix + "-minutes-up")}
         buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
       />
-      <Text style={{ fontSize: 12, textAlign: "center", width: 20 }}>
-        {timeObj.minutes}
-      </Text>
+      <TextInput_
+        value={String(timeObj.minutes).padStart(2, "0")}
+        onChangeText={(val) => onDirectEdit(prefix, "minutes", val)}
+        style={timeInputStyle}
+        debounceMs={800}
+      />
       <Button_
         icon={ICONS.downChevron}
         iconSize={iconSize}

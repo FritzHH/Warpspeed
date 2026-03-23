@@ -7,7 +7,6 @@ import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   useCheckoutStore,
   useOpenWorkordersStore,
-  useCurrentCustomerStore,
   useInventoryStore,
   useSettingsStore,
   useLoginStore,
@@ -96,7 +95,6 @@ export function NewCheckoutModalScreen() {
     state.workorders.find((o) => o.id === state.openWorkorderID) || null
   );
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
-  const zCustomer = useCurrentCustomerStore((state) => state.customer);
   const zInventory = useInventoryStore((state) => state.inventoryArr);
   const zSettings = useSettingsStore((state) => state.settings);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
@@ -115,8 +113,8 @@ export function NewCheckoutModalScreen() {
   let saleComplete = sSale?.paymentComplete || false;
   let amountLeftToPay = (sSale?.total || 0) - (sSale?.amountCaptured || 0);
   if (amountLeftToPay < 0) amountLeftToPay = 0;
-  let custFirst = zCustomer?.first || zOpenWorkorder?.customerFirst || "";
-  let custLast = zCustomer?.last || zOpenWorkorder?.customerLast || "";
+  let custFirst = zOpenWorkorder?.customerFirst || "";
+  let custLast = zOpenWorkorder?.customerLast || "";
 
   // ─── Initialization ──────────────────────────────────────
   // Called once when the modal opens. We use a flag to avoid
@@ -372,13 +370,12 @@ export function NewCheckoutModalScreen() {
     await newCheckoutCompleteSale(sale);
 
     // Write sale index for reporting
-    const customer = useCurrentCustomerStore.getState().customer;
     const primaryWO = sCombinedWorkorders[0];
     const customerInfo = {
-      first: customer?.first || primaryWO?.customerFirst || "",
-      last: customer?.last || primaryWO?.customerLast || "",
-      phone: customer?.cell || primaryWO?.customerPhone || "",
-      id: customer?.id || primaryWO?.customerID || "",
+      first: primaryWO?.customerFirst || "",
+      last: primaryWO?.customerLast || "",
+      phone: primaryWO?.customerPhone || "",
+      id: primaryWO?.customerID || "",
     };
     const allLines = sCombinedWorkorders.flatMap((wo) => wo.workorderLines || []);
     const isStandalone = primaryWO?.isStandaloneSale || false;
@@ -386,7 +383,14 @@ export function NewCheckoutModalScreen() {
 
     // Auto-send receipt via SMS/email
     const settings = useSettingsStore.getState().getSettings();
-    sendAutoSaleReceipt(sale, customer, settings);
+    const customerForReceipt = {
+      first: primaryWO?.customerFirst || "",
+      last: primaryWO?.customerLast || "",
+      cell: primaryWO?.customerPhone || "",
+      email: primaryWO?.customerEmail || "",
+      id: primaryWO?.customerID || "",
+    };
+    sendAutoSaleReceipt(sale, customerForReceipt, settings);
   }
 
   function handleCashChange(change) {

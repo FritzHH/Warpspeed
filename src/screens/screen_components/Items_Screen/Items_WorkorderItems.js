@@ -36,11 +36,9 @@ import {
   useInventoryStore,
   useSettingsStore,
   useTabNamesStore,
-  useCurrentCustomerStore,
   useLoginStore,
   useAlertScreenStore,
 } from "../../../stores";
-import { dbGetCustomer } from "../../../db_calls_wrapper";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
 
@@ -85,6 +83,9 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // dev
   const checkoutBtnRef = useRef();
+  const qtyTimerRef = useRef(null);
+  const qtyMapRef = useRef({});
+  const [sQtyMap, _setQtyMap] = useState({});
 
 
   ///////////////////////////////////////////////////////////////////////////
@@ -135,6 +136,12 @@ export const Items_WorkorderItemsTab = ({}) => {
     }
   }, [zInventoryArr, zOpenWorkorder]);
 
+  // clear local qty overrides when switching workorders
+  useEffect(() => {
+    _setQtyMap({});
+    qtyMapRef.current = {};
+  }, [zOpenWorkorder?.id]);
+
   // calculate runnings totals on the open workorder ///////////////
   useEffect(() => {
     if (!(zOpenWorkorder?.workorderLines?.length > 0)) return;
@@ -171,24 +178,51 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   function modifyQtyPressed(workorderLine, option) {
     useLoginStore.getState().requireLogin(() => {
-      let newWOLine = cloneDeep(workorderLine);
+      let currentQty = qtyMapRef.current[workorderLine.id] !== undefined
+        ? qtyMapRef.current[workorderLine.id]
+        : workorderLine.qty;
+
+      let newQty;
       if (option === "up") {
-        newWOLine.qty = newWOLine.qty + 1;
+        newQty = currentQty + 1;
       } else {
-        let qty = newWOLine.qty - 1;
-        if (qty <= 0) return;
-        newWOLine.qty = qty;
+        newQty = currentQty - 1;
+        if (newQty <= 0) return;
       }
 
-      if (newWOLine.discountObj?.name) {
-        let newLine = applyDiscountToWorkorderItem(newWOLine);
-        if (newLine.discountObj?.newPrice > 0) newWOLine = newLine;
-      }
+      // Update local state instantly
+      qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: newQty };
+      _setQtyMap({ ...qtyMapRef.current });
 
-      useOpenWorkordersStore.getState().setField(
-        "workorderLines",
-        replaceOrAddToArr(zOpenWorkorder.workorderLines, newWOLine)
-      );
+      // Debounce DB write
+      clearTimeout(qtyTimerRef.current);
+      qtyTimerRef.current = setTimeout(() => {
+        let storeWo = useOpenWorkordersStore.getState().workorders.find(
+          (o) => o.id === zOpenWorkorder.id
+        );
+        if (!storeWo) return;
+
+        let updatedLines = storeWo.workorderLines.map((line) => {
+          let overrideQty = qtyMapRef.current[line.id];
+          if (overrideQty === undefined) return line;
+          let newLine = { ...line, qty: overrideQty };
+          if (newLine.discountObj?.name) {
+            let discounted = applyDiscountToWorkorderItem(newLine);
+            if (discounted.discountObj?.newPrice > 0) return discounted;
+          }
+          return newLine;
+        });
+
+        useOpenWorkordersStore.getState().setField(
+          "workorderLines",
+          updatedLines,
+          zOpenWorkorder.id,
+          true
+        );
+
+        qtyMapRef.current = {};
+        _setQtyMap({});
+      }, 700);
     });
   }
 
@@ -264,9 +298,6 @@ export const Items_WorkorderItemsTab = ({}) => {
             itemsTabName: TAB_NAMES.itemsTab.workorderItems,
             optionsTabName: TAB_NAMES.optionsTab.inventory,
           });
-          dbGetCustomer(previousWorkorder.customerID).then((customer) =>
-            useCurrentCustomerStore.getState().setCustomer(customer, false)
-          );
           return;
         }
       }
@@ -439,6 +470,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               workorderLine={item}
               __splitItems={splitItems}
               __modQtyPressed={modifyQtyPressed}
+              localQty={sQtyMap[item.id]}
               index={idx}
               applyDiscount={applyDiscount}
               zSettingsObj={{ discounts: zDiscounts }}
@@ -624,12 +656,14 @@ export const LineItemComponent = ({
   __modQtyPressed,
   __setWorkorderLineItem,
   __splitItems,
+  localQty,
   index,
   applyDiscount,
   onEditCustomItem,
   isLocked,
 }) => {
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
+  const effectiveQty = localQty !== undefined ? localQty : workorderLine.qty;
   const [sTempQtyVal, _setTempQtyVal] = useState(null);
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
   const [sActiveNoteField, _sSetActiveNoteField] = useState(null);
@@ -858,7 +892,7 @@ export const LineItemComponent = ({
                   outlineWidth: 0,
                   width: "100%",
                 }}
-                value={sTempQtyVal === "" ? sTempQtyVal : workorderLine.qty}
+                value={sTempQtyVal === "" ? sTempQtyVal : effectiveQty}
                 onChangeText={(val) => {
                   if (isNaN(val) || val < 0) return;
                   if (val === "") {
@@ -887,7 +921,7 @@ export const LineItemComponent = ({
               justifyContent: "center",
             }}
           >
-            {(workorderLine.qty > 1 || workorderLine.discountObj?.newPrice) && (
+            {(effectiveQty > 1 || workorderLine.discountObj?.newPrice) && (
               <Text
                 style={{
                   paddingHorizontal: 0,
@@ -929,7 +963,7 @@ export const LineItemComponent = ({
                   formatCurrencyDisp(
                     workorderLine.useSalePrice
                       ? inventoryItem.salePrice
-                      : inventoryItem.price * workorderLine.qty
+                      : inventoryItem.price * effectiveQty
                   )}
             </Text>
           </View>
@@ -950,16 +984,16 @@ export const LineItemComponent = ({
               }
               }
             >
-              {workorderLine.qty > 1 && <Tooltip text="Split items" position="top">
+              {effectiveQty > 1 && <Tooltip text="Split items" position="top">
                 <Button_
                   icon={ICONS.axe}
                   iconSize={23}
                   disabled={isLocked}
-                  onPress={workorderLine.qty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
+                  onPress={effectiveQty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
                   buttonStyle={{
                     backgroundColor: "transparent",
                     paddingRight: 14,
-                    opacity: workorderLine.qty > 1 ? 1 : 0,
+                    opacity: effectiveQty > 1 ? 1 : 0,
                   }}
                 />
               </Tooltip>

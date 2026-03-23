@@ -798,7 +798,6 @@ export function broadcastWorkorderToDisplay(wo) {
   if (startedOn && Date.now() - startedOn > 300000) return;
 
   let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
-  let customer = useCurrentCustomerStore.getState().getCustomer();
   broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
     customerFirst: wo.customerFirst || "",
     customerLast: wo.customerLast || "",
@@ -807,16 +806,11 @@ export function broadcastWorkorderToDisplay(wo) {
     description: wo.description || "",
     workorderLines: lines,
     customer: {
-      first: customer.first || "",
-      last: customer.last || "",
-      cell: customer.cell || "",
-      landline: customer.landline || "",
-      email: customer.email || "",
-      streetAddress: customer.streetAddress || "",
-      unit: customer.unit || "",
-      city: customer.city || "",
-      state: customer.state || "",
-      zip: customer.zip || "",
+      first: wo.customerFirst || "",
+      last: wo.customerLast || "",
+      cell: wo.customerPhone || "",
+      landline: wo.customerLandline || "",
+      email: wo.customerEmail || "",
     },
     totals: {
       runningSubtotal: totals.runningSubtotal,

@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  Image,
 } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
@@ -32,7 +33,6 @@ import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
 import { useTranslation } from "../../../useTranslation";
 import {
   SMS_PROTO,
-  WORKORDER_PROTO,
   CUSTOMER_PROTO,
   SETTINGS_OBJ,
 } from "../../../data";
@@ -45,7 +45,6 @@ import React, {
   useCallback,
 } from "react";
 import {
-  useCurrentCustomerStore,
   useOpenWorkordersStore,
   useCustMessagesStore,
   useLoginStore,
@@ -54,7 +53,8 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS } from "../../../db_calls_wrapper";
+import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice } from "../../../db_calls_wrapper";
+import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 
 const TEXT_TEMPLATE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
@@ -71,12 +71,12 @@ const TEXT_TEMPLATE_VARIABLES = [
 
 export function MessagesComponent({}) {
   // getters ///////////////////////////////////////////////////////////////
-  let zCustomer = CUSTOMER_PROTO;
-  let zWorkorderObj = WORKORDER_PROTO;
-  zCustomer = useCurrentCustomerStore((state) => state.customer);
-  zWorkorderObj = useOpenWorkordersStore((state) =>
+  const zWorkorderObj = useOpenWorkordersStore((state) =>
     state.workorders.find((o) => o.id === state.openWorkorderID) || null
   );
+  const zCustomer = zWorkorderObj?.customerID
+    ? { id: zWorkorderObj.customerID, first: zWorkorderObj.customerFirst, last: zWorkorderObj.customerLast, cell: zWorkorderObj.customerPhone }
+    : CUSTOMER_PROTO;
   const zSettings = useSettingsStore((state) => state.settings);
   const zIncomingMessagesArr = useCustMessagesStore(
     (state) => state.incomingMessages
@@ -95,6 +95,7 @@ export function MessagesComponent({}) {
   const [sCanRespond, _setCanRespond] = useState(false);
   const [sInputHeight, _setInputHeight] = useState(36);
   const [sTranslateActive, _setTranslateActive] = useState(false);
+  const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
@@ -114,6 +115,15 @@ export function MessagesComponent({}) {
 
     // Update state immediately for responsive UI
     _setNewMessage(val);
+
+    // Imperative height adjustment — reset to 0 then measure scrollHeight so it shrinks on delete
+    if (textInputRef.current) {
+      const node = textInputRef.current;
+      node.style.height = "0px";
+      const h = Math.max(36, Math.ceil(node.scrollHeight));
+      node.style.height = h + "px";
+      _setInputHeight(h);
+    }
 
     // Trigger translation if active
     if (sTranslateActive) {
@@ -182,12 +192,13 @@ export function MessagesComponent({}) {
     if (sTranslateActive && sNewMessage.trim()) doTranslate(sNewMessage, newTarget);
   }
 
-  async function sendMessage(text) {
-    if (!text || !text.trim()) return;
+  async function sendMessage(text, imageUrl = "") {
+    if ((!text || !text.trim()) && !imageUrl) return;
     useLoginStore.getState().requireLogin(async () => {
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let msg = { ...SMS_PROTO };
-      msg.message = text;
+      msg.message = text || "";
+      msg.imageUrl = imageUrl;
       msg.phoneNumber = zCustomer.cell;
       msg.firstName = zCustomer.first;
       msg.lastName = zCustomer.last;
@@ -198,6 +209,7 @@ export function MessagesComponent({}) {
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
       _setNewMessage("");
+      _setInputHeight(36);
       _setCanRespond(false);
       clearTranslation();
       let result = await smsService.send(msg);
@@ -322,6 +334,84 @@ export function MessagesComponent({}) {
       }
     });
   }
+  async function handleSendSMSPayment() {
+    if (!zWorkorderObj || !zCustomer?.cell) return;
+    if (!zWorkorderObj.workorderLines || zWorkorderObj.workorderLines.length === 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Line Items",
+        message: "This workorder has no line items to charge for.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    if (zWorkorderObj.paymentComplete) {
+      useAlertScreenStore.getState().setValues({
+        title: "Already Paid",
+        message: "This workorder is already paid.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    if (zWorkorderObj.activeSaleID) {
+      useAlertScreenStore.getState().setValues({
+        title: "Payment In Progress",
+        message: "This workorder already has an active payment in progress.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    useLoginStore.getState().requireLogin(async () => {
+      let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent, [], false, !!zWorkorderObj.taxFree);
+      let amountDue = totals.finalTotal - (zWorkorderObj.amountPaid || 0);
+      let displayAmount = "$" + (amountDue / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      useAlertScreenStore.getState().setValues({
+        title: "Send SMS Payment",
+        message: "Send a payment link for " + displayAmount + " to " + zCustomer.first + " at " + zCustomer.cell + "?",
+        btn1Text: "Send",
+        btn2Text: "Cancel",
+        handleBtn1Press: async () => {
+          useAlertScreenStore.getState().resetAll();
+          let result = await dbCreateTextToPayInvoice(zWorkorderObj.id, "sms");
+          if (result && result.success) {
+            useAlertScreenStore.getState().setValues({
+              title: "Payment Link Sent",
+              message: "Payment link sent to " + zCustomer.first + ".",
+              btn1Text: "OK",
+              handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+              showAlert: true,
+              canExitOnOuterClick: true,
+            });
+          } else {
+            useAlertScreenStore.getState().setValues({
+              title: "Payment Link Failed",
+              message: result?.error || "Failed to send payment link",
+              btn1Text: "OK",
+              handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+              showAlert: true,
+              canExitOnOuterClick: true,
+            });
+          }
+        },
+        handleBtn2Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+    });
+  }
+  function handleMediaPicked(mediaItem) {
+    _setShowMediaPicker(false);
+    if (!mediaItem || !mediaItem.url) return;
+    sendMessage(mediaItem.url, mediaItem.url);
+  }
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
 
@@ -343,7 +433,7 @@ export function MessagesComponent({}) {
           width: "100%",
           flex: 1,
           flexShrink: 1,
-          backgroundColor: 'blue'
+          overflow: "hidden",
         }}
       >
         {messagesArr.length < 1 && (
@@ -390,14 +480,13 @@ export function MessagesComponent({}) {
         )}
       </View>
       {!zCustomer?.cell ? (
-        <View style={{ width: "100%", height: "100%" }}></View>
+        <View style={{ width: "100%", height: '100%' }}></View>
       ) : (
         <View
           style={{
             paddingTop: 10,
               flexDirection: "column",
-            width: "100%",
-              // height: "20%",
+              width: "100%",
           }}
         >
           {sTranslateActive && (translatedText || sTranslateLoading) ? (
@@ -412,117 +501,142 @@ export function MessagesComponent({}) {
             </View>
           ) : null}
           <View style={{ width: "100%" }}>
-            <TextInput
-              onChangeText={handleMessageChange}
-              ref={textInputRef}
-              autoFocus={true}
-              autoCapitalize="sentences"
-              multiline={true}
-              placeholderTextColor={"gray"}
-              placeholder={"Message..."}
-              onSelectionChange={(e) => {
-                cursorPositionRef.current = e.nativeEvent.selection.start;
-              }}
-              onContentSizeChange={(e) => {
-                let h = e?.nativeEvent?.contentSize?.height;
-                if (typeof h === "number" && h > 0) {
-                  _setInputHeight(Math.max(36, Math.ceil(h)));
-                }
-              }}
-              style={{
-                outlineColor: 'transparent',
-                outlineWidth: 0,
-                color: C.text,
-                padding: 5,
-                paddingBottom: 10,
-                fontSize: 15,
-                height: sInputHeight,
-                overflow: "hidden",
-                flexWrap: "wrap",
-                textWrap: "pretty",
-                borderWidth: 2,
-                borderRadius: 5,
-                borderColor: sCanRespond ? C.red : gray(0.15),
-                width: "100%",
-              }}
-              value={sNewMessage}
-            />
+              <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: sCanRespond ? C.red : gray(0.15), backgroundColor: "white" }}>
+                <TextInput
+                  onChangeText={handleMessageChange}
+                  ref={textInputRef}
+                  autoFocus={true}
+                  autoCapitalize="sentences"
+                  multiline={true}
+                  placeholderTextColor={"gray"}
+                  placeholder={"Message..."}
+                  onSelectionChange={(e) => {
+                    cursorPositionRef.current = e.nativeEvent.selection.start;
+                  }}
+                  onContentSizeChange={(e) => {
+                    let h = e?.nativeEvent?.contentSize?.height;
+                    if (typeof h === "number" && h > 0) {
+                      _setInputHeight(Math.max(36, Math.ceil(h)));
+                    }
+                  }}
+                  style={{
+                    outlineStyle: "none",
+                    outlineColor: "transparent",
+                    outlineWidth: 0,
+                    borderWidth: 0,
+                    borderColor: "transparent",
+                    color: C.text,
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                    paddingLeft: 5,
+                    paddingRight: 4,
+                    marginVertical: 8,
+                    fontSize: 15,
+                    lineHeight: 20,
+                    height: sInputHeight,
+                    overflow: "hidden",
+                    flex: 1,
+                    textAlignVertical: "top",
+                  }}
+                  value={sNewMessage}
+                />
+                <TouchableOpacity
+                  onPress={() => { if (sNewMessage.trim() && sNewMessage.length <= 1600) sendMessage(sNewMessage); }}
+                  style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() && sNewMessage.length <= 1600 ? 1 : 0.3 }}
+                >
+                  <Image_ icon={ICONS.airplane} size={41} />
+                </TouchableOpacity>
+              </View>
             <Text style={{ fontSize: 10, color: sNewMessage.length > 1600 ? C.red : gray(0.4), alignSelf: "flex-end", marginTop: 2 }}>
               {sNewMessage.length} / 1600
             </Text>
           </View>
-            <View style={{
-              width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "space-around", marginTop: 10, paddingHorizontal: 0
-
-            }}>
-            <Button_
-              onPress={() => sendMessage(sNewMessage)}
-              text={"Send"}
-              enabled={!!sNewMessage.trim() && sNewMessage.length <= 1600}
-              colorGradientArr={COLOR_GRADIENTS.blue}
-              buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
-            />
-            <DropdownMenu
-              dataArr={(zSettings?.textTemplates || []).map((t) => ({ label: t.name || "Untitled", message: t.message }))}
-              onSelect={(item) => {
-                let resolved = resolveTemplate(item.message);
-                _setNewMessage(resolved);
-                if (sTranslateActive) debouncedTranslate(resolved, targetLang);
-              }}
-              buttonText={"Templates"}
-              buttonStyle={{ paddingVertical: 5 }}
-              openUpward={true}
-            />
-            <DropdownMenu
-              dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
-              onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
-              buttonText={"Variables"}
-              buttonStyle={{ paddingVertical: 5 }}
-              openUpward={true}
-            />
-            <CheckBox_
-                buttonStyle={{}}
-                text={"Can Respond"}
-              isChecked={sCanRespond}
-              onCheck={() => _setCanRespond(!sCanRespond)}
-            />
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <CheckBox_
-                text={"Translate"}
-                isChecked={sTranslateActive}
-                onCheck={handleToggleTranslate}
-              />
-              {sTranslateActive && (
-                <TouchableOpacity onPress={handleFlipDirection} style={{ marginLeft: 4, paddingHorizontal: 6 }}>
-                  <Image_ icon={isEnToEs ? ICONS.exportIcon : ICONS.importIcon} size={18} />
-                </TouchableOpacity>
-              )}
+            <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <DropdownMenu
+                  dataArr={(zSettings?.textTemplates || []).map((t) => ({ label: t.name || "Untitled", message: t.message }))}
+                  onSelect={(item) => {
+                    let resolved = resolveTemplate(item.message);
+                    _setNewMessage(resolved);
+                    if (sTranslateActive) debouncedTranslate(resolved, targetLang);
+                  }}
+                  buttonText={"Templates"}
+                  buttonStyle={{ paddingVertical: 5 }}
+                  openUpward={true}
+                />
+                <DropdownMenu
+                  dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
+                  onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
+                  buttonText={"Variables"}
+                  buttonStyle={{ paddingVertical: 5 }}
+                  openUpward={true}
+                />
+                <Button_
+                  onPress={() => _setShowMediaPicker(true)}
+                  text={"Attach Media"}
+                  icon={ICONS.viewPhoto}
+                  iconSize={16}
+                  enabled={!!(zWorkorderObj?.media?.length)}
+                  colorGradientArr={COLOR_GRADIENTS.purple}
+                  buttonStyle={{ borderRadius: 5, paddingHorizontal: 10 }}
+                />
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <CheckBox_
+                  buttonStyle={{}}
+                  text={"Can Respond"}
+                  isChecked={sCanRespond}
+                  onCheck={() => _setCanRespond(!sCanRespond)}
+                />
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <CheckBox_
+                    text={"Translate"}
+                    isChecked={sTranslateActive}
+                    onCheck={handleToggleTranslate}
+                  />
+                  {sTranslateActive && (
+                    <TouchableOpacity onPress={handleFlipDirection} style={{ marginLeft: 4, paddingHorizontal: 6 }}>
+                      <Image_ icon={isEnToEs ? ICONS.exportIcon : ICONS.importIcon} size={18} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Button_
+                  onPress={handleSendWorkorderTicket}
+                  text={"Send Workorder"}
+                  enabled={!!zWorkorderObj && !!zCustomer?.cell}
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                />
+                <Button_
+                  onPress={handleSendSaleReceipt}
+                  text={"Send Receipt"}
+                  enabled={!!zWorkorderObj && !!zCustomer?.cell}
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                />
+                <Button_
+                  onPress={handleSendSMSPayment}
+                  text={"Send SMS Payment"}
+                  enabled={!!zWorkorderObj && !!zCustomer?.cell && !zWorkorderObj.paymentComplete && !zWorkorderObj.activeSaleID}
+                  colorGradientArr={COLOR_GRADIENTS.blue}
+                  buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                />
+              </View>
             </View>
-            <Button_
-              onPress={() => { _setNewMessage(""); _setInputHeight(36); clearTranslation(); }}
-              text={"Clear"}
-              colorGradientArr={COLOR_GRADIENTS.red}
-              buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
-            />
-            <Button_
-              onPress={handleSendWorkorderTicket}
-              text={"Send Workorder"}
-              enabled={!!zWorkorderObj && !!zCustomer?.cell}
-              colorGradientArr={COLOR_GRADIENTS.green}
-              buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
-            />
-            <Button_
-              onPress={handleSendSaleReceipt}
-              text={"Send Receipt"}
-              enabled={!!zWorkorderObj && !!zCustomer?.cell}
-              colorGradientArr={COLOR_GRADIENTS.green}
-              buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
-            />
-          </View>
         </View>
       )}
+      {sShowMediaPicker && zWorkorderObj?.id && (
+        <WorkorderMediaModal
+          visible={true}
+          onClose={() => _setShowMediaPicker(false)}
+          workorderID={zWorkorderObj.id}
+          mode="view"
+          onSelect={handleMediaPicked}
+        />
+      )}
     </View>
-    // </View>
   );
 }
 
@@ -554,7 +668,16 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
   return (
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE }}>
-        <Text style={{ ...MESSAGE_TEXT_STYLE }}>{msgObj.message}</Text>
+        {msgObj.imageUrl ? (
+          <Image
+            source={{ uri: msgObj.imageUrl }}
+            style={{ width: "100%", height: 180, borderRadius: 4, marginBottom: 4 }}
+            resizeMode="cover"
+          />
+        ) : null}
+        {msgObj.message && !msgObj.imageUrl ? (
+          <Text style={{ ...MESSAGE_TEXT_STYLE }}>{msgObj.message}</Text>
+        ) : null}
       </View>
       <View
         style={{
@@ -581,7 +704,16 @@ const OutgoingMessageComponent = memo(({ msgObj }) => {
   return (
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE }}>
-        <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
+        {msgObj.imageUrl ? (
+          <Image
+            source={{ uri: msgObj.imageUrl }}
+            style={{ width: "100%", height: 180, borderRadius: 4, marginBottom: 4 }}
+            resizeMode="cover"
+          />
+        ) : null}
+        {msgObj.message && !msgObj.imageUrl ? (
+          <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
+        ) : null}
       </View>
       <View
         style={{

@@ -37,7 +37,7 @@ import {
   RECEIPT_TYPES,
 } from "../../../data";
 import { MILLIS_IN_DAY } from "../../../constants";
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
@@ -81,6 +81,29 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowMediaModal, _setShowMediaModal] = useState(null); // null | "upload" | "view"
   const uploadInputRef = useRef(null);
 
+  // Estimated wait days — local state for instant UI, debounced DB write
+  const [sWaitDays, _setWaitDays] = useState(0);
+  const waitDaysTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!zOpenWorkorder?.partOrderEstimateMillis || !zOpenWorkorder?.partOrderedMillis) {
+      _setWaitDays(0);
+      return;
+    }
+    const days = Math.max(0, Math.round((zOpenWorkorder.partOrderEstimateMillis - zOpenWorkorder.partOrderedMillis) / MILLIS_IN_DAY));
+    _setWaitDays(days);
+  }, [zOpenWorkorder?.id]);
+
+  function updateWaitDays(newDays) {
+    _setWaitDays(newDays);
+    clearTimeout(waitDaysTimerRef.current);
+    waitDaysTimerRef.current = setTimeout(() => {
+      let now = Date.now();
+      useOpenWorkordersStore.getState().setField("partOrderedMillis", now, zOpenWorkorder.id, false);
+      useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), zOpenWorkorder.id);
+    }, 700);
+  }
+
   async function handleDirectUpload(e) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
@@ -104,6 +127,21 @@ export const ActiveWorkorderComponent = ({}) => {
   const partSourcesRef = useRef();
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses)?.label?.toLowerCase() === "done & paid";
+
+  // Stable reference so ScreenModal doesn't remount the modal content on parent re-renders
+  const CustomerInfoComponent = useCallback(() => (
+    <CustomerInfoScreenModalComponent
+      customerID={zOpenWorkorder?.customerID}
+      button1Text={"New Workorder"}
+      button2Text={"Close"}
+      handleButton1Press={() =>
+        handleCustomerNewWorkorderPress(
+          useCurrentCustomerStore.getState().customer
+        )
+      }
+      handleButton2Press={() => _setShowCustomerInfoScreen(false)}
+    />
+  ), [zOpenWorkorder?.customerID]);
 
   ///////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////
@@ -218,7 +256,13 @@ export const ActiveWorkorderComponent = ({}) => {
 
   function handleIntakePrintPress() {
     const settings = useSettingsStore.getState().getSettings();
-    const customer = useCurrentCustomerStore.getState().customer;
+    const customer = {
+      first: zOpenWorkorder?.customerFirst || "",
+      last: zOpenWorkorder?.customerLast || "",
+      cell: zOpenWorkorder?.customerPhone || "",
+      email: zOpenWorkorder?.customerEmail || "",
+      id: zOpenWorkorder?.customerID || "",
+    };
 
     const willSMS = settings?.autoSMSIntakeReceipt && customer?.cell;
     const willEmail = settings?.autoEmailIntakeReceipt && customer?.email;
@@ -339,19 +383,7 @@ export const ActiveWorkorderComponent = ({}) => {
               fontSize: 20,
               color: Colors.lightText,
             }}
-            Component={() => (
-              <CustomerInfoScreenModalComponent
-                incomingCustomer={useCurrentCustomerStore.getState().customer}
-                button1Text={"New Workorder"}
-                button2Text={"Close"}
-                handleButton1Press={() =>
-                  handleCustomerNewWorkorderPress(
-                    useCurrentCustomerStore.getState().customer
-                  )
-                }
-                handleButton2Press={() => _setShowCustomerInfoScreen(false)}
-              />
-            )}
+            Component={CustomerInfoComponent}
           />
           <View
             style={{
@@ -893,7 +925,6 @@ export const ActiveWorkorderComponent = ({}) => {
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                justifyContent: "space-between",
                 width: "100%",
                 marginTop: 11,
               }}
@@ -904,71 +935,49 @@ export const ActiveWorkorderComponent = ({}) => {
                 </Text>
                 <TouchableOpacity
                   disabled={isDonePaid}
-                  onPress={() => {
-                    let currentDays = 0;
-                    if (zOpenWorkorder?.partOrderEstimateMillis && zOpenWorkorder?.partOrderedMillis) {
-                      currentDays = Math.round((zOpenWorkorder.partOrderEstimateMillis - zOpenWorkorder.partOrderedMillis) / MILLIS_IN_DAY);
-                    }
-                    let newDays = Math.max(0, currentDays - 1);
-                    let now = Date.now();
-                    useOpenWorkordersStore.getState().setField("partOrderedMillis", now, zOpenWorkorder.id, false);
-                    useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), zOpenWorkorder.id);
-                  }}
+                  onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
                   style={{
-                    width: 22,
-                    height: 22,
+                    width: 20,
+                    height: 20,
                     borderRadius: 4,
-                    backgroundColor: isDonePaid ? gray(0.85) : C.blue,
+                    backgroundColor: isDonePaid ? gray(0.85) : C.buttonLightGreen,
                     justifyContent: "center",
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ color: "white", fontSize: 13, fontWeight: "700", marginTop: -1 }}>−</Text>
+                  <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>−</Text>
                 </TouchableOpacity>
                 <Text
                   style={{
-                    fontSize: 15,
-                    fontWeight: "600",
+                    fontSize: 13,
+                    fontWeight: "400",
                     color: C.text,
                     minWidth: 50,
                     textAlign: "center",
                   }}
                 >
-                  {(() => {
-                    if (!zOpenWorkorder?.partOrderEstimateMillis || !zOpenWorkorder?.partOrderedMillis) return "0";
-                    return Math.max(0, Math.round((zOpenWorkorder.partOrderEstimateMillis - zOpenWorkorder.partOrderedMillis) / MILLIS_IN_DAY));
-                  })()}
-                  {" days"}
+                  {sWaitDays + " days"}
                 </Text>
                 <TouchableOpacity
                   disabled={isDonePaid}
-                  onPress={() => {
-                    let currentDays = 0;
-                    if (zOpenWorkorder?.partOrderEstimateMillis && zOpenWorkorder?.partOrderedMillis) {
-                      currentDays = Math.round((zOpenWorkorder.partOrderEstimateMillis - zOpenWorkorder.partOrderedMillis) / MILLIS_IN_DAY);
-                    }
-                    let newDays = currentDays + 1;
-                    let now = Date.now();
-                    useOpenWorkordersStore.getState().setField("partOrderedMillis", now, zOpenWorkorder.id, false);
-                    useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), zOpenWorkorder.id);
-                  }}
+                  onPress={() => updateWaitDays(sWaitDays + 1)}
                   style={{
-                    width: 22,
-                    height: 22,
+                    width: 20,
+                    height: 20,
                     borderRadius: 4,
-                    backgroundColor: isDonePaid ? gray(0.85) : C.blue,
+                    backgroundColor: isDonePaid ? gray(0.85) : C.buttonLightGreen,
                     justifyContent: "center",
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ color: "white", fontSize: 13, fontWeight: "700", marginTop: -1 }}>+</Text>
+                  <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</Text>
                 </TouchableOpacity>
+                {!!zOpenWorkorder?.partOrderEstimateMillis && (
+                  <Text style={{ fontSize: 14, color: gray(0.45), marginLeft: 8 }}>
+                    {formatMillisForDisplay(zOpenWorkorder.partOrderEstimateMillis)}
+                  </Text>
+                )}
               </View>
-              {!!zOpenWorkorder?.partOrderEstimateMillis && (
-                <Text style={{ fontSize: 14, color: gray(0.45), textAlign: "right", marginLeft: "auto" }}>
-                  {formatMillisForDisplay(zOpenWorkorder.partOrderedMillis) + " → " + formatMillisForDisplay(zOpenWorkorder.partOrderEstimateMillis)}
-                </Text>
-              )}
             </View>
           </View>
         </View>

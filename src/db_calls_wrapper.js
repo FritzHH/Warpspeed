@@ -31,6 +31,7 @@ import {
   storageDelete,
   uploadPDFAndSendSMS,
   rehydrateFromArchiveCallable,
+  createTextToPayInvoiceCallable,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
 import { useSettingsStore, useLoginStore } from "./stores";
@@ -3142,6 +3143,22 @@ export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phon
  * @param {string[]} collections - Array of collection names to restore
  * @returns {Promise<Object>} { success, results: { collectionName: { success, docCount } } }
  */
+export async function dbCreateTextToPayInvoice(workorderID, channel = "sms") {
+  const { tenantID, storeID } = getTenantAndStore();
+  try {
+    const result = await createTextToPayInvoiceCallable({
+      workorderID,
+      channel,
+      tenantID,
+      storeID,
+    });
+    return result.data;
+  } catch (error) {
+    log("Error in dbCreateTextToPayInvoice:", error);
+    return { success: false, error: error.message || "Failed to send payment link" };
+  }
+}
+
 export async function dbRehydrateFromArchive(collections) {
   const { tenantID, storeID } = getTenantAndStore();
   try {

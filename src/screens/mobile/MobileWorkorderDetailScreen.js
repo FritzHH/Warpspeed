@@ -5,7 +5,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   useOpenWorkordersStore,
   useSettingsStore,
-  useCurrentCustomerStore,
 } from "../../stores";
 import { TextInput_, DropdownMenu, Image_, Button_ } from "../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
@@ -20,7 +19,6 @@ import {
   log,
 } from "../../utils";
 import {
-  dbGetCustomer,
   dbUploadWorkorderMedia,
   dbListenToSingleWorkorder,
 } from "../../db_calls_wrapper";
@@ -33,21 +31,11 @@ export function MobileWorkorderDetailScreen() {
   const zWorkorder = useOpenWorkordersStore((state) =>
     state.workorders.find((o) => o.id === id) || null
   );
-  const zCustomer = useCurrentCustomerStore((state) => state.customer);
   const zSettings = useSettingsStore((state) => state.settings);
 
   const [sShowMediaModal, _setShowMediaModal] = useState(null);
   const [sUploading, _setUploading] = useState(false);
   const fileInputRef = useRef(null);
-
-  // Load customer data when workorder changes
-  useEffect(() => {
-    if (zWorkorder?.customerID) {
-      dbGetCustomer(zWorkorder.customerID).then((customer) => {
-        useCurrentCustomerStore.getState().setCustomer(customer);
-      });
-    }
-  }, [zWorkorder?.customerID]);
 
   // Listen to this specific workorder for real-time updates
   useEffect(() => {
@@ -147,7 +135,7 @@ export function MobileWorkorderDetailScreen() {
             " " +
             capitalizeFirstLetterOfString(zWorkorder.customerLast)}
         </Text>
-        {!!(zCustomer?.cell || zWorkorder.customerPhone) && (
+        {!!zWorkorder.customerPhone && (
           <View
             style={{
               flexDirection: "row",
@@ -161,9 +149,7 @@ export function MobileWorkorderDetailScreen() {
               style={{ marginRight: 6 }}
             />
             <Text style={{ color: C.text, fontSize: 14 }}>
-              {formatPhoneWithDashes(
-                zCustomer?.cell || zWorkorder.customerPhone
-              )}
+              {formatPhoneWithDashes(zWorkorder.customerPhone)}
             </Text>
           </View>
         )}

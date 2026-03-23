@@ -253,6 +253,7 @@ export const SMS_PROTO = {
   canRespond: false,
   millis: "",
   message: "",
+  imageUrl: "",
   customerID: "",
   read: false,
   id: "",
@@ -493,6 +494,15 @@ export const QUICK_TEXT_PROTO = {
   id: "",
   buttonLabel: "",
   text: "",
+}
+
+export const PRINTER_PROTO = {
+  id: "",
+  printerName: "",
+  printerInfo: "",
+  label: "",
+  online: "",
+  lastSeen: "",
 }
 
 // Objects with initial data /////////////////////////////////////////
@@ -863,6 +873,10 @@ export const SETTINGS_OBJ = {
   receiptSetup: {
     includeFieldsInReceipt: ["displayName", "street", "city", "state", "phone"],
   },
+  printers: {
+
+  },
+  selectedPrinterID: "",
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   activeLoginTimeoutSeconds: 15,
@@ -917,7 +931,18 @@ export const SETTINGS_OBJ = {
       quickSearch: true,
     },
   },
-  textTemplates: [],
+  textTemplates: [
+    {
+      id: "dfdas",
+      buttonLabel: "Finished",
+      text: "Hi {firstName}, your {brand} {description} is ready for pickup! Your total is {totalAmount}. We're open {storeHours}. Call us at {storePhone} with any questions.",
+    },
+    {
+      id: "fkdnfdfd",
+      buttonLabel: "Part Ordered",
+      text: "Hi {firstName}, we've ordered a part for your {brand} {description}. As soon as we get the part we will proceed with the requested service. Call us at {storePhone} with any questions.",
+    }
+  ],
   autoCustomerNoteTexts: [],
   workorderTicketMessage: "Hi {firstName}, here is your workorder ticket for your {brand} {description}: {link}",
   saleReceiptMessage: "Hi {firstName}, here is your receipt from {storeName} for {total}: {link}",

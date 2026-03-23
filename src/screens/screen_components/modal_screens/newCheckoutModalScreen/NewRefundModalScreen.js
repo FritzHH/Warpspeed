@@ -7,7 +7,6 @@ import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
   useSettingsStore,
   useAlertScreenStore,
-  useCurrentCustomerStore,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
@@ -201,12 +200,12 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
     await newCheckoutCompleteSale(sale);
 
     // Write refund index for reporting
-    const customer = useCurrentCustomerStore.getState().customer;
+    const primaryWO = sWorkordersInSale[0];
     const customerInfo = {
-      first: customer?.first || "",
-      last: customer?.last || "",
-      phone: customer?.cell || "",
-      id: customer?.id || "",
+      first: primaryWO?.customerFirst || "",
+      last: primaryWO?.customerLast || "",
+      phone: primaryWO?.customerPhone || "",
+      id: primaryWO?.customerID || "",
     };
     saveRefundIndex(sale, refund, customerInfo);
 

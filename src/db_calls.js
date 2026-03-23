@@ -589,6 +589,10 @@ export const rehydrateFromArchiveCallable = httpsCallable(
   functions,
   "rehydrateFromArchive"
 );
+export const createTextToPayInvoiceCallable = httpsCallable(
+  functions,
+  "createTextToPayInvoice"
+);
 
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)

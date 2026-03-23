@@ -8,7 +8,7 @@ import { ROUTES } from "../routes";
 import { useSettingsStore } from "../stores";
 
 const LINK_ITEMS = [
-  { label: "Dashboard", path: ROUTES.dashboard, icon: ICONS.home },
+  { label: "Workorders", path: ROUTES.dashboard, icon: ICONS.gears1 },
   { label: "Login", path: ROUTES.login, icon: ICONS.userControl },
   { label: "Customer Display", path: ROUTES.display, icon: ICONS.eyeballs, popup: true },
   { label: "Translate", path: ROUTES.translate, icon: ICONS.letterI },

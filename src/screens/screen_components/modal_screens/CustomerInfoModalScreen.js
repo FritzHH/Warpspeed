@@ -20,7 +20,7 @@ import {
   resolveStatus,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useCurrentCustomerStore,
   useLoginStore,
@@ -31,12 +31,14 @@ import { CONTACT_RESTRICTIONS, CUSTOMER_PROTO } from "../../../data";
 import { Button_, CheckBox_, SmallLoadingIndicator, TextInput_ } from "../../../components";
 import {
   dbSaveCustomer,
+  dbGetCustomer,
   dbGetCompletedWorkorder,
   dbGetCompletedSale,
 } from "../../../db_calls_wrapper";
 
 export const CustomerInfoScreenModalComponent = ({
-  incomingCustomer = CUSTOMER_PROTO,
+  incomingCustomer = null,
+  customerID = null,
   isNewCustomer = false,
   isCurrentCustomer = true,
   button1Text,
@@ -44,12 +46,39 @@ export const CustomerInfoScreenModalComponent = ({
   handleButton1Press,
   handleButton2Press,
 }) => {
-  const [sCustomerInfo, _setCustomerInfo] = useState(incomingCustomer);
+  const [sCustomerInfo, _setCustomerInfo] = useState(incomingCustomer || CUSTOMER_PROTO);
+  const [sCustomerLoading, _setCustomerLoading] = useState(!incomingCustomer && !!customerID && !isNewCustomer);
+  const [sCustomerLoadError, _setCustomerLoadError] = useState(false);
   const [sWorkorders, _sSetWorkorders] = useState([]);
   const [sSales, _sSetSales] = useState([]);
   const [sWoLoading, _sSetWoLoading] = useState(false);
   const [sSalesLoading, _sSetSalesLoading] = useState(false);
   const [sDetailView, _sSetDetailView] = useState(null);
+  const mountedRef = useRef(true);
+
+  // Fetch customer on mount when customerID is provided (no incomingCustomer)
+  useEffect(() => {
+    mountedRef.current = true;
+    if (incomingCustomer || !customerID || isNewCustomer) return;
+    _setCustomerLoading(true);
+    _setCustomerLoadError(false);
+    dbGetCustomer(customerID).then((customer) => {
+      if (!mountedRef.current) return;
+      if (customer) {
+        _setCustomerInfo(customer);
+        useCurrentCustomerStore.getState().setCustomer(customer);
+        _setCustomerLoading(false);
+      } else {
+        _setCustomerLoadError(true);
+        _setCustomerLoading(false);
+      }
+    }).catch(() => {
+      if (!mountedRef.current) return;
+      _setCustomerLoadError(true);
+      _setCustomerLoading(false);
+    });
+    return () => { mountedRef.current = false; };
+  }, []);
 
   async function handleLoadWorkorders() {
     const woIDs = sCustomerInfo.workorders || [];

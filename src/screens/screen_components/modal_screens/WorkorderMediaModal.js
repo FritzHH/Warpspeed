@@ -9,7 +9,6 @@ import {
   useOpenWorkordersStore,
   useAlertScreenStore,
   useLayoutStore,
-  useCurrentCustomerStore,
   useSettingsStore,
   useLoginStore,
 } from "../../../stores";
@@ -27,6 +26,7 @@ export const WorkorderMediaModal = ({
   onClose,
   workorderID,
   mode, // "upload" or "view"
+  onSelect, // (mediaItem) => void — when provided, tapping a thumbnail picks it instead of full-view
 }) => {
   const isMobile = useLayoutStore((s) => s.isMobile);
   const zMedia =
@@ -43,11 +43,11 @@ export const WorkorderMediaModal = ({
 
   if (!visible) return null;
 
-  const zCustomer = useCurrentCustomerStore.getState().customer;
+  const zWorkorder = useOpenWorkordersStore.getState().workorders.find((w) => w.id === workorderID) || {};
   const zSettings = useSettingsStore.getState().settings;
   const storeName = zSettings?.storeInfo?.displayName || "Our store";
-  const hasCell = !!zCustomer?.cell?.length;
-  const hasEmail = !!zCustomer?.email?.length;
+  const hasCell = !!zWorkorder.customerPhone?.length;
+  const hasEmail = !!zWorkorder.customerEmail?.length;
 
   function toggleSelection(itemId) {
     _setSelectedIds((prev) => {
@@ -83,12 +83,12 @@ export const WorkorderMediaModal = ({
     if (hasCell) {
       let msg = cloneDeep(SMS_PROTO);
       msg.message = messageText;
-      msg.phoneNumber = zCustomer.cell;
-      msg.firstName = zCustomer.first || "";
-      msg.lastName = zCustomer.last || "";
+      msg.phoneNumber = zWorkorder.customerPhone;
+      msg.firstName = zWorkorder.customerFirst || "";
+      msg.lastName = zWorkorder.customerLast || "";
       msg.canRespond = new Date().getTime();
       msg.millis = new Date().getTime();
-      msg.customerID = zCustomer.id || "";
+      msg.customerID = zWorkorder.customerID || "";
       msg.id = generateRandomID();
       msg.type = "outgoing";
       msg.senderUserObj = useLoginStore.getState().currentUser || "";
@@ -99,7 +99,7 @@ export const WorkorderMediaModal = ({
         // Flag all customer workorders so the sender's list prioritizes them
         let senderUser = useLoginStore.getState().currentUser;
         let allWOs = useOpenWorkordersStore.getState().workorders;
-        allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
+        allWOs.filter((wo) => wo.customerID === zWorkorder.customerID).forEach((wo) => {
           useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", senderUser?.id || "", wo.id);
         });
       }
@@ -116,7 +116,7 @@ export const WorkorderMediaModal = ({
       const htmlBody = `<p>${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:</p>${linksHtml}`;
       const subject = `Media from ${storeName}`;
 
-      let result = await dbSendEmail(zCustomer.email, subject, htmlBody);
+      let result = await dbSendEmail(zWorkorder.customerEmail, subject, htmlBody);
       emailSuccess = result.success;
     }
 
@@ -427,7 +427,7 @@ export const WorkorderMediaModal = ({
                     }}
                   >
                     <TouchableOpacity
-                      onPress={() => _setFullView(item)}
+                      onPress={() => onSelect ? onSelect(item) : _setFullView(item)}
                       style={{ flex: 1 }}
                     >
                       {item.type === "video" ? (

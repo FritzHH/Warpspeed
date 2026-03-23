@@ -16,7 +16,6 @@ import { TAB_NAMES } from "../../../data";
 import React, { useRef } from "react";
 import { sortBy } from "lodash";
 import {
-  useCurrentCustomerStore,
   useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
@@ -24,7 +23,6 @@ import {
   useWorkorderPreviewStore,
 } from "../../../stores";
 
-import { dbGetCustomer } from "../../../db_calls_wrapper";
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
 
@@ -199,11 +197,6 @@ export function WorkordersComponent({}) {
   ///////////////////////////////////////////////////////////////////////////////////
 
   function workorderSelected(obj) {
-    dbGetCustomer(obj.customerID).then((customer) => {
-      // clog("cust obj", custObj);
-      useCurrentCustomerStore.getState().setCustomer(customer);
-    });
-
     useOpenWorkordersStore.getState().setOpenWorkorderID(obj.id);
     // _zSetInitialOpenWorkorder(obj);
     useTabNamesStore.getState().setItems({

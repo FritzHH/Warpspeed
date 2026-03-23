@@ -21,7 +21,9 @@
       "Bash(npm install @google-cloud/translate)",
       "Bash(ls -la \"C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\functions\"\" | grep -E \"env)",
       "Bash(config)",
-      "Bash(package \")"
+      "Bash(package \")",
+      "Bash(identify \"C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\src\\\\assets\\\\airplane.png\")",
+      "Bash(python3 -c \"from PIL import Image; img=Image.open\\(r''C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\src\\\\assets\\\\airplane.png''\\); print\\(img.size\\)\")"
     ]
   }
 }

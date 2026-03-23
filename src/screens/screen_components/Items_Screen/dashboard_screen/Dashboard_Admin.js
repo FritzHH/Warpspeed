@@ -64,14 +64,14 @@ import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
 import { PayrollModal } from "../../modal_screens/PayrollModal";
-import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveCustomer, dbRehydrateFromArchive, dbSavePunchObject } from "../../../../db_calls_wrapper";
+import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveCustomer, dbRehydrateFromArchive, dbSavePunchObject, dbSavePrintObj } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery } from "../../../../db_calls";
 import { DB_NODES } from "../../../../constants";
 
 const TAB_NAMES = {
   users: "User Control",
-  payments: "Payment Processing",
+  payments: "Payments/Printers",
   statuses: "Workorder Statuses",
   lists: "Lists & Options",
   waitTimes: "Wait Times",
@@ -511,6 +511,31 @@ export function Dashboard_Admin({}) {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
+              onPress={() => {
+                let printObj = {
+                  id: generateRandomID(),
+                  receiptType: "Workorder",
+                  workorderLines: [{ qty: 1, inventoryItem: { formalName: "Test Item ABC123" }, id: "test1" }],
+                };
+                dbSavePrintObj(printObj, "8C:77:3B:60:33:22_Rongta");
+              }}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                borderWidth: 2,
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.listItemWhite,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 20,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+                Test Print
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={async () => {
                 let dayjs = (await import("dayjs")).default;
                 let userID = "1234";
@@ -602,10 +627,16 @@ export function Dashboard_Admin({}) {
             </Text>
           )}
           {sExpand === TAB_NAMES.payments && (
-            <PaymentProcessingComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-            />
+            <>
+              <PaymentProcessingComponent
+                zSettingsObj={zSettingsObj}
+                handleSettingsFieldChange={handleSettingsFieldChange}
+              />
+              <PrintersComponent
+                zSettingsObj={zSettingsObj}
+                handleSettingsFieldChange={handleSettingsFieldChange}
+              />
+            </>
           )}
           {sExpand === TAB_NAMES.users && (
             <AppUserListComponent
@@ -3127,6 +3158,61 @@ const PaymentProcessingComponent = ({
           />
           <Text>%</Text>
         </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const printersObj = zSettingsObj?.printers || {};
+  const printersList = Object.values(printersObj);
+  const selectedPrinterID = zSettingsObj?.selectedPrinterID || "";
+
+  return (
+    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
+      <BoxContainerInnerComponent>
+        <View style={{ width: "100%", marginBottom: 10 }}>
+          <Text style={{ fontSize: 12, color: gray(0.6) }}>PRINTERS</Text>
+        </View>
+        {printersList.length === 0 && (
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>No printers configured</Text>
+        )}
+        {printersList.map((printer, idx) => (
+          <View
+            key={printer.id || idx}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: selectedPrinterID === printer.id ? C.green : C.buttonLightGreenOutline,
+              backgroundColor: C.backgroundListWhite,
+              padding: 10,
+              marginBottom: idx < printersList.length - 1 ? 8 : 0,
+              width: "100%",
+            }}
+          >
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: printer.online ? C.green : C.red, marginRight: 8 }} />
+            <CheckBox_
+              isChecked={selectedPrinterID === printer.id}
+              buttonStyle={{ backgroundColor: "transparent", marginRight: 10 }}
+              onCheck={() => handleSettingsFieldChange("selectedPrinterID", printer.id)}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
+              <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
+            </View>
+            {!!printer.printerInfo && (
+              <Tooltip text={printer.printerInfo} position="left">
+                <Button_
+                  icon={ICONS.info}
+                  iconSize={20}
+                  buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 5, paddingVertical: 0 }}
+                />
+              </Tooltip>
+            )}
+          </View>
+        ))}
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );

@@ -15,7 +15,7 @@ import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
-import { useAlertScreenStore, useSettingsStore } from "./stores";
+import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
 
 // const fs = require("node:fs");
@@ -2002,12 +2002,10 @@ function createPrintBase(workorder, customer, salesTaxPercent) {
   r.shopName = SHOP_NAME
   r.waitTime = workorder.waitTime?.label;
 
-  let startedBySplit = workorder.startedBy.split(" ");
-  r.startedBy = startedBySplit[0]
-  if (startedBySplit[1]?.length > 0) {
-    r.startedBy = r.startedBy + " " + startedBySplit[1].substring(0) + '.';
-
-  }
+  const currentUser = useLoginStore.getState().getCurrentUser();
+  const userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
+  const userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
+  r.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
   r.workorderNumber = r.workorderNumber || extractRandomFourDigits(workorder.id) // remove for production, initial workorders did not save this field
   r.shopContactBlurb =
     SHOP_CONTACT_BLURB;

@@ -27,8 +27,8 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
 } from "../../../stores";
-import { CONTACT_RESTRICTIONS, CUSTOMER_PROTO } from "../../../data";
-import { Button_, CheckBox_, SmallLoadingIndicator, TextInput_ } from "../../../components";
+import { CONTACT_RESTRICTIONS, CUSTOMER_LANGUAGES, CUSTOMER_PROTO } from "../../../data";
+import { Button_, CheckBox_, DropdownMenu, SmallLoadingIndicator, TextInput_ } from "../../../components";
 import {
   dbSaveCustomer,
   dbGetCustomer,
@@ -399,6 +399,17 @@ export const CustomerInfoScreenModalComponent = ({
             multiline
             numberOfLines={3}
           />
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: TEXT_INPUT_STYLE.marginTop }}>
+            <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 8 }}>Language</Text>
+            <DropdownMenu
+              dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
+              buttonText={sCustomerInfo.language || "English"}
+              buttonStyle={{ ...TEXT_INPUT_STYLE, marginTop: 0, flex: 1 }}
+              buttonTextStyle={{ fontSize: 14, color: C.text }}
+              onSelect={(item) => saveField("language", item.value)}
+              useSelectedAsButtonTitle={false}
+            />
+          </View>
 
           <View style={{ flexDirection: "column" }}>
             {!!button1Text && (

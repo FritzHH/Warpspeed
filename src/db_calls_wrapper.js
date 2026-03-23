@@ -1117,6 +1117,7 @@ export async function dbSavePrintObj(printObj, printerID) {
     }
 
     printObj.id = generateRandomID();
+    printObj.timestamp = Date.now();
     const path = buildPrintObjectPath(
       tenantID,
       storeID,

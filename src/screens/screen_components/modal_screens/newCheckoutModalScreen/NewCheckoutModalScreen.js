@@ -455,7 +455,7 @@ export function NewCheckoutModalScreen() {
 
   function handlePopRegister() {
     let printObj = { id: generateUPCBarcode(), receiptType: RECEIPT_TYPES.register };
-    dbSavePrintObj(printObj, zSettings?.printerCloudId || "8C:77:3B:60:33:22");
+    dbSavePrintObj(printObj, zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31");
   }
 
   function handleTaxFreeToggle() {

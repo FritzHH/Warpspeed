@@ -515,9 +515,42 @@ export function Dashboard_Admin({}) {
                 let printObj = {
                   id: generateRandomID(),
                   receiptType: "Workorder",
-                  workorderLines: [{ qty: 1, inventoryItem: { formalName: "Test Item ABC123" }, id: "test1" }],
+                  barcode: "100000000001",
+                  workorderNumber: "WO-10001",
+                  customerFirstName: "John",
+                  customerLastName: "Smith",
+                  customerCell: "239-555-1234",
+                  customerEmail: "john.smith@email.com",
+                  customerAddress: "123 Main St, Bonita Springs, FL 34135",
+                  brand: "Trek",
+                  model: "Domane SL 5",
+                  description: "Road Bike",
+                  color1: "Matte Black",
+                  color2: "Red",
+                  status: "In Progress",
+                  startedBy: "Mike",
+                  startedOnDate: "03/20/2026",
+                  finishedOnDate: "",
+                  subtotal: "$185.00",
+                  discount: "$10.00",
+                  tax: "$12.25",
+                  total: "$187.25",
+                  salesTaxPercent: "7%",
+                  labor: "$75.00",
+                  parts: "$110.00",
+                  shopName: "Bonita Bikes LLC",
+                  shopContactBlurb: "239-555-0000 | bonitabikes@email.com",
+                  thankYouBlurb: "Thank you for choosing Bonita Bikes!",
+                  workorderLines: [
+                    { qty: 1, inventoryItem: { formalName: "Brake Pad Set - Shimano 105", price: 3500 }, id: "line1" },
+                    { qty: 2, inventoryItem: { formalName: "Inner Tube 700x25c", price: 800 }, id: "line2" },
+                    { qty: 1, inventoryItem: { formalName: "Chain - KMC X11 Silver", price: 3500 }, id: "line3" },
+                    { qty: 1, inventoryItem: { formalName: "Labor - Full Tune Up", price: 7500 }, id: "line4" },
+                  ],
+                  customerNotes: ["Customer requested rush service", "Pickup after 5pm"],
+                  internalNotes: ["Rear derailleur cable frayed — replaced"],
                 };
-                dbSavePrintObj(printObj, "8C:77:3B:60:33:22_Rongta");
+                dbSavePrintObj(printObj, "8C:77:3B:60:33:22_Star MCP31");
               }}
               style={{
                 paddingVertical: 10,
@@ -3164,9 +3197,7 @@ const PaymentProcessingComponent = ({
 };
 
 const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
-  log("Full settings:", JSON.stringify(zSettingsObj, null, 2));
   const printersObj = zSettingsObj?.printers || {};
-  log("Printers:", printersObj);
   const printersList = Object.values(printersObj);
   const selectedPrinterID = zSettingsObj?.selectedPrinterID || "";
 

@@ -254,7 +254,7 @@ export const StandaloneSaleComponent = ({}) => {
             onPress={() =>
               dbSavePrintObj(
                 { id: generateUPCBarcode(), receiptType: RECEIPT_TYPES.register },
-                "8C:77:3B:60:33:22"
+                "8C:77:3B:60:33:22_Star MCP31"
               )
             }
           />
@@ -264,7 +264,7 @@ export const StandaloneSaleComponent = ({}) => {
             icon={ICONS.receipt}
             iconSize={40}
             onPress={() =>
-              dbSavePrintObj(printBuilder.test(), "8C:77:3B:60:33:22")
+              dbSavePrintObj(printBuilder.test(), "8C:77:3B:60:33:22_Star MCP31")
             }
           />
         </Tooltip>

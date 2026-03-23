@@ -1,4 +1,4 @@
-import { generateRandomID, bestForegroundHex } from "./utils";
+import { generateRandomID, generateUPCBarcode, extractRandomFourDigits, bestForegroundHex } from "./utils";
 import { COLORS, NONREMOVABLE_STATUSES } from "./data";
 
 // ============================================================================

@@ -236,22 +236,13 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleWorkorderPrintPress() {
-    // let toPrint = printBuilder.workorder(
-    //   zOpenWorkorder,
-    //   zCustomer,
-    //   useSettingsStore.getState().settings?.salesTaxPercent
-    // );
-
-        let toPrint = printBuilder.intake(
+    let toPrint = printBuilder.workorder(
       zOpenWorkorder,
       zCustomer,
       useSettingsStore.getState().settings?.salesTaxPercent
-        );
-
-    // dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Rongta");
-
-    dbTestCustomerPhoneWrite();
-
+    );
+    log("Print object:", JSON.stringify(toPrint, null, 2));
+    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Star MCP31");
   }
 
   function handleIntakePrintPress() {

@@ -11,6 +11,7 @@ import {
 import {
   firestoreWrite,
   firestoreRead,
+  firestoreUpdate,
   firestoreQuery,
   firestoreSubscribe,
   firestoreSubscribeCollection,
@@ -448,6 +449,34 @@ export async function dbSaveSettingsField(fieldName, value) {
       tenantID: null,
       storeID: null,
     };
+  }
+}
+
+/**
+ * Save a single field in the settings document without reading/rewriting the entire doc.
+ * Uses Firestore updateDoc so only the specified field is touched.
+ * @param {string} fieldName - Top-level field name (e.g. "printers", "acceptChecks")
+ * @param {*} value - Value to set
+ * @returns {Promise<Object>} Save result
+ */
+export async function dbSaveSettingsNode(fieldName, value) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbSaveSettingsNode");
+      return { success: false, error: "Configuration Error", message: "tenantID and storeID are not configured." };
+    }
+    if (!fieldName || typeof fieldName !== "string") {
+      log("Error: fieldName must be a non-empty string for dbSaveSettingsNode");
+      return { success: false, error: "Invalid Parameter", message: "fieldName must be a non-empty string" };
+    }
+    const path = buildSettingsPath(tenantID, storeID);
+    await firestoreUpdate(path, { [fieldName]: value });
+    log("Settings node saved", { fieldName, tenantID, storeID });
+    return { success: true, fieldName, value };
+  } catch (error) {
+    log("Error saving settings node:", error);
+    return { success: false, error: "Database Error", message: error.message };
   }
 }
 

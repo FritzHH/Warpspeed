@@ -3164,7 +3164,9 @@ const PaymentProcessingComponent = ({
 };
 
 const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  log("Full settings:", JSON.stringify(zSettingsObj, null, 2));
   const printersObj = zSettingsObj?.printers || {};
+  log("Printers:", printersObj);
   const printersList = Object.values(printersObj);
   const selectedPrinterID = zSettingsObj?.selectedPrinterID || "";
 
@@ -3181,8 +3183,6 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <View
             key={printer.id || idx}
             style={{
-              flexDirection: "row",
-              alignItems: "center",
               borderRadius: 8,
               borderWidth: 1,
               borderColor: selectedPrinterID === printer.id ? C.green : C.buttonLightGreenOutline,
@@ -3192,25 +3192,20 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               width: "100%",
             }}
           >
-            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: printer.online ? C.green : C.red, marginRight: 8 }} />
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: printer.online === true ? C.green : C.red, marginRight: 8 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
+                <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
+              </View>
+            </View>
             <CheckBox_
               isChecked={selectedPrinterID === printer.id}
-              buttonStyle={{ backgroundColor: "transparent", marginRight: 10 }}
+              text="Use this printer"
+              textStyle={{ fontSize: 13 }}
+              buttonStyle={{ backgroundColor: "transparent", marginTop: 8 }}
               onCheck={() => handleSettingsFieldChange("selectedPrinterID", printer.id)}
             />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
-              <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
-            </View>
-            {!!printer.printerInfo && (
-              <Tooltip text={printer.printerInfo} position="left">
-                <Button_
-                  icon={ICONS.info}
-                  iconSize={20}
-                  buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 5, paddingVertical: 0 }}
-                />
-              </Tooltip>
-            )}
           </View>
         ))}
       </BoxContainerInnerComponent>

@@ -23,7 +23,12 @@
       "Bash(config)",
       "Bash(package \")",
       "Bash(identify \"C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\src\\\\assets\\\\airplane.png\")",
-      "Bash(python3 -c \"from PIL import Image; img=Image.open\\(r''C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\src\\\\assets\\\\airplane.png''\\); print\\(img.size\\)\")"
+      "Bash(python3 -c \"from PIL import Image; img=Image.open\\(r''C:\\\\Users\\\\hiebf\\\\OneDrive\\\\Desktop\\\\warpspeed\\\\src\\\\assets\\\\airplane.png''\\); print\\(img.size\\)\")",
+      "Bash(xargs grep -l \"stripe\\\\|Stripe\")",
+      "Bash(find /c/Users/hiebf/OneDrive/Desktop/warpspeed/src -name \"*.js\" -type f -exec grep -l \"STRIPE_INITIATE_PAYMENT_INTENT_URL\\\\|STRIPE_CANCEL_PAYMENT_INTENT_URL\\\\|STRIPE_INITIATE_REFUND_URL\\\\|STRIPE_CONNECTION_TOKEN_FIREBASE_URL\\\\|STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL\" {} ;)",
+      "Bash(xargs basename -s .js)",
+      "Bash(node -e \"const fs=require\\(''fs''\\);const src=''src/shared'';const dst=''functions/shared'';if\\(fs.existsSync\\(dst\\)\\)fs.rmSync\\(dst,{recursive:true}\\);fs.cpSync\\(src,dst,{recursive:true}\\);console.log\\(''Copied src/shared → functions/shared''\\)\")",
+      "Bash(node -e \"const pb = require\\(''./shared/printBuilder''\\); console.log\\(''Exports:'', Object.keys\\(pb\\)\\); console.log\\(''printBuilder methods:'', Object.keys\\(pb.printBuilder\\)\\); console.log\\(''RECEIPT_TYPES:'', pb.RECEIPT_TYPES\\); console.log\\(''test receipt:'', pb.printBuilder.test\\(\\)\\);\")"
     ]
   }
 }

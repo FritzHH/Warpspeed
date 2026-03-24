@@ -22,6 +22,7 @@ import {
   Tooltip,
 } from "../../../components";
 import { C, ICONS } from "../../../styles";
+import { EmptyItemsComponent } from "./Items_Empty";
 import {
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
@@ -346,7 +347,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   // log("here", zOpenWorkorder);
-  if (!zOpenWorkorder) return null;
+  if (!zOpenWorkorder) return <EmptyItemsComponent />;
   let hasItems = zOpenWorkorder?.workorderLines?.length > 0;
   if (!hasItems)
     return (
@@ -772,7 +773,7 @@ export const LineItemComponent = ({
                           onPress={handleNoteButtonPress}
                           style={{ marginRight: 4 }}
                         >
-                          <Image source={ICONS.letterR} style={{ width: 18, height: 18, opacity: 0.5 }} />
+                          <Image source={ICONS.editPencil} style={{ width: 15, height: 15, opacity: 0.5 }} />
                         </TouchableOpacity>
                       </Tooltip>
                     )}
@@ -937,17 +938,6 @@ export const LineItemComponent = ({
                   )}
               </Text>
             )}
-            {/* {!!workorderLine.discountObj?.savings && (
-              <Text
-                style={{
-                  paddingHorizontal: 0,
-                  minWidth: 30,
-                  color: C.lightText,
-                }}
-              >
-                {"$ -" + formatCurrencyDisp(workorderLine.discountObj?.savings)}
-              </Text>
-            )} */}
             <Text
               style={{
                 fontWeight: "500",
@@ -987,7 +977,7 @@ export const LineItemComponent = ({
               {effectiveQty > 1 && <Tooltip text="Split items" position="top">
                 <Button_
                   icon={ICONS.axe}
-                  iconSize={23}
+                  iconSize={20}
                   disabled={isLocked}
                   onPress={effectiveQty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
                   buttonStyle={{
@@ -1001,7 +991,7 @@ export const LineItemComponent = ({
             <Tooltip text="Discounts" position="top">
               <DropdownMenu
                 buttonIcon={ICONS.dollarYellow}
-                buttonIconSize={25}
+                  buttonIconSize={22}
                 modalCoordY={25}
                   modalCoordX={-100}
                 enabled={!isLocked}

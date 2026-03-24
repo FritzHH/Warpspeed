@@ -391,7 +391,14 @@ const TabBar = ({ onTranslatePress }) => {
           buttonStyle={{
             borderTopRightRadius: 15,
           }}
-          onPress={() => useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.dashboard)}
+          onPress={() => {
+            let current = useTabNamesStore.getState().itemsTabName;
+            if (current === TAB_NAMES.itemsTab.dashboard && !useOpenWorkordersStore.getState().openWorkorderID) {
+              useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
+            } else {
+              useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.dashboard);
+            }
+          }}
           text={TAB_NAMES.itemsTab.dashboard}
           isSelected={
             zItemsTabName === TAB_NAMES.itemsTab.dashboard ? true : false

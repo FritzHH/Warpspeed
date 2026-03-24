@@ -14,17 +14,3 @@ export const firebaseConfig = {
 export const SMS_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/sendSMS";
 
-export const STRIPE_CONNECTION_TOKEN_FIREBASE_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/createStripeConnectionToken";
-
-export const STRIPE_INITIATE_PAYMENT_INTENT_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/initiatePaymentIntent";
-
-export const STRIPE_INITIATE_REFUND_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/initiateRefund";
-
-export const STRIPE_CANCEL_PAYMENT_INTENT_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/cancelServerDrivenStripePayment";
-
-export const STRIPE_GET_AVAIALABLE_STRIPE_READERS_URL =
-  "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/getAvailableStripeReaders";

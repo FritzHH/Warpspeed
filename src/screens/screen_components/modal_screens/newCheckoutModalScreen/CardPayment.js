@@ -75,6 +75,8 @@ export function CardPayment({
   settings,
   saleComplete = false,
   readerError = "",
+  saleID = "",
+  customerID = "",
 }) {
   const [sRequestedAmount, _setRequestedAmount] = useState("");
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState("");
@@ -154,7 +156,9 @@ export function CardPayment({
       let result = await newCheckoutProcessStripePayment(
         sRequestedAmount,
         activeReader.id,
-        sPaymentIntentID || null
+        sPaymentIntentID || null,
+        saleID,
+        customerID
       );
 
       if (!result?.success) {

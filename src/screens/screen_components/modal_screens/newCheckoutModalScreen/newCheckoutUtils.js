@@ -8,7 +8,7 @@ import {
 } from "../../../../utils";
 import { dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS } from "../../../../db_calls_wrapper";
 import { build_db_path } from "../../../../constants";
-import { useSettingsStore } from "../../../../stores";
+import { useLoginStore, useSettingsStore } from "../../../../stores";
 import { printBuilder } from "../../../../utils";
 import {
   SALE_PROTO,
@@ -311,7 +311,7 @@ export function splitWorkorderLinesToSingleQty(workorders) {
 }
 
 // ─── Send sale receipt via SMS/email ──────────────────────────
-function applyTemplate(template, vars) {
+function applyVars(template, vars) {
   let result = template;
   for (const [key, val] of Object.entries(vars)) {
     result = result.replace(new RegExp("\\{" + key + "\\}", "g"), val || "");
@@ -319,29 +319,27 @@ function applyTemplate(template, vars) {
   return result;
 }
 
-export async function sendSaleReceipt(sale, customer, workorder, settings) {
+export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate) {
   if (!sale || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
   const firstName = customer?.first || "Customer";
-  const storeName = settings?.storeName || "our store";
+  const storeName = settings?.storeInfo?.displayName || "our store";
   const total = formatCurrencyDisp(sale.total, true);
 
   // Generate PDF receipt and upload to Cloud Storage
   let receiptURL = "";
   try {
-    const receiptData = printBuilder.sale(sale, sale.payments || [], customer, workorder, settings?.salesTaxPercent);
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+    const receiptData = printBuilder.sale(sale, sale.payments || [], customer, workorder, settings?.salesTaxPercent, _ctx);
     const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
     const base64 = generateSaleReceiptPDF(receiptData);
     const storagePath = build_db_path.cloudStorage.saleReceiptPDF(sale.id, tenantID, storeID);
 
     // SMS — upload PDF and send link in one call
-    if (settings.autoSMSSalesReceipt && customer?.customerCell) {
+    if (smsTemplate && settings.autoSMSSalesReceipt && customer?.customerCell) {
       const vars = { firstName, storeName, total, link: "{link}" };
-      const msg = applyTemplate(
-        settings.saleReceiptMessage || "Hi {firstName}, here is your receipt from {storeName} for {total}: {link}",
-        vars
-      );
+      const msg = applyVars(smsTemplate.content || smsTemplate.message || "", vars);
       const result = await dbUploadPDFAndSendSMS({
         base64,
         storagePath,
@@ -350,7 +348,7 @@ export async function sendSaleReceipt(sale, customer, workorder, settings) {
         customerID: customer.id || "",
         messageID: generateRandomID(),
       });
-      if (result?.data?.downloadURL) receiptURL = result.data.downloadURL;
+      if (result?.data?.url) receiptURL = result.data.url;
       log("Sent sale receipt SMS to", customer.customerCell);
     } else {
       // No SMS but still upload PDF for email link
@@ -363,19 +361,13 @@ export async function sendSaleReceipt(sale, customer, workorder, settings) {
   }
 
   // Email
-  if (settings.autoEmailSalesReceipt && customer?.email) {
+  if (emailTemplate && settings.autoEmailSalesReceipt && customer?.email) {
     const vars = { firstName, storeName, total, link: receiptURL };
-    const subject = applyTemplate(
-      settings.saleReceiptEmailSubject || "Your receipt from {storeName}",
-      vars
-    );
+    const subject = applyVars(emailTemplate.subject || "", vars);
     const receiptLink = receiptURL
       ? "<p style='margin:24px 0'><a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Receipt</a></p>"
       : "";
-    const html = applyTemplate(
-      settings.saleReceiptEmailTemplate || "<div style='font-family:Arial,sans-serif;max-width:500px;margin:0 auto'><p>Hi {firstName},</p><p>Thank you for your purchase! Your total was <strong>{total}</strong>.</p>{receiptLink}<p>&mdash; {storeName}</p></div>",
-      { ...vars, receiptLink }
-    );
+    const html = applyVars(emailTemplate.content || emailTemplate.body || "", { ...vars, receiptLink });
     dbSendEmail(customer.email, subject, html);
     log("Sent sale receipt email to", customer.email);
   }

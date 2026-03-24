@@ -28,7 +28,7 @@ import { dbGetCustomer } from "../../../db_calls_wrapper";
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
 
 function computeWaitInfo(workorder) {
-  let label = calculateWaitEstimateLabel(workorder);
+  let label = calculateWaitEstimateLabel(workorder, useSettingsStore.getState().getSettings());
   let result = { waitEndDay: "", textColor: C.text, isMissing: false };
 
   if (!label) return result;
@@ -258,9 +258,8 @@ export function WorkordersComponent({}) {
   }
 
   function onMouseExit(workorder) {
-    useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
     exitTimerRef.current = setTimeout(() => {
-      // Restore the tab state that was active before the hover
+      // Restore tabs and clear preview in the same tick to avoid flicker
       if (preHoverTabsRef.current) {
         useTabNamesStore.getState().setItems(preHoverTabsRef.current);
         preHoverTabsRef.current = null;
@@ -282,6 +281,7 @@ export function WorkordersComponent({}) {
           }
         }
       }
+      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
       exitTimerRef.current = null;
     }, 50);
   }

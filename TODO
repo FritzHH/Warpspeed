@@ -4,3 +4,6 @@
 
 
 
+
+
+go to Dashboard_Admin -> email templates. i need a variable for pdf link to Intake receipt. then do the same for the text templates. then go to the printing process and modify to read this variable. once you have done that, 

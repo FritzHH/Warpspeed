@@ -14,6 +14,7 @@ const { onInit } = require("firebase-functions/v2/core");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const fetch = require("node-fetch");
+const { printBuilder: sharedPrintBuilder } = require("./shared/printBuilder");
 
 // Firebase Admin SDK - initialize once at module load (don't delete/recreate)
 let DB = null;
@@ -83,7 +84,7 @@ async function getDB(serviceAccountSecret = null) {
 //   process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
 // }
 
-const stripeSecretKey = defineSecret("stripeSecretKey");
+const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const twilioSecretKey = defineSecret("twilioSecretKey");
 const twilioSecretAccountNumber = defineSecret("twilioSecretAccountNum");
 const firebaseServiceAccountKey = defineSecret("firebase-service-account-key");
@@ -91,7 +92,8 @@ const lightspeedClientId = defineSecret("LIGHTSPEED_CLIENT_ID");
 const lightspeedClientSecret = defineSecret("LIGHTSPEED_CLIENT_SECRET");
 const googleTranslateApiKey = defineSecret("GOOGLE_TRANSLATE_API_KEY");
 const gmailAppPassword = defineSecret("GMAIL_APP_PASSWORD");
-const stripeWebhookSecret = defineSecret("stripeWebhookSecret");
+const stripeWebhookSecret = defineSecret("STRIPE_LINK_TO_PAY_WEBHOOK");
+const stripeTerminalWebhookSecret = defineSecret("STRIPE_CHECKOUT_WEBHOOK_SECRET");
 
 // initialization
 var stripe;
@@ -421,62 +423,67 @@ exports.initiatePaymentIntent = onRequest(
   }
 );
 
-exports.stripeEventWebhook = onRequest(
-  { cors: true, secrets: [stripeSecretKey] },
+exports.stripeCheckoutWebhook_Terminal = onRequest(
+  {
+    cors: true,
+    secrets: [
+      stripeSecretKey,
+      stripeTerminalWebhookSecret,
+      firebaseServiceAccountKey,
+      twilioSecretKey,
+      twilioSecretAccountNumber,
+      gmailAppPassword,
+    ],
+  },
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "http://localhost:3000");
-    log("Incoming Stripe webhook event body", req.body);
+
+    // ── Verify webhook signature ──
+    const stripeClient = Stripe(stripeSecretKey.value());
+    const sig = req.headers["stripe-signature"];
+    let event;
+    try {
+      event = stripeClient.webhooks.constructEvent(
+        req.rawBody,
+        sig,
+        stripeTerminalWebhookSecret.value()
+      );
+    } catch (err) {
+      log("stripeEventWebhook: signature verification failed", err.message);
+      return res.status(400).send("Webhook signature verification failed");
+    }
+
+    log("stripeEventWebhook: event type", event.type);
 
     let message = "";
     let error = false;
 
-    // Input validation
-    if (!req.body || !req.body.data || !req.body.data.object) {
+    const readerObj = event.data.object;
+    const action = readerObj?.action;
+
+    if (!action || !action.process_payment_intent) {
+      return res.status(200).json({ received: true, skipped: true });
+    }
+
+    const paymentIntentID = action.process_payment_intent.payment_intent;
+    const readerID = readerObj.id;
+
+    if (!paymentIntentID || !readerID) {
       return res.status(400).json({
         success: false,
-        message: "Invalid webhook payload structure.",
+        message: "Missing paymentIntentID or readerID.",
       });
     }
 
-    let paymentIntentID;
-    let action;
-    let readerID;
-
     try {
-      const stripeClient = Stripe(stripeSecretKey.value());
-
-      // Extract payment intent ID and action from webhook payload
-      action = req.body.data.object.action;
-      if (!action || !action.process_payment_intent) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid webhook action structure.",
-        });
-      }
-
-      paymentIntentID = action.process_payment_intent.payment_intent;
-      readerID = req.body.data.object.id;
-
-      if (!paymentIntentID || typeof paymentIntentID !== "string") {
-        return res.status(400).json({
-          success: false,
-          message: "Payment intent ID must be provided and must be a string.",
-        });
-      }
-
-      if (!readerID || typeof readerID !== "string") {
-        return res.status(400).json({
-          success: false,
-          message: "Reader ID must be provided and must be a string.",
-        });
-      }
-
       // Extract tenant/store context from payment intent metadata
       const paymentIntent = await stripeClient.paymentIntents.retrieve(
         paymentIntentID
       );
       const tenantID = paymentIntent.metadata?.tenantID;
       const storeID = paymentIntent.metadata?.storeID;
+      const saleID = paymentIntent.metadata?.saleID;
+      const customerID = paymentIntent.metadata?.customerID;
 
       if (!tenantID || !storeID) {
         throw new Error(
@@ -503,28 +510,22 @@ exports.stripeEventWebhook = onRequest(
         paymentIntentID,
       });
 
-      log("data package to show reader ID", req.body.data);
-
       // Handle successful payment
       if (action.status === "succeeded") {
-        log("Payment attempt succeeded");
+        log("stripeEventWebhook: payment succeeded", { paymentIntentID });
 
         try {
-          const paymentIntentComplete = await stripeClient.paymentIntents.retrieve(
-            paymentIntentID
-          );
+          const paymentIntentComplete =
+            await stripeClient.paymentIntents.retrieve(paymentIntentID);
 
           if (!paymentIntentComplete.latest_charge) {
             throw new Error("No charge found for successful payment intent");
           }
 
-          let chargeID = paymentIntentComplete.latest_charge;
-          log("Payment Intent complete obj", paymentIntentComplete);
-          log("Charge ID", chargeID);
-
+          const chargeID = paymentIntentComplete.latest_charge;
           const charge = await stripeClient.charges.retrieve(chargeID);
 
-          // Use Firestore with tenant/store hierarchy for completion
+          // Write charge to payment-processing (existing behavior — frontend listener)
           const completeRef = DB.collection("tenants")
             .doc(tenantID)
             .collection("stores")
@@ -542,13 +543,81 @@ exports.stripeEventWebhook = onRequest(
             readerID,
             paymentIntentID,
           });
-          log("Card charge object", charge);
+          log("stripeEventWebhook: charge written to payment-processing", { chargeID });
+
+          // ── SERVER-SIDE SALE COMPLETION ──
+          if (saleID) {
+            try {
+              const db = await getDB(firebaseServiceAccountKey);
+              const saleRef = db
+                .collection("tenants").doc(tenantID)
+                .collection("stores").doc(storeID)
+                .collection("active-sales").doc(saleID);
+
+              const saleSnap = await saleRef.get();
+
+              if (saleSnap.exists) {
+                const sale = saleSnap.data();
+
+                // Build payment from charge (mirrors buildCardPayment)
+                const card = charge?.payment_method_details?.card_present;
+                const payment = {
+                  id: generateUPCBarcode("sale"),
+                  amountCaptured: charge.amount_captured || 0,
+                  amountTendered: 0,
+                  last4: card?.last4 || "",
+                  cardType: card?.description || "",
+                  cardIssuer: card?.receipt?.application_preferred_name || "Unknown",
+                  millis: Date.now(),
+                  saleID: saleID,
+                  cash: false,
+                  check: false,
+                  isRefund: false,
+                  paymentProcessor: "stripe",
+                  chargeID: charge.id || "",
+                  authorizationCode: card?.receipt?.authorization_code || "",
+                  paymentIntentID: paymentIntentComplete.id || "",
+                  receiptURL: charge.receipt_url || "",
+                  expMonth: card?.exp_month || "",
+                  expYear: card?.exp_year || "",
+                  networkTransactionID: card?.network_transaction_id || "",
+                  amountRefunded: 0,
+                };
+
+                // Fetch customer and settings for sale completion
+                let customer = {};
+                if (customerID) {
+                  const custSnap = await db.collection("tenants").doc(tenantID)
+                    .collection("stores").doc(storeID)
+                    .collection("customers").doc(customerID).get();
+                  if (custSnap.exists) customer = custSnap.data();
+                }
+                const settingsSnap = await db.collection("tenants").doc(tenantID)
+                  .collection("stores").doc(storeID)
+                  .collection("settings").doc("settings").get();
+                const settings = settingsSnap.exists ? settingsSnap.data() : {};
+
+                await completeSaleServerSide({
+                  db, sale, saleID, tenantID, storeID, customerID,
+                  workorderIDs: sale.workorderIDs || [],
+                  addedItems: sale.addedItems || [],
+                  payment, charge, settings, customer,
+                  logPrefix: "Terminal",
+                  twilioClientRef: twilioClient,
+                  twilioSecretAccountNumber, twilioSecretKey, gmailAppPassword,
+                });
+              } else {
+                log("stripeCheckoutWebhook_Terminal: active sale not found (already completed)", { saleID });
+              }
+            } catch (saleError) {
+              log("stripeCheckoutWebhook_Terminal: sale completion error (non-fatal)", saleError.message);
+            }
+          }
         } catch (stripeError) {
-          log("Error retrieving payment details", stripeError);
-          // Continue execution - don't fail the webhook for this
+          log("stripeEventWebhook: error retrieving payment details", stripeError);
         }
       } else if (action.status === "failed") {
-        log("Payment attempt failed", action);
+        log("stripeEventWebhook: payment failed", action);
 
         const completeRef = DB.collection("tenants")
           .doc(tenantID)
@@ -570,19 +639,16 @@ exports.stripeEventWebhook = onRequest(
           paymentIntentID,
         };
 
-        // Retrieve PaymentIntent for detailed decline info
         try {
           const pi = await stripeClient.paymentIntents.retrieve(paymentIntentID);
           if (pi.last_payment_error) {
-            failureData.decline_code =
-              pi.last_payment_error.decline_code || "";
-            failureData.error_message =
-              pi.last_payment_error.message || "";
+            failureData.decline_code = pi.last_payment_error.decline_code || "";
+            failureData.error_message = pi.last_payment_error.message || "";
             failureData.error_code = pi.last_payment_error.code || "";
             failureData.error_type = pi.last_payment_error.type || "";
           }
         } catch (piError) {
-          log("Error retrieving PaymentIntent for failure details", piError);
+          log("stripeEventWebhook: error retrieving decline details", piError);
         }
 
         await completeRef.set(failureData);
@@ -590,13 +656,10 @@ exports.stripeEventWebhook = onRequest(
 
       // Cancel reader action to clean up
       try {
-        const readerResult = await stripeClient.terminal.readers.cancelAction(
-          readerID
-        );
-        log("Result of canceling reader after payment update", readerResult);
+        await stripeClient.terminal.readers.cancelAction(readerID);
+        log("stripeEventWebhook: reader action cancelled", { readerID });
       } catch (cancelError) {
-        log("Error canceling reader action", cancelError);
-        // Continue execution - don't fail the webhook for this
+        log("stripeEventWebhook: error cancelling reader", cancelError.message);
       }
     } catch (err) {
       error = true;
@@ -604,8 +667,7 @@ exports.stripeEventWebhook = onRequest(
         err instanceof Error
           ? `Webhook processing error: ${err.message}`
           : "Webhook processing error: An unknown error occurred.";
-
-      log("Stripe Webhook processing error", err.message);
+      log("stripeEventWebhook: processing error", err.message);
     }
 
     if (error) {
@@ -4112,7 +4174,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
   async (request) => {
     log("newCheckout: initiate payment intent request", request.data);
 
-    const { amount, readerID, paymentIntentID, tenantID, storeID } = request.data;
+    const { amount, readerID, paymentIntentID, tenantID, storeID, saleID, customerID } = request.data;
 
     if (!amount || typeof amount !== "number") {
       throw new HttpsError(
@@ -4175,7 +4237,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
           payment_method_types: ["card_present"],
           capture_method: "automatic",
           currency: "usd",
-          metadata: { tenantID, storeID },
+          metadata: { tenantID, storeID, saleID: saleID || "", customerID: customerID || "" },
         });
         finalPaymentIntentID = paymentIntent.id;
       } else {
@@ -6377,6 +6439,292 @@ function findHighestItem(workorderLines) {
   return { highestName, highestPrice };
 }
 
+// ─── completeSaleServerSide ──────────────────────────────────────
+// Shared helper used by both stripeCheckoutWebhook_Terminal and
+// stripeCheckoutWebhook_LinkToPay to complete a sale after payment.
+//
+// Params:
+//   db             — Firestore instance
+//   sale           — active sale object (from Firestore)
+//   saleID         — sale document ID
+//   tenantID       — tenant ID
+//   storeID        — store ID
+//   customerID     — customer ID (may be "")
+//   workorderIDs   — array of workorder IDs to complete
+//   addedItems     — items added at checkout (merged into primary WO)
+//   payment        — payment object to add to sale
+//   charge         — Stripe charge object (for receipt URL)
+//   settings       — store settings (fetched before calling)
+//   customer       — customer object (fetched before calling)
+//   logPrefix      — "Terminal" or "LinkToPay" for log messages
+//   twilioClient   — initialized Twilio client (or null)
+//   twilioSecretAccountNumber — secret ref
+//   twilioSecretKey — secret ref
+//   gmailAppPassword — secret ref
+//   channel        — "sms" | "email" | "both" | undefined
+//
+// Returns: { completed: bool, partial: bool }
+async function completeSaleServerSide({
+  db, sale, saleID, tenantID, storeID, customerID,
+  workorderIDs, addedItems, payment, charge, settings, customer,
+  logPrefix, twilioClientRef, twilioSecretAccountNumber, twilioSecretKey,
+  gmailAppPassword, channel,
+}) {
+  // Add payment to sale
+  sale.payments = [...(sale.payments || []), payment];
+  sale.amountCaptured = (sale.amountCaptured || 0) + payment.amountCaptured;
+
+  // Check if fully paid
+  if (sale.amountCaptured < sale.total) {
+    // Partial payment — update active sale
+    sale.status = "partial";
+    await db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("active-sales").doc(saleID)
+      .set(sale, { merge: true });
+    log(`completeSaleServerSide[${logPrefix}]: partial payment recorded`, {
+      saleID, amountCaptured: sale.amountCaptured, total: sale.total,
+    });
+    return { completed: false, partial: true };
+  }
+
+  // ── Sale is fully paid ──
+  sale.paymentComplete = true;
+  sale.status = "complete";
+  log(`completeSaleServerSide[${logPrefix}]: sale fully paid, completing`, { saleID });
+
+  // ── Complete workorders ──
+  for (let i = 0; i < workorderIDs.length; i++) {
+    const woID = workorderIDs[i];
+    const woRef = db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("open-workorders").doc(woID);
+    const woSnap = await woRef.get();
+    if (woSnap.exists) {
+      const wo = woSnap.data();
+      wo.paymentComplete = true;
+      wo.activeSaleID = "";
+      wo.amountPaid = sale.total;
+      wo.saleID = sale.id;
+      const existingSales = wo.sales || [];
+      if (!existingSales.includes(sale.id)) {
+        wo.sales = [...existingSales, sale.id];
+      }
+      wo.endedOnMillis = Date.now();
+      // Merge added items into primary workorder only
+      if (i === 0 && addedItems && addedItems.length > 0) {
+        wo.workorderLines = [...(wo.workorderLines || []), ...addedItems];
+      }
+      await db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("completed-workorders").doc(woID)
+        .set(wo);
+      await woRef.delete();
+    }
+  }
+
+  // ── Write completed sale, delete active sale ──
+  await db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("completed-sales").doc(saleID)
+    .set(sale);
+  await db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("active-sales").doc(saleID)
+    .delete();
+
+  // ── Save sales index ──
+  let allLines = [];
+  let primaryWO = null;
+  for (const woID of workorderIDs) {
+    const completedSnap = await db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("completed-workorders").doc(woID)
+      .get();
+    if (completedSnap.exists) {
+      const wo = completedSnap.data();
+      if (!primaryWO) primaryWO = wo;
+      allLines = [...allLines, ...(wo.workorderLines || [])];
+    }
+  }
+
+  const { highestName, highestPrice } = findHighestItem(allLines);
+  const payments = sale.payments || [];
+  const hasCash = payments.some((p) => p.cash && !p.isRefund);
+  const hasCard = payments.some((p) => !p.cash && !p.isRefund);
+  let paymentType = "";
+  if (hasCash && hasCard) paymentType = "Split";
+  else if (hasCash) paymentType = "Cash";
+  else if (hasCard) paymentType = "Card";
+
+  await db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("sales-index").doc(saleID)
+    .set({
+      id: saleID,
+      type: "sale",
+      saleID,
+      millis: Number(sale.millis) || Date.now(),
+      customerFirst: primaryWO?.customerFirst || "",
+      customerLast: primaryWO?.customerLast || "",
+      customerCell: primaryWO?.customerCell || "",
+      customerID: customerID || sale.customerID || "",
+      total: sale.total || 0,
+      subtotal: sale.subtotal || 0,
+      tax: sale.tax || 0,
+      salesTaxPercent: sale.salesTaxPercent || 0,
+      discount: sale.discount || 0,
+      amountRefunded: 0,
+      itemCount: allLines.length,
+      highestItemName: highestName,
+      highestItemPrice: highestPrice,
+      isStandaloneSale: primaryWO?.isStandaloneSale || false,
+      workorderIDs: workorderIDs,
+      paymentType: paymentType,
+    });
+
+  // ── Print receipt (if enabled in settings and sale is complete) ──
+  const printerID = settings?.printerCloudId || "";
+  if (settings?.autoPrintSalesReceipt && printerID && primaryWO) {
+    try {
+      const printContext = { currentUser: { first: "System", last: "" }, settings };
+      const customerForPrint = {
+        first: customer?.first || primaryWO?.customerFirst || "",
+        last: customer?.last || primaryWO?.customerLast || "",
+        customerCell: customer?.customerCell || customer?.cell || primaryWO?.customerCell || "",
+        customerLandline: customer?.customerLandline || "",
+        email: customer?.email || primaryWO?.customerEmail || "",
+      };
+      const printObj = sharedPrintBuilder.sale(sale, sale.payments, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext);
+      printObj.id = generateUPCBarcode("sale");
+      printObj.timestamp = Date.now();
+
+      // Remove undefined/null values (Firestore rejects undefined)
+      const cleanPrint = JSON.parse(JSON.stringify(printObj));
+
+      await db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("printers").doc(printerID)
+        .collection("to_print").doc(cleanPrint.id)
+        .set(cleanPrint);
+
+      // Auto-delete after 5 seconds (match frontend behavior)
+      setTimeout(async () => {
+        try {
+          await db.collection("tenants").doc(tenantID)
+            .collection("stores").doc(storeID)
+            .collection("printers").doc(printerID)
+            .collection("to_print").doc(cleanPrint.id)
+            .delete();
+        } catch (e) { /* ignore cleanup errors */ }
+      }, 5000);
+
+      // Pop cash register if cash change needed
+      const hasCashChange = (sale.payments || []).some(
+        (p) => p.cash && p.amountTendered > p.amountCaptured
+      );
+      if (hasCashChange) {
+        const registerObj = { id: generateUPCBarcode("sale"), popCashRegister: true, timestamp: Date.now() };
+        await db.collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("printers").doc(printerID)
+          .collection("to_print").doc(registerObj.id)
+          .set(registerObj);
+        setTimeout(async () => {
+          try {
+            await db.collection("tenants").doc(tenantID)
+              .collection("stores").doc(storeID)
+              .collection("printers").doc(printerID)
+              .collection("to_print").doc(registerObj.id)
+              .delete();
+          } catch (e) { /* ignore */ }
+        }, 5000);
+      }
+
+      log(`completeSaleServerSide[${logPrefix}]: print receipt written`, { printerID });
+    } catch (printErr) {
+      log(`completeSaleServerSide[${logPrefix}]: print error (non-fatal)`, printErr.message);
+    }
+  }
+
+  // ── Send receipt SMS ──
+  const storeName = settings?.storeInfo?.displayName || "Bonita Bikes";
+  const receiptUrl = charge?.receipt_url || "";
+  const amountDisplay = (sale.total / 100).toFixed(2);
+  const cleanPhone = (customer?.customerCell || customer?.cell || primaryWO?.customerCell || "").replace(/\D/g, "");
+  const customerEmail = customer?.email || "";
+
+  // SMS: Terminal uses autoSMSSalesReceipt setting; LinkToPay uses channel
+  const shouldSMS = channel
+    ? (channel === "sms" || channel === "both") && cleanPhone.length === 10
+    : settings?.autoSMSSalesReceipt && cleanPhone.length === 10;
+
+  if (shouldSMS) {
+    try {
+      let _twilio = twilioClientRef;
+      if (!_twilio) {
+        _twilio = require("twilio")(
+          twilioSecretAccountNumber.value(),
+          twilioSecretKey.value()
+        );
+      }
+      const receiptMsg = `Payment of $${amountDisplay} received by ${storeName}. Thank you! View your receipt: ${receiptUrl}`;
+      await _twilio.messages.create({
+        body: receiptMsg,
+        to: `+1${cleanPhone}`,
+        from: "+12393171234",
+      });
+      const receiptMsgID = generateUPCBarcode("customer");
+      await db.collection("customer_phone").doc(cleanPhone)
+        .collection("messages").doc(receiptMsgID)
+        .set({
+          id: receiptMsgID,
+          customerID: customerID || "",
+          message: receiptMsg,
+          phoneNumber: cleanPhone,
+          tenantID,
+          storeID,
+          type: "outgoing",
+          millis: Date.now(),
+          paymentConfirmation: true,
+          ...(channel ? { textToPay: true } : {}),
+        });
+      log(`completeSaleServerSide[${logPrefix}]: receipt SMS sent`, { phone: cleanPhone });
+    } catch (smsErr) {
+      log(`completeSaleServerSide[${logPrefix}]: SMS error`, smsErr.message);
+    }
+  }
+
+  // ── Send receipt email ──
+  const shouldEmail = channel
+    ? (channel === "email" || channel === "both") && customerEmail && customerEmail.includes("@")
+    : settings?.autoEmailSalesReceipt && customerEmail && customerEmail.includes("@");
+
+  if (shouldEmail) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: "support@bonitabikes.com",
+          pass: gmailAppPassword.value(),
+        },
+      });
+      await transporter.sendMail({
+        from: `"${storeName}" <support@bonitabikes.com>`,
+        to: customerEmail,
+        subject: `Payment Receipt from ${storeName} — $${amountDisplay}`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto"><p>Payment of <strong>$${amountDisplay}</strong> received by ${storeName}. Thank you!</p><p style="margin:24px 0"><a href="${receiptUrl}" style="display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px">View Receipt</a></p></div>`,
+      });
+      log(`completeSaleServerSide[${logPrefix}]: receipt email sent`, { email: customerEmail });
+    } catch (emailErr) {
+      log(`completeSaleServerSide[${logPrefix}]: email error`, emailErr.message);
+    }
+  }
+
+  log(`completeSaleServerSide[${logPrefix}]: sale completed`, { saleID });
+  return { completed: true, partial: false };
+}
+
 // ─── createTextToPayInvoice ─────────────────────────────────────
 // Creates a Stripe Checkout Session, saves an active sale, and sends
 // the payment link via SMS and/or email.
@@ -6644,12 +6992,12 @@ exports.createTextToPayInvoice = onCall(
   }
 );
 
-// ─── textToPayWebhook ───────────────────────────────────────────
+// ─── stripeCheckoutWebhook_LinkToPay ────────────────────────────────
 // Stripe Checkout Session webhook. Handles:
 //   checkout.session.completed → complete sale + workorder, send receipt
 //   checkout.session.expired   → clean up active sale + workorder flag
 
-exports.textToPayWebhook = onRequest(
+exports.stripeCheckoutWebhook_LinkToPay = onRequest(
   {
     secrets: [
       stripeSecretKey,
@@ -6661,7 +7009,7 @@ exports.textToPayWebhook = onRequest(
     ],
   },
   async (req, res) => {
-    log("textToPayWebhook: incoming event");
+    log("stripeCheckoutWebhook_LinkToPay: incoming event");
 
     try {
       const stripeClient = Stripe(stripeSecretKey.value());
@@ -6676,11 +7024,11 @@ exports.textToPayWebhook = onRequest(
           stripeWebhookSecret.value()
         );
       } catch (err) {
-        log("textToPayWebhook: signature verification failed", err.message);
+        log("stripeCheckoutWebhook_LinkToPay: signature verification failed", err.message);
         return res.status(400).send(`Webhook signature verification failed: ${err.message}`);
       }
 
-      log("textToPayWebhook: event type", event.type);
+      log("stripeCheckoutWebhook_LinkToPay: event type", event.type);
 
       const db = await getDB(firebaseServiceAccountKey);
       const session = event.data.object;
@@ -6688,7 +7036,7 @@ exports.textToPayWebhook = onRequest(
         session.metadata || {};
 
       if (!tenantID || !storeID || !saleID || !workorderID) {
-        log("textToPayWebhook: missing metadata, skipping", session.metadata);
+        log("stripeCheckoutWebhook_LinkToPay: missing metadata, skipping", session.metadata);
         return res.status(200).json({ received: true, skipped: true });
       }
 
@@ -6696,7 +7044,7 @@ exports.textToPayWebhook = onRequest(
       // CHECKOUT SESSION COMPLETED
       // ────────────────────────────────────────────────────────────
       if (event.type === "checkout.session.completed") {
-        log("textToPayWebhook: processing completed session", { saleID, workorderID });
+        log("stripeCheckoutWebhook_LinkToPay: processing completed session", { saleID, workorderID });
 
         // Fetch active sale
         const saleSnap = await db
@@ -6706,7 +7054,7 @@ exports.textToPayWebhook = onRequest(
           .get();
 
         if (!saleSnap.exists) {
-          log("textToPayWebhook: active sale not found, may already be processed", { saleID });
+          log("stripeCheckoutWebhook_LinkToPay: active sale not found, may already be processed", { saleID });
           return res.status(200).json({ received: true, alreadyProcessed: true });
         }
         const sale = saleSnap.data();
@@ -6719,7 +7067,7 @@ exports.textToPayWebhook = onRequest(
           .get();
 
         if (!woSnap.exists) {
-          log("textToPayWebhook: open workorder not found", { workorderID });
+          log("stripeCheckoutWebhook_LinkToPay: open workorder not found", { workorderID });
           return res.status(200).json({ received: true, workorderMissing: true });
         }
         const workorder = woSnap.data();
@@ -6775,165 +7123,18 @@ exports.textToPayWebhook = onRequest(
           textToPay: true,
         };
 
-        // ── Complete the sale (mirrors NewCheckoutModalScreen.js:316-320) ──
-        sale.payments = [...(sale.payments || []), payment];
-        sale.amountCaptured = (sale.amountCaptured || 0) + payment.amountCaptured;
-        sale.paymentComplete = true;
-        sale.status = "complete";
-
-        // Write completed sale
-        await db
-          .collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("completed-sales").doc(saleID)
-          .set(sale);
-
-        // Delete active sale
-        await db
-          .collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("active-sales").doc(saleID)
-          .delete();
-
-        // ── Complete the workorder (mirrors NewCheckoutModalScreen.js:346-367) ──
-        workorder.paymentComplete = true;
-        workorder.activeSaleID = "";
-        workorder.amountPaid = sale.total;
-        workorder.saleID = sale.id;
-        // replaceOrAddToArr pattern — add saleID if not already present
-        const existingSales = workorder.sales || [];
-        if (!existingSales.includes(sale.id)) {
-          workorder.sales = [...existingSales, sale.id];
-        }
-        workorder.endedOnMillis = Date.now();
-
-        // Write to completed-workorders
-        await db
-          .collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("completed-workorders").doc(workorderID)
-          .set(workorder);
-
-        // Delete from open-workorders
-        await db
-          .collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("open-workorders").doc(workorderID)
-          .delete();
-
-        // ── Save sales index (mirrors newCheckoutFirebaseCalls.js:358-404) ──
-        const { highestName, highestPrice } = findHighestItem(workorder.workorderLines);
-        const indexDoc = {
-          id: saleID,
-          type: "sale",
-          saleID,
-          millis: Number(sale.millis) || Date.now(),
-          customerFirst: customer.first || workorder.customerFirst || "",
-          customerLast: customer.last || workorder.customerLast || "",
-          customerCell: customer.customerCell || customer.cell || workorder.customerCell || workorder.customerPhone || "",
-          customerID: customerID || "",
-          total: sale.total || 0,
-          subtotal: sale.subtotal || 0,
-          tax: sale.tax || 0,
-          salesTaxPercent: sale.salesTaxPercent || 0,
-          discount: sale.discount || 0,
-          amountRefunded: 0,
-          itemCount: (workorder.workorderLines || []).length,
-          highestItemName: highestName,
-          highestItemPrice: highestPrice,
-          isStandaloneSale: false,
+        await completeSaleServerSide({
+          db, sale, saleID, tenantID, storeID, customerID,
           workorderIDs: [workorderID],
-          paymentType: "Card",
-        };
+          addedItems: [],
+          payment, charge, settings, customer,
+          logPrefix: "LinkToPay",
+          twilioClientRef: twilioClient,
+          twilioSecretAccountNumber, twilioSecretKey, gmailAppPassword,
+          channel,
+        });
 
-        await db
-          .collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("sales-index").doc(saleID)
-          .set(indexDoc);
-
-        // ── Send receipt ──
-        const receiptUrl = charge.receipt_url || "";
-        const amountDisplay = (charge.amount_captured / 100).toFixed(2);
-        const cleanPhone = (customer.customerCell || customer.cell || workorder.customerCell || workorder.customerPhone || "").replace(/\D/g, "");
-        const customerEmail = customer.email || "";
-
-        // SMS receipt + inject into message queue
-        if ((channel === "sms" || channel === "both") && cleanPhone.length === 10) {
-          try {
-            if (!twilioClient) {
-              twilioClient = require("twilio")(
-                twilioSecretAccountNumber.value(),
-                twilioSecretKey.value()
-              );
-            }
-
-            const receiptMsg = `Payment of $${amountDisplay} received by ${storeName}. Thank you! View your receipt: ${receiptUrl}`;
-
-            await twilioClient.messages.create({
-              body: receiptMsg,
-              to: `+1${cleanPhone}`,
-              from: "+12393171234",
-            });
-
-            // Inject into customer message queue
-            const receiptMsgID = generateUPCBarcode("customer");
-            await db
-              .collection("customer_phone").doc(cleanPhone)
-              .collection("messages").doc(receiptMsgID)
-              .set({
-                id: receiptMsgID,
-                customerID: customerID || "",
-                message: receiptMsg,
-                phoneNumber: cleanPhone,
-                tenantID,
-                storeID,
-                type: "outgoing",
-                millis: Date.now(),
-                textToPay: true,
-                paymentConfirmation: true,
-              });
-
-            log("textToPayWebhook: receipt SMS sent", { phone: cleanPhone });
-          } catch (smsErr) {
-            log("textToPayWebhook: failed to send receipt SMS", smsErr.message);
-          }
-        }
-
-        // Email receipt
-        if ((channel === "email" || channel === "both") && customerEmail && customerEmail.includes("@")) {
-          try {
-            const transporter = nodemailer.createTransport({
-              service: "gmail",
-              auth: {
-                user: "support@bonitabikes.com",
-                pass: gmailAppPassword.value(),
-              },
-            });
-
-            const htmlReceipt = `
-              <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
-                <p>Payment of <strong>$${amountDisplay}</strong> received by ${storeName}. Thank you!</p>
-                <p style="margin: 24px 0;">
-                  <a href="${receiptUrl}" style="display: inline-block; padding: 12px 24px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 6px; font-size: 14px;">View Receipt</a>
-                </p>
-              </div>
-            `;
-
-            await transporter.sendMail({
-              from: `"${storeName}" <support@bonitabikes.com>`,
-              to: customerEmail,
-              subject: `Payment Receipt from ${storeName} — $${amountDisplay}`,
-              html: htmlReceipt,
-            });
-
-            log("textToPayWebhook: receipt email sent", { email: customerEmail });
-          } catch (emailErr) {
-            log("textToPayWebhook: failed to send receipt email", emailErr.message);
-          }
-        }
-
-        log("textToPayWebhook: sale completed successfully", { saleID, workorderID });
+        log("stripeCheckoutWebhook_LinkToPay: sale completed successfully", { saleID, workorderID });
         return res.status(200).json({ received: true, completed: true });
       }
 
@@ -6941,7 +7142,7 @@ exports.textToPayWebhook = onRequest(
       // CHECKOUT SESSION EXPIRED
       // ────────────────────────────────────────────────────────────
       if (event.type === "checkout.session.expired") {
-        log("textToPayWebhook: processing expired session", { saleID, workorderID });
+        log("stripeCheckoutWebhook_LinkToPay: processing expired session", { saleID, workorderID });
 
         // Delete active sale (if it still exists)
         try {
@@ -6951,7 +7152,7 @@ exports.textToPayWebhook = onRequest(
             .collection("active-sales").doc(saleID)
             .delete();
         } catch (delErr) {
-          log("textToPayWebhook: error deleting expired active sale", delErr.message);
+          log("stripeCheckoutWebhook_LinkToPay: error deleting expired active sale", delErr.message);
         }
 
         // Clear workorder's activeSaleID (if workorder still open)
@@ -6965,7 +7166,7 @@ exports.textToPayWebhook = onRequest(
             await woRef.update({ activeSaleID: "" });
           }
         } catch (woErr) {
-          log("textToPayWebhook: error clearing workorder activeSaleID", woErr.message);
+          log("stripeCheckoutWebhook_LinkToPay: error clearing workorder activeSaleID", woErr.message);
         }
 
         // Inject expiration message into SMS queue
@@ -7009,22 +7210,22 @@ exports.textToPayWebhook = onRequest(
                   textToPay: true,
                 });
 
-              log("textToPayWebhook: expiration message injected", { phone: cleanPhone });
+              log("stripeCheckoutWebhook_LinkToPay: expiration message injected", { phone: cleanPhone });
             }
           } catch (expErr) {
-            log("textToPayWebhook: error sending expiration message", expErr.message);
+            log("stripeCheckoutWebhook_LinkToPay: error sending expiration message", expErr.message);
           }
         }
 
-        log("textToPayWebhook: expired session cleaned up", { saleID, workorderID });
+        log("stripeCheckoutWebhook_LinkToPay: expired session cleaned up", { saleID, workorderID });
         return res.status(200).json({ received: true, expired: true });
       }
 
       // Unhandled event type — acknowledge receipt
-      log("textToPayWebhook: unhandled event type", event.type);
+      log("stripeCheckoutWebhook_LinkToPay: unhandled event type", event.type);
       return res.status(200).json({ received: true, unhandled: true });
     } catch (error) {
-      log("textToPayWebhook: unhandled error", error);
+      log("stripeCheckoutWebhook_LinkToPay: unhandled error", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   }

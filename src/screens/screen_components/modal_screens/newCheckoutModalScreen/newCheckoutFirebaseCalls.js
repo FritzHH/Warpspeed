@@ -276,7 +276,7 @@ export function newCheckoutListenToPaymentUpdates(readerID, paymentIntentID, onU
 
 // ─── Stripe Callable Wrappers ─────────────────────────────────
 
-export async function newCheckoutProcessStripePayment(amount, readerID, paymentIntentID) {
+export async function newCheckoutProcessStripePayment(amount, readerID, paymentIntentID, saleID, customerID) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     const callables = await getCallables();
@@ -286,6 +286,8 @@ export async function newCheckoutProcessStripePayment(amount, readerID, paymentI
       paymentIntentID: paymentIntentID || null,
       tenantID,
       storeID,
+      saleID: saleID || "",
+      customerID: customerID || "",
     });
     log("newCheckout payment initiated:", result.data);
     return result.data;

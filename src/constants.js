@@ -188,6 +188,9 @@ export const build_db_path = {
     workorderTicketPDF: (workorderID, tenantID, storeID) => {
       return `${tenantID}/${storeID}/workorder-tickets/${workorderID}.pdf`;
     },
+    intakeReceiptPDF: (workorderID, tenantID, storeID) => {
+      return `${tenantID}/${storeID}/intake-receipts/${workorderID}.pdf`;
+    },
   },
 };
 

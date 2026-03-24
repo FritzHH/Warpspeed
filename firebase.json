@@ -7,6 +7,9 @@
     {
       "source": "functions",
       "codebase": "default",
+      "predeploy": [
+        "node -e \"const fs=require('fs');const src='src/shared';const dst='functions/shared';if(fs.existsSync(dst))fs.rmSync(dst,{recursive:true});fs.cpSync(src,dst,{recursive:true});console.log('Copied src/shared → functions/shared')\""
+      ],
       "ignore": [
         "node_modules",
         ".git",

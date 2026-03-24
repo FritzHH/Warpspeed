@@ -522,7 +522,7 @@ export const NONREMOVABLE_WAIT_TIMES = [
   {
     id: "34j3kj3vnkd",
     label: "No Estimate",
-    maxWaitTimeDays: 0,
+    maxWaitTimeDays: null,
     removable: false,
   }
 ]
@@ -915,6 +915,9 @@ export const SETTINGS_OBJ = {
   autoSMSSalesReceipt: true,
   autoEmailSalesReceipt: true,
   autoPrintSalesReceipt: true,
+  shopContactBlurb: "9102 Bonita Beach Rd SE\nBonita Springs, FL\n(239) 291-9396\nsupport@bonitabikes.com\nwww.bonitabikes.com",
+  intakeBlurb: "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.",
+  thankYouBlurb: "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
   selectedPrinterID: "",
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
@@ -970,26 +973,33 @@ export const SETTINGS_OBJ = {
       quickSearch: true,
     },
   },
-  textTemplates: [
+  smsTemplates: [
     {
       id: "dfdas",
-      buttonLabel: "Finished",
-      text: "Hi {firstName}, your {brand} {description} is ready for pickup! Your total is {totalAmount}. We're open {storeHours}. Call us at {storePhone} with any questions.",
+      label: "Finished",
+      content: "Hi {firstName}, your {brand} {description} is ready for pickup! Your total is {totalAmount}. We're open {storeHours}. Call us at {storePhone} with any questions.",
+      type: "",
     },
     {
       id: "fkdnfdfd",
-      buttonLabel: "Part Ordered",
-      text: "Hi {firstName}, we've ordered a part for your {brand} {description}. As soon as we get the part we will proceed with the requested service. Call us at {storePhone} with any questions.",
-    }
+      label: "Part Ordered",
+      content: "Hi {firstName}, we've ordered a part for your {brand} {description}. As soon as we get the part we will proceed with the requested service. Call us at {storePhone} with any questions.",
+      type: "",
+    },
+    {
+      id: "default_sms_sale_receipt",
+      label: "Sale Receipt",
+      content: "🎉 Thanks for your purchase, {firstName}! Your total was {total}. Here's your receipt: {link}\n\nWe appreciate your business! — {storeName} 🚲",
+      type: "saleReceipt",
+    },
+    {
+      id: "default_sms_intake_receipt",
+      label: "Intake Receipt",
+      content: "🔧 Hey {firstName}! Your {brand} {description} is checked in and in good hands. Here's your receipt: {link}\n\nWe'll keep you posted! — {storeName} 🚲",
+      type: "intakeReceipt",
+    },
   ],
   autoCustomerNoteTexts: [],
-  workorderTicketMessage: "Hi {firstName}, here is your workorder ticket for your {brand} {description}: {link}",
-  saleReceiptMessage: "Hi {firstName}, here is your receipt from {storeName} for {total}: {link}",
-  intakeReceiptMessage: "Hi {firstName}, your intake receipt for your {brand} {description} is ready. Thank you for choosing {storeName}!",
-  saleReceiptEmailSubject: "Your receipt from {storeName}",
-  intakeReceiptEmailSubject: "Your intake receipt from {storeName}",
-  saleReceiptEmailTemplate: "<div style='font-family:Arial,sans-serif;max-width:500px;margin:0 auto'><p>Hi {firstName},</p><p>Thank you for your purchase! Your total was <strong>{total}</strong>.</p>{receiptLink}<p>&mdash; {storeName}</p></div>",
-  intakeReceiptEmailTemplate: "<div style='font-family:Arial,sans-serif;max-width:500px;margin:0 auto'><p>Hi {firstName},</p><p>Your intake receipt for your {brand} {description} is ready.</p><p>Thank you for choosing {storeName}!</p></div>",
   translateStarters: [
     {
       id: "greeting_1",
@@ -1001,20 +1011,61 @@ export const SETTINGS_OBJ = {
   emailTemplates: [
     {
       id: "default_workorder_complete",
-      name: "Workorder Complete",
+      label: "Workorder Complete",
       subject: "Your bike is ready! — {storeName}",
-      body: "Hi {firstName},\n\nGreat news — your {brand} {description} is ready for pickup!\n\nItems completed:\n{lineItems}\n\n{customerNotes}\n\nTotal: {totalAmount}\n\n---\n{storeName}\n{storeAddress}\n{storeHours}\n{storePhone}\n\nPlease note: we do not monitor this inbox during the day, so responses may be delayed. You are better off calling the shop directly at {storePhone}.",
+      content: "Hi {firstName},\n\nGreat news — your {brand} {description} is ready for pickup!\n\nItems completed:\n{lineItems}\n\n{customerNotes}\n\nTotal: {totalAmount}\n\n---\n{storeName}\n{storeAddress}\n{storeHours}\n{storePhone}\n\nPlease note: we do not monitor this inbox during the day, so responses may be delayed. You are better off calling the shop directly at {storePhone}.",
+      type: "",
     },
     {
       id: "default_payroll_summary",
-      name: "Payroll Summary",
+      label: "Payroll Summary",
       subject: "Payroll Summary — {employeeName} — {payPeriod}",
-      body: "Hi {employeeName},\n\nHere is your work summary for {payPeriod}:\n\n{dailyBreakdown}\n\nTotal Hours: {totalHours}\nPay Rate: {payRate}\nTotal Pay: {totalPay}\n\n---\n{storeName}",
+      content: "Hi {employeeName},\n\nHere is your work summary for {payPeriod}:\n\n{dailyBreakdown}\n\nTotal Hours: {totalHours}\nPay Rate: {payRate}\nTotal Pay: {totalPay}\n\n---\n{storeName}",
+      type: "",
+    },
+    {
+      id: "default_email_sale_receipt",
+      label: "Sale Receipt",
+      subject: "Your receipt from {storeName}",
+      content: "Hi {firstName},\n\nThank you for your purchase! Your total was {total}.\n\n{receiptLink}\n\nWe appreciate your business and hope to see you again soon!\n\n---\n{storeName}",
+      type: "saleReceipt",
+    },
+    {
+      id: "default_email_intake_receipt",
+      label: "Intake Receipt",
+      subject: "Your {brand} is checked in — {storeName}",
+      content: "Hi {firstName},\n\nYour {brand} {description} has been checked in and is in good hands. Here's a copy of your intake receipt for your records.\n\n{receiptLink}\n\nWe'll keep you updated on the progress. If you have any questions in the meantime, don't hesitate to reach out!\n\n---\n{storeName}",
+      type: "intakeReceipt",
     },
   ],
 };
 
+export const SMS_TEMPLATE_PROTO = {
+  id: "",
+  label: "",
+  content: "",
+  type: "", // "" = general, "saleReceipt", "intakeReceipt"
+}
 
+export const EMAIL_TEMPLATE_PROTO = {
+  id: "",
+  label: "",
+  subject: "",
+  content: "",
+  type: "", // "" = general, "saleReceipt", "intakeReceipt"
+}
+
+export const TEMPLATE_TYPES = {
+  general: "",
+  saleReceipt: "saleReceipt",
+  intakeReceipt: "intakeReceipt",
+};
+
+export const TEMPLATE_TYPE_LABELS = {
+  "": "General",
+  saleReceipt: "Sale Receipt",
+  intakeReceipt: "Intake Receipt",
+};
 // RECEIPT STUFF ////////////////////////////////////////////////////
 
 // DB CONNECETED DO NOT CHANGE

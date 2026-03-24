@@ -17,6 +17,7 @@ import dayjs from "dayjs";
 import { C } from "./styles";
 import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
+const _shared = require("./shared/printBuilder");
 
 // const fs = require("node:fs");
 export const dim = {
@@ -1959,296 +1960,23 @@ export function resolveStatus(statusId, statuses) {
     || { id: statusId, label: "Unknown", textColor: "black", backgroundColor: "gray" };
 }
 
-/// RECEIPT PRINTING ////////////////////////////////////////////////////////////
-const SHOP_CONTACT_BLURB = "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
-  "(239) 291-9396\n" +
-  "support@bonitabikes.com\n" +
-  "www.bonitabikes.com"
-const INTAKE_BLURB = "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.";
-const THANK_YOU_BLURB = "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again."
-const SHOP_NAME = "Bonita Bikes LLC"
-
-
-function parseWorkorderLines(wo = WORKORDER_PROTO) {
-  let newLines = [];
-  wo.workorderLines.forEach((workorderLine, idx) => {
-    // log('workorder line ->>>>>>>>>', workorderLine)
-    let line = { ...workorderLine };
-    line.itemName = workorderLine.inventoryItem.formalName;
-    line.discountName = workorderLine.discountObj?.name;
-    line.discountSavings = workorderLine.discountObj?.savings;
-    line.price = workorderLine.inventoryItem.price;
-    line.salePrice = workorderLine.inventoryItem.salePrice;
-    line.finalPrice =
-      workorderLine.discountObj?.newPrice ||
-      workorderLine.inventoryItem.salePrice ||
-      workorderLine.inventoryItem.price;
-    line.finalPrice = line.finalPrice;
-    // line = removeUnusedFields(line);
-    newLines.push(line);
-  });
-  return newLines;
+export function findTemplateByType(templates, type) {
+  if (!templates || !type) return null;
+  return templates.find((t) => t.type === type) || null;
 }
 
-function createPrintBase(workorder, customer, salesTaxPercent) {
-  let r = { ...workorder, ...customer, ...calculateRunningTotals(workorder, salesTaxPercent, [], false, !!workorder.taxFree) }
-  r.workorderLines = parseWorkorderLines(workorder);
-  r.status = resolveStatus(workorder.status, SETTINGS_OBJ.statuses).label;
-  r.salesTaxPercent = salesTaxPercent;
-  r.color1 = workorder.color1.label;
-  r.color2 = workorder.color2.label;
-  r.barcode = r.id
-  r.shopName = SHOP_NAME
-  r.waitTime = workorder.waitTime?.label;
-  r.waitTimeEstimateLabel = calculateWaitEstimateLabel(workorder) || "";
+/// RECEIPT PRINTING — delegated to shared module (src/shared/printBuilder.js) ///
+// Re-export calculateWaitEstimateLabel so existing imports keep working
+export const calculateWaitEstimateLabel = _shared.calculateWaitEstimateLabel;
 
-  const currentUser = useLoginStore.getState().getCurrentUser();
-  const userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
-  const userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
-  r.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
-  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(workorder.id) // remove for production, initial workorders did not save this field
-  r.shopContactBlurb =
-    SHOP_CONTACT_BLURB;
-  r.thankYouBlurb = THANK_YOU_BLURB;
-  r.intakeBlurb = INTAKE_BLURB;
-  r.customerContact = formatPhoneForDisplay(customer.customerCell) || formatPhoneForDisplay(customer.customerLandline) || customer.email
-
-  delete r.changeLog;
-  delete r.media;
-  delete r.shopContactBlurb;
-
-  return r;
-}
-
-function createPrintIntakeTicket(workorder = WORKORDER_PROTO, customer = CUSTOMER_PROTO, salesTaxPercent) {
-  let r = { ...createPrintBase(workorder, salesTaxPercent, customer) };
-  r.receiptType = RECEIPT_TYPES.intake;
-  // r.workorderLines = parseWorkorderLines(wo);
-  // r.status = wo.status.label;
-  // r.waitTime = wo.waitTime.label;
-  // r.salesTaxPercent = salesTaxPercent;
-  // r.color1 = wo.color1.label;
-  // r.color2 = wo.color2.label;
-  // r.barcode = r.id
-
-  r.customerContact = formatPhoneForDisplay(customer.customerCell) || formatPhoneForDisplay(customer.customerLandline) || customer.email
-
-// r.shopName = "Bonita Bikes LLC"
-// r.shopContactBlurb =
-//   SHOP_CONTACT_BLURB;
-// r.thankYouBlurb = THANK_YOU_BLURB;
-// r.intakeBlurb = INTAKE_BLURB;
-
-  // let startedBySplit = wo.startedBy.split(" ");
-  // r.startedBy = startedBySplit[0]
-  // if (startedBySplit[1]?.length > 0)
-  // {
-  //    r.startedBy = r.startedBy + " " +  startedBySplit[1].substring(0) + '.';
-
-  // }
-  // r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
-
-  return r;
-}
-
-function createPrintWorkorder(
-  wo = WORKORDER_PROTO,
-  customer = CUSTOMER_PROTO,
-  salesTaxPercent
-) {
-  let r = {};
-  r = { ...r, ...wo, ...customer, ...calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree) };
-  r.receiptType = RECEIPT_TYPES.workorder;
-  r.workorderLines = parseWorkorderLines(wo);
-  r.status = resolveStatus(wo.status, SETTINGS_OBJ.statuses).label;
-  r.waitTime = wo.waitTime.label;
-  r.salesTaxPercent = salesTaxPercent;
-  r.color1 = wo.color1.label;
-  r.color2 = wo.color2.label;
-  r.barcode = r.id
-  r.shopName = "Bonita Bikes LLC"
-
-  let startedBySplit = wo.startedBy.split(" ");
-  r.startedBy = startedBySplit[0]
-  if (startedBySplit[1]?.length > 0) {
-    r.startedBy = r.startedBy + " " + startedBySplit[1].substring(0) + '.';
-
-  }
-  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
-
-  return r;
-}
-
-function createPrintSale(sale = SALE_PROTO, customer, wo = WORKORDER_PROTO, salesTaxPercent) {
-  let r = { ...r, ...wo, ...customer, ...sale, ...calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree) };
-  r.receiptType = RECEIPT_TYPES.sales;
-  r.workorderLines = parseWorkorderLines(wo);
-  r.status = resolveStatus(wo.status, SETTINGS_OBJ.statuses).label;
-  r.salesTaxPercent = salesTaxPercent;
-  r.color1 = wo.color1.label;
-  r.color2 = wo.color2.label;
-  r.payments = sale.payments;
-  r.barcode = r.id
-  r.shopName = "Bonita Bikes LLC"
-
-
-  r.customerContact = formatPhoneForDisplay(customer.customerCell) || formatPhoneForDisplay(customer.customerLandline) || customer.email
-
-  r.shopContactBlurb =
-    SHOP_CONTACT_BLURB;
-  r.thankYouBlurb = THANK_YOU_BLURB;
-
-  let startedBySplit = wo.startedBy.split(" ");
-  r.startedBy = startedBySplit[0]
-  if (startedBySplit[1]?.length > 0) {
-    r.startedBy = r.startedBy + " " + startedBySplit[1].substring(0) + '.';
-
-  }
-  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(wo.id) // remove for production, initial workorders did not save this field
-
-  return r;
-}
-
-
-
-// Shared wait time estimate label calculation
-// Takes a workorder and returns a display string for the estimated completion
-export function calculateWaitEstimateLabel(workorder) {
-  let waitObj = workorder?.waitTime;
-
-  // No wait time selected
-  if (!waitObj || !waitObj.label) return "Missing estimate";
-
-  // "No Estimate" selected
-  if (waitObj.label === "No Estimate") return "No estimate";
-
-  let maxWaitDays = Number(waitObj.maxWaitTimeDays);
-  if (!maxWaitDays || maxWaitDays <= 0) return "";
-
-  let startedOnMillis = Number(workorder.startedOnMillis);
-  if (!startedOnMillis) return "";
-
-  // Get settings
-  let settings = useSettingsStore.getState().getSettings();
-
-  // Get label categories
-  let categories = settings?.waitTimeLabelCategories || [];
-  if (categories.length === 0) {
-    categories = [
-      { id: "default1", label: "First half {weekDayName}" },
-      { id: "default2", label: "Second half {weekDayName}" },
-    ];
-  }
-
-  // Build open day set from store hours
-  let standardHours = settings?.storeHours?.standard || [];
-  let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  let openDayNames = new Set(standardHours.filter((d) => d.isOpen).map((d) => d.name));
-
-  // Calculate end date: walk forward from startedOn, counting only open days
-  let date = new Date(startedOnMillis);
-  let openDaysCounted = 0;
-  let safety = 0;
-  while (openDaysCounted < maxWaitDays && safety < 365) {
-    date.setDate(date.getDate() + 1);
-    safety++;
-    if (openDayNames.has(dayNames[date.getDay()])) openDaysCounted++;
-  }
-
-  // Compare at midnight precision
-  let endDate = new Date(date);
-  endDate.setHours(0, 0, 0, 0);
-  let today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let endTime = endDate.getTime();
-  let todayTime = today.getTime();
-  let daysOut = Math.round((endTime - todayTime) / 86400000);
-
-  // Pick category label (first half / second half)
-  let categoryIdx = 0;
-  if (daysOut === 0) {
-    let hoursIntoDay = new Date().getHours();
-    let segmentSize = 24 / categories.length;
-    categoryIdx = Math.min(Math.floor(hoursIntoDay / segmentSize), categories.length - 1);
-  }
-  let categoryLabel = (categories[categoryIdx]?.label || "").replace("{weekDayName}", "").trim();
-
-  // Build the suffix for short dates
-  function dateSuffix(d) {
-    return d === 1 || d === 21 || d === 31 ? "st" : d === 2 || d === 22 ? "nd" : d === 3 || d === 23 ? "rd" : "th";
-  }
-
-  if (daysOut < 0) {
-    // Overdue
-    let daysOverdue = Math.abs(daysOut);
-    if (daysOverdue === 1) return "Overdue yesterday";
-    if (daysOverdue <= 6) return "Overdue " + dayNames[endDate.getDay()];
-    let shortDay = getWordDayOfWeek(endTime, true);
-    let month = getWordMonth(endTime);
-    let day = endDate.getDate();
-    return "Overdue " + shortDay + ", " + month + " " + day + dateSuffix(day);
-  }
-
-  if (daysOut === 0) {
-    // Today
-    return categoryLabel ? categoryLabel + " today" : "Today";
-  }
-
-  if (daysOut === 1) {
-    // Tomorrow
-    return categoryLabel ? categoryLabel + " tomorrow" : "Tomorrow";
-  }
-
-  if (daysOut >= 2 && daysOut <= 3) {
-    // 2-3 days: category + day name
-    let targetDayName = dayNames[endDate.getDay()];
-    return categoryLabel ? categoryLabel + " " + targetDayName : targetDayName;
-  }
-
-  if (daysOut >= 4 && daysOut <= 6) {
-    // 4-6 days: day name only
-    return dayNames[endDate.getDay()];
-  }
-
-  // 7+ days: short date
-  let shortDay = getWordDayOfWeek(endTime, true);
-  let month = getWordMonth(endTime);
-  let day = endDate.getDate();
-  return shortDay + ", " + month + " " + day + dateSuffix(day);
-}
-
+// Re-export printBuilder with a test() override that uses Firebase-based generateRandomID
 export const printBuilder = {
-  test: () => {
-    return {
-      ...RECEIPT_PROTO,
-      id: generateRandomID(),
-      receiptType: RECEIPT_TYPES.test,
-    };
-  },
-  workorder: (workorder, customer, salesTaxPercent) =>
-  {
-    let receipt = createPrintBase
-      (workorder, customer, salesTaxPercent);
-    receipt.receiptType = RECEIPT_TYPES.workorder;
-    return receipt;
-  },
-  intake: (workorder, customer, salesTaxPercent) => {
-    let receipt = createPrintBase
-      (workorder, customer, salesTaxPercent);
-    receipt.receiptType = RECEIPT_TYPES.intake;
-    return receipt;
-  },
-  sale: (sale, payments, customer, workorder, salesTaxPercent) => {
-    let receipt = createPrintBase
-      (workorder, customer, salesTaxPercent);
-    receipt = { ...receipt, ...sale }
-    receipt.receiptType = RECEIPT_TYPES.sales;
-    receipt.payments = payments;
-    receipt.popCashRegister = (payments || []).some(
-      p => p.cash && p.amountTendered > p.amountCaptured
-    );
-    return receipt;
-  },
+  ..._shared.printBuilder,
+  test: () => ({
+    ...RECEIPT_PROTO,
+    id: generateRandomID(),
+    receiptType: RECEIPT_TYPES.test,
+  }),
 };
 
 // ============================================================================

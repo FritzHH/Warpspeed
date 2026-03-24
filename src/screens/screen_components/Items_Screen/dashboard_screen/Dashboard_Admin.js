@@ -28,6 +28,8 @@ import {
   removeDashesFromPhone,
   dollarsToCents,
   capitalizeFirstLetterOfString,
+  printBuilder,
+  calculateRunningTotals,
 } from "../../../../utils";
 import {
   // useDatabaseStore,
@@ -57,7 +59,7 @@ import { Children, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
-import { DISCOUNT_TYPES, PERMISSION_LEVELS } from "../../../../constants";
+import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
 import { APP_USER, INTAKE_BUTTON_PROTO, SETTINGS_OBJ, TIME_PUNCH_PROTO } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
@@ -643,6 +645,105 @@ export function Dashboard_Admin({}) {
             >
               <Text style={{ fontSize: 13, color: C.orange, fontWeight: "700" }}>
                 Inject Test Punches (1234)
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  const settings = useSettingsStore.getState().getSettings();
+                  const { tenantID, storeID } = settings;
+                  const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+
+                  const workorder = SPOOF_WORKORDER;
+                  const customer = {
+                    first: workorder.customerFirst,
+                    last: workorder.customerLast,
+                    customerCell: workorder.customerCell,
+                    customerLandline: workorder.customerLandline,
+                    email: workorder.customerEmail,
+                    contactRestriction: workorder.customerContactRestriction,
+                  };
+
+                  const totals = calculateRunningTotals(workorder, settings?.salesTaxPercent, [], false, !!workorder.taxFree);
+                  const fakeSale = {
+                    id: "s" + generateUPCBarcode().substring(1),
+                    millis: Date.now(),
+                    subtotal: totals.runningSubtotal,
+                    discount: totals.runningDiscount,
+                    tax: totals.runningTax,
+                    total: totals.finalTotal,
+                    amountCaptured: totals.finalTotal,
+                    payments: [],
+                    refunds: [],
+                    workorderID: workorder.id,
+                  };
+                  const cardAmount = Math.round(totals.finalTotal * 0.6);
+                  const cashAmount = totals.finalTotal - cardAmount;
+                  const fakeCardPayment = {
+                    amountCaptured: cardAmount,
+                    amountTendered: cardAmount,
+                    cash: false,
+                    last4: "4242",
+                    cardType: "Visa",
+                    brand: "visa",
+                    paymentMethod: "card_present",
+                    authorizationCode: "A83F72",
+                  };
+                  const fakeCashPayment = {
+                    amountCaptured: cashAmount,
+                    amountTendered: cashAmount + 500,
+                    cash: true,
+                  };
+
+                  const receiptData = printBuilder.sale(fakeSale, [fakeCardPayment, fakeCashPayment], customer, workorder, settings?.salesTaxPercent, _ctx);
+                  log("SPOOF SALE RECEIPT", JSON.stringify(receiptData, null, 2));
+
+                  // Send to thermal printer
+                  dbSavePrintObj(receiptData, "8C:77:3B:60:33:22_Star MCP31");
+
+                  // Generate and upload PDF
+                  const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
+                  const base64 = generateSaleReceiptPDF(receiptData);
+                  const storagePath = build_db_path.cloudStorage.saleReceiptPDF(fakeSale.id, tenantID, storeID);
+                  const { uploadStringToStorage } = await import("../../../../db_calls");
+                  const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
+                  if (uploadResult?.downloadURL) {
+                    log("Spoof sale PDF uploaded:", uploadResult.downloadURL);
+                    window.open(uploadResult.downloadURL, "_blank");
+                  } else {
+                    useAlertScreenStore.getState().setValues({
+                      title: "Spoof Sale Receipt",
+                      message: "Sent to printer. PDF upload may have failed.",
+                      btn1Text: "OK",
+                      handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                      canExitOnOuterClick: true,
+                    });
+                  }
+                } catch (e) {
+                  log("Spoof sale receipt error:", e);
+                  useAlertScreenStore.getState().setValues({
+                    title: "Error",
+                    message: e.message,
+                    btn1Text: "OK",
+                    handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                    canExitOnOuterClick: true,
+                  });
+                }
+              }}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                borderWidth: 2,
+                borderColor: C.purple,
+                backgroundColor: C.listItemWhite,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 10,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: C.purple, fontWeight: "700" }}>
+                Spoof Sale Receipt
               </Text>
             </TouchableOpacity>
           </>)}
@@ -4665,6 +4766,39 @@ const IntakeButtonEditModal = ({ buttonObj, onClose, onSave }) => {
   );
 };
 
+const TEMPLATE_EMOJIS = [
+  { id: "🎉", label: "🎉  Party" },
+  { id: "✅", label: "✅  Checkmark" },
+  { id: "🔧", label: "🔧  Wrench" },
+  { id: "🛠️", label: "🛠️  Tools" },
+  { id: "⚙️", label: "⚙️  Gear" },
+  { id: "🔩", label: "🔩  Bolt" },
+  { id: "🚲", label: "🚲  Bicycle" },
+  { id: "🚴", label: "🚴  Cyclist" },
+  { id: "💰", label: "💰  Money Bag" },
+  { id: "💳", label: "💳  Credit Card" },
+  { id: "🧾", label: "🧾  Receipt" },
+  { id: "🏷️", label: "🏷️  Price Tag" },
+  { id: "🛒", label: "🛒  Cart" },
+  { id: "🎁", label: "🎁  Gift" },
+  { id: "📋", label: "📋  Clipboard" },
+  { id: "📝", label: "📝  Memo" },
+  { id: "📱", label: "📱  Phone" },
+  { id: "📧", label: "📧  Email" },
+  { id: "🔔", label: "🔔  Bell" },
+  { id: "⭐", label: "⭐  Star" },
+  { id: "🌟", label: "🌟  Glowing Star" },
+  { id: "❤️", label: "❤️  Heart" },
+  { id: "👋", label: "👋  Wave" },
+  { id: "👍", label: "👍  Thumbs Up" },
+  { id: "🙏", label: "🙏  Thank You" },
+  { id: "😊", label: "😊  Smile" },
+  { id: "🤝", label: "🤝  Handshake" },
+  { id: "💪", label: "💪  Strong" },
+  { id: "🏆", label: "🏆  Trophy" },
+  { id: "🔥", label: "🔥  Fire" },
+];
+
 const TEXT_TEMPLATE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
   { label: "Last Name", variable: "{lastName}" },
@@ -5339,11 +5473,16 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
   const [sLocalEdits, _setLocalEdits] = useState({});
   const [sNewTemplateIds, _setNewTemplateIds] = useState([]);
   const [sUnsavedTemplates, _setUnsavedTemplates] = useState([]);
+  const [sEmojiModalTemplateId, _setEmojiModalTemplateId] = useState(null);
   const cursorPositionRefs = useRef({});
   const textInputRefs = useRef({});
 
-  let savedTemplates = zSettingsObj?.textTemplates || [];
-  let templates = [...sUnsavedTemplates, ...savedTemplates];
+  let savedTemplates = zSettingsObj?.smsTemplates || zSettingsObj?.textTemplates || [];
+  let templates = [...sUnsavedTemplates, ...savedTemplates].sort((a, b) => (b.type ? 1 : 0) - (a.type ? 1 : 0));
+
+  // Backward compat helpers
+  function getLabel(t) { return t.label || t.name || t.buttonLabel || ""; }
+  function getContent(t) { return t.content || t.message || t.text || ""; }
 
   function getLocalValue(templateId, field) {
     let key = templateId + "_" + field;
@@ -5357,8 +5496,9 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
   function handleAddTemplate() {
     let newTemplate = {
       id: generateRandomID(),
-      name: "",
-      message: "",
+      label: "",
+      content: "",
+      type: "",
     };
     _setUnsavedTemplates([newTemplate, ...sUnsavedTemplates]);
     _setNewTemplateIds([...sNewTemplateIds, newTemplate.id]);
@@ -5367,17 +5507,18 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
 
   function handleSaveNewTemplate(templateObj) {
     let finalTemplate = {
-      ...templateObj,
-      name: getLocalValue(templateObj.id, "name") ?? templateObj.name,
-      message: getLocalValue(templateObj.id, "message") ?? templateObj.message,
+      id: templateObj.id,
+      label: getLocalValue(templateObj.id, "label") ?? getLabel(templateObj),
+      content: getLocalValue(templateObj.id, "content") ?? getContent(templateObj),
+      type: templateObj.type || "",
     };
     let arr = [finalTemplate, ...savedTemplates];
-    handleSettingsFieldChange("textTemplates", arr);
+    handleSettingsFieldChange("smsTemplates", arr);
     _setUnsavedTemplates(sUnsavedTemplates.filter((t) => t.id !== templateObj.id));
     _setNewTemplateIds(sNewTemplateIds.filter((id) => id !== templateObj.id));
     let newEdits = { ...sLocalEdits };
-    delete newEdits[templateObj.id + "_name"];
-    delete newEdits[templateObj.id + "_message"];
+    delete newEdits[templateObj.id + "_label"];
+    delete newEdits[templateObj.id + "_content"];
     _setLocalEdits(newEdits);
   }
 
@@ -5387,57 +5528,45 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
       _setNewTemplateIds(sNewTemplateIds.filter((id) => id !== templateObj.id));
     } else {
       let arr = savedTemplates.filter((t) => t.id !== templateObj.id);
-      handleSettingsFieldChange("textTemplates", arr);
+      handleSettingsFieldChange("smsTemplates", arr);
     }
     if (sSelectedTemplateId === templateObj.id) _setSelectedTemplateId(null);
     let newEdits = { ...sLocalEdits };
-    delete newEdits[templateObj.id + "_name"];
-    delete newEdits[templateObj.id + "_message"];
+    delete newEdits[templateObj.id + "_label"];
+    delete newEdits[templateObj.id + "_content"];
     _setLocalEdits(newEdits);
   }
 
-  function handleTemplateNameChange(templateObj, val) {
+  function handleFieldChange(templateObj, field, val) {
     if (isNewTemplate(templateObj.id)) {
-      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_name"]: val });
+      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_" + field]: val });
     } else {
       let arr = savedTemplates.map((t) => {
-        if (t.id === templateObj.id) return { ...t, name: val };
+        if (t.id === templateObj.id) return { ...t, [field]: val };
         return t;
       });
-      handleSettingsFieldChange("textTemplates", arr);
-    }
-  }
-
-  function handleTemplateMessageChange(templateObj, val) {
-    if (isNewTemplate(templateObj.id)) {
-      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_message"]: val });
-    } else {
-      let arr = savedTemplates.map((t) => {
-        if (t.id === templateObj.id) return { ...t, message: val };
-        return t;
-      });
-      handleSettingsFieldChange("textTemplates", arr);
+      handleSettingsFieldChange("smsTemplates", arr);
     }
   }
 
   function handleInsertVariable(templateObj, variableStr) {
-    let currentMessage = isNewTemplate(templateObj.id)
-      ? (getLocalValue(templateObj.id, "message") ?? templateObj.message)
-      : templateObj.message;
+    let currentContent = isNewTemplate(templateObj.id)
+      ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj))
+      : getContent(templateObj);
     let cursorPos =
-      cursorPositionRefs.current[templateObj.id] ?? currentMessage.length;
-    let before = currentMessage.slice(0, cursorPos);
-    let after = currentMessage.slice(cursorPos);
-    let newMessage = before + variableStr + after;
+      cursorPositionRefs.current[templateObj.id] ?? currentContent.length;
+    let before = currentContent.slice(0, cursorPos);
+    let after = currentContent.slice(cursorPos);
+    let newContent = before + variableStr + after;
 
     if (isNewTemplate(templateObj.id)) {
-      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_message"]: newMessage });
+      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_content"]: newContent });
     } else {
       let arr = savedTemplates.map((t) => {
-        if (t.id === templateObj.id) return { ...t, message: newMessage };
+        if (t.id === templateObj.id) return { ...t, content: newContent };
         return t;
       });
-      handleSettingsFieldChange("textTemplates", arr);
+      handleSettingsFieldChange("smsTemplates", arr);
     }
     cursorPositionRefs.current[templateObj.id] =
       cursorPos + variableStr.length;
@@ -5486,7 +5615,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                   >
                     <TextInput_
                       onChangeText={(val) =>
-                        handleTemplateNameChange(templateObj, val)
+                        handleFieldChange(templateObj, "label", val)
                       }
                       onFocus={() => _setSelectedTemplateId(templateObj.id)}
                       placeholder="Template name..."
@@ -5502,24 +5631,31 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                         fontWeight: "500",
                         fontSize: 14,
                       }}
-                      value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "name") ?? templateObj.name) : templateObj.name}
+                      value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "label") ?? getLabel(templateObj)) : getLabel(templateObj)}
                     />
-                    <Tooltip text="Delete template" position="top">
-                      <BoxButton1
-                        onPress={() => handleDeleteTemplate(templateObj)}
-                        style={{ marginLeft: 10 }}
-                        iconSize={15}
-                        icon={ICONS.close1}
-                      />
-                    </Tooltip>
+                    {!templateObj.type && (
+                      <Tooltip text="Delete template" position="top">
+                        <BoxButton1
+                          onPress={() => handleDeleteTemplate(templateObj)}
+                          style={{ marginLeft: 8 }}
+                          iconSize={15}
+                          icon={ICONS.close1}
+                        />
+                      </Tooltip>
+                    )}
                   </View>
 
                   {/* Message body */}
                   <TextInput
-                    ref={(el) => { if (el) textInputRefs.current[templateObj.id] = el; }}
+                    ref={(el) => {
+                      if (el) {
+                        textInputRefs.current[templateObj.id] = el;
+                        setTimeout(() => { if (el.style) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }, 0);
+                      }
+                    }}
                     multiline={true}
                     onChangeText={(val) =>
-                      handleTemplateMessageChange(templateObj, val)
+                      handleFieldChange(templateObj, "content", val)
                     }
                     onFocus={() => _setSelectedTemplateId(templateObj.id)}
                     onSelectionChange={(event) => {
@@ -5547,18 +5683,34 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                       textAlignVertical: "top",
                       overflow: "hidden",
                     }}
-                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "message") ?? templateObj.message) : templateObj.message}
+                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj)) : getContent(templateObj)}
                   />
 
-                  {/* Variable buttons - shown when template is selected */}
+                  {/* Variable buttons + emoji picker - shown when template is selected */}
                   {isSelected && (
                     <View
                       style={{
                         flexDirection: "row",
                         flexWrap: "wrap",
                         marginTop: 8,
+                        alignItems: "center",
                       }}
                     >
+                      <TouchableOpacity
+                        onPress={() => _setEmojiModalTemplateId(templateObj.id)}
+                        style={{
+                          backgroundColor: C.buttonLightGreen,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          marginRight: 5,
+                          marginBottom: 5,
+                        }}
+                      >
+                        <Text style={{ fontSize: 14 }}>{"😊"}</Text>
+                      </TouchableOpacity>
                       {TEXT_TEMPLATE_VARIABLES.map((v) => (
                         <TouchableOpacity
                           key={v.variable}
@@ -5603,6 +5755,35 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
             }}
           />
         </View>
+
+        {/* Emoji picker modal — portaled to body to avoid z-index issues */}
+        {!!sEmojiModalTemplateId && createPortal(
+          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: 9999 }}>
+            <TouchableWithoutFeedback onPress={() => _setEmojiModalTemplateId(null)}>
+              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+            </TouchableWithoutFeedback>
+            <View style={{ backgroundColor: C.backgroundWhite, borderRadius: 12, padding: 15, width: 320 }}>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text, marginBottom: 10, textAlign: "center" }}>{"Insert Emoji"}</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
+                {TEMPLATE_EMOJIS.map((e) => (
+                  <TouchableOpacity
+                    key={e.id}
+                    onPress={() => {
+                      let tObj = templates.find((t) => t.id === sEmojiModalTemplateId);
+                      if (tObj) handleInsertVariable(tObj, e.id);
+                      _setEmojiModalTemplateId(null);
+                    }}
+                    style={{ width: 48, height: 48, justifyContent: "center", alignItems: "center", borderRadius: 8 }}
+                  >
+                    <Text style={{ fontSize: 24 }}>{e.id}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>,
+          document.body
+        )}
+
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
@@ -5634,11 +5815,16 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
   const [sLocalEdits, _setLocalEdits] = useState({});
   const [sNewTemplateIds, _setNewTemplateIds] = useState([]);
   const [sUnsavedTemplates, _setUnsavedTemplates] = useState([]);
+  const [sEmojiModalTemplateId, _setEmojiModalTemplateId] = useState(null);
   const cursorPositionRefs = useRef({});
   const textInputRefs = useRef({});
 
   let savedTemplates = zSettingsObj?.emailTemplates || [];
-  let templates = [...sUnsavedTemplates, ...savedTemplates];
+  let templates = [...sUnsavedTemplates, ...savedTemplates].sort((a, b) => (b.type ? 1 : 0) - (a.type ? 1 : 0));
+
+  // Backward compat helpers
+  function getLabel(t) { return t.label || t.name || ""; }
+  function getContent(t) { return t.content || t.body || ""; }
 
   function getLocalValue(templateId, field) {
     let key = templateId + "_" + field;
@@ -5652,9 +5838,10 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
   function handleAddTemplate() {
     let newTemplate = {
       id: generateRandomID(),
-      name: "",
+      label: "",
       subject: "",
-      body: "",
+      content: "",
+      type: "",
     };
     _setUnsavedTemplates([newTemplate, ...sUnsavedTemplates]);
     _setNewTemplateIds([...sNewTemplateIds, newTemplate.id]);
@@ -5663,19 +5850,20 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
 
   function handleSaveNewTemplate(templateObj) {
     let finalTemplate = {
-      ...templateObj,
-      name: getLocalValue(templateObj.id, "name") ?? templateObj.name,
+      id: templateObj.id,
+      label: getLocalValue(templateObj.id, "label") ?? getLabel(templateObj),
       subject: getLocalValue(templateObj.id, "subject") ?? templateObj.subject,
-      body: getLocalValue(templateObj.id, "body") ?? templateObj.body,
+      content: getLocalValue(templateObj.id, "content") ?? getContent(templateObj),
+      type: templateObj.type || "",
     };
     let arr = [finalTemplate, ...savedTemplates];
     handleSettingsFieldChange("emailTemplates", arr);
     _setUnsavedTemplates(sUnsavedTemplates.filter((t) => t.id !== templateObj.id));
     _setNewTemplateIds(sNewTemplateIds.filter((id) => id !== templateObj.id));
     let newEdits = { ...sLocalEdits };
-    delete newEdits[templateObj.id + "_name"];
+    delete newEdits[templateObj.id + "_label"];
     delete newEdits[templateObj.id + "_subject"];
-    delete newEdits[templateObj.id + "_body"];
+    delete newEdits[templateObj.id + "_content"];
     _setLocalEdits(newEdits);
   }
 
@@ -5689,9 +5877,9 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
     }
     if (sSelectedTemplateId === templateObj.id) _setSelectedTemplateId(null);
     let newEdits = { ...sLocalEdits };
-    delete newEdits[templateObj.id + "_name"];
+    delete newEdits[templateObj.id + "_label"];
     delete newEdits[templateObj.id + "_subject"];
-    delete newEdits[templateObj.id + "_body"];
+    delete newEdits[templateObj.id + "_content"];
     _setLocalEdits(newEdits);
   }
 
@@ -5708,20 +5896,20 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
   }
 
   function handleInsertVariable(templateObj, variableStr) {
-    let currentBody = isNewTemplate(templateObj.id)
-      ? (getLocalValue(templateObj.id, "body") ?? templateObj.body)
-      : templateObj.body;
+    let currentContent = isNewTemplate(templateObj.id)
+      ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj))
+      : getContent(templateObj);
     let cursorPos =
-      cursorPositionRefs.current[templateObj.id] ?? currentBody.length;
-    let before = currentBody.slice(0, cursorPos);
-    let after = currentBody.slice(cursorPos);
-    let newBody = before + variableStr + after;
+      cursorPositionRefs.current[templateObj.id] ?? currentContent.length;
+    let before = currentContent.slice(0, cursorPos);
+    let after = currentContent.slice(cursorPos);
+    let newContent = before + variableStr + after;
 
     if (isNewTemplate(templateObj.id)) {
-      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_body"]: newBody });
+      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_content"]: newContent });
     } else {
       let arr = savedTemplates.map((t) => {
-        if (t.id === templateObj.id) return { ...t, body: newBody };
+        if (t.id === templateObj.id) return { ...t, content: newContent };
         return t;
       });
       handleSettingsFieldChange("emailTemplates", arr);
@@ -5763,7 +5951,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                     backgroundColor: C.backgroundListWhite,
                   }}
                 >
-                  {/* Row: template name + delete button */}
+                  {/* Row: template name + type dropdown + delete button */}
                   <View
                     style={{
                       flexDirection: "row",
@@ -5773,7 +5961,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                   >
                     <TextInput_
                       onChangeText={(val) =>
-                        handleFieldChange(templateObj, "name", val)
+                        handleFieldChange(templateObj, "label", val)
                       }
                       onFocus={() => _setSelectedTemplateId(templateObj.id)}
                       placeholder="Template name..."
@@ -5789,16 +5977,18 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                         fontWeight: "500",
                         fontSize: 14,
                       }}
-                      value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "name") ?? templateObj.name) : templateObj.name}
+                      value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "label") ?? getLabel(templateObj)) : getLabel(templateObj)}
                     />
-                    <Tooltip text="Delete template" position="top">
-                      <BoxButton1
-                        onPress={() => handleDeleteTemplate(templateObj)}
-                        style={{ marginLeft: 10 }}
-                        iconSize={15}
-                        icon={ICONS.close1}
-                      />
-                    </Tooltip>
+                    {!templateObj.type && (
+                      <Tooltip text="Delete template" position="top">
+                        <BoxButton1
+                          onPress={() => handleDeleteTemplate(templateObj)}
+                          style={{ marginLeft: 8 }}
+                          iconSize={15}
+                          icon={ICONS.close1}
+                        />
+                      </Tooltip>
+                    )}
                   </View>
 
                   {/* Subject line */}
@@ -5824,10 +6014,15 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
 
                   {/* Email body */}
                   <TextInput
-                    ref={(el) => { if (el) textInputRefs.current[templateObj.id] = el; }}
+                    ref={(el) => {
+                      if (el) {
+                        textInputRefs.current[templateObj.id] = el;
+                        setTimeout(() => { if (el.style) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }, 0);
+                      }
+                    }}
                     multiline={true}
                     onChangeText={(val) =>
-                      handleFieldChange(templateObj, "body", val)
+                      handleFieldChange(templateObj, "content", val)
                     }
                     onFocus={() => _setSelectedTemplateId(templateObj.id)}
                     onSelectionChange={(event) => {
@@ -5855,18 +6050,34 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                       textAlignVertical: "top",
                       overflow: "hidden",
                     }}
-                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "body") ?? templateObj.body) : templateObj.body}
+                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj)) : getContent(templateObj)}
                   />
 
-                  {/* Variable buttons - shown when template is selected */}
+                  {/* Variable buttons + emoji picker - shown when template is selected */}
                   {isSelected && (
                     <View
                       style={{
                         flexDirection: "row",
                         flexWrap: "wrap",
                         marginTop: 8,
+                        alignItems: "center",
                       }}
                     >
+                      <TouchableOpacity
+                        onPress={() => _setEmojiModalTemplateId(templateObj.id)}
+                        style={{
+                          backgroundColor: C.buttonLightGreen,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          marginRight: 5,
+                          marginBottom: 5,
+                        }}
+                      >
+                        <Text style={{ fontSize: 14 }}>{"😊"}</Text>
+                      </TouchableOpacity>
                       {EMAIL_TEMPLATE_VARIABLES.map((v) => (
                         <TouchableOpacity
                           key={v.variable}
@@ -5911,6 +6122,36 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
             }}
           />
         </View>
+
+        {/* Emoji picker modal */}
+        {/* Emoji picker modal — portaled to body to avoid z-index issues */}
+        {!!sEmojiModalTemplateId && createPortal(
+          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: 9999 }}>
+            <TouchableWithoutFeedback onPress={() => _setEmojiModalTemplateId(null)}>
+              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+            </TouchableWithoutFeedback>
+            <View style={{ backgroundColor: C.backgroundWhite, borderRadius: 12, padding: 15, width: 320 }}>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text, marginBottom: 10, textAlign: "center" }}>{"Insert Emoji"}</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
+                {TEMPLATE_EMOJIS.map((e) => (
+                  <TouchableOpacity
+                    key={e.id}
+                    onPress={() => {
+                      let tObj = templates.find((t) => t.id === sEmojiModalTemplateId);
+                      if (tObj) handleInsertVariable(tObj, e.id);
+                      _setEmojiModalTemplateId(null);
+                    }}
+                    style={{ width: 48, height: 48, justifyContent: "center", alignItems: "center", borderRadius: 8 }}
+                  >
+                    <Text style={{ fontSize: 24 }}>{e.id}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>,
+          document.body
+        )}
+
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
@@ -6366,3 +6607,168 @@ function BackupRecoveryComponent() {
     </BoxContainerOuterComponent>
   );
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Spoof data
+////////////////////////////////////////////////////////////////////////////////
+
+const SPOOF_WORKORDER = {
+  id: "028788618626",
+  partSource: "Amazon",
+  customerNotes: [
+    {
+      name: "(Fritz H)  ",
+      userID: "1234",
+      value: "Here are some customer notes\n\nAnother line of customer notes",
+      id: "50799ROzyfyPUnCqI7yo",
+      createdAt: 1774375558248,
+    },
+  ],
+  paymentComplete: false,
+  startedBy: "Fritz Hieb",
+  internalNotes: [
+    {
+      id: "YUOO8yY18SOeVDByopiz",
+      createdAt: 1774360100201,
+      value: "Here are the intake notes blah blah\n\nAnother line of intake notes",
+      name: "(Fritz H)  ",
+      userID: "1234",
+    },
+  ],
+  description: "Hybrid",
+  amountPaid: 0,
+  customerLandline: "",
+  taxFree: false,
+  waitTime: { label: "1-2 Days", id: "34j3kj3", maxWaitTimeDays: 2, removable: true },
+  model: "",
+  color2: { textColor: "white", label: "Red", backgroundColor: "red" },
+  changeLog: [],
+  media: [],
+  workorderLines: [
+    {
+      receiptNotes: "",
+      warranty: false,
+      useSalePrice: false,
+      inventoryItem: {
+        manufacturerSku: "",
+        formalName: "HELMET AERIUS RAVEN L/XL M-BK",
+        cost: 1995,
+        brand: "",
+        category: "Part",
+        minutes: 0,
+        salePrice: 0,
+        upc: "",
+        id: "05YYGGwRFFZ3cnnszUvz",
+        customSku: "",
+        informalName: "",
+        ean: "",
+        price: 0,
+      },
+      qty: 1,
+      intakeNotes: "",
+      discountObj: "",
+      id: "002462623550",
+    },
+    {
+      inventoryItem: {
+        price: 6000,
+        ean: "",
+        informalName: "",
+        customSku: "",
+        id: "086Gn523CkHuuPsPIL7r",
+        upc: "014658020235",
+        salePrice: 0,
+        cost: 3249,
+        brand: "",
+        minutes: 0,
+        category: "Part",
+        formalName: "CAR RACK HOLYWD CROSSBAR ADAPTER BOOMERPRO",
+        manufacturerSku: "BA-PRO",
+      },
+      intakeNotes: "",
+      qty: 2,
+      id: "002473171737",
+      discountObj: "",
+      receiptNotes: "",
+      warranty: false,
+      useSalePrice: false,
+    },
+    {
+      intakeNotes: "Put this shit on bro",
+      qty: 1,
+      discountObj: {
+        newPrice: 2400,
+        name: "20% Off Item",
+        value: "20",
+        id: "394393",
+        savings: 600,
+        type: "%",
+      },
+      id: "002482225496",
+      inventoryItem: {
+        customSku: "",
+        informalName: "",
+        ean: "850051028009",
+        price: 3000,
+        formalName: "BOTTLE CAGE BIKASE ABC SIDEWINDER ADJUSTABLE DRINK HOLDER BK",
+        manufacturerSku: "1024",
+        salePrice: 0,
+        cost: 1849,
+        brand: "",
+        category: "Part",
+        minutes: 0,
+        upc: "850051028009",
+        id: "0AS4fNqu2f9I7Po11bgC",
+      },
+      receiptNotes: "Here are the receipt notes for customer",
+      warranty: false,
+      useSalePrice: false,
+    },
+    {
+      warranty: false,
+      useSalePrice: false,
+      receiptNotes: "",
+      discountObj: {
+        name: "50% Off Item",
+        value: "50",
+        newPrice: 1200,
+        savings: 1200,
+        id: "1333k",
+        type: "%",
+      },
+      id: "002494882721",
+      intakeNotes: "",
+      qty: 3,
+      inventoryItem: {
+        price: 800,
+        ean: "",
+        informalName: "Valve Core Remover - Park kT",
+        customSku: "",
+        upc: "763477008572",
+        id: "0AwfMK11HyiJJ9FPIbAv",
+        salePrice: 0,
+        cost: 499,
+        brand: "",
+        minutes: 0,
+        category: "Part",
+        formalName: "TOOL VALVE CORE REMOVER PARK VC-1",
+        manufacturerSku: "VC-1",
+      },
+    },
+  ],
+  status: "383rne3kj",
+  sales: [],
+  activeSaleID: "",
+  customerCell: "2393369177",
+  customerContactRestriction: "",
+  customerEmail: "hieb.fritz@gmail.com",
+  waitTimeEstimateLabel: "First half Tuesday",
+  isStandaloneSale: false,
+  brand: "Sun",
+  workorderNumber: "82860",
+  customerLast: "Hieb",
+  color1: { backgroundColor: "blue", label: "Blue", textColor: "white" },
+  customerID: "011460657456",
+  customerFirst: "Fritz",
+  startedOnMillis: 1774312878862,
+};

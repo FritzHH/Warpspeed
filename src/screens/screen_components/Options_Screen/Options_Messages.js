@@ -271,7 +271,8 @@ export function MessagesComponent({}) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
     useLoginStore.getState().requireLogin(async () => {
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
-      let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, zSettings?.salesTaxPercent);
+      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
+      let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, zSettings?.salesTaxPercent, _ctx);
       let { generateWorkorderTicketPDF } = await import("../../../pdfGenerator");
       let base64 = generateWorkorderTicketPDF(receiptData);
       let storagePath = build_db_path.cloudStorage.workorderTicketPDF(zWorkorderObj.id, tenantID, storeID);
@@ -535,7 +536,7 @@ export function MessagesComponent({}) {
             <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 10 }}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <DropdownMenu
-                  dataArr={(zSettings?.textTemplates || []).map((t) => ({ label: t.name || "Untitled", message: t.message }))}
+                  dataArr={(zSettings?.smsTemplates || zSettings?.textTemplates || []).map((t) => ({ label: t.label || t.name || t.buttonLabel || "Untitled", message: t.content || t.message || t.text || "" }))}
                   onSelect={(item) => {
                     let resolved = resolveTemplate(item.message);
                     _setNewMessage(resolved);

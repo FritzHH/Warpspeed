@@ -4,15 +4,12 @@ import {
   Text,
   TextInput,
   FlatList,
-  TouchableWithoutFeedback,
 } from "react-native-web";
 import { generateRandomID, gray, resolveStatus } from "../../../utils";
 import { Image_, TouchableOpacity_, TextInput_, Tooltip } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useOpenWorkordersStore, useLoginStore, useSettingsStore } from "../../../stores";
-
-const DOUBLE_TAP_MS = 350;
 
 /// Notes Tab Component
 export function Notes_MainComponent() {
@@ -62,8 +59,7 @@ export function Notes_MainComponent() {
   const isDonePaid = resolveStatus(zWorkorderStatus, zStatuses)?.label?.toLowerCase() === "done & paid";
 
   /////////////////////////////////////////////////////////////////////////////////
-  const [sFocusIdx, _setFocusIdx] = useState(null);
-  const lastTapRef = useRef({ time: 0, key: null });
+  const [sEditingNoteId, _setEditingNoteId] = useState(null);
 
   function formatUserShowName() {
     return (
@@ -97,29 +93,18 @@ export function Notes_MainComponent() {
         fieldName = "internalNotes";
       }
 
+      const newId = generateRandomID();
       notesArr.unshift({
         name: formatUserShowName(),
         userID: zCurrentUser.id,
         value: "",
-        id: generateRandomID(),
+        id: newId,
         createdAt: Date.now(),
       });
 
       useOpenWorkordersStore.getState().setField(fieldName, notesArr);
+      _setEditingNoteId(newId);
     });
-  }
-
-  function handleRowPress(item, index, option) {
-    const now = Date.now();
-    const key = `${option}-${item.id}`;
-    const prev = lastTapRef.current;
-    if (prev.key === key && now - prev.time < DOUBLE_TAP_MS) {
-      deleteItem(item, index, option);
-      lastTapRef.current = { time: 0, key: null };
-      return;
-    }
-    lastTapRef.current = { time: now, key };
-    _setFocusIdx(index);
   }
 
   function deleteItem(item, index, option) {
@@ -248,17 +233,31 @@ export function Notes_MainComponent() {
               renderItem={(item) => {
                 let index = item.index;
                 item = item.item;
+                const isEditing = sEditingNoteId === item.id;
                 return (
                   <View
                     style={{
                       width: "100%",
                       flexDirection: "row",
-                      alignItems: "flex-start",
+                      alignItems: "center",
                       borderRadius: 5,
                       backgroundColor: C.backgroundWhite,
+                      marginBottom: 3,
                     }}
                   >
-                    <View style={{ alignItems: "center", paddingTop: 2 }}>
+                    <View style={{ alignItems: "center", justifyContent: "center", flexDirection: "row", paddingTop: 2 }}>
+                      <Tooltip text="Delete note" position="right">
+                        <TouchableOpacity_
+                          onPress={() => { deleteItem(item, index, "customer"); _setEditingNoteId(null); }}
+                          style={{ padding: 2 }}
+                        >
+                          <Image_
+                            icon={ICONS.trash}
+                            size={14}
+                            style={{ opacity: 0.35, filter: "grayscale(100%)" }}
+                          />
+                        </TouchableOpacity_>
+                      </Tooltip>
                       <Tooltip text={formatNoteDate(item.createdAt)} position="right">
                         <Text
                           style={{
@@ -271,39 +270,45 @@ export function Notes_MainComponent() {
                           {item.name}
                         </Text>
                       </Tooltip>
-                      <Tooltip text="Delete note" position="right">
-                        <TouchableOpacity_
-                          onPress={() => deleteItem(item, index, "customer")}
-                          style={{ padding: 2 }}
-                        >
-                          <Image_
-                            icon={ICONS.trash}
-                            size={14}
-                            style={{ opacity: 0.35, filter: "grayscale(100%)" }}
-                          />
-                        </TouchableOpacity_>
-                      </Tooltip>
                     </View>
-                    <TextInput_
-                      multiline={true}
-                      numberOfLines={10}
-                      capitalize={true}
-                      onChangeText={(val) =>
-                        textChanged(val, index, "customer")
-                      }
-                      style={{
-                        padding: 2,
-                        paddingLeft: 4,
-                        lineHeight: 18,
-                        outlineWidth: 0,
-                        outlineStyle: "none",
-                        borderWidth: 0,
-                        flex: 1,
-                        color: C.text,
-                      }}
-                      autoFocus={index === sFocusIdx}
-                      value={item.value}
-                    />
+                    {isEditing ? (
+                      <TextInput_
+                        multiline={true}
+                        numberOfLines={10}
+                        capitalize={true}
+                        onChangeText={(val) =>
+                          textChanged(val, index, "customer")
+                        }
+                        onBlur={() => _setEditingNoteId(null)}
+                        style={{
+                          padding: 2,
+                          paddingLeft: 4,
+                          lineHeight: 18,
+                          outlineWidth: 0,
+                          outlineStyle: "none",
+                          borderWidth: 0,
+                          flex: 1,
+                          color: C.text,
+                        }}
+                        autoFocus={true}
+                        value={item.value}
+                      />
+                    ) : (
+                      <TouchableOpacity_
+                        onPress={() => _setEditingNoteId(item.id)}
+                        style={{ flex: 1, padding: 2, paddingLeft: 4, cursor: "text" }}
+                      >
+                        <Text
+                          style={{
+                            lineHeight: 18,
+                            color: item.value ? C.text : gray(0.5),
+                            fontSize: 14,
+                          }}
+                        >
+                          {item.value || "Empty note"}
+                        </Text>
+                      </TouchableOpacity_>
+                    )}
                   </View>
                 );
               }}
@@ -368,56 +373,57 @@ export function Notes_MainComponent() {
               </Text>
             </TouchableOpacity_>
           </Tooltip>
-          <TouchableWithoutFeedback onPress={() => outsideClicked("internal")}>
-            <View
-              style={{
-                width: "100%",
-                height: "100%",
-                // backgroundColor: APP_BASE_COLORS.backgroundListWhite,
-                flexDirection: "column",
-                paddingRight: 10,
-              }}
-            >
-              <FlatList
-                keyExtractor={(i, idx) => idx}
-                data={zInternalNotes}
-                renderItem={(item) => {
-                  let index = item.index;
-                  item = item.item;
-                  return (
-                    <View
-                      style={{
-                        width: "100%",
-                        flexDirection: "row",
-                        alignItems: "flex-start",
-                        backgroundColor: C.backgroundWhite,
-                      }}
-                    >
-                      <View style={{ alignItems: "center", paddingTop: 2 }}>
-                        <Tooltip text={formatNoteDate(item.createdAt)} position="right">
-                          <Text
-                            style={{
-                              color: gray(.4),
-                              padding: 2,
-                              fontSize: 12,
-                            }}
-                          >
-                            {item.name}
-                          </Text>
-                        </Tooltip>
-                        <Tooltip text="Delete note" position="right">
-                          <TouchableOpacity_
-                            onPress={() => deleteItem(item, index, "internal")}
-                            style={{ padding: 2 }}
-                          >
-                            <Image_
-                              icon={ICONS.trash}
-                              size={14}
-                              style={{ opacity: 0.35, filter: "grayscale(100%)" }}
-                            />
-                          </TouchableOpacity_>
-                        </Tooltip>
-                      </View>
+          <View
+            style={{
+              width: "100%",
+              height: "100%",
+              flexDirection: "column",
+              paddingRight: 10,
+            }}
+          >
+            <FlatList
+              keyExtractor={(i, idx) => idx}
+              data={zInternalNotes}
+              renderItem={(item) => {
+                let index = item.index;
+                item = item.item;
+                const isEditing = sEditingNoteId === item.id;
+                return (
+                  <View
+                    style={{
+                      width: "100%",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: C.backgroundWhite,
+                      marginBottom: 3,
+                    }}
+                  >
+                    <View style={{ alignItems: "center", justifyContent: "center", flexDirection: "row", paddingTop: 2 }}>
+                      <Tooltip text="Delete note" position="right">
+                        <TouchableOpacity_
+                          onPress={() => { deleteItem(item, index, "internal"); _setEditingNoteId(null); }}
+                          style={{ padding: 2 }}
+                        >
+                          <Image_
+                            icon={ICONS.trash}
+                            size={14}
+                            style={{ opacity: 0.35, filter: "grayscale(100%)" }}
+                          />
+                        </TouchableOpacity_>
+                      </Tooltip>
+                      <Tooltip text={formatNoteDate(item.createdAt)} position="right">
+                        <Text
+                          style={{
+                            color: gray(.4),
+                            padding: 2,
+                            fontSize: 12,
+                          }}
+                        >
+                          {item.name}
+                        </Text>
+                      </Tooltip>
+                    </View>
+                    {isEditing ? (
                       <TextInput_
                         multiline={true}
                         numberOfLines={10}
@@ -425,6 +431,7 @@ export function Notes_MainComponent() {
                         onChangeText={(val) =>
                           textChanged(val, index, "internal")
                         }
+                        onBlur={() => _setEditingNoteId(null)}
                         style={{
                           padding: 2,
                           paddingLeft: 4,
@@ -435,15 +442,30 @@ export function Notes_MainComponent() {
                           flex: 1,
                           color: C.text,
                         }}
-                        autoFocus={index === sFocusIdx}
+                        autoFocus={true}
                         value={item.value}
                       />
-                    </View>
-                  );
-                }}
-              />
-            </View>
-          </TouchableWithoutFeedback>
+                    ) : (
+                      <TouchableOpacity_
+                        onPress={() => _setEditingNoteId(item.id)}
+                        style={{ flex: 1, padding: 2, paddingLeft: 4, cursor: "text" }}
+                      >
+                        <Text
+                          style={{
+                            lineHeight: 18,
+                            color: item.value ? C.text : gray(0.5),
+                            fontSize: 14,
+                          }}
+                        >
+                          {item.value || "Empty note"}
+                        </Text>
+                      </TouchableOpacity_>
+                    )}
+                  </View>
+                );
+              }}
+            />
+          </View>
         </View>
       </View>
     </View>

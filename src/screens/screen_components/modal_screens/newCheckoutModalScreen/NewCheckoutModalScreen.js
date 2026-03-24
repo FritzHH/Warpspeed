@@ -11,6 +11,7 @@ import {
   useSettingsStore,
   useLoginStore,
   useAlertScreenStore,
+  useCurrentCustomerStore,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
@@ -22,6 +23,7 @@ import {
   replaceOrAddToArr,
   formatPhoneWithDashes,
   formatPhoneForDisplay,
+  findTemplateByType,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO } from "../../../../data";
 import { dbSavePrintObj } from "../../../../db_calls_wrapper";
@@ -98,6 +100,7 @@ export function NewCheckoutModalScreen() {
   const zInventory = useInventoryStore((state) => state.inventoryArr);
   const zSettings = useSettingsStore((state) => state.settings);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
+  const zCustomer = useCurrentCustomerStore((state) => state.customer);
 
   // ─── Local State ──────────────────────────────────────────
   const [sSale, _setSale] = useState(null);
@@ -304,6 +307,11 @@ export function NewCheckoutModalScreen() {
 
   // ─── Payment Handling ─────────────────────────────────────
   function handlePaymentCapture(payment) {
+    // Guard: if sale is already marked complete locally, skip
+    if (sSale?.paymentComplete) {
+      log("handlePaymentCapture: sale already complete, skipping");
+      return;
+    }
     let sale = cloneDeep(sSale);
     payment.saleID = sale.id;
     sale.payments = [...sale.payments, payment];
@@ -342,6 +350,18 @@ export function NewCheckoutModalScreen() {
   }
 
   async function handleSaleComplete(sale) {
+    // Idempotency: check if webhook already completed this sale
+    let existingActiveSale = await newCheckoutGetActiveSale(sale.id);
+    if (!existingActiveSale) {
+      log("handleSaleComplete: active sale gone (webhook completed it). UI cleanup only.");
+      // Webhook handled DB completion, printing, SMS/email — just clean up local UI
+      for (let wo of sCombinedWorkorders) {
+        useOpenWorkordersStore.getState().removeWorkorder(wo, false);
+      }
+      return;
+    }
+
+    // Normal flow — webhook hasn't completed it yet
     // Mark all combined workorders as complete
     for (let wo of sCombinedWorkorders) {
       let woToComplete = cloneDeep(wo);
@@ -402,14 +422,34 @@ export function NewCheckoutModalScreen() {
 
     // Print sale receipt
     if (settings?.autoPrintSalesReceipt) {
-      let toPrint = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent);
+      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+      let toPrint = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
       dbSavePrintObj(toPrint, printerID);
     }
 
-    // SMS/Email — sendSaleReceipt checks settings internally, but skip the call
-    // entirely if the customer has neither a phone number nor an email
-    if (customerForReceipt.customerCell || customerForReceipt.email) {
-      sendSaleReceipt(sale, customerForReceipt, primaryWO, settings);
+    // SMS/Email — template-driven
+    const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
+    const emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+
+    const smsContent = smsTemplate?.content || smsTemplate?.message || "";
+    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    let emptyParts = [];
+    if (settings?.autoSMSSalesReceipt && customerForReceipt.customerCell && !smsContent.trim()) emptyParts.push("SMS");
+    if (settings?.autoEmailSalesReceipt && customerForReceipt.email && !emailContent.trim()) emptyParts.push("email");
+    if (emptyParts.length > 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "Empty Template",
+        message: "The sale receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ", or uncheck the auto " + emptyParts.join("/") + " option in Dashboard > Printing.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    }
+
+    const canSMS = customerForReceipt.customerCell && smsContent.trim();
+    const canEmail = customerForReceipt.email && emailContent.trim();
+    if (canSMS || canEmail) {
+      sendSaleReceipt(sale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
     }
   }
 
@@ -470,12 +510,14 @@ export function NewCheckoutModalScreen() {
       email: primaryWO?.customerEmail || "",
       id: primaryWO?.customerID || "",
     };
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
     let toPrint = printBuilder.sale(
       sSale,
       sSale.payments,
       customer,
       primaryWO,
-      zSettings?.salesTaxPercent
+      zSettings?.salesTaxPercent,
+      _ctx
     );
     const printerID = zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
     dbSavePrintObj(toPrint, printerID);
@@ -585,6 +627,8 @@ export function NewCheckoutModalScreen() {
                 settings={zSettings}
                 saleComplete={saleComplete}
                 readerError={sReaderError}
+                saleID={sSale?.id || ""}
+                customerID={sSale?.customerID || zCustomer?.id || ""}
               />
             </View>
 

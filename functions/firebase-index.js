@@ -5923,10 +5923,15 @@ exports.translateTextCallable = onCall(
     try {
       const { text, targetLanguage, sourceLanguage } = request.data;
 
-      if (!text || typeof text !== "string" || text.trim().length === 0) {
+      const isArray = Array.isArray(text);
+      if (
+        !text ||
+        (isArray && (text.length === 0 || text.some((t) => typeof t !== "string" || !t.trim()))) ||
+        (!isArray && (typeof text !== "string" || text.trim().length === 0))
+      ) {
         throw new HttpsError(
           "invalid-argument",
-          "Text is required and must be a non-empty string"
+          "Text is required and must be a non-empty string or array of non-empty strings"
         );
       }
 
@@ -5956,16 +5961,19 @@ exports.translateTextCallable = onCall(
         options
       );
 
+      const translations = isArray
+        ? apiResponse?.data?.translations
+        : [apiResponse?.data?.translations?.[0]];
       const detectedSourceLanguage =
-        apiResponse?.data?.translations?.[0]?.detectedSourceLanguage ||
+        translations?.[0]?.detectedSourceLanguage ||
         sourceLanguage ||
         null;
 
       log("Translation successful", {
         targetLanguage,
         detectedSourceLanguage,
-        inputLength: text.length,
-        outputLength: translatedText.length,
+        inputLength: isArray ? text.length + " items" : text.length,
+        outputLength: isArray ? translatedText.length + " items" : translatedText.length,
       });
 
       return {

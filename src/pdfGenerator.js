@@ -2,6 +2,36 @@
 import { jsPDF } from "jspdf";
 
 ////////////////////////////////////////////////////////////////////////////////
+// Default label sets (exported so receiptTranslator can read the keys)
+////////////////////////////////////////////////////////////////////////////////
+
+export const DEFAULT_SALE_LABELS = {
+  title: "SALES RECEIPT",
+  subtotal: "Subtotal",
+  discount: "Discount",
+  salesTax: "Sales Tax",
+  cardFee: "Card Fee",
+  total: "TOTAL",
+  itemHeader: "Item",
+  qtyHeader: "Qty",
+  priceHeader: "Price",
+  totalHeader: "Total",
+  payments: "Payments",
+  cash: "Cash",
+  card: "Card",
+  auth: "Auth",
+  tendered: "Tendered",
+  change: "Change",
+  amountPaid: "Amount Paid",
+  notesHeader: "Notes for our customer:",
+  customer: "Customer",
+  contact: "Contact",
+  woNumber: "WO #",
+  discountPrefix: "Discount",
+  notePrefix: "Note",
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -51,26 +81,28 @@ function addTotalRow(doc, y, label, value, leftX, rightX, bold) {
   return y + 13;
 }
 
-function addTotals(doc, y, data, leftX, rightX) {
-  y = addTotalRow(doc, y, "Subtotal", data.runningSubtotal || data.subtotal || 0, leftX, rightX, false);
+function addTotals(doc, y, data, leftX, rightX, L) {
+  if (!L) L = DEFAULT_SALE_LABELS;
+  y = addTotalRow(doc, y, L.subtotal, data.runningSubtotal || data.subtotal || 0, leftX, rightX, false);
 
   if ((data.runningDiscount || data.discount || 0) > 0) {
-    y = addTotalRow(doc, y, "Discount", -(data.runningDiscount || data.discount || 0), leftX, rightX, false);
+    y = addTotalRow(doc, y, L.discount, -(data.runningDiscount || data.discount || 0), leftX, rightX, false);
   }
 
-  y = addTotalRow(doc, y, "Sales Tax", data.runningTax || data.tax || 0, leftX, rightX, false);
+  y = addTotalRow(doc, y, L.salesTax, data.runningTax || data.tax || 0, leftX, rightX, false);
 
   if ((data.cardFee || 0) > 0) {
-    let label = "Card Fee" + (data.cardFeePercent ? " (" + data.cardFeePercent + "%)" : "");
+    let label = L.cardFee + (data.cardFeePercent ? " (" + data.cardFeePercent + "%)" : "");
     y = addTotalRow(doc, y, label, data.cardFee, leftX, rightX, false);
   }
 
   y += 2;
-  y = addTotalRow(doc, y, "TOTAL", data.finalTotal || data.total || 0, leftX, rightX, true);
+  y = addTotalRow(doc, y, L.total, data.finalTotal || data.total || 0, leftX, rightX, true);
   return y;
 }
 
-function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes) {
+function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes, L) {
+  if (!L) L = DEFAULT_SALE_LABELS;
   let contentWidth = rightX - leftX;
   let qtyX = rightX - 90;
   let priceX = rightX - 45;
@@ -79,10 +111,10 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes)
   // Column headers
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.text("Item", leftX, y);
-  doc.text("Qty", qtyX, y, { align: "right" });
-  doc.text("Price", priceX, y, { align: "right" });
-  doc.text("Total", rightX, y, { align: "right" });
+  doc.text(L.itemHeader, leftX, y);
+  doc.text(L.qtyHeader, qtyX, y, { align: "right" });
+  doc.text(L.priceHeader, priceX, y, { align: "right" });
+  doc.text(L.totalHeader, rightX, y, { align: "right" });
   y += 4;
   doc.setDrawColor(180);
   doc.line(leftX, y, rightX, y);
@@ -92,7 +124,7 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes)
   (lines || []).forEach((line) => {
     y = checkPageBreak(doc, y, 30, margin);
 
-    let name = line.itemName || "Item";
+    let name = line.itemName || L.itemHeader;
     doc.setFontSize(9);
     let nameLines = doc.splitTextToSize(name, nameMaxWidth);
     nameLines.forEach((nl, i) => {
@@ -114,7 +146,7 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes)
     if (line.discountName && (line.discountSavings || 0) > 0) {
       doc.setFontSize(7);
       doc.setTextColor(100, 100, 100);
-      doc.text("  Discount: " + line.discountName + " (-$" + formatCents(line.discountSavings) + ")", leftX, y);
+      doc.text("  " + L.discountPrefix + ": " + line.discountName + " (-$" + formatCents(line.discountSavings) + ")", leftX, y);
       doc.setTextColor(0);
       y += 10;
     }
@@ -123,7 +155,7 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes)
     if (includeReceiptNotes && line.receiptNotes) {
       doc.setFontSize(7);
       doc.setTextColor(80, 80, 80);
-      let noteLines = doc.splitTextToSize("Note: " + line.receiptNotes, contentWidth - 10);
+      let noteLines = doc.splitTextToSize(L.notePrefix + ": " + line.receiptNotes, contentWidth - 10);
       noteLines.forEach((nl) => {
         y = checkPageBreak(doc, y, 10, margin);
         doc.text(nl, leftX + 4, y);
@@ -143,7 +175,8 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes)
 // Sale Receipt PDF
 ////////////////////////////////////////////////////////////////////////////////
 
-export function generateSaleReceiptPDF(data) {
+export function generateSaleReceiptPDF(data, labels) {
+  let L = { ...DEFAULT_SALE_LABELS, ...(labels || {}) };
   let pageWidth = 226; // ~80mm in pt
   let margin = 10;
   let contentWidth = pageWidth - margin * 2;
@@ -162,8 +195,8 @@ export function generateSaleReceiptPDF(data) {
   y += 10;
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text("SALES RECEIPT", centerX, y, { align: "center" });
-  y += 6;
+  doc.text(L.title, centerX, y, { align: "center" });
+  y += 14;
 
   // Transaction date/time — directly below title
   doc.setFontSize(8);
@@ -184,17 +217,17 @@ export function generateSaleReceiptPDF(data) {
   doc.setFont("helvetica", "normal");
   let custName = [(data.first || ""), (data.last || "")].filter(Boolean).join(" ");
   if (custName) {
-    doc.text("Customer: " + custName, leftX, y);
+    doc.text(L.customer + ": " + custName, leftX, y);
     y += 11;
   }
   if (data.customerContact) {
-    doc.text("Contact: " + data.customerContact, leftX, y);
+    doc.text(L.contact + ": " + data.customerContact, leftX, y);
     y += 11;
   }
 
   // Workorder #
   if (data.workorderNumber) {
-    doc.text("WO #: " + data.workorderNumber, leftX, y);
+    doc.text(L.woNumber + ": " + data.workorderNumber, leftX, y);
     y += 11;
   }
 
@@ -202,11 +235,11 @@ export function generateSaleReceiptPDF(data) {
   y = addDivider(doc, y, leftX, rightX);
 
   // Line items
-  y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, false);
+  y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, false, L);
   y = addDivider(doc, y, leftX, rightX);
 
   // Totals
-  y = addTotals(doc, y, data, leftX, rightX);
+  y = addTotals(doc, y, data, leftX, rightX, L);
   y += 4;
   y = addDivider(doc, y, leftX, rightX);
 
@@ -215,27 +248,27 @@ export function generateSaleReceiptPDF(data) {
   if (payments.length > 0) {
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text("Payments", leftX, y);
+    doc.text(L.payments, leftX, y);
     y += 13;
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     payments.forEach((p) => {
       y = checkPageBreak(doc, y, 20, margin);
-      let type = p.cash ? "Cash" : p.cardType || "Card";
+      let type = p.cash ? L.cash : p.cardType || L.card;
       let amount = "$" + formatCents(p.amountCaptured || 0);
       let detail = p.last4 ? " (..." + p.last4 + ")" : "";
       doc.text(type + detail + "  " + amount, leftX + 4, y);
       y += 11;
 
       if (!p.cash && p.authorizationCode) {
-        doc.text("  Auth: " + p.authorizationCode, leftX + 4, y);
+        doc.text("  " + L.auth + ": " + p.authorizationCode, leftX + 4, y);
         y += 11;
       }
 
       if (p.cash && p.amountTendered > p.amountCaptured) {
         let change = p.amountTendered - p.amountCaptured;
-        doc.text("  Tendered: $" + formatCents(p.amountTendered) + "  Change: $" + formatCents(change), leftX + 4, y);
+        doc.text("  " + L.tendered + ": $" + formatCents(p.amountTendered) + "  " + L.change + ": $" + formatCents(change), leftX + 4, y);
         y += 11;
       }
     });
@@ -245,7 +278,7 @@ export function generateSaleReceiptPDF(data) {
     if (data.amountCaptured > 0) {
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
-      doc.text("Amount Paid: $" + formatCents(data.amountCaptured), leftX, y);
+      doc.text(L.amountPaid + ": $" + formatCents(data.amountCaptured), leftX, y);
       y += 14;
     }
 
@@ -259,13 +292,13 @@ export function generateSaleReceiptPDF(data) {
     y = checkPageBreak(doc, y, 30, margin);
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text("Notes for our customer:", leftX, y);
+    doc.text(L.notesHeader, leftX, y);
     y += 13;
 
     // Receipt notes grouped by item
     receiptNoteLines.forEach((line) => {
       y = checkPageBreak(doc, y, 20, margin);
-      let itemName = (line.itemName || "Item") + ":";
+      let itemName = (line.itemName || L.itemHeader) + ":";
       doc.setFontSize(8);
 
       // Item name — bold underline, wraps on its own line(s)

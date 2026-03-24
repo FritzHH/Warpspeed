@@ -38,7 +38,7 @@ export function MobileMessagesScreen() {
   const [sSending, _setSending] = useState(false);
   const scrollRef = useRef(null);
 
-  const customerPhone = zWorkorder?.customerPhone;
+  const customerPhone = zWorkorder?.customerCell;
   const customerFirst = zWorkorder?.customerFirst || "";
   const customerLast = zWorkorder?.customerLast || "";
   const customerID = zWorkorder?.customerID || "";

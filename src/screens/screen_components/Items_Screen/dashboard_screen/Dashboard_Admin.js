@@ -3318,8 +3318,9 @@ const WorkorderStatusesComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
 }) => {
-  const [sBackgroundColorWheelItem, _setBackgroundColorWheelItem] = useState();
-  const [sTextColorWheelItem, _setTextColorWheelItem] = useState();
+  const [sColorModalItem, _setColorModalItem] = useState(null);
+  const [sModalBgColor, _setModalBgColor] = useState("");
+  const [sModalTextColor, _setModalTextColor] = useState("");
   const [sEditableInputIdx, _setEditableInputIdx] = useState(null);
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
@@ -3375,6 +3376,7 @@ const WorkorderStatusesComponent = ({
                 proto.backgroundColor = gray(0.3);
                 proto.textColor = C.text;
                 proto.removable = true;
+                proto.requireWaitTime = false;
                 let newStatuses = [proto, ...zSettingsObj.statuses];
                 handleSettingsFieldChange("statuses", newStatuses);
               }}
@@ -3436,38 +3438,46 @@ const WorkorderStatusesComponent = ({
                       alignItems: "center",
                       flexDirection: "row",
                       flex: 1,
-                      height: 35,
+                      minHeight: 35,
                       borderRadius: 5,
                     }}
                   >
                     {!item.removable && (
                       <View style={{ width: "10%" }} />
                     )}
-                    <TextInput_
-                      style={{
-                        width: "100%",
-                        textAlign: "center",
-                        color: item.textColor,
-                        outlineWidth: 0,
-                        paddingVertical: 4,
-                        fontSize: 13,
-                        borderWidth: 1,
-                        borderColor:
-                          isEditing && item.removable
-                            ? gray(0.4)
-                            : "transparent",
-                      }}
-                      onChangeText={(val) => {
-                        let newStatuses = zSettingsObj.statuses.map((o) => {
-                          if (o.id === item.id) return { ...o, label: val };
-                          return o;
-                        });
-                        handleSettingsFieldChange("statuses", newStatuses);
-                      }}
-                      editable={isEditing && item.removable}
-                      autoFocus={isEditing}
-                      value={item.label}
-                    />
+                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                      <TextInput_
+                        style={{
+                          width: "100%",
+                          textAlign: "center",
+                          color: item.textColor,
+                          outlineWidth: 0,
+                          paddingVertical: 4,
+                          fontSize: 13,
+                          borderWidth: 1,
+                          borderColor:
+                            isEditing && item.removable
+                              ? gray(0.4)
+                              : "transparent",
+                        }}
+                        onChangeText={(val) => {
+                          let newStatuses = zSettingsObj.statuses.map((o) => {
+                            if (o.id === item.id) return { ...o, label: val };
+                            return o;
+                          });
+                          handleSettingsFieldChange("statuses", newStatuses);
+                        }}
+                        editable={isEditing && item.removable}
+                        autoFocus={isEditing}
+                        value={item.label}
+                      />
+                      {!!zSettingsObj?.waitTimeLinkedStatus?.[item.id] && (
+                        <Text style={{ color: item.textColor, fontSize: 10, textAlign: "center", marginTop: -2 }}>
+                          <Text style={{ fontStyle: "italic" }}>{"Wait time: "}</Text>
+                          {zSettingsObj.waitTimeLinkedStatus[item.id].label}
+                        </Text>
+                      )}
+                    </View>
                     {!item.removable && (
                       <View
                         style={{
@@ -3490,55 +3500,86 @@ const WorkorderStatusesComponent = ({
                       marginLeft: 10,
                     }}
                   >
-                    <BoxButton1
-                      style={{ paddingHorizontal: 5 }}
-                      iconSize={17}
-                      icon={isEditing ? ICONS.clickHere : ICONS.editPencil}
-                      onPress={() =>
-                        _setEditableInputIdx(
-                          isEditing ? null : idx
-                        )
-                      }
-                    />
-                    <BoxButton1
-                      style={{ paddingHorizontal: 5 }}
-                      iconSize={15}
-                      icon={ICONS.close1}
-                      onPress={() => {
-                        let newStatuses = zSettingsObj.statuses.filter(
-                          (o) => o.id != item.id
-                        );
-                        handleSettingsFieldChange("statuses", newStatuses);
-                      }}
-                    />
-                    <BoxButton1
-                      style={{ paddingHorizontal: 5 }}
-                      iconSize={23}
-                      icon={ICONS.colorWheel}
-                      onPress={() => {
-                        if (sBackgroundColorWheelItem?.id === item.id) {
-                          _setBackgroundColorWheelItem();
-                          _setTextColorWheelItem();
-                        } else {
-                          _setBackgroundColorWheelItem(item);
-                          _setTextColorWheelItem();
+                    <Tooltip text="Edit label" position="top">
+                      <BoxButton1
+                        style={{ paddingHorizontal: 5 }}
+                        iconSize={17}
+                        icon={isEditing ? ICONS.clickHere : ICONS.editPencil}
+                        onPress={() =>
+                          _setEditableInputIdx(
+                            isEditing ? null : idx
+                          )
                         }
-                      }}
-                    />
-                    <BoxButton1
-                      onPress={() => {
-                        if (sTextColorWheelItem?.id === item.id) {
-                          _setBackgroundColorWheelItem();
-                          _setTextColorWheelItem();
-                        } else {
-                          _setBackgroundColorWheelItem();
-                          _setTextColorWheelItem(item);
-                        }
-                      }}
-                      style={{ paddingHorizontal: 5 }}
-                      iconSize={22}
-                      icon={ICONS.letterT}
-                    />
+                      />
+                    </Tooltip>
+                    <Tooltip text="Delete status" position="top">
+                      <BoxButton1
+                        style={{ paddingHorizontal: 5 }}
+                        iconSize={15}
+                        icon={ICONS.close1}
+                        onPress={() => {
+                          let newStatuses = zSettingsObj.statuses.filter(
+                            (o) => o.id != item.id
+                          );
+                          handleSettingsFieldChange("statuses", newStatuses);
+                        }}
+                      />
+                    </Tooltip>
+                    <Tooltip text="Edit colors" position="top">
+                      <BoxButton1
+                        style={{ paddingHorizontal: 5 }}
+                        iconSize={23}
+                        icon={ICONS.colorWheel}
+                        onPress={() => {
+                          _setColorModalItem(item);
+                          _setModalBgColor(item.backgroundColor);
+                          _setModalTextColor(item.textColor);
+                        }}
+                      />
+                    </Tooltip>
+                    <Tooltip text="Link wait time" position="top">
+                      <DropdownMenu
+                        dataArr={[
+                          { id: "__none__", label: "No linked wait time" },
+                          ...(zSettingsObj?.waitTimes || []),
+                        ]}
+                        onSelect={(selected) => {
+                          let updated = { ...(zSettingsObj?.waitTimeLinkedStatus || {}) };
+                          if (selected.id === "__none__") {
+                            delete updated[item.id];
+                          } else {
+                            updated[item.id] = selected;
+                          }
+                          handleSettingsFieldChange("waitTimeLinkedStatus", updated);
+                        }}
+                        buttonIcon={ICONS.clock}
+                        buttonIconSize={18}
+                        buttonStyle={{
+                          backgroundColor: "transparent",
+                          borderWidth: 0,
+                          paddingHorizontal: 5,
+                          paddingVertical: 0,
+                        }}
+                        buttonText={""}
+                        modalCoordX={-120}
+                        modalCoordY={30}
+                        menuMaxHeight={300}
+                      />
+                    </Tooltip>
+                    <Tooltip text="Require wait time" position="top">
+                      <CheckBox_
+                        text=""
+                        isChecked={!!item.requireWaitTime}
+                        onCheck={() => {
+                          let newStatuses = zSettingsObj.statuses.map((o) => {
+                            if (o.id === item.id) return { ...o, requireWaitTime: !o.requireWaitTime };
+                            return o;
+                          });
+                          handleSettingsFieldChange("statuses", newStatuses);
+                        }}
+                        buttonStyle={{ marginLeft: 5 }}
+                      />
+                    </Tooltip>
                   </View>
                   {/* Drag direction indicators */}
                   {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
@@ -3564,58 +3605,115 @@ const WorkorderStatusesComponent = ({
                     />
                   )}
                 </div>
-                {/* Color wheel pickers */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    width: "100%",
-                    justifyContent: "flex-end",
-                    paddingRight: "5%",
-                  }}
-                >
-                  {sBackgroundColorWheelItem?.id === item.id && (
-                    <ColorWheel
-                      initialColor={item.backgroundColor}
-                      style={{ marginVertical: 7 }}
-                      onColorChange={(val) => {
-                        let back = val.hex;
-                        let text = bestForegroundHex(val.hex);
-                        let newStatuses = zSettingsObj.statuses.map((o) => {
-                          if (o.id === item.id)
-                            return {
-                              ...o,
-                              backgroundColor: back,
-                              textColor: text,
-                            };
-                          return o;
-                        });
-                        handleSettingsFieldChange("statuses", newStatuses);
-                      }}
-                    />
-                  )}
-                  {sTextColorWheelItem?.id === item.id && (
-                    <ColorWheel
-                      initialColor={item.textColor}
-                      style={{ marginVertical: 7 }}
-                      onColorChange={(val) => {
-                        let newStatuses = zSettingsObj.statuses.map((o) => {
-                          if (o.id === item.id)
-                            return {
-                              ...o,
-                              textColor: val.hex,
-                            };
-                          return o;
-                        });
-                        handleSettingsFieldChange("statuses", newStatuses);
-                      }}
-                    />
-                  )}
-                </View>
               </div>
             );
           })}
         </View>
       </BoxContainerInnerComponent>
+
+      {/* Color picker modal */}
+      {!!sColorModalItem && createPortal(
+        <View
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: C.backgroundListWhite,
+              borderRadius: 10,
+              padding: 30,
+              alignItems: "center",
+              maxWidth: 650,
+              width: "90%",
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 20 }}>
+              Edit Status Colors
+            </Text>
+
+            {/* Live preview */}
+            <View
+              style={{
+                backgroundColor: sModalBgColor,
+                borderRadius: 5,
+                paddingVertical: 10,
+                paddingHorizontal: 30,
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: 200,
+                marginBottom: 25,
+              }}
+            >
+              <Text style={{ color: sModalTextColor, fontSize: 14, fontWeight: "500" }}>
+                {sColorModalItem.label}
+              </Text>
+            </View>
+
+            {/* Two color wheels side by side */}
+            <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 30 }}>
+              <View style={{ alignItems: "center" }}>
+                <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
+                  Background Color
+                </Text>
+                <ColorWheel
+                  key={"bg-" + sColorModalItem.id}
+                  initialColor={sModalBgColor}
+                  onColorChange={(val) => {
+                    _setModalBgColor(val.hex);
+                    _setModalTextColor(bestForegroundHex(val.hex));
+                  }}
+                />
+              </View>
+              <View style={{ alignItems: "center" }}>
+                <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
+                  Text Color
+                </Text>
+                <ColorWheel
+                  key={"text-" + sColorModalItem.id}
+                  initialColor={sModalTextColor}
+                  onColorChange={(val) => {
+                    _setModalTextColor(val.hex);
+                  }}
+                />
+              </View>
+            </View>
+
+            {/* Action buttons */}
+            <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 25, gap: 15 }}>
+              <Button_
+                text="Save Changes"
+                colorGradientArr={COLOR_GRADIENTS.green}
+                onPress={() => {
+                  let newStatuses = zSettingsObj.statuses.map((o) => {
+                    if (o.id === sColorModalItem.id)
+                      return { ...o, backgroundColor: sModalBgColor, textColor: sModalTextColor };
+                    return o;
+                  });
+                  handleSettingsFieldChange("statuses", newStatuses);
+                  _setColorModalItem(null);
+                }}
+              />
+              <Button_
+                text="Exit (discard any changes)"
+                colorGradientArr={COLOR_GRADIENTS.grey}
+                onPress={() => _setColorModalItem(null)}
+              />
+            </View>
+          </View>
+        </View>,
+        document.body
+      )}
     </BoxContainerOuterComponent>
   );
 };
@@ -4870,8 +4968,8 @@ const ImportComponent = () => {
       const data = await loadAndCacheLightspeedData();
       const digits = sCustLookup.trim().replace(/\D/g, "");
       const cust = data.customers.find(c => {
-        const cellDigits = c.cell.replace(/\D/g, "");
-        const landlineDigits = c.landline.replace(/\D/g, "");
+        const cellDigits = c.customerCell.replace(/\D/g, "");
+        const landlineDigits = c.customerLandline.replace(/\D/g, "");
         return cellDigits === digits || landlineDigits === digits;
       });
       if (cust) {

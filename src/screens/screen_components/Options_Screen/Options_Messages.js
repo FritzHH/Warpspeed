@@ -55,6 +55,7 @@ import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
 import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice } from "../../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
+import { sendSaleReceipt } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 
 const TEXT_TEMPLATE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
@@ -75,7 +76,7 @@ export function MessagesComponent({}) {
     state.workorders.find((o) => o.id === state.openWorkorderID) || null
   );
   const zCustomer = zWorkorderObj?.customerID
-    ? { id: zWorkorderObj.customerID, first: zWorkorderObj.customerFirst, last: zWorkorderObj.customerLast, cell: zWorkorderObj.customerPhone }
+    ? { id: zWorkorderObj.customerID, first: zWorkorderObj.customerFirst, last: zWorkorderObj.customerLast, customerCell: zWorkorderObj.customerCell }
     : CUSTOMER_PROTO;
   const zSettings = useSettingsStore((state) => state.settings);
   const zIncomingMessagesArr = useCustMessagesStore(
@@ -199,7 +200,7 @@ export function MessagesComponent({}) {
       let msg = { ...SMS_PROTO };
       msg.message = text || "";
       msg.imageUrl = imageUrl;
-      msg.phoneNumber = zCustomer.cell;
+      msg.phoneNumber = zCustomer.customerCell;
       msg.firstName = zCustomer.first;
       msg.lastName = zCustomer.last;
       msg.canRespond = sCanRespond ? new Date().getTime() : null;
@@ -267,7 +268,7 @@ export function MessagesComponent({}) {
       .replace(/\{storePhone\}/g, ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || ""));
   }
   async function handleSendWorkorderTicket() {
-    if (!zWorkorderObj || !zCustomer?.cell) return;
+    if (!zWorkorderObj || !zCustomer?.customerCell) return;
     useLoginStore.getState().requireLogin(async () => {
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
       let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, zSettings?.salesTaxPercent);
@@ -281,7 +282,7 @@ export function MessagesComponent({}) {
         base64,
         storagePath,
         message,
-        phoneNumber: zCustomer.cell,
+        phoneNumber: zCustomer.customerCell,
         customerID: zCustomer.id,
         messageID,
       });
@@ -300,42 +301,22 @@ export function MessagesComponent({}) {
     });
   }
 
-  async function handleSendSaleReceipt() {
-    if (!zWorkorderObj || !zCustomer?.cell) return;
-    useLoginStore.getState().requireLogin(async () => {
-      let { tenantID, storeID } = useSettingsStore.getState().getSettings();
-      let sale = zWorkorderObj;
-      let receiptData = printBuilder.sale(sale, sale.payments || [], zCustomer, zWorkorderObj, zSettings?.salesTaxPercent);
-      let { generateSaleReceiptPDF } = await import("../../../pdfGenerator");
-      let base64 = generateSaleReceiptPDF(receiptData);
-      let storagePath = build_db_path.cloudStorage.saleReceiptPDF(zWorkorderObj.id, tenantID, storeID);
-      let messageTemplate = zSettings?.saleReceiptMessage || "Hi {firstName}, here is your receipt: {link}";
-      let message = resolveTemplate(messageTemplate);
-      let messageID = generateRandomID();
-      let result = await dbUploadPDFAndSendSMS({
-        base64,
-        storagePath,
-        message,
-        phoneNumber: zCustomer.cell,
-        customerID: zCustomer.id,
-        messageID,
-      });
-      if (result && result.success) {
-        sendMessage(message.replace(/\{link\}/g, "[PDF link]"));
-      } else {
-        useAlertScreenStore.getState().setValues({
-          title: "Receipt Send Failed",
-          message: result?.error || "Failed to upload and send receipt",
-          btn1Text: "OK",
-          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-          showAlert: true,
-          canExitOnOuterClick: true,
-        });
-      }
+  function handleSendSaleReceipt() {
+    if (!zWorkorderObj || !zCustomer?.customerCell) return;
+    useLoginStore.getState().requireLogin(() => {
+      const settings = useSettingsStore.getState().getSettings();
+      const customer = {
+        first: zWorkorderObj.customerFirst || "",
+        last: zWorkorderObj.customerLast || "",
+        customerCell: zWorkorderObj.customerPhone || "",
+        email: zWorkorderObj.customerEmail || "",
+        id: zWorkorderObj.customerID || "",
+      };
+      sendSaleReceipt(zWorkorderObj, customer, zWorkorderObj, settings);
     });
   }
   async function handleSendSMSPayment() {
-    if (!zWorkorderObj || !zCustomer?.cell) return;
+    if (!zWorkorderObj || !zCustomer?.customerCell) return;
     if (!zWorkorderObj.workorderLines || zWorkorderObj.workorderLines.length === 0) {
       useAlertScreenStore.getState().setValues({
         title: "No Line Items",
@@ -375,7 +356,7 @@ export function MessagesComponent({}) {
       let displayAmount = "$" + (amountDue / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       useAlertScreenStore.getState().setValues({
         title: "Send SMS Payment",
-        message: "Send a payment link for " + displayAmount + " to " + zCustomer.first + " at " + zCustomer.cell + "?",
+        message: "Send a payment link for " + displayAmount + " to " + zCustomer.first + " at " + zCustomer.customerCell + "?",
         btn1Text: "Send",
         btn2Text: "Cancel",
         handleBtn1Press: async () => {
@@ -450,7 +431,7 @@ export function MessagesComponent({}) {
             >
               {!zCustomer?.id
                 ? "Select a customer to message"
-                : zCustomer?.cell
+                : zCustomer?.customerCell
                 ? "No messages to/from this cell phone #"
                 : "No cell phone on account\n\nText messaging deactivated"}
             </Text>
@@ -479,7 +460,7 @@ export function MessagesComponent({}) {
           />
         )}
       </View>
-      {!zCustomer?.cell ? (
+      {!zCustomer?.customerCell ? (
         <View style={{ width: "100%", height: '100%' }}></View>
       ) : (
         <View
@@ -605,21 +586,21 @@ export function MessagesComponent({}) {
                 <Button_
                   onPress={handleSendWorkorderTicket}
                   text={"Send Workorder"}
-                  enabled={!!zWorkorderObj && !!zCustomer?.cell}
+                  enabled={!!zWorkorderObj && !!zCustomer?.customerCell}
                   colorGradientArr={COLOR_GRADIENTS.green}
                   buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
                 />
                 <Button_
                   onPress={handleSendSaleReceipt}
                   text={"Send Receipt"}
-                  enabled={!!zWorkorderObj && !!zCustomer?.cell}
+                  enabled={!!zWorkorderObj && !!zCustomer?.customerCell}
                   colorGradientArr={COLOR_GRADIENTS.green}
                   buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
                 />
                 <Button_
                   onPress={handleSendSMSPayment}
                   text={"Send SMS Payment"}
-                  enabled={!!zWorkorderObj && !!zCustomer?.cell && !zWorkorderObj.paymentComplete && !zWorkorderObj.activeSaleID}
+                  enabled={!!zWorkorderObj && !!zCustomer?.customerCell && !zWorkorderObj.paymentComplete && !zWorkorderObj.activeSaleID}
                   colorGradientArr={COLOR_GRADIENTS.blue}
                   buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
                 />

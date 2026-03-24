@@ -123,10 +123,10 @@ export const MiddleItemComponent = ({
                 }}
               />
               <View>
-                {!!zCustomer?.cell && (
+                {!!zCustomer?.customerCell && (
                   <Text style={{ color: C.text }}>
                     <Text>{"cell: "}</Text>
-                    {formatPhoneWithDashes(zCustomer?.cell)}
+                    {formatPhoneWithDashes(zCustomer?.customerCell)}
                   </Text>
                 )}
                 {!!zCustomer?.land && (

@@ -46,7 +46,7 @@ export const WorkorderMediaModal = ({
   const zWorkorder = useOpenWorkordersStore.getState().workorders.find((w) => w.id === workorderID) || {};
   const zSettings = useSettingsStore.getState().settings;
   const storeName = zSettings?.storeInfo?.displayName || "Our store";
-  const hasCell = !!zWorkorder.customerPhone?.length;
+  const hasCell = !!zWorkorder.customerCell?.length;
   const hasEmail = !!zWorkorder.customerEmail?.length;
 
   function toggleSelection(itemId) {
@@ -83,7 +83,7 @@ export const WorkorderMediaModal = ({
     if (hasCell) {
       let msg = cloneDeep(SMS_PROTO);
       msg.message = messageText;
-      msg.phoneNumber = zWorkorder.customerPhone;
+      msg.phoneNumber = zWorkorder.customerCell;
       msg.firstName = zWorkorder.customerFirst || "";
       msg.lastName = zWorkorder.customerLast || "";
       msg.canRespond = new Date().getTime();

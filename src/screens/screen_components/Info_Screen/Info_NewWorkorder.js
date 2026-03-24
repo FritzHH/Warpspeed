@@ -13,7 +13,7 @@ import {
   extractRandomFiveDigits,
 } from "../../../utils";
 import { ScreenModal, Button_, PhoneNumberInput, Tooltip } from "../../../components";
-import { CUSTOMER_PROTO, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
+import { CUSTOMER_PROTO, SETTINGS_OBJ, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { cloneDeep } from "lodash";
 import {
@@ -48,8 +48,10 @@ export function NewWorkorderComponent({}) {
   }, [sTextInput]);
   // dev ///////////////////////////////////
 
+  const zIsSearching = useCustomerSearchStore((s) => s.isSearching);
+
   useEffect(() => {
-    if (zCustomerSearchResults.length > 0) {
+    if (zCustomerSearchResults.length > 0 || zIsSearching) {
       useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.customerList);
     } else {
       // Only clear to empty if items tab is currently showing customerList
@@ -59,18 +61,19 @@ export function NewWorkorderComponent({}) {
         useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
       }
     }
-  }, [zCustomerSearchResults]);
+  }, [zCustomerSearchResults, zIsSearching]);
 
   // Update button visibility when dependencies change
   useEffect(() => {
+    const rawDigits = removeDashesFromPhone(sTextInput);
     const shouldShow =
       (sSearchFieldName === "phone" &&
-        sTextInput.length === 10 &&
+        rawDigits.length === 10 &&
         zCustomerSearchResults.length === 0) ||
       (sSearchFieldName !== "phone" && sTextInput.length >= 3);
 
     setButtonVisible(shouldShow);
-  }, [sSearchFieldName, sTextInput.length, zCustomerSearchResults.length]);
+  }, [sSearchFieldName, sTextInput, zCustomerSearchResults.length]);
 
   async function handleTextChange(incomingText = "") {
     // log(incomingText);
@@ -101,8 +104,10 @@ export function NewWorkorderComponent({}) {
       const primaryType = options.includes("phone") ? "phone" : options.includes("email") ? "email" : "name";
       useCustomerSearchStore.getState().setSearchQuery(displayQuery || searchStrings.join(" "), primaryType);
 
-      // Debounce the actual DB calls (300ms)
+      // Clear old results immediately so loading indicator shows right away
+      useCustomerSearchStore.getState().setSearchResults([]);
       useCustomerSearchStore.getState().setIsSearching(true);
+      // Debounce the actual DB calls (300ms)
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       searchTimerRef.current = setTimeout(() => {
         let pending = funs.length;
@@ -136,25 +141,27 @@ export function NewWorkorderComponent({}) {
         searchStr = rawText;
         _setTextInput(formatPhoneWithDashes(searchStr));
       }
-      searchFun([searchStr], ["phone"]);
+      if (rawText.length >= 7) searchFun([searchStr], ["phone"]);
       return;
     } else if (
       isNumeric &&
       incomingText.includes("-") &&
       rawText.length === 6
     ) {
-      // log(Math.random());
       let searchStr = rawText;
       if (sTextInput.length === 8) {
         // there was a dash, user deleted it so remove the number preceding the dash
         searchStr = rawText.substring(0, 5);
       }
       _setTextInput(formatPhoneWithDashes(searchStr));
-      // run search here on phone numbers
-      searchFun([searchStr], ["phone"]);
+      if (rawText.length >= 7) searchFun([searchStr], ["phone"]);
       return;
     } else if (isNumeric && rawText.length > 10) {
       // do nothing, search ran on the last round and do not enter the new
+      return;
+    } else if (isNumeric) {
+      _setTextInput(formatPhoneWithDashes(rawText));
+      if (rawText.length >= 7) searchFun([rawText], ["phone"]);
       return;
     }
 
@@ -180,7 +187,7 @@ export function NewWorkorderComponent({}) {
   function handleCreateCustomerBtnPressed() {
     let custInfo = cloneDeep(CUSTOMER_PROTO);
     if (sSearchFieldName === "phone") {
-      custInfo.cell = sTextInput;
+      custInfo.customerCell = removeDashesFromPhone(sTextInput);
     } else {
       if (sTextInput.includes("@")) {
         custInfo.email = sTextInput;
@@ -238,10 +245,10 @@ export function NewWorkorderComponent({}) {
     _setCustomerInfo(null);
   }
 
-  function handleCreateNewCustomerPressed() {
+  function handleCreateNewCustomerPressed(customerInfoFromModal) {
     useLoginStore.getState().requireLogin(() => {
-      // first create new customer
-      let newCustomer = cloneDeep(sCustomerInfo);
+      // first create new customer — use the modal's updated state, not the stale local copy
+      let newCustomer = cloneDeep(customerInfoFromModal || sCustomerInfo);
       newCustomer.id = generateUPCBarcode();
       newCustomer.millisCreated = new Date().getTime();
 
@@ -250,12 +257,12 @@ export function NewWorkorderComponent({}) {
         customerID: newCustomer.id,
         customerFirst: newCustomer.first,
         customerLast: newCustomer.last,
-        customerPhone: newCustomer.cell || newCustomer.landline,
-        customerLandline: newCustomer.landline,
+        customerCell: newCustomer.customerCell || newCustomer.customerLandline,
+        customerLandline: newCustomer.customerLandline,
         customerEmail: newCustomer.email,
         customerContactRestriction: newCustomer.contactRestriction,
-        startedByFirst: useLoginStore.getCurrentUser().first,
-        startedByLast: useLoginStore.getCurrentUser().last,
+        startedByFirst: useLoginStore.getState().getCurrentUser().first,
+        startedByLast: useLoginStore.getState().getCurrentUser().last,
         status: SETTINGS_OBJ.statuses[0]?.id || "",
       });
 
@@ -279,7 +286,7 @@ export function NewWorkorderComponent({}) {
   return (
     <View
       ref={containerRef}
-      onMouseEnter={() => {
+      onClick={() => {
         let input = containerRef.current?.querySelector("input");
         if (input) input.focus();
       }}
@@ -329,9 +336,9 @@ export function NewWorkorderComponent({}) {
               color: C.text,
               borderBottomWidth: 1,
               borderColor: gray(0.2),
-              width: 300,
+              width: "80%",
               height: 37,
-              outlineWidth: 0,
+              outlineStyle: "none",
               fontSize: 18,
               alignSelf: "center",
             }}
@@ -391,6 +398,7 @@ export function NewWorkorderComponent({}) {
         </View>
       </View>
       <View
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           alignItems: "flex-end",

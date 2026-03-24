@@ -135,7 +135,7 @@ export function MobileWorkorderDetailScreen() {
             " " +
             capitalizeFirstLetterOfString(zWorkorder.customerLast)}
         </Text>
-        {!!zWorkorder.customerPhone && (
+        {!!zWorkorder.customerCell && (
           <View
             style={{
               flexDirection: "row",
@@ -149,7 +149,7 @@ export function MobileWorkorderDetailScreen() {
               style={{ marginRight: 6 }}
             />
             <Text style={{ color: C.text, fontSize: 14 }}>
-              {formatPhoneWithDashes(zWorkorder.customerPhone)}
+              {formatPhoneWithDashes(zWorkorder.customerCell)}
             </Text>
           </View>
         )}

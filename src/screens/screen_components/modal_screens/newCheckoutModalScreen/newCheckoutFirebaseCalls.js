@@ -372,7 +372,7 @@ export async function saveSaleIndex(sale, customerInfo, workorderLines, isStanda
     indexDoc.millis = Number(sale.millis) || Date.now();
     indexDoc.customerFirst = customerInfo?.first || "";
     indexDoc.customerLast = customerInfo?.last || "";
-    indexDoc.customerPhone = customerInfo?.phone || "";
+    indexDoc.customerCell = customerInfo?.phone || "";
     indexDoc.customerID = customerInfo?.id || "";
     indexDoc.total = sale.total || 0;
     indexDoc.subtotal = sale.subtotal || 0;
@@ -420,7 +420,7 @@ export async function saveRefundIndex(sale, refund, customerInfo) {
     indexDoc.millis = Number(refund.millis) || Date.now();
     indexDoc.customerFirst = customerInfo?.first || "";
     indexDoc.customerLast = customerInfo?.last || "";
-    indexDoc.customerPhone = customerInfo?.phone || "";
+    indexDoc.customerCell = customerInfo?.phone || "";
     indexDoc.customerID = customerInfo?.id || "";
     indexDoc.total = 0;
     indexDoc.subtotal = 0;

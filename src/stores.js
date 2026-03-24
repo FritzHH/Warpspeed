@@ -64,7 +64,7 @@ export const useLayoutStore = create((set, get) => ({
 
 export const useTabNamesStore = create((set, get) => ({
   infoTabName: TAB_NAMES.infoTab.customer,
-  itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+  itemsTabName: TAB_NAMES.itemsTab.empty,
   optionsTabName: TAB_NAMES.optionsTab.workorders,
 
   getItemsTabName: () => get().itemsTabName,
@@ -808,8 +808,8 @@ export function broadcastWorkorderToDisplay(wo) {
     customer: {
       first: wo.customerFirst || "",
       last: wo.customerLast || "",
-      cell: wo.customerPhone || "",
-      landline: wo.customerLandline || "",
+      customerCell: wo.customerCell || "",
+      customerLandline: wo.customerLandline || "",
       email: wo.customerEmail || "",
     },
     totals: {
@@ -956,6 +956,7 @@ function appendToChangeLog(workorder, fieldName, oldVal, newVal) {
 
 export const useOpenWorkordersStore = create((set, get) => ({
   workorders: [],
+  workordersLoaded: false,
   openWorkorder: null,
   openWorkorderID: null,
   workorderPreviewID: null,
@@ -982,8 +983,12 @@ export const useOpenWorkordersStore = create((set, get) => ({
     }
   },
   setOpenWorkorders: (workorders) => {
-    let localOnly = get().workorders.filter((wo) => wo.isStandaloneSale);
-    set({ workorders: [...workorders, ...localOnly] });
+    let incomingIDs = new Set(workorders.map((wo) => wo.id));
+    // Keep local-only workorders that haven't made it to DB yet
+    let localOnly = get().workorders.filter(
+      (wo) => (wo.isStandaloneSale || wo._unsaved) && !incomingIDs.has(wo.id)
+    );
+    set({ workorders: [...workorders, ...localOnly], workordersLoaded: true });
   },
   setWorkorder: (wo, saveToDB = true, batch = true) => {
     if (wo.isStandaloneSale) wo = { ...wo, lastInteractionMillis: Date.now() };
@@ -1003,10 +1008,19 @@ export const useOpenWorkordersStore = create((set, get) => ({
       workorder.changeLog = [...(workorder.changeLog || []), ...logEntries];
     }
     if (workorder.isStandaloneSale) workorder.lastInteractionMillis = Date.now();
+    let wasUnsaved = workorder._unsaved;
     if (workorder._unsaved) delete workorder._unsaved;
 
     set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
-    if (saveToDB && !workorder.isStandaloneSale) debouncedSaveWorkorder(workorder);
+    if (saveToDB && !workorder.isStandaloneSale) {
+      if (wasUnsaved) {
+        // First save — write immediately so Firestore listener includes it
+        // before the debounce window allows setOpenWorkorders to wipe it
+        dbSaveOpenWorkorder(workorder);
+      } else {
+        debouncedSaveWorkorder(workorder);
+      }
+    }
     if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
   },
 

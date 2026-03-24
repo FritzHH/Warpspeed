@@ -29,7 +29,7 @@ import {
   createNewSale,
   updateSaleWithTotals,
   calculateSaleTotals,
-  sendAutoSaleReceipt,
+  sendSaleReceipt,
 } from "./newCheckoutUtils";
 import {
   newCheckoutSaveActiveSale,
@@ -374,23 +374,43 @@ export function NewCheckoutModalScreen() {
     const customerInfo = {
       first: primaryWO?.customerFirst || "",
       last: primaryWO?.customerLast || "",
-      phone: primaryWO?.customerPhone || "",
+      phone: primaryWO?.customerCell || "",
       id: primaryWO?.customerID || "",
     };
     const allLines = sCombinedWorkorders.flatMap((wo) => wo.workorderLines || []);
     const isStandalone = primaryWO?.isStandaloneSale || false;
     saveSaleIndex(sale, customerInfo, allLines, isStandalone);
 
-    // Auto-send receipt via SMS/email
+    // Receipt actions based on settings
     const settings = useSettingsStore.getState().getSettings();
     const customerForReceipt = {
       first: primaryWO?.customerFirst || "",
       last: primaryWO?.customerLast || "",
-      cell: primaryWO?.customerPhone || "",
+      customerCell: primaryWO?.customerCell || "",
       email: primaryWO?.customerEmail || "",
       id: primaryWO?.customerID || "",
     };
-    sendAutoSaleReceipt(sale, customerForReceipt, settings);
+    const printerID = settings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
+
+    // Always pop cash register if cash change is needed
+    const hasCashChange = (sale.payments || []).some(
+      (p) => p.cash && p.amountTendered > p.amountCaptured
+    );
+    if (hasCashChange) {
+      dbSavePrintObj({ popCashRegister: true }, printerID);
+    }
+
+    // Print sale receipt
+    if (settings?.autoPrintSalesReceipt) {
+      let toPrint = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent);
+      dbSavePrintObj(toPrint, printerID);
+    }
+
+    // SMS/Email — sendSaleReceipt checks settings internally, but skip the call
+    // entirely if the customer has neither a phone number nor an email
+    if (customerForReceipt.customerCell || customerForReceipt.email) {
+      sendSaleReceipt(sale, customerForReceipt, primaryWO, settings);
+    }
   }
 
   function handleCashChange(change) {
@@ -442,15 +462,23 @@ export function NewCheckoutModalScreen() {
 
   function handleReprint() {
     if (!sSale) return;
+    const primaryWO = sCombinedWorkorders[0];
+    const customer = {
+      first: primaryWO?.customerFirst || "",
+      last: primaryWO?.customerLast || "",
+      customerCell: primaryWO?.customerCell || "",
+      email: primaryWO?.customerEmail || "",
+      id: primaryWO?.customerID || "",
+    };
     let toPrint = printBuilder.sale(
       sSale,
       sSale.payments,
-      zCustomer,
-      sCombinedWorkorders[0],
+      customer,
+      primaryWO,
       zSettings?.salesTaxPercent
     );
-    // dbSavePrintObj would be called here if printing is needed
-    log("Reprint receipt:", toPrint);
+    const printerID = zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
+    dbSavePrintObj(toPrint, printerID);
   }
 
   function handlePopRegister() {
@@ -606,10 +634,10 @@ export function NewCheckoutModalScreen() {
                           )}
                         </View>
                         <View>
-                          {!!zCustomer.cell && (
+                          {!!zCustomer.customerCell && (
                             <Text style={{ color: C.text }}>
                               <Text>{"cell: "}</Text>
-                              {formatPhoneForDisplay(zCustomer.cell)}
+                              {formatPhoneForDisplay(zCustomer.customerCell)}
                             </Text>
                           )}
                           {!!zCustomer.land && (

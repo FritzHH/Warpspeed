@@ -13,6 +13,7 @@ import {
 import {
   Button,
   Button_,
+  Image_,
   ScreenModal,
   SmallLoadingIndicator,
   TouchableOpacity_,
@@ -43,8 +44,8 @@ export function CustomerSearchListComponent({}) {
       const digits = zSearchQuery.replace(/\D/g, "");
       if (!digits) return zSearchResults;
       return zSearchResults.filter((c) => {
-        const cellDigits = (c.cell || "").replace(/\D/g, "");
-        const landDigits = (c.landline || c.land || "").replace(/\D/g, "");
+        const cellDigits = (c.customerCell || "").replace(/\D/g, "");
+        const landDigits = (c.customerLandline || c.land || "").replace(/\D/g, "");
         return cellDigits.includes(digits) || landDigits.includes(digits);
       });
     } else if (zSearchType === "email") {
@@ -71,8 +72,8 @@ export function CustomerSearchListComponent({}) {
         customerID: customer.id,
         customerFirst: customer.first,
         customerLast: customer.last,
-        customerPhone: customer.cell || customer.landline,
-        customerLandline: customer.landline,
+        customerCell: customer.customerCell || customer.customerLandline,
+        customerLandline: customer.customerLandline,
         customerEmail: customer.email,
         customerContactRestriction: customer.contactRestriction,
         startedByFirst: useLoginStore.getState().currentUser?.first,
@@ -104,6 +105,10 @@ export function CustomerSearchListComponent({}) {
         paddingHorizontal: 10,
       }}
     >
+      <Image_
+        icon={require('../../../resources/bblogo_trans_high.png')}
+        style={{ opacity: 0.1, width: "90%", height: "90%", position: "absolute", alignSelf: "center" }}
+      />
       <FlatList
         style={{
           width: "100%",
@@ -120,7 +125,7 @@ export function CustomerSearchListComponent({}) {
         ListEmptyComponent={() => (
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>
             {zIsSearching ? (
-              <SmallLoadingIndicator />
+              <SmallLoadingIndicator message="Searching customers...." size={40} textStyle={{ fontSize: 16 }} />
             ) : (
               <Text style={{ color: gray(0.4), fontSize: 14 }}>No customers found</Text>
             )}
@@ -131,17 +136,13 @@ export function CustomerSearchListComponent({}) {
           return (
             <View
               style={{
-                paddingVertical: 7,
                 flexDirection: "row",
                 width: "100%",
-                paddingHorizontal: 7,
-                borderWidth: 1,
-                borderColor: C.listItemBorder,
-                backgroundColor: C.backgroundListWhite,
-                borderLeftWidth: 3,
-                borderLeftColor: C.buttonLightGreenOutline,
-                borderRadius: 10,
-                marginBottom: 5,
+                height: 60,
+                paddingHorizontal: 10,
+                backgroundColor: "transparent",
+                borderBottomWidth: 1,
+                borderColor: gray(0.1),
               }}
             >
               <View
@@ -177,16 +178,16 @@ export function CustomerSearchListComponent({}) {
                       {"cell:  "}
                     </Text>
                     <Text style={{ color: C.text, fontSize: 14 }}>
-                      {formatPhoneForDisplay(customer?.cell)}
+                      {formatPhoneForDisplay(customer?.customerCell)}
                     </Text>
-                    {!!customer?.land && (
+                    {!!(customer?.customerLandline || customer?.land) && (
                       <Text
                         style={{ color: C.text, marginLeft: 30, fontSize: 14 }}
                       >
                         <Text style={{ color: gray(0.35), fontSize: 12 }}>
                           {"landline:  "}
                         </Text>
-                        {customer?.land}
+                        {customer?.customerLandline || customer?.land}
                       </Text>
                     )}
                     {!!customer?.email && (

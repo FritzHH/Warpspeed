@@ -67,8 +67,8 @@ export const ActiveWorkorderComponent = ({}) => {
   const zCustomer = {
     first: zOpenWorkorder?.customerFirst || "",
     last: zOpenWorkorder?.customerLast || "",
-    cell: zOpenWorkorder?.customerPhone || "",
-    landline: zOpenWorkorder?.customerLandline || "",
+    customerCell: zOpenWorkorder?.customerCell || "",
+    customerLandline: zOpenWorkorder?.customerLandline || "",
     email: zOpenWorkorder?.customerEmail || "",
     contactRestriction: zOpenWorkorder?.customerContactRestriction || "",
   };
@@ -79,6 +79,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowCustomerInfoScreen, _setShowCustomerInfoScreen] =
     React.useState(false);
   const [sShowMediaModal, _setShowMediaModal] = useState(null); // null | "upload" | "view"
+  const [sWaitTimeBlink, _setWaitTimeBlink] = useState(false);
   const uploadInputRef = useRef(null);
 
   // Estimated wait days — local state for instant UI, debounced DB write
@@ -94,13 +95,31 @@ export const ActiveWorkorderComponent = ({}) => {
     _setWaitDays(days);
   }, [zOpenWorkorder?.id]);
 
+  // Blink wait time input when status requires wait time but none is selected
+  useEffect(() => {
+    let statusObj = (zSettings?.statuses || []).find((s) => s.id === zOpenWorkorder?.status);
+    let waitLabel = zOpenWorkorder?.waitTime?.label || "";
+    let needsBlink = statusObj?.requireWaitTime && waitLabel.length <= 3;
+    if (!needsBlink) {
+      _setWaitTimeBlink(false);
+      return;
+    }
+    _setWaitTimeBlink(true);
+    let interval = setInterval(() => {
+      _setWaitTimeBlink((prev) => !prev);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [zOpenWorkorder?.status, zOpenWorkorder?.waitTime?.label, zSettings?.statuses]);
+
   function updateWaitDays(newDays) {
     _setWaitDays(newDays);
     clearTimeout(waitDaysTimerRef.current);
+    const woID = zOpenWorkorder?.id;
+    if (!woID) return;
     waitDaysTimerRef.current = setTimeout(() => {
       let now = Date.now();
-      useOpenWorkordersStore.getState().setField("partOrderedMillis", now, zOpenWorkorder.id, false);
-      useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), zOpenWorkorder.id);
+      useOpenWorkordersStore.getState().setField("partOrderedMillis", now, woID, false);
+      useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), woID);
     }, 700);
   }
 
@@ -223,8 +242,8 @@ export const ActiveWorkorderComponent = ({}) => {
       );
       wo.customerFirst = customer.first;
       wo.customerLast = customer.last;
-      wo.customerPhone = customer.cell || customer.landline;
-      wo.customerLandline = customer.landline || "";
+      wo.customerCell = customer.customerCell || customer.customerLandline;
+      wo.customerLandline = customer.customerLandline || "";
       wo.customerEmail = customer.email || "";
       wo.customerContactRestriction = customer.contactRestriction || "";
       wo.id = generateUPCBarcode();
@@ -247,47 +266,29 @@ export const ActiveWorkorderComponent = ({}) => {
 
   function handleIntakePrintPress() {
     const settings = useSettingsStore.getState().getSettings();
-    const customer = {
-      first: zOpenWorkorder?.customerFirst || "",
-      last: zOpenWorkorder?.customerLast || "",
-      cell: zOpenWorkorder?.customerPhone || "",
-      email: zOpenWorkorder?.customerEmail || "",
-      id: zOpenWorkorder?.customerID || "",
-    };
 
-    // Always print
-    let toPrint = printBuilder.intake(
-      zOpenWorkorder,
-      zCustomer,
-      settings?.salesTaxPercent
-    );
-    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Star MCP31");
+    // Print
+    if (settings?.autoPrintIntakeReceipt !== false) {
+      let toPrint = printBuilder.intake(
+        zOpenWorkorder,
+        zCustomer,
+        settings?.salesTaxPercent
+      );
+      dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Star MCP31");
+    }
 
-    // Optionally send SMS/email
-    const willSMS = settings?.autoSMSIntakeReceipt && customer?.cell;
-    const willEmail = settings?.autoEmailIntakeReceipt && customer?.email;
+    // SMS — only if enabled in settings and customer has a phone number
+    if (settings?.autoSMSIntakeReceipt && zCustomer.customerCell) {
+      sendIntakeReceipt(settings, zCustomer, zOpenWorkorder, "sms");
+    }
 
-    if (!willSMS && !willEmail) return;
-
-    let channels = [];
-    if (willSMS) channels.push("SMS");
-    if (willEmail) channels.push("email");
-    const channelText = channels.join(" and ");
-
-    useAlertScreenStore.getState().setValues({
-      title: "SEND INTAKE RECEIPT",
-      message: "This will " + channelText + " the Intake Receipt to the customer. Are you sure?",
-      btn1Text: "SEND",
-      btn2Text: "CANCEL",
-      handleBtn1Press: () => {
-        sendIntakeReceipt(settings, customer, zOpenWorkorder);
-      },
-      handleBtn2Press: () => {},
-      showAlert: true,
-    });
+    // Email — only if enabled in settings and customer has an email
+    if (settings?.autoEmailIntakeReceipt && zCustomer.email) {
+      sendIntakeReceipt(settings, zCustomer, zOpenWorkorder, "email");
+    }
   }
 
-  function sendIntakeReceipt(settings, customer, workorder) {
+  function sendIntakeReceipt(settings, customer, workorder, channel) {
     const firstName = customer?.first || "Customer";
     const storeName = settings?.storeName || "our store";
     const brand = workorder?.brand || "";
@@ -302,22 +303,22 @@ export const ActiveWorkorderComponent = ({}) => {
       return result;
     }
 
-    if (settings.autoSMSIntakeReceipt && customer?.cell) {
+    if (channel === "sms") {
       const msg = applyTemplate(
         settings.intakeReceiptMessage || "Hi {firstName}, your intake receipt for your {brand} {description} is ready. Thank you for choosing {storeName}!",
         vars
       );
       dbSendSMS({
         message: msg,
-        phoneNumber: customer.cell,
-        customerID: customer.id || "",
+        phoneNumber: customer.customerCell,
+        customerID: workorder?.customerID || "",
         id: generateRandomID(),
         canRespond: false,
       });
-      log("Sent intake receipt SMS to", customer.cell);
+      log("Sent intake receipt SMS to", customer.customerCell);
     }
 
-    if (settings.autoEmailIntakeReceipt && customer?.email) {
+    if (channel === "email") {
       const subject = applyTemplate(
         settings.intakeReceiptEmailSubject || "Your intake receipt from {storeName}",
         vars
@@ -399,7 +400,7 @@ export const ActiveWorkorderComponent = ({}) => {
               width: "95%",
             }}
           >
-            {(zCustomer?.cell?.length > 0 || zOpenWorkorder?.customerPhone?.length > 0) && (
+            {(zCustomer?.customerCell?.length > 0 || zOpenWorkorder?.customerCell?.length > 0) && (
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Image_
                   icon={ICONS.cellPhone}
@@ -407,11 +408,11 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{ marginRight: 5 }}
                 />
                 <Text style={{ color: C.text, fontSize: 12 }}>
-                  {formatPhoneWithDashes(zCustomer?.cell || zOpenWorkorder?.customerPhone)}
+                  {formatPhoneWithDashes(zCustomer?.customerCell || zOpenWorkorder?.customerCell)}
                 </Text>
               </View>
             )}
-            {!zCustomer?.landline.length > 0 && (
+            {!zCustomer?.customerLandline.length > 0 && (
               <View
                 style={{
                   flexDirection: "row",
@@ -425,7 +426,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{ marginRight: 7 }}
                 />
                 <Text style={{ color: C.text, fontSize: 12 }}>
-                  {/* {formatPhoneWithDashes(zCustomer.landline)} */}
+                  {/* {formatPhoneWithDashes(zCustomer.customerLandline)} */}
                   {formatPhoneWithDashes(2343234323)}
                 </Text>
               </View>
@@ -728,6 +729,37 @@ export const ActiveWorkorderComponent = ({}) => {
                 </View>
               </View>
             </View>
+            {(() => {
+              const rs = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses);
+              return (
+                <StatusPickerModal
+                  statuses={zSettings.statuses}
+                  enabled={!isDonePaid}
+                  onSelect={(val) => {
+                    const store = useOpenWorkordersStore.getState();
+                    store.setField("status", val.id, zOpenWorkorder.id);
+                    // Auto-populate linked wait time if one is configured for this status
+                    const linked = zSettings?.waitTimeLinkedStatus?.[val.id];
+                    if (linked) {
+                      store.setField("waitTime", linked, zOpenWorkorder.id);
+                    }
+                  }}
+                  buttonStyle={{
+                    width: "100%",
+                    backgroundColor: rs.backgroundColor,
+                    marginTop: 11,
+                  }}
+                  buttonTextStyle={{
+                    color: rs.textColor,
+                    fontWeight: "normal",
+                    fontSize: 14,
+                  }}
+                  modalCoordX={100}
+                  modalCoordY={40}
+                  buttonText={rs.label}
+                />
+              );
+            })()}
             <View
               style={{
                 flexDirection: "row",
@@ -737,20 +769,27 @@ export const ActiveWorkorderComponent = ({}) => {
                 marginTop: 11,
               }}
             >
-              <TextInput
-                placeholderText={"Estimated Wait"}
+              <TextInput_
+                placeholder={"Wait time estimate"}
+                editable={!isDonePaid}
                 style={{
                   width: "45%",
                   borderWidth: 1,
                   borderColor: C.buttonLightGreenOutline,
+                  color: C.text,
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
                   outlineWidth: 0,
                   borderRadius: 5,
+                  fontWeight: (zOpenWorkorder?.waitTime?.label || zOpenWorkorder?.waitTime) ? "500" : null,
+                  backgroundColor: sWaitTimeBlink ? "rgba(255, 255, 0, 0.35)" : "transparent",
+                  transition: "background-color 300ms ease",
                 }}
-                value={zOpenWorkorder?.waitTime?.label || ""}
-                editable={false}
+                value={zOpenWorkorder?.waitTime?.label || (typeof zOpenWorkorder?.waitTime === "string" ? zOpenWorkorder?.waitTime : "")}
+                onChangeText={(val) => {
+                  useOpenWorkordersStore.getState().setField("waitTime", val, zOpenWorkorder.id);
+                }}
               />
               <View
                 style={{
@@ -783,31 +822,6 @@ export const ActiveWorkorderComponent = ({}) => {
                 </View>
               </View>
             </View>
-            {(() => {
-              const rs = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses);
-              return (
-                <StatusPickerModal
-                  statuses={zSettings.statuses}
-                  enabled={!isDonePaid}
-                  onSelect={(val) => {
-                    useOpenWorkordersStore.getState().setField("status", val.id, zOpenWorkorder.id);
-                  }}
-                  buttonStyle={{
-                    width: "100%",
-                    backgroundColor: rs.backgroundColor,
-                    marginTop: 11,
-                  }}
-                  buttonTextStyle={{
-                    color: rs.textColor,
-                    fontWeight: "normal",
-                    fontSize: 14,
-                  }}
-                  modalCoordX={100}
-                  modalCoordY={40}
-                  buttonText={rs.label}
-                />
-              );
-            })()}
           </View>
 
           <View
@@ -931,7 +945,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>
-                  Estimated wait
+                  Estimated delivery
                 </Text>
                 <TouchableOpacity
                   disabled={isDonePaid}
@@ -996,7 +1010,14 @@ export const ActiveWorkorderComponent = ({}) => {
           flexDirection: "row",
           justifyContent: "center",
           gap: 12,
-          marginVertical: 8,
+          width: "100%",
+          alignItems: "center",
+          borderRadius: 5,
+          borderColor: C.listItemBorder,
+          borderWidth: 1,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          marginBottom: 8,
         }}
       >
         <Button_

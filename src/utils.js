@@ -849,15 +849,15 @@ export function searchPhoneNum(searchTerm, customerArrToSearch) {
   let resObj = {};
   for (let i = 0; i <= customerArrToSearch.length - 1; i++) {
     let customerObj = customerArrToSearch[i];
-    if (customerObj.cell.startsWith(searchTerm))
+    if (customerObj.customerCell.startsWith(searchTerm))
       resObj[customerObj.id] = customerObj;
-    if (customerObj.landline.startsWith(searchTerm))
+    if (customerObj.customerLandline.startsWith(searchTerm))
       resObj[customerObj.id] = customerObj;
 
     if (searchTerm.length === 4) {
-      if (customerObj.cell.endsWith(searchTerm))
+      if (customerObj.customerCell.endsWith(searchTerm))
         resObj[customerObj.id] = customerObj;
-      if (customerObj.landline.endsWith(searchTerm))
+      if (customerObj.customerLandline.endsWith(searchTerm))
         resObj[customerObj.id] = customerObj;
     }
   }
@@ -1924,7 +1924,7 @@ export function createNewWorkorder({
   customerID,
   customerFirst,
   customerLast,
-  customerPhone,
+  customerCell,
   customerLandline,
   customerEmail,
   customerContactRestriction,
@@ -1934,21 +1934,20 @@ export function createNewWorkorder({
   status,
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
-  wo.isStandaloneSale = isStandaloneSale;
+  wo.isStandaloneSale = isStandaloneSale || false;
   wo.id = generateUPCBarcode();
   wo.workorderNumber = extractRandomFourDigits(wo.id);
-  wo.status = SETTINGS_OBJ.statuses[0]?.id || "";
-  wo.customerFirst = customerFirst;
-  wo.customerLast = customerLast;
-  wo.customerPhone = customerPhone;
+  wo.status = status || SETTINGS_OBJ.statuses[0]?.id || "";
+  wo.customerFirst = customerFirst || "";
+  wo.customerLast = customerLast || "";
+  wo.customerCell = customerCell || "";
   wo.customerLandline = customerLandline || "";
   wo.customerEmail = customerEmail || "";
   wo.customerContactRestriction = customerContactRestriction || "";
-  wo.customerID = customerID;
-  (wo.startedBy = startedByFirst + " " + startedByLast),
-    wo.changeLog.push("Started by: " + startedByFirst + " " + startedByLast);
+  wo.customerID = customerID || "";
+  wo.startedBy = (startedByFirst || "") + " " + (startedByLast || "");
+  wo.changeLog.push("Started by: " + (startedByFirst || "") + " " + (startedByLast || ""));
   wo.startedOnMillis = new Date().getTime();
-  wo.status = status;
   wo._unsaved = true;
   return wo;
 }
@@ -2011,7 +2010,7 @@ function createPrintBase(workorder, customer, salesTaxPercent) {
     SHOP_CONTACT_BLURB;
   r.thankYouBlurb = THANK_YOU_BLURB;
   r.intakeBlurb = INTAKE_BLURB;
-  r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
+  r.customerContact = formatPhoneForDisplay(customer.customerCell) || formatPhoneForDisplay(customer.customerLandline) || customer.email
 
   delete r.changeLog;
   delete r.media;
@@ -2031,7 +2030,7 @@ function createPrintIntakeTicket(workorder = WORKORDER_PROTO, customer = CUSTOME
   // r.color2 = wo.color2.label;
   // r.barcode = r.id
 
-  r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
+  r.customerContact = formatPhoneForDisplay(customer.customerCell) || formatPhoneForDisplay(customer.customerLandline) || customer.email
 
 // r.shopName = "Bonita Bikes LLC"
 // r.shopContactBlurb =
@@ -2092,7 +2091,7 @@ function createPrintSale(sale = SALE_PROTO, customer, wo = WORKORDER_PROTO, sale
   r.shopName = "Bonita Bikes LLC"
 
 
-  r.customerContact = formatPhoneForDisplay(customer.cell) || formatPhoneForDisplay(customer.landline) || customer.email
+  r.customerContact = formatPhoneForDisplay(customer.customerCell) || formatPhoneForDisplay(customer.customerLandline) || customer.email
 
   r.shopContactBlurb =
     SHOP_CONTACT_BLURB;

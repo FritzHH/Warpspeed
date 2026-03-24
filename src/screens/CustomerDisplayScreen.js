@@ -181,8 +181,8 @@ function OverlayPanel({ children, header }) {
 function CustomerInfoSection({ customer }) {
   if (!customer) return null;
   let name = [customer.first, customer.last].filter(Boolean).join(" ");
-  let cell = formatPhoneForDisplay(customer.cell);
-  let landline = formatPhoneForDisplay(customer.landline);
+  let cell = formatPhoneForDisplay(customer.customerCell);
+  let landline = formatPhoneForDisplay(customer.customerLandline);
   let addressParts = [
     [customer.streetAddress, customer.unit].filter(Boolean).join(" "),
     [customer.city, customer.state].filter(Boolean).join(", "),

@@ -217,8 +217,8 @@ export const CustomerInfoScreenModalComponent = ({
   const CUSTOMER_TO_WORKORDER_FIELDS = {
     first: "customerFirst",
     last: "customerLast",
-    cell: "customerPhone",
-    landline: "customerLandline",
+    customerCell: "customerCell",
+    customerLandline: "customerLandline",
     email: "customerEmail",
     contactRestriction: "customerContactRestriction",
   };
@@ -310,7 +310,7 @@ export const CustomerInfoScreenModalComponent = ({
             />
           </View>
           <View>
-            {!!sCustomerInfo?.cell && (
+            {!!sCustomerInfo?.customerCell && (
               <Text style={{ color: gray(0.3), fontSize: 11, marginLeft: 2 }}>
                 Cell
               </Text>
@@ -319,14 +319,14 @@ export const CustomerInfoScreenModalComponent = ({
               onChangeText={(val) => {
                 val = removeDashesFromPhone(val);
                 if (val.length > 10) return;
-                saveField("cell", val);
+                saveField("customerCell", val);
               }}
               placeholder="Cell phone"
               style={{
                 ...TEXT_INPUT_STYLE,
-                marginTop: sCustomerInfo.cell ? 1 : TEXT_INPUT_STYLE.marginTop,
+                marginTop: sCustomerInfo.customerCell ? 1 : TEXT_INPUT_STYLE.marginTop,
               }}
-              value={formatPhoneWithDashes(sCustomerInfo.cell)}
+              value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
             />
           </View>
 
@@ -334,11 +334,11 @@ export const CustomerInfoScreenModalComponent = ({
             onChangeText={(val) => {
               val = removeDashesFromPhone(val);
               if (val.length > 10) return;
-              saveField("landline", val);
+              saveField("customerLandline", val);
             }}
             placeholder="Landline"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={formatPhoneWithDashes(sCustomerInfo.landline)}
+            value={formatPhoneWithDashes(sCustomerInfo.customerLandline)}
           />
           <TextInput_
             onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
@@ -410,6 +410,13 @@ export const CustomerInfoScreenModalComponent = ({
               useSelectedAsButtonTitle={false}
             />
           </View>
+          <CheckBox_
+            isChecked={!!sCustomerInfo.gatedCommunity}
+            text="Gated community"
+            textStyle={{ fontSize: 13 }}
+            buttonStyle={{ backgroundColor: "transparent", marginTop: TEXT_INPUT_STYLE.marginTop }}
+            onCheck={() => saveField("gatedCommunity", !sCustomerInfo.gatedCommunity)}
+          />
 
           <View style={{ flexDirection: "column" }}>
             {!!button1Text && (
@@ -975,8 +982,8 @@ const WorkorderDetailView = ({ workorder, sales, onClose }) => {
               null
             }
           />
-          {!!workorder.customerPhone && (
-            <DetailRow label="Phone" value={formatPhoneWithDashes(workorder.customerPhone)} />
+          {!!workorder.customerCell && (
+            <DetailRow label="Phone" value={formatPhoneWithDashes(workorder.customerCell)} />
           )}
 
           {/* Bike info */}

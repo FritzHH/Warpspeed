@@ -760,8 +760,8 @@ export async function dbSaveCustomer(customer) {
         id: customer.id,
         first: customer.first || "",
         last: customer.last || "",
-        cell: customer.cell || "",
-        landline: customer.landline || "",
+        customerCell: customer.customerCell || "",
+        customerLandline: customer.customerLandline || "",
         email: customer.email || "",
         tenantID,
         storeID,
@@ -772,13 +772,13 @@ export async function dbSaveCustomer(customer) {
       contactIndexData = removeUnusedFields(contactIndexData);
 
       // Save by cell phone if exists - store under "info" field
-      if (customer.cell && customer.cell.length === 10) {
-        await firestoreWrite(`customer_phone/${customer.cell}`, {
+      if (customer.customerCell && customer.customerCell.length === 10) {
+        await firestoreWrite(`customer_phone/${customer.customerCell}`, {
           info: contactIndexData,
         });
         log("Customer cell phone index updated", {
           customerID: customer.id,
-          phone: customer.cell,
+          phone: customer.customerCell,
         });
       }
     } catch (indexError) {
@@ -1636,58 +1636,21 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
     const { tenantID, storeID } = getTenantAndStore();
 
     if (!tenantID || !storeID) {
-      log(
-        "Error: tenantID and storeID are not configured for dbSearchCustomersByPhone"
-      );
+      log("Error: tenantID and storeID are not configured for dbSearchCustomersByPhone");
       return [];
-      return {
-        success: false,
-        error: "Configuration Error",
-        message:
-          "tenantID and storeID are not configured. Please check your settings.",
-        customers: [],
-        count: 0,
-        phoneNumber: phoneNumber || "",
-        tenantID,
-        storeID,
-      };
     }
 
     if (!phoneNumber || typeof phoneNumber !== "string") {
-      log(
-        "Error: phoneNumber is required and must be a string for dbSearchCustomersByPhone"
-      );
+      log("Error: phoneNumber is required and must be a string for dbSearchCustomersByPhone");
       return [];
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message: "phoneNumber is required and must be a string",
-        customers: [],
-        count: 0,
-        phoneNumber: phoneNumber || "",
-        tenantID,
-        storeID,
-      };
     }
 
     // Clean and validate phone number (remove non-digits, limit to 10 digits)
     const cleanPhone = phoneNumber.replace(/\D/g, "").substring(0, 10);
 
     if (cleanPhone.length === 0) {
-      log(
-        "Error: Phone number must contain at least one digit for dbSearchCustomersByPhone"
-      );
+      log("Error: Phone number must contain at least one digit for dbSearchCustomersByPhone");
       return [];
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message: "Phone number must contain at least one digit",
-        customers: [],
-        count: 0,
-        phoneNumber: cleanPhone,
-        tenantID,
-        storeID,
-      };
     }
 
     // Build collection path for customers
@@ -1695,7 +1658,8 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
 
     // Create queries for phone number search (partial match for real-time typing)
     // Each field gets a range query to find partial matches
-    const fieldQueries = [{ field: "cell" }, { field: "landline" }];
+    // Query both new and old field names for backward compatibility with existing Firestore documents
+    const fieldQueries = [{ field: "customerCell" }, { field: "customerLandline" }, { field: "cell" }, { field: "landline" }];
 
     // Execute multiple queries and combine results
     const allResults = [];
@@ -1737,16 +1701,7 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
     return allResults;
   } catch (error) {
     log("Error searching customers by phone:", error);
-    return {
-      success: false,
-      error: "Database Error",
-      message: error.message,
-      customers: [],
-      count: 0,
-      phoneNumber: phoneNumber || "",
-      tenantID: null,
-      storeID: null,
-    };
+    return [];
   }
 }
 
@@ -1760,55 +1715,21 @@ export async function dbSearchCustomersByEmail(email) {
     const { tenantID, storeID } = getTenantAndStore();
 
     if (!tenantID || !storeID) {
-      log(
-        "Error: tenantID and storeID are not configured for dbSearchCustomersByEmail"
-      );
-      return {
-        success: false,
-        error: "Configuration Error",
-        message:
-          "tenantID and storeID are not configured. Please check your settings.",
-        customers: [],
-        count: 0,
-        email: email || "",
-        tenantID,
-        storeID,
-      };
+      log("Error: tenantID and storeID are not configured for dbSearchCustomersByEmail");
+      return [];
     }
 
     if (!email || typeof email !== "string") {
-      log(
-        "Error: email is required and must be a string for dbSearchCustomersByEmail"
-      );
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message: "email is required and must be a string",
-        customers: [],
-        count: 0,
-        email: email || "",
-        tenantID,
-        storeID,
-      };
+      log("Error: email is required and must be a string for dbSearchCustomersByEmail");
+      return [];
     }
 
     // Clean and validate email (trim whitespace, convert to lowercase)
     const cleanEmail = email.trim().toLowerCase();
 
     if (cleanEmail.length === 0) {
-      log(
-        "Error: Email must contain at least one character for dbSearchCustomersByEmail"
-      );
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message: "Email must contain at least one character",
-        customers: [],
-        count: 0,
-        email: cleanEmail,
-        tenantID,
-        storeID,
-      };
+      log("Error: Email must contain at least one character for dbSearchCustomersByEmail");
+      return [];
     }
 
     // Build collection path for customers
@@ -1834,16 +1755,7 @@ export async function dbSearchCustomersByEmail(email) {
     return filteredResults;
   } catch (error) {
     log("Error searching customers by email:", error);
-    return {
-      success: false,
-      error: "Database Error",
-      message: error.message,
-      customers: [],
-      count: 0,
-      email: email || "",
-      tenantID: null,
-      storeID: null,
-    };
+    return [];
   }
 }
 
@@ -1858,55 +1770,21 @@ export async function dbSearchCustomersByName(name) {
     const { tenantID, storeID } = getTenantAndStore();
 
     if (!tenantID || !storeID) {
-      log(
-        "Error: tenantID and storeID are not configured for dbSearchCustomersByName"
-      );
-      return {
-        success: false,
-        error: "Configuration Error",
-        message:
-          "tenantID and storeID are not configured. Please check your settings.",
-        customers: [],
-        count: 0,
-        name: name || "",
-        tenantID,
-        storeID,
-      };
+      log("Error: tenantID and storeID are not configured for dbSearchCustomersByName");
+      return [];
     }
 
     if (!name || typeof name !== "string") {
-      log(
-        "Error: name is required and must be a string for dbSearchCustomersByName"
-      );
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message: "name is required and must be a string",
-        customers: [],
-        count: 0,
-        name: name || "",
-        tenantID,
-        storeID,
-      };
+      log("Error: name is required and must be a string for dbSearchCustomersByName");
+      return [];
     }
 
     // Clean and validate name (trim whitespace, convert to lowercase)
     const cleanName = name.trim().toLowerCase();
 
     if (cleanName.length === 0) {
-      log(
-        "Error: Name must contain at least one character for dbSearchCustomersByName"
-      );
-      return {
-        success: false,
-        error: "Invalid Parameter",
-        message: "Name must contain at least one character",
-        customers: [],
-        count: 0,
-        name: cleanName,
-        tenantID,
-        storeID,
-      };
+      log("Error: Name must contain at least one character for dbSearchCustomersByName");
+      return [];
     }
 
     // Build collection path for customers
@@ -1960,16 +1838,7 @@ export async function dbSearchCustomersByName(name) {
     return allResults;
   } catch (error) {
     log("Error searching customers by name:", error);
-    return {
-      success: false,
-      error: "Database Error",
-      message: error.message,
-      customers: [],
-      count: 0,
-      name: name || "",
-      tenantID: null,
-      storeID: null,
-    };
+    return [];
   }
 }
 

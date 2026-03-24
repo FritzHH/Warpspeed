@@ -204,7 +204,7 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
     const customerInfo = {
       first: primaryWO?.customerFirst || "",
       last: primaryWO?.customerLast || "",
-      phone: primaryWO?.customerPhone || "",
+      phone: primaryWO?.customerCell || "",
       id: primaryWO?.customerID || "",
     };
     saveRefundIndex(sale, refund, customerInfo);

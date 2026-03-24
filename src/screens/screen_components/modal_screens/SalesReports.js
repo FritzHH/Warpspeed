@@ -109,7 +109,7 @@ export const SalesReportsModal = ({ handleExit }) => {
       millis: dayjs().subtract(1, "hour").valueOf(),
       customerFirst: "John",
       customerLast: "Davidson",
-      customerPhone: "2392919396",
+      customerCell: "2392919396",
       customerID: "cust001",
       total: 15000,
       subtotal: 13636,
@@ -131,7 +131,7 @@ export const SalesReportsModal = ({ handleExit }) => {
       millis: dayjs().subtract(3, "hour").valueOf(),
       customerFirst: "Sarah",
       customerLast: "Mitchell",
-      customerPhone: "2395551234",
+      customerCell: "2395551234",
       customerID: "cust002",
       total: 4250,
       subtotal: 4250,
@@ -153,7 +153,7 @@ export const SalesReportsModal = ({ handleExit }) => {
       millis: dayjs().subtract(30, "minute").valueOf(),
       customerFirst: "John",
       customerLast: "Davidson",
-      customerPhone: "2392919396",
+      customerCell: "2392919396",
       customerID: "cust001",
       total: 0,
       subtotal: 0,
@@ -175,7 +175,7 @@ export const SalesReportsModal = ({ handleExit }) => {
       millis: dayjs().subtract(5, "hour").valueOf(),
       customerFirst: "Maria",
       customerLast: "Gonzalez",
-      customerPhone: "2398675309",
+      customerCell: "2398675309",
       customerID: "cust003",
       total: 52499,
       subtotal: 47726,
@@ -197,7 +197,7 @@ export const SalesReportsModal = ({ handleExit }) => {
       millis: dayjs().subtract(1, "day").valueOf(),
       customerFirst: "Robert",
       customerLast: "Chen",
-      customerPhone: "2391112222",
+      customerCell: "2391112222",
       customerID: "cust004",
       total: 1299,
       subtotal: 1299,
@@ -292,7 +292,7 @@ export const SalesReportsModal = ({ handleExit }) => {
     filteredResults = sResults.filter((r) => {
       let first = (r.customerFirst || "").toLowerCase();
       let last = (r.customerLast || "").toLowerCase();
-      let phone = (r.customerPhone || "").toLowerCase();
+      let phone = (r.customerCell || "").toLowerCase();
       let item = (r.highestItemName || "").toLowerCase();
       return (
         first.includes(searchQuery) ||
@@ -377,10 +377,10 @@ export const SalesReportsModal = ({ handleExit }) => {
       : "";
 
     let phoneStr = "";
-    if (item.customerPhone) {
-      let digits = item.customerPhone.toString().replace(/\D/g, "");
+    if (item.customerCell) {
+      let digits = item.customerCell.toString().replace(/\D/g, "");
       if (digits.length === 10) phoneStr = "(" + digits.slice(0, 3) + ") " + digits.slice(3, 6) + "-" + digits.slice(6);
-      else phoneStr = formatPhoneWithDashes(item.customerPhone);
+      else phoneStr = formatPhoneWithDashes(item.customerCell);
     }
 
     let paymentLabel = item.paymentType || "";

@@ -993,8 +993,8 @@ exports.incomingSMS = onRequest(
           id: info.id,
           first: info.first,
           last: info.last,
-          cell: info.cell,
-          landline: info.landline,
+          customerCell: info.customerCell || info.cell,
+          customerLandline: info.customerLandline || info.landline,
           email: info.email,
         };
         tenantID = info.tenantID;
@@ -1238,8 +1238,8 @@ exports.incomingSMSEnhanced = onRequest(
             id: info.id,
             first: info.first,
             last: info.last,
-            cell: info.cell,
-            landline: info.landline,
+            customerCell: info.customerCell || info.cell,
+            customerLandline: info.customerLandline || info.landline,
             email: info.email,
           };
           tenantID = info.tenantID;
@@ -1250,7 +1250,7 @@ exports.incomingSMSEnhanced = onRequest(
             tenantID,
             storeID,
             customerName: `${customerData.first} ${customerData.last}`,
-            lookupBy: "cell",
+            lookupBy: "customerCell",
           });
         }
 
@@ -1297,7 +1297,7 @@ exports.incomingSMSEnhanced = onRequest(
                   .collection("stores")
                   .doc(currentStoreID)
                   .collection("customers")
-                  .where("cell", "==", normalizedPhone)
+                  .where("customerCell", "==", normalizedPhone)
                   .limit(1)
                   .get();
 
@@ -1324,8 +1324,8 @@ exports.incomingSMSEnhanced = onRequest(
                           id: customerData.id,
                           first: customerData.first || "",
                           last: customerData.last || "",
-                          cell: customerData.cell || "",
-                          landline: customerData.landline || "",
+                          customerCell: customerData.customerCell || customerData.cell || "",
+                          customerLandline: customerData.customerLandline || customerData.landline || "",
                           email: customerData.email || "",
                           tenantID,
                           storeID,
@@ -4817,8 +4817,8 @@ exports.lightspeedImportData = onCall(
       // Map to app proto
       const mapped = [];
       for (const c of lsCustomers) {
-        let cell = "";
-        let landline = "";
+        let customerCell = "";
+        let customerLandline = "";
 
         if (c.Contact && c.Contact.Phones && c.Contact.Phones.ContactPhone) {
           const phones = Array.isArray(c.Contact.Phones.ContactPhone)
@@ -4827,8 +4827,8 @@ exports.lightspeedImportData = onCall(
           for (const p of phones) {
             const clean = lsCleanPhone(p.number);
             if (!clean) continue;
-            if (!cell) { cell = clean; }
-            else if (!landline) { landline = clean; break; }
+            if (!customerCell) { customerCell = clean; }
+            else if (!customerLandline) { customerLandline = clean; break; }
           }
         }
 
@@ -4862,8 +4862,8 @@ exports.lightspeedImportData = onCall(
         mapped.push({
           first: (c.firstName || "").toLowerCase(),
           last: (c.lastName || "").toLowerCase(),
-          cell,
-          landline,
+          customerCell,
+          customerLandline,
           contactRestriction: "",
           email,
           streetAddress,
@@ -4885,17 +4885,17 @@ exports.lightspeedImportData = onCall(
       const phoneMap = new Map();
       const noPhone = [];
       for (const cust of mapped) {
-        if (!cust.cell) { noPhone.push(cust); continue; }
-        if (phoneMap.has(cust.cell)) {
-          const existing = phoneMap.get(cust.cell);
+        if (!cust.customerCell) { noPhone.push(cust); continue; }
+        if (phoneMap.has(cust.customerCell)) {
+          const existing = phoneMap.get(cust.customerCell);
           const existingFilled = Object.values(existing).filter(v => v !== "" && v !== 0).length;
           const newFilled = Object.values(cust).filter(v => v !== "" && v !== 0).length;
           if (newFilled > existingFilled) {
             cust.id = existing.id;
-            phoneMap.set(cust.cell, cust);
+            phoneMap.set(cust.customerCell, cust);
           }
         } else {
-          phoneMap.set(cust.cell, cust);
+          phoneMap.set(cust.customerCell, cust);
         }
       }
       const deduped = [...phoneMap.values(), ...noPhone];
@@ -5121,7 +5121,7 @@ exports.lightspeedImportData = onCall(
           internalNotes.push({ id: db.collection("_").doc().id, text: wo.internalNote.trim(), millis: Date.now() });
         }
 
-        let customerID = "", customerFirst = "", customerLast = "", customerPhone = "";
+        let customerID = "", customerFirst = "", customerLast = "", customerCell = "";
         if (wo.Customer) {
           customerFirst = (wo.Customer.firstName || "").toLowerCase();
           customerLast = (wo.Customer.lastName || "").toLowerCase();
@@ -5129,7 +5129,7 @@ exports.lightspeedImportData = onCall(
           const match = customerNameMap.get(nameKey);
           if (match) {
             customerID = match.id;
-            customerPhone = match.cell || "";
+            customerCell = match.customerCell || match.cell || "";
             linked++;
           } else {
             unlinked++;
@@ -5217,7 +5217,7 @@ exports.lightspeedImportData = onCall(
           customerID,
           customerFirst,
           customerLast,
-          customerPhone,
+          customerCell,
           model,
           brand,
           description,
@@ -6454,7 +6454,7 @@ exports.createTextToPayInvoice = onCall(
         if (custSnap.exists) customer = custSnap.data();
       }
 
-      const cleanPhone = (customer.cell || "").replace(/\D/g, "");
+      const cleanPhone = (customer.customerCell || customer.cell || "").replace(/\D/g, "");
       const customerEmail = customer.email || "";
 
       // Validate channel against available contact info
@@ -6830,7 +6830,7 @@ exports.textToPayWebhook = onRequest(
           millis: Number(sale.millis) || Date.now(),
           customerFirst: customer.first || workorder.customerFirst || "",
           customerLast: customer.last || workorder.customerLast || "",
-          customerPhone: customer.cell || workorder.customerPhone || "",
+          customerCell: customer.customerCell || customer.cell || workorder.customerCell || workorder.customerPhone || "",
           customerID: customerID || "",
           total: sale.total || 0,
           subtotal: sale.subtotal || 0,
@@ -6855,7 +6855,7 @@ exports.textToPayWebhook = onRequest(
         // ── Send receipt ──
         const receiptUrl = charge.receipt_url || "";
         const amountDisplay = (charge.amount_captured / 100).toFixed(2);
-        const cleanPhone = (customer.cell || workorder.customerPhone || "").replace(/\D/g, "");
+        const cleanPhone = (customer.customerCell || customer.cell || workorder.customerCell || workorder.customerPhone || "").replace(/\D/g, "");
         const customerEmail = customer.email || "";
 
         // SMS receipt + inject into message queue
@@ -6982,7 +6982,7 @@ exports.textToPayWebhook = onRequest(
               if (custSnap.exists) customer = custSnap.data();
             }
 
-            const cleanPhone = (customer.cell || "").replace(/\D/g, "");
+            const cleanPhone = (customer.customerCell || customer.cell || "").replace(/\D/g, "");
             if (cleanPhone.length === 10) {
               // Fetch settings for store name
               const settingsSnap = await db

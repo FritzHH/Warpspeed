@@ -117,33 +117,33 @@ export const NONREMOVABLE_STATUSES = [
     id: "34kttekj",
     label: "Newly Created",
     textColor: "white",
-
     backgroundColor: "red",
     removable: false,
+    requireWaitTime: false,
   },
   {
     id: "34kttdkfekj",
     label: "On the Stand",
     textColor: "white",
-
     backgroundColor: "pink",
     removable: false,
+    requireWaitTime: false,
   },
   {
     id: "383rne3kj",
-
     textColor: "black",
     backgroundColor: "rgb(192,192,192)",
     label: "Service",
     removable: false,
+    requireWaitTime: false,
   },
   {
     id: "33knktg",
-
     textColor: "white",
     backgroundColor: "green",
     label: "Finished",
     removable: false,
+    requireWaitTime: false,
   },
 ];
 
@@ -189,8 +189,8 @@ export const TAB_NAMES = {
 };
 
 export const FOCUS_NAMES = {
-  cell: "cell",
-  land: "land",
+  customerCell: "customerCell",
+  customerLandline: "customerLandline",
   first: "first",
   last: "last",
   email: "email",
@@ -325,6 +325,7 @@ export const SALE_PROTO = {
   refunds: [],
   textToPay: false,
   checkoutSessionID: "",
+  receiptURL: "",
 };
 
 export const SALE_INDEX_PROTO = {
@@ -334,7 +335,7 @@ export const SALE_INDEX_PROTO = {
   millis: 0,
   customerFirst: "",
   customerLast: "",
-  customerPhone: "",
+  customerCell: "",
   customerID: "",
   total: 0,
   subtotal: 0,
@@ -365,7 +366,7 @@ export const WORKORDER_PROTO = {
   customerID: "",
   customerFirst: "",
   customerLast: "",
-  customerPhone: "",
+  customerCell: "",
   customerLandline: "",
   customerEmail: "",
   customerContactRestriction: "",
@@ -427,8 +428,8 @@ export const CUSTOMER_LANGUAGES = {
 export const CUSTOMER_PROTO = {
   first: "",
   last: "",
-  cell: "",
-  landline: "",
+  customerCell: "",
+  customerLandline: "",
   contactRestriction: "",
   email: "",
   streetAddress: "",
@@ -439,6 +440,7 @@ export const CUSTOMER_PROTO = {
   addressNotes: "",
   id: "",
   interactionRating: "",
+  gatedCommunity: false,
   workorders: [],
   previousBikes: [],
   sales: [],
@@ -447,8 +449,8 @@ export const CUSTOMER_PROTO = {
 };
 
 export const CUSTOMER_PREVIEW_PROTO = {
-  cell: "",
-  landline: "",
+  customerCell: "",
+  customerLandline: "",
   first: "",
   last: "",
   id: "",
@@ -758,6 +760,7 @@ export const SETTINGS_OBJ = {
       type: DISCOUNT_TYPES.dollar,
     },
   ],
+  waitTimeLinkedStatus: {},
   waitTimes: [
     {
       id: "34j3kj3dfdfgfkj3",

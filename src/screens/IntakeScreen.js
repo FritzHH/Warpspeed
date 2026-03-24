@@ -101,7 +101,7 @@ export function IntakeScreen() {
       customerID: "",
       customerFirst: "",
       customerLast: "",
-      customerPhone: "",
+      customerCell: "",
       startedByFirst: zCurrentUser?.first || "",
       startedByLast: zCurrentUser?.last || "",
       isStandaloneSale: false,

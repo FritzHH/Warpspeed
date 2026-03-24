@@ -247,8 +247,8 @@ export function mapCustomers(customerCSVText) {
       id: row.customerID || "",
       first: (row.firstName || "").toLowerCase().trim(),
       last: (row.lastName || "").toLowerCase().trim(),
-      cell: formatPhone(row.phone1),
-      landline: formatPhone(row.phone2),
+      customerCell: formatPhone(row.phone1),
+      customerLandline: formatPhone(row.phone2),
       contactRestriction: "",
       email: (row.email || "").toLowerCase().trim(),
       streetAddress: (row.address1 || "").trim(),
@@ -363,7 +363,7 @@ export function mapWorkorders(
     const customer = customerMap[wo.customerID] || null;
     const customerFirst = (wo.customerFirstName || "").toLowerCase().trim();
     const customerLast = (wo.customerLastName || "").toLowerCase().trim();
-    const customerPhone = customer ? customer.cell : "";
+    const customerCell = customer ? customer.customerCell : "";
 
     // Status — match by label
     const statusLabel = (wo.statusName || "").toLowerCase();
@@ -493,7 +493,7 @@ export function mapWorkorders(
       customerID: wo.customerID || "",
       customerFirst,
       customerLast,
-      customerPhone,
+      customerCell,
       model: "",
       brand,
       description,

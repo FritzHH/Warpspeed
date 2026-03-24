@@ -6,7 +6,10 @@ import {
   formatCurrencyDisp,
   log,
 } from "../../../../utils";
-import { dbSendSMS, dbSendEmail } from "../../../../db_calls_wrapper";
+import { dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS } from "../../../../db_calls_wrapper";
+import { build_db_path } from "../../../../constants";
+import { useSettingsStore } from "../../../../stores";
+import { printBuilder } from "../../../../utils";
 import {
   SALE_PROTO,
   PAYMENT_OBJECT_PROTO,
@@ -307,7 +310,7 @@ export function splitWorkorderLinesToSingleQty(workorders) {
   });
 }
 
-// ─── Auto-send sale receipt via SMS/email ─────────────────────
+// ─── Send sale receipt via SMS/email ──────────────────────────
 function applyTemplate(template, vars) {
   let result = template;
   for (const [key, val] of Object.entries(vars)) {
@@ -316,34 +319,52 @@ function applyTemplate(template, vars) {
   return result;
 }
 
-export function sendAutoSaleReceipt(sale, customer, settings) {
+export async function sendSaleReceipt(sale, customer, workorder, settings) {
   if (!sale || !settings) return;
+  const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
   const firstName = customer?.first || "Customer";
   const storeName = settings?.storeName || "our store";
   const total = formatCurrencyDisp(sale.total, true);
-  const receiptURL = sale.payments?.find((p) => p.receiptURL)?.receiptURL || "";
 
-  const vars = { firstName, storeName, total, link: receiptURL };
+  // Generate PDF receipt and upload to Cloud Storage
+  let receiptURL = "";
+  try {
+    const receiptData = printBuilder.sale(sale, sale.payments || [], customer, workorder, settings?.salesTaxPercent);
+    const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
+    const base64 = generateSaleReceiptPDF(receiptData);
+    const storagePath = build_db_path.cloudStorage.saleReceiptPDF(sale.id, tenantID, storeID);
 
-  // SMS
-  if (settings.autoSMSSalesReceipt && customer?.cell) {
-    const msg = applyTemplate(
-      settings.saleReceiptMessage || "Hi {firstName}, here is your receipt from {storeName} for {total}: {link}",
-      vars
-    );
-    dbSendSMS({
-      message: msg,
-      phoneNumber: customer.cell,
-      customerID: customer.id || "",
-      id: generateRandomID(),
-      canRespond: false,
-    });
-    log("Auto-sent sale receipt SMS to", customer.cell);
+    // SMS — upload PDF and send link in one call
+    if (settings.autoSMSSalesReceipt && customer?.customerCell) {
+      const vars = { firstName, storeName, total, link: "{link}" };
+      const msg = applyTemplate(
+        settings.saleReceiptMessage || "Hi {firstName}, here is your receipt from {storeName} for {total}: {link}",
+        vars
+      );
+      const result = await dbUploadPDFAndSendSMS({
+        base64,
+        storagePath,
+        message: msg,
+        phoneNumber: customer.customerCell,
+        customerID: customer.id || "",
+        messageID: generateRandomID(),
+      });
+      if (result?.data?.downloadURL) receiptURL = result.data.downloadURL;
+      log("Sent sale receipt SMS to", customer.customerCell);
+    } else {
+      // No SMS but still upload PDF for email link
+      const { uploadStringToStorage } = await import("../../../../db_calls");
+      const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
+      if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
+    }
+  } catch (e) {
+    log("Error generating/uploading sale receipt PDF:", e);
   }
 
   // Email
   if (settings.autoEmailSalesReceipt && customer?.email) {
+    const vars = { firstName, storeName, total, link: receiptURL };
     const subject = applyTemplate(
       settings.saleReceiptEmailSubject || "Your receipt from {storeName}",
       vars
@@ -356,6 +377,6 @@ export function sendAutoSaleReceipt(sale, customer, settings) {
       { ...vars, receiptLink }
     );
     dbSendEmail(customer.email, subject, html);
-    log("Auto-sent sale receipt email to", customer.email);
+    log("Sent sale receipt email to", customer.email);
   }
 }

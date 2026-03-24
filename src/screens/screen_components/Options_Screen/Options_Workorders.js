@@ -10,7 +10,7 @@ import {
   log,
   resolveStatus,
 } from "../../../utils";
-import { TabMenuDivider as Divider, CheckBox_ } from "../../../components";
+import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator } from "../../../components";
 import { C, Colors } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useRef } from "react";
@@ -35,7 +35,7 @@ function computeWaitInfo(workorder) {
 
   const startedOnMillis = Number(workorder.startedOnMillis);
   const maxWaitDays = Number(workorder.waitTime?.maxWaitTimeDays);
-  if (!maxWaitDays || !startedOnMillis) return { color: null, waitEndDay: "", textColor: null };
+  if (isNaN(maxWaitDays) || maxWaitDays === null || !startedOnMillis) return { color: null, waitEndDay: "", textColor: null };
 
   let endWaitMillis = startedOnMillis + maxWaitDays * NUM_MILLIS_IN_DAY;
 
@@ -151,7 +151,7 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
     >
       <View style={{ flexDirection: "column", alignItems: "flex-end" }}>
         {!!info.waitEndDay && (
-          <Text style={{ color: info.textColor || C.text, fontSize: 13, fontWeight: "600", textAlign: "right" }}>
+          <Text style={{ color: info.textColor || C.text, fontSize: info.waitEndDay === "Today" ? 16 : 13, fontWeight: info.waitEndDay === "Today" ? "600" : undefined, textAlign: "right" }}>
             {capitalizeFirstLetterOfString(info.waitEndDay)}
           </Text>
         )}
@@ -172,6 +172,7 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
 export function WorkordersComponent({}) {
   // getters ///////////////////////////////////////////////////////
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
+  const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
   const zOpenWorkorderID = useOpenWorkordersStore((state) => state.openWorkorderID);
   const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
@@ -234,8 +235,8 @@ export function WorkordersComponent({}) {
       });
 
       arr.sort((a, b) => {
-        let aHasWait = !!(a.waitTime?.maxWaitTimeDays && a.startedOnMillis);
-        let bHasWait = !!(b.waitTime?.maxWaitTimeDays && b.startedOnMillis);
+        let aHasWait = !!(a.waitTime?.maxWaitTimeDays != null && a.startedOnMillis);
+        let bHasWait = !!(b.waitTime?.maxWaitTimeDays != null && b.startedOnMillis);
         if (aHasWait && !bHasWait) return -1;
         if (!aHasWait && bHasWait) return 1;
         if (!aHasWait && !bHasWait) return 0;
@@ -361,6 +362,15 @@ export function WorkordersComponent({}) {
         }}
         data={sortWorkorders(zOpenWorkorders)}
         keyExtractor={(item, index) => index}
+        ListEmptyComponent={() => (
+          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>
+            {!zWorkordersLoaded ? (
+              <SmallLoadingIndicator message="Loading workorders...." size={40} textStyle={{ fontSize: 16 }} />
+            ) : (
+              <Text style={{ color: gray(0.4), fontSize: 14 }}>No workorders</Text>
+            )}
+          </View>
+        )}
         renderItem={(item) => {
           let workorder = item.item;
           const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);

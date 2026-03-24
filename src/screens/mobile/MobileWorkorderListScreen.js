@@ -120,7 +120,7 @@ export function MobileWorkorderListScreen() {
                 </View>
 
                 {/* Phone number */}
-                {!!workorder.customerPhone && (
+                {!!workorder.customerCell && (
                   <Text
                     numberOfLines={1}
                     style={{
@@ -130,7 +130,7 @@ export function MobileWorkorderListScreen() {
                       marginBottom: 4,
                     }}
                   >
-                    {formatPhoneWithDashes(workorder.customerPhone)}
+                    {formatPhoneWithDashes(workorder.customerCell)}
                   </Text>
                 )}
 

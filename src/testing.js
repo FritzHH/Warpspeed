@@ -89,7 +89,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
     wo.status = SETTINGS_OBJ.statuses[Math.floor(Math.random() * 5)]?.id || "";
     wo.customerFirst = "Ricky";
     wo.customerLast = "Bobby";
-    wo.customerPhone = "2393369177";
+    wo.customerCell = "2393369177";
     wo.customerID = "1236";
     wo.startedBy = "Fritz Hieb";
     wo.changeLog.push("Started by: " + "Fritz" + " " + "Hieb");
@@ -117,7 +117,7 @@ export function fillCustomers() {
     cust.id = generateUPCBarcode();
     cust.first = "test first" + i;
     cust.last = "test last " + i;
-    cust.cell = "111111111" + i;
+    cust.customerCell = "111111111" + i;
     cust.city = "test city " + i;
   }
 }

@@ -5,7 +5,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 
 import { TAB_NAMES } from "../../data";
-import { TabMenuButton, Image_, TextInput_, Button_ } from "../../components";
+import { TabMenuButton, Image_, TextInput_, Button_, Tooltip } from "../../components";
 import { Items_Dashboard } from "../screen_components/Items_Screen/Items_Dashboard";
 import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
 import { WorkorderPreview } from "../screen_components/Items_Screen/Items_WorkorderPreview";
@@ -373,12 +373,14 @@ const TabBar = ({ onTranslatePress }) => {
           alignItems: "center",
         }}
       >
-        <TouchableOpacity
-          onPress={onTranslatePress}
-          style={{ paddingHorizontal: 10, justifyContent: "center" }}
-        >
-          <Image_ icon={ICONS.paperPlane} size={22} />
-        </TouchableOpacity>
+        <Tooltip text="Send translated text to customer display" position="bottom">
+          <TouchableOpacity
+            onPress={onTranslatePress}
+            style={{ paddingHorizontal: 10, justifyContent: "center" }}
+          >
+            <Image_ icon={ICONS.paperPlane} size={22} />
+          </TouchableOpacity>
+        </Tooltip>
         <TouchableOpacity
           onPress={() => (window.location.href = ROUTES.home)}
           style={{ paddingHorizontal: 10, justifyContent: "center", marginTop: 4 }}

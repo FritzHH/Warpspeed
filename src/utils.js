@@ -2000,6 +2000,7 @@ function createPrintBase(workorder, customer, salesTaxPercent) {
   r.barcode = r.id
   r.shopName = SHOP_NAME
   r.waitTime = workorder.waitTime?.label;
+  r.waitTimeEstimateLabel = calculateWaitEstimateLabel(workorder) || "";
 
   const currentUser = useLoginStore.getState().getCurrentUser();
   const userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
@@ -2109,6 +2110,112 @@ function createPrintSale(sale = SALE_PROTO, customer, wo = WORKORDER_PROTO, sale
 }
 
 
+
+// Shared wait time estimate label calculation
+// Takes a workorder and returns a display string for the estimated completion
+export function calculateWaitEstimateLabel(workorder) {
+  let waitObj = workorder?.waitTime;
+
+  // No wait time selected
+  if (!waitObj || !waitObj.label) return "Missing estimate";
+
+  // "No Estimate" selected
+  if (waitObj.label === "No Estimate") return "No estimate";
+
+  let maxWaitDays = Number(waitObj.maxWaitTimeDays);
+  if (!maxWaitDays || maxWaitDays <= 0) return "";
+
+  let startedOnMillis = Number(workorder.startedOnMillis);
+  if (!startedOnMillis) return "";
+
+  // Get settings
+  let settings = useSettingsStore.getState().getSettings();
+
+  // Get label categories
+  let categories = settings?.waitTimeLabelCategories || [];
+  if (categories.length === 0) {
+    categories = [
+      { id: "default1", label: "First half {weekDayName}" },
+      { id: "default2", label: "Second half {weekDayName}" },
+    ];
+  }
+
+  // Build open day set from store hours
+  let standardHours = settings?.storeHours?.standard || [];
+  let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  let openDayNames = new Set(standardHours.filter((d) => d.isOpen).map((d) => d.name));
+
+  // Calculate end date: walk forward from startedOn, counting only open days
+  let date = new Date(startedOnMillis);
+  let openDaysCounted = 0;
+  let safety = 0;
+  while (openDaysCounted < maxWaitDays && safety < 365) {
+    date.setDate(date.getDate() + 1);
+    safety++;
+    if (openDayNames.has(dayNames[date.getDay()])) openDaysCounted++;
+  }
+
+  // Compare at midnight precision
+  let endDate = new Date(date);
+  endDate.setHours(0, 0, 0, 0);
+  let today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let endTime = endDate.getTime();
+  let todayTime = today.getTime();
+  let daysOut = Math.round((endTime - todayTime) / 86400000);
+
+  // Pick category label (first half / second half)
+  let categoryIdx = 0;
+  if (daysOut === 0) {
+    let hoursIntoDay = new Date().getHours();
+    let segmentSize = 24 / categories.length;
+    categoryIdx = Math.min(Math.floor(hoursIntoDay / segmentSize), categories.length - 1);
+  }
+  let categoryLabel = (categories[categoryIdx]?.label || "").replace("{weekDayName}", "").trim();
+
+  // Build the suffix for short dates
+  function dateSuffix(d) {
+    return d === 1 || d === 21 || d === 31 ? "st" : d === 2 || d === 22 ? "nd" : d === 3 || d === 23 ? "rd" : "th";
+  }
+
+  if (daysOut < 0) {
+    // Overdue
+    let daysOverdue = Math.abs(daysOut);
+    if (daysOverdue === 1) return "Overdue yesterday";
+    if (daysOverdue <= 6) return "Overdue " + dayNames[endDate.getDay()];
+    let shortDay = getWordDayOfWeek(endTime, true);
+    let month = getWordMonth(endTime);
+    let day = endDate.getDate();
+    return "Overdue " + shortDay + ", " + month + " " + day + dateSuffix(day);
+  }
+
+  if (daysOut === 0) {
+    // Today
+    return categoryLabel ? categoryLabel + " today" : "Today";
+  }
+
+  if (daysOut === 1) {
+    // Tomorrow
+    return categoryLabel ? categoryLabel + " tomorrow" : "Tomorrow";
+  }
+
+  if (daysOut >= 2 && daysOut <= 3) {
+    // 2-3 days: category + day name
+    let targetDayName = dayNames[endDate.getDay()];
+    return categoryLabel ? categoryLabel + " " + targetDayName : targetDayName;
+  }
+
+  if (daysOut >= 4 && daysOut <= 6) {
+    // 4-6 days: day name only
+    return dayNames[endDate.getDay()];
+  }
+
+  // 7+ days: short date
+  let shortDay = getWordDayOfWeek(endTime, true);
+  let month = getWordMonth(endTime);
+  let day = endDate.getDate();
+  return shortDay + ", " + month + " " + day + dateSuffix(day);
+}
 
 export const printBuilder = {
   test: () => {

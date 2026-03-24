@@ -3,8 +3,10 @@
 import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
+  checkInputForNumbersOnly,
   formatMillisForDisplay,
   formatPhoneWithDashes,
+  createNewWorkorder,
   generateRandomID,
   generateUPCBarcode,
   gray,
@@ -13,6 +15,7 @@ import {
   printBuilder,
   removeUnusedFields,
   resolveStatus,
+  calculateWaitEstimateLabel,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -33,8 +36,10 @@ import {
   TAB_NAMES,
   COLORS,
   NONREMOVABLE_STATUSES,
+  NONREMOVABLE_WAIT_TIMES,
   CONTACT_RESTRICTIONS,
   RECEIPT_TYPES,
+  WAIT_TIMES_PROTO,
 } from "../../../data";
 import { MILLIS_IN_DAY } from "../../../constants";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -147,15 +152,16 @@ export const ActiveWorkorderComponent = ({}) => {
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses)?.label?.toLowerCase() === "done & paid";
 
+
   // Stable reference so ScreenModal doesn't remount the modal content on parent re-renders
   const CustomerInfoComponent = useCallback(() => (
     <CustomerInfoScreenModalComponent
       customerID={zOpenWorkorder?.customerID}
       button1Text={"New Workorder"}
       button2Text={"Close"}
-      handleButton1Press={() =>
+      handleButton1Press={(customerInfoFromModal) =>
         handleCustomerNewWorkorderPress(
-          useCurrentCustomerStore.getState().customer
+          customerInfoFromModal || useCurrentCustomerStore.getState().customer
         )
       }
       handleButton2Press={() => _setShowCustomerInfoScreen(false)}
@@ -233,22 +239,20 @@ export const ActiveWorkorderComponent = ({}) => {
 
   function handleCustomerNewWorkorderPress(customer) {
     useLoginStore.getState().requireLogin(() => {
-      _setShowCustomerInfoScreen();
-      let wo = cloneDeep(WORKORDER_PROTO);
-      wo.customerID = customer.id;
+      _setShowCustomerInfoScreen(false);
       let _currentUser = useLoginStore.getState().currentUser;
-      wo.changeLog = wo.changeLog.push(
-        "Started by: " + _currentUser?.first + " " + _currentUser?.last?.[0]
-      );
-      wo.customerFirst = customer.first;
-      wo.customerLast = customer.last;
-      wo.customerCell = customer.customerCell || customer.customerLandline;
-      wo.customerLandline = customer.customerLandline || "";
-      wo.customerEmail = customer.email || "";
-      wo.customerContactRestriction = customer.contactRestriction || "";
-      wo.id = generateUPCBarcode();
-      wo.startedOnMillis = new Date().getTime();
-      wo.status = SETTINGS_OBJ.statuses[0]?.id || "";
+      let wo = createNewWorkorder({
+        customerID: customer.id,
+        customerFirst: customer.first,
+        customerLast: customer.last,
+        customerCell: customer.customerCell || customer.customerLandline,
+        customerLandline: customer.customerLandline,
+        customerEmail: customer.email,
+        customerContactRestriction: customer.contactRestriction,
+        startedByFirst: _currentUser?.first,
+        startedByLast: _currentUser?.last,
+        status: SETTINGS_OBJ.statuses[0]?.id || "",
+      });
       useOpenWorkordersStore.getState().setWorkorder(wo, false);
       useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
     });
@@ -363,29 +367,31 @@ export const ActiveWorkorderComponent = ({}) => {
             borderRadius: 7,
           }}
         >
-          <ScreenModal
-            modalVisible={sShowCustomerInfoScreen}
-            showOuterModal={true}
-            buttonLabel={
-              capitalizeFirstLetterOfString(zCustomer?.first || zOpenWorkorder?.customerFirst) + " " + capitalizeFirstLetterOfString(zCustomer?.last || zOpenWorkorder?.customerLast)
-            }
-            buttonIcon={ICONS.ridingBike}
-            buttonIconStyle={{ width: 35, height: 35 }}
-            buttonStyle={{
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: 5,
-              borderRadius: 5,
-              paddingHorizontal: 20,
-              backgroundColor: "transparent",
-            }}
-            handleButtonPress={() => _setShowCustomerInfoScreen(true)}
-            buttonTextStyle={{
-              fontSize: 20,
-              color: Colors.lightText,
-            }}
-            Component={CustomerInfoComponent}
-          />
+          <Tooltip text="View/edit customer" position="top">
+            <ScreenModal
+              modalVisible={sShowCustomerInfoScreen}
+              showOuterModal={true}
+              buttonLabel={
+                capitalizeFirstLetterOfString(zCustomer?.first || zOpenWorkorder?.customerFirst) + " " + capitalizeFirstLetterOfString(zCustomer?.last || zOpenWorkorder?.customerLast)
+              }
+              buttonIcon={ICONS.ridingBike}
+              buttonIconStyle={{ width: 35, height: 35 }}
+              buttonStyle={{
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 5,
+                borderRadius: 5,
+                paddingHorizontal: 20,
+                backgroundColor: "transparent",
+              }}
+              handleButtonPress={() => _setShowCustomerInfoScreen(true)}
+              buttonTextStyle={{
+                fontSize: 20,
+                color: Colors.lightText,
+              }}
+              Component={CustomerInfoComponent}
+            />
+          </Tooltip>
           <View
             style={{
               flexDirection: "row",
@@ -769,11 +775,14 @@ export const ActiveWorkorderComponent = ({}) => {
                 marginTop: 11,
               }}
             >
+              <Text style={{ color: gray(0.5), fontSize: 13, marginRight: 4 }}>
+                Max wait days:
+              </Text>
               <TextInput_
-                placeholder={"Wait time estimate"}
+                placeholder={"0"}
                 editable={!isDonePaid}
                 style={{
-                  width: "45%",
+                  width: 50,
                   borderWidth: 1,
                   borderColor: C.buttonLightGreenOutline,
                   color: C.text,
@@ -782,24 +791,31 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontSize: 15,
                   outlineWidth: 0,
                   borderRadius: 5,
-                  fontWeight: (zOpenWorkorder?.waitTime?.label || zOpenWorkorder?.waitTime) ? "500" : null,
+                  textAlign: "center",
+                  fontWeight: (zOpenWorkorder?.waitTime?.maxWaitTimeDays != null && zOpenWorkorder?.waitTime?.maxWaitTimeDays !== "") ? "500" : null,
                   backgroundColor: sWaitTimeBlink ? "rgba(255, 255, 0, 0.35)" : "transparent",
                   transition: "background-color 300ms ease",
                 }}
-                value={zOpenWorkorder?.waitTime?.label || (typeof zOpenWorkorder?.waitTime === "string" ? zOpenWorkorder?.waitTime : "")}
+                value={String(zOpenWorkorder?.waitTime?.maxWaitTimeDays ?? "")}
                 onChangeText={(val) => {
-                  useOpenWorkordersStore.getState().setField("waitTime", val, zOpenWorkorder.id);
+                  if (val !== "" && !checkInputForNumbersOnly(val)) return;
+                  let days = val === "" ? "" : Number(val);
+                  let waitObj = {
+                    ...WAIT_TIMES_PROTO,
+                    id: zOpenWorkorder?.waitTime?.id || generateRandomID(),
+                    label: val === "" ? "" : val + (days === 1 ? " Day" : " Days"),
+                    maxWaitTimeDays: days,
+                  };
+                  useOpenWorkordersStore.getState().setField("waitTime", waitObj, zOpenWorkorder.id);
                 }}
               />
               <View
                 style={{
-                  // marginTop: 11,
-                  width: "55%",
+                  flex: 1,
                   flexDirection: "row",
                   paddingLeft: 5,
                   justifyContent: "flex-start",
                   alignItems: "center",
-                  // backgroundColor: "green",
                 }}
               >
                 <View style={{ width: "100%" }}>
@@ -808,20 +824,29 @@ export const ActiveWorkorderComponent = ({}) => {
                     dataArr={zSettings.waitTimes}
                     enabled={!isDonePaid}
                     onSelect={(item, idx) => {
-                      useOpenWorkordersStore.getState().setField("waitTime", item, zOpenWorkorder.id);
+                      let isNonRemovable = NONREMOVABLE_WAIT_TIMES.some((nr) => nr.id === item.id);
+                      let waitObj = { ...item, removable: !isNonRemovable };
+                      useOpenWorkordersStore.getState().setField("waitTime", waitObj, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      opacity: zOpenWorkorder?.waitTime.label
+                      opacity: zOpenWorkorder?.waitTime?.label
                         ? DROPDOWN_SELECTED_OPACITY
                         : 1,
                     }}
-                    // modalCoordX={50}
                     ref={waitTimesRef}
                     buttonText={"Wait Times"}
                   />
                 </View>
               </View>
             </View>
+            {(() => {
+              let estimateLabel = calculateWaitEstimateLabel(zOpenWorkorder);
+              return estimateLabel ? (
+                <Text style={{ color: gray(0.5), fontSize: 13, fontStyle: "italic", marginTop: 4, width: "100%" }}>
+                  {estimateLabel}
+                </Text>
+              ) : null;
+            })()}
           </View>
 
           <View
@@ -829,11 +854,11 @@ export const ActiveWorkorderComponent = ({}) => {
               marginTop: 11,
               width: "100%",
 
-              borderColor: gray(0.05),
+              // borderColor: gray(0.05),
               paddingHorizontal: 8,
               paddingVertical: 8,
-              backgroundColor: C.backgroundListWhite,
-              borderWidth: 1,
+              backgroundColor: gray(0.05),
+              // borderWidth: 1,
               borderRadius: 5,
             }}
           >
@@ -1009,40 +1034,44 @@ export const ActiveWorkorderComponent = ({}) => {
         style={{
           flexDirection: "row",
           justifyContent: "center",
-          gap: 12,
-          width: "100%",
+          backgroundColor: C.backgroundListWhite,
           alignItems: "center",
           borderRadius: 5,
           borderColor: C.listItemBorder,
           borderWidth: 1,
-          paddingHorizontal: 10,
+          paddingHorizontal: 25,
+          borderRadius: 10,
           paddingVertical: 4,
           marginBottom: 8,
         }}
       >
-        <Button_
-          icon={ICONS.uploadCamera}
-          iconSize={40}
-          disabled={isDonePaid}
-          onPress={() => !isDonePaid && uploadInputRef.current?.click()}
-          buttonStyle={{
-            backgroundColor: "transparent",
-            paddingHorizontal: 0,
-            paddingVertical: 0,
-            opacity: isDonePaid ? 0.3 : 1,
-          }}
-        />
-        <View>
+        <Tooltip text="Upload photo" position="top">
           <Button_
-            icon={ICONS.viewPhoto}
-            iconSize={50}
-            onPress={() => _setShowMediaModal("view")}
+            icon={ICONS.uploadCamera}
+            iconSize={40}
+            disabled={isDonePaid}
+            onPress={() => !isDonePaid && uploadInputRef.current?.click()}
             buttonStyle={{
               backgroundColor: "transparent",
               paddingHorizontal: 0,
               paddingVertical: 0,
+              opacity: isDonePaid ? 0.3 : 1,
             }}
           />
+        </Tooltip>
+        <View>
+          <Tooltip text="View photos" position="top">
+            <Button_
+              icon={ICONS.viewPhoto}
+              iconSize={50}
+              onPress={() => _setShowMediaModal("view")}
+              buttonStyle={{
+                backgroundColor: "transparent",
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+              }}
+            />
+          </Tooltip>
           {/* {zOpenWorkorder?.media?.length > 0 && ( */}
             <View
               style={{
@@ -1112,7 +1141,7 @@ export const ActiveWorkorderComponent = ({}) => {
             onPress={handleIntakePrintPress}
           />
         </Tooltip>
-        <Tooltip text="Standalone Sale" position="top">
+        <Tooltip text="New sale" position="top">
           <Button_
             icon={ICONS.cashRegister}
             iconSize={35}

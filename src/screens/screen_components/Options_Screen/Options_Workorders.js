@@ -1,17 +1,16 @@
 /* eslint-disable */
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import {
+  calculateWaitEstimateLabel,
   capitalizeFirstLetterOfString,
   formatMillisForDisplay,
-  getWordDayOfWeek,
-  getWordMonth,
   gray,
   lightenRGBByPercent,
   log,
   resolveStatus,
 } from "../../../utils";
-import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator } from "../../../components";
-import { C, Colors } from "../../../styles";
+import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_ } from "../../../components";
+import { C, Colors, ICONS } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useRef } from "react";
 import { sortBy } from "lodash";
@@ -28,105 +27,67 @@ import { dbGetCustomer } from "../../../db_calls_wrapper";
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
 
-const dayNamesArr = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 function computeWaitInfo(workorder) {
-  const nowMillis = Date.now();
+  let label = calculateWaitEstimateLabel(workorder);
+  let result = { waitEndDay: "", textColor: C.text, isMissing: false };
 
-  const startedOnMillis = Number(workorder.startedOnMillis);
-  const maxWaitDays = Number(workorder.waitTime?.maxWaitTimeDays);
-  if (isNaN(maxWaitDays) || maxWaitDays === null || !startedOnMillis) return { color: null, waitEndDay: "", textColor: null };
+  if (!label) return result;
 
-  let endWaitMillis = startedOnMillis + maxWaitDays * NUM_MILLIS_IN_DAY;
-
-  // get closed day names from settings
-  let closedDayNamesArr = [];
-  const settings = useSettingsStore.getState().settings;
-  if (settings?.storeHours) {
-    Object.keys(settings.storeHours).forEach((dayName) => {
-      if (!settings.storeHours[dayName]?.isOpen) closedDayNamesArr.push(dayName);
-    });
+  // "Missing estimate" → show question mark icon
+  if (label === "Missing estimate") {
+    result.isMissing = true;
+    return result;
   }
 
-  // count closed days within wait period
-  let closedDaysInRange = 0;
-  if (closedDayNamesArr.length > 0) {
-    let current = new Date(startedOnMillis);
-    current.setHours(0, 0, 0, 0);
-    const end = new Date(endWaitMillis);
-    end.setHours(0, 0, 0, 0);
-    while (current <= end) {
-      if (closedDayNamesArr.includes(dayNamesArr[current.getDay()])) closedDaysInRange++;
-      current.setDate(current.getDate() + 1);
-    }
+  // "No estimate" → display as-is
+  if (label === "No estimate") {
+    result.waitEndDay = label;
+    return result;
   }
 
-  endWaitMillis = endWaitMillis + closedDaysInRange * NUM_MILLIS_IN_DAY;
+  let lowerLabel = label.toLowerCase();
 
-  // compare dates at midnight for day-level precision
-  let endDate = new Date(endWaitMillis);
-  endDate.setHours(0, 0, 0, 0);
-  let today = new Date(nowMillis);
-  today.setHours(0, 0, 0, 0);
-  let yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  let tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  let dayAfterTomorrow = new Date(today);
-  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-
-  let endTime = endDate.getTime();
-  let todayTime = today.getTime();
-  let yesterdayTime = yesterday.getTime();
-  let tomorrowTime = tomorrow.getTime();
-  let dayAfterTomorrowTime = dayAfterTomorrow.getTime();
-
-  let result = { color: null, waitEndDay: "", textColor: null };
-
-  if (endTime === todayTime) {
-    // due today
-    result.waitEndDay = "Today";
-    result.color = "red";
-    result.textColor = C.orange;
-  } else if (endTime === yesterdayTime) {
-    // due yesterday
-    result.waitEndDay = "Yesterday";
-    result.color = "red";
+  // Color rules
+  if (lowerLabel.includes("today") || lowerLabel.includes("overdue")) {
     result.textColor = "red";
-  } else if (endTime < yesterdayTime) {
-    // past due before yesterday — show short date in red
-    let shortDay = getWordDayOfWeek(endWaitMillis, true);
-    let month = getWordMonth(endWaitMillis);
-    let day = endDate.getDate();
-    let suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
-    result.waitEndDay = shortDay + ", " + month + " " + day + suffix;
-    result.color = "red";
-    result.textColor = "red";
-  } else if (endTime === tomorrowTime) {
-    // due tomorrow
-    result.waitEndDay = "Tomorrow";
-    result.color = "yellow";
-    result.textColor = C.text;
-  } else if (endTime === dayAfterTomorrowTime) {
-    // due day after tomorrow
-    result.waitEndDay = getWordDayOfWeek(endWaitMillis);
-    result.color = "green";
-    result.textColor = C.text;
-  } else {
-    // future — more than 2 days out
-    let daysOut = Math.ceil((endTime - todayTime) / NUM_MILLIS_IN_DAY);
-    if (daysOut <= 6) {
-      result.waitEndDay = getWordDayOfWeek(endWaitMillis);
+  } else if (lowerLabel.includes("tomorrow")) {
+    result.textColor = C.green;
+  }
+
+  // Overdue: split "Overdue X" into 2 lines
+  if (lowerLabel.startsWith("overdue ")) {
+    let afterOverdue = label.substring(8); // after "Overdue "
+    // Capitalize "Yesterday" if present
+    if (afterOverdue.toLowerCase() === "yesterday") afterOverdue = "Yesterday";
+    result.waitEndDay = "Overdue\n" + afterOverdue;
+    return result;
+  }
+
+  // Check for "today", "tomorrow" — capitalize and put on second line
+  if (lowerLabel.includes("today")) {
+    let parts = label.split(/\s+(today)/i);
+    let prefix = parts[0]?.trim();
+    if (prefix) {
+      result.waitEndDay = prefix + "\nToday";
     } else {
-      let shortDay = getWordDayOfWeek(endWaitMillis, true);
-      let month = getWordMonth(endWaitMillis);
-      let day = endDate.getDate();
-      let suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
-      result.waitEndDay = shortDay + " " + month + " " + day + suffix;
+      result.waitEndDay = "Today";
     }
-    result.textColor = C.text;
+    return result;
   }
 
+  if (lowerLabel.includes("tomorrow")) {
+    let parts = label.split(/\s+(tomorrow)/i);
+    let prefix = parts[0]?.trim();
+    if (prefix) {
+      result.waitEndDay = prefix + "\nTomorrow";
+    } else {
+      result.waitEndDay = "Tomorrow";
+    }
+    return result;
+  }
+
+  // Everything else: just show the label as-is (day name or short date)
+  result.waitEndDay = label;
   return result;
 }
 
@@ -149,22 +110,24 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
         marginLeft: 5,
       }}
     >
-      <View style={{ flexDirection: "column", alignItems: "flex-end" }}>
-        {!!info.waitEndDay && (
-          <Text style={{ color: info.textColor || C.text, fontSize: info.waitEndDay === "Today" ? 16 : 13, fontWeight: info.waitEndDay === "Today" ? "600" : undefined, textAlign: "right" }}>
+      <View style={{ flexDirection: "column", alignItems: info.isMissing ? "center" : "flex-end", justifyContent: "center" }}>
+        {info.isMissing ? (
+          <Image_ source={ICONS.questionMark} style={{ width: 35, height: 35 }} />
+        ) : !!info.waitEndDay && info.waitEndDay.includes("\n") ? (
+          <>
+            <Text style={{ color: info.textColor, fontSize: 11, textAlign: "right", fontStyle: "italic" }}>
+              {capitalizeFirstLetterOfString(info.waitEndDay.split("\n")[0])}
+            </Text>
+            <Text style={{ color: info.textColor, fontSize: 13, textAlign: "right" }}>
+              {info.waitEndDay.split("\n")[1]}
+            </Text>
+          </>
+        ) : !!info.waitEndDay ? (
+          <Text style={{ color: info.textColor, fontSize: 13, textAlign: "right" }}>
             {capitalizeFirstLetterOfString(info.waitEndDay)}
           </Text>
-        )}
+        ) : null}
       </View>
-      {/* <View
-        style={{
-          backgroundColor: info.color,
-          width: 13,
-          height: 13,
-          borderRadius: 100,
-          marginLeft: 7,
-        }}
-      /> */}
     </View>
   );
 });
@@ -237,8 +200,8 @@ export function WorkordersComponent({}) {
       arr.sort((a, b) => {
         let aHasWait = !!(a.waitTime?.maxWaitTimeDays != null && a.startedOnMillis);
         let bHasWait = !!(b.waitTime?.maxWaitTimeDays != null && b.startedOnMillis);
-        if (aHasWait && !bHasWait) return -1;
-        if (!aHasWait && bHasWait) return 1;
+        if (!aHasWait && bHasWait) return -1;
+        if (aHasWait && !bHasWait) return 1;
         if (!aHasWait && !bHasWait) return 0;
         let aDue = a.startedOnMillis + a.waitTime.maxWaitTimeDays * NUM_MILLIS_IN_DAY;
         let bDue = b.startedOnMillis + b.waitTime.maxWaitTimeDays * NUM_MILLIS_IN_DAY;

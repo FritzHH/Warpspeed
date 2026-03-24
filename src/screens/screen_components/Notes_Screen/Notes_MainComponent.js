@@ -7,7 +7,7 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import { generateRandomID, gray, resolveStatus } from "../../../utils";
-import { Image_, TouchableOpacity_, TextInput_ } from "../../../components";
+import { Image_, TouchableOpacity_, TextInput_, Tooltip } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState, useRef } from "react";
 import { useOpenWorkordersStore, useLoginStore, useSettingsStore } from "../../../stores";
@@ -71,6 +71,20 @@ export function Notes_MainComponent() {
     );
   }
 
+  function formatNoteDate(millis) {
+    if (!millis) return "";
+    const d = new Date(millis);
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const day = days[d.getDay()];
+    const month = d.getMonth() + 1;
+    const date = d.getDate();
+    let hours = d.getHours();
+    const mins = d.getMinutes().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    return `${day} ${month}/${date}, ${hours}:${mins} ${ampm}`;
+  }
+
   function outsideClicked(option) {
     useLoginStore.getState().requireLogin(() => {
       let notesArr;
@@ -88,6 +102,7 @@ export function Notes_MainComponent() {
         userID: zCurrentUser.id,
         value: "",
         id: generateRandomID(),
+        createdAt: Date.now(),
       });
 
       useOpenWorkordersStore.getState().setField(fieldName, notesArr);
@@ -173,39 +188,40 @@ export function Notes_MainComponent() {
             paddingRight: 10,
           }}
         >
-          <TouchableOpacity_
-            onPress={() => outsideClicked("customer")}
-            style={{
-              flexDirection: "row",
-              width: "100%",
-              height: 35,
-              justifyContent: "space-between",
-              alignItems: "center",
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-              borderRadius: 15,
-              marginBottom: 5,
-            }}
-          >
-            <View
+          <Tooltip text="Add note" position="top">
+            <TouchableOpacity_
+              onPress={() => outsideClicked("customer")}
               style={{
                 flexDirection: "row",
+                width: "100%",
+                height: 35,
+                justifyContent: "space-between",
                 alignItems: "center",
-                width: "30%",
-                paddingLeft: 8,
+                borderColor: C.buttonLightGreenOutline,
+                borderWidth: 1,
+                borderRadius: 15,
+                marginBottom: 5,
               }}
             >
-              <Image_ icon={ICONS.notes} size={20} />
-              <Text
+              <View
                 style={{
-                  fontSize: 15,
-                  color: C.text,
-                  fontWeight: 500,
-                  marginLeft: 10,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  width: "30%",
+                  paddingLeft: 8,
                 }}
               >
-                {"Customer Notes"}
-              </Text>
+                <Image_ icon={ICONS.notes} size={20} />
+                <Text
+                  style={{
+                    fontSize: 15,
+                    color: C.text,
+                    fontWeight: 500,
+                    marginLeft: 10,
+                  }}
+                >
+                  {"Customer Notes"}
+                </Text>
             </View>
             <Text
               style={{
@@ -217,7 +233,8 @@ export function Notes_MainComponent() {
             >
               Click Here
             </Text>
-          </TouchableOpacity_>
+            </TouchableOpacity_>
+          </Tooltip>
 
           <View
             style={{
@@ -232,52 +249,62 @@ export function Notes_MainComponent() {
                 let index = item.index;
                 item = item.item;
                 return (
-                  <TouchableWithoutFeedback
-                    onPress={() => handleRowPress(item, index, "customer")}
+                  <View
+                    style={{
+                      width: "100%",
+                      flexDirection: "row",
+                      alignItems: "flex-start",
+                      borderRadius: 5,
+                      backgroundColor: C.backgroundWhite,
+                    }}
                   >
-                    <View
-                      style={{
-                        width: "100%",
-                        // paddingVertical: 3,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        borderRadius: 5,
-                        backgroundColor: C.backgroundWhite,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: gray(.4),
-                          padding: 2,
-                          fontSize: 12,
-                          // height: customerNotesHeight[index] || null,
-                          outlineWidth: 0,
-                        }}
-                      >
-                        {item.name}
-                      </Text>
-                      <TextInput_
-                        multiline={true}
-                        numberOfLines={10}
-                        capitalize={true}
-                        onChangeText={(val) =>
-                          textChanged(val, index, "customer")
-                        }
-                        style={{
-                          padding: 2,
-                          paddingLeft: 4,
-                          lineHeight: 18,
-                          outlineWidth: 0,
-                          outlineStyle: "none",
-                          borderWidth: 0,
-                          width: "100%",
-                          color: C.text,
-                        }}
-                        autoFocus={index === sFocusIdx}
-                        value={item.value}
-                      />
+                    <View style={{ alignItems: "center", paddingTop: 2 }}>
+                      <Tooltip text={formatNoteDate(item.createdAt)} position="right">
+                        <Text
+                          style={{
+                            color: gray(.4),
+                            padding: 2,
+                            fontSize: 12,
+                            outlineWidth: 0,
+                          }}
+                        >
+                          {item.name}
+                        </Text>
+                      </Tooltip>
+                      <Tooltip text="Delete note" position="right">
+                        <TouchableOpacity_
+                          onPress={() => deleteItem(item, index, "customer")}
+                          style={{ padding: 2 }}
+                        >
+                          <Image_
+                            icon={ICONS.trash}
+                            size={14}
+                            style={{ opacity: 0.35, filter: "grayscale(100%)" }}
+                          />
+                        </TouchableOpacity_>
+                      </Tooltip>
                     </View>
-                  </TouchableWithoutFeedback>
+                    <TextInput_
+                      multiline={true}
+                      numberOfLines={10}
+                      capitalize={true}
+                      onChangeText={(val) =>
+                        textChanged(val, index, "customer")
+                      }
+                      style={{
+                        padding: 2,
+                        paddingLeft: 4,
+                        lineHeight: 18,
+                        outlineWidth: 0,
+                        outlineStyle: "none",
+                        borderWidth: 0,
+                        flex: 1,
+                        color: C.text,
+                      }}
+                      autoFocus={index === sFocusIdx}
+                      value={item.value}
+                    />
+                  </View>
                 );
               }}
             />
@@ -294,51 +321,53 @@ export function Notes_MainComponent() {
             // paddingLeft: 10,
           }}
         >
-          <TouchableOpacity_
-            onPress={() => outsideClicked("internal")}
-            style={{
-              flexDirection: "row",
-              width: "100%",
-              height: 35,
-              justifyContent: "flex-start",
-              alignItems: "center",
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-              borderRadius: 15,
-              marginBottom: 5,
-              paddingHorizontal: 3,
-            }}
-          >
-            <View
+          <Tooltip text="Add note" position="top">
+            <TouchableOpacity_
+              onPress={() => outsideClicked("internal")}
               style={{
-                width: "30%",
                 flexDirection: "row",
+                width: "100%",
+                height: 35,
+                justifyContent: "flex-start",
                 alignItems: "center",
+                borderColor: C.buttonLightGreenOutline,
+                borderWidth: 1,
+                borderRadius: 15,
+                marginBottom: 5,
+                paddingHorizontal: 3,
               }}
             >
-              <Image_ icon={ICONS.gears1} size={20} />
-              <Text
+              <View
                 style={{
-                  marginLeft: 10,
-                  fontSize: 15,
-                  color: C.text,
-                  fontWeight: 500,
+                  width: "30%",
+                  flexDirection: "row",
+                  alignItems: "center",
                 }}
               >
-                {"Internal Notes"}
+                <Image_ icon={ICONS.gears1} size={20} />
+                <Text
+                  style={{
+                    marginLeft: 10,
+                    fontSize: 15,
+                    color: C.text,
+                    fontWeight: 500,
+                  }}
+                >
+                  {"Internal Notes"}
+                </Text>
+              </View>
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: gray(0.18),
+                  width: "70%",
+                  textAlign: "center",
+                }}
+              >
+                Click Here
               </Text>
-            </View>
-            <Text
-              style={{
-                fontSize: 16,
-                color: gray(0.18),
-                width: "70%",
-                textAlign: "center",
-              }}
-            >
-              Click Here
-            </Text>
-          </TouchableOpacity_>
+            </TouchableOpacity_>
+          </Tooltip>
           <TouchableWithoutFeedback onPress={() => outsideClicked("internal")}>
             <View
               style={{
@@ -356,50 +385,60 @@ export function Notes_MainComponent() {
                   let index = item.index;
                   item = item.item;
                   return (
-                    <TouchableWithoutFeedback
-                      onPress={() => handleRowPress(item, index, "internal")}
+                    <View
+                      style={{
+                        width: "100%",
+                        flexDirection: "row",
+                        alignItems: "flex-start",
+                        backgroundColor: C.backgroundWhite,
+                      }}
                     >
-                      <View
-                        style={{
-                          width: "100%",
-                          // paddingVertical: 3,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          backgroundColor: C.backgroundWhite,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: gray(.4),
-                            padding: 2,
-                            // height: internalNotesHeight[index] || null,
-                            fontSize: 12
-                          }}
-                        >
-                          {item.name}
-                        </Text>
-                        <TextInput_
-                          multiline={true}
-                          numberOfLines={10}
-                          capitalize={true}
-                          onChangeText={(val) =>
-                            textChanged(val, index, "internal")
-                          }
-                          style={{
-                            padding: 2,
-                            paddingLeft: 4,
-                            lineHeight: 18,
-                            outlineWidth: 0,
-                            outlineStyle: "none",
-                            borderWidth: 0,
-                            width: "100%",
-                            color: C.text,
-                          }}
-                          autoFocus={index === sFocusIdx}
-                          value={item.value}
-                        />
+                      <View style={{ alignItems: "center", paddingTop: 2 }}>
+                        <Tooltip text={formatNoteDate(item.createdAt)} position="right">
+                          <Text
+                            style={{
+                              color: gray(.4),
+                              padding: 2,
+                              fontSize: 12,
+                            }}
+                          >
+                            {item.name}
+                          </Text>
+                        </Tooltip>
+                        <Tooltip text="Delete note" position="right">
+                          <TouchableOpacity_
+                            onPress={() => deleteItem(item, index, "internal")}
+                            style={{ padding: 2 }}
+                          >
+                            <Image_
+                              icon={ICONS.trash}
+                              size={14}
+                              style={{ opacity: 0.35, filter: "grayscale(100%)" }}
+                            />
+                          </TouchableOpacity_>
+                        </Tooltip>
                       </View>
-                    </TouchableWithoutFeedback>
+                      <TextInput_
+                        multiline={true}
+                        numberOfLines={10}
+                        capitalize={true}
+                        onChangeText={(val) =>
+                          textChanged(val, index, "internal")
+                        }
+                        style={{
+                          padding: 2,
+                          paddingLeft: 4,
+                          lineHeight: 18,
+                          outlineWidth: 0,
+                          outlineStyle: "none",
+                          borderWidth: 0,
+                          flex: 1,
+                          color: C.text,
+                        }}
+                        autoFocus={index === sFocusIdx}
+                        value={item.value}
+                      />
+                    </View>
                   );
                 }}
               />

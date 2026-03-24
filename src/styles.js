@@ -128,6 +128,7 @@ export const ICONS = {
   listGif: require(ASSETS_PATH + "list.gif"),
   clockGif: require(ASSETS_PATH + "clock.gif"),
   clock: require(ASSETS_PATH + "clock.png"),
+  questionMark: require(ASSETS_PATH + "questionMark.png"),
   cancelGif: require(ASSETS_PATH + "cancel.gif"),
   paperPlane: require(ASSETS_PATH + "paperPlane.png"),
   eyeballs: require(ASSETS_PATH + "eyeballs.png"),

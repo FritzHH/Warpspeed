@@ -157,7 +157,6 @@ export const WAIT_TIME_INCREMENTS = {
   week: "Weeks",
 };
 
-export const NONREMOVABLE_WAIT_TIMES = [];
 
 ////////// names of stuff ////////////////////////////
 export const INVENTORY_CATEGORY_NAMES = {
@@ -384,6 +383,7 @@ export const WORKORDER_PROTO = {
     label: "",
   },
   waitTime: "",
+  waitTimeEstimateLabel: "",
   changeLog: [],
   startedBy: "",
   startedOnMillis: "",
@@ -495,7 +495,6 @@ export const AUTO_CUSTOMER_NOTE_PROTO = {
 }
 
 export const AUTO_CUSTOMER_NOTE_TEXTS = [
-
 ]
 
 export const QUICK_TEXT_PROTO = {
@@ -512,6 +511,21 @@ export const PRINTER_PROTO = {
   online: "",
   lastSeen: "",
 }
+export const WAIT_TIMES_PROTO = {
+  id: "",
+  label: "",
+  maxWaitTimeDays: "",
+  removable: true,
+}
+
+export const NONREMOVABLE_WAIT_TIMES = [
+  {
+    id: "34j3kj3vnkd",
+    label: "No Estimate",
+    maxWaitTimeDays: 0,
+    removable: false,
+  }
+]
 
 // Objects with initial data /////////////////////////////////////////
 export const FRITZ_USER_OBJ = {
@@ -761,6 +775,13 @@ export const SETTINGS_OBJ = {
     },
   ],
   waitTimeLinkedStatus: {},
+  waitTimeLabelCategories: [
+    {
+      id: 'dkfjdk',
+      label: "First half {weekDayName}"
+    },
+    { id: 'ndfkdaj', label: 'Second half {weekDayName}' }
+  ],
   waitTimes: [
     {
       id: "34j3kj3dfdfgfkj3",
@@ -770,41 +791,44 @@ export const SETTINGS_OBJ = {
     {
       id: "34jngfedde3kj3kj3",
       label: "Today",
-      maxWaitTimeDays: 0,
+      maxWaitTimeDays: 0, removable: true,
     },
     {
       id: "34j3kjdww3kj3",
       label: "Tomorrow",
-      maxWaitTimeDays: 1,
+      maxWaitTimeDays: 1, removable: true,
     },
     {
       id: "34j3kj3",
       label: "1-2 Days",
-      maxWaitTimeDays: 2,
+      maxWaitTimeDays: 2, removable: true,
     },
     {
       id: "34j3kj33",
       label: "2-3 Days",
-      maxWaitTimeDays: 3,
+      maxWaitTimeDays: 3, removable: true,
     },
     {
       id: "34j3kj3kj3",
       label: "3-5 Days",
-      maxWaitTimeDays: 5,
+      maxWaitTimeDays: 5, removable: true,
     },
     {
       id: "34j3kj33kj3n",
       label: "1 Week",
-      maxWaitTimeDays: 7,
+      maxWaitTimeDays: 7, removable: true,
     },
     {
       id: "34j3kj3,rkjk",
       label: "1-2 Weeks",
-      maxWaitTimeDays: 14,
+      maxWaitTimeDays: 14, removable: true,
+
     },
     {
       id: "34j3kj3vnkd",
       label: "No Estimate",
+      maxWaitTimeDays: 0,
+      removable: false,
     },
   ],
   storeHours: {

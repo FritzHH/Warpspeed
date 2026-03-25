@@ -158,50 +158,59 @@ export function CardPayment({
 
   let activeReader = getInitialReader();
 
-  // ── Setup Firestore listeners (reused by startPayment + useEffect recovery) ──
+  // ── Setup Firestore listener on updates/current (single path for all events) ──
   function setupListeners(readerID, piID) {
+    console.log("setupListeners CALLED with readerID:", readerID, "piID:", piID);
     cleanupStoreListeners();
     let store = useStripePaymentStore.getState();
 
     let listener = newCheckoutListenToPaymentUpdates(
       readerID,
       piID,
-      // onUpdate
-      (updateData) => {
-        if (!updateData) return;
-        log("newCheckout card update:", updateData);
-        useStripePaymentStore.getState().setCardMessage("Processing payment...");
-        useStripePaymentStore.getState().setCardStatus("processingPayment");
-      },
-      // onCompletion
-      (completionData) => {
-        if (!completionData) return;
-        log("newCheckout card completion:", completionData);
-
-        // Clear timeout
+      (data) => {
+        if (!data) return;
         let s = useStripePaymentStore.getState();
-        if (s._cardTimeout) {
-          clearTimeout(s._cardTimeout);
-          s._cardTimeout = null;
-        }
+        console.log("newCheckout card UPDATE:", JSON.stringify(data, null, 2));
 
-        if (completionData.status === "succeeded" || completionData.payment_intent) {
-          let payment = buildCardPayment(completionData);
+        // ── SUCCESS: charge object written by webhook (has payment_intent or amount_captured) ──
+        if (data.status === "succeeded" && (data.payment_intent || data.amount_captured)) {
+          if (s._cardTimeout) { clearTimeout(s._cardTimeout); s._cardTimeout = null; }
+          let payment = buildCardPayment(data);
           s.setCardMessage(`Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`);
+          s.setCardError("");
           s.setCardStatus("succeeded");
           s.setPaymentIntentID(null);
           cleanupStoreListeners();
           if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
           if (callbacksRef.current.onPaymentCapture) callbacksRef.current.onPaymentCapture(payment);
-        } else if (completionData.status === "failed" || completionData.failure_code || completionData.decline_code) {
-          s.setCardError(buildCompletionError(completionData));
+          return;
+        }
+
+        // ── FAILURE: enriched failure data written by webhook ──
+        // Card declined / failed does NOT mean reader is busy — go back to idle so user can retry
+        if (data.status === "failed" || data.failure_code || data.decline_code) {
+          if (s._cardTimeout) { clearTimeout(s._cardTimeout); s._cardTimeout = null; }
+          s.setCardError(buildCompletionError(data));
           s.setCardMessage("");
-          s.setCardStatus("failed");
+          s.setCardStatus("idle");
+          s.setPaymentIntentID(null);
           cleanupStoreListeners();
           if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
+          return;
         }
+
+        // ── IN-PROGRESS: card tapped, processing, etc. ──
+        s.setCardMessage("Processing payment...");
+        s.setCardStatus("processingPayment");
       }
     );
+
+    if (!listener) {
+      console.log("setupListeners: listener returned null — newCheckoutListenToPaymentUpdates failed");
+      store.setCardError("Failed to set up payment listener");
+      store.setCardStatus("failed");
+      return;
+    }
 
     store._cardListeners = listener;
 
@@ -210,7 +219,8 @@ export function CardPayment({
       let s = useStripePaymentStore.getState();
       s.setCardError("Payment timed out — card reader may be unresponsive");
       s.setCardMessage("");
-      s.setCardStatus("failed");
+      s.setCardStatus("idle");
+      s.setPaymentIntentID(null);
       cleanupStoreListeners();
       if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     }, PAYMENT_TIMEOUT_MS);
@@ -234,18 +244,16 @@ export function CardPayment({
     // Case B: detect reader action when idle
     if (zCardStatus === "idle") {
       let action = activeReader.action;
-      if (action && action.type) {
+      if (action && action.type === "process_payment_intent") {
         let actionPiID = action.process_payment_intent?.payment_intent || "";
-        if (actionPiID && actionPiID === zPaymentIntentID) {
+        if (!actionPiID) return; // no PI on action — not a real block
+        if (actionPiID === zPaymentIntentID) {
           _zSetCardStatus("waitingForCard");
           _zSetCardMessage("Card reader ready to accept payment");
           setupListeners(activeReader.id, zPaymentIntentID);
         } else {
           _zSetCardStatus("readerBusy");
-          let msg = action.type === "process_payment_intent"
-            ? "Reader has an active payment" + (actionPiID ? " (" + actionPiID + ")" : "")
-            : "Reader is busy (" + action.type + ")";
-          _zSetCardError(msg);
+          _zSetCardError("Reader has an active payment (" + actionPiID + ")");
         }
       }
     }
@@ -451,10 +459,13 @@ export function CardPayment({
   }
 
   // ── Button state ──
-  let showClearReader = zCardStatus === "waitingForCard" || zCardStatus === "failed" || zCardStatus === "readerBusy";
-  let showClearing = zCardStatus === "clearing";
-  let showProcessing = zCardStatus === "initiating" || zCardStatus === "processingPayment";
-  let startEnabled = isEnabled && sRequestedAmount >= 50;
+  let startDisabled = !isEnabled
+    || sRequestedAmount < 50
+    || zCardStatus === "initiating"
+    || zCardStatus === "processingPayment"
+    || zCardStatus === "clearing"
+    || zCardStatus === "waitingForCard"
+    || zCardStatus === "readerBusy";
 
   return (
     <View
@@ -613,43 +624,35 @@ export function CardPayment({
         ) : null}
       </View>
 
-      {/* Action Button */}
-      {showClearReader ? (
+      {/* Action Buttons */}
+      <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+        <View style={{ width: '33%', alignItems: "flex-start", justifyContent: "flex-end", paddingLeft: 7 }}>
         <Tooltip text="Clearing the reader will cancel the transaction for all users, be careful!" position="top">
+
           <Button_
-            text="CLEAR READER"
+              text="Clear Reader"
             onPress={clearReader}
-            enabled={true}
+              enabled={zCardStatus !== "clearing"}
             colorGradientArr={COLOR_GRADIENTS.red}
+              textStyle={{ color: C.textWhite, fontSize: 11 }}
+              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90 }}
+            />
+          </Tooltip>
+
+        </View>
+        <View style={{ width: '33%', alignItems: "center", backgroundColor: 'transparent' }}>
+          <Button_
+            text="START CARD SALE"
+            onPress={startPayment}
+            enabled={!startDisabled}
+            colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
+            buttonStyle={{ cursor: startDisabled ? "default" : "inherit" }}
           />
-        </Tooltip>
-      ) : showClearing ? (
-        <Button_
-          text="CLEARING..."
-          enabled={false}
-          colorGradientArr={COLOR_GRADIENTS.red}
-          textStyle={{ color: C.textWhite, fontSize: 16 }}
-        />
-      ) : showProcessing ? (
-        <Button_
-          text="PROCESSING..."
-          enabled={false}
-          colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ color: C.textWhite, fontSize: 16 }}
-        />
-      ) : (
-        <Button_
-          text="START CARD SALE"
-          onPress={startPayment}
-          enabled={startEnabled}
-          colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ color: C.textWhite, fontSize: 16 }}
-          buttonStyle={{
-            cursor: startEnabled ? "inherit" : "default",
-          }}
-        />
-      )}
+        </View>
+        <View style={{ width: '33%', backgroundColor: 'green' }}>
+        </View>
+      </View>
     </View>
   );
 }

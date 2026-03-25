@@ -171,7 +171,7 @@ export function WorkorderCombiner({
                 )}
                 {!wo.isStandaloneSale && (
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    {wo.color1?.backgroundColor && (
+                    {wo.color1?.backgroundColor ? (
                       <Text
                         style={{
                           paddingHorizontal: 10,
@@ -184,8 +184,8 @@ export function WorkorderCombiner({
                       >
                         {wo.color1?.label || ""}
                       </Text>
-                    )}
-                    {wo.color2?.backgroundColor && (
+                    ) : null}
+                    {wo.color2?.backgroundColor ? (
                       <Text
                         style={{
                           paddingHorizontal: 10,
@@ -198,7 +198,7 @@ export function WorkorderCombiner({
                       >
                         {wo.color2?.label || ""}
                       </Text>
-                    )}
+                    ) : null}
                   </View>
                 )}
               </View>

@@ -188,7 +188,6 @@ export function NewCheckoutModalScreen() {
     let sale = createNewSale(zSettings, createdBy);
 
     if (zOpenWorkorder) {
-      console.log("WORKORDER FIELDS:", JSON.stringify(zOpenWorkorder, null, 2));
       // Checkout with workorder
       sale.customerID = zOpenWorkorder.customerID || "";
       let combined = [cloneDeep(zOpenWorkorder)];

@@ -233,18 +233,18 @@ export async function newCheckoutFetchWorkordersForSale(workorderIDs) {
 
 // ─── Payment Listener (Firestore Real-time) ───────────────────
 
-export function newCheckoutListenToPaymentUpdates(readerID, paymentIntentID, onUpdate, onCompletion) {
+export function newCheckoutListenToPaymentUpdates(readerID, paymentIntentID, onUpdate) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !readerID || !paymentIntentID) {
-      log("newCheckoutListenToPaymentUpdates: missing required params");
+      log("newCheckoutListenToPaymentUpdates: missing required params — tenantID:", tenantID, "storeID:", storeID, "readerID:", readerID, "piID:", paymentIntentID);
       return null;
     }
 
     const updatesPath = buildPaymentUpdatesPath(tenantID, storeID, readerID, paymentIntentID);
-    const completionsPath = buildPaymentCompletionsPath(tenantID, storeID, readerID, paymentIntentID);
+    log("newCheckoutListenToPaymentUpdates: subscribing to", updatesPath);
 
-    const unsubscribeUpdates = firestoreSubscribe(updatesPath, (data, error) => {
+    const unsubscribe = firestoreSubscribe(updatesPath, (data, error) => {
       if (error) {
         log("Payment updates listener error:", error);
         return;
@@ -252,20 +252,9 @@ export function newCheckoutListenToPaymentUpdates(readerID, paymentIntentID, onU
       if (onUpdate) onUpdate(data);
     });
 
-    const unsubscribeCompletions = firestoreSubscribe(completionsPath, (data, error) => {
-      if (error) {
-        log("Payment completions listener error:", error);
-        return;
-      }
-      if (onCompletion) onCompletion(data);
-    });
-
     return {
-      unsubscribeUpdates,
-      unsubscribeCompletions,
       unsubscribe: () => {
-        if (unsubscribeUpdates) unsubscribeUpdates();
-        if (unsubscribeCompletions) unsubscribeCompletions();
+        if (unsubscribe) unsubscribe();
       },
     };
   } catch (error) {

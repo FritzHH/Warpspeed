@@ -476,6 +476,9 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
     }
 
     try {
+      // Ensure DB is initialized before any Firestore operations
+      await getDB(firebaseServiceAccountKey);
+
       // Extract tenant/store context from payment intent metadata
       const paymentIntent = await stripeClient.paymentIntents.retrieve(
         paymentIntentID
@@ -510,7 +513,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
         paymentIntentID,
       });
 
-      // Handle successful payment
+      // Handle successful payment — write enriched data to updates/current
       if (action.status === "succeeded") {
         log("stripeEventWebhook: payment succeeded", { paymentIntentID });
 
@@ -525,25 +528,15 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
           const chargeID = paymentIntentComplete.latest_charge;
           const charge = await stripeClient.charges.retrieve(chargeID);
 
-          // Write charge to payment-processing (existing behavior — frontend listener)
-          const completeRef = DB.collection("tenants")
-            .doc(tenantID)
-            .collection("stores")
-            .doc(storeID)
-            .collection("payment-processing")
-            .doc(readerID)
-            .collection("payments")
-            .doc(paymentIntentID)
-            .collection("completions")
-            .doc("current");
-
-          await completeRef.set({
+          // Write charge to updates/current (overwrites initial action write)
+          await updateRef.set({
             ...charge,
+            status: "succeeded",
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
             readerID,
             paymentIntentID,
           });
-          log("stripeEventWebhook: charge written to payment-processing", { chargeID });
+          log("stripeEventWebhook: charge written to updates/current", { chargeID });
 
           // ── SERVER-SIDE SALE COMPLETION ──
           if (saleID) {
@@ -619,17 +612,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
       } else if (action.status === "failed") {
         log("stripeEventWebhook: payment failed", action);
 
-        const completeRef = DB.collection("tenants")
-          .doc(tenantID)
-          .collection("stores")
-          .doc(storeID)
-          .collection("payment-processing")
-          .doc(readerID)
-          .collection("payments")
-          .doc(paymentIntentID)
-          .collection("completions")
-          .doc("current");
-
+        // Build enriched failure data and write to updates/current (overwrites initial action write)
         let failureData = {
           status: "failed",
           failure_code: action.failure_code || "unknown",
@@ -651,7 +634,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
           log("stripeEventWebhook: error retrieving decline details", piError);
         }
 
-        await completeRef.set(failureData);
+        await updateRef.set(failureData);
       }
 
       // Cancel reader action to clean up

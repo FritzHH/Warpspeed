@@ -1,5 +1,6 @@
 /* eslint-disable */
 
+import { identity } from "lodash";
 import { DISCOUNT_TYPES, MILLIS_IN_HOUR, PERMISSION_LEVELS } from "./constants";
 import { getRgbFromNamedColor, lightenRGBByPercent } from "./utils";
 
@@ -511,6 +512,7 @@ export const PRINTER_PROTO = {
   online: "",
   lastSeen: "",
 }
+
 export const WAIT_TIMES_PROTO = {
   id: "",
   label: "",
@@ -526,6 +528,15 @@ export const NONREMOVABLE_WAIT_TIMES = [
     removable: false,
   }
 ]
+
+export const QUICK_ITEM_BUTTON_PROTO = {
+  id: "",
+  name: "",
+  parentID: null,
+  items: [/*inventory item IDs*/],
+  removable: true,
+}
+
 
 // Objects with initial data /////////////////////////////////////////
 export const FRITZ_USER_OBJ = {
@@ -703,21 +714,21 @@ export const SETTINGS_OBJ = {
   ],
   intakeButtons: [/*{ ...INTAKE_BUTTON_PROTO }*/],
   quickItemButtons: [
-    { id: "38trrneg", name: "Tune-Up", parentID: null, items: [] },
-    { id: "38trrdfdneg", name: "Tube", parentID: null, items: ["3Rh6JaP75v1esbywt18E", "9xCMXA89wZeAt1IBfLoU"] },
-    { id: "38trrsdfneg", name: "Tire", parentID: null, items: [] },
-    { id: "38trdfdrneg", name: "Tube & Tire", parentID: null, items: [] },
-    { id: "38trdfadrneg", name: "Brakes", parentID: null, items: [] },
-    { id: "38tradfdrneg", name: "Cable", parentID: null, items: ["Rcr7QgWyNPapdoYVuS7P", "9xCMXA89wZeAt1IBfLoU"] },
-    { id: "38trrnebfdgdg", name: "Shifting", parentID: null, items: ["iBFklersI6UmzR8x1ADn", "Rcr7QgWyNPapdoYVuS7P"] },
-    { id: "38trrnadfvceg", name: "Drivetrain", parentID: null, items: [] },
-    { id: "38trsadgdvdrneg", name: "Spoke", parentID: null, items: [] },
-    { id: "38trerfedgbdrneg", name: "Cleaning", parentID: null, items: [] },
-    { id: "38trrfrdggdneg", name: "Scooter", parentID: null, items: [] },
-    { id: "bnfdeqw", name: "Pickup/Delivery", parentID: null, items: [] },
-    { id: "34trhrg", name: "Diagnostics", parentID: null, items: [] },
-    { id: "labor", name: "$Labor", parentID: null, items: [] },
-    { id: "part", name: "$Part", parentID: null, items: [] },
+    { id: "38trrneg", name: "Tune-Up", parentID: null, items: [], removable: true },
+    { id: "38trrdfdneg", name: "Tube", parentID: null, items: ["3Rh6JaP75v1esbywt18E", "9xCMXA89wZeAt1IBfLoU"], removable: true },
+    { id: "38trrsdfneg", name: "Tire", parentID: null, items: [], removable: true },
+    { id: "38trdfdrneg", name: "Tube & Tire", parentID: null, items: [], removable: true },
+    { id: "38trdfadrneg", name: "Brakes", parentID: null, items: [], removable: true },
+    { id: "38tradfdrneg", name: "Cable", parentID: null, items: ["Rcr7QgWyNPapdoYVuS7P", "9xCMXA89wZeAt1IBfLoU"], removable: true },
+    { id: "38trrnebfdgdg", name: "Shifting", parentID: null, items: ["iBFklersI6UmzR8x1ADn", "Rcr7QgWyNPapdoYVuS7P"], removable: true },
+    { id: "38trrnadfvceg", name: "Drivetrain", parentID: null, items: [], removable: true },
+    { id: "38trsadgdvdrneg", name: "Spoke", parentID: null, items: [], removable: true },
+    { id: "38trerfedgbdrneg", name: "Cleaning", parentID: null, items: [], removable: true },
+    { id: "38trrfrdggdneg", name: "Scooter", parentID: null, items: [], removable: true },
+    { id: "bnfdeqw", name: "Pickup/Delivery", parentID: null, items: [], removable: true },
+    { id: "34trhrg", name: "Diagnostics", parentID: null, items: [], removable: true },
+    { id: "labor", name: "$Labor", parentID: null, items: [], removable: false },
+    { id: "part", name: "$Part", parentID: null, items: [], removable: false },
   ],
   // colors:
   bikeBrands: ["Trek", "Specialized", "Sun", "Marin", "Cannondale", "Jamis"],

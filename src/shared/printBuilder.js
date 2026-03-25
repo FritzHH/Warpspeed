@@ -348,6 +348,12 @@ function createPrintBase(workorder, customer, salesTaxPercent, context) {
   r.shopName = SHOP_NAME;
   r.waitTime = workorder.waitTime?.label;
   r.waitTimeEstimateLabel = calculateWaitEstimateLabel(workorder, _settings) || "";
+  if (workorder.partOrderEstimateMillis) {
+    var d = new Date(Number(workorder.partOrderEstimateMillis));
+    r.partEstimatedDelivery = getWordDayOfWeek(workorder.partOrderEstimateMillis, true) + ", " + getWordMonth(workorder.partOrderEstimateMillis) + " " + d.getDate();
+  } else {
+    r.partEstimatedDelivery = "";
+  }
 
   var userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
   var userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();

@@ -717,14 +717,14 @@ export const LineItemComponent = ({
           }}
         >
           <View style={{ width: "100%" }}>
-            {!!workorderLine.discountObj?.discountName && (
+            {!!(workorderLine.discountObj?.name || workorderLine.discountObj?.discountName) && (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <Text style={{ color: C.green, fontSize: 12, marginRight: 5 }}>
-                  {workorderLine.discountObj.discountName}
+                  {workorderLine.discountObj.name || workorderLine.discountObj.discountName}
                 </Text>
                 {!!workorderLine.discountObj?.savings && (
                   <Text style={{ color: C.green, fontSize: 12 }}>
-                    {"$" + formatCurrencyDisp(workorderLine.discountObj.savings)}
+                    {"-$" + formatCurrencyDisp(workorderLine.discountObj.savings)}
                   </Text>
                 )}
               </View>
@@ -792,7 +792,7 @@ export const LineItemComponent = ({
                         }}
                         numberOfLines={2}
                       >
-                        {inventoryItem.formalName || (isCustom ? "(tap to edit)" : "")}
+                        {inventoryItem.formalName ? (<>{(inventoryItem.customPart || inventoryItem.customLabor) && <Text style={{ fontSize: 13, fontWeight: "600", textTransform: "lowercase" }}>{inventoryItem.customPart ? "custom part - " : "custom labor - "}</Text>}{inventoryItem.formalName}</>) : (isCustom ? "(tap to edit)" : "")}
                       </Text>
                     </TouchableOpacity>
                   </View>

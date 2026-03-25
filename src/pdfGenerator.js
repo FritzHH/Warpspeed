@@ -394,6 +394,7 @@ export function generateWorkorderTicketPDF(data) {
   y = addDivider(doc, y, leftX, rightX);
 
   // Title
+  y += 10;
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
   let ticketTitle = data.receiptType === "Intake" ? "INTAKE TICKET" : "WORKORDER TICKET";

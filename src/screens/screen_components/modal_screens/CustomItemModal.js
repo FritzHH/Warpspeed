@@ -1,7 +1,7 @@
 /* eslint-disable */
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { View, Text, TouchableOpacity } from "react-native-web";
+import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { Button_, TextInput_, DropdownMenu } from "../../../components";
 import {
@@ -65,7 +65,8 @@ export const CustomItemModal = ({
   if (!visible) return null;
 
   function handlePriceChange(raw) {
-    const { display, cents } = usdTypeMask(raw);
+    const digitsOnly = String(raw).replace(/\D/g, "");
+    const { display, cents } = usdTypeMask(digitsOnly);
     _setPriceDisplay(display);
     _setPriceCents(cents);
     _setPriceManuallySet(true);
@@ -206,7 +207,7 @@ export const CustomItemModal = ({
           <TextInput_
             placeholder={isLabor ? "Labor description" : "Part name"}
             value={sName}
-            onChangeText={_setName}
+            onChangeText={(val) => _setName(val.length === 1 ? val.toUpperCase() : val.charAt(0).toUpperCase() + val.slice(1))}
             style={{
               borderWidth: 1,
               borderColor: C.buttonLightGreenOutline,
@@ -227,12 +228,13 @@ export const CustomItemModal = ({
                 Minutes
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <TextInput_
+                <TextInput
                   placeholder="0"
                   placeholderTextColor={gray(0.2)}
                   value={sMinutes}
-                  onChangeText={handleMinutesChange}
+                  onChangeText={(val) => handleMinutesChange(val.replace(/\D/g, ""))}
                   onFocus={handleMinutesFocus}
+                  inputMode="numeric"
                   style={{
                     width: 80,
                     borderWidth: 1,
@@ -267,12 +269,13 @@ export const CustomItemModal = ({
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Text style={{ fontSize: 16, color: C.text, marginRight: 4 }}>$</Text>
-              <TextInput_
+              <TextInput
                 placeholder="0.00"
                 placeholderTextColor={gray(0.2)}
                 value={sPriceDisplay}
                 onChangeText={handlePriceChange}
                 onFocus={handlePriceFocus}
+                inputMode="numeric"
                 style={{
                   width: 120,
                   borderWidth: 1,
@@ -298,7 +301,7 @@ export const CustomItemModal = ({
             <TextInput_
               placeholder="Intake notes..."
               value={sIntakeNotes}
-              onChangeText={_setIntakeNotes}
+              onChangeText={(val) => _setIntakeNotes(val.charAt(0).toUpperCase() + val.slice(1))}
               multiline={true}
               numberOfLines={3}
               style={{
@@ -323,7 +326,7 @@ export const CustomItemModal = ({
             <TextInput_
               placeholder="Receipt notes..."
               value={sReceiptNotes}
-              onChangeText={_setReceiptNotes}
+              onChangeText={(val) => _setReceiptNotes(val.charAt(0).toUpperCase() + val.slice(1))}
               multiline={true}
               numberOfLines={3}
               style={{

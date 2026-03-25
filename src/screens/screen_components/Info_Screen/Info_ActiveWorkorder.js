@@ -157,14 +157,23 @@ export const ActiveWorkorderComponent = ({}) => {
     let failed = 0;
     _setUploadProgress({ completed: 0, total, failed: 0, done: false });
     let newMedia = [...(zOpenWorkorder?.media || [])];
+    let storeName = (zSettings?.storeInfo?.displayName || "photo").replace(/\s+/g, "_");
     for (let i = 0; i < files.length; i++) {
       let fileToUpload = files[i];
+      let ext = fileToUpload.name.split(".").pop() || "jpg";
+      let rand = Math.floor(1000 + Math.random() * 9000);
+      let typeLabel = fileToUpload.type.startsWith("video") ? "Video" : "Image";
+      let cleanName = `${storeName}_${typeLabel}_${rand}.${ext}`;
       if (shouldCompress && fileToUpload.type.startsWith("image")) {
         let compressed = await compressImage(fileToUpload, 1024, 0.65);
         if (compressed) {
-          compressed.name = fileToUpload.name;
+          compressed.name = cleanName;
           fileToUpload = compressed;
+        } else {
+          fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
         }
+      } else {
+        fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
       }
       const result = await dbUploadWorkorderMedia(zOpenWorkorder.id, fileToUpload);
       if (result.success) {

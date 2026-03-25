@@ -1869,13 +1869,13 @@ function ftpReader() {
   //     client.ftp.verbose = true; // Optional: for debug logging
   //     //     Server                   : ftp.jbi.bike
   //     // Login name         : 121080
-  //     // Password            : g3QX&bn5
+  //     // Password            : [REDACTED]
   //     try {
   //       // Connect to FTP server
   //       await client.access({
   //         host: "ftp.jbi.bike",
   //         user: "121080",
-  //         password: "g3QX&bn5",
+  //         password: "[REDACTED]",
   //         secure: false, // Set to true if using FTPS
   //       });
   //       // List files in the root directory

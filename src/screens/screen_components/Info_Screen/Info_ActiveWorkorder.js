@@ -8,7 +8,7 @@ import {
   formatPhoneWithDashes,
   createNewWorkorder,
   generateRandomID,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
   log,
@@ -269,7 +269,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
       let wo = cloneDeep(WORKORDER_PROTO);
       wo.isStandaloneSale = true;
-      wo.id = generateUPCBarcode();
+      wo.id = generateEAN13Barcode();
       wo.startedBy = useLoginStore.getState().currentUser?.id;
       wo.startedOnMillis = new Date().getTime();
 

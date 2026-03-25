@@ -13,7 +13,7 @@ import { TextInput_, Button_, DropdownMenu, Image_ } from "../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import {
   searchInventory,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   formatCurrencyDisp,
   calculateRunningTotals,
   applyDiscountToWorkorderItem,
@@ -98,7 +98,7 @@ export function MobileItemEditScreen() {
       let workorderLines = zWorkorder.workorderLines || [];
       let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
       lineItem.inventoryItem = item;
-      lineItem.id = generateUPCBarcode();
+      lineItem.id = generateEAN13Barcode();
       workorderLines = [...workorderLines, lineItem];
       useOpenWorkordersStore
         .getState()
@@ -160,7 +160,7 @@ export function MobileItemEditScreen() {
       for (let i = 0; i <= num - 1; i++) {
         let newLine = cloneDeep(workorderLine);
         newLine.qty = 1;
-        newLine.id = generateUPCBarcode();
+        newLine.id = generateEAN13Barcode();
         newLine.discountObj = null;
         if (i === 0) {
           workorderLines[index] = newLine;

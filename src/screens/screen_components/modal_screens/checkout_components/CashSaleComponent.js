@@ -18,7 +18,7 @@ import {
 import { cloneDeep } from "lodash";
 import {
   formatCurrencyDisp,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   gray,
   usdTypeMask,
   dollarsToCents,
@@ -148,7 +148,7 @@ export const CashSaleComponent = ({
   function handleProcessRefundPress() {
     let refund = cloneDeep(REFUND_PROTO);
     refund.amountRefunded = sRequestedAmount;
-    refund.id = generateUPCBarcode();
+    refund.id = generateEAN13Barcode();
     refund.millis = new Date().getTime();
     handleRefundCapture(refund);
   }
@@ -161,7 +161,7 @@ export const CashSaleComponent = ({
     payment.cash = !sIsCheck;
     payment.check = sIsCheck;
     payment.millis = new Date().getTime();
-    payment.id = generateUPCBarcode();
+    payment.id = generateEAN13Barcode();
     handlePaymentCapture(payment);
 
     let diff = sTenderAmount - sRequestedAmount;

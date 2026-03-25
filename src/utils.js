@@ -1243,7 +1243,6 @@ export function generateEAN13Barcode(barcodeType) {
   let data = (begins + timePart + randomPart).slice(0, 12);
   return data + ean13CheckDigit(data);
 }
-export const generateUPCBarcode = generateEAN13Barcode;
 
 /**
  * Get the next sequential EAN-13 barcode for workorders or sales.

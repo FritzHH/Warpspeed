@@ -11,7 +11,7 @@ import {
 } from "../stores";
 import {
   createNewWorkorder,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   resolveStatus,
   formatCurrencyDisp,
   gray,
@@ -137,7 +137,7 @@ export function IntakeScreen() {
       if (!invItem) return;
       let line = cloneDeep(WORKORDER_ITEM_PROTO);
       line.inventoryItem = invItem;
-      line.id = generateUPCBarcode();
+      line.id = generateEAN13Barcode();
       lines.push(line);
     });
 

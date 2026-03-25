@@ -3,7 +3,7 @@ import { cloneDeep } from "lodash";
 import {
   generateBarcode,
   generateRandomID,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   trimToTwoDecimals,
 } from "./utils";
 import { INVENTORY_ITEM_PROTO } from "./data";
@@ -65,7 +65,7 @@ export function fillInventoryFromLightspeedObjArr(lightspeedObjArr) {
   for (let i = 0; i <= lightspeedObjArr.length - 1; i++) {
     let obj = lightspeedObjArr[i];
     let inv = cloneDeep(INVENTORY_ITEM_PROTO);
-    inv.id = generateUPCBarcode();
+    inv.id = generateEAN13Barcode();
     inv.formalName = obj.description;
     inv.upc = obj.upc;
     inv.cost = trimToTwoDecimals(obj.cost);

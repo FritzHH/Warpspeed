@@ -1,7 +1,6 @@
 import { cloneDeep } from "lodash";
 import {
   generateEAN13Barcode,
-  generateEAN13Barcode as generateUPCBarcode,
   getNextID,
   generateRandomID,
   calculateRunningTotals,
@@ -158,7 +157,7 @@ export function updateSaleWithTotals(sale, combinedWorkorders, addedItems, setti
 
 export function buildCashPayment(amountCaptured, amountTendered, isCheck) {
   let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
-  payment.id = generateUPCBarcode();
+  payment.id = generateEAN13Barcode();
   payment.amountCaptured = amountCaptured;
   payment.amountTendered = amountTendered;
   payment.cash = !isCheck;
@@ -172,7 +171,7 @@ export function buildCardPayment(stripeChargeData) {
   let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
   let card = stripeChargeData?.payment_method_details?.card_present;
 
-  payment.id = generateUPCBarcode();
+  payment.id = generateEAN13Barcode();
   payment.amountCaptured = stripeChargeData.amount_captured || 0;
   payment.cardIssuer = card?.receipt?.application_preferred_name || "Unknown";
   payment.cardType = card?.description || "";
@@ -196,7 +195,7 @@ export function buildManualCardPayment(chargeData) {
   let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
   let card = chargeData?.payment_method_details?.card;
 
-  payment.id = generateUPCBarcode();
+  payment.id = generateEAN13Barcode();
   payment.amountCaptured = chargeData.amount_captured || 0;
   payment.cardIssuer = card?.brand || "Unknown";
   payment.cardType = card?.brand || "";
@@ -280,7 +279,7 @@ export function validateCardRefundAmount(requestedAmount, payment) {
 
 export function buildRefundObject(amountRefunded, selectedLines, cardRefundID, notes, type) {
   let refund = cloneDeep(REFUND_PROTO);
-  refund.id = generateUPCBarcode();
+  refund.id = generateEAN13Barcode();
   refund.type = type || "";
   refund.amountRefunded = amountRefunded;
   refund.workorderLines = selectedLines || [];

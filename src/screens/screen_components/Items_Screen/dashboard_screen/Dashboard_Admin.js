@@ -19,7 +19,7 @@ import {
   searchInventory,
   generateRandomID,
   generateTimesForListDisplay,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   getNextID,
   getDayOfWeekFrom0To7Input,
   log,
@@ -1425,7 +1425,7 @@ const AppUserListComponent = ({
 
   function handleNewUserPress() {
     let userObj = cloneDeep(APP_USER);
-    userObj.id = generateUPCBarcode();
+    userObj.id = generateEAN13Barcode();
     let role = PERMISSION_LEVELS.user;
     userObj.permissions = role;
     commitUserInfoChange(userObj, true);

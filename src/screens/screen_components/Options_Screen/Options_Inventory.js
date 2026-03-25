@@ -7,7 +7,7 @@ import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
   formatCurrencyDisp,
   generateRandomID,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
   log,
@@ -215,7 +215,7 @@ export function InventoryComponent({}) {
       if (!workorderLines) workorderLines = [];
       let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
       lineItem.inventoryItem = item;
-      lineItem.id = generateUPCBarcode();
+      lineItem.id = generateEAN13Barcode();
       workorderLines = [...workorderLines, lineItem];
       useOpenWorkordersStore
         .getState()

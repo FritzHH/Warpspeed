@@ -17,7 +17,7 @@ import {
 import {
   lightenRGBByPercent,
   formatCurrencyDisp,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   log,
   printBuilder,
   gray,
@@ -329,7 +329,7 @@ export function NewCheckoutModalScreen() {
       qty: 1,
       inventoryItem: cloneDeep(invItem),
       discountObj: null,
-      id: generateUPCBarcode(),
+      id: generateEAN13Barcode(),
       useSalePrice: false,
       warranty: false,
     };
@@ -764,7 +764,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handlePopRegister() {
-    let printObj = { id: generateUPCBarcode(), receiptType: RECEIPT_TYPES.register };
+    let printObj = { id: generateEAN13Barcode(), receiptType: RECEIPT_TYPES.register };
     dbSavePrintObj(printObj, zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31");
     _setShowPopConfirm(true);
     setTimeout(() => _setShowPopConfirm(false), 1000);

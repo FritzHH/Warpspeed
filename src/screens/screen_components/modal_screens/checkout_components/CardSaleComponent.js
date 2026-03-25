@@ -18,7 +18,7 @@ import {
 import { cloneDeep, initial } from "lodash";
 import {
   formatCurrencyDisp,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   log,
   gray,
   usdTypeMask,
@@ -397,7 +397,7 @@ export const StripeCreditCardComponent = ({
             "Unknown";
           payment.cardType =
             paymentMethodDetails?.description || "Unknown Card";
-          payment.id = generateUPCBarcode();
+          payment.id = generateEAN13Barcode();
           payment.isRefund = sIsRefund;
           payment.millis = new Date().getTime();
           payment.authorizationCode =

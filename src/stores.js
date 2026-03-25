@@ -12,7 +12,7 @@ import {
   addOrRemoveFromArr,
   arrHasItem,
   checkArr,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   log,
   removeFieldFromObj,
   replaceOrAddToArr,
@@ -521,7 +521,7 @@ export const useLoginStore = create((set, get) => ({
   // create new punch obj, log user in locally and send punch obj to DB
   setCreateUserClock: (userID, millis, option) => {
     let punch = { ...TIME_PUNCH_PROTO };
-    punch.id = generateUPCBarcode();
+    punch.id = generateEAN13Barcode();
     punch.userID = userID;
     punch.option = option;
     punch.millis = millis;

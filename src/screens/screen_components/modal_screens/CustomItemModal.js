@@ -5,7 +5,7 @@ import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { Button_, TextInput_, DropdownMenu } from "../../../components";
 import {
-  generateUPCBarcode,
+  generateEAN13Barcode,
   usdTypeMask,
   applyDiscountToWorkorderItem,
   gray,
@@ -120,14 +120,14 @@ export const CustomItemModal = ({
     invItem.minutes = isLabor ? Number(sMinutes) || 0 : 0;
     invItem.id = isEditing
       ? existingLine.inventoryItem.id
-      : generateUPCBarcode();
+      : generateEAN13Barcode();
 
     // Build the workorder line
     let line = isEditing ? cloneDeep(existingLine) : cloneDeep(WORKORDER_ITEM_PROTO);
     line.inventoryItem = invItem;
     line.intakeNotes = sIntakeNotes;
     line.receiptNotes = sReceiptNotes;
-    if (!isEditing) line.id = generateUPCBarcode();
+    if (!isEditing) line.id = generateEAN13Barcode();
 
     // Apply discount if set
     if (sDiscountObj) {

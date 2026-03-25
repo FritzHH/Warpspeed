@@ -1,233 +1,250 @@
 /* eslint-disable */
-import { FlatList, View, Text, TextInput } from "react-native-web";
+import { View, Text, TextInput } from "react-native-web";
 import { TAB_NAMES, RECEIPT_TYPES } from "../../../data";
 import {
   useOpenWorkordersStore,
   useTabNamesStore,
   useCurrentCustomerStore,
+  useAlertScreenStore,
+  useCheckoutStore,
+  useWorkorderPreviewStore,
+  useTicketSearchStore,
 } from "../../../stores";
 
 import {
-  Button,
-  CheckBox_,
-  ScreenModal,
-  SHADOW_RADIUS_PROTO,
   Button_,
   SmallLoadingIndicator,
   Tooltip,
 } from "../../../components";
 import {
-  calculateRunningTotals,
-  generateUPCBarcode,
+  generateEAN13Barcode,
   gray,
   log,
   printBuilder,
-  showAlert,
-  trimToTwoDecimals,
 } from "../../../utils";
 import { useRef, useState } from "react";
-import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
   dbSavePrintObj,
   dbGetCompletedWorkorder,
   dbGetCompletedSale,
   dbGetCustomer,
+  dbSearchCompletedWorkorders,
+  dbSearchWorkordersByIdPrefix,
+  dbSearchSalesByIdPrefix,
 } from "../../../db_calls_wrapper";
 import { newCheckoutGetActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 export const StandaloneSaleComponent = ({}) => {
-  // store getters
-  const [sScanValue, _setScanValue] = useState("");
-  const [sSearching, _setSearching] = useState(false);
-  const [sResult, _setResult] = useState(null);
-  const [sError, _setError] = useState("");
-  const scanInputRef = useRef(null);
+  const [sTicketSearch, _setTicketSearch] = useState("");
+  const [sTicketSearching, _setTicketSearching] = useState(false);
 
   //////////////////////////////////////////////////////////////////////
 
-  async function handleScan(value) {
-    let digits = value.replace(/\D/g, "");
-    if (digits.length < 13) return;
-    digits = digits.substring(0, 13);
-    _setScanValue(digits);
-    _setSearching(true);
-    _setError("");
-    _setResult(null);
-
-    try {
-      let prefix = digits[0];
-
-      if (prefix === "1") {
-        // Warpspeed workorder — check local store first, then completed
-        let wo = useOpenWorkordersStore.getState().workorders.find(
-          (o) => o.id === digits
-        );
-        if (!wo) wo = await dbGetCompletedWorkorder(digits);
-        if (wo) {
-          _setResult({ type: "workorder", data: wo });
-        } else {
-          _setError("No workorder found for this ticket.");
-        }
-      } else if (prefix === "3") {
-        // Warpspeed sale — search by ID directly
-        let sale = await newCheckoutGetActiveSale(digits);
-        if (!sale) sale = await dbGetCompletedSale(digits);
-        if (sale) {
-          _setResult({ type: "sale", data: sale });
-        } else {
-          _setError("No sale found for this ticket.");
-        }
-      } else if (prefix === "2") {
-        // Lightspeed legacy — could be sale (22) or workorder (25)
-        let wo = useOpenWorkordersStore.getState().workorders.find(
-          (o) => o.id === digits
-        );
-        if (!wo) wo = await dbGetCompletedWorkorder(digits);
-        if (wo) {
-          _setResult({ type: "workorder", data: wo });
-        } else {
-          let sale = await newCheckoutGetActiveSale(digits);
-          if (!sale) sale = await dbGetCompletedSale(digits);
-          if (sale) {
-            _setResult({ type: "sale", data: sale });
-          } else {
-            _setError("No ticket found.");
-          }
-        }
+  function openWorkorder(wo, isCompleted) {
+    const store = useOpenWorkordersStore.getState();
+    store.setWorkorderPreviewID(null);
+    if (isCompleted) {
+      store.setWorkorder(wo, false);
+      store.setLockedWorkorderID(wo.id);
+      store.setOpenWorkorderID(wo.id);
+    } else {
+      if (wo.paymentComplete) {
+        store.setLockedWorkorderID(wo.id);
       } else {
-        _setError("Unrecognized ticket prefix.");
+        store.setLockedWorkorderID(null);
       }
-    } catch (e) {
-      log("Scan search error:", e);
-      _setError("Error searching. Try again.");
+      store.setOpenWorkorderID(wo.id);
     }
-
-    _setSearching(false);
-  }
-
-  function handleSelectWorkorder(wo) {
-    if (wo.customerID) {
-      dbGetCustomer(wo.customerID).then((customer) => {
-        if (customer) useCurrentCustomerStore.getState().setCustomer(customer);
-      });
-    }
-    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,
       optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
+    useWorkorderPreviewStore.getState().setPreviewObj(null);
+    if (wo.customerID) {
+      dbGetCustomer(wo.customerID).then((customer) => {
+        if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
+      });
+    }
+    _setTicketSearch("");
   }
 
+  function openSale(sale, isCompleted) {
+    if (isCompleted) {
+      useCheckoutStore.getState().setStringOnly(sale.id);
+    } else {
+      useCheckoutStore.getState().setViewOnlySale(sale);
+      useCheckoutStore.getState().setIsCheckingOut(true);
+    }
+    _setTicketSearch("");
+  }
+
+  function showTicketAlert(message) {
+    useAlertScreenStore.getState().setValues({
+      title: "Ticket Search",
+      message,
+      btn1Text: "OK",
+      handleBtn1Press: () => {},
+      showAlert: true,
+      canExitOnOuterClick: true,
+    });
+  }
+
+  async function executeTicketSearch() {
+    let trimmed = sTicketSearch.trim();
+    if (!trimmed) return;
+    _setTicketSearching(true);
+
+    try {
+      const store = useOpenWorkordersStore.getState();
+      const openWOs = store.getWorkorders();
+      const isFullBarcode = /^\d{13}$/.test(trimmed);
+      const isWoNumber = /^\d{5}$/.test(trimmed);
+      const isFirst4 = /^\d{4}$/.test(trimmed);
+
+      // Full 13-digit EAN-13 barcode — auto search
+      if (isFullBarcode) {
+        const prefix = trimmed[0];
+        if (prefix === "1") {
+          let found = openWOs.find((w) => w.id === trimmed);
+          if (found) { openWorkorder(found, false); return; }
+          let completed = await dbGetCompletedWorkorder(trimmed);
+          if (completed) { openWorkorder(completed, true); return; }
+          showTicketAlert("Workorder not found");
+        } else if (prefix === "3") {
+          let sale = await newCheckoutGetActiveSale(trimmed);
+          if (sale) { openSale(sale, false); return; }
+          sale = await dbGetCompletedSale(trimmed);
+          if (sale) { openSale(sale, true); return; }
+          showTicketAlert("Sale not found");
+        } else if (prefix === "2") {
+          let found = openWOs.find((w) => w.id === trimmed);
+          if (found) { openWorkorder(found, false); return; }
+          let completedWo = await dbGetCompletedWorkorder(trimmed);
+          if (completedWo) { openWorkorder(completedWo, true); return; }
+          let sale = await newCheckoutGetActiveSale(trimmed);
+          if (sale) { openSale(sale, false); return; }
+          sale = await dbGetCompletedSale(trimmed);
+          if (sale) { openSale(sale, true); return; }
+          showTicketAlert("Ticket not found");
+        } else {
+          showTicketAlert("Unrecognized barcode prefix");
+        }
+        return;
+      }
+
+      // 5-digit workorder number
+      if (isWoNumber) {
+        let found = openWOs.find((w) => w.workorderNumber === trimmed);
+        if (found) { openWorkorder(found, false); return; }
+        let results = await dbSearchCompletedWorkorders("workorderNumber", trimmed);
+        if (results.length > 0) { openWorkorder(results[0], true); return; }
+        showTicketAlert("Workorder not found");
+        return;
+      }
+
+      // 4-digit prefix search
+      if (isFirst4) {
+        const prefix = trimmed[0];
+        useTicketSearchStore.getState().setIsSearching(true);
+        useTicketSearchStore.getState().setResults([]);
+        useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.ticketSearchResults);
+
+        if (prefix === "1") {
+          let results = await dbSearchWorkordersByIdPrefix(trimmed);
+          useTicketSearchStore.getState().setResults(results);
+        } else if (prefix === "3") {
+          let results = await dbSearchSalesByIdPrefix(trimmed);
+          useTicketSearchStore.getState().setResults(results);
+        } else if (prefix === "2") {
+          let [woResults, saleResults] = await Promise.all([
+            dbSearchWorkordersByIdPrefix(trimmed),
+            dbSearchSalesByIdPrefix(trimmed),
+          ]);
+          useTicketSearchStore.getState().setResults([...woResults, ...saleResults]);
+        } else {
+          showTicketAlert("First digit must be 1 (workorder), 2 (legacy), or 3 (sale)");
+        }
+        useTicketSearchStore.getState().setIsSearching(false);
+        return;
+      }
+
+      showTicketAlert("Enter a 13-digit barcode, 5-digit WO #, or first 4 digits");
+    } catch (err) {
+      log("Ticket search error:", err);
+      showTicketAlert("Search error — please try again");
+    } finally {
+      _setTicketSearching(false);
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////
   return (
     <View
       style={{
         width: "100%",
         height: "100%",
+        justifyContent: "space-between",
         alignItems: "center",
       }}
     >
-      {/* Scan input */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          width: "100%",
-          paddingHorizontal: 15,
-          paddingTop: 10,
-        }}
-      >
-        <TextInput
-          ref={scanInputRef}
-          value={sScanValue}
-          onChangeText={(val) => {
-            _setScanValue(val);
-            _setError("");
-            _setResult(null);
-            let digits = val.replace(/\D/g, "");
-            if (digits.length >= 12) handleScan(val);
-          }}
-          placeholder="Scan ticket here..."
-          placeholderTextColor="lightgray"
-          style={{
-            flex: 1,
-            borderColor: C.buttonLightGreenOutline,
-            borderWidth: 2,
-            borderRadius: 10,
-            backgroundColor: C.listItemWhite,
-            paddingVertical: 10,
-            paddingHorizontal: 10,
-            fontSize: 16,
-            outlineWidth: 0,
-          }}
-        />
-        {sSearching && (
-          <View style={{ marginLeft: 10 }}>
-            <SmallLoadingIndicator />
-          </View>
-        )}
-      </View>
-
-      {/* Error message */}
-      {sError ? (
-        <Text style={{ color: C.red, marginTop: 10, fontSize: 14 }}>
-          {sError}
-        </Text>
-      ) : null}
-
-      {/* Result display */}
-      {sResult ? (
+      {/* Ticket search input */}
+      <View style={{ width: "100%" }}>
         <View
           style={{
-            marginTop: 10,
             width: "100%",
-            paddingHorizontal: 15,
+            paddingTop: 10,
+            paddingHorizontal: 20,
+            flexDirection: "row",
+            alignItems: "center",
           }}
         >
-          {sResult.type === "workorder" && (
-            <Button_
-              text={
-                "Open Workorder — " +
-                (sResult.data.customerFirst || "") +
-                " " +
-                (sResult.data.customerLast || "") +
-                " (#" +
-                (sResult.data.workorderNumber || "") +
-                ")"
-              }
-              onPress={() => handleSelectWorkorder(sResult.data)}
-              colorGradientArr={COLOR_GRADIENTS.green}
-              buttonStyle={{
-                paddingVertical: 10,
-                paddingHorizontal: 15,
-                borderRadius: 8,
-              }}
-              textStyle={{ fontSize: 14, color: "white", fontWeight: "600" }}
-            />
-          )}
-          {sResult.type === "sale" && (
-            <View
-              style={{
-                backgroundColor: C.listItemWhite,
-                borderColor: C.buttonLightGreenOutline,
-                borderWidth: 2,
-                borderRadius: 10,
-                padding: 12,
-              }}
-            >
-              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
-                {"Sale: " + sResult.data.id}
-              </Text>
-              <Text style={{ fontSize: 13, color: C.lightText, marginTop: 4 }}>
-                {"Total: $" +
-                  ((sResult.data.total || 0) / 100).toFixed(2) +
-                  "  |  Status: " +
-                  (sResult.data.status || (sResult.data.paymentComplete ? "completed" : "unknown"))}
-              </Text>
+          <TextInput
+            value={sTicketSearch}
+            placeholder={"Scan ticket or enter first 4 of barcode"}
+            placeholderTextColor={gray(0.35)}
+            onChangeText={(val) => _setTicketSearch(val)}
+            onSubmitEditing={() => executeTicketSearch()}
+            style={{
+              flex: 1,
+              caretColor: C.cursorRed,
+              color: C.text,
+              borderWidth: 1,
+              borderColor: gray(0.15),
+              borderRadius: 7,
+              height: 35,
+              outlineStyle: "none",
+              fontSize: 14,
+              paddingHorizontal: 10,
+              backgroundColor: C.listItemWhite,
+            }}
+          />
+          {sTicketSearching && (
+            <View style={{ marginLeft: 8 }}>
+              <SmallLoadingIndicator />
             </View>
           )}
         </View>
-      ) : null}
+        {sTicketSearch.trim().length === 4 && /^\d{4}$/.test(sTicketSearch.trim()) && (
+          <View style={{ width: "100%", paddingHorizontal: 20, alignItems: "flex-end", marginTop: 3 }}>
+            <Button_
+              text={sTicketSearch.trim()[0] === "3" ? "Search Sales" : sTicketSearch.trim()[0] === "2" ? "Search Legacy" : "Search Workorders"}
+              onPress={() => executeTicketSearch()}
+              buttonStyle={{
+                width: 150,
+                borderRadius: 5,
+                paddingVertical: 6,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.buttonLightGreen,
+              }}
+              textStyle={{ fontSize: 11, color: C.text }}
+            />
+          </View>
+        )}
+      </View>
 
       {/* Existing content */}
       <View
@@ -269,7 +286,7 @@ export const StandaloneSaleComponent = ({}) => {
             iconSize={40}
             onPress={() =>
               dbSavePrintObj(
-                { id: generateUPCBarcode(), receiptType: RECEIPT_TYPES.register },
+                { id: generateEAN13Barcode(), receiptType: RECEIPT_TYPES.register },
                 "8C:77:3B:60:33:22_Star MCP31"
               )
             }

@@ -119,7 +119,7 @@ export function CashPayment({
         alignItems: "center",
         paddingTop: 20,
         width: "100%",
-        flex: 1,
+        height: "48%",
         borderRadius: 15,
         ...SHADOW_RADIUS_PROTO,
         justifyContent: "space-between",
@@ -334,16 +334,21 @@ export function CashPayment({
       ) : null}
 
       {/* Process Button */}
-      <Button_
-        text="COMPLETE PAYMENT"
-        onPress={handleProcessPayment}
-        enabled={isEnabled && sPayAmount > 0}
-        colorGradientArr={COLOR_GRADIENTS.green}
-        textStyle={{ color: C.textWhite, fontSize: 16 }}
-        buttonStyle={{
-          cursor: isEnabled && sPayAmount > 0 ? "inherit" : "default",
-        }}
-      />
+      {(() => {
+        let canComplete = isEnabled && sPayAmount > 0 && (sIsCheck || sTenderAmount >= sPayAmount);
+        return (
+          <Button_
+            text="COMPLETE PAYMENT"
+            onPress={handleProcessPayment}
+            enabled={canComplete}
+            colorGradientArr={COLOR_GRADIENTS.green}
+            textStyle={{ color: C.textWhite, fontSize: 16 }}
+            buttonStyle={{
+              cursor: canComplete ? "inherit" : "default",
+            }}
+          />
+        );
+      })()}
     </View>
   );
 }

@@ -58,6 +58,9 @@ import { InventorySearch } from "./InventorySearch";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
 import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
 
+// DEV FLAG — set true to freeze UI after sale completes (skips DB writes, printing, SMS)
+const DEV_SKIP_COMPLETION = true;
+
 // Map CUSTOMER_LANGUAGES keys to Google Translate ISO codes
 const LANG_TO_ISO = { spanish: "es", english: "en" };
 function getTranslateCode(langKey) {
@@ -397,7 +400,7 @@ export function NewCheckoutModalScreen() {
     broadcastSaleToDisplay(sale, sCombinedWorkorders, sAddedItems, custFirst, custLast);
 
     // Persist immediately — network-failure-proof
-    newCheckoutSaveActiveSale(sale);
+    if (!DEV_SKIP_COMPLETION) newCheckoutSaveActiveSale(sale);
   }
 
   // Update workorders to track that a sale is in progress
@@ -406,11 +409,16 @@ export function NewCheckoutModalScreen() {
       let updated = cloneDeep(wo);
       updated.activeSaleID = sale.id;
       updated.amountPaid = sale.amountCaptured;
-      useOpenWorkordersStore.getState().setWorkorder(updated, true);
+      if (!DEV_SKIP_COMPLETION) useOpenWorkordersStore.getState().setWorkorder(updated, true);
     }
   }
 
   async function handleSaleComplete(sale) {
+    // DEV: skip all DB writes, printing, SMS — freeze UI for layout work
+    if (DEV_SKIP_COMPLETION) {
+      log("DEV_SKIP_COMPLETION: sale complete locally, skipping DB/print/SMS", sale);
+      return;
+    }
     // Idempotency: check if webhook already completed this sale
     let existingActiveSale = await newCheckoutGetActiveSale(sale.id);
     if (!existingActiveSale) {
@@ -473,16 +481,17 @@ export function NewCheckoutModalScreen() {
     };
     const printerID = settings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
 
-    // Always pop cash register if cash change is needed
-    const hasCashChange = (sale.payments || []).some(
-      (p) => p.cash && p.amountTendered > p.amountCaptured
-    );
-    if (hasCashChange) {
-      dbSavePrintObj({ popCashRegister: true }, printerID);
-    }
-
     // Build receipt context
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+
+    // Build the sale receipt — it computes popCashRegister and cashChangeGiven
+    let saleReceipt = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
+
+    // Pop cash register if receipt says change is needed and auto-print is off
+    // (auto-printed receipt already carries the popCashRegister flag)
+    if (saleReceipt.popCashRegister && !settings?.autoPrintSalesReceipt) {
+      dbSavePrintObj({ popCashRegister: true }, printerID);
+    }
 
     // Translate receipt if non-English language is set
     let translatedReceipt = null;
@@ -490,8 +499,7 @@ export function NewCheckoutModalScreen() {
     let langCode = getTranslateCode(sReceiptLanguage);
     if (langCode) {
       try {
-        let englishReceipt = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
-        let translated = await translateSalesReceipt(englishReceipt, langCode);
+        let translated = await translateSalesReceipt(saleReceipt, langCode);
         translatedReceipt = translated.translatedReceipt;
         translatedPdfLabels = translated.pdfLabels;
       } catch (e) {
@@ -501,12 +509,7 @@ export function NewCheckoutModalScreen() {
 
     // Print sale receipt
     if (settings?.autoPrintSalesReceipt) {
-      let toPrint;
-      if (translatedReceipt) {
-        toPrint = translatedReceipt;
-      } else {
-        toPrint = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
-      }
+      let toPrint = translatedReceipt || saleReceipt;
       dbSavePrintObj(toPrint, printerID);
     }
 
@@ -581,6 +584,17 @@ export function NewCheckoutModalScreen() {
     _setReaderError("");
     _setInitialized(false);
     _setReceiptLanguage("english");
+    // Clean up card payment state + listeners
+    let stripeStore = useStripePaymentStore.getState();
+    if (stripeStore._cardListeners) {
+      stripeStore._cardListeners.unsubscribe();
+      stripeStore._cardListeners = null;
+    }
+    if (stripeStore._cardTimeout) {
+      clearTimeout(stripeStore._cardTimeout);
+      stripeStore._cardTimeout = null;
+    }
+    stripeStore.resetCardTransaction();
     useCheckoutStore.getState().setIsCheckingOut(false);
   }
 
@@ -691,7 +705,7 @@ export function NewCheckoutModalScreen() {
               style={{
                 width: "29%",
                 height: "100%",
-                gap: 10,
+                justifyContent: "space-between",
               }}
             >
               <CashPayment
@@ -722,125 +736,94 @@ export function NewCheckoutModalScreen() {
               style={{
                 width: "29%",
                 paddingLeft: 10,
-                justifyContent: "space-between",
               }}
             >
-              <View style={{ flex: 1 }}>
-                <ScrollView style={{ flex: 1 }}>
-                  {/* Customer Info */}
-                  {zCustomer && (
-                    <View
-                      style={{
-                        borderWidth: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        borderRadius: 10,
-                        paddingVertical: 5,
-                        paddingHorizontal: 10,
-                        backgroundColor: C.backgroundListWhite,
-                      }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <View>
-                          <Text style={{ color: C.text, textTransform: "uppercase" }}>
-                            {zCustomer.first} {zCustomer.last}
-                            {!!zCustomer.contactRestriction && (
-                              <Text style={{ color: C.red }}>
-                                {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.call
-                                  ? "    (CALL ONLY)"
-                                  : "    (EMAIL ONLY)"}
-                              </Text>
-                            )}
+              {/* Customer Info */}
+              {zCustomer && (
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderRadius: 10,
+                    paddingVertical: 5,
+                    paddingHorizontal: 10,
+                    backgroundColor: C.backgroundListWhite,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <View>
+                      <Text style={{ color: C.text, textTransform: "uppercase" }}>
+                        {zCustomer.first} {zCustomer.last}
+                        {!!zCustomer.contactRestriction && (
+                          <Text style={{ color: C.red }}>
+                            {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.call
+                              ? "    (CALL ONLY)"
+                              : "    (EMAIL ONLY)"}
                           </Text>
-                          {zCustomer.email && (
-                            <Text style={{ color: gray(0.6), fontSize: 12 }}>
-                              {zCustomer.email}
-                            </Text>
-                          )}
-                        </View>
-                        <View>
-                          {zCustomer.customerCell ? (
-                            <Text style={{ color: C.text }}>
-                              {formatPhoneForDisplay(zCustomer.customerCell)}
-                            </Text>
-                          ) : !!zCustomer.land && (
-                            <Text style={{ color: C.text }}>
-                              {formatPhoneForDisplay(zCustomer.land)}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                      {!!zCustomer.streetAddress && (
-                        <Text style={{ color: C.text, fontSize: 13 }}>
-                          {zCustomer.streetAddress}
-                          {!!zCustomer.unit && (
-                            <Text style={{ color: C.text, fontSize: 13 }}>
-                              {"  |  Unit " + zCustomer.unit}
-                            </Text>
-                          )}
-                          {!!zCustomer.city && (
-                            <Text style={{ color: C.text, fontSize: 13 }}>
-                              {"   |   " + zCustomer.city}
-                            </Text>
-                          )}
+                        )}
+                      </Text>
+                      {zCustomer.email && (
+                        <Text style={{ color: gray(0.6), fontSize: 12 }}>
+                          {zCustomer.email}
                         </Text>
                       )}
                     </View>
-                  )}
-
-                  {/* Sale Totals */}
-                  <SaleTotals
-                    sale={sSale}
-                    cashChangeNeeded={sCashChangeNeeded}
-                    settings={zSettings}
-                  />
-
-                  {/* Payments List */}
-                  <PaymentsList payments={sSale?.payments} />
-                </ScrollView>
-              </View>
-
-              {/* Tax-Free & Receipt Language */}
-              {!saleComplete && (
-                <View
-                  style={{
-                    width: "100%",
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    paddingTop: 8,
-                    gap: 20,
-                  }}
-                >
-                  {sCombinedWorkorders.length > 0 && (
-                    <CheckBox_
-                      text="Tax-Free"
-                      isChecked={!!sCombinedWorkorders[0]?.taxFree}
-                      onCheck={handleTaxFreeToggle}
-                      textStyle={{ fontSize: 13, color: gray(0.5) }}
-                    />
-                  )}
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Receipts sent in:</Text>
-                    <DropdownMenu
-                      dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
-                      selectedIdx={Object.keys(CUSTOMER_LANGUAGES).indexOf(sReceiptLanguage || "english")}
-                      useSelectedAsButtonTitle={true}
-                      onSelect={(item) => _setReceiptLanguage(item.key)}
-                      buttonStyle={{ paddingHorizontal: 10, paddingVertical: 3 }}
-                      buttonTextStyle={{ fontSize: 12 }}
-                      buttonIcon={null}
-                      buttonIconSize={0}
-                      modalCoordX={80}
-                      modalCoordY={-15}
-                    />
+                    <View>
+                      {zCustomer.customerCell ? (
+                        <Text style={{ color: C.text }}>
+                          {formatPhoneForDisplay(zCustomer.customerCell)}
+                        </Text>
+                      ) : !!zCustomer.land && (
+                        <Text style={{ color: C.text }}>
+                          {formatPhoneForDisplay(zCustomer.land)}
+                        </Text>
+                      )}
+                    </View>
                   </View>
+                  {!!zCustomer.streetAddress && (
+                    <Text style={{ color: C.text, fontSize: 13 }}>
+                      {zCustomer.streetAddress}
+                      {!!zCustomer.unit && (
+                        <Text style={{ color: C.text, fontSize: 13 }}>
+                          {"  |  Unit " + zCustomer.unit}
+                        </Text>
+                      )}
+                      {!!zCustomer.city && (
+                        <Text style={{ color: C.text, fontSize: 13 }}>
+                          {"   |   " + zCustomer.city}
+                        </Text>
+                      )}
+                    </Text>
+                  )}
                 </View>
               )}
+
+              {/* Sale Totals (includes Amount Left To Pay + Change) */}
+              <SaleTotals
+                sale={sSale}
+                cashChangeNeeded={sCashChangeNeeded}
+                settings={zSettings}
+              />
+
+              {/* Blue container — fills remaining space */}
+              <View
+                style={{
+                  flex: 1,
+                  // backgroundColor: "blue",
+                  // borderRadius: 15,
+                  marginTop: 3,
+                }}
+              >
+
+                <PaymentsList payments={sSale?.payments} />
+
+              </View>
+
 
               {/* Bottom Buttons: Cancel/Close + Reprint */}
               <View
@@ -848,10 +831,52 @@ export function NewCheckoutModalScreen() {
                   width: "100%",
                   flexDirection: "row",
                   alignItems: "center",
-                  justifyContent: "space-around",
-                  paddingTop: 10,
+                  justifyContent: "space-between",
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  backgroundColor: C.backgroundListWhite,
+                  borderRadius: 10,
+                  paddingVertical: 2,
+                  marginTop: 5
                 }}
               >
+                {/* Tax-Free & Receipt Language */}
+                {/* {!saleComplete && (
+                  <View
+                    style={{
+                      // width: "100%",
+                      flexDirection: "row",
+                      // justifyContent: "center",
+                      alignItems: "center",
+                      paddingTop: 8,
+                      // gap: 20,
+                    }}
+                  > */}
+                {sCombinedWorkorders.length > 0 && !saleComplete && (
+                  <CheckBox_
+                    text="Tax-Free"
+                    isChecked={!!sCombinedWorkorders[0]?.taxFree}
+                    onCheck={handleTaxFreeToggle}
+                    textStyle={{ fontSize: 13, color: gray(0.5) }}
+                  />
+                )}
+                <View style={{ flexDirection: "column", alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, color: gray(0.5) }}>Receipt text</Text>
+                  <DropdownMenu
+                    dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
+                    selectedIdx={Object.keys(CUSTOMER_LANGUAGES).indexOf(sReceiptLanguage || "english")}
+                    useSelectedAsButtonTitle={true}
+                    onSelect={(item) => _setReceiptLanguage(item.key)}
+                    buttonStyle={{ marginLeft: 5, paddingHorizontal: 2, paddingVertical: 3 }}
+                    buttonTextStyle={{ fontSize: 12 }}
+                    buttonIcon={null}
+                    buttonIconSize={0}
+                    modalCoordX={80}
+                    modalCoordY={-55}
+                  />
+                </View>
+                {/* </View> */}
+                {/* )} */}
                 <Button_
                   enabled={
                     saleComplete ||
@@ -861,8 +886,17 @@ export function NewCheckoutModalScreen() {
                   text={saleComplete ? "CLOSE" : "CANCEL"}
                   onPress={closeModal}
                   textStyle={{ color: C.textWhite }}
-                  buttonStyle={{ width: 150 }}
+                  buttonStyle={{ width: 100, marginLeft: 0 }}
                 />
+                {saleComplete && (
+                  <Button_
+                    colorGradientArr={COLOR_GRADIENTS.greenblue}
+                    text="REPRINT"
+                    onPress={handleReprint}
+                    textStyle={{ color: C.textWhite }}
+                    buttonStyle={{ width: 100 }}
+                  />
+                )}
                 <Tooltip text="Pop register" position="top">
                   <Button_
                     onPress={handlePopRegister}
@@ -870,15 +904,7 @@ export function NewCheckoutModalScreen() {
                     iconSize={30}
                   />
                 </Tooltip>
-                {saleComplete && (
-                  <Button_
-                    colorGradientArr={COLOR_GRADIENTS.greenblue}
-                    text="REPRINT"
-                    onPress={handleReprint}
-                    textStyle={{ color: C.textWhite }}
-                    buttonStyle={{ width: 150 }}
-                  />
-                )}
+
               </View>
             </View>
 

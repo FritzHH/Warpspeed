@@ -100,12 +100,10 @@ export function PaymentsList({ payments = [] }) {
       }}
     >
       <Text style={{ color: C.green }}>PAYMENTS</Text>
-      <View style={{ maxHeight: "40%", width: "100%" }}>
-        <ScrollView contentContainerStyle={{ alignItems: "center" }}>
-          {payments.map((payment, idx) => (
-            <PaymentRow key={payment.id || idx} payment={payment} />
-          ))}
-        </ScrollView>
+      <View style={{ width: "100%" }}>
+        {payments.map((payment, idx) => (
+          <PaymentRow key={payment.id || idx} payment={payment} />
+        ))}
       </View>
     </View>
   );

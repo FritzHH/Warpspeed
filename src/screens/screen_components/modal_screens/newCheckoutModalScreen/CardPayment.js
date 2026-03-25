@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput, Animated } from "react-native-web";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button_, DropdownMenu, SHADOW_RADIUS_PROTO, SmallLoadingIndicator, Tooltip } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
@@ -10,6 +10,7 @@ import {
   gray,
   localStorageWrapper,
 } from "../../../../utils";
+import { useStripePaymentStore } from "../../../../stores";
 import { buildCardPayment } from "./newCheckoutUtils";
 import {
   newCheckoutProcessStripePayment,
@@ -95,6 +96,19 @@ function buildCompletionError(completionData) {
   return rawCode ? `Payment failed (${rawCode})` : "Payment failed";
 }
 
+// Cleans up Firestore listeners + timeout stored on the Zustand store
+function cleanupStoreListeners() {
+  let store = useStripePaymentStore.getState();
+  if (store._cardTimeout) {
+    clearTimeout(store._cardTimeout);
+    store._cardTimeout = null;
+  }
+  if (store._cardListeners) {
+    store._cardListeners.unsubscribe();
+    store._cardListeners = null;
+  }
+}
+
 export function CardPayment({
   amountLeftToPay = 0,
   onPaymentCapture,
@@ -107,37 +121,31 @@ export function CardPayment({
   onCardProcessingStart,
   onCardProcessingEnd,
 }) {
+  // ── Local state (input-only, no persistence needed) ──
   const [sRequestedAmount, _setRequestedAmount] = useState("");
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState("");
   const [sCardReader, _setCardReader] = useState(null);
-  const [sPaymentIntentID, _setPaymentIntentID] = useState("");
-  const [sProcessing, _setProcessing] = useState(false);
-  const [sErrorMessage, _setErrorMessage] = useState("");
-  const [sSuccessMessage, _setSuccessMessage] = useState("");
-  const [sListeners, _setListeners] = useState(null);
   const [sFocused, _setFocused] = useState("");
-  // Reader has an active action: our payment waiting for card, or an orphaned payment
-  const [sReaderActive, _setReaderActive] = useState(false);
 
-  const listenersRef = useRef(null);
-  const timeoutRef = useRef(null);
   const autoLoadedRef = useRef(false);
   const prevAmountRef = useRef(amountLeftToPay);
-  const startupCheckDoneRef = useRef(false);
 
-  function cleanupListeners() {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    if (listenersRef.current) {
-      listenersRef.current.unsubscribe();
-      listenersRef.current = null;
-      _setListeners(null);
-    }
-  }
+  // Ref for prop callbacks so Firestore listener closures always have current values
+  const callbacksRef = useRef({ onPaymentCapture, onCardProcessingEnd, onCardProcessingStart });
+  callbacksRef.current = { onPaymentCapture, onCardProcessingEnd, onCardProcessingStart };
 
-  // Auto-select reader from localStorage (per-device)
+  // ── Zustand state (persists across re-mounts) ──
+  const zCardStatus = useStripePaymentStore((s) => s.cardStatus);
+  const zCardError = useStripePaymentStore((s) => s.cardError);
+  const zCardMessage = useStripePaymentStore((s) => s.cardMessage);
+  const zPaymentIntentID = useStripePaymentStore((s) => s.paymentIntentID);
+  const _zSetCardStatus = useStripePaymentStore((s) => s.setCardStatus);
+  const _zSetCardError = useStripePaymentStore((s) => s.setCardError);
+  const _zSetCardMessage = useStripePaymentStore((s) => s.setCardMessage);
+  const _zSetPaymentIntentID = useStripePaymentStore((s) => s.setPaymentIntentID);
+  const _zResetCardTransaction = useStripePaymentStore((s) => s.resetCardTransaction);
+
+  // ── Reader selection (localStorage per-device) ──
   function getInitialReader() {
     if (sCardReader) return sCardReader;
     let saved = localStorageWrapper.getItem(LS_CARD_READER_KEY);
@@ -150,26 +158,100 @@ export function CardPayment({
 
   let activeReader = getInitialReader();
 
-  // On startup: check if the selected reader has a stuck/orphaned action
-  if (activeReader && !startupCheckDoneRef.current && !sProcessing && !sReaderActive) {
-    startupCheckDoneRef.current = true;
-    let action = activeReader.action;
-    if (action && action.type) {
-      let piID = action.process_payment_intent?.payment_intent || "";
-      if (piID && piID === sPaymentIntentID) {
-        // This is our payment intent — reader is ready for customer
-        _setReaderActive(true);
-        _setSuccessMessage("Waiting for card tap/insert...");
-      } else {
-        let msg = action.type === "process_payment_intent"
-          ? `Reader has an active payment` + (piID ? ` (${piID})` : "")
-          : `Reader is busy (${action.type})`;
-        _setReaderActive(true);
-        _setErrorMessage(msg);
+  // ── Setup Firestore listeners (reused by startPayment + useEffect recovery) ──
+  function setupListeners(readerID, piID) {
+    cleanupStoreListeners();
+    let store = useStripePaymentStore.getState();
+
+    let listener = newCheckoutListenToPaymentUpdates(
+      readerID,
+      piID,
+      // onUpdate
+      (updateData) => {
+        if (!updateData) return;
+        log("newCheckout card update:", updateData);
+        useStripePaymentStore.getState().setCardMessage("Processing payment...");
+        useStripePaymentStore.getState().setCardStatus("processingPayment");
+      },
+      // onCompletion
+      (completionData) => {
+        if (!completionData) return;
+        log("newCheckout card completion:", completionData);
+
+        // Clear timeout
+        let s = useStripePaymentStore.getState();
+        if (s._cardTimeout) {
+          clearTimeout(s._cardTimeout);
+          s._cardTimeout = null;
+        }
+
+        if (completionData.status === "succeeded" || completionData.payment_intent) {
+          let payment = buildCardPayment(completionData);
+          s.setCardMessage(`Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`);
+          s.setCardStatus("succeeded");
+          s.setPaymentIntentID(null);
+          cleanupStoreListeners();
+          if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
+          if (callbacksRef.current.onPaymentCapture) callbacksRef.current.onPaymentCapture(payment);
+        } else if (completionData.status === "failed" || completionData.failure_code || completionData.decline_code) {
+          s.setCardError(buildCompletionError(completionData));
+          s.setCardMessage("");
+          s.setCardStatus("failed");
+          cleanupStoreListeners();
+          if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
+        }
       }
-    }
+    );
+
+    store._cardListeners = listener;
+
+    // Payment timeout
+    store._cardTimeout = setTimeout(() => {
+      let s = useStripePaymentStore.getState();
+      s.setCardError("Payment timed out — card reader may be unresponsive");
+      s.setCardMessage("");
+      s.setCardStatus("failed");
+      cleanupStoreListeners();
+      if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
+    }, PAYMENT_TIMEOUT_MS);
   }
 
+  // ── useEffect: listener recovery + orphan detection ──
+  useEffect(() => {
+    if (!activeReader) return;
+    let store = useStripePaymentStore.getState();
+
+    // Case A: recover lost listener for our in-progress payment
+    if (
+      (zCardStatus === "waitingForCard" || zCardStatus === "processingPayment") &&
+      !store._cardListeners &&
+      zPaymentIntentID
+    ) {
+      setupListeners(activeReader.id, zPaymentIntentID);
+      return;
+    }
+
+    // Case B: detect reader action when idle
+    if (zCardStatus === "idle") {
+      let action = activeReader.action;
+      if (action && action.type) {
+        let actionPiID = action.process_payment_intent?.payment_intent || "";
+        if (actionPiID && actionPiID === zPaymentIntentID) {
+          _zSetCardStatus("waitingForCard");
+          _zSetCardMessage("Card reader ready to accept payment");
+          setupListeners(activeReader.id, zPaymentIntentID);
+        } else {
+          _zSetCardStatus("readerBusy");
+          let msg = action.type === "process_payment_intent"
+            ? "Reader has an active payment" + (actionPiID ? " (" + actionPiID + ")" : "")
+            : "Reader is busy (" + action.type + ")";
+          _zSetCardError(msg);
+        }
+      }
+    }
+  }, [activeReader?.id, activeReader?.action?.type, zCardStatus]);
+
+  // ── Handlers ──
   function handleAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
     if (result.cents > amountLeftToPay) {
@@ -184,170 +266,116 @@ export function CardPayment({
   function handleReaderSelect(item) {
     let reader = stripeReaders.find((r) => r.id === item.id);
     _setCardReader(reader || null);
-    _setErrorMessage("");
-    _setReaderActive(false);
+    _zSetCardError("");
+    _zSetCardMessage("");
     if (reader) {
       localStorageWrapper.setItem(LS_CARD_READER_KEY, { id: reader.id, label: item.label || reader.id });
       // Check if newly selected reader has a stuck action
       if (reader.action && reader.action.type) {
         let piID = reader.action.process_payment_intent?.payment_intent || "";
-        if (piID && piID === sPaymentIntentID) {
-          _setReaderActive(true);
-          _setSuccessMessage("Waiting for card tap/insert...");
+        if (piID && piID === zPaymentIntentID) {
+          _zSetCardStatus("waitingForCard");
+          _zSetCardMessage("Card reader ready to accept payment");
         } else {
+          _zSetCardStatus("readerBusy");
           let msg = reader.action.type === "process_payment_intent"
-            ? `Reader has an active payment` + (piID ? ` (${piID})` : "")
-            : `Reader is busy (${reader.action.type})`;
-          _setReaderActive(true);
-          _setErrorMessage(msg);
+            ? "Reader has an active payment" + (piID ? " (" + piID + ")" : "")
+            : "Reader is busy (" + reader.action.type + ")";
+          _zSetCardError(msg);
         }
+      } else {
+        // Reader has no action — reset to idle if was in a reader-specific state
+        if (zCardStatus === "readerBusy") _zSetCardStatus("idle");
       }
     }
   }
 
   async function startPayment() {
-    if (sProcessing || sReaderActive) return;
+    if (zCardStatus !== "idle" && zCardStatus !== "succeeded") return;
     if (!activeReader) {
-      _setErrorMessage("No card reader selected");
+      _zSetCardError("No card reader selected");
       return;
     }
     if (!sRequestedAmount || sRequestedAmount < 50) {
-      _setErrorMessage("Minimum card payment is $0.50");
+      _zSetCardError("Minimum card payment is $0.50");
       return;
     }
     if (sRequestedAmount > amountLeftToPay) {
-      _setErrorMessage("Amount exceeds balance due");
+      _zSetCardError("Amount exceeds balance due");
       return;
     }
 
-    _setProcessing(true);
-    _setErrorMessage("");
-    _setSuccessMessage("Initiating payment...");
+    _zSetCardStatus("initiating");
+    _zSetCardError("");
+    _zSetCardMessage("Initiating payment...");
 
-    // Notify parent that card is processing this amount (cash side updates immediately)
-    if (onCardProcessingStart) onCardProcessingStart(sRequestedAmount);
+    if (callbacksRef.current.onCardProcessingStart) callbacksRef.current.onCardProcessingStart(sRequestedAmount);
 
     try {
       let result = await newCheckoutProcessStripePayment(
         sRequestedAmount,
         activeReader.id,
-        sPaymentIntentID || null,
+        zPaymentIntentID || null,
         saleID,
         customerID
       );
 
       if (!result?.success) {
-        _setErrorMessage(result?.message || "Payment initiation failed");
-        _setSuccessMessage("");
-        _setProcessing(false);
-        if (onCardProcessingEnd) onCardProcessingEnd();
+        _zSetCardError(result?.message || "Payment initiation failed");
+        _zSetCardMessage("");
+        _zSetCardStatus("failed");
+        if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
         return;
       }
 
       let piID = result.data?.paymentIntentID;
-      _setPaymentIntentID(piID);
-      _setProcessing(false);
-      _setReaderActive(true);
-      _setSuccessMessage("Waiting for card tap/insert...");
+      _zSetPaymentIntentID(piID);
+      _zSetCardStatus("waitingForCard");
+      _zSetCardMessage("Card reader ready to accept payment");
 
-      // Set up real-time listener for payment updates
-      let listener = newCheckoutListenToPaymentUpdates(
-        activeReader.id,
-        piID,
-        // onUpdate
-        (updateData) => {
-          if (!updateData) return;
-          log("newCheckout card update:", updateData);
-          _setSuccessMessage("Processing payment...");
-        },
-        // onCompletion
-        (completionData) => {
-          if (!completionData) return;
-          log("newCheckout card completion:", completionData);
-
-          // Clear timeout on any completion response
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
-
-          if (
-            completionData.status === "succeeded" ||
-            completionData.payment_intent
-          ) {
-            let payment = buildCardPayment(completionData);
-            _setSuccessMessage(
-              `Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`
-            );
-            _setReaderActive(false);
-            _setRequestedAmount("");
-            _setRequestedAmountDisp("");
-            _setPaymentIntentID("");
-            cleanupListeners();
-            if (onCardProcessingEnd) onCardProcessingEnd();
-            if (onPaymentCapture) onPaymentCapture(payment);
-          } else if (completionData.status === "failed" || completionData.failure_code || completionData.decline_code) {
-            _setErrorMessage(buildCompletionError(completionData));
-            _setSuccessMessage("");
-            cleanupListeners();
-            if (onCardProcessingEnd) onCardProcessingEnd();
-            // Keep sReaderActive true — user needs to clear the reader
-          }
-        }
-      );
-
-      listenersRef.current = listener;
-      _setListeners(listener);
-
-      // Payment timeout
-      timeoutRef.current = setTimeout(() => {
-        _setErrorMessage("Payment timed out — card reader may be unresponsive");
-        _setSuccessMessage("");
-        cleanupListeners();
-        if (onCardProcessingEnd) onCardProcessingEnd();
-        // Keep sReaderActive true — user needs to clear the reader
-      }, PAYMENT_TIMEOUT_MS);
+      setupListeners(activeReader.id, piID);
     } catch (error) {
       log("newCheckout card payment error:", error);
       let msg = error?.message || "Payment failed";
-      let isReaderBusy = error?.code === "functions/resource-exhausted"
-        || msg.includes("currently processing")
-        || msg.includes("Reader is busy");
-      if (isReaderBusy) {
-        _setReaderActive(true);
-      } else if (error?.code === "functions/unavailable" || msg.includes("offline")) {
-        msg = "Reader is offline — check power and network (" + msg + ")";
+      let code = error?.code || "";
+
+      if (code === "functions/resource-exhausted" || msg.includes("currently processing") || msg.includes("Reader is busy")) {
+        _zSetCardStatus("readerBusy");
+        _zSetCardError(msg);
+      } else if (code === "functions/unavailable" || msg.includes("offline")) {
+        _zSetCardStatus("idle");
+        _zSetCardError("Reader is offline — check power and network (" + msg + ")");
+      } else {
+        _zSetCardStatus("idle");
+        _zSetCardError(msg);
       }
-      _setErrorMessage(msg);
-      _setSuccessMessage("");
-      _setProcessing(false);
-      cleanupListeners();
-      if (onCardProcessingEnd) onCardProcessingEnd();
+      _zSetCardMessage("");
+      cleanupStoreListeners();
+      if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     }
   }
 
-  // Clears whatever action the reader is processing (our payment or orphaned)
   async function clearReader() {
     if (!activeReader) return;
+    _zSetCardStatus("clearing");
+    _zSetCardMessage("Clearing reader...");
+    _zSetCardError("");
+    cleanupStoreListeners();
+
     try {
-      _setProcessing(true);
-      _setSuccessMessage("Clearing reader...");
-      _setErrorMessage("");
-      cleanupListeners();
       let result = await newCheckoutCancelStripePayment(activeReader.id);
-      _setSuccessMessage(result?.message || "Reader cleared");
-      _setProcessing(false);
-      _setReaderActive(false);
-      _setPaymentIntentID("");
-      if (onCardProcessingEnd) onCardProcessingEnd();
+      _zSetCardMessage(result?.message || "Reader cleared");
+      _zResetCardTransaction();
+      if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     } catch (error) {
       log("clearReader error:", error);
-      _setErrorMessage(error?.message || "Failed to clear reader");
-      _setSuccessMessage("");
-      _setProcessing(false);
+      _zSetCardError(error?.message || "Failed to clear reader");
+      _zSetCardMessage("");
+      _zSetCardStatus("readerBusy");
     }
   }
 
+  // ── Derived values ──
   let savedCardReaders = settings?.cardReaders || [];
   let readerDropdownData = stripeReaders
     .filter((r) => r.status === "online")
@@ -358,7 +386,8 @@ export function CardPayment({
 
   let hasOnlineReaders = readerDropdownData.length > 0;
   let boxEnabled = hasOnlineReaders && !saleComplete;
-  let isEnabled = boxEnabled && amountLeftToPay > 0 && !sProcessing;
+  let isProcessing = zCardStatus === "initiating" || zCardStatus === "processingPayment" || zCardStatus === "clearing";
+  let isEnabled = boxEnabled && amountLeftToPay > 0 && !isProcessing;
 
   // Auto-load amountLeftToPay into card amount on first availability
   if (hasOnlineReaders && amountLeftToPay > 0 && !autoLoadedRef.current) {
@@ -380,6 +409,7 @@ export function CardPayment({
     }
   }
 
+  // ── No readers early return ──
   if (!hasOnlineReaders) {
     return (
       <View
@@ -387,7 +417,7 @@ export function CardPayment({
           alignItems: "center",
           paddingTop: 20,
           width: "100%",
-          flex: 1,
+          height: "48%",
           borderRadius: 15,
           ...SHADOW_RADIUS_PROTO,
           justifyContent: "center",
@@ -420,6 +450,10 @@ export function CardPayment({
     );
   }
 
+  // ── Button state ──
+  let showClearReader = zCardStatus === "waitingForCard" || zCardStatus === "failed" || zCardStatus === "readerBusy";
+  let showClearing = zCardStatus === "clearing";
+  let showProcessing = zCardStatus === "initiating" || zCardStatus === "processingPayment";
   let startEnabled = isEnabled && sRequestedAmount >= 50;
 
   return (
@@ -429,7 +463,7 @@ export function CardPayment({
         alignItems: "center",
         paddingTop: 15,
         width: "100%",
-        flex: 1,
+        height: "48%",
         borderRadius: 15,
         ...SHADOW_RADIUS_PROTO,
         justifyContent: "space-between",
@@ -458,7 +492,7 @@ export function CardPayment({
                 ? (savedCardReaders.find((s) => s.id === activeReader.id)?.label || activeReader.id)
                 : "Select Reader"
             }
-            enabled={!sProcessing}
+            enabled={!isProcessing}
             buttonStyle={{
               paddingVertical: 4,
               paddingHorizontal: 6,
@@ -525,7 +559,7 @@ export function CardPayment({
 
       {/* Status Messages + Processing Indicator */}
       <View style={{ alignItems: "center", justifyContent: "center" }}>
-        {sProcessing && (
+        {isProcessing && (
           <SmallLoadingIndicator
             color={C.green}
             text=""
@@ -533,7 +567,7 @@ export function CardPayment({
             containerStyle={{ padding: 2 }}
           />
         )}
-        {sErrorMessage ? (
+        {zCardError ? (
           <View
             style={{
               backgroundColor: "rgba(220,50,50,0.1)",
@@ -551,11 +585,11 @@ export function CardPayment({
                 textAlign: "center",
               }}
             >
-              {sErrorMessage}
+              {zCardError}
             </Text>
           </View>
         ) : null}
-        {sSuccessMessage ? (
+        {zCardMessage ? (
           <View
             style={{
               backgroundColor: "rgba(0,160,0,0.1)",
@@ -573,32 +607,46 @@ export function CardPayment({
                 textAlign: "center",
               }}
             >
-              {sSuccessMessage}
+              {zCardMessage}
             </Text>
           </View>
         ) : null}
       </View>
 
       {/* Action Button */}
-      {sReaderActive ? (
+      {showClearReader ? (
         <Tooltip text="Clearing the reader will cancel the transaction for all users, be careful!" position="top">
           <Button_
-            text={sProcessing ? "CLEARING..." : "CLEAR READER"}
+            text="CLEAR READER"
             onPress={clearReader}
-            enabled={!sProcessing}
+            enabled={true}
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
           />
         </Tooltip>
+      ) : showClearing ? (
+        <Button_
+          text="CLEARING..."
+          enabled={false}
+          colorGradientArr={COLOR_GRADIENTS.red}
+          textStyle={{ color: C.textWhite, fontSize: 16 }}
+        />
+      ) : showProcessing ? (
+        <Button_
+          text="PROCESSING..."
+          enabled={false}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          textStyle={{ color: C.textWhite, fontSize: 16 }}
+        />
       ) : (
         <Button_
-          text={sProcessing ? "PROCESSING..." : "START CARD SALE"}
+          text="START CARD SALE"
           onPress={startPayment}
-          enabled={startEnabled && !sProcessing}
+          enabled={startEnabled}
           colorGradientArr={COLOR_GRADIENTS.green}
           textStyle={{ color: C.textWhite, fontSize: 16 }}
           buttonStyle={{
-            cursor: startEnabled && !sProcessing ? "inherit" : "default",
+            cursor: startEnabled ? "inherit" : "default",
           }}
         />
       )}

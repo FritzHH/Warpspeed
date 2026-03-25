@@ -441,6 +441,31 @@ export const useStripePaymentStore = create((set, get) => ({
       paymentAmount: 0,
     }));
   },
+
+  // ── Card transaction state (persists across CardPayment re-mounts) ──
+  cardStatus: "idle", // "idle" | "initiating" | "waitingForCard" | "processingPayment" | "succeeded" | "failed" | "readerBusy" | "clearing"
+  cardError: "",
+  cardMessage: "",
+
+  getCardStatus: () => get().cardStatus,
+  getCardError: () => get().cardError,
+  getCardMessage: () => get().cardMessage,
+
+  setCardStatus: (cardStatus) => set({ cardStatus }),
+  setCardError: (cardError) => set({ cardError }),
+  setCardMessage: (cardMessage) => set({ cardMessage }),
+
+  resetCardTransaction: () =>
+    set({
+      cardStatus: "idle",
+      cardError: "",
+      cardMessage: "",
+      paymentIntentID: null,
+    }),
+
+  // Non-reactive refs (set via getState(), not in set())
+  // _cardListeners: null   — Firestore listener { unsubscribe }
+  // _cardTimeout: null      — payment timeout ID
 }));
 
 export const useLoginStore = create((set, get) => ({

@@ -486,7 +486,11 @@ export const ActiveWorkorderComponent = ({}) => {
         paddingBottom: 11,
         paddingTop: 5,
         paddingHorizontal: 5,
-        backgroundColor: (zIsPreview || zIsLocked) ? lightenRGBByPercent(C.lightred, 80) : C.backgroundWhite,
+        backgroundColor: (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.sales?.length > 0)
+          ? lightenRGBByPercent(C.red, 60)
+          : (zIsPreview || zIsLocked)
+            ? lightenRGBByPercent(C.lightred, 80)
+            : C.backgroundWhite,
         borderRadius: 7,
       }}
     >

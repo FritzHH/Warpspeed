@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button_ } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
@@ -17,6 +17,7 @@ export function CardRefund({
   onProcessRefund,
   settings,
   refundComplete = false,
+  suggestedAmount = 0,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
@@ -24,6 +25,19 @@ export function CardRefund({
   const [sErrorMessage, _setErrorMessage] = useState("");
   const [sSuccessMessage, _setSuccessMessage] = useState("");
   const [sFocused, _setFocused] = useState(false);
+  const prevSuggestedRef = useRef(0);
+
+  // Auto-populate when suggested amount changes from item selection
+  if (suggestedAmount !== prevSuggestedRef.current) {
+    prevSuggestedRef.current = suggestedAmount;
+    if (suggestedAmount > 0 && !sFocused) {
+      _setRefundAmountDisp(formatCurrencyDisp(suggestedAmount));
+      _setRefundAmount(suggestedAmount);
+    } else if (suggestedAmount === 0) {
+      _setRefundAmountDisp("");
+      _setRefundAmount("");
+    }
+  }
 
   function handleAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });

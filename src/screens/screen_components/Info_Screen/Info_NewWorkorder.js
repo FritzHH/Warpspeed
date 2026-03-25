@@ -25,6 +25,8 @@ import {
   useLoginStore,
   useWorkorderPreviewStore,
   useAlertScreenStore,
+  useTicketSearchStore,
+  useCheckoutStore,
 } from "../../../stores";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
@@ -34,7 +36,11 @@ import {
   dbGetCompletedWorkorder,
   dbSearchCompletedWorkorders,
   dbGetCustomer,
+  dbSearchWorkordersByIdPrefix,
+  dbSearchSalesByIdPrefix,
+  dbGetCompletedSale,
 } from "../../../db_calls_wrapper";
+import { newCheckoutGetActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 export function NewWorkorderComponent({}) {
   // store getters ///////////////////////////////////////////////////////////////
@@ -58,7 +64,12 @@ export function NewWorkorderComponent({}) {
       store.setLockedWorkorderID(wo.id);
       store.setOpenWorkorderID(wo.id);
     } else {
-      store.setLockedWorkorderID(null);
+      // lock if payment is complete even on open workorders
+      if (wo.paymentComplete) {
+        store.setLockedWorkorderID(wo.id);
+      } else {
+        store.setLockedWorkorderID(null);
+      }
       store.setOpenWorkorderID(wo.id);
     }
     useTabNamesStore.getState().setItems({
@@ -71,6 +82,18 @@ export function NewWorkorderComponent({}) {
       dbGetCustomer(wo.customerID).then((customer) => {
         if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
       });
+    }
+    _setTicketSearch("");
+  }
+
+  function openSale(sale, isCompleted) {
+    if (isCompleted) {
+      // completed sale → open refund screen via receiptScan trigger in BaseScreen
+      useCheckoutStore.getState().setStringOnly(sale.id);
+    } else {
+      // partial/active sale → open checkout screen
+      useCheckoutStore.getState().setViewOnlySale(sale);
+      useCheckoutStore.getState().setIsCheckingOut(true);
     }
     _setTicketSearch("");
   }
@@ -98,23 +121,40 @@ export function NewWorkorderComponent({}) {
     try {
       const store = useOpenWorkordersStore.getState();
       const openWOs = store.getWorkorders();
-      const isFullBarcode = /^\d{12}$/.test(trimmed);
+      const isFullBarcode = /^\d{13}$/.test(trimmed);
       const isWoNumber = /^\d{5}$/.test(trimmed);
-      const isLast4 = /^\d{4}$/.test(trimmed);
+      const isFirst4 = /^\d{4}$/.test(trimmed);
 
-      // Full 12-digit barcode
+      // Full 13-digit EAN-13 barcode — auto search
       if (isFullBarcode) {
         const prefix = trimmed[0];
         if (prefix === "1") {
-          // Workorder barcode — check local first
+          // Warpspeed workorder barcode — check local first
           let found = openWOs.find((w) => w.id === trimmed);
           if (found) { openWorkorder(found, false); return; }
-          // Firestore completed workorders
           let completed = await dbGetCompletedWorkorder(trimmed);
           if (completed) { openWorkorder(completed, true); return; }
           showTicketAlert("Workorder not found");
+        } else if (prefix === "3") {
+          // Warpspeed sale barcode — search by ID
+          let sale = await newCheckoutGetActiveSale(trimmed);
+          if (sale) { openSale(sale, false); return; }
+          sale = await dbGetCompletedSale(trimmed);
+          if (sale) { openSale(sale, true); return; }
+          showTicketAlert("Sale not found");
         } else if (prefix === "2") {
-          showTicketAlert("Sale receipts not supported yet");
+          // Lightspeed legacy barcode — could be sale (22) or workorder (25)
+          // Check workorders first (local then Firestore)
+          let found = openWOs.find((w) => w.id === trimmed);
+          if (found) { openWorkorder(found, false); return; }
+          let completedWo = await dbGetCompletedWorkorder(trimmed);
+          if (completedWo) { openWorkorder(completedWo, true); return; }
+          // Check sales
+          let sale = await newCheckoutGetActiveSale(trimmed);
+          if (sale) { openSale(sale, false); return; }
+          sale = await dbGetCompletedSale(trimmed);
+          if (sale) { openSale(sale, true); return; }
+          showTicketAlert("Ticket not found");
         } else {
           showTicketAlert("Unrecognized barcode prefix");
         }
@@ -125,22 +165,40 @@ export function NewWorkorderComponent({}) {
       if (isWoNumber) {
         let found = openWOs.find((w) => w.workorderNumber === trimmed);
         if (found) { openWorkorder(found, false); return; }
-        // Query Firestore by workorderNumber
         let results = await dbSearchCompletedWorkorders("workorderNumber", trimmed);
         if (results.length > 0) { openWorkorder(results[0], true); return; }
         showTicketAlert("Workorder not found");
         return;
       }
 
-      // 4-digit last 4 of barcode
-      if (isLast4) {
-        let found = openWOs.find((w) => w.id?.endsWith(trimmed));
-        if (found) { openWorkorder(found, false); return; }
-        showTicketAlert("Not found in open workorders. Use full barcode for closed.");
+      // 4-digit prefix search — button press search
+      if (isFirst4) {
+        const prefix = trimmed[0];
+        useTicketSearchStore.getState().setIsSearching(true);
+        useTicketSearchStore.getState().setResults([]);
+        useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.ticketSearchResults);
+
+        if (prefix === "1") {
+          let results = await dbSearchWorkordersByIdPrefix(trimmed);
+          useTicketSearchStore.getState().setResults(results);
+        } else if (prefix === "3") {
+          let results = await dbSearchSalesByIdPrefix(trimmed);
+          useTicketSearchStore.getState().setResults(results);
+        } else if (prefix === "2") {
+          // Lightspeed legacy — search both workorders and sales
+          let [woResults, saleResults] = await Promise.all([
+            dbSearchWorkordersByIdPrefix(trimmed),
+            dbSearchSalesByIdPrefix(trimmed),
+          ]);
+          useTicketSearchStore.getState().setResults([...woResults, ...saleResults]);
+        } else {
+          showTicketAlert("First digit must be 1 (workorder), 2 (legacy), or 3 (sale)");
+        }
+        useTicketSearchStore.getState().setIsSearching(false);
         return;
       }
 
-      showTicketAlert("Enter a 12-digit barcode, 5-digit WO #, or last 4 digits");
+      showTicketAlert("Enter a 13-digit barcode, 5-digit WO #, or first 4 digits");
     } catch (err) {
       log("Ticket search error:", err);
       showTicketAlert("Search error — please try again");
@@ -405,39 +463,57 @@ export function NewWorkorderComponent({}) {
       }}
     >
       {/* Ticket search input */}
-      <View
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          padding: 10,
-          paddingHorizontal: 20,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <TextInput
-          value={sTicketSearch}
-          placeholder={"Scan ticket, enter WO #, or last 4 of barcode"}
-          placeholderTextColor={gray(0.35)}
-          onChangeText={(val) => handleTicketSearch(val)}
-          onSubmitEditing={() => executeTicketSearch()}
+      <View onClick={(e) => e.stopPropagation()} style={{ width: "100%" }}>
+        <View
           style={{
-            flex: 1,
-            caretColor: C.cursorRed,
-            color: C.text,
-            borderWidth: 1,
-            borderColor: gray(0.15),
-            borderRadius: 7,
-            height: 35,
-            outlineStyle: "none",
-            fontSize: 14,
-            paddingHorizontal: 10,
-            backgroundColor: C.listItemWhite,
+            width: "100%",
+            paddingTop: 10,
+            paddingHorizontal: 20,
+            flexDirection: "row",
+            alignItems: "center",
           }}
-        />
-        {sTicketSearching && (
-          <View style={{ marginLeft: 8 }}>
-            <SmallLoadingIndicator />
+        >
+          <TextInput
+            value={sTicketSearch}
+            placeholder={"Scan ticket or enter first 4 of barcode"}
+            placeholderTextColor={gray(0.35)}
+            onChangeText={(val) => handleTicketSearch(val)}
+            onSubmitEditing={() => executeTicketSearch()}
+            style={{
+              flex: 1,
+              caretColor: C.cursorRed,
+              color: C.text,
+              borderWidth: 1,
+              borderColor: gray(0.15),
+              borderRadius: 7,
+              height: 35,
+              outlineStyle: "none",
+              fontSize: 14,
+              paddingHorizontal: 10,
+              backgroundColor: C.listItemWhite,
+            }}
+          />
+          {sTicketSearching && (
+            <View style={{ marginLeft: 8 }}>
+              <SmallLoadingIndicator />
+            </View>
+          )}
+        </View>
+        {sTicketSearch.trim().length === 4 && /^\d{4}$/.test(sTicketSearch.trim()) && (
+          <View style={{ width: "100%", paddingHorizontal: 20, alignItems: "flex-end", marginTop: 3 }}>
+            <Button_
+              text={sTicketSearch.trim()[0] === "3" ? "Search Sales" : sTicketSearch.trim()[0] === "2" ? "Search Legacy" : "Search Workorders"}
+              onPress={() => executeTicketSearch()}
+              buttonStyle={{
+                width: 150,
+                borderRadius: 5,
+                paddingVertical: 6,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.buttonLightGreen,
+              }}
+              textStyle={{ fontSize: 11, color: C.text }}
+            />
           </View>
         )}
       </View>

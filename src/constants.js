@@ -217,6 +217,7 @@ export const DB_NODES = {
     INCOMING_MESSAGES: "incoming-messages", // LEGACY — messages now at customer_phone/{phone}/messages
     COMPLETED_WORKORDERS: "completed-workorders",
     COMPLETED_SALES: "completed-sales",
+    ACTIVE_SALES: "active-sales",
     ARCHIVE_LOGS: "archive-logs",
   },
 

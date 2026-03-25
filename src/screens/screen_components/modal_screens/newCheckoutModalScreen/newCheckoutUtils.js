@@ -1,6 +1,8 @@
 import { cloneDeep } from "lodash";
 import {
-  generateUPCBarcode,
+  generateEAN13Barcode,
+  generateEAN13Barcode as generateUPCBarcode,
+  getNextID,
   generateRandomID,
   calculateRunningTotals,
   formatCurrencyDisp,
@@ -17,18 +19,19 @@ import {
 } from "../../../../data";
 
 // ─── Sale ID ──────────────────────────────────────────────────
-// Sale IDs start with "s" + 11 digits so scanners can distinguish
-// them from workorder IDs (pure 12-digit numeric).
+// Sale IDs are 13-digit EAN-13 barcodes starting with "3".
+// Prefix "2" is reserved for Lightspeed legacy barcodes (sales + workorders).
 
 export function generateSaleID() {
-  const base = generateUPCBarcode("sale"); // 12 digits starting with "2"
-  return { id: "s" + base.substring(1), barcode: base };
+  return getNextID("sale"); // 13 digits starting with "3"
 }
 
 export function isSaleID(id) {
-  return (
-    typeof id === "string" && id.length === 12 && id.startsWith("s")
-  );
+  return typeof id === "string" && id.length === 13 && /^\d{13}$/.test(id) && id.startsWith("3");
+}
+
+export function isLightspeedID(id) {
+  return typeof id === "string" && id.length === 13 && /^\d{13}$/.test(id) && id.startsWith("2");
 }
 
 // ─── New Sale Object ──────────────────────────────────────────
@@ -36,9 +39,7 @@ export function isSaleID(id) {
 
 export function createNewSale(settings, createdBy = "") {
   let sale = cloneDeep(SALE_PROTO);
-  const { id, barcode } = generateSaleID();
-  sale.id = id;
-  sale.barcode = barcode;
+  sale.id = generateSaleID();
   sale.millis = Date.now();
   sale.salesTaxPercent = settings?.salesTaxPercent || 0;
   sale.status = "active";
@@ -191,6 +192,28 @@ export function buildCardPayment(stripeChargeData) {
   return payment;
 }
 
+export function buildManualCardPayment(chargeData) {
+  let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
+  let card = chargeData?.payment_method_details?.card;
+
+  payment.id = generateUPCBarcode();
+  payment.amountCaptured = chargeData.amount_captured || 0;
+  payment.cardIssuer = card?.brand || "Unknown";
+  payment.cardType = card?.brand || "";
+  payment.millis = Date.now();
+  payment.paymentIntentID = chargeData.payment_intent || "";
+  payment.chargeID = chargeData.id || "";
+  payment.paymentProcessor = "stripe";
+  payment.receiptURL = chargeData.receipt_url || "";
+  payment.last4 = card?.last4 || "";
+  payment.expMonth = card?.exp_month || "";
+  payment.expYear = card?.exp_year || "";
+  payment.amountRefunded = chargeData.amount_refunded || 0;
+  payment.cash = false;
+
+  return payment;
+}
+
 // ─── Refund Validation ────────────────────────────────────────
 
 export function calculateRefundLimits(originalSale, settings) {
@@ -210,14 +233,9 @@ export function calculateRefundLimits(originalSale, settings) {
   // If cardFeeRefund is false, subtract the card fee from the max refund
   let cardFeeDeduction = 0;
   if (!settings?.cardFeeRefund && originalSale.cardFee > 0) {
-    // Only deduct card fee if it hasn't already been accounted for
-    // in previous refunds
     cardFeeDeduction = originalSale.cardFee;
-    // If previous refunds already excluded card fee, don't deduct again
-    if (totalPreviouslyRefunded === 0) {
-      maxRefund = maxRefund - cardFeeDeduction;
-      if (maxRefund < 0) maxRefund = 0;
-    }
+    maxRefund = maxRefund - cardFeeDeduction;
+    if (maxRefund < 0) maxRefund = 0;
   }
 
   return {
@@ -260,9 +278,10 @@ export function validateCardRefundAmount(requestedAmount, payment) {
 
 // ─── Build Refund Object ──────────────────────────────────────
 
-export function buildRefundObject(amountRefunded, selectedLines, cardRefundID, notes) {
+export function buildRefundObject(amountRefunded, selectedLines, cardRefundID, notes, type) {
   let refund = cloneDeep(REFUND_PROTO);
   refund.id = generateUPCBarcode();
+  refund.type = type || "";
   refund.amountRefunded = amountRefunded;
   refund.workorderLines = selectedLines || [];
   refund.millis = Date.now();

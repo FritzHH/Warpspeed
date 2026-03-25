@@ -162,6 +162,8 @@ export const useCheckoutStore = create((set, get) => ({
   receiptScan: "",
   message: "",
   loading: false,
+  viewOnlySale: null,
+  isViewOnly: false,
 
   getMessage: () => get().message,
   getLoading: () => get().loading,
@@ -173,6 +175,7 @@ export const useCheckoutStore = create((set, get) => ({
   setLoading: (loading) => set({ loading }),
   // setSaleObj: (saleObj) => set({ saleObj }),
   setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),
+  setViewOnlySale: (sale) => set({ viewOnlySale: sale, isViewOnly: !!sale?.paymentComplete }),
   setReceiptScan: (receiptScan, callback) => {
     set({ receiptScan });
     if (receiptScan?.length === 12) {
@@ -230,6 +233,16 @@ export const useCheckoutStore = create((set, get) => ({
       // _setRefundScanMessage("");
     }
   },
+}));
+
+export const useTicketSearchStore = create((set, get) => ({
+  results: [],
+  isSearching: false,
+  getResults: () => get().results,
+  getIsSearching: () => get().isSearching,
+  setResults: (results) => set({ results }),
+  setIsSearching: (isSearching) => set({ isSearching }),
+  reset: () => set({ results: [], isSearching: false }),
 }));
 
 export const useAlertScreenStore = create((set, get) => ({
@@ -1118,6 +1131,26 @@ export const useListenersStore = create((set, get) => ({
   custPreviewRemoveSub: "",
   customerObjSub: "",
   settingsSub: "",
+}));
+
+export const useMigrationStore = create((set, get) => ({
+  migrating: false,
+  devMigrating: false,
+  step: "",
+  progress: { done: 0, total: 0 },
+  result: "",
+
+  getMigrating: () => get().migrating,
+  getDevMigrating: () => get().devMigrating,
+  getStep: () => get().step,
+  getProgress: () => get().progress,
+  getResult: () => get().result,
+
+  setMigrating: (migrating) => set({ migrating }),
+  setDevMigrating: (devMigrating) => set({ devMigrating }),
+  setStep: (step) => set({ step }),
+  setProgress: (progress) => set({ progress }),
+  setResult: (result) => set({ result }),
 }));
 
 /// internal functions ///////////////////////////////////////////

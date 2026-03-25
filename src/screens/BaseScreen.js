@@ -33,7 +33,8 @@ import {
 import { FaceDetectionClientComponent } from "../faceDetection";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
-import { isSaleID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
+import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
+import { decodeLightspeedBarcode } from "../utils";
 import { newCheckoutGetStripeReaders } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import {
   dbListenToSettings,
@@ -123,9 +124,15 @@ export function BaseScreen() {
 
   const zReceiptScan = useCheckoutStore((state) => state.receiptScan);
 
-  // Detect sale-ID scans (starts with "s") to open refund modal
+  // Detect sale-ID scans to open refund modal (prefix 3 = Warpspeed sale, prefix 22 = LS sale)
   useEffect(() => {
-    if (zReceiptScan && isSaleID(zReceiptScan) && !sRefundModalVisible) {
+    if (!zReceiptScan || sRefundModalVisible) return;
+    let isSale = isSaleID(zReceiptScan);
+    if (!isSale && isLightspeedID(zReceiptScan)) {
+      let decoded = decodeLightspeedBarcode(zReceiptScan);
+      isSale = decoded?.type === "sale";
+    }
+    if (isSale) {
       _setRefundSaleID(zReceiptScan);
       _setRefundModalVisible(true);
       useCheckoutStore.getState().setStringOnly("");
@@ -211,9 +218,7 @@ export function BaseScreen() {
         let result = await newCheckoutGetStripeReaders();
         let readersArr = result?.data?.data || [];
         useStripePaymentStore.getState().setReadersArr(readersArr);
-      } catch (e) {
-        log("BaseScreen fetchReaders error:", e);
-      }
+      } catch (e) {}
     }
     fetchReaders();
     let interval = setInterval(fetchReaders, 5 * 60 * 1000);

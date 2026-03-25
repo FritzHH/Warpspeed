@@ -81,17 +81,14 @@ function formatPhoneForDisplay(num) {
   return "(" + digits.slice(0, 3) + ") " + digits.slice(3, 6) + "-" + digits.slice(6, 10) + " " + digits.slice(10);
 }
 
-function extractRandomFourDigits(twelveDigitNumber) {
-  const numStr = String(twelveDigitNumber);
-  if (!numStr || numStr.length !== 12) {
-    throw new Error("Input must be exactly 12 digits");
-  }
-  if (!/^\d{12}$/.test(numStr)) {
-    throw new Error("Input must contain only digits");
+function generateWorkorderNumber(barcodeNumber) {
+  const numStr = String(barcodeNumber);
+  if (!numStr || !/^\d{12,13}$/.test(numStr)) {
+    throw new Error("Input must be 12 or 13 digits");
   }
   const indexes = [];
   while (indexes.length < 5) {
-    const randomIndex = Math.floor(Math.random() * 12);
+    const randomIndex = Math.floor(Math.random() * numStr.length);
     if (!indexes.includes(randomIndex)) {
       indexes.push(randomIndex);
     }
@@ -358,7 +355,7 @@ function createPrintBase(workorder, customer, salesTaxPercent, context) {
   var userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
   var userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
   r.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
-  r.workorderNumber = r.workorderNumber || extractRandomFourDigits(workorder.id);
+  r.workorderNumber = "";
   r.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
   r.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
   r.intakeBlurb = _settings.intakeBlurb || INTAKE_BLURB;
@@ -395,6 +392,7 @@ var printBuilder = {
   sale: function (sale, payments, customer, workorder, salesTaxPercent, context) {
     var receipt = createPrintBase(workorder, customer, salesTaxPercent, context);
     receipt = Object.assign({}, receipt, sale);
+    receipt.barcode = sale.id;
     receipt.receiptType = RECEIPT_TYPES.sales;
     receipt.payments = payments;
     receipt.popCashRegister = (payments || []).some(function (p) {
@@ -423,7 +421,7 @@ module.exports = {
   resolveStatus: resolveStatus,
   formatPhoneForDisplay: formatPhoneForDisplay,
   capitalizeFirstLetterOfString: capitalizeFirstLetterOfString,
-  extractRandomFourDigits: extractRandomFourDigits,
+  generateWorkorderNumber: generateWorkorderNumber,
   RECEIPT_TYPES: RECEIPT_TYPES,
   RECEIPT_PROTO: RECEIPT_PROTO,
   SHOP_NAME: SHOP_NAME,

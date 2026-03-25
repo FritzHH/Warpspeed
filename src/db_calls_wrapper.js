@@ -33,9 +33,10 @@ import {
   uploadPDFAndSendSMS,
   rehydrateFromArchiveCallable,
   createTextToPayInvoiceCallable,
+  firestoreBatchWrite,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
-import { useSettingsStore, useLoginStore } from "./stores";
+import { useSettingsStore, useLoginStore, useOpenWorkordersStore } from "./stores";
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -320,11 +321,34 @@ function buildPaymentReaderCompletionsPath(
 // DATABASE WRAPPER FUNCTIONS
 // ============================================================================
 
+/**
+ * Write an array of items to a Firestore collection using native batch writes (500 per batch).
+ * @param {Array<Object>} items - Array of objects, each must have an `id` field
+ * @param {string} collectionName - "customers"|"inventory"|"open-workorders"|"completed-workorders"|"completed-sales"|"active-sales"
+ * @param {function} [onProgress] - Optional callback(done, total)
+ * @returns {Promise<{success: boolean, count: number}>}
+ */
+export async function dbBatchWrite(items, collectionName, onProgress) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID) return { success: false, count: 0 };
+  const BATCH_SIZE = 200;
+  const base = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${collectionName}`;
+  let done = 0;
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const chunk = items.slice(i, i + BATCH_SIZE);
+    await firestoreBatchWrite(chunk.map(item => ({ path: `${base}/${item.id}`, data: item })));
+    done += chunk.length;
+    if (onProgress) onProgress(done, items.length);
+    if (i + BATCH_SIZE < items.length) await new Promise(r => setTimeout(r, 500));
+  }
+  return { success: true, count: items.length };
+}
+
 // setters /////////////////////////////////////////////////////////////////////
 
 /**
  * Delete all documents in a Firestore collection.
- * @param {"inventory"|"customers"|"open-workorders"} collectionName
+ * @param {"inventory"|"customers"|"open-workorders"|"completed-workorders"|"completed-sales"|"active-sales"} collectionName
  * @returns {Promise<Object>} { success, deletedCount }
  */
 export async function dbClearCollection(collectionName) {
@@ -333,21 +357,24 @@ export async function dbClearCollection(collectionName) {
     if (!tenantID || !storeID) {
       return { success: false, error: "Configuration Error", deletedCount: 0 };
     }
-    let collectionPath;
-    if (collectionName === "inventory") {
-      collectionPath = buildInventoryCollectionPath(tenantID, storeID);
-    } else if (collectionName === "customers") {
-      collectionPath = buildCustomerCollectionPath(tenantID, storeID);
-    } else if (collectionName === "open-workorders") {
-      collectionPath = buildOpenWorkordersCollectionPath(tenantID, storeID);
-    } else {
+    const base = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}`;
+    const collectionMap = {
+      "inventory": DB_NODES.FIRESTORE.INVENTORY,
+      "customers": DB_NODES.FIRESTORE.CUSTOMERS,
+      "open-workorders": DB_NODES.FIRESTORE.OPEN_WORKORDERS,
+      "completed-workorders": DB_NODES.FIRESTORE.COMPLETED_WORKORDERS,
+      "completed-sales": DB_NODES.FIRESTORE.COMPLETED_SALES,
+      "active-sales": DB_NODES.FIRESTORE.ACTIVE_SALES,
+    };
+    const node = collectionMap[collectionName];
+    if (!node) {
       return { success: false, error: "Unknown collection: " + collectionName, deletedCount: 0 };
     }
+    const collectionPath = `${base}/${node}`;
     let docs = await firestoreQuery(collectionPath);
     for (let doc of docs) {
       await firestoreDelete(collectionPath + "/" + doc.id);
     }
-    log("Cleared collection", { collectionName, deletedCount: docs.length });
     return { success: true, deletedCount: docs.length };
   } catch (error) {
     log("Error clearing collection:", error);
@@ -423,13 +450,6 @@ export async function dbSaveSettingsField(fieldName, value) {
     // Save the updated settings
     await firestoreWrite(buildSettingsPath(tenantID, storeID), updatedSettings);
 
-    log("Settings field saved", {
-      fieldName,
-      value,
-      tenantID,
-      storeID,
-    });
-
     return {
       success: true,
       fieldName,
@@ -472,7 +492,6 @@ export async function dbSaveSettingsNode(fieldName, value) {
     }
     const path = buildSettingsPath(tenantID, storeID);
     await firestoreUpdate(path, { [fieldName]: value });
-    log("Settings node saved", { fieldName, tenantID, storeID });
     return { success: true, fieldName, value };
   } catch (error) {
     log("Error saving settings node:", error);
@@ -516,8 +535,6 @@ export async function dbSaveSettings(settings) {
 
     let settingsToSave = settings;
     await firestoreWrite(buildSettingsPath(tenantID, storeID), settingsToSave);
-
-    log("Settings saved", { tenantID, storeID });
 
     return {
       success: true,
@@ -682,6 +699,70 @@ export async function dbSearchCompletedWorkorders(field, value) {
   }
 }
 
+export async function dbSearchWorkordersByIdPrefix(prefix) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+
+    // local open workorders
+    const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+    const localMatches = openWOs
+      .filter((w) => w.id && w.id.startsWith(prefix))
+      .map((w) => ({ type: "workorder", data: w, isCompleted: false }));
+
+    // firestore completed workorders — range query on document ID field
+    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}`;
+    const completedResults = await firestoreQuery(
+      collectionPath,
+      [
+        { field: "id", operator: ">=", value: prefix },
+        { field: "id", operator: "<=", value: prefix + "\uf8ff" },
+      ],
+      { limit: 20 }
+    );
+    const completedMatches = completedResults
+      .filter((w) => w.id && w.id.startsWith(prefix))
+      .map((w) => ({ type: "workorder", data: w, isCompleted: true }));
+
+    return [...localMatches, ...completedMatches];
+  } catch (error) {
+    log("Error searching workorders by ID prefix:", error);
+    return [];
+  }
+}
+
+export async function dbSearchSalesByIdPrefix(prefix) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+
+    const activePath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/active-sales`;
+    const completedPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_SALES}`;
+
+    const whereClauses = [
+      { field: "id", operator: ">=", value: prefix },
+      { field: "id", operator: "<=", value: prefix + "\uf8ff" },
+    ];
+
+    const [activeResults, completedResults] = await Promise.all([
+      firestoreQuery(activePath, whereClauses, { limit: 20 }),
+      firestoreQuery(completedPath, whereClauses, { limit: 20 }),
+    ]);
+
+    const activeMatches = activeResults
+      .filter((s) => s.id && s.id.startsWith(prefix))
+      .map((s) => ({ type: "sale", data: s, isCompleted: false }));
+    const completedMatches = completedResults
+      .filter((s) => s.id && s.id.startsWith(prefix))
+      .map((s) => ({ type: "sale", data: s, isCompleted: true }));
+
+    return [...activeMatches, ...completedMatches];
+  } catch (error) {
+    log("Error searching sales by ID prefix:", error);
+    return [];
+  }
+}
+
 export async function dbSaveCompletedWorkorder(workorder) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
@@ -718,6 +799,26 @@ export async function dbSaveCompletedSale(sale) {
     return { success: true };
   } catch (error) {
     log("Error saving completed sale:", error);
+    return { success: false };
+  }
+}
+
+export async function dbSaveActiveSale(sale) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbSaveActiveSale");
+      return { success: false };
+    }
+    if (!sale || !sale.id) {
+      log("Error: sale object with id is required for dbSaveActiveSale");
+      return { success: false };
+    }
+    const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/active-sales/${sale.id}`;
+    await firestoreWrite(path, sale);
+    return { success: true };
+  } catch (error) {
+    log("Error saving active sale:", error);
     return { success: false };
   }
 }
@@ -797,10 +898,6 @@ export async function dbSaveCustomer(customer) {
       if (customer.customerCell && customer.customerCell.length === 10) {
         await firestoreWrite(`customer_phone/${customer.customerCell}`, {
           info: contactIndexData,
-        });
-        log("Customer cell phone index updated", {
-          customerID: customer.id,
-          phone: customer.customerCell,
         });
       }
     } catch (indexError) {
@@ -895,13 +992,6 @@ export async function dbSaveInventoryItem(item, itemID = null) {
     const path = buildInventoryPath(tenantID, storeID, id);
 
     await firestoreWrite(path, itemToSave);
-
-    log("Inventory item saved", {
-      itemID: id,
-      tenantID,
-      storeID,
-      path,
-    });
 
     return {
       success: true,
@@ -1146,12 +1236,9 @@ export async function dbSavePrintObj(printObj, printerID) {
       printerID,
       printObj.id
     );
-    // log(`Saving print object to path: ${path}`);
-
     let cleanedPrintObj = removeEmptyFields(printObj);
 
     let stringifiedPrintObj = stringifyAllObjectFields(cleanedPrintObj);
-    log("Final object to save:", stringifiedPrintObj);
 
     const result = await firestoreWrite(path, stringifiedPrintObj);
 
@@ -1159,9 +1246,6 @@ export async function dbSavePrintObj(printObj, printerID) {
       // Set timer to remove the print object after 100ms
       setTimeout(async () => {
         try {
-          log(
-            `Removing print object with ID: ${printObj.id} after ${PRINT_OBJECT_REMOVAL_DELAY}ms`
-          );
           let deleteResult;
           // if (!printObj.persistFlag) {
           deleteResult = await firestoreDelete(path);
@@ -1201,14 +1285,7 @@ export async function dbSavePrintObj(printObj, printerID) {
       };
     }
   } catch (error) {
-    log("=== ERROR IN dbSavePrintObj ===");
-    log("Error details:", error);
-    log("Error message:", error.message);
-    log("Error stack:", error.stack);
-    log("Error code:", error.code);
-    log("Error name:", error.name);
-    log("Full error object:", JSON.stringify(error, null, 2));
-    log("=== END ERROR LOGGING ===");
+    log("Error in dbSavePrintObj:", error.message);
 
     return {
       success: false,
@@ -2493,14 +2570,12 @@ export function processServerDrivenStripePayment(
   readerID,
   paymentIntentID
 ) {
-  // log(readerID);
   return processServerDrivenStripePaymentCallable({
     amount: Number(saleAmount),
     readerID,
     paymentIntentID,
   })
     .then((result) => {
-      log("Payment initiated successfully:", result.data);
       return result.data;
     })
     .catch((error) => {
@@ -2515,7 +2590,6 @@ export function processServerDrivenStripeRefund(amount, paymentIntentID) {
     paymentIntentID,
   })
     .then((result) => {
-      log("Refund initiated successfully:", result.data);
       return result.data;
     })
     .catch((error) => {
@@ -2529,7 +2603,6 @@ export function cancelServerDrivenStripePayment(readerID) {
     readerID,
   })
     .then((result) => {
-      log("Payment cancelled successfully:", result.data);
       return result.data;
     })
     .catch((error) => {
@@ -2543,7 +2616,6 @@ export function retrieveAvailableStripeReaders(readerID) {
     readerID,
   })
     .then((result) => {
-      log("Stripe readers retrieved successfully:", result.data);
       return result.data;
     })
     .catch((error) => {
@@ -2602,13 +2674,10 @@ export async function dbSendSMS(
       canRespond: !!message.canRespond,
     };
 
-    log("Sending SMS with data:", smsData);
-
     // Call the enhanced SMS function
     let result = await sendSMSEnhanced(smsData);
 
     if (result.success) {
-      log("SMS sent successfully:", result.data);
       return {
         success: true,
         message: result.message,
@@ -2663,12 +2732,9 @@ export async function dbSendEmail(to, subject, htmlBody) {
       storeID,
     };
 
-    log("Sending email with data:", emailData);
-
     let result = await sendEmail(emailData);
 
     if (result.success) {
-      log("Email sent successfully:", result.data);
       return {
         success: true,
         message: result.message,
@@ -2702,16 +2768,12 @@ export async function dbSendEmail(to, subject, htmlBody) {
  */
 export async function dbTestCustomerPhoneWrite() {
   try {
-    log("Testing customer_phone write via callable function");
-
     const { testCustomerPhoneWriteCallable } = await import("./db_calls");
 
     const result = await testCustomerPhoneWriteCallable({
       testData: "Hello from client",
       timestamp: Date.now(),
     });
-
-    log("Test write result", result.data);
 
     return {
       success: true,
@@ -2738,8 +2800,6 @@ export async function dbTestCustomerPhoneWrite() {
  */
 export async function dbTestCustomerPhoneWriteHTTP() {
   try {
-    log("Testing customer_phone write via HTTP endpoint");
-
     const response = await fetch(
       "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/testCustomerPhoneWriteHTTP",
       {
@@ -2760,8 +2820,6 @@ export async function dbTestCustomerPhoneWriteHTTP() {
     }
 
     const result = await response.json();
-
-    log("Test HTTP write result", result);
 
     return {
       success: result.success,
@@ -2804,11 +2862,6 @@ export async function dbGetCustomerMessages(
     if (cleanPhone.length !== 10) {
       throw new Error("Phone number must be 10 digits");
     }
-
-    log("Retrieving customer messages", {
-      phone: cleanPhone,
-      startAfter: startAfterTimestamp ? "paginating" : "first page",
-    });
 
     // Import Firestore functions directly
     const { collection, query, orderBy, limit, startAfter, getDocs } =

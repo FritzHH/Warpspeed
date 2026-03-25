@@ -1,13 +1,13 @@
 /* eslint-disable */
 
-import { View } from "react-native-web";
+import { View, ActivityIndicator } from "react-native-web";
 import {
   checkInternetConnection,
   dim,
   localStorageWrapper,
   log,
 } from "../../utils";
-import { TabMenuButton, Image_, Button_, SmallLoadingIndicator } from "../../components";
+import { TabMenuButton, Image_, Button_ } from "../../components";
 import { C, ICONS } from "../../styles";
 import { TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
@@ -208,7 +208,7 @@ export const TabBar = ({
   function renderUserArea() {
     // loading — spinner only
     if (zCameraStatus === "loading") {
-      return <SmallLoadingIndicator />;
+      return <ActivityIndicator size={16} color={C.green} />;
     }
 
     // failed — show user or login button + error icon
@@ -225,7 +225,8 @@ export const TabBar = ({
     if (zCameraStatus === "ready") {
       return (
         <>
-          {zCurrentUser ? <UserButton /> : <SmallLoadingIndicator />}
+          {zCurrentUser ? <UserButton /> : <ActivityIndicator size={16} color={C.green} />}
+          <View style={{ width: 5 }} />
           <CameraIcon />
         </>
       );

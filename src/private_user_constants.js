@@ -14,3 +14,6 @@ export const firebaseConfig = {
 export const SMS_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/sendSMS";
 
+// Stripe publishable key (client-side tokenization)
+export const STRIPE_PUBLISHABLE_KEY = "pk_test_51RRLB9QIJQpcXP9dFNqDeOHSo2gzvP6RvdEP0oWQ0jMyyGIrvIZqwEE6ZOJdSL8M8aAtqxjnNwFvjAq3D1ScrLQz005Zk6g3Cp";
+

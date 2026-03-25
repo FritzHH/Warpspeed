@@ -1,4 +1,4 @@
-import { generateRandomID, generateUPCBarcode, extractRandomFourDigits, bestForegroundHex } from "./utils";
+import { generateRandomID, buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex } from "./utils";
 import { COLORS, NONREMOVABLE_STATUSES } from "./data";
 
 // ============================================================================
@@ -52,7 +52,7 @@ function sanitize(str) {
   return str.replace(/'\//g, "'");
 }
 
-function parseCSV(text) {
+export function parseCSV(text) {
   let rows = splitCSVRows(text);
   let headers = parseCSVLine(rows[0]);
   return rows.slice(1).map(row => {
@@ -84,7 +84,7 @@ export function mapStatuses(statusesCSVText) {
       const bgColor = row.Color || "#B8B8B8";
       const textColor = bestForegroundHex(bgColor);
       return {
-        id: generateRandomID(),
+        id: "ls_" + row.Status.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_"),
         label: row.Status.trim(),
         textColor,
         backgroundColor: bgColor,
@@ -92,6 +92,39 @@ export function mapStatuses(statusesCSVText) {
       };
     });
 
+  return [...NONREMOVABLE_STATUSES, ...csvStatuses];
+}
+
+/**
+ * Extract unique status names from workorders.csv and merge with NONREMOVABLE_STATUSES.
+ * Use this when statuses.csv is not available.
+ */
+export function extractStatusesFromWorkorders(workorderCSVText) {
+  const rows = parseCSV(workorderCSVText);
+  const seen = new Set();
+  const extracted = [];
+  for (const row of rows) {
+    const name = (row.statusName || "").trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    extracted.push(name);
+  }
+  const nonremovableLabels = new Set(
+    NONREMOVABLE_STATUSES.map(s => s.label.toLowerCase())
+  );
+  const csvStatuses = extracted
+    .filter(name => !nonremovableLabels.has(name.toLowerCase()))
+    .map(name => {
+      const bgColor = "#B8B8B8";
+      const textColor = bestForegroundHex(bgColor);
+      return {
+        id: "ls_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+        label: name,
+        textColor,
+        backgroundColor: bgColor,
+        removable: true,
+      };
+    });
   return [...NONREMOVABLE_STATUSES, ...csvStatuses];
 }
 
@@ -193,7 +226,7 @@ function formatPhone(raw) {
 // Dollar → Cents
 // ============================================================================
 
-function dollarsToCents(val) {
+export function dollarsToCents(val) {
   if (!val && val !== 0) return 0;
   return Math.round(parseFloat(val) * 100) || 0;
 }
@@ -485,10 +518,10 @@ export function mapWorkorders(
       });
     }
 
-    const newID = generateUPCBarcode();
+    const ean13 = buildLightspeedEAN13("25", woID);
     const mappedWo = {
-      workorderNumber: extractRandomFourDigits(newID),
-      id: newID,
+      workorderNumber: generateWorkorderNumber(ean13),
+      id: ean13,
       lightspeed_id: woID,
       customerID: wo.customerID || "",
       customerFirst,
@@ -610,7 +643,7 @@ export function mapSales(
 
     // Map payments
     const paymentRows = paymentsMap[lsSaleID] || [];
-    const saleID = "s" + generateRandomID().substring(1);
+    const saleID = buildLightspeedEAN13("22", lsSaleID);
 
     // Stripe records for this sale (matched by Order ID = saleID)
     const stripeForSale = stripeByOrderID[lsSaleID] || [];
@@ -676,6 +709,7 @@ export function mapSales(
 
     const mappedSale = {
       id: saleID,
+      lightspeed_id: lsSaleID,
       millis,
       subtotal,
       discount,
@@ -688,6 +722,7 @@ export function mapSales(
       workorderIDs,
       payments,
       refunds: [],
+      _importSource: "lightspeed",
     };
 
     sales.push(mappedSale);

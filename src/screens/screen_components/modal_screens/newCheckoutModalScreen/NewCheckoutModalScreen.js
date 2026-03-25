@@ -28,7 +28,7 @@ import {
   applyDiscountToWorkorderItem,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES } from "../../../../data";
-import { dbSavePrintObj } from "../../../../db_calls_wrapper";
+import { dbSavePrintObj, dbGetCompletedWorkorder } from "../../../../db_calls_wrapper";
 import {
   createNewSale,
   updateSaleWithTotals,
@@ -51,15 +51,17 @@ import {
 import { SaleHeader } from "./SaleHeader";
 import { CashPayment } from "./CashPayment";
 import { CardPayment } from "./CardPayment";
+import { CardReaderPayment } from "./CardReaderPayment";
 import { SaleTotals } from "./SaleTotals";
 import { PaymentsList } from "./PaymentsList";
 import { WorkorderCombiner } from "./WorkorderCombiner";
 import { InventorySearch } from "./InventorySearch";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
 import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
+import { NewRefundModalScreen } from "./NewRefundModalScreen";
 
-// DEV FLAG — set true to freeze UI after sale completes (skips DB writes, printing, SMS)
-const DEV_SKIP_COMPLETION = true;
+// DEV FLAG default — toggled via on-screen switch
+let _devSkipCompletion = true;
 
 // Map CUSTOMER_LANGUAGES keys to Google Translate ISO codes
 const LANG_TO_ISO = { spanish: "es", english: "en" };
@@ -129,7 +131,10 @@ export function NewCheckoutModalScreen() {
   const [sShowTaxFreeConfirm, _setShowTaxFreeConfirm] = useState(false);
   const [sShowPopConfirm, _setShowPopConfirm] = useState(false);
   const [sCardProcessingAmount, _setCardProcessingAmount] = useState(0);
+  const [sCardMode, _setCardMode] = useState("reader"); // "reader" or "manual"
   const [sNewItemModal, _setNewItemModal] = useState(null);
+  const [sDevSkip, _setDevSkip] = useState(_devSkipCompletion);
+  const [sShowRefundModal, _setShowRefundModal] = useState(false);
 
   // ─── Derived Values ───────────────────────────────────────
   let isStandalone = !zOpenWorkorder;
@@ -147,7 +152,14 @@ export function NewCheckoutModalScreen() {
   if (zIsCheckingOut && !sInitialized) {
     _setInitialized(true);
     _setReceiptLanguage(zCustomer?.language || "english");
-    initializeCheckout();
+
+    // Check if we're opening a partial sale from ticket search
+    let viewOnlySale = useCheckoutStore.getState().viewOnlySale;
+    if (viewOnlySale) {
+      initializeFromViewOnlySale(viewOnlySale);
+    } else {
+      initializeCheckout();
+    }
   }
 
   async function initializeCheckout() {
@@ -208,6 +220,30 @@ export function NewCheckoutModalScreen() {
     newCheckoutSaveActiveSale(sale);
 
     // Fetch card readers
+    fetchReaders();
+  }
+
+  async function initializeFromViewOnlySale(sale) {
+    _setSale(sale);
+
+    // Rebuild combined workorders from the sale's workorderIDs
+    let combined = [];
+    let openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+    for (let woID of (sale.workorderIDs || [])) {
+      let wo = openWOs.find((w) => w.id === woID);
+      if (wo) {
+        combined.push(cloneDeep(wo));
+      } else {
+        let completed = await dbGetCompletedWorkorder(woID);
+        if (completed) combined.push(completed);
+      }
+    }
+    _setCombinedWorkorders(combined);
+
+    if (sale.addedItems?.length > 0) {
+      _setAddedItems(sale.addedItems);
+    }
+
     fetchReaders();
   }
 
@@ -399,7 +435,7 @@ export function NewCheckoutModalScreen() {
     broadcastSaleToDisplay(sale, sCombinedWorkorders, sAddedItems, custFirst, custLast);
 
     // Persist immediately — network-failure-proof
-    if (!DEV_SKIP_COMPLETION) newCheckoutSaveActiveSale(sale);
+    if (!sDevSkip) newCheckoutSaveActiveSale(sale);
   }
 
   // Update workorders to track that a sale is in progress
@@ -408,14 +444,14 @@ export function NewCheckoutModalScreen() {
       let updated = cloneDeep(wo);
       updated.activeSaleID = sale.id;
       updated.amountPaid = sale.amountCaptured;
-      if (!DEV_SKIP_COMPLETION) useOpenWorkordersStore.getState().setWorkorder(updated, true);
+      if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
     }
   }
 
   async function handleSaleComplete(sale) {
     // DEV: skip all DB writes, printing, SMS — freeze UI for layout work
-    if (DEV_SKIP_COMPLETION) {
-      log("DEV_SKIP_COMPLETION: sale complete locally, skipping DB/print/SMS", sale);
+    if (sDevSkip) {
+      log("sDevSkip: sale complete locally, skipping DB/print/SMS", sale);
       return;
     }
     // Idempotency: check if webhook already completed this sale
@@ -539,7 +575,102 @@ export function NewCheckoutModalScreen() {
   }
 
   function handleCashChange(change) {
-    _setCashChangeNeeded(change);
+    _setCashChangeNeeded(prev => prev + change);
+  }
+
+  function handlePartialPayment() {
+    let remaining = (sSale?.total || 0) - (sSale?.amountCaptured || 0);
+    useAlertScreenStore.getState().setValues({
+      showAlert: true,
+      title: "Partial Payment",
+      message:
+        "Close this sale with a remaining balance of $" +
+        formatCurrencyDisp(remaining) +
+        "? A receipt will be printed and the customer can return to pay the rest.",
+      btn1Text: "Yes, Close",
+      btn1Handler: async () => {
+        useAlertScreenStore.getState().setValues({ showAlert: false });
+
+        const primaryWO = sCombinedWorkorders[0];
+        const customerForReceipt = {
+          first: primaryWO?.customerFirst || "",
+          last: primaryWO?.customerLast || "",
+          customerCell: primaryWO?.customerCell || "",
+          email: primaryWO?.customerEmail || "",
+          id: primaryWO?.customerID || "",
+        };
+        const settings = useSettingsStore.getState().getSettings();
+        const printerID = settings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
+        const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+
+        // Build receipt
+        let saleReceipt = printBuilder.sale(
+          sSale,
+          sSale.payments,
+          customerForReceipt,
+          primaryWO,
+          settings?.salesTaxPercent,
+          _ctx
+        );
+
+        // Pop register if change is owed
+        if (saleReceipt.popCashRegister && !settings?.autoPrintSalesReceipt) {
+          dbSavePrintObj({ popCashRegister: true }, printerID);
+        }
+
+        // Translate if non-English
+        let translatedReceipt = null;
+        let translatedPdfLabels = null;
+        let langCode = getTranslateCode(sReceiptLanguage);
+        if (langCode) {
+          try {
+            let translated = await translateSalesReceipt(saleReceipt, langCode);
+            translatedReceipt = translated.translatedReceipt;
+            translatedPdfLabels = translated.pdfLabels;
+          } catch (e) {
+            log("Receipt translation failed on partial payment, using English:", e);
+          }
+        }
+
+        // Print receipt if auto-print enabled
+        if (settings?.autoPrintSalesReceipt) {
+          let toPrint = translatedReceipt || saleReceipt;
+          dbSavePrintObj(toPrint, printerID);
+        }
+
+        // SMS/Email
+        const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
+        const emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+        const smsContent = smsTemplate?.content || smsTemplate?.message || "";
+        const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+
+        let emptyParts = [];
+        if (settings?.autoSMSSalesReceipt && customerForReceipt.customerCell && !smsContent.trim()) emptyParts.push("SMS");
+        if (settings?.autoEmailSalesReceipt && customerForReceipt.email && !emailContent.trim()) emptyParts.push("email");
+        if (emptyParts.length > 0) {
+          useAlertScreenStore.getState().setValues({
+            title: "Empty Template",
+            message: "The sale receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ", or uncheck the auto " + emptyParts.join("/") + " option in Dashboard > Printing.",
+            btn1Text: "OK",
+            handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+            canExitOnOuterClick: true,
+          });
+        }
+
+        const canSMS = customerForReceipt.customerCell && smsContent.trim();
+        const canEmail = customerForReceipt.email && emailContent.trim();
+        if (canSMS || canEmail) {
+          sendSaleReceipt(sSale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels);
+        }
+
+        // Close without completing — sale stays in active-sales
+        resetAndClose();
+      },
+      btn2Text: "Go Back",
+      btn2Handler: () => {
+        useAlertScreenStore.getState().setValues({ showAlert: false });
+      },
+    });
   }
 
   // ─── Close Modal ──────────────────────────────────────────
@@ -594,6 +725,7 @@ export function NewCheckoutModalScreen() {
       stripeStore._cardTimeout = null;
     }
     stripeStore.resetCardTransaction();
+    useCheckoutStore.getState().setViewOnlySale(null);
     useCheckoutStore.getState().setIsCheckingOut(false);
   }
 
@@ -691,6 +823,15 @@ export function NewCheckoutModalScreen() {
             overflow: "hidden",
           }}
         >
+          {/* DEV TOGGLE */}
+          <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", paddingVertical: 4 }}>
+            <CheckBox_
+              text={"DEV: Skip DB/Print"}
+              isChecked={sDevSkip}
+              onCheck={() => _setDevSkip(!sDevSkip)}
+              textStyle={{ fontSize: 11, color: sDevSkip ? C.red : gray(0.4) }}
+            />
+          </View>
           {/* ── Main 3-Column Layout ────────────────────── */}
           <View
             style={{
@@ -716,18 +857,34 @@ export function NewCheckoutModalScreen() {
                 hasReaders={onlineReaders.length > 0}
                 isVisible={zIsCheckingOut}
               />
-              <CardPayment
-                amountLeftToPay={amountLeftToPay}
-                onPaymentCapture={handlePaymentCapture}
-                stripeReaders={zStripeReaders}
-                settings={zSettings}
-                saleComplete={saleComplete}
-                readerError={sReaderError}
-                saleID={sSale?.id || ""}
-                customerID={sSale?.customerID || zCustomer?.id || ""}
-                onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
-                onCardProcessingEnd={() => _setCardProcessingAmount(0)}
-              />
+              {sCardMode === "manual" ? (
+                <CardPayment
+                  amountLeftToPay={amountLeftToPay}
+                  onPaymentCapture={handlePaymentCapture}
+                  saleComplete={saleComplete}
+                  saleID={sSale?.id || ""}
+                  customerID={sSale?.customerID || zCustomer?.id || ""}
+                  customerEmail={zCustomer?.email || ""}
+                  onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
+                  onCardProcessingEnd={() => _setCardProcessingAmount(0)}
+                  onSwitchToReader={() => _setCardMode("reader")}
+                />
+              ) : (
+                <CardReaderPayment
+                  amountLeftToPay={amountLeftToPay}
+                  onPaymentCapture={handlePaymentCapture}
+                    stripeReaders={zStripeReaders}
+                    settings={zSettings}
+                    saleComplete={saleComplete}
+                    readerError={sReaderError}
+                    saleID={sSale?.id || ""}
+                    customerID={sSale?.customerID || zCustomer?.id || ""}
+                    customerEmail={zCustomer?.email || ""}
+                    onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
+                    onCardProcessingEnd={() => _setCardProcessingAmount(0)}
+                    onSwitchToManual={() => _setCardMode("manual")}
+                  />
+              )}
             </View>
 
             {/* ── MIDDLE COLUMN: Totals & Payments ──────── */}
@@ -819,7 +976,10 @@ export function NewCheckoutModalScreen() {
                 }}
               >
 
-                <PaymentsList payments={sSale?.payments} />
+                <PaymentsList
+                  payments={sSale?.payments}
+                  onRefund={saleComplete ? () => _setShowRefundModal(true) : null}
+                />
 
               </View>
 
@@ -836,22 +996,13 @@ export function NewCheckoutModalScreen() {
                   backgroundColor: C.backgroundListWhite,
                   borderRadius: 10,
                   paddingVertical: 2,
+                  paddingHorizontal: 3,
                   marginTop: 5
                 }}
               >
                 {/* Tax-Free & Receipt Language */}
-                {/* {!saleComplete && (
-                  <View
-                    style={{
-                      // width: "100%",
-                      flexDirection: "row",
-                      // justifyContent: "center",
-                      alignItems: "center",
-                      paddingTop: 8,
-                      // gap: 20,
-                    }}
-                  > */}
-                {sCombinedWorkorders.length > 0 && !saleComplete && (
+
+                {sCombinedWorkorders.length > 0 && !saleComplete && !(sSale?.payments.length > 0) && (
                   <CheckBox_
                     text="Tax-Free"
                     isChecked={!!sCombinedWorkorders[0]?.taxFree}
@@ -859,8 +1010,11 @@ export function NewCheckoutModalScreen() {
                     textStyle={{ fontSize: 13, color: gray(0.5) }}
                   />
                 )}
+
+
                 <View style={{ flexDirection: "column", alignItems: "center" }}>
                   <Text style={{ fontSize: 12, color: gray(0.5) }}>Receipt text</Text>
+
                   <DropdownMenu
                     dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
                     selectedIdx={Object.keys(CUSTOMER_LANGUAGES).indexOf(sReceiptLanguage || "english")}
@@ -871,11 +1025,19 @@ export function NewCheckoutModalScreen() {
                     buttonIcon={null}
                     buttonIconSize={0}
                     modalCoordX={80}
-                    modalCoordY={-55}
+                    // modalCoordY={50}
+                    openUpward={true}
                   />
                 </View>
-                {/* </View> */}
-                {/* )} */}
+                {!saleComplete && (sSale?.payments.length > 0) && (
+                  <Button_
+                    colorGradientArr={COLOR_GRADIENTS.greenblue}
+                    text="PARTIAL PAYMENT"
+                    onPress={handlePartialPayment}
+                    textStyle={{ color: C.textWhite, fontSize: 13 }}
+                    buttonStyle={{ width: 130, height: 35 }}
+                  />
+                )}
                 <Button_
                   enabled={
                     saleComplete ||
@@ -884,8 +1046,8 @@ export function NewCheckoutModalScreen() {
                   colorGradientArr={COLOR_GRADIENTS.red}
                   text={saleComplete ? "CLOSE" : "CANCEL"}
                   onPress={closeModal}
-                  textStyle={{ color: C.textWhite }}
-                  buttonStyle={{ width: 100, marginLeft: 0 }}
+                  textStyle={{ color: C.textWhite, fontSize: 13 }}
+                  buttonStyle={{ width: 80, height: 30, }}
                 />
                 {saleComplete && (
                   <Button_
@@ -1068,6 +1230,12 @@ export function NewCheckoutModalScreen() {
               skipPortal={true}
             />
           )}
+          <NewRefundModalScreen
+            visible={sShowRefundModal}
+            sale={sSale}
+            onClose={() => _setShowRefundModal(false)}
+            onSaleUpdated={(updatedSale) => _setSale(updatedSale)}
+          />
         </View>
       )}
     />

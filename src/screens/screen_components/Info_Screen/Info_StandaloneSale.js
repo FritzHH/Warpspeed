@@ -47,8 +47,8 @@ export const StandaloneSaleComponent = ({}) => {
 
   async function handleScan(value) {
     let digits = value.replace(/\D/g, "");
-    if (digits.length < 12) return;
-    digits = digits.substring(0, 12);
+    if (digits.length < 13) return;
+    digits = digits.substring(0, 13);
     _setScanValue(digits);
     _setSearching(true);
     _setError("");
@@ -58,7 +58,7 @@ export const StandaloneSaleComponent = ({}) => {
       let prefix = digits[0];
 
       if (prefix === "1") {
-        // Workorder — check local store first, then completed
+        // Warpspeed workorder — check local store first, then completed
         let wo = useOpenWorkordersStore.getState().workorders.find(
           (o) => o.id === digits
         );
@@ -68,15 +68,31 @@ export const StandaloneSaleComponent = ({}) => {
         } else {
           _setError("No workorder found for this ticket.");
         }
-      } else if (prefix === "2") {
-        // Sale — derive sale ID, check active then completed
-        let saleID = "s" + digits.substring(1);
-        let sale = await newCheckoutGetActiveSale(saleID);
-        if (!sale) sale = await dbGetCompletedSale(saleID);
+      } else if (prefix === "3") {
+        // Warpspeed sale — search by ID directly
+        let sale = await newCheckoutGetActiveSale(digits);
+        if (!sale) sale = await dbGetCompletedSale(digits);
         if (sale) {
           _setResult({ type: "sale", data: sale });
         } else {
           _setError("No sale found for this ticket.");
+        }
+      } else if (prefix === "2") {
+        // Lightspeed legacy — could be sale (22) or workorder (25)
+        let wo = useOpenWorkordersStore.getState().workorders.find(
+          (o) => o.id === digits
+        );
+        if (!wo) wo = await dbGetCompletedWorkorder(digits);
+        if (wo) {
+          _setResult({ type: "workorder", data: wo });
+        } else {
+          let sale = await newCheckoutGetActiveSale(digits);
+          if (!sale) sale = await dbGetCompletedSale(digits);
+          if (sale) {
+            _setResult({ type: "sale", data: sale });
+          } else {
+            _setError("No ticket found.");
+          }
         }
       } else {
         _setError("Unrecognized ticket prefix.");

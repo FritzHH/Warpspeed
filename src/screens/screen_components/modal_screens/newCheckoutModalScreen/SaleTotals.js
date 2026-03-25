@@ -1,5 +1,6 @@
 /* eslint-disable */
-import { View, Text } from "react-native-web";
+import { View, Text, Animated } from "react-native-web";
+import { useRef } from "react";
 import { C, Fonts } from "../../../../styles";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
@@ -67,7 +68,27 @@ export function SaleTotals({
   cashChangeNeeded,
   settings,
 }) {
+  const successScale = useRef(new Animated.Value(0)).current;
+  const successOpacity = useRef(new Animated.Value(0)).current;
+  const successPulse = useRef(new Animated.Value(1)).current;
+  const successAnimStarted = useRef(false);
+
   if (!sale) return null;
+
+  if (sale.paymentComplete && !successAnimStarted.current) {
+    successAnimStarted.current = true;
+    Animated.parallel([
+      Animated.spring(successScale, { toValue: 1, friction: 4, tension: 80, useNativeDriver: false }),
+      Animated.timing(successOpacity, { toValue: 1, duration: 300, useNativeDriver: false }),
+    ]).start(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(successPulse, { toValue: 1.06, duration: 800, useNativeDriver: false }),
+          Animated.timing(successPulse, { toValue: 1, duration: 800, useNativeDriver: false }),
+        ])
+      ).start();
+    });
+  }
 
   let hasDiscount = (sale.discount || 0) > 0;
   let hasCardFee = (sale.cardFee || 0) > 0;
@@ -171,15 +192,27 @@ export function SaleTotals({
 
         {/* Sale Complete */}
         {sale.paymentComplete && (
-          <Text
+          <Animated.View
             style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: gray(0.6),
+              backgroundColor: C.green,
+              borderRadius: 10,
+              paddingVertical: 8,
+              paddingHorizontal: 20,
+              opacity: successOpacity,
+              transform: [{ scale: Animated.multiply(successScale, successPulse) }],
             }}
           >
-            PAYMENT COMPLETE!
-          </Text>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "700",
+                color: C.textWhite,
+                textAlign: "center",
+              }}
+            >
+              PAYMENT COMPLETE
+            </Text>
+          </Animated.View>
         )}
       </View>
 

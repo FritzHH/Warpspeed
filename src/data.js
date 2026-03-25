@@ -146,6 +146,14 @@ export const NONREMOVABLE_STATUSES = [
     removable: false,
     requireWaitTime: false,
   },
+  {
+    id: "33knkdkanctg",
+    textColor: "white",
+    backgroundColor: "green",
+    label: "Finished - No Auto Text",
+    removable: false,
+    requireWaitTime: false,
+  },
 ];
 
 export const CONTACT_RESTRICTIONS = {
@@ -177,6 +185,7 @@ export const TAB_NAMES = {
     changeLog: "Change Log",
     dashboard: "Dashboard",
     customerList: "Customer List",
+    ticketSearchResults: "Ticket Search Results",
     preview: "Preview",
     empty: "Empty",
   },
@@ -301,6 +310,7 @@ export const PAYMENT_OBJECT_PROTO = {
 
 export const REFUND_PROTO = {
   id: "",
+  type: "",
   workorderLines: [],
   amountRefunded: 0,
   millis: "",
@@ -310,7 +320,6 @@ export const REFUND_PROTO = {
 
 export const SALE_PROTO = {
   id: "",
-  barcode: "",
   millis: "",
   subtotal: 0,
   discount: 0,
@@ -1053,6 +1062,8 @@ export const SETTINGS_OBJ = {
     },
   ],
   statusAutoText: [],
+  nextWorkorderCounter: 1,
+  nextSaleCounter: 1,
 };
 
 export const SMS_TEMPLATE_PROTO = {

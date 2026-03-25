@@ -24,7 +24,7 @@ import {
 import {
   newCheckoutFetchCompletedSale,
   newCheckoutFetchWorkordersForSale,
-  newCheckoutCompleteSale,
+  newCheckoutUpdateCompletedSale,
   newCheckoutSaveActiveSale,
   saveRefundIndex,
 } from "./newCheckoutFirebaseCalls";
@@ -35,7 +35,7 @@ import { RefundTotals } from "./RefundTotals";
 import { RefundItemSelector } from "./RefundItemSelector";
 import { RefundPaymentSelector } from "./RefundPaymentSelector";
 
-export function NewRefundModalScreen({ visible, saleID, onClose }) {
+export function NewRefundModalScreen({ visible, saleID, sale: saleProp, onClose, onSaleUpdated }) {
   const zSettings = useSettingsStore((state) => state.settings);
 
   // ─── Local State ──────────────────────────────────────────
@@ -49,6 +49,7 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
   const [sLoading, _setLoading] = useState(false);
   const [sLoadMessage, _setLoadMessage] = useState("");
   const [sInitialized, _setInitialized] = useState(false);
+  const [sIsActiveSale, _setIsActiveSale] = useState(false);
 
   // ─── Derived Values ───────────────────────────────────────
   let refundLimits = calculateRefundLimits(sOriginalSale, zSettings);
@@ -78,10 +79,49 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
   let maxCardRefund = Math.min(cardPaymentsTotal, refundLimits.maxRefund);
   let maxCashRefund = Math.min(cashPaymentsTotal, refundLimits.maxRefund);
 
+  // Compute suggested refund total (same formula as RefundTotals)
+  let suggestedRefundTotal = 0;
+  if (!sIsCustomAmount && selectedItemsTotal > 0) {
+    let taxRate = zSettings?.salesTaxPercent || 0;
+    let refundTax = Math.round(selectedItemsTotal * (taxRate / 100));
+    let totalRequested = selectedItemsTotal + refundTax;
+    let cardFeeRefundAmount = 0;
+    if (zSettings?.cardFeeRefund && sOriginalSale?.cardFee > 0) {
+      let refundRatio = totalRequested / (sOriginalSale.total - (sOriginalSale.cardFee || 0));
+      cardFeeRefundAmount = Math.round((sOriginalSale.cardFee || 0) * refundRatio);
+    }
+    suggestedRefundTotal = totalRequested + cardFeeRefundAmount;
+  }
+
   // ─── Initialization ──────────────────────────────────────
-  if (visible && saleID && !sInitialized) {
+  if (visible && !sInitialized && (saleID || saleProp)) {
     _setInitialized(true);
-    loadSaleData(saleID);
+    if (saleProp) {
+      loadSaleFromProp(saleProp);
+    } else {
+      loadSaleData(saleID);
+    }
+  }
+
+  async function loadSaleFromProp(sale) {
+    _setLoading(true);
+    _setLoadMessage("Loading sale...");
+    try {
+      _setOriginalSale(cloneDeep(sale));
+      _setIsActiveSale(!sale.paymentComplete);
+      _setLoadMessage("Loading workorders...");
+      let workorders = await newCheckoutFetchWorkordersForSale(
+        sale.workorderIDs || []
+      );
+      let splitWOs = splitWorkorderLinesToSingleQty(workorders);
+      _setWorkordersInSale(splitWOs);
+      _setLoading(false);
+      _setLoadMessage("");
+    } catch (error) {
+      log("Error loading sale for refund:", error);
+      _setLoadMessage("Error loading sale data");
+      _setLoading(false);
+    }
   }
 
   async function loadSaleData(id) {
@@ -130,7 +170,14 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
       let newItemsTotal = selectedItemsTotal + itemPrice;
       let newTotalWithTax = newItemsTotal + Math.round(newItemsTotal * (taxRate / 100));
 
-      if (newTotalWithTax > refundLimits.maxRefund) {
+      // Include card fee refund in the check if applicable
+      let cardFeeRefundAmount = 0;
+      if (zSettings?.cardFeeRefund && sOriginalSale?.cardFee > 0 && newTotalWithTax > 0) {
+        let refundRatio = newTotalWithTax / (sOriginalSale.total - (sOriginalSale.cardFee || 0));
+        cardFeeRefundAmount = Math.round((sOriginalSale.cardFee || 0) * refundRatio);
+      }
+
+      if (newTotalWithTax + cardFeeRefundAmount > refundLimits.maxRefund) {
         useAlertScreenStore.getState().setValues({
           showAlert: true,
           title: "Refund Limit Exceeded",
@@ -173,15 +220,16 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
 
     let refund = buildRefundObject(
       amount,
-      type === "cash" ? sSelectedItems : sSelectedItems,
+      sSelectedItems,
       cardDetails?.refundId || "",
-      ""
+      "",
+      type
     );
 
     sale.refunds = [...(sale.refunds || []), refund];
     sale.amountRefunded = (sale.amountRefunded || 0) + amount;
 
-    // Update the specific payment's amountRefunded if it's a card refund
+    // Update per-payment amountRefunded
     if (type === "card" && cardDetails?.paymentId) {
       sale.payments = sale.payments.map((p) => {
         if (p.id === cardDetails.paymentId) {
@@ -192,12 +240,25 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
         }
         return p;
       });
+    } else if (type === "cash") {
+      let remaining = amount;
+      sale.payments = sale.payments.map((p) => {
+        if (remaining <= 0 || (!p.cash && !p.check)) return p;
+        let available = p.amountCaptured - (p.amountRefunded || 0);
+        let deduct = Math.min(remaining, available);
+        remaining -= deduct;
+        return { ...p, amountRefunded: (p.amountRefunded || 0) + deduct };
+      });
     }
 
     _setOriginalSale(sale);
 
     // Persist updated sale immediately
-    await newCheckoutCompleteSale(sale);
+    if (sIsActiveSale) {
+      await newCheckoutSaveActiveSale(sale);
+    } else {
+      await newCheckoutUpdateCompletedSale(sale);
+    }
 
     // Write refund index for reporting
     const primaryWO = sWorkordersInSale[0];
@@ -214,6 +275,15 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
     if (newLimits.maxRefund <= 0) {
       _setRefundComplete(true);
     }
+
+    // Sync parent sale state (checkout modal)
+    if (onSaleUpdated) onSaleUpdated(sale);
+
+    // Reset selection for next refund
+    _setSelectedItems([]);
+    _setSelectedPayment(null);
+    _setCustomRefundAmount(0);
+    _setIsCustomAmount(false);
   }
 
   // ─── Close Modal ──────────────────────────────────────────
@@ -225,6 +295,7 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
     _setIsCustomAmount(false);
     _setCustomRefundAmount(0);
     _setRefundComplete(false);
+    _setIsActiveSale(false);
     _setLoading(false);
     _setLoadMessage("");
     _setInitialized(false);
@@ -294,7 +365,7 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
                   color: C.text,
                 }}
               >
-                Sale: {saleID}
+                Sale: {saleID || sOriginalSale?.id || saleProp?.id || ""}
               </Text>
               {sOriginalSale && (
                 <Text style={{ fontSize: 12, color: C.lightText }}>
@@ -381,6 +452,7 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
                     maxCashRefund={maxCashRefund}
                     onProcessRefund={handleProcessRefund}
                     refundComplete={sRefundComplete}
+                    suggestedAmount={!sIsCustomAmount ? suggestedRefundTotal : 0}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -390,6 +462,7 @@ export function NewRefundModalScreen({ visible, saleID, onClose }) {
                     onProcessRefund={handleProcessRefund}
                     settings={zSettings}
                     refundComplete={sRefundComplete}
+                    suggestedAmount={!sIsCustomAmount ? suggestedRefundTotal : 0}
                   />
                 </View>
               </View>

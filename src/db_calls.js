@@ -17,6 +17,7 @@ import {
   limit,
   serverTimestamp,
   onSnapshot,
+  writeBatch as firestoreWriteBatch,
 } from "firebase/firestore";
 import {
   getDatabase,
@@ -87,6 +88,21 @@ export async function firestoreWrite(path, data) {
       path: path,
     };
   }
+}
+
+/**
+ * Write multiple documents in a single Firestore batch (max 500 per batch).
+ * @param {Array<{path: string, data: Object}>} items - Array of { path, data } objects
+ * @returns {Promise<{success: boolean, count: number}>}
+ */
+export async function firestoreBatchWrite(items) {
+  const batch = firestoreWriteBatch(DB);
+  for (const item of items) {
+    const docRef = doc(DB, ...item.path.split("/"));
+    batch.set(docRef, item.data);
+  }
+  await batch.commit();
+  return { success: true, count: items.length };
 }
 
 /**

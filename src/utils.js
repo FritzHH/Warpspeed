@@ -516,31 +516,23 @@ export function stringifyAllObjectFields(obj) {
 }
 
 // numbers /////////////////////////////////////////////////////////
-export function extractRandomFourDigits(twelveDigitNumber) {
-  // Convert to string and validate
-  const numStr = String(twelveDigitNumber);
+export function generateWorkorderNumber(barcodeNumber) {
+  const numStr = String(barcodeNumber);
 
-  // Validate input
-  if (!numStr || numStr.length !== 12) {
-    throw new Error("Input must be exactly 12 digits");
+  if (!numStr || !/^\d{12,13}$/.test(numStr)) {
+    throw new Error("Input must be 12 or 13 digits");
   }
 
-  if (!/^\d{12}$/.test(numStr)) {
-    throw new Error("Input must contain only digits");
-  }
-
-  // Generate 5 unique random indexes between 0 and 11
+  // Generate 5 unique random indexes
   const indexes = [];
   while (indexes.length < 5) {
-    const randomIndex = Math.floor(Math.random() * 12);
+    const randomIndex = Math.floor(Math.random() * numStr.length);
     if (!indexes.includes(randomIndex)) {
       indexes.push(randomIndex);
     }
   }
 
-  // Extract digits at the random indexes
   const result = indexes.map((index) => numStr[index]).join("");
-
   return result;
 }
 
@@ -1221,44 +1213,110 @@ export function generateRandomID(collectionPath) {
 }
 
 /**
- * Create a barcode record for a specific type.
- * @param {'workorder'|'sale'|'customer'} barcodeType - The barcode category.
- * @returns {string}
+ * Compute EAN-13 check digit from first 12 digits.
+ * @param {string} first12 - 12-digit string
+ * @returns {number}
  */
-export function generateUPCBarcode(barcodeType) {
-  // Get current millis since epoch
+export function ean13CheckDigit(first12) {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += parseInt(first12[i]) * (i % 2 === 0 ? 1 : 3);
+  return (10 - (sum % 10)) % 10;
+}
+
+/**
+ * Create a 13-digit EAN-13 barcode for a specific type.
+ * Prefix: 1 = workorder, 3 = sale, 4 = customer.
+ * Prefix 2 is reserved for Lightspeed legacy barcodes.
+ * @param {'workorder'|'sale'|'customer'} barcodeType
+ * @returns {string} 13-digit EAN-13 barcode
+ */
+export function generateEAN13Barcode(barcodeType) {
   let begins = "0";
   switch (barcodeType) {
-    case "workorder":
-      begins = "1";
-      break;
-    case "sale":
-      begins = "2";
-      break;
-    case "customer":
-      begins = "3";
+    case "workorder": begins = "1"; break;
+    case "sale": begins = "3"; break;
+    case "customer": begins = "4"; break;
   }
   const millis = Date.now().toString();
   const timePart = millis.slice(-8);
   const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-  let upc = timePart + randomPart;
-  upc = upc.replace(/^./, begins);
-  return upc;
+  let data = (begins + timePart + randomPart).slice(0, 12);
+  return data + ean13CheckDigit(data);
+}
+export const generateUPCBarcode = generateEAN13Barcode;
+
+/**
+ * Get the next sequential EAN-13 barcode for workorders or sales.
+ * Reads the counter from settings, increments it, and persists back.
+ * @param {"workorder"|"sale"} type
+ * @returns {string} 13-digit EAN-13 barcode
+ */
+export function getNextID(type) {
+  const settings = useSettingsStore.getState().settings || {};
+  let counterField, prefix;
+  switch (type) {
+    case "workorder":
+      counterField = "nextWorkorderCounter";
+      prefix = "1";
+      break;
+    case "sale":
+      counterField = "nextSaleCounter";
+      prefix = "3";
+      break;
+    default:
+      return generateEAN13Barcode(type);
+  }
+  const counter = settings[counterField] || 1;
+  const padded = String(counter).padStart(11, "0");
+  const data = prefix + padded;
+  const barcode = data + ean13CheckDigit(data);
+
+  // Increment counter locally + persist to DB
+  const next = counter + 1;
+  useSettingsStore.getState().setField(counterField, next, false);
+  import("./db_calls_wrapper.js").then(m => m.dbSaveSettingsNode(counterField, next));
+
+  return barcode;
 }
 
 /**
- * @param {string} upcBarcode
- * @returns {'workorder'|'sale'|'customer'}
+ * Decode a Lightspeed EAN-13 barcode into type and original LS ID.
+ * LS uses prefix 22 for sales, 25 for workorders.
+ * @param {string} barcode13 - 13-digit barcode string
+ * @returns {{ type: 'sale'|'workorder', lsID: string } | null}
  */
-export function getReceiptType(upcBarcode) {
-  switch (upcBarcode) {
-    case upcBarcode.beginsWith("1"):
-      return "workorder";
-    case upcBarcode.beginsWith("2"):
-      return "sale";
-    case upcBarcode.beginsWith("3"):
-      return "customer";
-  }
+export function decodeLightspeedBarcode(barcode13) {
+  if (!barcode13 || barcode13.length !== 13 || !/^\d{13}$/.test(barcode13)) return null;
+  let prefix = barcode13.slice(0, 2);
+  let type = prefix === "22" ? "sale" : prefix === "25" ? "workorder" : null;
+  if (!type) return null;
+  let lsID = barcode13.slice(2, 12).replace(/^0+/, "") || "0";
+  return { type, lsID };
+}
+
+/**
+ * Build a Lightspeed-format EAN-13 barcode from a 2-digit prefix and LS ID.
+ * @param {string} prefix2digit - "22" for sale, "25" for workorder
+ * @param {string|number} lsID - Lightspeed sequential ID
+ * @returns {string} 13-digit EAN-13 barcode
+ */
+export function buildLightspeedEAN13(prefix2digit, lsID) {
+  let padded = String(lsID).padStart(10, "0");
+  let data = prefix2digit + padded;
+  return data + ean13CheckDigit(data);
+}
+
+/**
+ * @param {string} barcode - 13-digit EAN-13 barcode
+ * @returns {'workorder'|'sale'|'lightspeed'|'customer'|undefined}
+ */
+export function getReceiptType(barcode) {
+  if (!barcode || barcode.length < 1) return undefined;
+  if (barcode.startsWith("1")) return "workorder";
+  if (barcode.startsWith("3")) return "sale";
+  if (barcode.startsWith("2")) return "lightspeed";
+  if (barcode.startsWith("4")) return "customer";
+  return undefined;
 }
 
 export async function randomWordGenerator() {
@@ -1321,36 +1379,10 @@ export function removeEmptyFields(obj) {
 
 export function removeUnusedFields(obj) {
   if (!isObject(obj)) return obj;
-
-  log("=== removeUnusedFields START ===");
-  log("Input object:", obj);
-  log("Object keys:", Object.keys(obj));
-
-  let usedFields = [];
-  let keys = Object.keys(obj);
-
-  keys.forEach((key) => {
-    const value = obj[key];
-    log(
-      `Checking key: ${key}, value: ${value}, type: ${typeof value}, truthy: ${!!value}`
-    );
-
-    if (value) {
-      usedFields.push(key);
-      log(`✓ Keeping field: ${key}`);
-    } else {
-      log(`✗ Removing field: ${key} (falsy value: ${value})`);
-    }
-  });
-
-  log("Fields to keep:", usedFields);
-
   let newObj = {};
-  usedFields.forEach((field) => (newObj[field] = obj[field]));
-
-  log("Final cleaned object:", newObj);
-  log("=== removeUnusedFields END ===");
-
+  Object.keys(obj).forEach((key) => {
+    if (obj[key]) newObj[key] = obj[key];
+  });
   return newObj;
 }
 
@@ -1936,8 +1968,8 @@ export function createNewWorkorder({
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
   wo.isStandaloneSale = isStandaloneSale || false;
-  wo.id = generateUPCBarcode();
-  wo.workorderNumber = extractRandomFourDigits(wo.id);
+  wo.id = getNextID("workorder");
+  wo.workorderNumber = generateWorkorderNumber(wo.id);
   wo.status = status || SETTINGS_OBJ.statuses[0]?.id || "";
   wo.customerFirst = customerFirst || "";
   wo.customerLast = customerLast || "";

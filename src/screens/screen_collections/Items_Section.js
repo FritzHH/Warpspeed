@@ -21,6 +21,7 @@ import { C, ICONS, Fonts, COLOR_GRADIENTS } from "../../styles";
 import { ROUTES } from "../../routes";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 import { Items_ChangeLog } from "../screen_components/Items_Screen/Items_ChangeLog";
+import { Items_TicketSearchResults } from "../screen_components/Items_Screen/Items_TicketSearchResults";
 import { log, gray } from "../../utils";
 import { useTranslation } from "../../useTranslation";
 import {
@@ -51,6 +52,8 @@ export const Items_Section = React.memo(({}) => {
         return <WorkorderPreview />;
       case TAB_NAMES.itemsTab.workorderItems:
         return <Items_WorkorderItemsTab />;
+      case TAB_NAMES.itemsTab.ticketSearchResults:
+        return <Items_TicketSearchResults />;
       case TAB_NAMES.itemsTab.empty:
         return <EmptyItemsComponent />;
       default:

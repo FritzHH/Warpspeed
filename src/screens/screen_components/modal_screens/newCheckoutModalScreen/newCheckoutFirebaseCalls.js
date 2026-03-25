@@ -28,6 +28,7 @@ let _newCheckoutInitiatePaymentIntentCallable = null;
 let _newCheckoutCancelPaymentCallable = null;
 let _newCheckoutProcessRefundCallable = null;
 let _newCheckoutGetAvailableReadersCallable = null;
+let _newCheckoutManualCardPaymentCallable = null;
 
 async function getCallables() {
   if (!_newCheckoutInitiatePaymentIntentCallable) {
@@ -36,12 +37,14 @@ async function getCallables() {
     _newCheckoutCancelPaymentCallable = httpsCallable(fns, "newCheckoutCancelPaymentCallable");
     _newCheckoutProcessRefundCallable = httpsCallable(fns, "newCheckoutProcessRefundCallable");
     _newCheckoutGetAvailableReadersCallable = httpsCallable(fns, "newCheckoutGetAvailableReadersCallable");
+    _newCheckoutManualCardPaymentCallable = httpsCallable(fns, "newCheckoutManualCardPaymentCallable");
   }
   return {
     initiatePayment: _newCheckoutInitiatePaymentIntentCallable,
     cancelPayment: _newCheckoutCancelPaymentCallable,
     processRefund: _newCheckoutProcessRefundCallable,
     getReaders: _newCheckoutGetAvailableReadersCallable,
+    manualCardPayment: _newCheckoutManualCardPaymentCallable,
   };
 }
 
@@ -139,6 +142,22 @@ export async function newCheckoutCompleteSale(sale) {
     return { success: true };
   } catch (error) {
     log("newCheckoutCompleteSale error:", error);
+    return { success: false, error };
+  }
+}
+
+export async function newCheckoutUpdateCompletedSale(sale) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("newCheckoutUpdateCompletedSale: missing tenantID/storeID");
+      return { success: false };
+    }
+    const path = `tenants/${tenantID}/stores/${storeID}/completed-sales/${sale.id}`;
+    await firestoreWrite(path, sale);
+    return { success: true };
+  } catch (error) {
+    log("newCheckoutUpdateCompletedSale error:", error);
     return { success: false, error };
   }
 }
@@ -265,7 +284,7 @@ export function newCheckoutListenToPaymentUpdates(readerID, paymentIntentID, onU
 
 // ─── Stripe Callable Wrappers ─────────────────────────────────
 
-export async function newCheckoutProcessStripePayment(amount, readerID, paymentIntentID, saleID, customerID) {
+export async function newCheckoutProcessStripePayment(amount, readerID, paymentIntentID, saleID, customerID, customerEmail) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     const callables = await getCallables();
@@ -277,6 +296,7 @@ export async function newCheckoutProcessStripePayment(amount, readerID, paymentI
       storeID,
       saleID: saleID || "",
       customerID: customerID || "",
+      customerEmail: customerEmail || "",
     });
     log("newCheckout payment initiated:", result.data);
     return result.data;
@@ -321,6 +341,27 @@ export async function newCheckoutGetStripeReaders() {
     return result.data;
   } catch (error) {
     log("newCheckoutGetStripeReaders error:", error);
+    throw error;
+  }
+}
+
+export async function newCheckoutProcessManualCardPayment(amount, paymentMethodID, saleID, customerID, customerEmail) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    const callables = await getCallables();
+    const result = await callables.manualCardPayment({
+      amount: Number(amount),
+      paymentMethodID,
+      tenantID,
+      storeID,
+      saleID: saleID || "",
+      customerID: customerID || "",
+      customerEmail: customerEmail || "",
+    });
+    log("newCheckout manual card payment:", result.data);
+    return result.data;
+  } catch (error) {
+    log("newCheckoutProcessManualCardPayment error:", error);
     throw error;
   }
 }

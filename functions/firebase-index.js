@@ -4157,7 +4157,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
   async (request) => {
     log("newCheckout: initiate payment intent request", request.data);
 
-    const { amount, readerID, paymentIntentID, tenantID, storeID, saleID, customerID } = request.data;
+    const { amount, readerID, paymentIntentID, tenantID, storeID, saleID, customerID, customerEmail } = request.data;
 
     if (!amount || typeof amount !== "number") {
       throw new HttpsError(
@@ -4215,13 +4215,15 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
       let finalPaymentIntentID;
 
       if (!paymentIntentID) {
-        paymentIntent = await stripeClient.paymentIntents.create({
+        const piParams = {
           amount,
           payment_method_types: ["card_present"],
           capture_method: "automatic",
           currency: "usd",
           metadata: { tenantID, storeID, saleID: saleID || "", customerID: customerID || "" },
-        });
+        };
+        if (customerEmail) piParams.receipt_email = customerEmail;
+        paymentIntent = await stripeClient.paymentIntents.create(piParams);
         finalPaymentIntentID = paymentIntent.id;
       } else {
         finalPaymentIntentID = paymentIntentID;
@@ -4387,6 +4389,87 @@ exports.newCheckoutCancelPaymentCallable = onCall(
         "internal",
         error.message || "Failed to reset reader"
       );
+    }
+  }
+);
+
+// ── Manual Card Entry (keyed-in card payment, no terminal reader) ──────────
+
+exports.newCheckoutManualCardPaymentCallable = onCall(
+  { secrets: [stripeSecretKey] },
+  async (request) => {
+    log("newCheckout: manual card payment request", {
+      amount: request.data?.amount,
+      saleID: request.data?.saleID,
+    });
+
+    const { amount, paymentMethodID, tenantID, storeID, saleID, customerID, customerEmail } = request.data;
+
+    if (!amount || amount < 50) {
+      throw new HttpsError("invalid-argument", "Amount must be at least $0.50 (50 cents).");
+    }
+    if (!paymentMethodID) {
+      throw new HttpsError("invalid-argument", "Payment method ID is required.");
+    }
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "Tenant and store IDs are required.");
+    }
+
+    const stripeClient = Stripe(stripeSecretKey.value());
+
+    try {
+      // Create + confirm PaymentIntent with client-tokenized PaymentMethod
+      const piParams = {
+        amount: Number(amount),
+        currency: "usd",
+        payment_method: paymentMethodID,
+        payment_method_types: ["card"],
+        confirm: true,
+        capture_method: "automatic",
+        metadata: {
+          tenantID,
+          storeID,
+          saleID: saleID || "",
+          customerID: customerID || "",
+          entryMethod: "manual",
+        },
+      };
+      if (customerEmail) piParams.receipt_email = customerEmail;
+      const paymentIntent = await stripeClient.paymentIntents.create(piParams);
+
+      // 3. Handle result
+      if (paymentIntent.status === "succeeded") {
+        const chargeID = paymentIntent.latest_charge;
+        const charge = await stripeClient.charges.retrieve(chargeID);
+
+        log("newCheckout: manual card payment succeeded", { chargeID, paymentIntentID: paymentIntent.id });
+
+        return {
+          success: true,
+          data: {
+            charge,
+            paymentIntentID: paymentIntent.id,
+          },
+        };
+      }
+
+      // requires_action, requires_payment_method, etc.
+      return {
+        success: false,
+        message: "Card requires additional verification — use the physical reader instead.",
+        status: paymentIntent.status,
+      };
+    } catch (error) {
+      log("newCheckout: manual card payment error", error.message);
+
+      // Return Stripe error details so the client can display them
+      return {
+        success: false,
+        message: error.message || "Payment failed",
+        code: error.code || "",
+        decline_code: error.decline_code || "",
+        type: error.type || "",
+      };
     }
   }
 );
@@ -5388,6 +5471,8 @@ exports.lightspeedImportData = onCall(
           customSku: item.customSku || "",
           manufacturerSku: item.manufacturerSku || "",
           minutes: 0,
+          customPart: false,
+          customLabor: false,
         });
       }
 
@@ -6630,8 +6715,7 @@ exports.rehydrateFromArchive = onCall(
 
 // Helper: generate sale ID (mirrors client-side generateSaleID in newCheckoutUtils.js)
 function generateSaleID() {
-  const barcode = generateUPCBarcode("sale"); // 12 digits starting with "2"
-  return { id: "s" + barcode.substring(1), barcode };
+  return generateUPCBarcode("sale"); // 12 digits starting with "2"
 }
 
 // Helper: calculate workorder totals server-side
@@ -7085,10 +7169,9 @@ exports.createTextToPayInvoice = onCall(
       }
 
       // ── Create sale object ──
-      const { id: saleID, barcode } = generateSaleID();
+      const saleID = generateSaleID();
       const sale = {
         id: saleID,
-        barcode,
         millis: Date.now(),
         subtotal: totals.subtotal,
         discount: totals.discount > 0 ? totals.discount : null,

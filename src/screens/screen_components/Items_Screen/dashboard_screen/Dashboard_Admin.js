@@ -30,6 +30,7 @@ import {
   capitalizeFirstLetterOfString,
   printBuilder,
   calculateRunningTotals,
+  localStorageWrapper,
 } from "../../../../utils";
 import {
   // useDatabaseStore,
@@ -39,6 +40,7 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
+  useStripePaymentStore,
 } from "../../../../stores";
 import {
   Button,
@@ -68,8 +70,9 @@ import { SalesReportsModal } from "../../modal_screens/SalesReports";
 import { PayrollModal } from "../../modal_screens/PayrollModal";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveCustomer, dbRehydrateFromArchive, dbSavePunchObject, dbSavePrintObj } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses } from "../../../../lightspeed_import";
-import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery } from "../../../../db_calls";
+import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite } from "../../../../db_calls";
 import { DB_NODES } from "../../../../constants";
+import { newCheckoutGetStripeReaders } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 const TAB_NAMES = {
   users: "User Control",
@@ -98,7 +101,8 @@ const DROPDOWN_ORDERING_SELECTION_NAMES = {
 export function Dashboard_Admin({}) {
   // store getters ///////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.settings);
-
+  const zLiveReaders = useStripePaymentStore((state) => state.readersArr) || [];
+  log('readers: ', zLiveReaders)
   // local state ///////////////////////////////////////////////////////////
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
     useState(false);
@@ -286,11 +290,16 @@ export function Dashboard_Admin({}) {
             <VerticalSpacer />
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.payments}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.payments ? null : TAB_NAMES.payments
-                )
-              }
+              handleExpandPress={() => {
+                let opening = sExpand !== TAB_NAMES.payments;
+                _setExpand(opening ? TAB_NAMES.payments : null);
+                if (opening) {
+                  newCheckoutGetStripeReaders().then((result) => {
+                    let arr = result?.data?.data || [];
+                    useStripePaymentStore.getState().setReadersArr(arr);
+                  }).catch(() => { });
+                }
+              }}
               text={TAB_NAMES.payments}
               icon={ICONS.paymentProcessing}
               style={{
@@ -746,6 +755,82 @@ export function Dashboard_Admin({}) {
                 Spoof Sale Receipt
               </Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={async () => {
+                const WO_ID = "049366289294";
+                try {
+                  const settings = useSettingsStore.getState().getSettings();
+                  const { tenantID, storeID } = settings;
+                  if (!tenantID || !storeID) { log("Revert: missing tenantID/storeID"); return; }
+
+                  const basePath = `tenants/${tenantID}/stores/${storeID}`;
+
+                  // 1. Find the workorder — check open-workorders first, then completed-workorders
+                  let wo = null;
+                  let wasCompleted = false;
+                  const openPath = `${basePath}/open-workorders/${WO_ID}`;
+                  wo = await firestoreRead(openPath);
+                  if (!wo) {
+                    const completedPath = `${basePath}/completed-workorders/${WO_ID}`;
+                    wo = await firestoreRead(completedPath);
+                    if (wo) wasCompleted = true;
+                  }
+                  if (!wo) {
+                    log("Revert: workorder not found in open or completed", WO_ID);
+                    useAlertScreenStore.getState().setValues({ title: "Revert Failed", message: "Workorder " + WO_ID + " not found.", btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
+                    return;
+                  }
+
+                  // 2. Delete associated sales (active + completed)
+                  let saleIDs = [wo.activeSaleID, wo.saleID, ...(wo.sales || [])].filter(Boolean);
+                  let uniqueSaleIDs = [...new Set(saleIDs)];
+                  for (let sid of uniqueSaleIDs) {
+                    await firestoreDelete(`${basePath}/active-sales/${sid}`).catch(() => {});
+                    await firestoreDelete(`${basePath}/completed-sales/${sid}`).catch(() => {});
+                  }
+
+                  // 3. Strip payment/sale fields from workorder
+                  wo.paymentComplete = false;
+                  wo.amountPaid = 0;
+                  wo.activeSaleID = "";
+                  wo.saleID = "";
+                  wo.sales = [];
+                  wo.endedOnMillis = "";
+
+                  // 4. Write clean workorder to open-workorders
+                  await firestoreWrite(openPath, wo);
+
+                  // 5. Delete from completed-workorders if it was there
+                  if (wasCompleted) {
+                    await firestoreDelete(`${basePath}/completed-workorders/${WO_ID}`);
+                  }
+
+                  // 6. Update local Zustand store
+                  useOpenWorkordersStore.getState().setWorkorder(wo, false);
+
+                  log("Revert complete for", WO_ID);
+                  useAlertScreenStore.getState().setValues({ title: "Reverted", message: "Workorder " + WO_ID + " reset to fresh state in open-workorders.", btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
+                } catch (e) {
+                  log("Revert error:", e);
+                  useAlertScreenStore.getState().setValues({ title: "Revert Error", message: e.message, btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
+                }
+              }}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                borderWidth: 2,
+                borderColor: C.red,
+                backgroundColor: C.listItemWhite,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 10,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: C.red, fontWeight: "700" }}>
+                Revert Sale (049366289294)
+              </Text>
+            </TouchableOpacity>
           </>)}
           {!!sExpand && (
             <Text
@@ -765,6 +850,7 @@ export function Dashboard_Admin({}) {
               <PaymentProcessingComponent
                 zSettingsObj={zSettingsObj}
                 handleSettingsFieldChange={handleSettingsFieldChange}
+                liveReaders={zLiveReaders}
               />
               <PrintersComponent
                 zSettingsObj={zSettingsObj}
@@ -993,6 +1079,229 @@ function BoxButton1({
       }}
       onPress={onPress}
     />
+  );
+}
+
+const LS_CARD_READER_KEY = "warpspeed_selected_card_reader";
+
+function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveReaders }) {
+  const [sEditingId, _setEditingId] = useState(null);
+  const [sLabelDraft, _setLabelDraft] = useState("");
+  const [sSelectedReader, _setSelectedReader] = useState(() => localStorageWrapper.getItem(LS_CARD_READER_KEY));
+
+  // Merge live Stripe readers with saved labels
+  let mergedReaders = liveReaders.map((live) => {
+    let saved = savedReaders.find((s) => s.id === live.id);
+    return {
+      id: live.id,
+      label: saved?.label || "",
+      status: live.status || "offline",
+      device_type: live.device_type || "",
+      isLive: true,
+    };
+  });
+  // Add saved readers not in live list (stale/disconnected)
+  savedReaders.forEach((saved) => {
+    if (saved.id && !mergedReaders.find((m) => m.id === saved.id)) {
+      mergedReaders.push({ id: saved.id, label: saved.label || "", status: "offline", device_type: "", isLive: false });
+    }
+  });
+
+  function saveLabel(readerId, label) {
+    let updated = savedReaders.filter((s) => s.id !== readerId);
+    if (label.trim()) updated.push({ id: readerId, label: label.trim() });
+    onSaveReaders(updated);
+  }
+
+  function handleDeleteReader(reader) {
+    let isConnected = reader.isLive;
+    useAlertScreenStore.getState().setValues({
+      title: isConnected ? "Reader Connected" : "Remove Reader",
+      message: isConnected
+        ? "This reader is connected to the Stripe account. It will appear back in this list until it is removed from your account."
+        : "This reader is no longer connected to the account. Safely remove?",
+      btn1Text: "Remove",
+      btn2Text: "Cancel",
+      handleBtn1Press: () => {
+        let updated = savedReaders.filter((s) => s.id !== reader.id);
+        onSaveReaders(updated);
+        // If this was the selected reader, clear local selection
+        if (sSelectedReader?.id === reader.id) {
+          _setSelectedReader(null);
+          localStorageWrapper.removeItem(LS_CARD_READER_KEY);
+        }
+        useAlertScreenStore.getState().setShowAlert(false);
+      },
+      handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+      canExitOnOuterClick: true,
+    });
+  }
+
+  // Build dropdown data for selected reader
+  let dropdownData = mergedReaders.map((r) => {
+    let isOffline = r.status !== "online";
+    return {
+      id: r.id,
+      label: (r.label || r.id) + (isOffline ? "  (offline)" : ""),
+      disabled: isOffline,
+      rawLabel: r.label,
+      textColor: isOffline ? gray(0.5) : C.text,
+    };
+  });
+
+  let selectedLabel = "";
+  if (sSelectedReader?.id) {
+    selectedLabel = sSelectedReader.label || sSelectedReader.id;
+  }
+
+  return (
+    <View style={{ marginTop: 7, width: "100%", alignItems: "flex-end" }}>
+      <View
+        style={{
+          borderRadius: 8,
+          backgroundColor: C.backgroundListWhite,
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+          padding: 10,
+          width: "100%",
+        }}
+      >
+        <Text style={{ fontSize: 12, color: gray(0.6), marginBottom: 10 }}>
+          {"STRIPE CARD READERS"}
+        </Text>
+
+        {mergedReaders.length === 0 && (
+          <Text style={{ fontSize: 12, color: gray(0.4), fontStyle: "italic", marginBottom: 5 }}>
+            No readers found on account
+          </Text>
+        )}
+
+        <FlatList
+          data={mergedReaders}
+          ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
+          renderItem={(obj) => {
+            let reader = obj.item;
+            let isOnline = reader.status === "online";
+            let isEditing = sEditingId === reader.id;
+            let hasLabel = !!reader.label;
+
+            return (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: C.listItemWhite,
+                  borderRadius: 6,
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                }}
+              >
+                {/* Status dot */}
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: isOnline ? C.green : gray(0.4),
+                    marginRight: 10,
+                  }}
+                />
+                {/* Reader info */}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: gray(0.5) }}>
+                    {reader.device_type ? reader.device_type + "  ·  " : ""}{reader.id.length > 20 ? "..." + reader.id.slice(-12) : reader.id}
+                  </Text>
+                  {hasLabel && !isEditing && (
+                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+                      <Text style={{ fontSize: 14, color: C.text, fontWeight: "500" }}>
+                        {reader.label}
+                      </Text>
+                      <Button_
+                        icon={ICONS.editPencil}
+                        iconSize={14}
+                        buttonStyle={{ paddingHorizontal: 6, backgroundColor: "transparent" }}
+                        onPress={() => {
+                          _setEditingId(reader.id);
+                          _setLabelDraft(reader.label);
+                        }}
+                      />
+                    </View>
+                  )}
+                  {(!hasLabel || isEditing) && (
+                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+                      <TextInput_
+                        value={isEditing ? sLabelDraft : ""}
+                        onChangeText={(val) => {
+                          _setLabelDraft(val);
+                          saveLabel(reader.id, val);
+                        }}
+                        placeholder="Enter label..."
+                        placeholderTextColor={gray(0.4)}
+                        style={{
+                          outlineWidth: 0,
+                          fontSize: 14,
+                          paddingVertical: 3,
+                          paddingHorizontal: 6,
+                          backgroundColor: C.backgroundWhite,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          minWidth: 140,
+                        }}
+                        onFocus={() => {
+                          if (sEditingId !== reader.id) {
+                            _setEditingId(reader.id);
+                            _setLabelDraft(reader.label || "");
+                          }
+                        }}
+                        onBlur={() => {
+                          _setEditingId(null);
+                          _setLabelDraft("");
+                        }}
+                      />
+                    </View>
+                  )}
+                </View>
+                {/* Delete button */}
+                <TouchableOpacity
+                  onPress={() => handleDeleteReader(reader)}
+                  style={{ padding: 6, marginLeft: 4 }}
+                >
+                  <Image_ source={ICONS.close1} style={{ width: 12, height: 12, opacity: 0.4 }} />
+                </TouchableOpacity>
+              </View>
+            );
+          }}
+        />
+      </View>
+
+      {/* Selected Reader Dropdown */}
+      <View
+        style={{
+          flexDirection: "row",
+          width: "100%",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          marginTop: 15,
+        }}
+      >
+        <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
+        <DropdownComponent
+          label={selectedLabel || "None"}
+          data={dropdownData}
+          onSelect={(item) => {
+            if (item.disabled) return;
+            let obj = { id: item.id, label: item.rawLabel || "" };
+            _setSelectedReader(obj);
+            localStorageWrapper.setItem(LS_CARD_READER_KEY, obj);
+          }}
+          itemTextStyle={{}}
+          itemStyle={{}}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -3068,6 +3377,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
 const PaymentProcessingComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
+  liveReaders: zLiveReaders = [],
 }) => {
   // const [sExpand, _setExpand] = useState();
 
@@ -3103,162 +3413,12 @@ const PaymentProcessingComponent = ({
             )
           }
         />
-        {/**card reader flatlist */}
-        <View
-          style={{
-            marginTop: 7,
-            width: "100%",
-            alignItems: "flex-end",
-          }}
-        >
-          <View
-            style={{
-              borderRadius: 8,
-              backgroundColor: C.backgroundListWhite,
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              padding: 10,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-start",
-                  marginBottom: 10,
-                  alignItems: "center",
-                  width: "100%",
-                }}
-              >
-                <BoxButton1
-                  onPress={() => {
-                    handleSettingsFieldChange("cardReaders", [
-                      ...zSettingsObj.cardReaders,
-                      { id: "", label: "" },
-                    ]);
-                  }}
-                  icon={ICONS.add}
-                  style={{ marginRight: 10, paddingLeft: 0 }}
-                />
-                <Text style={{ fontSize: 12, color: gray(0.6) }}>
-                  {"STRIPE CARD READERS"}
-                </Text>
-              </View>
-            </View>
-
-            {/**Flatlist showing the available card readers */}
-            <View style={{ width: "100%" }}>
-              <FlatList
-                ItemSeparatorComponent={() => (
-                  <View
-                    style={{
-                      height: 5,
-                    }}
-                  />
-                )}
-                style={{}}
-                data={zSettingsObj?.cardReaders || []}
-                renderItem={(obj) => {
-                  obj = cloneDeep(obj);
-                  let idx = obj.index;
-                  let item = obj.item;
-                  return (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "flex-end",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Text style={{ color: gray(0.55), marginRight: 10 }}>
-                        ID:
-                      </Text>
-                      <TextInput_
-                        style={{ outlineWidth: 0 }}
-                        editable={true}
-                        value={item.id}
-                        placeholder="Assign reader name..."
-                        placeholderTextColor={gray(0.4)}
-                        onChangeText={(val) => {
-                          let cardReaderArr = zSettingsObj.cardReaders?.map(
-                            (o) => {
-                              if (o.id === item.id) return { ...o, id: val };
-                              return o;
-                            }
-                          );
-                          handleSettingsFieldChange(
-                            "cardReaders",
-                            cloneDeep(cardReaderArr)
-                          );
-                        }}
-                      />
-                      <TextInput_
-                        value={item.label}
-                        onChangeText={(val) => {
-                          let cardReaderArr = zSettingsObj.cardReaders?.map(
-                            (o) => {
-                              if (o.id === item.id) return { ...o, label: val };
-                              return o;
-                            }
-                          );
-                          handleSettingsFieldChange(
-                            "cardReaders",
-                            cloneDeep(cardReaderArr)
-                          );
-                        }}
-                        placeholder="Assign reader name..."
-                        placeholderTextColor={gray(0.4)}
-                        style={{
-                          textAlign: "right",
-                          paddingRight: 2,
-                          justifyContent: "flex-end",
-                          paddingVertical: 4,
-                          backgroundColor: C.listItemWhite,
-                          borderWidth: 1,
-                          paddingRight: 2,
-                          borderColor: C.buttonLightGreenOutline,
-                          outlineWidth: 0,
-                        }}
-                      />
-                      <Button_
-                        buttonStyle={{ paddingHorizontal: 10 }}
-                        iconSize={15}
-                        icon={ICONS.close1}
-                        onPress={() => {
-                          handleSettingsFieldChange(
-                            "cardReaders",
-                            zSettingsObj.cardReaders.filter(
-                              (obj) => obj.label != item.label
-                            )
-                          );
-                        }}
-                      />
-                    </View>
-                    // </View>
-                  );
-                }}
-              />
-            </View>
-          </View>
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            width: "95%",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            marginTop: 20,
-          }}
-        >
-          <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
-          <DropdownComponent
-            label={zSettingsObj?.selectedCardReaderObj?.label || ""}
-            data={zSettingsObj?.cardReaders || []}
-            onSelect={(obj) =>
-              handleSettingsFieldChange("selectedCardReaderObj", obj)
-            }
-          />
-        </View>
+        {/**card reader list — auto-discovered from Stripe */}
+        <CardReaderManager
+          liveReaders={zLiveReaders}
+          savedReaders={zSettingsObj?.cardReaders || []}
+          onSaveReaders={(arr) => handleSettingsFieldChange("cardReaders", arr)}
+        />
         <View
           style={{
             width: "100%",

@@ -17,6 +17,7 @@ export function CashPayment({
   saleComplete = false,
   onCashChange,
   hasReaders = false,
+  isVisible = false,
 }) {
   const [sPayAmount, _setPayAmount] = useState("");
   const [sPayAmountDisp, _setPayAmountDisp] = useState("");
@@ -28,10 +29,12 @@ export function CashPayment({
 
   const tenderInputRef = useRef(null);
   const autoLoadedRef = useRef(false);
+  const prevAmountRef = useRef(amountLeftToPay);
 
   // Auto-load amountLeftToPay into pay amount on first availability
-  if (amountLeftToPay > 0 && !autoLoadedRef.current) {
+  if (amountLeftToPay > 0 && !autoLoadedRef.current && isVisible) {
     autoLoadedRef.current = true;
+    prevAmountRef.current = amountLeftToPay;
     _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
     _setPayAmount(amountLeftToPay);
     if (!hasReaders) {
@@ -39,15 +42,31 @@ export function CashPayment({
     }
   }
 
+  // Sync display when balance changes externally (other payment captured, card processing)
+  if (autoLoadedRef.current && amountLeftToPay !== prevAmountRef.current) {
+    prevAmountRef.current = amountLeftToPay;
+    if (amountLeftToPay > 0) {
+      _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
+      _setPayAmount(amountLeftToPay);
+    } else {
+      _setPayAmountDisp("");
+      _setPayAmount(0);
+    }
+    _setTenderAmountDisp("");
+    _setTenderAmount(0);
+  }
+
   function handlePayAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
     if (result.cents > amountLeftToPay) {
       _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
       _setPayAmount(amountLeftToPay);
+
       return;
     }
     _setPayAmountDisp(result.display);
     _setPayAmount(result.cents);
+
   }
 
   function handleTenderAmountChange(val) {
@@ -95,16 +114,17 @@ export function CashPayment({
 
   return (
     <View
+      pointerEvents={saleComplete || amountLeftToPay <= 0 ? "none" : "auto"}
       style={{
         alignItems: "center",
         paddingTop: 20,
         width: "100%",
-        height: "48%",
+        flex: 1,
         borderRadius: 15,
         ...SHADOW_RADIUS_PROTO,
         justifyContent: "space-between",
         paddingBottom: 20,
-        opacity: saleComplete ? 0.2 : 1,
+        opacity: saleComplete || amountLeftToPay <= 0 ? 0.2 : 1,
       }}
     >
       {/* Check checkbox */}
@@ -199,6 +219,7 @@ export function CashPayment({
                   _setFocused("pay");
                   _setPayAmountDisp("");
                   _setPayAmount(0);
+
                 }}
                 style={{
                   fontSize: 20,

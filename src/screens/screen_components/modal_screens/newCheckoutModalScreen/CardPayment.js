@@ -1,8 +1,7 @@
 /* eslint-disable */
 import { View, Text, TextInput, Animated } from "react-native-web";
-import { TouchableOpacity } from "react-native";
 import { useState, useRef } from "react";
-import { Button_, DropdownMenu, SHADOW_RADIUS_PROTO } from "../../../../components";
+import { Button_, DropdownMenu, SHADOW_RADIUS_PROTO, SmallLoadingIndicator, Tooltip } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
   usdTypeMask,
@@ -48,8 +47,10 @@ function PulsingText({ text }) {
 const PAYMENT_TIMEOUT_MS = 120000; // 2 minutes
 const LS_CARD_READER_KEY = "warpspeed_selected_card_reader";
 
-function formatDeclineCode(code) {
+// Maps Stripe decline_code and failure_code values to user-friendly messages
+function formatStripeError(code) {
   const messages = {
+    // decline_code values (issuer-side)
     insufficient_funds: "Insufficient funds on card",
     lost_card: "This card has been reported lost",
     stolen_card: "This card has been reported stolen",
@@ -64,8 +65,34 @@ function formatDeclineCode(code) {
     pickup_card: "Card cannot be used — customer should contact their bank",
     not_permitted: "Payment not permitted on this card",
     withdrawal_count_limit_exceeded: "Card has exceeded withdrawal limit",
+    invalid_account: "Card account is invalid",
+    new_account_information_available: "Card info has changed — try again",
+    currency_not_supported: "Card does not support USD",
+    duplicate_transaction: "Duplicate transaction — already processed",
+    reenter_transaction: "Could not process — try again",
+    // failure_code values (terminal/reader-side)
+    timed_out: "Reader timed out waiting for card — try again",
+    card_removed: "Card removed too early — reinsert and hold until done",
+    canceled: "Payment was cancelled",
+    card_swipe_not_supported: "Card swipe not supported — use chip or tap",
+    chip_read_failed: "Chip read failed — try again or use tap",
+    contactless_not_supported: "Tap not supported — use chip",
+    pin_required: "PIN required — reinsert card and enter PIN",
+    offline_pin_required: "Offline PIN required",
+    online_or_offline_pin_required: "PIN required — reinsert card and enter PIN",
+    no_common_application: "Card not compatible with this reader",
   };
-  return messages[code] || `Card declined (${code})`;
+  return messages[code] || null;
+}
+
+// Builds a display-friendly error from completion data, always including the raw Stripe code
+function buildCompletionError(completionData) {
+  let rawCode = completionData.decline_code || completionData.failure_code || "";
+  let rawMsg = completionData.failure_message || completionData.error_message || "";
+  let friendly = rawCode ? formatStripeError(rawCode) : null;
+  if (friendly) return rawCode ? `${friendly} (${rawCode})` : friendly;
+  if (rawMsg) return rawMsg;
+  return rawCode ? `Payment failed (${rawCode})` : "Payment failed";
 }
 
 export function CardPayment({
@@ -77,6 +104,8 @@ export function CardPayment({
   readerError = "",
   saleID = "",
   customerID = "",
+  onCardProcessingStart,
+  onCardProcessingEnd,
 }) {
   const [sRequestedAmount, _setRequestedAmount] = useState("");
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState("");
@@ -87,10 +116,14 @@ export function CardPayment({
   const [sSuccessMessage, _setSuccessMessage] = useState("");
   const [sListeners, _setListeners] = useState(null);
   const [sFocused, _setFocused] = useState("");
+  // Reader has an active action: our payment waiting for card, or an orphaned payment
+  const [sReaderActive, _setReaderActive] = useState(false);
 
   const listenersRef = useRef(null);
   const timeoutRef = useRef(null);
   const autoLoadedRef = useRef(false);
+  const prevAmountRef = useRef(amountLeftToPay);
+  const startupCheckDoneRef = useRef(false);
 
   function cleanupListeners() {
     if (timeoutRef.current) {
@@ -104,7 +137,7 @@ export function CardPayment({
     }
   }
 
-  // Auto-select reader from localStorage (per-computer)
+  // Auto-select reader from localStorage (per-device)
   function getInitialReader() {
     if (sCardReader) return sCardReader;
     let saved = localStorageWrapper.getItem(LS_CARD_READER_KEY);
@@ -116,6 +149,26 @@ export function CardPayment({
   }
 
   let activeReader = getInitialReader();
+
+  // On startup: check if the selected reader has a stuck/orphaned action
+  if (activeReader && !startupCheckDoneRef.current && !sProcessing && !sReaderActive) {
+    startupCheckDoneRef.current = true;
+    let action = activeReader.action;
+    if (action && action.type) {
+      let piID = action.process_payment_intent?.payment_intent || "";
+      if (piID && piID === sPaymentIntentID) {
+        // This is our payment intent — reader is ready for customer
+        _setReaderActive(true);
+        _setSuccessMessage("Waiting for card tap/insert...");
+      } else {
+        let msg = action.type === "process_payment_intent"
+          ? `Reader has an active payment` + (piID ? ` (${piID})` : "")
+          : `Reader is busy (${action.type})`;
+        _setReaderActive(true);
+        _setErrorMessage(msg);
+      }
+    }
+  }
 
   function handleAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
@@ -132,15 +185,28 @@ export function CardPayment({
     let reader = stripeReaders.find((r) => r.id === item.id);
     _setCardReader(reader || null);
     _setErrorMessage("");
+    _setReaderActive(false);
     if (reader) {
-      localStorageWrapper.setItem(LS_CARD_READER_KEY, {
-        id: reader.id,
-        label: reader.label || reader.id,
-      });
+      localStorageWrapper.setItem(LS_CARD_READER_KEY, { id: reader.id, label: item.label || reader.id });
+      // Check if newly selected reader has a stuck action
+      if (reader.action && reader.action.type) {
+        let piID = reader.action.process_payment_intent?.payment_intent || "";
+        if (piID && piID === sPaymentIntentID) {
+          _setReaderActive(true);
+          _setSuccessMessage("Waiting for card tap/insert...");
+        } else {
+          let msg = reader.action.type === "process_payment_intent"
+            ? `Reader has an active payment` + (piID ? ` (${piID})` : "")
+            : `Reader is busy (${reader.action.type})`;
+          _setReaderActive(true);
+          _setErrorMessage(msg);
+        }
+      }
     }
   }
 
   async function startPayment() {
+    if (sProcessing || sReaderActive) return;
     if (!activeReader) {
       _setErrorMessage("No card reader selected");
       return;
@@ -158,6 +224,9 @@ export function CardPayment({
     _setErrorMessage("");
     _setSuccessMessage("Initiating payment...");
 
+    // Notify parent that card is processing this amount (cash side updates immediately)
+    if (onCardProcessingStart) onCardProcessingStart(sRequestedAmount);
+
     try {
       let result = await newCheckoutProcessStripePayment(
         sRequestedAmount,
@@ -171,11 +240,14 @@ export function CardPayment({
         _setErrorMessage(result?.message || "Payment initiation failed");
         _setSuccessMessage("");
         _setProcessing(false);
+        if (onCardProcessingEnd) onCardProcessingEnd();
         return;
       }
 
       let piID = result.data?.paymentIntentID;
       _setPaymentIntentID(piID);
+      _setProcessing(false);
+      _setReaderActive(true);
       _setSuccessMessage("Waiting for card tap/insert...");
 
       // Set up real-time listener for payment updates
@@ -207,28 +279,19 @@ export function CardPayment({
             _setSuccessMessage(
               `Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`
             );
-            _setProcessing(false);
+            _setReaderActive(false);
             _setRequestedAmount("");
             _setRequestedAmountDisp("");
             _setPaymentIntentID("");
-
-            // Clean up listener
             cleanupListeners();
-
+            if (onCardProcessingEnd) onCardProcessingEnd();
             if (onPaymentCapture) onPaymentCapture(payment);
-          } else if (completionData.status === "failed" || completionData.failure_code) {
-            let errorMsg = "Payment failed";
-            if (completionData.decline_code) {
-              errorMsg = formatDeclineCode(completionData.decline_code);
-            } else if (completionData.failure_message) {
-              errorMsg = completionData.failure_message;
-            } else if (completionData.failure_code) {
-              errorMsg = `Payment failed: ${completionData.failure_code}`;
-            }
-            _setErrorMessage(errorMsg);
+          } else if (completionData.status === "failed" || completionData.failure_code || completionData.decline_code) {
+            _setErrorMessage(buildCompletionError(completionData));
             _setSuccessMessage("");
-            _setProcessing(false);
             cleanupListeners();
+            if (onCardProcessingEnd) onCardProcessingEnd();
+            // Keep sReaderActive true — user needs to clear the reader
           }
         }
       );
@@ -238,44 +301,60 @@ export function CardPayment({
 
       // Payment timeout
       timeoutRef.current = setTimeout(() => {
-        _setErrorMessage(
-          "Payment timed out — card reader may be unresponsive. Try resetting the reader."
-        );
+        _setErrorMessage("Payment timed out — card reader may be unresponsive");
         _setSuccessMessage("");
-        _setProcessing(false);
         cleanupListeners();
+        if (onCardProcessingEnd) onCardProcessingEnd();
+        // Keep sReaderActive true — user needs to clear the reader
       }, PAYMENT_TIMEOUT_MS);
     } catch (error) {
       log("newCheckout card payment error:", error);
-      _setErrorMessage(error?.message || "Payment failed");
+      let msg = error?.message || "Payment failed";
+      let isReaderBusy = error?.code === "functions/resource-exhausted"
+        || msg.includes("currently processing")
+        || msg.includes("Reader is busy");
+      if (isReaderBusy) {
+        _setReaderActive(true);
+      } else if (error?.code === "functions/unavailable" || msg.includes("offline")) {
+        msg = "Reader is offline — check power and network (" + msg + ")";
+      }
+      _setErrorMessage(msg);
       _setSuccessMessage("");
       _setProcessing(false);
       cleanupListeners();
+      if (onCardProcessingEnd) onCardProcessingEnd();
     }
   }
 
-  async function resetCardReader() {
+  // Clears whatever action the reader is processing (our payment or orphaned)
+  async function clearReader() {
     if (!activeReader) return;
     try {
-      _setSuccessMessage("Resetting reader...");
+      _setProcessing(true);
+      _setSuccessMessage("Clearing reader...");
       _setErrorMessage("");
       cleanupListeners();
-      await newCheckoutCancelStripePayment(activeReader.id);
-      _setSuccessMessage("Reader reset");
+      let result = await newCheckoutCancelStripePayment(activeReader.id);
+      _setSuccessMessage(result?.message || "Reader cleared");
       _setProcessing(false);
+      _setReaderActive(false);
       _setPaymentIntentID("");
+      if (onCardProcessingEnd) onCardProcessingEnd();
     } catch (error) {
-      _setErrorMessage("Failed to reset reader");
+      log("clearReader error:", error);
+      _setErrorMessage(error?.message || "Failed to clear reader");
       _setSuccessMessage("");
+      _setProcessing(false);
     }
   }
 
+  let savedCardReaders = settings?.cardReaders || [];
   let readerDropdownData = stripeReaders
     .filter((r) => r.status === "online")
-    .map((r) => ({
-      id: r.id,
-      label: r.label || r.id,
-    }));
+    .map((r) => {
+      let saved = savedCardReaders.find((s) => s.id === r.id);
+      return { id: r.id, label: saved?.label || r.id };
+    });
 
   let hasOnlineReaders = readerDropdownData.length > 0;
   let boxEnabled = hasOnlineReaders && !saleComplete;
@@ -284,8 +363,21 @@ export function CardPayment({
   // Auto-load amountLeftToPay into card amount on first availability
   if (hasOnlineReaders && amountLeftToPay > 0 && !autoLoadedRef.current) {
     autoLoadedRef.current = true;
+    prevAmountRef.current = amountLeftToPay;
     _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
     _setRequestedAmount(amountLeftToPay);
+  }
+
+  // Sync display when balance changes externally (cash payment captured)
+  if (autoLoadedRef.current && amountLeftToPay !== prevAmountRef.current) {
+    prevAmountRef.current = amountLeftToPay;
+    if (amountLeftToPay > 0) {
+      _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
+      _setRequestedAmount(amountLeftToPay);
+    } else {
+      _setRequestedAmountDisp("");
+      _setRequestedAmount(0);
+    }
   }
 
   if (!hasOnlineReaders) {
@@ -295,7 +387,7 @@ export function CardPayment({
           alignItems: "center",
           paddingTop: 20,
           width: "100%",
-          height: "48%",
+          flex: 1,
           borderRadius: 15,
           ...SHADOW_RADIUS_PROTO,
           justifyContent: "center",
@@ -328,14 +420,16 @@ export function CardPayment({
     );
   }
 
+  let startEnabled = isEnabled && sRequestedAmount >= 50;
+
   return (
     <View
       pointerEvents={boxEnabled ? "auto" : "none"}
       style={{
         alignItems: "center",
-        paddingTop: 20,
+        paddingTop: 15,
         width: "100%",
-        height: "48%",
+        flex: 1,
         borderRadius: 15,
         ...SHADOW_RADIUS_PROTO,
         justifyContent: "space-between",
@@ -343,72 +437,47 @@ export function CardPayment({
         opacity: boxEnabled ? 1 : 0.2,
       }}
     >
-      {/* Title */}
-      <Text
-        style={{
-          fontSize: 25,
-          color: gray(0.6),
-          fontWeight: 500,
-        }}
-      >
-        CARD SALE
-      </Text>
-
-      {/* Reader error message */}
-      {!!readerError && (
-        <Text
-          style={{
-            fontSize: 11,
-            color: C.lightred,
-            fontStyle: "italic",
-          }}
-        >
-          {readerError}
-        </Text>
-      )}
-
-      {/* Reader Selection */}
+      {/* Title + Reader Selector Row */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: 8,
-          width: "80%",
-          marginTop: 5,
+          width: "90%",
+          justifyContent: "space-between",
         }}
       >
-        <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 25, color: gray(0.6), fontWeight: 500 }}>
+          CARD SALE
+        </Text>
+        <View style={{ width: "45%" }}>
           <DropdownMenu
             dataArr={readerDropdownData}
             onSelect={handleReaderSelect}
             buttonText={
               activeReader
-                ? activeReader.label || activeReader.id
+                ? (savedCardReaders.find((s) => s.id === activeReader.id)?.label || activeReader.id)
                 : "Select Reader"
             }
-            enabled={isEnabled}
+            enabled={!sProcessing}
             buttonStyle={{
-              paddingVertical: 6,
-              paddingHorizontal: 8,
-              borderRadius: 10,
+              paddingVertical: 4,
+              paddingHorizontal: 6,
+              borderRadius: 8,
               borderWidth: 1,
               borderColor: C.buttonLightGreenOutline,
               backgroundColor: C.listItemWhite,
             }}
+            buttonTextStyle={{ fontSize: 11 }}
           />
         </View>
-        <TouchableOpacity
-          onPress={resetCardReader}
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderRadius: 6,
-            backgroundColor: gray(0.08),
-          }}
-        >
-          <Text style={{ fontSize: 11, color: C.lightText }}>Reset</Text>
-        </TouchableOpacity>
       </View>
+
+      {/* Reader error message */}
+      {!!readerError && (
+        <Text style={{ fontSize: 11, color: C.lightred, fontStyle: "italic" }}>
+          {readerError}
+        </Text>
+      )}
 
       {/* Payment Amount Input */}
       <View
@@ -422,17 +491,14 @@ export function CardPayment({
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          width: "60%",
+          paddingBottom: 6,
+          paddingRight: 7,
           marginTop: 5,
         }}
       >
         <Text style={{ fontSize: 15 }}>$</Text>
         <View
-          style={{
-            width: 120,
-            alignItems: "flex-end",
-            paddingRight: 5,
-          }}
+          style={{ width: 100, alignItems: "flex-end", paddingRight: 5 }}
         >
           <TextInput
             onFocus={() => {
@@ -457,43 +523,85 @@ export function CardPayment({
         </View>
       </View>
 
-      {/* Status Messages */}
-      {sErrorMessage ? (
-        <Text
-          style={{
-            fontSize: 11,
-            color: C.lightred,
-            fontStyle: "italic",
-            marginBottom: 4,
-          }}
-        >
-          {sErrorMessage}
-        </Text>
-      ) : null}
-      {sSuccessMessage ? (
-        <Text
-          style={{
-            fontSize: 11,
-            color: C.green,
-            fontStyle: "italic",
-            marginBottom: 4,
-          }}
-        >
-          {sSuccessMessage}
-        </Text>
-      ) : null}
+      {/* Status Messages + Processing Indicator */}
+      <View style={{ alignItems: "center", justifyContent: "center" }}>
+        {sProcessing && (
+          <SmallLoadingIndicator
+            color={C.green}
+            text=""
+            message=""
+            containerStyle={{ padding: 2 }}
+          />
+        )}
+        {sErrorMessage ? (
+          <View
+            style={{
+              backgroundColor: "rgba(220,50,50,0.1)",
+              borderRadius: 8,
+              paddingVertical: 5,
+              paddingHorizontal: 14,
+              marginTop: 2,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                color: C.lightred,
+                fontWeight: "500",
+                textAlign: "center",
+              }}
+            >
+              {sErrorMessage}
+            </Text>
+          </View>
+        ) : null}
+        {sSuccessMessage ? (
+          <View
+            style={{
+              backgroundColor: "rgba(0,160,0,0.1)",
+              borderRadius: 8,
+              paddingVertical: 5,
+              paddingHorizontal: 14,
+              marginTop: 2,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                color: C.green,
+                fontWeight: "500",
+                textAlign: "center",
+              }}
+            >
+              {sSuccessMessage}
+            </Text>
+          </View>
+        ) : null}
+      </View>
 
-      {/* Process Button */}
-      <Button_
-        text={sProcessing ? "PROCESSING..." : "START CARD SALE"}
-        onPress={startPayment}
-        enabled={isEnabled && sRequestedAmount >= 50}
-        colorGradientArr={COLOR_GRADIENTS.blue}
-        textStyle={{ color: C.textWhite, fontSize: 16 }}
-        buttonStyle={{
-          cursor: isEnabled && sRequestedAmount >= 50 ? "inherit" : "default",
-        }}
-      />
+      {/* Action Button */}
+      {sReaderActive ? (
+        <Tooltip text="Clearing the reader will cancel the transaction for all users, be careful!" position="top">
+          <Button_
+            text={sProcessing ? "CLEARING..." : "CLEAR READER"}
+            onPress={clearReader}
+            enabled={!sProcessing}
+            colorGradientArr={COLOR_GRADIENTS.red}
+            textStyle={{ color: C.textWhite, fontSize: 16 }}
+          />
+        </Tooltip>
+      ) : (
+        <Button_
+          text={sProcessing ? "PROCESSING..." : "START CARD SALE"}
+          onPress={startPayment}
+          enabled={startEnabled && !sProcessing}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          textStyle={{ color: C.textWhite, fontSize: 16 }}
+          buttonStyle={{
+            cursor: startEnabled && !sProcessing ? "inherit" : "default",
+          }}
+        />
+      )}
     </View>
   );
 }

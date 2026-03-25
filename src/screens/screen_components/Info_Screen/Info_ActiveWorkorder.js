@@ -62,7 +62,6 @@ import {
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS } from "../../../db_calls_wrapper";
-import { firestoreWrite } from "../../../db_calls";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -77,6 +76,7 @@ export const ActiveWorkorderComponent = ({}) => {
     return state.workorders.find((o) => o.id === id) || null;
   });
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
+  const zIsLocked = useOpenWorkordersStore((state) => !!state.lockedWorkorderID && state.lockedWorkorderID === (state.workorderPreviewID || state.openWorkorderID));
   const zCustomerLanguage = useCurrentCustomerStore((state) => state.customer?.language || "");
   const zCustomer = {
     first: zOpenWorkorder?.customerFirst || "",
@@ -283,54 +283,15 @@ export const ActiveWorkorderComponent = ({}) => {
     });
   }
 
-  async function handleShareWorkorder() {
-    if (!zOpenWorkorder?.id) return;
-    const { tenantID, storeID } = useSettingsStore.getState().getSettings();
-    const currentUser = useLoginStore.getState().getCurrentUser();
-    // Generate 3-digit PIN, check for collision
-    let pin = "";
-    for (let attempt = 0; attempt < 20; attempt++) {
-      pin = String(Math.floor(100 + Math.random() * 900));
-      // No collision check needed — 1000 combos per store, overwrites are fine
-      break;
-    }
-    const now = Date.now();
-    const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
-    const pinDoc = {
-      pin,
-      workorderID: zOpenWorkorder.id,
-      tenantID: tenantID || "",
-      storeID: storeID || "",
-      customerID: zOpenWorkorder.customerID || "",
-      createdAt: now,
-      expiresAt,
-      createdBy: currentUser?.id || "",
-    };
-    const result = await firestoreWrite(`workorder-pins/${pin}`, pinDoc);
-    if (!result?.success) {
-      useAlertScreenStore.getState().setAlert({
-        title: "Error",
-        message: "Failed to generate share link. Please try again.",
-      });
-      return;
-    }
-    const url = `${window.location.origin}/wo/${pin}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      useAlertScreenStore.getState().setAlert({
-        title: "Link Copied",
-        message: `Customer link copied to clipboard.\nExpires in 7 days.\n\n${url}`,
-      });
-    } catch (e) {
-      useAlertScreenStore.getState().setAlert({
-        title: "Share Link",
-        message: `Copy this link:\n\n${url}`,
-      });
-    }
-  }
-
   function handleNewWorkorderPress() {
-    useOpenWorkordersStore.getState().setOpenWorkorderID(null);
+    // If viewing a locked (completed) workorder, remove it from the local store
+    const store = useOpenWorkordersStore.getState();
+    const lockedID = store.lockedWorkorderID;
+    if (lockedID) {
+      store.setLockedWorkorderID(null);
+      store.removeWorkorder(lockedID, false);
+    }
+    store.setOpenWorkorderID(null);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.customer,
       itemsTabName: TAB_NAMES.itemsTab.empty,
@@ -525,7 +486,7 @@ export const ActiveWorkorderComponent = ({}) => {
         paddingBottom: 11,
         paddingTop: 5,
         paddingHorizontal: 5,
-        backgroundColor: zIsPreview ? lightenRGBByPercent(C.lightred, 80) : C.backgroundWhite,
+        backgroundColor: (zIsPreview || zIsLocked) ? lightenRGBByPercent(C.lightred, 80) : C.backgroundWhite,
         borderRadius: 7,
       }}
     >
@@ -1389,18 +1350,6 @@ export const ActiveWorkorderComponent = ({}) => {
               paddingVertical: 0,
             }}
             onPress={handleStartStandaloneSalePress}
-          />
-        </Tooltip>
-        <Tooltip text="Share with customer" position="top">
-          <Button_
-            icon={ICONS.exportIcon}
-            iconSize={30}
-            buttonStyle={{
-              backgroundColor: "transparent",
-              paddingHorizontal: 0,
-              paddingVertical: 0,
-            }}
-            onPress={handleShareWorkorder}
           />
         </Tooltip>
       </View>

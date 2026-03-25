@@ -6167,7 +6167,7 @@ const CUSTOMER_WO_UI_LABELS = {
   uploadPhotos: "Upload Photos",
   greeting: "Here's your workorder",
   waitTime: "Wait Time",
-  linkExpired: "This link has expired or is invalid.",
+  notFound: "This workorder could not be found.",
 };
 
 exports.getCustomerWorkorder = onRequest(
@@ -6190,17 +6190,10 @@ exports.getCustomerWorkorder = onRequest(
         return res.status(404).json({ success: false, error: "Link not found or expired" });
       }
       const pinDoc = pinSnap.data();
+      const { tenantID, storeID, workorderID } = pinDoc;
 
-      // Check expiry
-      const expiresAt = pinDoc.expiresAt?.toMillis?.() || pinDoc.expiresAt || 0;
-      if (Date.now() > expiresAt) {
-        return res.status(410).json({ success: false, error: "This link has expired" });
-      }
-
-      const { tenantID, storeID, workorderID, customerID } = pinDoc;
-
-      // Fetch workorder, settings, customer in parallel
-      const [woSnap, settingsSnap, custSnap] = await Promise.all([
+      // Fetch settings + try open-workorders first
+      const [openWoSnap, settingsSnap] = await Promise.all([
         db.collection("tenants").doc(tenantID)
           .collection("stores").doc(storeID)
           .collection("open-workorders").doc(workorderID)
@@ -6209,21 +6202,41 @@ exports.getCustomerWorkorder = onRequest(
           .collection("stores").doc(storeID)
           .collection("settings").doc("settings")
           .get(),
-        customerID
-          ? db.collection("tenants").doc(tenantID)
-              .collection("stores").doc(storeID)
-              .collection("customers").doc(customerID)
-              .get()
-          : Promise.resolve(null),
       ]);
 
-      if (!woSnap.exists) {
+      let workorder = null;
+      let isCompleted = false;
+
+      if (openWoSnap.exists) {
+        workorder = openWoSnap.data();
+      } else {
+        // Try completed-workorders
+        const closedWoSnap = await db.collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("completed-workorders").doc(workorderID)
+          .get();
+        if (closedWoSnap.exists) {
+          workorder = closedWoSnap.data();
+          isCompleted = true;
+        }
+      }
+
+      if (!workorder) {
         return res.status(404).json({ success: false, error: "Workorder not found" });
       }
 
-      const workorder = woSnap.data();
       const settings = settingsSnap.exists ? settingsSnap.data() : {};
-      const customer = custSnap?.exists ? custSnap.data() : {};
+
+      // Fetch customer using workorder's customerID (may differ from pin doc if updated later)
+      const custID = workorder.customerID || pinDoc.customerID || "";
+      let customer = {};
+      if (custID) {
+        const custSnap = await db.collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("customers").doc(custID)
+          .get();
+        if (custSnap.exists) customer = custSnap.data();
+      }
       const statuses = settings.statuses || [];
 
       // Resolve status
@@ -6285,6 +6298,7 @@ exports.getCustomerWorkorder = onRequest(
         customerFirst: customer.first || workorder.customerFirst || "",
         customerLanguage: customer.language || "English",
         pin,
+        isCompleted,
         translations: null,
       };
 
@@ -6342,12 +6356,6 @@ exports.customerUploadWorkorderMedia = onRequest(
         return res.status(404).json({ success: false, error: "Link not found or expired" });
       }
       const pinDoc = pinSnap.data();
-
-      const expiresAt = pinDoc.expiresAt?.toMillis?.() || pinDoc.expiresAt || 0;
-      if (Date.now() > expiresAt) {
-        return res.status(410).json({ success: false, error: "This link has expired" });
-      }
-
       const { tenantID, storeID, workorderID } = pinDoc;
 
       // Decode base64

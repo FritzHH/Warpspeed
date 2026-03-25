@@ -19,11 +19,11 @@ import React, {
   useCallback,
 } from "react";
 import { Image } from "react-native-web";
-import { gray, ifNumIsOdd, lightenRGBByPercent, log } from "./utils";
+import { gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log } from "./utils";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
 import { SETTINGS_OBJ, PRIVILEDGE_LEVELS } from "./data";
 import { cloneDeep } from "lodash";
-import { DEBOUNCE_DELAY } from "./constants";
+import { DEBOUNCE_DELAY, LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "./constants";
 import {
   useInventoryStore,
   useInvModalStore,
@@ -1276,23 +1276,17 @@ export const LoginModalScreen = ({ modalVisible }) => {
     }, 400);
   }
 
-  function handleUserSelect(userObj) {
-    useLoginStore.getState().setCurrentUser(userObj);
-    useLoginStore.getState().setLastActionMillis();
-    _setPin("");
-    _setError("");
-    _setSuccess(true);
-    setTimeout(() => {
-      _setSuccess(false);
-      useLoginStore.getState().setShowLoginScreen(false);
-      useLoginStore.getState().runPostLoginFunction();
-      promptClockInIfNeeded(userObj);
-    }, 400);
-  }
-
   function promptClockInIfNeeded(userObj) {
     let punchClock = useLoginStore.getState().punchClock;
     if (punchClock[userObj.id]) return; // already clocked in
+
+    // check localStorage pause
+    let clockPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj) || {};
+    const lastCheckMillis = clockPauseObj[userObj.id];
+    if (lastCheckMillis && (Date.now() - lastCheckMillis < PAUSE_USER_CLOCK_IN_CHECK_MILLIS)) {
+      return; // still within pause window
+    }
+
     useAlertScreenStore.getState().setValues({
       title: "PUNCH CLOCK",
       message: "Hi " + userObj.first + ", you are not clocked in. Would you like to punch in now?",
@@ -1301,15 +1295,16 @@ export const LoginModalScreen = ({ modalVisible }) => {
       handleBtn1Press: () => {
         useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), "in");
       },
-      handleBtn2Press: () => null,
+      handleBtn2Press: () => {
+        let freshPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj) || {};
+        freshPauseObj[userObj.id] = Date.now();
+        localStorageWrapper.setItem(LOCAL_DB_KEYS.userClockCheckPauseObj, freshPauseObj);
+      },
       showAlert: true,
     });
   }
 
   if (!modalVisible) return null;
-
-  let users = zSettingsObj?.users || [];
-  let showUserList = !zAdminPrivilege && users.length > 0;
 
   return ReactDOM.createPortal(
     <View
@@ -1382,37 +1377,6 @@ export const LoginModalScreen = ({ modalVisible }) => {
             {!!sError && (
               <Text style={{ fontSize: 12, color: C.red, marginTop: 6, textAlign: "center" }}>{sError}</Text>
             )}
-          </View>
-        )}
-
-        {/* User list — only for non-privileged login */}
-        {showUserList && !sSuccess && (
-          <View style={{ marginTop: 16 }}>
-            <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 8 }}>Or select a user</Text>
-            <ScrollView style={{ maxHeight: 200 }}>
-              {users.map((u) => (
-                <TouchableOpacity
-                  key={u.id}
-                  onPress={() => handleUserSelect(u)}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 8,
-                    paddingHorizontal: 10,
-                    marginBottom: 4,
-                    backgroundColor: gray(0.04),
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: gray(0.1),
-                  }}
-                >
-                  <Text style={{ fontSize: 14, color: C.text, flex: 1 }}>
-                    {u.first} {u.last}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: gray(0.5) }}>{u.permissions?.name || u.permissions}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
           </View>
         )}
 

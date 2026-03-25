@@ -1949,6 +1949,7 @@ export function createNewWorkorder({
   wo.startedBy = (startedByFirst || "") + " " + (startedByLast || "");
   wo.changeLog.push("Started by: " + (startedByFirst || "") + " " + (startedByLast || ""));
   wo.startedOnMillis = new Date().getTime();
+  wo.customerPin = String(Math.floor(100 + Math.random() * 900));
   wo._unsaved = true;
   return wo;
 }

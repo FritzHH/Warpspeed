@@ -150,7 +150,7 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
         right: 0,
         bottom: 0,
         backgroundColor: "rgba(0,0,0,.4)",
-        zIndex: 9999,
+        zIndex: 10002,
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -282,7 +282,7 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
 
 // ─── main component ────────────────────────────────────────────────────────
 
-export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
+export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }) => {
   const zSettingsObj = useSettingsStore((state) => state.settings);
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
   const quickButtons = zSettingsObj?.quickItemButtons || [];
@@ -473,6 +473,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               style={inputStyle}
               value={String(sItem[fieldName] || "")}
               onChangeText={(v) => handleFieldChange(fieldName, v)}
+              autoFocus={opts.autoFocus}
             />
           )
         ) : (
@@ -529,7 +530,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           <View>
             {/* SECTION 1: Item Details */}
             <View>
-            {renderField("Catalog Name", "formalName")}
+            {renderField("Catalog Name", "formalName", { autoFocus: true })}
             {renderField("Descriptive Name", "informalName")}
             {/* Brand + Category + Minutes row */}
             <View style={{ flexDirection: "row", marginTop: 4, gap: 10 }}>
@@ -694,19 +695,24 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                 <Image_ icon={ICONS.trash} size={40} />
               </TouchableOpacity>
             )}
-            {isNew && (
-              <TouchableOpacity
-                onPress={handleSaveNewItem}
-                style={{
-                  paddingHorizontal: 20,
-                  paddingVertical: 10,
-                  borderRadius: 6,
-                  backgroundColor: C.green,
-                }}
-              >
-                <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Save</Text>
-              </TouchableOpacity>
-            )}
+            {isNew && (() => {
+              let canSave = !!(sItem.formalName && sItem.formalName.trim() && sItem.price > 0);
+              return (
+                <TouchableOpacity
+                  onPress={canSave ? handleSaveNewItem : undefined}
+                  activeOpacity={canSave ? 0.2 : 1}
+                  style={{
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 6,
+                    backgroundColor: C.green,
+                    opacity: canSave ? 1 : 0.35,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Save</Text>
+                </TouchableOpacity>
+              );
+            })()}
             <TouchableOpacity
               onPress={handleExit}
               style={{ padding: 6, borderRadius: 6 }}
@@ -718,7 +724,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
       </TouchableWithoutFeedback>
   );
 
-  return createPortal(
+  const portalContent = (
     <>
       <div
         onClick={handleExit}
@@ -729,7 +735,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           right: 0,
           bottom: 0,
           backgroundColor: "rgba(50,50,50,.5)",
-          zIndex: 9998,
+          zIndex: 10001,
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
@@ -747,7 +753,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           onClose={() => _setShowQBPicker(false)}
         />
       )}
-    </>,
-    document.body
+    </>
   );
+
+  if (skipPortal) return portalContent;
+  return createPortal(portalContent, document.body);
 };

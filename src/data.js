@@ -399,7 +399,9 @@ export const WORKORDER_PROTO = {
   status: "",
   taxFree: false,
   archived: false,
-  media: [], taxFreeReceiptNote: "No items on this workorder were taxable. All items must be labor-only, and no shop parts or material left the shop with the customer.",
+  media: [],
+  customerPin: "",
+  taxFreeReceiptNote: "No items on this workorder were taxable. All items must be labor-only, and no shop parts or material left the shop with the customer.",
 };
 
 export const WORKORDER_ITEM_PROTO = {
@@ -953,10 +955,10 @@ export const SETTINGS_OBJ = {
   tenantID: "1234",
   storeID: "999",
   users: [FRITZ_USER_OBJ],
-  cardReaders: [{ label: "Front Right Desk", id: "tmr_GFKNEgYkwcsIFF" }],
+  cardReaders: [],
   selectedCardReaderObj: {
-    label: "Front Right Desk",
-    id: "tmr_GFKNEgYkwcsIFF",
+    label: "",
+    id: "",
   },
   defaultPayrollTimeFrame: {
     "begin": 'lastFriday',

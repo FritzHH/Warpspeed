@@ -25,6 +25,7 @@ import {
   formatPhoneWithDashes,
   formatPhoneForDisplay,
   findTemplateByType,
+  applyDiscountToWorkorderItem,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES } from "../../../../data";
 import { dbSavePrintObj } from "../../../../db_calls_wrapper";
@@ -55,6 +56,7 @@ import { PaymentsList } from "./PaymentsList";
 import { WorkorderCombiner } from "./WorkorderCombiner";
 import { InventorySearch } from "./InventorySearch";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
+import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
 
 // Map CUSTOMER_LANGUAGES keys to Google Translate ISO codes
 const LANG_TO_ISO = { spanish: "es", english: "en" };
@@ -123,12 +125,16 @@ export function NewCheckoutModalScreen() {
   const [sReceiptLanguage, _setReceiptLanguage] = useState("english");
   const [sShowTaxFreeConfirm, _setShowTaxFreeConfirm] = useState(false);
   const [sShowPopConfirm, _setShowPopConfirm] = useState(false);
+  const [sCardProcessingAmount, _setCardProcessingAmount] = useState(0);
+  const [sNewItemModal, _setNewItemModal] = useState(null);
 
   // ─── Derived Values ───────────────────────────────────────
   let isStandalone = !zOpenWorkorder;
   let saleComplete = sSale?.paymentComplete || false;
   let amountLeftToPay = (sSale?.total || 0) - (sSale?.amountCaptured || 0);
   if (amountLeftToPay < 0) amountLeftToPay = 0;
+  let cashAmountLeftToPay = amountLeftToPay - sCardProcessingAmount;
+  if (cashAmountLeftToPay < 0) cashAmountLeftToPay = 0;
   let custFirst = zOpenWorkorder?.customerFirst || "";
   let custLast = zOpenWorkorder?.customerLast || "";
 
@@ -294,6 +300,46 @@ export function NewCheckoutModalScreen() {
     _setAddedItems(newAddedItems);
 
     // Recalculate totals
+    let updated = updateSaleWithTotals(
+      sSale,
+      sCombinedWorkorders,
+      newAddedItems,
+      zSettings
+    );
+    _setSale(updated);
+    broadcastSaleToDisplay(updated, sCombinedWorkorders, newAddedItems, custFirst, custLast);
+    newCheckoutSaveActiveSale(updated);
+  }
+
+  function handleItemQtyChange(item, newQty) {
+    if (newQty < 1) return;
+    let newAddedItems = sAddedItems.map((i) =>
+      i.id === item.id ? { ...i, qty: newQty } : i
+    );
+    _setAddedItems(newAddedItems);
+
+    let updated = updateSaleWithTotals(
+      sSale,
+      sCombinedWorkorders,
+      newAddedItems,
+      zSettings
+    );
+    _setSale(updated);
+    broadcastSaleToDisplay(updated, sCombinedWorkorders, newAddedItems, custFirst, custLast);
+    newCheckoutSaveActiveSale(updated);
+  }
+
+  function handleItemDiscount(item, discountObj) {
+    let newAddedItems = sAddedItems.map((i) => {
+      if (i.id !== item.id) return i;
+      let updatedItem = { ...i, discountObj };
+      if (discountObj) {
+        updatedItem = applyDiscountToWorkorderItem(updatedItem);
+      }
+      return updatedItem;
+    });
+    _setAddedItems(newAddedItems);
+
     let updated = updateSaleWithTotals(
       sSale,
       sCombinedWorkorders,
@@ -531,6 +577,7 @@ export function NewCheckoutModalScreen() {
     _setCombinedWorkorders([]);
     _setAddedItems([]);
     _setCashChangeNeeded(0);
+    _setCardProcessingAmount(0);
     _setReaderError("");
     _setInitialized(false);
     _setReceiptLanguage("english");
@@ -644,16 +691,17 @@ export function NewCheckoutModalScreen() {
               style={{
                 width: "29%",
                 height: "100%",
-                justifyContent: "space-between",
+                gap: 10,
               }}
             >
               <CashPayment
-                amountLeftToPay={amountLeftToPay}
+                amountLeftToPay={cashAmountLeftToPay}
                 onPaymentCapture={handlePaymentCapture}
                 acceptChecks={zSettings?.acceptChecks}
                 saleComplete={saleComplete}
                 onCashChange={handleCashChange}
                 hasReaders={onlineReaders.length > 0}
+                isVisible={zIsCheckingOut}
               />
               <CardPayment
                 amountLeftToPay={amountLeftToPay}
@@ -664,6 +712,8 @@ export function NewCheckoutModalScreen() {
                 readerError={sReaderError}
                 saleID={sSale?.id || ""}
                 customerID={sSale?.customerID || zCustomer?.id || ""}
+                onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
+                onCardProcessingEnd={() => _setCardProcessingAmount(0)}
               />
             </View>
 
@@ -713,15 +763,12 @@ export function NewCheckoutModalScreen() {
                           )}
                         </View>
                         <View>
-                          {!!zCustomer.customerCell && (
+                          {zCustomer.customerCell ? (
                             <Text style={{ color: C.text }}>
-                              <Text>{"cell: "}</Text>
                               {formatPhoneForDisplay(zCustomer.customerCell)}
                             </Text>
-                          )}
-                          {!!zCustomer.land && (
-                            <Text style={{ color: C.text, fontSize: 13 }}>
-                              <Text>{"land: "}</Text>
+                          ) : !!zCustomer.land && (
+                            <Text style={{ color: C.text }}>
                               {formatPhoneForDisplay(zCustomer.land)}
                             </Text>
                           )}
@@ -848,7 +895,11 @@ export function NewCheckoutModalScreen() {
                   addedItems={sAddedItems}
                   onAddItem={handleAddItem}
                   onRemoveItem={handleRemoveItem}
+                  onQtyChange={handleItemQtyChange}
+                  onDiscountChange={handleItemDiscount}
                   inventory={zInventory}
+                  discounts={zSettings?.discounts || []}
+                  onOpenNewItemModal={(item) => _setNewItemModal(item)}
                 />
 
                 {/* Workorders (combiner + line items) */}
@@ -982,6 +1033,15 @@ export function NewCheckoutModalScreen() {
                 </Text>
               </View>
             </View>
+          )}
+          {sNewItemModal && (
+            <InventoryItemModalScreen
+              key={sNewItemModal.id}
+              item={sNewItemModal}
+              isNew={true}
+              handleExit={() => _setNewItemModal(null)}
+              skipPortal={true}
+            />
           )}
         </View>
       )}

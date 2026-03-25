@@ -11,8 +11,9 @@ import {
   gray,
   capitalizeAllWordsInSentence,
   extractRandomFiveDigits,
+  lightenRGBByPercent,
 } from "../../../utils";
-import { ScreenModal, Button_, PhoneNumberInput, Tooltip } from "../../../components";
+import { ScreenModal, Button_, PhoneNumberInput, Tooltip, TextInput_, SmallLoadingIndicator } from "../../../components";
 import { CUSTOMER_PROTO, SETTINGS_OBJ, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { cloneDeep } from "lodash";
@@ -22,12 +23,17 @@ import {
   useTabNamesStore,
   useOpenWorkordersStore,
   useLoginStore,
+  useWorkorderPreviewStore,
+  useAlertScreenStore,
 } from "../../../stores";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
   dbSearchCustomersByEmail,
   dbSearchCustomersByName,
   dbSearchCustomersByPhone,
+  dbGetCompletedWorkorder,
+  dbSearchCompletedWorkorders,
+  dbGetCustomer,
 } from "../../../db_calls_wrapper";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 export function NewWorkorderComponent({}) {
@@ -39,8 +45,109 @@ export function NewWorkorderComponent({}) {
   const [sSearchFieldName, _setSearchFieldName] = React.useState("phone");
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
   const [buttonVisible, setButtonVisible] = React.useState(false);
+  const [sTicketSearch, _setTicketSearch] = React.useState("");
+  const [sTicketSearching, _setTicketSearching] = React.useState(false);
   const searchTimerRef = useRef(null);
   const containerRef = useRef(null);
+
+  function openWorkorder(wo, isCompleted) {
+    const store = useOpenWorkordersStore.getState();
+    store.setWorkorderPreviewID(null);
+    if (isCompleted) {
+      store.setWorkorder(wo, false);
+      store.setLockedWorkorderID(wo.id);
+      store.setOpenWorkorderID(wo.id);
+    } else {
+      store.setLockedWorkorderID(null);
+      store.setOpenWorkorderID(wo.id);
+    }
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
+    });
+    useWorkorderPreviewStore.getState().setPreviewObj(null);
+    if (wo.customerID) {
+      dbGetCustomer(wo.customerID).then((customer) => {
+        if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
+      });
+    }
+    _setTicketSearch("");
+  }
+
+  async function handleTicketSearch(input) {
+    _setTicketSearch(input);
+  }
+
+  function showTicketAlert(message) {
+    useAlertScreenStore.getState().setValues({
+      title: "Ticket Search",
+      message,
+      btn1Text: "OK",
+      handleBtn1Press: () => {},
+      showAlert: true,
+      canExitOnOuterClick: true,
+    });
+  }
+
+  async function executeTicketSearch() {
+    let trimmed = sTicketSearch.trim();
+    if (!trimmed) return;
+    _setTicketSearching(true);
+
+    try {
+      const store = useOpenWorkordersStore.getState();
+      const openWOs = store.getWorkorders();
+      const isFullBarcode = /^\d{12}$/.test(trimmed);
+      const isWoNumber = /^\d{5}$/.test(trimmed);
+      const isLast4 = /^\d{4}$/.test(trimmed);
+
+      // Full 12-digit barcode
+      if (isFullBarcode) {
+        const prefix = trimmed[0];
+        if (prefix === "1") {
+          // Workorder barcode — check local first
+          let found = openWOs.find((w) => w.id === trimmed);
+          if (found) { openWorkorder(found, false); return; }
+          // Firestore completed workorders
+          let completed = await dbGetCompletedWorkorder(trimmed);
+          if (completed) { openWorkorder(completed, true); return; }
+          showTicketAlert("Workorder not found");
+        } else if (prefix === "2") {
+          showTicketAlert("Sale receipts not supported yet");
+        } else {
+          showTicketAlert("Unrecognized barcode prefix");
+        }
+        return;
+      }
+
+      // 5-digit workorder number
+      if (isWoNumber) {
+        let found = openWOs.find((w) => w.workorderNumber === trimmed);
+        if (found) { openWorkorder(found, false); return; }
+        // Query Firestore by workorderNumber
+        let results = await dbSearchCompletedWorkorders("workorderNumber", trimmed);
+        if (results.length > 0) { openWorkorder(results[0], true); return; }
+        showTicketAlert("Workorder not found");
+        return;
+      }
+
+      // 4-digit last 4 of barcode
+      if (isLast4) {
+        let found = openWOs.find((w) => w.id?.endsWith(trimmed));
+        if (found) { openWorkorder(found, false); return; }
+        showTicketAlert("Not found in open workorders. Use full barcode for closed.");
+        return;
+      }
+
+      showTicketAlert("Enter a 12-digit barcode, 5-digit WO #, or last 4 digits");
+    } catch (err) {
+      log("Ticket search error:", err);
+      showTicketAlert("Search error — please try again");
+    } finally {
+      _setTicketSearching(false);
+    }
+  }
 
   // dev ////////////////////////////////////
   useEffect(() => {
@@ -297,14 +404,50 @@ export function NewWorkorderComponent({}) {
         alignItems: "center",
       }}
     >
-      {/* <LoginModalScreen modalVisible={zShowLoginScreen} /> */}
+      {/* Ticket search input */}
+      <View
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          padding: 10,
+          paddingHorizontal: 20,
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        <TextInput
+          value={sTicketSearch}
+          placeholder={"Scan ticket, enter WO #, or last 4 of barcode"}
+          placeholderTextColor={gray(0.35)}
+          onChangeText={(val) => handleTicketSearch(val)}
+          onSubmitEditing={() => executeTicketSearch()}
+          style={{
+            flex: 1,
+            caretColor: C.cursorRed,
+            color: C.text,
+            borderWidth: 1,
+            borderColor: gray(0.15),
+            borderRadius: 7,
+            height: 35,
+            outlineStyle: "none",
+            fontSize: 14,
+            paddingHorizontal: 10,
+            backgroundColor: C.listItemWhite,
+          }}
+        />
+        {sTicketSearching && (
+          <View style={{ marginLeft: 8 }}>
+            <SmallLoadingIndicator />
+          </View>
+        )}
+      </View>
 
       <View
         style={{
           alignItems: "flex-end",
           width: "100%",
           padding: 20,
-          marginTop: "70%",
+          marginTop: "60%",
         }}
       >
         {sSearchFieldName === "phone" ? (

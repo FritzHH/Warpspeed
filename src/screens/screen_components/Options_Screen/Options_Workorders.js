@@ -163,8 +163,14 @@ export function WorkordersComponent({}) {
   ///////////////////////////////////////////////////////////////////////////////////
 
   function workorderSelected(obj) {
-    useOpenWorkordersStore.getState().setOpenWorkorderID(obj.id);
-    // _zSetInitialOpenWorkorder(obj);
+    const store = useOpenWorkordersStore.getState();
+    // Clear locked (completed) workorder if switching away
+    const lockedID = store.lockedWorkorderID;
+    if (lockedID && lockedID !== obj.id) {
+      store.setLockedWorkorderID(null);
+      store.removeWorkorder(lockedID, false);
+    }
+    store.setOpenWorkorderID(obj.id);
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,

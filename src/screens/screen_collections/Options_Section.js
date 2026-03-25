@@ -7,7 +7,7 @@ import {
   localStorageWrapper,
   log,
 } from "../../utils";
-import { TabMenuButton, Image_, Button_ } from "../../components";
+import { TabMenuButton, Image_, Button_, SmallLoadingIndicator } from "../../components";
 import { C, ICONS } from "../../styles";
 import { TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
@@ -25,8 +25,6 @@ import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
 export const Options_Section = React.memo(({}) => {
   // store getters ///////////////////////////////////////////////////////////////
   const zOptionsTabName = useTabNamesStore((state) => state.optionsTabName);
-
-  const zWebcamDetected = useLoginStore((state) => state.webcamDetected);
 
   //////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
@@ -94,7 +92,6 @@ export const Options_Section = React.memo(({}) => {
     <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
       <TabBar
         zOptionsTabName={zOptionsTabName}
-        webcamDetected={zWebcamDetected}
         handleUserPress={handleUserClockPress}
       />
       {ScreenComponent()}
@@ -103,25 +100,23 @@ export const Options_Section = React.memo(({}) => {
 });
 
 export const TabBar = ({
-  webcamDetected,
-  // sIsOnline,
   zOptionsTabName,
   handleUserPress,
 }) => {
   const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zPunchClock = useLoginStore((state) => state.punchClock);
+  const zCameraStatus = useLoginStore((state) => state.cameraStatus);
+  const zCameraError = useLoginStore((state) => state.cameraError);
   // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
 
   // run constant checks to check if interent is connected
   useEffect(() => {
-    // log("here");
     async function tick() {
       let isOnline = false;
       try {
         isOnline = await checkInternetConnection();
       } catch (e) {}
-      // log(isOnline.toString());
       _setIsOnline(isOnline);
     }
     let id = setInterval(tick, INTERNET_CHECK_DELAY);
@@ -130,91 +125,150 @@ export const TabBar = ({
 
   let isClockedIn = zPunchClock[zCurrentUser?.id];
 
+  function showCameraError() {
+    useAlertScreenStore.getState().setValues({
+      title: "CAMERA ERROR",
+      message: zCameraError || "Unknown camera error",
+      btn1Text: "OK",
+      handleBtn1Press: () => null,
+      showAlert: true,
+    });
+  }
+
+  function UserButton() {
+    return (
+      <Button_
+        onPress={() => handleUserPress(zCurrentUser)}
+        icon={isClockedIn ? ICONS.check : ICONS.redx}
+        text={
+          zCurrentUser.first +
+          " " +
+          (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
+          "."
+        }
+        textStyle={{ fontSize: 13, color: C.text }}
+        iconSize={13}
+        buttonStyle={{
+          paddingHorizontal: 7,
+          paddingVertical: 2,
+          marginRight: 5,
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+          backgroundColor: C.buttonLightGreen,
+          borderRadius: 15,
+        }}
+      />
+    );
+  }
+
+  function LoginButton() {
+    return (
+      <Button_
+        onPress={() => useLoginStore.getState().setShowLoginScreen(true)}
+        icon={ICONS.userControl}
+        iconSize={13}
+        text="Login"
+        textStyle={{ fontSize: 13, color: C.text }}
+        buttonStyle={{
+          paddingHorizontal: 7,
+          paddingVertical: 2,
+          marginRight: 5,
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+          backgroundColor: C.buttonLightGreen,
+          borderRadius: 15,
+        }}
+      />
+    );
+  }
+
+  function CameraIcon() {
+    return (
+      <View title="Camera on and identifying">
+        <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
+      </View>
+    );
+  }
+
+  function ErrorIcon() {
+    return (
+      <Button_
+        onPress={showCameraError}
+        icon={ICONS.redx}
+        iconSize={15}
+        buttonStyle={{
+          paddingHorizontal: 4,
+          paddingVertical: 2,
+          marginRight: 3,
+        }}
+      />
+    );
+  }
+
+  function renderUserArea() {
+    // loading — spinner only
+    if (zCameraStatus === "loading") {
+      return <SmallLoadingIndicator />;
+    }
+
+    // failed — show user or login button + error icon
+    if (zCameraStatus === "failed") {
+      return (
+        <>
+          {zCurrentUser ? <UserButton /> : <LoginButton />}
+          <ErrorIcon />
+        </>
+      );
+    }
+
+    // ready — camera started, searching for face
+    if (zCameraStatus === "ready") {
+      return (
+        <>
+          {zCurrentUser ? <UserButton /> : <SmallLoadingIndicator />}
+          <CameraIcon />
+        </>
+      );
+    }
+
+    // idle or matched — normal display
+    return (
+      <>
+        {zCurrentUser ? <UserButton /> : <LoginButton />}
+        <CameraIcon />
+      </>
+    );
+  }
+
   return (
     <View
       style={{
         flexDirection: "row",
         width: "100%",
-        // width: "100%",
         justifyContent: "space-between",
         paddingRight: 5,
       }}
     >
       <View style={{ flexDirection: "row", justifyContent: "flex-start" }}>
         <TabMenuButton
-          // height={height}
           buttonStyle={{ borderTopLeftRadius: 15 }}
           onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.inventory)}
           text={TAB_NAMES.optionsTab.inventory}
-          isSelected={
-            zOptionsTabName === TAB_NAMES.optionsTab.inventory ? true : false
-          }
+          isSelected={zOptionsTabName === TAB_NAMES.optionsTab.inventory}
         />
-        {/* <Divider /> */}
         <TabMenuButton
-          // height={height}
           onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders)}
           text={TAB_NAMES.optionsTab.workorders}
-          isSelected={
-            zOptionsTabName == TAB_NAMES.optionsTab.workorders ? true : false
-          }
+          isSelected={zOptionsTabName === TAB_NAMES.optionsTab.workorders}
         />
         <TabMenuButton
-          // height={height}
           onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.messages)}
           text={TAB_NAMES.optionsTab.messages}
-          isSelected={
-            zOptionsTabName == TAB_NAMES.optionsTab.messages ? true : false
-          }
+          isSelected={zOptionsTabName === TAB_NAMES.optionsTab.messages}
         />
       </View>
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        {zCurrentUser ? (
-          <Button_
-            onPress={() => handleUserPress(zCurrentUser)}
-            icon={isClockedIn ? ICONS.check : ICONS.redx}
-            text={
-              zCurrentUser.first +
-              " " +
-              (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
-              "."
-            }
-            textStyle={{ fontSize: 13, color: C.text }}
-            iconSize={13}
-            buttonStyle={{
-              paddingHorizontal: 7,
-              paddingVertical: 2,
-              marginRight: 5,
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              backgroundColor: C.buttonLightGreen,
-              borderRadius: 15,
-            }}
-          />
-        ) : (
-          <Button_
-            onPress={() => useLoginStore.getState().setShowLoginScreen(true)}
-            icon={ICONS.userControl}
-            iconSize={13}
-            text="Login"
-            textStyle={{ fontSize: 13, color: C.text }}
-            buttonStyle={{
-              paddingHorizontal: 7,
-              paddingVertical: 2,
-              marginRight: 5,
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              backgroundColor: C.buttonLightGreen,
-              borderRadius: 15,
-            }}
-          />
-        )}
-
-        {!!webcamDetected && (
-          <View title="Camera on and identifying">
-            <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
-          </View>
-        )}
+        {renderUserArea()}
         <View style={{ width: 5 }} />
         <Image_
           style={{ width: 28, height: 28 }}

@@ -60,6 +60,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
         await startVideo();
         useLoginStore.getState().setWebcamDetected(true);
+        useLoginStore.getState().setCameraStatus("ready");
 
         if (!cancelled) {
           log("Face detection setup complete — webcam found, models loaded.");
@@ -68,6 +69,8 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       } catch (e) {
         log("Face detection setup failed:", e);
         useLoginStore.getState().setWebcamDetected(false);
+        useLoginStore.getState().setCameraStatus("failed");
+        useLoginStore.getState().setCameraError(e?.message || "Camera failed to start");
         if (!cancelled) _setStatus("No webcam detected");
       }
     }
@@ -117,6 +120,8 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         lastMatchRef.current = { userId: matchedUser.id, timestamp: Date.now() };
         useLoginStore.getState().setCurrentUser(matchedUser);
         useLoginStore.getState().setLastActionMillis();
+        useLoginStore.getState().setCameraStatus("matched");
+        useLoginStore.getState().runPostLoginFunction();
         checkClockIn(matchedUser);
       } else {
         // no match or no face — check grace period before clearing
@@ -127,6 +132,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         // grace period expired — clear user
         lastMatchRef.current = { userId: null, timestamp: 0 };
         useLoginStore.getState().setCurrentUser(null);
+        useLoginStore.getState().setCameraStatus("idle");
       }
     }, FACIAL_RECOGNITION_INTERVAL_MILLIS);
 

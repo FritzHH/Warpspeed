@@ -666,6 +666,7 @@ export function InventoryComponent({}) {
         </View>
         {sModalItem && (
           <InventoryItemModalScreen
+            key={sModalItem.id}
             item={sModalItem}
             isNew={!!(sModalItem.id && !sModalItem.formalName)}
             handleExit={() => _setModalItem(null)}

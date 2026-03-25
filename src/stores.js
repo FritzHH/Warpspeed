@@ -452,8 +452,10 @@ export const useLoginStore = create((set, get) => ({
   punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
   lastActionMillis: 0,
-  postLoginFunctionCallback: () => {},
+  postLoginFunctionCallback: null,
   showLoginScreen: false,
+  cameraStatus: "loading", // "loading" | "ready" | "failed" | "idle" | "matched"
+  cameraError: null,
 
   // face login
   runBackgroundRecognition: true,
@@ -497,12 +499,17 @@ export const useLoginStore = create((set, get) => ({
     set({
       punchClock,
     });
-    dbSaveCurrentPunchClock(punchClock, "1234", "999");
-    dbSavePunchObject(punch, punch.id, "1234", "999");
+    let tenantID = useSettingsStore.getState().getSettings()?.tenantID;
+    let storeID = useSettingsStore.getState().getSettings()?.storeID;
+    dbSaveCurrentPunchClock(punchClock, tenantID, storeID);
+    dbSavePunchObject(punch, punch.id, tenantID, storeID);
   },
 
   setPunchClock: (punchClock) => set({ punchClock }),
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
+  setCameraStatus: (cameraStatus) => set({ cameraStatus }),
+  setCameraError: (cameraError) => set({ cameraError }),
+  setPostLoginFunctionCallback: (postLoginFunctionCallback) => set({ postLoginFunctionCallback }),
   setRunBackgroundRecognition: (runBackgroundRecognition) =>
     set(() => ({ runBackgroundRecognition })),
   setModalVisible: (modalVisible) => set((state) => ({ modalVisible })),
@@ -564,44 +571,37 @@ export const useLoginStore = create((set, get) => ({
     let cur = new Date().getTime();
     let diff = (cur - lastMillis) / 1000;
     let userObj = get().currentUser;
-    // log("diff", diff);
     let hasAccess = true;
+
     if (priviledgeLevel && userObj) {
+      let perm = userObj.permissions?.name || userObj.permissions;
       hasAccess = false;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.owner &&
-        userObj.permissions == PRIVILEDGE_LEVELS.owner
-      ) {
-      }
-      hasAccess = true;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.admin &&
-        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
-          userObj.permissions == PRIVILEDGE_LEVELS.admin)
-      )
+      if (priviledgeLevel === PRIVILEDGE_LEVELS.user) hasAccess = true;
+      if (priviledgeLevel === PRIVILEDGE_LEVELS.superUser &&
+        (perm === PRIVILEDGE_LEVELS.superUser || perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
         hasAccess = true;
-      if (
-        priviledgeLevel == PRIVILEDGE_LEVELS.superUser &&
-        (userObj.permissions == PRIVILEDGE_LEVELS.owner ||
-          userObj.permissions == PRIVILEDGE_LEVELS.admin ||
-          userObj.permissions == PRIVILEDGE_LEVELS.superUser)
-      )
+      if (priviledgeLevel === PRIVILEDGE_LEVELS.admin &&
+        (perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
+        hasAccess = true;
+      if (priviledgeLevel === PRIVILEDGE_LEVELS.owner && perm === PRIVILEDGE_LEVELS.owner)
         hasAccess = true;
     }
-    // log("user in login store", userObj);
-    // log("diff", diff);
-    // log(get().loginTimeout);
+
     let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
     if (diff > timeout || !hasAccess || !userObj) {
-      set((state) => ({ postLoginFunctionCallback }));
-      set((state) => ({ showLoginScreen: true }));
-      set((state) => ({ adminPrivilege: priviledgeLevel }));
+      set({ postLoginFunctionCallback, showLoginScreen: true, adminPrivilege: priviledgeLevel || "" });
       return;
     } else if (hasAccess) {
       postLoginFunctionCallback();
     }
   },
-  runPostLoginFunction: () => get().postLoginFunctionCallback(),
+  runPostLoginFunction: () => {
+    const cb = get().postLoginFunctionCallback;
+    if (cb) {
+      cb();
+      set({ postLoginFunctionCallback: null });
+    }
+  },
 }));
 
 export const useInventoryStore = create((set, get) => ({
@@ -960,6 +960,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
   openWorkorder: null,
   openWorkorderID: null,
   workorderPreviewID: null,
+  lockedWorkorderID: null,
 
   getOpenWorkorder: () => {
     let id = get().openWorkorderID;
@@ -972,7 +973,9 @@ export const useOpenWorkordersStore = create((set, get) => ({
   },
   getWorkorderPreviewID: () => get().workorderPreviewID,
 
-  setWorkorderPreviewID: (workorderPreviewID) => set({ workorderPreviewID }), 
+  setWorkorderPreviewID: (workorderPreviewID) => set({ workorderPreviewID }),
+  getLockedWorkorderID: () => get().lockedWorkorderID,
+  setLockedWorkorderID: (lockedWorkorderID) => set({ lockedWorkorderID }),
   setOpenWorkorderID: (openWorkorderID) => {
     set({ openWorkorderID });
     if (openWorkorderID) {
@@ -998,6 +1001,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
   },
   setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
     if (!workorderID) workorderID = get().openWorkorderID;
+    if (get().lockedWorkorderID === workorderID) return;
     let workorder = get().workorders.find((o) => o.id === workorderID);
 
     // changelog: append entries for discrete fields, debounce text fields
@@ -1016,7 +1020,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
       if (wasUnsaved) {
         // First save — write immediately so Firestore listener includes it
         // before the debounce window allows setOpenWorkorders to wipe it
-        dbSaveOpenWorkorder(workorder);
+        dbSaveOpenWorkorder(workorder, null, true);
       } else {
         debouncedSaveWorkorder(workorder);
       }

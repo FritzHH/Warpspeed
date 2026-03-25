@@ -544,7 +544,7 @@ export async function dbSaveSettings(settings) {
  * @param {string} workorderID - Workorder ID (optional, will use workorder.id if not provided)
  * @returns {Promise<Object>} Save result
  */
-export async function dbSaveOpenWorkorder(workorder, workorderID = null) {
+export async function dbSaveOpenWorkorder(workorder, workorderID = null, isFirstSave = false) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -602,12 +602,19 @@ export async function dbSaveOpenWorkorder(workorder, workorderID = null) {
 
     await firestoreWrite(path, workorderToSave);
 
-    // log("Open workorder saved", {
-    //   workorderID: id,
-    //   tenantID,
-    //   storeID,
-    //   path,
-    // });
+    // Auto-create customer PIN doc for the customer-facing workorder screen (only on first save)
+    if (workorderToSave.customerPin && isFirstSave) {
+      const pinPath = `workorder-pins/${workorderToSave.customerPin}`;
+      firestoreWrite(pinPath, {
+        pin: workorderToSave.customerPin,
+        workorderID: id,
+        tenantID,
+        storeID,
+        customerID: workorderToSave.customerID || "",
+        createdAt: Date.now(),
+        createdBy: workorderToSave.startedBy || "",
+      }).catch(() => {}); // fire-and-forget
+    }
 
     return {
       success: true,
@@ -657,6 +664,21 @@ export async function dbGetCompletedWorkorder(id) {
   } catch (error) {
     log("Error retrieving completed workorder:", error);
     return null;
+  }
+}
+
+export async function dbSearchCompletedWorkorders(field, value) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}`;
+    const results = await firestoreQuery(collectionPath, [
+      { field, operator: "==", value },
+    ], { limit: 5 });
+    return results;
+  } catch (error) {
+    log("Error searching completed workorders:", error);
+    return [];
   }
 }
 

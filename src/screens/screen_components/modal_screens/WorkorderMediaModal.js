@@ -192,6 +192,34 @@ export const WorkorderMediaModal = ({
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  const [sDeleting, _setDeleting] = useState(false);
+
+  function handleDeleteSelected() {
+    const selectedItems = zMedia.filter((m) => sSelectedIds.has(m.id));
+    if (!selectedItems.length) return;
+    let count = selectedItems.length;
+    useAlertScreenStore.getState().setValues({
+      title: "Delete Media",
+      message: `Are you sure you want to delete ${count} ${count === 1 ? "image" : "images"}?`,
+      btn1Text: "Delete",
+      btn2Text: "Cancel",
+      handleBtn1Press: async () => {
+        useAlertScreenStore.getState().setValues({ showAlert: false });
+        _setDeleting(true);
+        for (let i = 0; i < selectedItems.length; i++) {
+          await dbDeleteWorkorderMedia(selectedItems[i]);
+        }
+        const remaining = zMedia.filter((m) => !sSelectedIds.has(m.id));
+        useOpenWorkordersStore.getState().setField("media", remaining, workorderID);
+        _setSelectedIds(new Set());
+        _setDeleting(false);
+      },
+      handleBtn2Press: () => {
+        useAlertScreenStore.getState().setValues({ showAlert: false });
+      },
+    });
+  }
+
   function handleDeleteMedia(mediaItem) {
     useAlertScreenStore.getState().setValues({
       title: "Delete Media",
@@ -278,14 +306,6 @@ export const WorkorderMediaModal = ({
               text="Close"
               colorGradientArr={COLOR_GRADIENTS.grey}
               onPress={() => _setFullView(null)}
-              buttonStyle={{ paddingHorizontal: 24, paddingVertical: 10 }}
-            />
-            <Button_
-              text="Delete"
-              colorGradientArr={COLOR_GRADIENTS.red}
-              icon={ICONS.trash}
-              iconSize={16}
-              onPress={() => handleDeleteMedia(sFullView)}
               buttonStyle={{ paddingHorizontal: 24, paddingVertical: 10 }}
             />
           </View>
@@ -515,8 +535,8 @@ export const WorkorderMediaModal = ({
           )}
         </ScrollView>
 
-        {/* Footer — Send Media button */}
-        {zMedia.length > 0 && (hasCell || hasEmail) && (
+        {/* Footer — Send / Delete Media buttons */}
+        {zMedia.length > 0 && (selectedCount > 0 || (hasCell || hasEmail)) && (
           <View
             style={{
               flexDirection: "row",
@@ -533,21 +553,40 @@ export const WorkorderMediaModal = ({
                 {selectedCount} selected
               </Text>
             )}
-            <Button_
-              text={sSending ? "Sending..." : "Send Media"}
-              colorGradientArr={COLOR_GRADIENTS.green}
-              icon={ICONS.paperPlane}
-              iconSize={16}
-              onPress={handleSendMedia}
-              enabled={selectedCount > 0 && !sSending}
-              buttonStyle={{
-                paddingHorizontal: 20,
-                paddingVertical: 10,
-                borderRadius: 8,
-                opacity: selectedCount > 0 && !sSending ? 1 : 0.4,
-              }}
-              textStyle={{ fontSize: 14, fontWeight: "500" }}
-            />
+            {selectedCount > 0 && (
+              <Button_
+                text={sDeleting ? "Deleting..." : "Delete Media"}
+                colorGradientArr={COLOR_GRADIENTS.red}
+                icon={ICONS.close1}
+                iconSize={14}
+                onPress={handleDeleteSelected}
+                enabled={!sDeleting && !sSending}
+                buttonStyle={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  opacity: !sDeleting && !sSending ? 1 : 0.4,
+                }}
+                textStyle={{ fontSize: 14, fontWeight: "500" }}
+              />
+            )}
+            {(hasCell || hasEmail) && (
+              <Button_
+                text={sSending ? "Sending..." : "Send Media"}
+                colorGradientArr={COLOR_GRADIENTS.green}
+                icon={ICONS.paperPlane}
+                iconSize={16}
+                onPress={handleSendMedia}
+                enabled={selectedCount > 0 && !sSending}
+                buttonStyle={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 8,
+                  opacity: selectedCount > 0 && !sSending ? 1 : 0.4,
+                }}
+                textStyle={{ fontSize: 14, fontWeight: "500" }}
+              />
+            )}
           </View>
         )}
       </div>

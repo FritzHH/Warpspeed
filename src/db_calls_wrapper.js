@@ -2973,7 +2973,7 @@ export async function dbUploadWorkorderMedia(workorderID, file) {
 
     let thumbnailUrl = null;
     let thumbnailStoragePath = null;
-    const thumbBlob = await compressImage(file);
+    const thumbBlob = await compressImage(file, 300, 0.5);
     if (thumbBlob) {
       const thumbPath = build_db_path.cloudStorage.workorderAttachment(
         workorderID, "thumbnails", tenantID, storeID, file.name

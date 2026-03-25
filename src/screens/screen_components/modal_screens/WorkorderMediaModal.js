@@ -58,13 +58,27 @@ export const WorkorderMediaModal = ({
     });
   }
 
-  async function handleSendMedia() {
+  function handleSendMedia() {
     const selectedItems = zMedia.filter((m) => sSelectedIds.has(m.id));
     if (!selectedItems.length) return;
     if (!hasCell && !hasEmail) return;
 
-    _setSending(true);
+    // Update local store immediately — mark as sent
+    const updatedMedia = zMedia.map((m) => {
+      if (!sSelectedIds.has(m.id)) return m;
+      return {
+        ...m,
+        sentToCustomer: {
+          sms: hasCell || !!(m.sentToCustomer?.sms),
+          email: hasEmail || !!(m.sentToCustomer?.email),
+          sentAt: Date.now(),
+        },
+      };
+    });
+    useOpenWorkordersStore.getState().setField("media", updatedMedia, workorderID);
+    onClose();
 
+    // Fire off sends in background
     const hasImages = selectedItems.some((m) => m.type === "image");
     const hasVideos = selectedItems.some((m) => m.type === "video");
     let noun = hasImages && hasVideos
@@ -76,10 +90,6 @@ export const WorkorderMediaModal = ({
     const links = selectedItems.map((m) => m.url).join("\n");
     const messageText = `${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:\n\n${links}`;
 
-    let smsSuccess = false;
-    let emailSuccess = false;
-
-    // Send SMS
     if (hasCell) {
       let msg = cloneDeep(SMS_PROTO);
       msg.message = messageText;
@@ -92,20 +102,17 @@ export const WorkorderMediaModal = ({
       msg.id = generateRandomID();
       msg.type = "outgoing";
       msg.senderUserObj = useLoginStore.getState().currentUser || "";
-
-      let result = await smsService.send(msg);
-      smsSuccess = result.success;
-      if (smsSuccess) {
-        // Flag all customer workorders so the sender's list prioritizes them
-        let senderUser = useLoginStore.getState().currentUser;
-        let allWOs = useOpenWorkordersStore.getState().workorders;
-        allWOs.filter((wo) => wo.customerID === zWorkorder.customerID).forEach((wo) => {
-          useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", senderUser?.id || "", wo.id);
-        });
-      }
+      smsService.send(msg).then((result) => {
+        if (result.success) {
+          let senderUser = useLoginStore.getState().currentUser;
+          let allWOs = useOpenWorkordersStore.getState().workorders;
+          allWOs.filter((wo) => wo.customerID === zWorkorder.customerID).forEach((wo) => {
+            useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", senderUser?.id || "", wo.id);
+          });
+        }
+      });
     }
 
-    // Send Email
     if (hasEmail) {
       const linksHtml = selectedItems
         .map((m) => {
@@ -115,52 +122,8 @@ export const WorkorderMediaModal = ({
         .join("");
       const htmlBody = `<p>${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:</p>${linksHtml}`;
       const subject = `Media from ${storeName}`;
-
-      let result = await dbSendEmail(zWorkorder.customerEmail, subject, htmlBody);
-      emailSuccess = result.success;
+      dbSendEmail(zWorkorder.customerEmail, subject, htmlBody);
     }
-
-    // Update sentToCustomer metadata on each selected media item
-    if (smsSuccess || emailSuccess) {
-      const updatedMedia = zMedia.map((m) => {
-        if (!sSelectedIds.has(m.id)) return m;
-        return {
-          ...m,
-          sentToCustomer: {
-            sms: smsSuccess || !!(m.sentToCustomer?.sms),
-            email: emailSuccess || !!(m.sentToCustomer?.email),
-            sentAt: Date.now(),
-          },
-        };
-      });
-      useOpenWorkordersStore
-        .getState()
-        .setField("media", updatedMedia, workorderID);
-      _setSelectedIds(new Set());
-    }
-
-    _setSending(false);
-
-    // Show result alert
-    let resultParts = [];
-    if (smsSuccess) resultParts.push("SMS");
-    if (emailSuccess) resultParts.push("Email");
-    let failParts = [];
-    if (hasCell && !smsSuccess) failParts.push("SMS");
-    if (hasEmail && !emailSuccess) failParts.push("Email");
-
-    let alertMsg = "";
-    if (resultParts.length) alertMsg += `Sent via ${resultParts.join(" & ")}.`;
-    if (failParts.length) alertMsg += `${alertMsg ? " " : ""}Failed to send via ${failParts.join(" & ")}.`;
-
-    useAlertScreenStore.getState().setValues({
-      title: "Send Media",
-      message: alertMsg,
-      btn1Text: "OK",
-      handleBtn1Press: () => {
-        useAlertScreenStore.getState().setValues({ showAlert: false });
-      },
-    });
   }
 
   async function handleFilesSelected(e) {
@@ -197,27 +160,16 @@ export const WorkorderMediaModal = ({
   function handleDeleteSelected() {
     const selectedItems = zMedia.filter((m) => sSelectedIds.has(m.id));
     if (!selectedItems.length) return;
-    let count = selectedItems.length;
-    useAlertScreenStore.getState().setValues({
-      title: "Delete Media",
-      message: `Are you sure you want to delete ${count} ${count === 1 ? "image" : "images"}?`,
-      btn1Text: "Delete",
-      btn2Text: "Cancel",
-      handleBtn1Press: async () => {
-        useAlertScreenStore.getState().setValues({ showAlert: false });
-        _setDeleting(true);
-        for (let i = 0; i < selectedItems.length; i++) {
-          await dbDeleteWorkorderMedia(selectedItems[i]);
-        }
-        const remaining = zMedia.filter((m) => !sSelectedIds.has(m.id));
-        useOpenWorkordersStore.getState().setField("media", remaining, workorderID);
-        _setSelectedIds(new Set());
-        _setDeleting(false);
-      },
-      handleBtn2Press: () => {
-        useAlertScreenStore.getState().setValues({ showAlert: false });
-      },
-    });
+
+    // Update local store immediately and close
+    const remaining = zMedia.filter((m) => !sSelectedIds.has(m.id));
+    useOpenWorkordersStore.getState().setField("media", remaining, workorderID);
+    onClose();
+
+    // Fire off storage deletes in background
+    for (let i = 0; i < selectedItems.length; i++) {
+      dbDeleteWorkorderMedia(selectedItems[i]);
+    }
   }
 
   function handleDeleteMedia(mediaItem) {
@@ -295,20 +247,6 @@ export const WorkorderMediaModal = ({
               resizeMode="contain"
             />
           )}
-          <View
-            style={{
-              flexDirection: "row",
-              marginTop: 16,
-              gap: 12,
-            }}
-          >
-            <Button_
-              text="Close"
-              colorGradientArr={COLOR_GRADIENTS.grey}
-              onPress={() => _setFullView(null)}
-              buttonStyle={{ paddingHorizontal: 24, paddingVertical: 10 }}
-            />
-          </View>
         </div>
       </div>,
       document.body
@@ -542,9 +480,8 @@ export const WorkorderMediaModal = ({
               flexDirection: "row",
               justifyContent: "flex-end",
               alignItems: "center",
-              padding: 12,
-              borderTopWidth: 1,
-              borderTopColor: gray(0.9),
+              paddingHorizontal: 12,
+              paddingBottom: 12,
               gap: 10,
             }}
           >

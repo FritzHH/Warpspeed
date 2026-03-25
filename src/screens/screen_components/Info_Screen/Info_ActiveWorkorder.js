@@ -17,6 +17,7 @@ import {
   resolveStatus,
   calculateWaitEstimateLabel,
   findTemplateByType,
+  compressImage,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -28,6 +29,7 @@ import {
   PrinterButton,
   StatusPickerModal,
   Tooltip,
+  CheckBox_,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -44,6 +46,7 @@ import {
 } from "../../../data";
 import { MILLIS_IN_DAY, build_db_path } from "../../../constants";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
@@ -88,6 +91,8 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sWaitTimeBlink, _setWaitTimeBlink] = useState(false);
   const uploadInputRef = useRef(null);
   const [sUploadProgress, _setUploadProgress] = useState(null); // null | { completed, total, failed, done }
+  const [sPendingFiles, _setPendingFiles] = useState(null); // null | File[]
+  const [sCompressConfirm, _setCompressConfirm] = useState(true);
 
   // Estimated wait days — local state for instant UI, debounced DB write
   const [sWaitDays, _setWaitDays] = useState(0);
@@ -130,16 +135,38 @@ export const ActiveWorkorderComponent = ({}) => {
     }, 700);
   }
 
-  async function handleDirectUpload(e) {
+  function handleDirectUpload(e) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
+    _setPendingFiles(files);
+    _setCompressConfirm(true);
+    if (uploadInputRef.current) uploadInputRef.current.value = "";
+  }
+
+  function handleCancelUpload() {
+    _setPendingFiles(null);
+  }
+
+  async function handleConfirmUpload() {
+    let files = sPendingFiles;
+    let shouldCompress = sCompressConfirm;
+    _setPendingFiles(null);
+    if (!files?.length) return;
     let total = files.length;
     let completed = 0;
     let failed = 0;
     _setUploadProgress({ completed: 0, total, failed: 0, done: false });
     let newMedia = [...(zOpenWorkorder?.media || [])];
     for (let i = 0; i < files.length; i++) {
-      const result = await dbUploadWorkorderMedia(zOpenWorkorder.id, files[i]);
+      let fileToUpload = files[i];
+      if (shouldCompress && fileToUpload.type.startsWith("image")) {
+        let compressed = await compressImage(fileToUpload, 1024, 0.65);
+        if (compressed) {
+          compressed.name = fileToUpload.name;
+          fileToUpload = compressed;
+        }
+      }
+      const result = await dbUploadWorkorderMedia(zOpenWorkorder.id, fileToUpload);
       if (result.success) {
         newMedia.push(result.mediaItem);
         completed++;
@@ -149,7 +176,6 @@ export const ActiveWorkorderComponent = ({}) => {
       _setUploadProgress({ completed, total, failed, done: false });
     }
     useOpenWorkordersStore.getState().setField("media", newMedia, zOpenWorkorder.id);
-    if (uploadInputRef.current) uploadInputRef.current.value = "";
     _setUploadProgress({ completed, total, failed, done: true });
     setTimeout(() => _setUploadProgress(null), failed > 0 ? 5000 : 3000);
   }
@@ -1292,6 +1318,63 @@ export const ActiveWorkorderComponent = ({}) => {
           />
         </Tooltip>
       </View>
+      {/* Upload confirmation modal */}
+      {sPendingFiles && ReactDOM.createPortal(
+        <View
+          style={{
+            position: "fixed",
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={handleCancelUpload}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, cursor: "default" }}
+          />
+          <View
+            style={{
+              width: 520,
+              backgroundColor: C.backgroundWhite,
+              borderRadius: 12,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 20,
+            }}
+          >
+            <Text style={{ fontSize: 14, color: C.text, marginBottom: 16, lineHeight: 20, textAlign: "center" }}>
+              Default compression is on. Only uncheck the compression box if small details are important, as upload time will increase dramatically.
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <CheckBox_
+                text="Medium compression"
+                isChecked={sCompressConfirm}
+                onCheck={() => _setCompressConfirm(!sCompressConfirm)}
+              />
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Button_
+                  text="Upload"
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  onPress={handleConfirmUpload}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+                  textStyle={{ fontSize: 14 }}
+                />
+                <Button_
+                  text="Cancel"
+                  colorGradientArr={COLOR_GRADIENTS.grey}
+                  onPress={handleCancelUpload}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+                  textStyle={{ fontSize: 14 }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>,
+        document.body
+      )}
       {sShowMediaModal && (
         <WorkorderMediaModal
           visible={!!sShowMediaModal}

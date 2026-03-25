@@ -87,6 +87,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowMediaModal, _setShowMediaModal] = useState(null); // null | "upload" | "view"
   const [sWaitTimeBlink, _setWaitTimeBlink] = useState(false);
   const uploadInputRef = useRef(null);
+  const [sUploadProgress, _setUploadProgress] = useState(null); // null | { completed, total, failed, done }
 
   // Estimated wait days — local state for instant UI, debounced DB write
   const [sWaitDays, _setWaitDays] = useState(0);
@@ -132,13 +133,25 @@ export const ActiveWorkorderComponent = ({}) => {
   async function handleDirectUpload(e) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
+    let total = files.length;
+    let completed = 0;
+    let failed = 0;
+    _setUploadProgress({ completed: 0, total, failed: 0, done: false });
     let newMedia = [...(zOpenWorkorder?.media || [])];
     for (let i = 0; i < files.length; i++) {
       const result = await dbUploadWorkorderMedia(zOpenWorkorder.id, files[i]);
-      if (result.success) newMedia.push(result.mediaItem);
+      if (result.success) {
+        newMedia.push(result.mediaItem);
+        completed++;
+      } else {
+        failed++;
+      }
+      _setUploadProgress({ completed, total, failed, done: false });
     }
     useOpenWorkordersStore.getState().setField("media", newMedia, zOpenWorkorder.id);
     if (uploadInputRef.current) uploadInputRef.current.value = "";
+    _setUploadProgress({ completed, total, failed, done: true });
+    setTimeout(() => _setUploadProgress(null), failed > 0 ? 5000 : 3000);
   }
 
   // Refs for dropdown components
@@ -1113,75 +1126,112 @@ export const ActiveWorkorderComponent = ({}) => {
         onChange={handleDirectUpload}
         style={{ display: "none" }}
       />
+      <style>{`
+        @keyframes uploadBarCycle {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(350%); }
+        }
+      `}</style>
       <View
         style={{
-          flexDirection: "row",
-          justifyContent: "center",
           backgroundColor: C.backgroundListWhite,
-          alignItems: "center",
-          borderRadius: 5,
+          borderRadius: 10,
           borderColor: C.listItemBorder,
           borderWidth: 1,
           paddingHorizontal: 25,
-          borderRadius: 10,
           paddingVertical: 4,
           marginBottom: 8,
+          alignItems: "center",
+          overflow: "hidden",
         }}
       >
-        <Tooltip text="Upload photo" position="top">
-          <Button_
-            icon={ICONS.uploadCamera}
-            iconSize={40}
-            disabled={isDonePaid}
-            onPress={() => !isDonePaid && uploadInputRef.current?.click()}
-            buttonStyle={{
-              backgroundColor: "transparent",
-              paddingHorizontal: 0,
-              paddingVertical: 0,
-              opacity: isDonePaid ? 0.3 : 1,
-            }}
-          />
-        </Tooltip>
-        <View>
-          <Tooltip text="View photos" position="top">
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+          <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "Upload photo"} position="top">
             <Button_
-              icon={ICONS.viewPhoto}
-              iconSize={50}
-              onPress={() => _setShowMediaModal("view")}
+              icon={ICONS.uploadCamera}
+              iconSize={40}
+              disabled={isDonePaid}
+              onPress={() => !isDonePaid && uploadInputRef.current?.click()}
               buttonStyle={{
                 backgroundColor: "transparent",
                 paddingHorizontal: 0,
                 paddingVertical: 0,
+                opacity: isDonePaid ? 0.3 : 1,
               }}
             />
           </Tooltip>
-          {/* {zOpenWorkorder?.media?.length > 0 && ( */}
-            <View
-              style={{
-                position: "absolute",
-              top: -1,
-              right: -5,
-              // backgroundColor: C.backgroundWhite,
-              borderRadius: 8,
-              minWidth: 16,
-              height: 16,
-                justifyContent: "center",
-                alignItems: "center",
-              paddingHorizontal: 3,
-              }}
-            >
-              <Text
+          <View>
+            <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "View photos"} position="top">
+              <Button_
+                icon={ICONS.viewPhoto}
+                iconSize={50}
+                onPress={() => _setShowMediaModal("view")}
+                buttonStyle={{
+                  backgroundColor: "transparent",
+                  paddingHorizontal: 0,
+                  paddingVertical: 0,
+                }}
+              />
+            </Tooltip>
+            {/* {zOpenWorkorder?.media?.length > 0 && ( */}
+              <View
                 style={{
-                color: zOpenWorkorder?.media?.length > 0 ? C.red : 'gray',
-                fontSize: 15,
-                  fontWeight: "700",
+                  position: "absolute",
+                  top: -1,
+                  right: -5,
+                  borderRadius: 8,
+                  minWidth: 16,
+                  height: 16,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 3,
                 }}
               >
-              {zOpenWorkorder?.media?.length || 0}
-              </Text>
-            </View>
-          {/* )} */}
+                <Text
+                  style={{
+                    color: zOpenWorkorder?.media?.length > 0 ? C.red : 'gray',
+                    fontSize: 15,
+                    fontWeight: "700",
+                  }}
+                >
+                  {zOpenWorkorder?.media?.length || 0}
+                </Text>
+              </View>
+            {/* )} */}
+          </View>
         </View>
+        {/* Upload progress bar */}
+        {sUploadProgress && (
+          <Tooltip text={!sUploadProgress.done ? "Upload in progress, you may continue work safely" : ""} position="bottom" style={{ alignSelf: "stretch" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", width: "100%", paddingBottom: 4 }}>
+              <Text style={{ fontSize: 11, color: sUploadProgress.done ? (sUploadProgress.failed > 0 ? C.red : C.green) : gray(0.45), fontWeight: "700", marginRight: 6 }}>
+                {sUploadProgress.completed}/{sUploadProgress.total}
+              </Text>
+              <View style={{ flex: 1, height: 4, backgroundColor: gray(0.88), borderRadius: 2, overflow: "hidden" }}>
+                {!sUploadProgress.done ? (
+                  <div
+                    style={{
+                      width: "40%",
+                      height: "100%",
+                      backgroundColor: C.blue,
+                      borderRadius: 2,
+                      animation: "uploadBarCycle 1.2s ease-in-out infinite",
+                    }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      backgroundColor: sUploadProgress.failed > 0 ? C.red : C.green,
+                      borderRadius: 2,
+                    }}
+                  />
+                )}
+              </View>
+            </View>
+          </Tooltip>
+        )}
       </View>
       <View
         style={{

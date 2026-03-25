@@ -24,6 +24,7 @@ import {
 import { C, ICONS } from "../../../styles";
 import { EmptyItemsComponent } from "./Items_Empty";
 import {
+  CUSTOMER_PROTO,
   WORKORDER_ITEM_PROTO,
   INVENTORY_ITEM_PROTO,
   SETTINGS_OBJ,
@@ -33,6 +34,7 @@ import { useEffect, useRef, useState } from "react";
 import { cloneDeep, zipObject } from "lodash";
 import {
   useCheckoutStore,
+  useCurrentCustomerStore,
   useOpenWorkordersStore,
   useInventoryStore,
   useSettingsStore,
@@ -304,6 +306,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       }
 
       store.setOpenWorkorderID(null);
+      useCurrentCustomerStore.getState().setCustomer({ ...CUSTOMER_PROTO }, false);
       useTabNamesStore.getState().setItems({
         itemsTabName: TAB_NAMES.itemsTab.empty,
         infoTabName: TAB_NAMES.infoTab.customer,

@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
-import { getNewCollectionRef } from "./db_calls_wrapper";
+import { getNewCollectionRef, dbSendSMS, dbSendEmail } from "./db_calls_wrapper";
 import {
   CONTACT_RESTRICTIONS,
   CUSTOMER_PROTO,
@@ -2165,4 +2165,163 @@ export function populateEmailTemplate(templateStr, data) {
   return templateStr.replace(/\{(\w+)\}/g, (match, key) => {
     return data[key] !== undefined && data[key] !== null ? String(data[key]) : match;
   });
+}
+
+// ==================== STATUS AUTO-TEXT ====================
+
+export function resolveTemplateStandalone(templateStr, workorder, customer, settings) {
+  if (!templateStr) return "";
+  let totalAmount = "";
+  try {
+    let totals = calculateRunningTotals(workorder, settings?.salesTaxPercent, [], false, !!workorder?.taxFree);
+    totalAmount = "$" + (totals.finalTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  } catch (e) {
+    totalAmount = "$0.00";
+  }
+  let lineItems = "";
+  try {
+    lineItems = (workorder?.workorderLines || [])
+      .map((line) => {
+        let name = line.inventoryItem?.informalName || line.inventoryItem?.formalName || "";
+        return line.qty + "x " + name;
+      })
+      .join(", ");
+  } catch (e) {}
+  let storeHoursText = "";
+  try {
+    storeHoursText = formatStoreHours(settings?.storeHours);
+  } catch (e) {}
+  let firstName = customer?.first || workorder?.customerFirst || "";
+  let lastName = customer?.last || workorder?.customerLast || "";
+  let storeName = settings?.storeInfo?.displayName || settings?.storeInfo?.name || "";
+  let storePhone = settings?.storeInfo?.phone || "";
+  let formattedPhone = storePhone.length === 10
+    ? "(" + storePhone.slice(0, 3) + ") " + storePhone.slice(3, 6) + "-" + storePhone.slice(6)
+    : storePhone;
+  return templateStr
+    .replace(/\{firstName\}/g, capitalizeFirstLetterOfString(firstName) || "")
+    .replace(/\{lastName\}/g, capitalizeFirstLetterOfString(lastName) || "")
+    .replace(/\{brand\}/g, workorder?.brand || "")
+    .replace(/\{description\}/g, workorder?.description || "")
+    .replace(/\{totalAmount\}/g, totalAmount)
+    .replace(/\{total\}/g, totalAmount)
+    .replace(/\{lineItems\}/g, lineItems)
+    .replace(/\{partOrdered\}/g, workorder?.partOrdered || "")
+    .replace(/\{partSource\}/g, workorder?.partSource || "")
+    .replace(/\{storeHours\}/g, storeHoursText)
+    .replace(/\{storePhone\}/g, formattedPhone)
+    .replace(/\{storeName\}/g, storeName)
+    .replace(/\{storeAddress\}/g, settings?.storeInfo?.address || "")
+    .replace(/\{customerNotes\}/g, (workorder?.customerNotes || []).map(n => n.value || n.text || n.note || "").filter(Boolean).join("\n") || "");
+}
+
+const PENDING_AUTO_TEXT_KEY = "warpspeed_pending_auto_texts";
+
+function persistPendingAutoText(msg) {
+  try {
+    let arr = JSON.parse(localStorage.getItem(PENDING_AUTO_TEXT_KEY) || "[]");
+    arr.push(msg);
+    localStorage.setItem(PENDING_AUTO_TEXT_KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.log("Error persisting pending auto-text:", e);
+  }
+}
+
+function removePendingAutoText(id) {
+  try {
+    let arr = JSON.parse(localStorage.getItem(PENDING_AUTO_TEXT_KEY) || "[]");
+    arr = arr.filter((m) => m.id !== id);
+    localStorage.setItem(PENDING_AUTO_TEXT_KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.log("Error removing pending auto-text:", e);
+  }
+}
+
+async function executeAutoText(msg) {
+  try {
+    if (msg.smsMessage && msg.customerCell) {
+      await dbSendSMS({
+        message: msg.smsMessage,
+        phoneNumber: msg.customerCell,
+        customerID: msg.customerID || "",
+        id: generateRandomID(),
+      });
+    }
+    if (msg.emailSubject && msg.emailBody && msg.customerEmail) {
+      await dbSendEmail(msg.customerEmail, msg.emailSubject, msg.emailBody);
+    }
+  } catch (e) {
+    console.log("Error executing auto-text:", e);
+  }
+}
+
+export function scheduleAutoText(rule, workorder, settings) {
+  let cell = workorder?.customerCell || "";
+  let email = workorder?.customerEmail || "";
+  if (!cell && !email) return;
+  if (!rule.smsTemplateID && !rule.emailTemplateID) return;
+
+  let smsMessage = "";
+  if (rule.smsTemplateID && cell) {
+    let tpl = (settings?.smsTemplates || []).find((t) => t.id === rule.smsTemplateID);
+    if (tpl) smsMessage = resolveTemplateStandalone(tpl.content, workorder, null, settings);
+  }
+  let emailSubject = "";
+  let emailBody = "";
+  if (rule.emailTemplateID && email) {
+    let tpl = (settings?.emailTemplates || []).find((t) => t.id === rule.emailTemplateID);
+    if (tpl) {
+      emailSubject = resolveTemplateStandalone(tpl.subject || "", workorder, null, settings);
+      emailBody = resolveTemplateStandalone(tpl.content || "", workorder, null, settings);
+    }
+  }
+
+  if (!smsMessage && !emailSubject) return;
+
+  let delayMs = ((rule.delayMinutes || 0) * 60 + (rule.delaySeconds || 0)) * 1000;
+  let sendAtMillis = Date.now() + delayMs;
+  let pendingMsg = {
+    id: generateRandomID(),
+    workorderID: workorder?.id || "",
+    customerCell: cell,
+    customerEmail: email,
+    customerID: workorder?.customerID || "",
+    smsMessage,
+    emailSubject,
+    emailBody,
+    sendAtMillis,
+    createdAtMillis: Date.now(),
+  };
+
+  if (delayMs <= 0) {
+    executeAutoText(pendingMsg);
+  } else {
+    persistPendingAutoText(pendingMsg);
+    setTimeout(() => {
+      executeAutoText(pendingMsg);
+      removePendingAutoText(pendingMsg.id);
+    }, delayMs);
+  }
+}
+
+export function recoverPendingAutoTexts() {
+  try {
+    let arr = JSON.parse(localStorage.getItem(PENDING_AUTO_TEXT_KEY) || "[]");
+    if (!arr.length) return;
+    let now = Date.now();
+    arr.forEach((msg) => {
+      let remaining = msg.sendAtMillis - now;
+      if (remaining <= 0) {
+        executeAutoText(msg);
+        removePendingAutoText(msg.id);
+      } else {
+        setTimeout(() => {
+          executeAutoText(msg);
+          removePendingAutoText(msg.id);
+        }, remaining);
+      }
+    });
+  } catch (e) {
+    console.log("Error recovering pending auto-texts:", e);
+  }
 }

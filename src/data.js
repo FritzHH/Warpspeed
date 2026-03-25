@@ -423,7 +423,8 @@ export const CUSTOMER_PREVIOUS_BIKE_PROTO = {
 
 export const CUSTOMER_LANGUAGES = {
   spanish: "Spanish",
-  english: "English"
+  english: "English",
+  french: "French"
 }
 
 export const CUSTOMER_PROTO = {
@@ -446,7 +447,7 @@ export const CUSTOMER_PROTO = {
   previousBikes: [],
   sales: [],
   millisCreated: "",
-  language: ""
+  language: CUSTOMER_LANGUAGES.english
 };
 
 export const CUSTOMER_PREVIEW_PROTO = {
@@ -1049,6 +1050,7 @@ export const SETTINGS_OBJ = {
       type: "intakeReceipt",
     },
   ],
+  statusAutoText: [],
 };
 
 export const SMS_TEMPLATE_PROTO = {
@@ -1076,6 +1078,15 @@ export const TEMPLATE_TYPE_LABELS = {
   "": "General",
   saleReceipt: "Sale Receipt",
   intakeReceipt: "Intake Receipt",
+};
+
+export const STATUS_AUTO_TEXT_PROTO = {
+  id: "",
+  statusID: "",
+  smsTemplateID: "",
+  emailTemplateID: "",
+  delayMinutes: 0,
+  delaySeconds: 0,
 };
 // RECEIPT STUFF ////////////////////////////////////////////////////
 

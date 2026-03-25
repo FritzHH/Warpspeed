@@ -17,6 +17,7 @@ import {
   formatCurrencyDisp,
   gray,
   log,
+  scheduleAutoText,
 } from "../../utils";
 import {
   dbUploadWorkorderMedia,
@@ -357,7 +358,16 @@ export function MobileWorkorderDetailScreen() {
             <Text style={LABEL_STYLE}>Status</Text>
             <DropdownMenu
               dataArr={zSettings?.statuses || []}
-              onSelect={(val) => setField("status", val.id)}
+              onSelect={(val) => {
+                setField("status", val.id);
+                // Auto-text: check if this status has an auto-text rule
+                const autoTextRules = zSettings?.statusAutoText || [];
+                const rule = autoTextRules.find((r) => r.statusID === val.id);
+                if (rule) {
+                  const wo = useOpenWorkordersStore.getState().getWorkorders().find((w) => w.id === zWorkorder.id) || zWorkorder;
+                  scheduleAutoText(rule, wo, zSettings);
+                }
+              }}
               buttonStyle={{
                 width: "100%",
                 backgroundColor: rs.backgroundColor,

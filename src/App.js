@@ -14,6 +14,7 @@ import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
 import { HomeScreen } from "./screens/HomeScreen";
+import { CustomerWorkorderScreen } from "./screens/CustomerWorkorderScreen";
 import {
   onAuthStateChange,
   loadTenantAndSettings,
@@ -182,6 +183,9 @@ function App() {
 
         {/* Public route - Translation Display */}
         <Route path={ROUTES.translate} element={<TranslateScreen />} />
+
+        {/* Public route - Customer Workorder View */}
+        <Route path={ROUTES.customerWorkorder} element={<CustomerWorkorderScreen />} />
 
         {/* Protected route - Intake Screen */}
         <Route

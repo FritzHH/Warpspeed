@@ -3,7 +3,7 @@ import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { Button_, Image_, CheckBox_ } from "../../../components";
+import { Button_, Image_, CheckBox_, Tooltip } from "../../../components";
 import { gray, generateRandomID, log } from "../../../utils";
 import {
   useOpenWorkordersStore,
@@ -39,6 +39,8 @@ export const WorkorderMediaModal = ({
   const [sFullView, _setFullView] = useState(null); // media item for full-size overlay
   const [sSelectedIds, _setSelectedIds] = useState(new Set());
   const [sSending, _setSending] = useState(false);
+  const [sSendText, _setSendText] = useState(true);
+  const [sSendEmail, _setSendEmail] = useState(false);
   const fileInputRef = useRef(null);
 
   if (!visible) return null;
@@ -61,7 +63,9 @@ export const WorkorderMediaModal = ({
   function handleSendMedia() {
     const selectedItems = zMedia.filter((m) => sSelectedIds.has(m.id));
     if (!selectedItems.length) return;
-    if (!hasCell && !hasEmail) return;
+    let sendSms = sSendText && hasCell;
+    let sendEmail = sSendEmail && hasEmail;
+    if (!sendSms && !sendEmail) return;
 
     // Update local store immediately — mark as sent
     const updatedMedia = zMedia.map((m) => {
@@ -69,8 +73,8 @@ export const WorkorderMediaModal = ({
       return {
         ...m,
         sentToCustomer: {
-          sms: hasCell || !!(m.sentToCustomer?.sms),
-          email: hasEmail || !!(m.sentToCustomer?.email),
+          sms: sendSms || !!(m.sentToCustomer?.sms),
+          email: sendEmail || !!(m.sentToCustomer?.email),
           sentAt: Date.now(),
         },
       };
@@ -90,7 +94,7 @@ export const WorkorderMediaModal = ({
     const links = selectedItems.map((m) => m.url).join("\n");
     const messageText = `${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:\n\n${links}`;
 
-    if (hasCell) {
+    if (sendSms) {
       let msg = cloneDeep(SMS_PROTO);
       msg.message = messageText;
       msg.phoneNumber = zWorkorder.customerCell;
@@ -113,7 +117,7 @@ export const WorkorderMediaModal = ({
       });
     }
 
-    if (hasEmail) {
+    if (sendEmail) {
       const linksHtml = selectedItems
         .map((m) => {
           const label = m.type === "video" ? "View Video" : "View Photo";
@@ -371,11 +375,16 @@ export const WorkorderMediaModal = ({
               {zMedia.map((item) => {
                 const isSelected = sSelectedIds.has(item.id);
                 const wasSent = !!(item.sentToCustomer?.sms || item.sentToCustomer?.email);
+                let displayName = item.originalFilename || item.filename;
+                let displaySize = item.originalFileSize || item.fileSize;
+                let sizeStr = displaySize
+                  ? (displaySize < 1048576 ? (displaySize / 1024).toFixed(0) + " KB" : (displaySize / 1048576).toFixed(1) + " MB")
+                  : "";
                 return (
+                  <View key={item.id} style={{ width: isMobile ? "31%" : 120, alignItems: "center" }}>
                   <View
-                    key={item.id}
                     style={{
-                      width: isMobile ? "31%" : 120,
+                      width: "100%",
                       height: isMobile ? 100 : 120,
                       borderRadius: 8,
                       borderWidth: isSelected ? 2 : 1,
@@ -451,10 +460,20 @@ export const WorkorderMediaModal = ({
                         }}
                       >
                         <Text style={{ color: "white", fontSize: 9, fontWeight: "600" }}>
-                          Sent
+                          {item.sentToCustomer?.sms && item.sentToCustomer?.email
+                            ? "Text + Email"
+                            : item.sentToCustomer?.sms
+                              ? "Texted"
+                              : "Emailed"}
                         </Text>
                       </View>
                     )}
+                  </View>
+                  <Tooltip text={`${displayName}${sizeStr ? ` — ${sizeStr}` : ""}`} position="bottom">
+                    <Text style={{ fontSize: 9, color: gray(0.5), marginTop: 2, width: isMobile ? undefined : 120 }}>
+                      {displayName}{sizeStr ? ` — ${sizeStr}` : ""}
+                    </Text>
+                  </Tooltip>
                   </View>
                 );
               })}
@@ -478,18 +497,37 @@ export const WorkorderMediaModal = ({
           <View
             style={{
               flexDirection: "row",
-              justifyContent: "flex-end",
+              justifyContent: "space-between",
               alignItems: "center",
               paddingHorizontal: 12,
               paddingBottom: 12,
-              gap: 10,
+              paddingTop: 4,
+              borderTopWidth: 1,
+              borderTopColor: gray(0.9),
             }}
           >
-            {selectedCount > 0 && (
-              <Text style={{ color: C.lightText, fontSize: 13 }}>
-                {selectedCount} selected
-              </Text>
-            )}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              {selectedCount > 0 && (
+                <Text style={{ color: C.lightText, fontSize: 13 }}>
+                  {selectedCount} selected
+                </Text>
+              )}
+              {hasCell && (
+                <CheckBox_
+                  text="Text"
+                  isChecked={sSendText}
+                  onCheck={() => _setSendText(!sSendText)}
+                />
+              )}
+              {hasEmail && (
+                <CheckBox_
+                  text="Email"
+                  isChecked={sSendEmail}
+                  onCheck={() => _setSendEmail(!sSendEmail)}
+                />
+              )}
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             {selectedCount > 0 && (
               <Button_
                 text={sDeleting ? "Deleting..." : "Delete Media"}
@@ -524,6 +562,7 @@ export const WorkorderMediaModal = ({
                 textStyle={{ fontSize: 14, fontWeight: "500" }}
               />
             )}
+            </View>
           </View>
         )}
       </div>

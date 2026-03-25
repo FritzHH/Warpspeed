@@ -399,17 +399,6 @@ export const CustomerInfoScreenModalComponent = ({
             multiline
             numberOfLines={3}
           />
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: TEXT_INPUT_STYLE.marginTop }}>
-            <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 8 }}>Language</Text>
-            <DropdownMenu
-              dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
-              buttonText={sCustomerInfo.language || "English"}
-              buttonStyle={{ ...TEXT_INPUT_STYLE, marginTop: 0, flex: 1 }}
-              buttonTextStyle={{ fontSize: 14, color: C.text }}
-              onSelect={(item) => saveField("language", item.value)}
-              useSelectedAsButtonTitle={false}
-            />
-          </View>
           <CheckBox_
             isChecked={!!sCustomerInfo.gatedCommunity}
             text="Gated community"
@@ -417,6 +406,17 @@ export const CustomerInfoScreenModalComponent = ({
             buttonStyle={{ backgroundColor: "transparent", marginTop: TEXT_INPUT_STYLE.marginTop }}
             onCheck={() => saveField("gatedCommunity", !sCustomerInfo.gatedCommunity)}
           />
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: TEXT_INPUT_STYLE.marginTop }}>
+            <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 8 }}>Language</Text>
+            <DropdownMenu
+              dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
+              buttonText={sCustomerInfo.language || CUSTOMER_LANGUAGES.english}
+              buttonStyle={{ ...TEXT_INPUT_STYLE, marginTop: 0, flex: 1 }}
+              buttonTextStyle={{ fontSize: 14, color: C.text }}
+              onSelect={(item) => saveField("language", item.value)}
+              useSelectedAsButtonTitle={false}
+            />
+          </View>
 
           <View style={{ flexDirection: "column" }}>
             {!!button1Text && (

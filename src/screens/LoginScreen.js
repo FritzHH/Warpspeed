@@ -1,7 +1,7 @@
 /* eslint-disable */
 import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, Alert } from "react-native-web";
-import { C, Colors, ICONS, ViewStyles } from "../styles";
+import { C, Colors, COLOR_GRADIENTS, ICONS, ViewStyles } from "../styles";
 import { sendPasswordReset, dbLoginUser } from "../db_calls_wrapper";
 
 export function LoginScreen({ sessionError, onClearError }) {
@@ -123,7 +123,7 @@ export function LoginScreen({ sessionError, onClearError }) {
 const styles = {
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.mainBackground,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
@@ -131,7 +131,7 @@ const styles = {
   formContainer: {
     width: "100%",
     maxWidth: 400,
-    backgroundColor: "white",
+    backgroundColor: C.backgroundWhite,
     borderRadius: 10,
     padding: 30,
     shadowColor: "#000",
@@ -148,45 +148,45 @@ const styles = {
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 20,
-    color: Colors.primary,
+    color: C.text,
   },
   subtitle: {
     fontSize: 16,
     textAlign: "center",
     marginBottom: 20,
-    color: Colors.textSecondary,
+    color: C.lightText,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: C.buttonLightGreenOutline,
     borderRadius: 8,
     padding: 12,
     marginBottom: 15,
     fontSize: 16,
-    backgroundColor: "white",
+    backgroundColor: C.listItemWhite,
   },
   button: {
-    backgroundColor: Colors.primary,
+    backgroundColor: C.green,
     borderRadius: 8,
     padding: 15,
     alignItems: "center",
     marginBottom: 10,
   },
   buttonDisabled: {
-    backgroundColor: Colors.textSecondary,
+    opacity: 0.5,
   },
   buttonText: {
-    color: "white",
+    color: C.textWhite,
     fontSize: 16,
     fontWeight: "bold",
   },
   secondaryButton: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: C.green,
   },
   secondaryButtonText: {
-    color: Colors.primary,
+    color: C.green,
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -195,12 +195,12 @@ const styles = {
     marginTop: 10,
   },
   linkText: {
-    color: Colors.primary,
+    color: C.blue,
     fontSize: 14,
     textDecorationLine: "underline",
   },
   errorText: {
-    color: "red",
+    color: C.lightred,
     fontSize: 14,
     textAlign: "center",
     marginBottom: 10,

@@ -2,7 +2,7 @@
 import { View, Text, ScrollView } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, Tooltip } from "../../../../components";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_ } from "../../../../components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   useCheckoutStore,
@@ -12,6 +12,7 @@ import {
   useLoginStore,
   useAlertScreenStore,
   useCurrentCustomerStore,
+  useStripePaymentStore,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
@@ -25,7 +26,7 @@ import {
   formatPhoneForDisplay,
   findTemplateByType,
 } from "../../../../utils";
-import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO } from "../../../../data";
+import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES } from "../../../../data";
 import { dbSavePrintObj } from "../../../../db_calls_wrapper";
 import {
   createNewSale,
@@ -33,6 +34,8 @@ import {
   calculateSaleTotals,
   sendSaleReceipt,
 } from "./newCheckoutUtils";
+import { translateSalesReceipt } from "../../../../shared/receiptTranslator";
+import { generateSaleReceiptPDF } from "../../../../pdfGenerator";
 import {
   newCheckoutSaveActiveSale,
   newCheckoutGetActiveSale,
@@ -52,6 +55,13 @@ import { PaymentsList } from "./PaymentsList";
 import { WorkorderCombiner } from "./WorkorderCombiner";
 import { InventorySearch } from "./InventorySearch";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
+
+// Map CUSTOMER_LANGUAGES keys to Google Translate ISO codes
+const LANG_TO_ISO = { spanish: "es", english: "en" };
+function getTranslateCode(langKey) {
+  if (!langKey || langKey === "english") return "";
+  return LANG_TO_ISO[langKey] || langKey;
+}
 
 function broadcastSaleToDisplay(sale, combinedWOs, addedItems, customerFirst, customerLast) {
   if (!sale) return;
@@ -101,15 +111,18 @@ export function NewCheckoutModalScreen() {
   const zSettings = useSettingsStore((state) => state.settings);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zCustomer = useCurrentCustomerStore((state) => state.customer);
+  const zStripeReaders = useStripePaymentStore((state) => state.readersArr) || [];
 
   // ─── Local State ──────────────────────────────────────────
   const [sSale, _setSale] = useState(null);
   const [sCombinedWorkorders, _setCombinedWorkorders] = useState([]);
   const [sAddedItems, _setAddedItems] = useState([]);
   const [sCashChangeNeeded, _setCashChangeNeeded] = useState(0);
-  const [sStripeReaders, _setStripeReaders] = useState([]);
   const [sReaderError, _setReaderError] = useState("");
   const [sInitialized, _setInitialized] = useState(false);
+  const [sReceiptLanguage, _setReceiptLanguage] = useState("english");
+  const [sShowTaxFreeConfirm, _setShowTaxFreeConfirm] = useState(false);
+  const [sShowPopConfirm, _setShowPopConfirm] = useState(false);
 
   // ─── Derived Values ───────────────────────────────────────
   let isStandalone = !zOpenWorkorder;
@@ -124,6 +137,7 @@ export function NewCheckoutModalScreen() {
   // repeated init without adding a useEffect.
   if (zIsCheckingOut && !sInitialized) {
     _setInitialized(true);
+    _setReceiptLanguage(zCustomer?.language || "english");
     initializeCheckout();
   }
 
@@ -193,9 +207,9 @@ export function NewCheckoutModalScreen() {
     try {
       let result = await newCheckoutGetStripeReaders();
       let readersArr = result?.data?.data || [];
-      let readers = readersArr.filter((r) => r.status === "online");
-      if (readers.length > 0) {
-        _setStripeReaders(readers);
+      useStripePaymentStore.getState().setReadersArr(readersArr);
+      let online = readersArr.filter((r) => r.status === "online");
+      if (online.length > 0) {
         _setReaderError("");
       } else {
         _setReaderError("No card readers connected to account");
@@ -207,9 +221,10 @@ export function NewCheckoutModalScreen() {
   }
 
   // Poll for card readers every 5s when none are detected
+  let onlineReaders = zStripeReaders.filter((r) => r.status === "online");
   const readerPollRef = useRef(null);
   useEffect(() => {
-    if (sStripeReaders.length === 0 && sInitialized) {
+    if (onlineReaders.length === 0 && sInitialized) {
       readerPollRef.current = setInterval(fetchReaders, 5000);
     }
     return () => {
@@ -218,7 +233,7 @@ export function NewCheckoutModalScreen() {
         readerPollRef.current = null;
       }
     };
-  }, [sStripeReaders.length, sInitialized]);
+  }, [onlineReaders.length, sInitialized]);
 
   // ─── Workorder Combining ──────────────────────────────────
   function handleToggleWorkorder(wo) {
@@ -420,10 +435,32 @@ export function NewCheckoutModalScreen() {
       dbSavePrintObj({ popCashRegister: true }, printerID);
     }
 
+    // Build receipt context
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+
+    // Translate receipt if non-English language is set
+    let translatedReceipt = null;
+    let translatedPdfLabels = null;
+    let langCode = getTranslateCode(sReceiptLanguage);
+    if (langCode) {
+      try {
+        let englishReceipt = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
+        let translated = await translateSalesReceipt(englishReceipt, langCode);
+        translatedReceipt = translated.translatedReceipt;
+        translatedPdfLabels = translated.pdfLabels;
+      } catch (e) {
+        log("Receipt translation failed, falling back to English:", e);
+      }
+    }
+
     // Print sale receipt
     if (settings?.autoPrintSalesReceipt) {
-      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      let toPrint = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
+      let toPrint;
+      if (translatedReceipt) {
+        toPrint = translatedReceipt;
+      } else {
+        toPrint = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
+      }
       dbSavePrintObj(toPrint, printerID);
     }
 
@@ -449,7 +486,7 @@ export function NewCheckoutModalScreen() {
     const canSMS = customerForReceipt.customerCell && smsContent.trim();
     const canEmail = customerForReceipt.email && emailContent.trim();
     if (canSMS || canEmail) {
-      sendSaleReceipt(sale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+      sendSaleReceipt(sale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels);
     }
   }
 
@@ -494,13 +531,13 @@ export function NewCheckoutModalScreen() {
     _setCombinedWorkorders([]);
     _setAddedItems([]);
     _setCashChangeNeeded(0);
-    _setStripeReaders([]);
     _setReaderError("");
     _setInitialized(false);
+    _setReceiptLanguage("english");
     useCheckoutStore.getState().setIsCheckingOut(false);
   }
 
-  function handleReprint() {
+  async function handleReprint() {
     if (!sSale) return;
     const primaryWO = sCombinedWorkorders[0];
     const customer = {
@@ -519,6 +556,17 @@ export function NewCheckoutModalScreen() {
       zSettings?.salesTaxPercent,
       _ctx
     );
+
+    let langCode = getTranslateCode(sReceiptLanguage);
+    if (langCode) {
+      try {
+        let translated = await translateSalesReceipt(toPrint, langCode);
+        toPrint = translated.translatedReceipt;
+      } catch (e) {
+        log("Receipt translation failed on reprint, using English:", e);
+      }
+    }
+
     const printerID = zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
     dbSavePrintObj(toPrint, printerID);
   }
@@ -526,6 +574,27 @@ export function NewCheckoutModalScreen() {
   function handlePopRegister() {
     let printObj = { id: generateUPCBarcode(), receiptType: RECEIPT_TYPES.register };
     dbSavePrintObj(printObj, zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31");
+    _setShowPopConfirm(true);
+    setTimeout(() => _setShowPopConfirm(false), 1000);
+  }
+
+  function applyTaxFree(newVal) {
+    let newCombined = sCombinedWorkorders.map((wo) => ({
+      ...wo,
+      taxFree: newVal,
+    }));
+    _setCombinedWorkorders(newCombined);
+
+    // Persist to each workorder
+    newCombined.forEach((wo) => {
+      useOpenWorkordersStore.getState().setField("taxFree", newVal, wo.id);
+    });
+
+    // Recalculate sale totals
+    let updated = updateSaleWithTotals(sSale, newCombined, sAddedItems, zSettings);
+    _setSale(updated);
+    broadcastSaleToDisplay(updated, newCombined, sAddedItems, custFirst, custLast);
+    newCheckoutSaveActiveSale(updated);
   }
 
   function handleTaxFreeToggle() {
@@ -533,45 +602,10 @@ export function NewCheckoutModalScreen() {
     if (!primaryWO) return;
     const currentlyTaxFree = !!primaryWO.taxFree;
 
-    const applyTaxFree = (newVal) => {
-      let newCombined = sCombinedWorkorders.map((wo) => ({
-        ...wo,
-        taxFree: newVal,
-      }));
-      _setCombinedWorkorders(newCombined);
-
-      // Persist to each workorder
-      newCombined.forEach((wo) => {
-        useOpenWorkordersStore.getState().setField("taxFree", newVal, wo.id);
-      });
-
-      // Recalculate sale totals
-      let updated = updateSaleWithTotals(sSale, newCombined, sAddedItems, zSettings);
-      _setSale(updated);
-      broadcastSaleToDisplay(updated, newCombined, sAddedItems, custFirst, custLast);
-      newCheckoutSaveActiveSale(updated);
-    };
-
     if (currentlyTaxFree) {
-      // Unchecking — no confirmation needed
       applyTaxFree(false);
     } else {
-      // Checking — confirm with user
-      useAlertScreenStore.getState().setValues({
-        showAlert: true,
-        fullScreen: true,
-        title: "Tax-Free Confirmation",
-        message: "No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.",
-        btn1Text: "Confirm Tax-Free",
-        handleBtn1Press: () => {
-          useAlertScreenStore.getState().setValues({ showAlert: false });
-          applyTaxFree(true);
-        },
-        btn2Text: "Cancel",
-        handleBtn2Press: () => {
-          useAlertScreenStore.getState().setValues({ showAlert: false });
-        },
-      });
+      _setShowTaxFreeConfirm(true);
     }
   }
 
@@ -619,11 +653,12 @@ export function NewCheckoutModalScreen() {
                 acceptChecks={zSettings?.acceptChecks}
                 saleComplete={saleComplete}
                 onCashChange={handleCashChange}
+                hasReaders={onlineReaders.length > 0}
               />
               <CardPayment
                 amountLeftToPay={amountLeftToPay}
                 onPaymentCapture={handlePaymentCapture}
-                stripeReaders={sStripeReaders}
+                stripeReaders={zStripeReaders}
                 settings={zSettings}
                 saleComplete={saleComplete}
                 readerError={sReaderError}
@@ -722,21 +757,41 @@ export function NewCheckoutModalScreen() {
                 </ScrollView>
               </View>
 
-              {/* Tax-Free Checkbox */}
-              {sCombinedWorkorders.length > 0 && !saleComplete && (
+              {/* Tax-Free & Receipt Language */}
+              {!saleComplete && (
                 <View
                   style={{
                     width: "100%",
+                    flexDirection: "row",
+                    justifyContent: "center",
                     alignItems: "center",
                     paddingTop: 8,
+                    gap: 20,
                   }}
                 >
-                  <CheckBox_
-                    text="Tax-Free"
-                    isChecked={!!sCombinedWorkorders[0]?.taxFree}
-                    onCheck={handleTaxFreeToggle}
-                    textStyle={{ fontSize: 13, color: gray(0.5) }}
-                  />
+                  {sCombinedWorkorders.length > 0 && (
+                    <CheckBox_
+                      text="Tax-Free"
+                      isChecked={!!sCombinedWorkorders[0]?.taxFree}
+                      onCheck={handleTaxFreeToggle}
+                      textStyle={{ fontSize: 13, color: gray(0.5) }}
+                    />
+                  )}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Receipts sent in:</Text>
+                    <DropdownMenu
+                      dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
+                      selectedIdx={Object.keys(CUSTOMER_LANGUAGES).indexOf(sReceiptLanguage || "english")}
+                      useSelectedAsButtonTitle={true}
+                      onSelect={(item) => _setReceiptLanguage(item.key)}
+                      buttonStyle={{ paddingHorizontal: 10, paddingVertical: 3 }}
+                      buttonTextStyle={{ fontSize: 12 }}
+                      buttonIcon={null}
+                      buttonIconSize={0}
+                      modalCoordX={80}
+                      modalCoordY={-15}
+                    />
+                  </View>
                 </View>
               )}
 
@@ -764,7 +819,7 @@ export function NewCheckoutModalScreen() {
                 <Tooltip text="Pop register" position="top">
                   <Button_
                     onPress={handlePopRegister}
-                    icon={ICONS.cashRegister}
+                    icon={ICONS.openCashRegister}
                     iconSize={30}
                   />
                 </Tooltip>
@@ -814,6 +869,120 @@ export function NewCheckoutModalScreen() {
               </ScrollView>
             </View>
           </View>
+
+          {/* Tax-Free Confirmation Overlay (inline to avoid z-index issues with global AlertBox_) */}
+          {sShowTaxFreeConfirm && (
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.4)",
+                justifyContent: "center",
+                alignItems: "center",
+                borderRadius: 15,
+                zIndex: 100,
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: C.backgroundWhite,
+                  borderRadius: 15,
+                  alignItems: "center",
+                  justifyContent: "space-around",
+                  minWidth: "32%",
+                  minHeight: "24%",
+                  paddingVertical: 25,
+                  paddingHorizontal: 20,
+                }}
+              >
+                <Text
+                  style={{
+                    fontWeight: "500",
+                    color: "red",
+                    fontSize: 25,
+                    textAlign: "center",
+                  }}
+                >
+                  Tax-Free Confirmation
+                </Text>
+                <Text
+                  style={{
+                    textAlign: "center",
+                    width: "90%",
+                    marginTop: 10,
+                    color: C.text,
+                    fontSize: 18,
+                  }}
+                >
+                  No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.
+                </Text>
+                <View
+                  style={{
+                    marginTop: 25,
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    gap: 20,
+                  }}
+                >
+                  <Button_
+                    colorGradientArr={COLOR_GRADIENTS.green}
+                    text="Confirm Tax-Free"
+                    textStyle={{ color: C.textWhite }}
+                    onPress={() => {
+                      _setShowTaxFreeConfirm(false);
+                      applyTaxFree(true);
+                    }}
+                  />
+                  <Button_
+                    colorGradientArr={COLOR_GRADIENTS.blue}
+                    text="Cancel"
+                    textStyle={{ color: C.textWhite }}
+                    onPress={() => _setShowTaxFreeConfirm(false)}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Pop Register Confirmation */}
+          {sShowPopConfirm && (
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.35)",
+                justifyContent: "center",
+                alignItems: "center",
+                borderRadius: 15,
+                zIndex: 100,
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: C.backgroundWhite,
+                  borderRadius: 15,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 30,
+                  paddingHorizontal: 40,
+                }}
+              >
+                <Image_
+                  source={ICONS.openCashRegister}
+                  style={{ width: 60, height: 60, marginBottom: 12 }}
+                />
+                <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>
+                  Register Opened
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
     />

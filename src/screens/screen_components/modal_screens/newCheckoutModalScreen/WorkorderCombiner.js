@@ -71,6 +71,7 @@ export function WorkorderCombiner({
         let isPrimary = wo.id === primaryWorkorderID;
         let totals = calculateRunningTotals(wo, 0);
         let subtotal = totals.runningTotal || 0;
+        let effectiveTaxPercent = wo.taxFree ? 0 : salesTaxPercent;
 
         return (
           <View key={wo.id}>
@@ -419,7 +420,7 @@ export function WorkorderCombiner({
                 <Text style={{ fontSize: 13, color: "gray" }}>
                   {"TAX: "}
                   <Text style={{ color: C.text, fontWeight: "500", fontSize: 14 }}>
-                    {"$" + formatCurrencyDisp((totals.runningTotal || 0) * salesTaxPercent / 100)}
+                    {"$" + formatCurrencyDisp((totals.runningTotal || 0) * effectiveTaxPercent / 100)}
                   </Text>
                 </Text>
                 <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
@@ -437,7 +438,7 @@ export function WorkorderCombiner({
                   {"TOTAL: "}
                   <Text style={{ fontWeight: "700", color: C.text, fontSize: 15 }}>
                     {"$" + formatCurrencyDisp(
-                      (totals.runningTotal || 0) + (totals.runningTotal || 0) * salesTaxPercent / 100
+                      (totals.runningTotal || 0) + (totals.runningTotal || 0) * effectiveTaxPercent / 100
                     )}
                   </Text>
                 </Text>

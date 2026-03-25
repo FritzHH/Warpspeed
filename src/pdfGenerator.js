@@ -349,6 +349,22 @@ export function generateSaleReceiptPDF(data, labels) {
     y = addDivider(doc, y, leftX, rightX);
   }
 
+  // Tax-free / labor-only disclaimer
+  if (data.taxFree) {
+    y = checkPageBreak(doc, y, 20, margin);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(100, 100, 100);
+    let taxFreeText = "* This ticket contained only labor, no sale items were transferred to the customer *";
+    let taxFreeLines = doc.splitTextToSize(taxFreeText, contentWidth);
+    taxFreeLines.forEach((line) => {
+      doc.text(line, centerX, y, { align: "center" });
+      y += 9;
+    });
+    doc.setTextColor(0);
+    y += 6;
+  }
+
   // Thank you blurb
   if (data.thankYouBlurb) {
     y = checkPageBreak(doc, y, 40, margin);

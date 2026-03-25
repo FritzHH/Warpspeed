@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button_, CheckBox_, SHADOW_RADIUS_PROTO } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
@@ -16,6 +16,7 @@ export function CashPayment({
   acceptChecks = false,
   saleComplete = false,
   onCashChange,
+  hasReaders = false,
 }) {
   const [sPayAmount, _setPayAmount] = useState("");
   const [sPayAmountDisp, _setPayAmountDisp] = useState("");
@@ -25,8 +26,26 @@ export function CashPayment({
   const [sFocused, _setFocused] = useState("");
   const [sStatusMessage, _setStatusMessage] = useState("");
 
+  const tenderInputRef = useRef(null);
+  const autoLoadedRef = useRef(false);
+
+  // Auto-load amountLeftToPay into pay amount on first availability
+  if (amountLeftToPay > 0 && !autoLoadedRef.current) {
+    autoLoadedRef.current = true;
+    _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
+    _setPayAmount(amountLeftToPay);
+    if (!hasReaders) {
+      setTimeout(() => tenderInputRef.current?.focus(), 100);
+    }
+  }
+
   function handlePayAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
+    if (result.cents > amountLeftToPay) {
+      _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
+      _setPayAmount(amountLeftToPay);
+      return;
+    }
     _setPayAmountDisp(result.display);
     _setPayAmount(result.cents);
   }
@@ -233,6 +252,7 @@ export function CashPayment({
               }}
             >
               <TextInput
+                ref={tenderInputRef}
                 onFocus={() => {
                   _setFocused("tender");
                   _setTenderAmountDisp("");
@@ -261,6 +281,18 @@ export function CashPayment({
               >
                 Tender
               </Text>
+              {sTenderAmount > 0 && sPayAmount > 0 && sTenderAmount >= sPayAmount && (
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: C.green,
+                    fontWeight: "600",
+                    marginTop: 2,
+                  }}
+                >
+                  {"Change: $" + formatCurrencyDisp(sTenderAmount - sPayAmount)}
+                </Text>
+              )}
             </View>
           </View>
         </View>

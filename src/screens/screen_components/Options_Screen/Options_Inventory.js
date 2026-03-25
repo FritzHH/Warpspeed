@@ -98,7 +98,15 @@ export function InventoryComponent({}) {
       return;
     }
     if (searchTerm.length < 2) return;
-    _setSearchResults(searchInventory(searchTerm, zInventoryArr));
+    let results = searchInventory(searchTerm, zInventoryArr);
+    _setSearchResults(results);
+    // Auto-open create modal when a 12-digit number is entered and not found in inventory
+    if (/^\d{12}$/.test(searchTerm) && results.length === 0) {
+      let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
+      newItem.id = generateRandomID();
+      newItem.upc = searchTerm;
+      _setModalItem(newItem);
+    }
   };
 
   function handleQuickButtonPress(buttonObj) {

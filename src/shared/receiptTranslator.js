@@ -29,11 +29,8 @@ function collectTranslatableText(receipt) {
     entries.push({ key: "thankYouBlurb", value: receipt.thankYouBlurb });
   }
 
-  // Line item text
+  // Line item text (skip itemName — inventory names stay in English)
   (receipt.workorderLines || []).forEach(function (line, i) {
-    if (line.itemName) {
-      entries.push({ key: "line_" + i + "_itemName", value: line.itemName });
-    }
     if (line.discountName) {
       entries.push({ key: "line_" + i + "_discountName", value: line.discountName });
     }

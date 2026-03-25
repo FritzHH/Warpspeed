@@ -2953,7 +2953,7 @@ export function dbListenToCustomerMessages(customerPhone, callback) {
 // WORKORDER MEDIA
 // ============================================================================
 
-export async function dbUploadWorkorderMedia(workorderID, file) {
+export async function dbUploadWorkorderMedia(workorderID, file, extraMeta = {}) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     const currentUser = useLoginStore.getState().currentUser;
@@ -2993,6 +2993,9 @@ export async function dbUploadWorkorderMedia(workorderID, file) {
       thumbnailStoragePath,
       type: file.type.startsWith("video") ? "video" : "image",
       filename: file.name,
+      fileSize: file.size || 0,
+      originalFilename: extraMeta.originalFilename || file.name,
+      originalFileSize: extraMeta.originalFileSize || file.size || 0,
       uploadedAt: Date.now(),
       uploadedBy: currentUser?.id || null,
     };

@@ -22,6 +22,7 @@ import {
   useCheckoutStore,
   useAlertScreenStore,
   useTabNamesStore,
+  useStripePaymentStore,
   broadcastWorkorderToDisplay,
 } from "../stores";
 import {
@@ -33,6 +34,7 @@ import { FaceDetectionClientComponent } from "../faceDetection";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { isSaleID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
+import { newCheckoutGetStripeReaders } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import {
   dbListenToSettings,
   dbListenToOpenWorkorders,
@@ -40,7 +42,7 @@ import {
   dbListenToInventory,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES } from "../data";
-import { clog, log } from "../utils";
+import { clog, log, recoverPendingAutoTexts } from "../utils";
 import { cloneDeep, throttle } from "lodash";
 import { ROUTES } from "../routes";
 
@@ -202,6 +204,22 @@ export function BaseScreen() {
     };
   }, []);
 
+  // Pre-load Stripe card readers on mount + refresh every 5 minutes
+  useEffect(() => {
+    async function fetchReaders() {
+      try {
+        let result = await newCheckoutGetStripeReaders();
+        let readersArr = result?.data?.data || [];
+        useStripePaymentStore.getState().setReadersArr(readersArr);
+      } catch (e) {
+        log("BaseScreen fetchReaders error:", e);
+      }
+    }
+    fetchReaders();
+    let interval = setInterval(fetchReaders, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   ////////  testing    //////////////////////////////////////////////////////////////////////
 
   // testing, build db items
@@ -251,6 +269,9 @@ export function BaseScreen() {
       // log("incoming workorder listen", data);
       useOpenWorkordersStore.getState().setOpenWorkorders(data);
     });
+
+    // Recover any pending auto-text messages from localStorage (crash recovery)
+    recoverPendingAutoTexts();
   }, []);
 
 

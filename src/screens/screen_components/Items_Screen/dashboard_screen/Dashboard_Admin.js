@@ -60,7 +60,7 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, INTAKE_BUTTON_PROTO, SETTINGS_OBJ, TIME_PUNCH_PROTO } from "../../../../data";
+import { APP_USER, INTAKE_BUTTON_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -3425,6 +3425,7 @@ const WorkorderStatusesComponent = ({
   const [sEditableInputIdx, _setEditableInputIdx] = useState(null);
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
+  const [sShowAutoText, _setShowAutoText] = useState(false);
 
   function reorderStatuses(fromIdx, toIdx) {
     if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
@@ -3461,6 +3462,24 @@ const WorkorderStatusesComponent = ({
             borderRadius: 10,
           }}
         >
+          {/* Status Auto-Text show/hide */}
+          <View style={{ width: "100%", marginBottom: 12 }}>
+            <TouchableOpacity
+              onPress={() => _setShowAutoText(!sShowAutoText)}
+              style={{ flexDirection: "row", alignItems: "center", marginBottom: sShowAutoText ? 8 : 0 }}
+            >
+              <Text style={{ fontSize: 13, color: gray(0.5), fontWeight: "600" }}>
+                {sShowAutoText ? "Status Auto-Text  \u25B2" : "Status Auto-Text  \u25BC"}
+              </Text>
+            </TouchableOpacity>
+            {sShowAutoText && (
+              <StatusAutoTextSection
+                zSettingsObj={zSettingsObj}
+                handleSettingsFieldChange={handleSettingsFieldChange}
+              />
+            )}
+          </View>
+
           <View style={{ width: "100%", alignItems: "flex-start" }}>
             <BoxButton1
               style={{
@@ -3816,6 +3835,184 @@ const WorkorderStatusesComponent = ({
         document.body
       )}
     </BoxContainerOuterComponent>
+  );
+};
+
+const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  let rules = zSettingsObj?.statusAutoText || [];
+  let statuses = zSettingsObj?.statuses || [];
+  let smsTemplates = zSettingsObj?.smsTemplates || [];
+  let emailTemplates = zSettingsObj?.emailTemplates || [];
+  let usedStatusIDs = rules.map((r) => r.statusID);
+
+  function updateRule(ruleID, field, value) {
+    let updated = rules.map((r) => (r.id === ruleID ? { ...r, [field]: value } : r));
+    handleSettingsFieldChange("statusAutoText", updated);
+  }
+
+  function deleteRule(ruleID) {
+    handleSettingsFieldChange("statusAutoText", rules.filter((r) => r.id !== ruleID));
+  }
+
+  function addRule() {
+    let newRule = { ...STATUS_AUTO_TEXT_PROTO, id: generateRandomID() };
+    handleSettingsFieldChange("statusAutoText", [...rules, newRule]);
+  }
+
+  function getStatusLabel(statusID) {
+    let s = statuses.find((o) => o.id === statusID);
+    return s ? s.label : "Select Status";
+  }
+
+  function getTemplateLabel(templateID, templates) {
+    if (!templateID) return "None";
+    let t = templates.find((o) => o.id === templateID);
+    return t ? t.label : "None";
+  }
+
+  return (
+    <View style={{ width: "100%", paddingHorizontal: 4 }}>
+      <BoxButton1
+        style={{ alignSelf: "flex-start", marginBottom: 8 }}
+        onPress={addRule}
+      />
+      {rules.map((rule) => {
+        let availableStatuses = statuses.filter(
+          (s) => s.id === rule.statusID || !usedStatusIDs.includes(s.id)
+        );
+        let statusObj = statuses.find((s) => s.id === rule.statusID);
+        return (
+          <View
+            key={rule.id}
+            style={{
+              width: "100%",
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              borderRadius: 8,
+              backgroundColor: C.listItemWhite,
+              padding: 10,
+              marginBottom: 8,
+            }}
+          >
+            {/* Status selector */}
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>Status</Text>
+              <DropdownMenu
+                dataArr={availableStatuses.map((s) => ({ label: s.label, id: s.id }))}
+                onSelect={(val) => updateRule(rule.id, "statusID", val.id)}
+                buttonText={getStatusLabel(rule.statusID)}
+                buttonStyle={{
+                  flex: 1,
+                  backgroundColor: statusObj?.backgroundColor || gray(0.1),
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                }}
+                buttonTextStyle={{
+                  color: statusObj?.textColor || C.text,
+                  fontSize: 12,
+                  fontWeight: "500",
+                }}
+              />
+            </View>
+
+            {/* SMS template selector */}
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>SMS</Text>
+              <DropdownMenu
+                dataArr={[{ label: "None", id: "" }, ...smsTemplates.map((t) => ({ label: t.label, id: t.id }))]}
+                onSelect={(val) => updateRule(rule.id, "smsTemplateID", val.id)}
+                buttonText={getTemplateLabel(rule.smsTemplateID, smsTemplates)}
+                buttonStyle={{
+                  flex: 1,
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: gray(0.15),
+                }}
+                buttonTextStyle={{ fontSize: 12, color: C.text }}
+              />
+            </View>
+
+            {/* Email template selector */}
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>Email</Text>
+              <DropdownMenu
+                dataArr={[{ label: "None", id: "" }, ...emailTemplates.map((t) => ({ label: t.label, id: t.id }))]}
+                onSelect={(val) => updateRule(rule.id, "emailTemplateID", val.id)}
+                buttonText={getTemplateLabel(rule.emailTemplateID, emailTemplates)}
+                buttonStyle={{
+                  flex: 1,
+                  paddingVertical: 6,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: gray(0.15),
+                }}
+                buttonTextStyle={{ fontSize: 12, color: C.text }}
+              />
+            </View>
+
+            {/* Delay inputs */}
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>Delay</Text>
+              <TextInput_
+                value={String(rule.delayMinutes || 0)}
+                onChangeText={(val) => {
+                  let num = parseInt(val, 10);
+                  if (isNaN(num) || num < 0) num = 0;
+                  updateRule(rule.id, "delayMinutes", num);
+                }}
+                style={{
+                  width: 50,
+                  height: 30,
+                  borderWidth: 1,
+                  borderColor: gray(0.15),
+                  borderRadius: 6,
+                  paddingHorizontal: 6,
+                  textAlign: "center",
+                  fontSize: 12,
+                  outlineWidth: 0,
+                }}
+              />
+              <Text style={{ fontSize: 11, color: gray(0.4), marginHorizontal: 4 }}>min</Text>
+              <TextInput_
+                value={String(rule.delaySeconds || 0)}
+                onChangeText={(val) => {
+                  let num = parseInt(val, 10);
+                  if (isNaN(num) || num < 0) num = 0;
+                  if (num > 59) num = 59;
+                  updateRule(rule.id, "delaySeconds", num);
+                }}
+                style={{
+                  width: 50,
+                  height: 30,
+                  borderWidth: 1,
+                  borderColor: gray(0.15),
+                  borderRadius: 6,
+                  paddingHorizontal: 6,
+                  textAlign: "center",
+                  fontSize: 12,
+                  outlineWidth: 0,
+                }}
+              />
+              <Text style={{ fontSize: 11, color: gray(0.4), marginHorizontal: 4 }}>sec</Text>
+            </View>
+
+            {/* Delete button */}
+            <TouchableOpacity
+              onPress={() => deleteRule(rule.id)}
+              style={{ alignSelf: "flex-end" }}
+            >
+              <Text style={{ fontSize: 11, color: C.lightred, fontWeight: "500" }}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+      {rules.length === 0 && (
+        <Text style={{ fontSize: 11, color: gray(0.4), fontStyle: "italic" }}>
+          No auto-text rules configured. Tap + to add one.
+        </Text>
+      )}
+    </View>
   );
 };
 

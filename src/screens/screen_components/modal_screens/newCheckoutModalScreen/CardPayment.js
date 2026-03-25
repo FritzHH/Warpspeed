@@ -90,6 +90,7 @@ export function CardPayment({
 
   const listenersRef = useRef(null);
   const timeoutRef = useRef(null);
+  const autoLoadedRef = useRef(false);
 
   function cleanupListeners() {
     if (timeoutRef.current) {
@@ -118,6 +119,11 @@ export function CardPayment({
 
   function handleAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
+    if (result.cents > amountLeftToPay) {
+      _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
+      _setRequestedAmount(amountLeftToPay);
+      return;
+    }
     _setRequestedAmountDisp(result.display);
     _setRequestedAmount(result.cents);
   }
@@ -274,6 +280,13 @@ export function CardPayment({
   let hasOnlineReaders = readerDropdownData.length > 0;
   let boxEnabled = hasOnlineReaders && !saleComplete;
   let isEnabled = boxEnabled && amountLeftToPay > 0 && !sProcessing;
+
+  // Auto-load amountLeftToPay into card amount on first availability
+  if (hasOnlineReaders && amountLeftToPay > 0 && !autoLoadedRef.current) {
+    autoLoadedRef.current = true;
+    _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
+    _setRequestedAmount(amountLeftToPay);
+  }
 
   if (!hasOnlineReaders) {
     return (

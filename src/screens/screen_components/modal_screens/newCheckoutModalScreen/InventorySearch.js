@@ -1,7 +1,8 @@
 /* eslint-disable */
-import { View, Text, TextInput, ScrollView } from "react-native-web";
+import { View, Text, ScrollView } from "react-native-web";
 import { TouchableOpacity } from "react-native";
 import { useState } from "react";
+import { TextInput_ } from "../../../../components";
 import { C, Fonts } from "../../../../styles";
 import {
   searchInventory,
@@ -135,7 +136,7 @@ export function InventorySearch({
           paddingHorizontal: 10,
         }}
       >
-        <TextInput
+        <TextInput_
           style={{
             borderBottomColor: gray(0.3),
             borderBottomWidth: 1,

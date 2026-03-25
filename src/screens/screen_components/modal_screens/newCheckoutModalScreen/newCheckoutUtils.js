@@ -319,7 +319,7 @@ function applyVars(template, vars) {
   return result;
 }
 
-export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate) {
+export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels) {
   if (!sale || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
@@ -330,10 +330,17 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
   // Generate PDF receipt and upload to Cloud Storage
   let receiptURL = "";
   try {
-    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-    const receiptData = printBuilder.sale(sale, sale.payments || [], customer, workorder, settings?.salesTaxPercent, _ctx);
-    const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
-    const base64 = generateSaleReceiptPDF(receiptData);
+    let base64;
+    if (translatedReceipt && translatedPdfLabels) {
+      // Use pre-translated receipt data and labels for Spanish PDF
+      const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
+      base64 = generateSaleReceiptPDF(translatedReceipt, translatedPdfLabels);
+    } else {
+      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+      const receiptData = printBuilder.sale(sale, sale.payments || [], customer, workorder, settings?.salesTaxPercent, _ctx);
+      const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
+      base64 = generateSaleReceiptPDF(receiptData);
+    }
     const storagePath = build_db_path.cloudStorage.saleReceiptPDF(sale.id, tenantID, storeID);
 
     // SMS — upload PDF and send link in one call

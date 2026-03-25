@@ -18,6 +18,7 @@ import {
   calculateWaitEstimateLabel,
   findTemplateByType,
   compressImage,
+  scheduleAutoText,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -43,6 +44,7 @@ import {
   CONTACT_RESTRICTIONS,
   RECEIPT_TYPES,
   WAIT_TIMES_PROTO,
+  CUSTOMER_LANGUAGES,
 } from "../../../data";
 import { MILLIS_IN_DAY, build_db_path } from "../../../constants";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -55,10 +57,12 @@ import {
   useSettingsStore,
   useTabNamesStore,
   useAlertScreenStore,
+  useUploadProgressStore,
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS } from "../../../db_calls_wrapper";
+import { firestoreWrite } from "../../../db_calls";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -73,6 +77,7 @@ export const ActiveWorkorderComponent = ({}) => {
     return state.workorders.find((o) => o.id === id) || null;
   });
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
+  const zCustomerLanguage = useCurrentCustomerStore((state) => state.customer?.language || "");
   const zCustomer = {
     first: zOpenWorkorder?.customerFirst || "",
     last: zOpenWorkorder?.customerLast || "",
@@ -90,7 +95,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowMediaModal, _setShowMediaModal] = useState(null); // null | "upload" | "view"
   const [sWaitTimeBlink, _setWaitTimeBlink] = useState(false);
   const uploadInputRef = useRef(null);
-  const [sUploadProgress, _setUploadProgress] = useState(null); // null | { completed, total, failed, done }
+  const sUploadProgress = useUploadProgressStore((s) => s.progress);
   const [sPendingFiles, _setPendingFiles] = useState(null); // null | File[]
   const [sCompressConfirm, _setCompressConfirm] = useState(true);
 
@@ -155,11 +160,13 @@ export const ActiveWorkorderComponent = ({}) => {
     let total = files.length;
     let completed = 0;
     let failed = 0;
-    _setUploadProgress({ completed: 0, total, failed: 0, done: false });
+    useUploadProgressStore.getState().setProgress({ completed: 0, total, failed: 0, done: false });
     let newMedia = [...(zOpenWorkorder?.media || [])];
     let storeName = (zSettings?.storeInfo?.displayName || "photo").replace(/\s+/g, "_");
     for (let i = 0; i < files.length; i++) {
       let fileToUpload = files[i];
+      let originalFilename = fileToUpload.name;
+      let originalFileSize = fileToUpload.size;
       let ext = fileToUpload.name.split(".").pop() || "jpg";
       let rand = Math.floor(1000 + Math.random() * 9000);
       let typeLabel = fileToUpload.type.startsWith("video") ? "Video" : "Image";
@@ -175,18 +182,18 @@ export const ActiveWorkorderComponent = ({}) => {
       } else {
         fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
       }
-      const result = await dbUploadWorkorderMedia(zOpenWorkorder.id, fileToUpload);
+      const result = await dbUploadWorkorderMedia(zOpenWorkorder.id, fileToUpload, { originalFilename, originalFileSize });
       if (result.success) {
         newMedia.push(result.mediaItem);
         completed++;
       } else {
         failed++;
       }
-      _setUploadProgress({ completed, total, failed, done: false });
+      useUploadProgressStore.getState().setProgress({ completed, total, failed, done: false });
     }
     useOpenWorkordersStore.getState().setField("media", newMedia, zOpenWorkorder.id);
-    _setUploadProgress({ completed, total, failed, done: true });
-    setTimeout(() => _setUploadProgress(null), failed > 0 ? 5000 : 3000);
+    useUploadProgressStore.getState().setProgress({ completed, total, failed, done: true });
+    setTimeout(() => useUploadProgressStore.getState().setProgress(null), failed > 0 ? 5000 : 3000);
   }
 
   // Refs for dropdown components
@@ -274,6 +281,52 @@ export const ActiveWorkorderComponent = ({}) => {
         optionsTabName: TAB_NAMES.optionsTab.inventory,
       });
     });
+  }
+
+  async function handleShareWorkorder() {
+    if (!zOpenWorkorder?.id) return;
+    const { tenantID, storeID } = useSettingsStore.getState().getSettings();
+    const currentUser = useLoginStore.getState().getCurrentUser();
+    // Generate 3-digit PIN, check for collision
+    let pin = "";
+    for (let attempt = 0; attempt < 20; attempt++) {
+      pin = String(Math.floor(100 + Math.random() * 900));
+      // No collision check needed — 1000 combos per store, overwrites are fine
+      break;
+    }
+    const now = Date.now();
+    const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
+    const pinDoc = {
+      pin,
+      workorderID: zOpenWorkorder.id,
+      tenantID: tenantID || "",
+      storeID: storeID || "",
+      customerID: zOpenWorkorder.customerID || "",
+      createdAt: now,
+      expiresAt,
+      createdBy: currentUser?.id || "",
+    };
+    const result = await firestoreWrite(`workorder-pins/${pin}`, pinDoc);
+    if (!result?.success) {
+      useAlertScreenStore.getState().setAlert({
+        title: "Error",
+        message: "Failed to generate share link. Please try again.",
+      });
+      return;
+    }
+    const url = `${window.location.origin}/wo/${pin}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      useAlertScreenStore.getState().setAlert({
+        title: "Link Copied",
+        message: `Customer link copied to clipboard.\nExpires in 7 days.\n\n${url}`,
+      });
+    } catch (e) {
+      useAlertScreenStore.getState().setAlert({
+        title: "Share Link",
+        message: `Copy this link:\n\n${url}`,
+      });
+    }
   }
 
   function handleNewWorkorderPress() {
@@ -519,6 +572,11 @@ export const ActiveWorkorderComponent = ({}) => {
               Component={CustomerInfoComponent}
             />
           </Tooltip>
+          {!!zCustomerLanguage && zCustomerLanguage !== CUSTOMER_LANGUAGES.english && (
+            <Text style={{ fontSize: 11, color: gray(0.5), textAlign: "center" }}>
+              {zCustomerLanguage}
+            </Text>
+          )}
           <View
             style={{
               flexDirection: "row",
@@ -879,6 +937,13 @@ export const ActiveWorkorderComponent = ({}) => {
                     const linked = zSettings?.waitTimeLinkedStatus?.[val.id];
                     if (linked) {
                       store.setField("waitTime", linked, zOpenWorkorder.id);
+                    }
+                    // Auto-text: check if this status has an auto-text rule
+                    const autoTextRules = zSettings?.statusAutoText || [];
+                    const rule = autoTextRules.find((r) => r.statusID === val.id);
+                    if (rule) {
+                      const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
+                      scheduleAutoText(rule, wo, zSettings);
                     }
                   }}
                   buttonStyle={{
@@ -1326,6 +1391,18 @@ export const ActiveWorkorderComponent = ({}) => {
             onPress={handleStartStandaloneSalePress}
           />
         </Tooltip>
+        <Tooltip text="Share with customer" position="top">
+          <Button_
+            icon={ICONS.exportIcon}
+            iconSize={30}
+            buttonStyle={{
+              backgroundColor: "transparent",
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+            }}
+            onPress={handleShareWorkorder}
+          />
+        </Tooltip>
       </View>
       {/* Upload confirmation modal */}
       {sPendingFiles && ReactDOM.createPortal(
@@ -1346,7 +1423,7 @@ export const ActiveWorkorderComponent = ({}) => {
           />
           <View
             style={{
-              width: 520,
+              width: 624,
               backgroundColor: C.backgroundWhite,
               borderRadius: 12,
               borderWidth: 2,
@@ -1354,9 +1431,15 @@ export const ActiveWorkorderComponent = ({}) => {
               padding: 20,
             }}
           >
-            <Text style={{ fontSize: 14, color: C.text, marginBottom: 16, lineHeight: 20, textAlign: "center" }}>
-              Default compression is on. Only uncheck the compression box if small details are important, as upload time will increase dramatically.
+            <Text style={{ fontSize: 14, color: C.text, marginBottom: 10, lineHeight: 20, textAlign: "center" }}>
+              Compression is set to medium. Only uncheck the box if you need high zoom capability, as the process takes drastically longer. Recommendation: first try the compressed image to see if it's good enough before using the uncompressed option.
             </Text>
+            {sPendingFiles.map((f, idx) => (
+              <Text key={idx} style={{ fontSize: 12, color: gray(0.45), textAlign: "center" }}>
+                {f.name} — {f.size < 1048576 ? (f.size / 1024).toFixed(0) + " KB" : (f.size / 1048576).toFixed(1) + " MB"}
+              </Text>
+            ))}
+            <View style={{ height: 14 }} />
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <CheckBox_
                 text="Medium compression"

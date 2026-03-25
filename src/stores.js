@@ -1068,6 +1068,13 @@ export const useSettingsStore = create((set, get) => ({
   },
 }));
 
+export const useUploadProgressStore = create((set, get) => ({
+  // null | { completed, total, failed, done }
+  progress: null,
+  setProgress: (progress) => set({ progress }),
+  clearProgress: () => set({ progress: null }),
+}));
+
 export const useListenersStore = create((set, get) => ({
   inventoryChangeSub: "",
   inventoryAddSub: "",

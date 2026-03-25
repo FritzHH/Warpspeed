@@ -6139,6 +6139,267 @@ async function cleanupOldMedia(db, bucket, tenantID, storeID) {
   }
 }
 
+// ============================================================================
+// Customer-Facing Workorder Screen
+// ============================================================================
+
+const LANGUAGE_MAP = { English: "en", Spanish: "es", French: "fr" };
+
+const CUSTOMER_WO_UI_LABELS = {
+  yourWorkorder: "Your Workorder",
+  status: "Status",
+  estimatedReady: "Estimated ready",
+  brand: "Brand",
+  model: "Model",
+  description: "Description",
+  colors: "Colors",
+  items: "Items",
+  notes: "Notes",
+  media: "Photos & Videos",
+  subtotal: "Subtotal",
+  discount: "Discount",
+  tax: "Tax",
+  total: "Total",
+  amountPaid: "Amount Paid",
+  balanceDue: "Balance Due",
+  partsOnOrder: "Parts on Order",
+  estDelivery: "Est. Delivery",
+  uploadPhotos: "Upload Photos",
+  greeting: "Here's your workorder",
+  waitTime: "Wait Time",
+  linkExpired: "This link has expired or is invalid.",
+};
+
+exports.getCustomerWorkorder = onRequest(
+  {
+    cors: true,
+    secrets: [firebaseServiceAccountKey, googleTranslateApiKey],
+  },
+  async (req, res) => {
+    try {
+      const pin = req.query.pin || req.body?.pin;
+      if (!pin || typeof pin !== "string" || pin.length < 3) {
+        return res.status(400).json({ success: false, error: "Invalid PIN" });
+      }
+
+      const db = await getDB(firebaseServiceAccountKey);
+
+      // Look up PIN
+      const pinSnap = await db.collection("workorder-pins").doc(pin).get();
+      if (!pinSnap.exists) {
+        return res.status(404).json({ success: false, error: "Link not found or expired" });
+      }
+      const pinDoc = pinSnap.data();
+
+      // Check expiry
+      const expiresAt = pinDoc.expiresAt?.toMillis?.() || pinDoc.expiresAt || 0;
+      if (Date.now() > expiresAt) {
+        return res.status(410).json({ success: false, error: "This link has expired" });
+      }
+
+      const { tenantID, storeID, workorderID, customerID } = pinDoc;
+
+      // Fetch workorder, settings, customer in parallel
+      const [woSnap, settingsSnap, custSnap] = await Promise.all([
+        db.collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("open-workorders").doc(workorderID)
+          .get(),
+        db.collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("settings").doc("settings")
+          .get(),
+        customerID
+          ? db.collection("tenants").doc(tenantID)
+              .collection("stores").doc(storeID)
+              .collection("customers").doc(customerID)
+              .get()
+          : Promise.resolve(null),
+      ]);
+
+      if (!woSnap.exists) {
+        return res.status(404).json({ success: false, error: "Workorder not found" });
+      }
+
+      const workorder = woSnap.data();
+      const settings = settingsSnap.exists ? settingsSnap.data() : {};
+      const customer = custSnap?.exists ? custSnap.data() : {};
+      const statuses = settings.statuses || [];
+
+      // Resolve status
+      const statusObj = statuses.find((s) => s.id === workorder.status) || {
+        label: workorder.status || "Unknown",
+        textColor: "black",
+        backgroundColor: "whitesmoke",
+      };
+
+      // Build items (names + qty only, no internal pricing)
+      const items = (workorder.workorderLines || []).map((line) => ({
+        name: line.inventoryItem?.formalName || line.inventoryItem?.informalName || "Item",
+        qty: Number(line.qty) || 1,
+      }));
+
+      // Calculate totals
+      const totals = calculateWorkorderTotal(workorder, settings);
+      const formatCents = (c) => "$" + (c / 100).toFixed(2);
+
+      // Build media array (thumbnails + full URLs, strip internal fields)
+      const media = (workorder.media || []).map((m) => ({
+        id: m.id,
+        thumbnailUrl: m.thumbnailUrl || m.url,
+        url: m.url,
+        type: m.type || "image",
+        filename: m.filename || "",
+      }));
+
+      // Build response
+      const payload = {
+        storeName: settings?.storeInfo?.displayName || "",
+        storePhone: settings?.storeInfo?.phone || "",
+        workorderNumber: workorder.workorderNumber || "",
+        brand: workorder.brand || "",
+        model: workorder.model || "",
+        description: workorder.description || "",
+        color1: workorder.color1 || null,
+        color2: workorder.color2 || null,
+        status: {
+          label: statusObj.label || "",
+          backgroundColor: statusObj.backgroundColor || "whitesmoke",
+          textColor: statusObj.textColor || "black",
+        },
+        waitTime: workorder.waitTime?.label || "",
+        waitTimeEstimateLabel: workorder.waitTimeEstimateLabel || "",
+        startedOnMillis: workorder.startedOnMillis || null,
+        partOrdered: workorder.partOrdered || "",
+        partEstimatedDelivery: workorder.partEstimatedDelivery || "",
+        items,
+        customerNotes: workorder.customerNotes || [],
+        showPricing: !!settings.showCustomerPricing,
+        subtotal: formatCents(totals.subtotal),
+        discount: formatCents(totals.discount),
+        tax: formatCents(totals.tax),
+        total: formatCents(totals.total),
+        amountPaid: formatCents(workorder.amountPaid || 0),
+        balanceDue: formatCents(totals.total - (workorder.amountPaid || 0)),
+        media,
+        customerFirst: customer.first || workorder.customerFirst || "",
+        customerLanguage: customer.language || "English",
+        pin,
+        translations: null,
+      };
+
+      // Translate UI labels if customer language is not English
+      const langCode = LANGUAGE_MAP[payload.customerLanguage];
+      if (langCode && langCode !== "en") {
+        try {
+          const labelKeys = Object.keys(CUSTOMER_WO_UI_LABELS);
+          const labelValues = Object.values(CUSTOMER_WO_UI_LABELS);
+          // Also translate the status label
+          const textsToTranslate = [...labelValues, payload.status.label];
+
+          const { Translate } = require("@google-cloud/translate").v2;
+          const translate = new Translate({ key: googleTranslateApiKey.value() });
+          const [translated] = await translate.translate(textsToTranslate, { to: langCode, from: "en" });
+
+          const translations = {};
+          labelKeys.forEach((key, i) => {
+            translations[key] = translated[i];
+          });
+          translations.statusLabel = translated[translated.length - 1];
+          payload.translations = translations;
+        } catch (transErr) {
+          log("getCustomerWorkorder: translation error (non-fatal)", transErr.message);
+          // Continue without translations
+        }
+      }
+
+      return res.status(200).json({ success: true, data: payload });
+    } catch (error) {
+      log("getCustomerWorkorder: error", error);
+      return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+  }
+);
+
+exports.customerUploadWorkorderMedia = onRequest(
+  {
+    cors: true,
+    secrets: [firebaseServiceAccountKey],
+  },
+  async (req, res) => {
+    try {
+      const { pin, fileBase64, fileName, contentType } = req.body || {};
+
+      if (!pin || !fileBase64 || !fileName) {
+        return res.status(400).json({ success: false, error: "Missing required fields: pin, fileBase64, fileName" });
+      }
+
+      const db = await getDB(firebaseServiceAccountKey);
+
+      // Validate PIN
+      const pinSnap = await db.collection("workorder-pins").doc(pin).get();
+      if (!pinSnap.exists) {
+        return res.status(404).json({ success: false, error: "Link not found or expired" });
+      }
+      const pinDoc = pinSnap.data();
+
+      const expiresAt = pinDoc.expiresAt?.toMillis?.() || pinDoc.expiresAt || 0;
+      if (Date.now() > expiresAt) {
+        return res.status(410).json({ success: false, error: "This link has expired" });
+      }
+
+      const { tenantID, storeID, workorderID } = pinDoc;
+
+      // Decode base64
+      const buffer = Buffer.from(fileBase64, "base64");
+      const fileSizeBytes = buffer.length;
+
+      // Upload to Cloud Storage
+      const bucket = admin.storage().bucket();
+      const timestamp = Date.now();
+      const mediaID = "cm_" + generateUPCBarcode("customer") + "_" + timestamp;
+      const storagePath = `${tenantID}/${storeID}/workorders/${workorderID}/attachments/media/${timestamp}_${fileName}`;
+      const file = bucket.file(storagePath);
+
+      await file.save(buffer, {
+        metadata: { contentType: contentType || "image/jpeg" },
+      });
+      await file.makePublic();
+
+      const url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+
+      // Build media item
+      const mediaItem = {
+        id: mediaID,
+        url,
+        storagePath,
+        thumbnailUrl: url,
+        thumbnailStoragePath: "",
+        type: (contentType || "").startsWith("video") ? "video" : "image",
+        filename: fileName,
+        fileSize: fileSizeBytes,
+        originalFilename: fileName,
+        originalFileSize: fileSizeBytes,
+        uploadedAt: timestamp,
+        uploadedBy: "customer",
+      };
+
+      // Update workorder media array
+      await db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("open-workorders").doc(workorderID)
+        .update({
+          media: FieldValue.arrayUnion(mediaItem),
+        });
+
+      return res.status(200).json({ success: true, data: { mediaItem } });
+    } catch (error) {
+      log("customerUploadWorkorderMedia: error", error);
+      return res.status(500).json({ success: false, error: "Internal server error" });
+    }
+  }
+);
+
 /**
  * Nightly scheduled function — runs at 1:00 AM Eastern every day.
  * Archives 4 Firestore collections to Cloud Storage and cleans up old media.

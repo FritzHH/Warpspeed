@@ -49,7 +49,7 @@ export function RefundTotals({
   previouslyRefunded = 0,
   maxRefundAllowed = 0,
   cardFeeDeduction = 0,
-  settings,
+  salesTaxPercent,
   isCustomAmount = false,
   hasItemSelection = false,
   onCustomAmountChange,
@@ -135,7 +135,7 @@ export function RefundTotals({
             label="SELECTED ITEMS"
             value={selectedItemsTotal}
           />
-          {settings?.salesTaxPercent > 0 && (
+          {salesTaxPercent > 0 && (
             <TotalRow
               label={`TAX (${settings.salesTaxPercent}%)`}
               value={itemRefundTotal - selectedItemsTotal}

@@ -11,15 +11,16 @@ import {
   formatPhoneWithDashes,
   resolveStatus,
   gray,
+  deepEqual,
 } from "../../utils";
 import { dbGetOpenWorkorders } from "../../db_calls_wrapper";
 
 export function MobileWorkorderListScreen() {
   const navigate = useNavigate();
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
-  const zSettings = useSettingsStore((state) => state.settings);
+  const zStatuses = useSettingsStore((state) => state.settings?.statuses, deepEqual);
 
-  const groups = groupWorkordersByStatus(zWorkorders, zSettings?.statuses);
+  const groups = groupWorkordersByStatus(zWorkorders, zStatuses);
 
   return (
     <ScrollView
@@ -77,7 +78,7 @@ export function MobileWorkorderListScreen() {
 
           {/* Workorder Cards */}
           {group.items.map((workorder) => {
-            const rs = resolveStatus(workorder.status, zSettings?.statuses);
+            const rs = resolveStatus(workorder.status, zStatuses);
             return (
               <TouchableOpacity
                 key={workorder.id}

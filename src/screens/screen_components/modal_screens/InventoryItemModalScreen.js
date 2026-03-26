@@ -31,6 +31,7 @@ import {
   gray,
   log,
   showAlert,
+  deepEqual,
 } from "../../../utils";
 import {
   dbSaveInventoryItem,
@@ -283,9 +284,10 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
 // ─── main component ────────────────────────────────────────────────────────
 
 export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }) => {
-  const zSettingsObj = useSettingsStore((state) => state.settings);
+  const zQuickItemButtons = useSettingsStore((s) => s.settings?.quickItemButtons, deepEqual);
+  const zAutoCustomerNoteTexts = useSettingsStore((s) => s.settings?.autoCustomerNoteTexts, deepEqual);
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
-  const quickButtons = zSettingsObj?.quickItemButtons || [];
+  const quickButtons = zQuickItemButtons || [];
 
   const [sItem, _setItem] = useState(() => cloneDeep(item));
   const [sEditing, _setEditing] = useState(!!isNew);
@@ -308,7 +310,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   );
 
   // auto customer note
-  const zAutoNoteTexts = zSettingsObj?.autoCustomerNoteTexts || [];
+  const zAutoNoteTexts = zAutoCustomerNoteTexts || [];
   const [sAutoNoteText, _setAutoNoteText] = useState(
     () => zAutoNoteTexts.find((n) => n.inventoryItemID === item.id)?.text || ""
   );

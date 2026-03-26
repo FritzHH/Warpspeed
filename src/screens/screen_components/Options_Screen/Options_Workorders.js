@@ -8,6 +8,7 @@ import {
   lightenRGBByPercent,
   log,
   resolveStatus,
+  deepEqual,
 } from "../../../utils";
 import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_, Button_, TextInput_ } from "../../../components";
 import { C, Colors, Fonts, ICONS } from "../../../styles";
@@ -149,7 +150,7 @@ export function WorkordersComponent({}) {
   const zOpenWorkorderID = useOpenWorkordersStore((state) => state.openWorkorderID);
   const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
-  const zSettings = useSettingsStore((state) => state.settings);
+  const zUsers = useSettingsStore((state) => state.settings?.users, deepEqual);
 
   const [sSearchTerm, _setSearchTerm] = useState("");
 
@@ -163,7 +164,7 @@ export function WorkordersComponent({}) {
   function handleTogglePreview() {
     if (!zCurrentUser) return;
     let newVal = !sAllowPreview;
-    let userArr = (zSettings?.users || []).map((u) => {
+    let userArr = (zUsers || []).map((u) => {
       if (u.id === zCurrentUser.id) return { ...u, preview: newVal };
       return u;
     });

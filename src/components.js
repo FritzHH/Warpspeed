@@ -19,7 +19,7 @@ import React, {
   useCallback,
 } from "react";
 import { Image } from "react-native-web";
-import { formatCurrencyDisp, formatMillisForDisplay, generateRandomID, gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log, usdTypeMask } from "./utils";
+import { formatCurrencyDisp, formatMillisForDisplay, generateRandomID, gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log, usdTypeMask, deepEqual } from "./utils";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
 import { SETTINGS_OBJ, PRIVILEDGE_LEVELS, CUSTOMER_DEPOST_TYPES } from "./data";
 import { cloneDeep } from "lodash";
@@ -1250,7 +1250,7 @@ export const InventoryItemScreeenModalComponent = ({
 
 export const LoginModalScreen = ({ modalVisible }) => {
   const zAdminPrivilege = useLoginStore((state) => state.adminPrivilege);
-  const zSettingsObj = useSettingsStore((state) => state.settings);
+  const zUsers = useSettingsStore((state) => state.settings?.users, deepEqual);
   const [sPin, _setPin] = useState("");
   const [sError, _setError] = useState("");
   const [sSuccess, _setSuccess] = useState(false);
@@ -1266,8 +1266,8 @@ export const LoginModalScreen = ({ modalVisible }) => {
     _setPin(input);
     _setError("");
 
-    let userObj = zSettingsObj?.users?.find((u) => u.pin == input);
-    if (!userObj) userObj = zSettingsObj?.users?.find((u) => u.alternatePin == input);
+    let userObj = zUsers?.find((u) => u.pin == input);
+    if (!userObj) userObj = zUsers?.find((u) => u.alternatePin == input);
     if (!userObj) return;
 
     // Check privilege level if required

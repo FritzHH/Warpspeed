@@ -20,6 +20,7 @@ import {
   log,
   generateRandomID,
   lightenRGBByPercent,
+  deepEqual,
 } from "../../../utils";
 import dayjs from "dayjs";
 import CalendarPicker, {
@@ -193,9 +194,12 @@ function pairPunches(filteredArr) {
 
 export const PayrollModal = ({ handleExit }) => {
   const defaultStyles = useDefaultStyles();
-  const zSettingsObj = useSettingsStore((state) => state.settings);
+  const zDefaultPayrollTimeFrame = useSettingsStore((s) => s.settings?.defaultPayrollTimeFrame, deepEqual);
+  const zStoreDisplayName = useSettingsStore((s) => s.settings?.storeInfo?.displayName);
+  const zEmailTemplates = useSettingsStore((s) => s.settings?.emailTemplates, deepEqual);
+  const zUsers = useSettingsStore((s) => s.settings?.users, deepEqual);
 
-  let tf = zSettingsObj?.defaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
+  let tf = zDefaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
   let defaultRange = getTimeFrameRange(tf);
 
   // selected user
@@ -267,7 +271,7 @@ export const PayrollModal = ({ handleExit }) => {
   let totalWages = trimToTwoDecimals((runningTotalMinutes / 60) * hourlyWage);
 
   function handleDefaultRangeShortcut() {
-    let curTf = zSettingsObj?.defaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
+    let curTf = zDefaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
     let range = getTimeFrameRange(curTf);
     _setActiveShortcut("Pay Period");
     _setPendingStart(null);
@@ -546,10 +550,10 @@ export const PayrollModal = ({ handleExit }) => {
         totalHoursObj.hours + ":" + String(totalHoursObj.minutes).padStart(2, "0");
       let payRateStr = "$" + hourlyWage.toFixed(2) + "/hr";
       let totalPayStr = "$" + Number(totalWages).toLocaleString();
-      let storeName = zSettingsObj?.storeInfo?.displayName || "";
+      let storeName = zStoreDisplayName || "";
 
       // Find the payroll template from settings
-      let template = (zSettingsObj?.emailTemplates || []).find(
+      let template = (zEmailTemplates || []).find(
         (t) => t.id === "default_payroll_summary"
       );
 
@@ -673,7 +677,7 @@ export const PayrollModal = ({ handleExit }) => {
               >
                 SELECT USER
               </Text>
-              {(zSettingsObj?.users || []).map((user) => {
+              {(zUsers || []).map((user) => {
                 let isSelected = sSelectedUser?.id === user.id;
                 return (
                   <TouchableOpacity
@@ -1613,7 +1617,10 @@ export const PayrollModal = ({ handleExit }) => {
     sSaving,
     sEmailing,
     sEmailStatus,
-    zSettingsObj,
+    zUsers,
+    zEmailTemplates,
+    zStoreDisplayName,
+    zDefaultPayrollTimeFrame,
   ]);
 
   return ReactDOM.createPortal(

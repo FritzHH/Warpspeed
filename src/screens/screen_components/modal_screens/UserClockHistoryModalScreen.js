@@ -31,6 +31,7 @@ import sr from "dayjs/locale/sr";
 import { cloneDeep, range, sortBy } from "lodash";
 import { isEven } from "face-api.js/build/commonjs/utils";
 import { useLoginStore, useSettingsStore } from "../../../stores";
+import { deepEqual } from "../../../utils";
 import {
   MILLIS_IN_DAY,
   MILLIS_IN_HOUR,
@@ -50,7 +51,7 @@ import {
 export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   // store getters //////////////////////////////////////////////////////
   const zCurrentUserObj = useLoginStore((state) => state.currentUser);
-  const zSettingsObj = useSettingsStore((state) => state.settings);
+  const zUsers = useSettingsStore((state) => state.settings?.users, deepEqual);
 
   // local state ////////////////////////////////////////////////////////
   const [sUserObj, _setUserObj] = useState(userObj);
@@ -83,7 +84,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   useEffect(() => {
     let selectedUserIdx;
     let idx = 0;
-    let dataArr = zSettingsObj?.users.map((user_obj) => {
+    let dataArr = zUsers.map((user_obj) => {
       if (user_obj.id === sUserObj.id) selectedUserIdx = idx;
       // log(user_obj);
       idx++;
@@ -97,7 +98,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     _setUserDropdownDataArr(dataArr);
 
     // let selectedUserIdx = zS
-  }, [zSettingsObj, sUserObj, _setSelectedUserIdx, _setUserDropdownDataArr]);
+  }, [zUsers, sUserObj, _setSelectedUserIdx, _setUserDropdownDataArr]);
 
   // filter the set for the date range selected
   useEffect(() => {
@@ -271,7 +272,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     }
 
     function handleUserSelect(item, idx) {
-      let user = zSettingsObj.users.find((o) => o.id === item.id);
+      let user = zUsers?.find((o) => o.id === item.id);
       _setUserObj(user);
     }
 

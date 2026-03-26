@@ -13,6 +13,7 @@ import {
   formatCurrencyDisp,
   log,
   gray,
+  deepEqual,
 } from "../../../../utils";
 import {
   calculateRefundLimits,
@@ -36,7 +37,8 @@ import { RefundItemSelector } from "./RefundItemSelector";
 import { RefundPaymentSelector } from "./RefundPaymentSelector";
 
 export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialPayment, onClose, onSaleUpdated }) {
-  const zSettings = useSettingsStore((state) => state.settings);
+  const zSalesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent);
+  const zCardFeeRefund = useSettingsStore((s) => s.settings?.cardFeeRefund);
 
   // ─── Local State ──────────────────────────────────────────
   const [sOriginalSale, _setOriginalSale] = useState(null);
@@ -53,7 +55,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
   const [sCustomCardPayment, _setCustomCardPayment] = useState(null);
 
   // ─── Derived Values ───────────────────────────────────────
-  let refundLimits = calculateRefundLimits(sOriginalSale, zSettings);
+  let refundLimits = calculateRefundLimits(sOriginalSale, { cardFeeRefund: zCardFeeRefund });
   let previouslyRefundedIDs = getPreviouslyRefundedLineIDs(sOriginalSale);
 
   // Calculate selected items subtotal
@@ -90,7 +92,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
   // Item-based refund total (subtotal + tax)
   let itemRefundTotal = 0;
   if (sSelectedItems.length > 0) {
-    let taxRate = zSettings?.salesTaxPercent || 0;
+    let taxRate = zSalesTaxPercent || 0;
     let refundTax = Math.round(selectedItemsTotal * (taxRate / 100));
     itemRefundTotal = selectedItemsTotal + refundTax;
   }
@@ -116,7 +118,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
   // Compute which items would exceed the refund limit if added
   let disabledItemIDs = new Set();
   {
-    let taxRate = zSettings?.salesTaxPercent || 0;
+    let taxRate = zSalesTaxPercent || 0;
     sWorkordersInSale.forEach((wo) => {
       (wo.workorderLines || []).forEach((line) => {
         if (sSelectedItems.find((s) => s.id === line.id)) return;
@@ -328,7 +330,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
     saveRefundIndex(sale, refund, customerInfo);
 
     // Check if fully refunded
-    let newLimits = calculateRefundLimits(sale, zSettings);
+    let newLimits = calculateRefundLimits(sale, { cardFeeRefund: zCardFeeRefund });
     if (newLimits.maxRefund <= 0) {
       _setRefundComplete(true);
     }
@@ -531,7 +533,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                     }
                     maxCardRefund={maxCardRefund}
                     onProcessRefund={handleProcessRefund}
-                    settings={zSettings}
+                    salesTaxPercent={zSalesTaxPercent}
                     refundComplete={sRefundComplete}
                     suggestedAmount={
                       hasItemSelection ? itemCardAmount
@@ -562,7 +564,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                     previouslyRefunded={refundLimits.previouslyRefunded}
                     maxRefundAllowed={refundLimits.maxRefund}
                     cardFeeDeduction={refundLimits.cardFeeDeduction}
-                    settings={zSettings}
+                    salesTaxPercent={zSalesTaxPercent}
                     isCustomAmount={false}
                     hasItemSelection={hasItemSelection}
                     onCustomAmountChange={handleCustomAmountChange}

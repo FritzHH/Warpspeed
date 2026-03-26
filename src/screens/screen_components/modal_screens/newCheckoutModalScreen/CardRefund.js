@@ -15,7 +15,7 @@ export function CardRefund({
   selectedPayment,
   maxCardRefund = 0,
   onProcessRefund,
-  settings,
+  salesTaxPercent,
   refundComplete = false,
   suggestedAmount = 0,
   lockedAmount = false,

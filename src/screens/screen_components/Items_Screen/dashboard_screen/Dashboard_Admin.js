@@ -7370,9 +7370,8 @@ const ARCHIVE_COLLECTION_NAMES = [
 const MILLIS_IN_WEEK = 7 * 24 * 60 * 60 * 1000;
 
 function BackupRecoveryComponent() {
-  const zSettings = useSettingsStore((state) => state.settings);
-  const tenantID = zSettings?.tenantID;
-  const storeID = zSettings?.storeID;
+  const tenantID = useSettingsStore((state) => state.settings?.tenantID);
+  const storeID = useSettingsStore((state) => state.settings?.storeID);
 
   const [sLogs, _setLogs] = useState([]);
   const [sLoading, _setLoading] = useState(false);

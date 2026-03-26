@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { View, Text, FlatList } from "react-native-web";
-import { gray } from "../../../utils";
+import { gray, deepEqual } from "../../../utils";
 import { C, Fonts } from "../../../styles";
 import { useOpenWorkordersStore } from "../../../stores";
 
@@ -69,12 +69,12 @@ function ChangeLogRow({ entry, index }) {
 }
 
 export function Items_ChangeLog() {
-  let zOpenWorkorder = useOpenWorkordersStore((state) => {
+  const zChangeLog = useOpenWorkordersStore((state) => {
     let id = state.openWorkorderID;
-    return state.workorders.find((o) => o.id === id);
-  });
+    return state.workorders.find((o) => o.id === id)?.changeLog || [];
+  }, deepEqual);
 
-  let changeLog = zOpenWorkorder?.changeLog || [];
+  let changeLog = zChangeLog;
   let sorted = [...changeLog].sort((a, b) => b.timestamp - a.timestamp);
 
   if (sorted.length === 0) {

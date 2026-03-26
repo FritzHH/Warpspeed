@@ -1,7 +1,7 @@
 /*eslint-disable*/
 
 import { Modal, TouchableWithoutFeedback, View } from "react-native-web";
-import { useLoginStore, useSettingsStore } from "../../../stores";
+import { useLoginStore } from "../../../stores";
 import { Button_, ScreenModal } from "../../../components";
 import { FaceDetectionClientComponent } from "../../../faceDetection";
 import { log } from "../../../utils";
@@ -17,9 +17,6 @@ export function FaceEnrollModalScreen({
   const _zSetRunBackgroundFacialRecognition = useLoginStore(
     (state) => state.setRunBackgroundRecognition
   );
-
-  // store getters ///////////////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.settings);
 
   // local state ///////////////////////////////////////////////////////////
   useEffect(() => {

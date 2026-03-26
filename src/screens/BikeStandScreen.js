@@ -17,6 +17,7 @@ import {
   lightenRGBByPercent,
   capitalizeFirstLetterOfString,
   applyDiscountToWorkorderItem,
+  deepEqual,
 } from "../utils";
 import { WORKORDER_ITEM_PROTO } from "../data";
 import { Button_, Image_ } from "../components";
@@ -84,7 +85,8 @@ function sortWorkorders(inputArr, statuses, currentUser) {
 ////////////////////////////////////////////////////////////////////////////////
 
 export function BikeStandScreen() {
-  const zSettings = useSettingsStore((state) => state.settings);
+  const zStatuses = useSettingsStore((s) => s.settings?.statuses, deepEqual);
+  const zIntakeQuickButtons = useSettingsStore((s) => s.settings?.intakeQuickButtons, deepEqual);
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zInventory = useInventoryStore((state) => state.inventoryArr);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
@@ -107,10 +109,10 @@ export function BikeStandScreen() {
     });
   }, []);
 
-  let statuses = zSettings?.statuses || [];
+  let statuses = zStatuses || [];
   let sortedWorkorders = sortWorkorders(zWorkorders || [], statuses, zCurrentUser);
   let selectedWorkorder = (zWorkorders || []).find((o) => o.id === sSelectedWorkorderID);
-  let intakeQuickButtons = zSettings?.intakeQuickButtons || [];
+  let intakeQuickButtons = zIntakeQuickButtons || [];
   // Handle legacy flat format gracefully
   if (intakeQuickButtons.length > 0 && !Array.isArray(intakeQuickButtons[0])) {
     intakeQuickButtons = [];

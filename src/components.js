@@ -44,7 +44,7 @@ import { dbDeleteInventoryItem, dbSaveInventoryItem } from "./db_calls_wrapper";
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
 
-export const StaleBanner = ({ text, style }) => {
+export const StaleBanner = ({ text, style, textStyle }) => {
   const opacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -68,7 +68,7 @@ export const StaleBanner = ({ text, style }) => {
         ...style,
       }}
     >
-      <Text style={{ color: "white", fontSize: 11, fontWeight: "600" }}>{text}</Text>
+      <Text style={{ color: "white", fontSize: 11, fontWeight: "600", ...textStyle }}>{text}</Text>
     </Animated.View>
   );
 };

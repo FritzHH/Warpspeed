@@ -2,7 +2,7 @@
 import { View, Text, ScrollView } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_ } from "../../../../components";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_, StaleBanner } from "../../../../components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   useCheckoutStore,
@@ -151,13 +151,16 @@ export function NewCheckoutModalScreen() {
   let custFirst = zOpenWorkorder?.customerFirst || "";
   let custLast = zOpenWorkorder?.customerLast || "";
   let sessionHasNewPayments = (sSale?.payments?.length || 0) > sSessionStartPaymentCount;
+  let hasRealPayments = (sSale?.payments || []).some((p) => !p.isDeposit);
 
   // ─── Initialization ──────────────────────────────────────
   // Called once when the modal opens. We use a flag to avoid
   // repeated init without adding a useEffect.
   if (zIsCheckingOut && !sInitialized) {
     _setInitialized(true);
-    _setReceiptLanguage(zCustomer?.language || "english");
+    _setReceiptLanguage(
+      Object.keys(CUSTOMER_LANGUAGES).find((k) => CUSTOMER_LANGUAGES[k] === zCustomer?.language) || "english"
+    );
 
     // Check if we're opening a partial sale from ticket search
     let viewOnlySale = useCheckoutStore.getState().viewOnlySale;
@@ -523,7 +526,7 @@ export function NewCheckoutModalScreen() {
     let sale = await dbGetCompletedSale(payment.depositSaleID);
     if (!sale) return;
     let settings = useSettingsStore.getState().getSettings();
-    let printerID = settings?.printerCloudId || "";
+    let printerID = settings?.selectedPrinterID || "";
     if (!printerID) return;
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let customerInfo = {
@@ -622,7 +625,7 @@ export function NewCheckoutModalScreen() {
 
     // Print receipt
     let settings = useSettingsStore.getState().getSettings();
-    let printerID = settings?.printerCloudId || "";
+    let printerID = settings?.selectedPrinterID || "";
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let emptyWO = { workorderLines: [], taxFree: false, status: "" };
     let saleReceipt = printBuilder.sale(sale, sale.payments || [], customerInfo, emptyWO, 0, _ctx);
@@ -705,7 +708,7 @@ export function NewCheckoutModalScreen() {
       email: primaryWO?.customerEmail || "",
       id: primaryWO?.customerID || "",
     };
-    const printerID = settings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
+    const printerID = settings?.selectedPrinterID || "8C:77:3B:60:33:22_Star MCP31";
 
     // Build receipt context
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
@@ -791,7 +794,7 @@ export function NewCheckoutModalScreen() {
           id: primaryWO?.customerID || "",
         };
         const settings = useSettingsStore.getState().getSettings();
-        const printerID = settings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
+        const printerID = settings?.selectedPrinterID || "8C:77:3B:60:33:22_Star MCP31";
         const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
 
         // Build receipt
@@ -952,27 +955,29 @@ export function NewCheckoutModalScreen() {
       }
     }
 
-    const printerID = zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
+    const printerID = zSettings?.selectedPrinterID || "8C:77:3B:60:33:22_Star MCP31";
     dbSavePrintObj(toPrint, printerID);
   }
 
   function handlePrintReceipt() {
     if (!sSale) return;
+    let settings = useSettingsStore.getState().getSettings();
     let isDeposit = sSale.isDepositSale;
     let primaryWO = isDeposit ? null : sCombinedWorkorders[0];
     let customer = isDeposit
       ? { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" }
       : { first: primaryWO?.customerFirst || "", last: primaryWO?.customerLast || "", customerCell: primaryWO?.customerCell || "", email: primaryWO?.customerEmail || "", id: primaryWO?.customerID || "" };
-    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let wo = isDeposit ? { workorderLines: [], taxFree: false, status: "" } : primaryWO;
-    let receipt = printBuilder.sale(sSale, sSale.payments || [], customer, wo, zSettings?.salesTaxPercent, _ctx);
-    let printerID = zSettings?.printerCloudId || "";
+    let receipt = printBuilder.sale(sSale, sSale.payments || [], customer, wo, settings?.salesTaxPercent, _ctx);
+    let printerID = settings?.selectedPrinterID || "";
     if (printerID) dbSavePrintObj(receipt, printerID);
   }
 
   function handlePopRegister() {
+    let settings = useSettingsStore.getState().getSettings();
     let printObj = { id: generateEAN13Barcode(), receiptType: RECEIPT_TYPES.register };
-    dbSavePrintObj(printObj, zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31");
+    dbSavePrintObj(printObj, settings?.selectedPrinterID || "");
     _setShowPopConfirm(true);
     setTimeout(() => _setShowPopConfirm(false), 1000);
   }
@@ -1462,17 +1467,24 @@ export function NewCheckoutModalScreen() {
               }}
             >
               <ScrollView style={{ flex: 1 }}>
-                {/* Inventory Search (always available) */}
-                <InventorySearch
-                  addedItems={sAddedItems}
-                  onAddItem={handleAddItem}
-                  onRemoveItem={handleRemoveItem}
-                  onQtyChange={handleItemQtyChange}
-                  onDiscountChange={handleItemDiscount}
-                  inventory={zInventory}
-                  discounts={zSettings?.discounts || []}
-                  onOpenNewItemModal={(item) => _setNewItemModal(item)}
-                />
+                {hasRealPayments ? (
+                  <StaleBanner
+                    text="Sale In Progress"
+                    style={{ height: 60, justifyContent: "center", width: "100%" }}
+                    textStyle={{ fontSize: 21 }}
+                  />
+                ) : (
+                  <InventorySearch
+                    addedItems={sAddedItems}
+                    onAddItem={handleAddItem}
+                    onRemoveItem={handleRemoveItem}
+                    onQtyChange={handleItemQtyChange}
+                    onDiscountChange={handleItemDiscount}
+                    inventory={zInventory}
+                    discounts={zSettings?.discounts || []}
+                    onOpenNewItemModal={(item) => _setNewItemModal(item)}
+                  />
+                )}
 
                 {/* Workorders (combiner + line items) */}
                 {!isStandalone && (

@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
-import { Pressable_, Tooltip } from "../../../../components";
+import { Tooltip } from "../../../../components";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
 function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemoveDeposit }) {
@@ -147,16 +147,19 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
     tooltipText += "\nRight-click to remove deposit from sale";
   }
 
+  let handlePress = isDeposit
+    ? (onPrintDepositReceipt && payment.depositSaleID ? onPrintDepositReceipt : undefined)
+    : onPress || undefined;
+
   return (
     <Tooltip text={tooltipText} position="top">
-      <Pressable_
-        onPress={isDeposit
-          ? (onPrintDepositReceipt && payment.depositSaleID ? onPrintDepositReceipt : undefined)
-          : onPress || undefined}
-        onRightPress={isDeposit && onRemoveDeposit ? onRemoveDeposit : undefined}
+      <TouchableOpacity
+        onPress={handlePress}
+        onContextMenu={isDeposit && onRemoveDeposit ? (e) => { e.preventDefault(); onRemoveDeposit(); } : undefined}
+        activeOpacity={handlePress ? 0.6 : 1}
       >
         {content}
-      </Pressable_>
+      </TouchableOpacity>
     </Tooltip>
   );
 }

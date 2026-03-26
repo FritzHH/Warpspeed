@@ -15,6 +15,7 @@ import {
   resolveStatus,
   formatCurrencyDisp,
   gray,
+  deepEqual,
 } from "../utils";
 import { WORKORDER_ITEM_PROTO, COLORS } from "../data";
 import {
@@ -38,7 +39,18 @@ const DROPDOWN_SELECTED_OPACITY = 0.3;
 ////////////////////////////////////////////////////////////////////////////////
 
 export function IntakeScreen() {
-  const zSettings = useSettingsStore((state) => state.settings);
+  const zSettings = useSettingsStore((state) => {
+    const s = state.settings;
+    return {
+      intakeButtons: s?.intakeButtons,
+      statuses: s?.statuses,
+      bikeBrands: s?.bikeBrands,
+      bikeBrandsName: s?.bikeBrandsName,
+      bikeOptionalBrands: s?.bikeOptionalBrands,
+      bikeOptionalBrandsName: s?.bikeOptionalBrandsName,
+      bikeDescriptions: s?.bikeDescriptions,
+    };
+  }, deepEqual);
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zInventory = useInventoryStore((state) => state.inventoryArr);
   const zCurrentUser = useLoginStore((state) => state.currentUser);

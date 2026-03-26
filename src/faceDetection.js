@@ -90,8 +90,7 @@ async function loadModelCached(net, modelName, db) {
           try {
             const cached = await getCachedShard(db, cacheKey);
             if (cached) {
-              log("Face model cache hit: " + filename);
-              return cached;
+              return cached; // cache hit
             }
           } catch (e) { /* fall through to network */ }
         }
@@ -175,7 +174,6 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         useLoginStore.getState().setCameraStatus("ready");
 
         if (!cancelled) {
-          log("Face detection setup complete — webcam found, models loaded.");
           _setReady(true);
         }
       } catch (e) {
@@ -206,8 +204,6 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     if (!sReady) return;
 
     _setStatus("Setup ready, enroll face now");
-    log("Starting background facial recognition");
-
     if (intervalRef.current) clearInterval(intervalRef.current);
 
     intervalRef.current = setInterval(async () => {

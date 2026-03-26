@@ -178,13 +178,11 @@ export function Dashboard_Admin({}) {
 
   //////////////////////////////////////////////////////////////////////////
   // Main component /////////////////////////////////////////////////////////
-  let OuterWrapper = sExpand === TAB_NAMES.quickItems ? View : ScrollView;
   return (
-    <OuterWrapper
+    <View
       style={{
-        padding: 0,
         paddingTop: 20,
-        flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
+        flex: 1,
       }}
     >
       {/**Modals that will appear when user takes an action */}
@@ -240,11 +238,11 @@ export function Dashboard_Admin({}) {
           flexDirection: "row",
           justifyContent: "space-between",
           paddingHorizontal: 5,
-          flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
+          flex: 1,
         }}
       >
         {/*********************left-side column container *****************/}
-        <View style={{ width: "30%" }}>
+        <ScrollView style={{ width: "30%" }}>
           <View
             style={{
               width: "100%",
@@ -521,16 +519,16 @@ export function Dashboard_Admin({}) {
               icon={ICONS.tools}
             />
           </View>
-        </View>
+        </ScrollView>
 
         {/*********************right-side column container****************** */}
 
-        <View
+        <ScrollView
           style={{
             width: "70%",
-            alignItems: "center",
             flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
           }}
+          contentContainerStyle={{ alignItems: "center" }}
         >
           {!sExpand && (<>
             <TouchableOpacity
@@ -970,9 +968,9 @@ export function Dashboard_Admin({}) {
           )}
           {sExpand === TAB_NAMES.import && <ImportComponent />}
           {sExpand === TAB_NAMES.backup && <BackupRecoveryComponent />}
-        </View>
+        </ScrollView>
       </View>
-    </OuterWrapper>
+    </View>
   );
 }
 

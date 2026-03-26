@@ -112,6 +112,26 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
   let hasCardPayments = cardPaymentsTotal > 0;
   let hasCashPayments = cashPaymentsTotal > 0;
 
+  // Compute which items would exceed the refund limit if added
+  let disabledItemIDs = new Set();
+  {
+    let taxRate = zSettings?.salesTaxPercent || 0;
+    sWorkordersInSale.forEach((wo) => {
+      (wo.workorderLines || []).forEach((line) => {
+        if (sSelectedItems.find((s) => s.id === line.id)) return;
+        if (previouslyRefundedIDs.includes(line.id) || previouslyRefundedIDs.includes(line._originalLineId)) return;
+        let itemPrice = line.discountObj?.newPrice != null
+          ? line.discountObj.newPrice
+          : line.inventoryItem?.price || 0;
+        let newItemsTotal = selectedItemsTotal + itemPrice;
+        let newTotalWithTax = newItemsTotal + Math.round(newItemsTotal * (taxRate / 100));
+        if (newTotalWithTax > refundLimits.maxRefund) {
+          disabledItemIDs.add(line.id);
+        }
+      });
+    });
+  }
+
   // ─── Initialization ──────────────────────────────────────
   if (visible && !sInitialized && (saleID || saleProp)) {
     _setInitialized(true);
@@ -182,35 +202,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
     if (exists) {
       _setSelectedItems(sSelectedItems.filter((s) => s.id !== line.id));
     } else {
-      // Check if adding this item would exceed the refund limit
-      let itemPrice = line.discountObj?.newPrice != null
-        ? line.discountObj.newPrice
-        : line.inventoryItem?.price || 0;
-      let taxRate = zSettings?.salesTaxPercent || 0;
-      let newItemsTotal = selectedItemsTotal + itemPrice;
-      let newTotalWithTax = newItemsTotal + Math.round(newItemsTotal * (taxRate / 100));
-
-      // Include card fee refund in the check if applicable
-      let cardFeeRefundAmount = 0;
-      if (zSettings?.cardFeeRefund && sOriginalSale?.cardFee > 0 && newTotalWithTax > 0) {
-        let refundRatio = newTotalWithTax / (sOriginalSale.total - (sOriginalSale.cardFee || 0));
-        cardFeeRefundAmount = Math.round((sOriginalSale.cardFee || 0) * refundRatio);
-      }
-
-      if (newTotalWithTax + cardFeeRefundAmount > refundLimits.maxRefund) {
-        useAlertScreenStore.getState().setValues({
-          showAlert: true,
-          title: "Refund Limit Exceeded",
-          message: `Adding this item would bring the refund to ${formatCurrencyDisp(newTotalWithTax)}, which exceeds the maximum refund of ${formatCurrencyDisp(refundLimits.maxRefund)}.`,
-          subMessage: refundLimits.previouslyRefunded > 0
-            ? `Previous refunds totaling ${formatCurrencyDisp(refundLimits.previouslyRefunded)} have already been processed.`
-            : "",
-          btn1Text: "OK",
-          handleBtn1Press: () => useAlertScreenStore.getState().setValues({ showAlert: false }),
-        });
-        return;
-      }
-
+      if (disabledItemIDs.has(line.id)) return;
       _setSelectedItems([...sSelectedItems, cloneDeep(line)]);
     }
     // Switch out of custom amount mode when selecting items
@@ -405,25 +397,6 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
             >
-              <View
-                style={{
-                  backgroundColor: C.lightred,
-                  borderRadius: 6,
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: Fonts.weight.textHeavy,
-                    color: "white",
-                    letterSpacing: 1,
-                  }}
-                >
-                  REFUND
-                </Text>
-              </View>
               <Text
                 style={{
                   fontSize: 14,
@@ -440,15 +413,39 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
               )}
             </View>
 
+            {/* Center: REFUND SCREEN indicator */}
+            <View
+              style={{
+                backgroundColor: C.lightred,
+                borderRadius: 6,
+                paddingHorizontal: 14,
+                paddingVertical: 4,
+                position: "absolute",
+                left: "50%",
+                transform: [{ translateX: "-50%" }],
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: Fonts.weight.textHeavy,
+                  color: "white",
+                  letterSpacing: 1,
+                }}
+              >
+                REFUND SCREEN
+              </Text>
+            </View>
+
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
               {/* Toggle custom amount mode */}
               {sOriginalSale && !sRefundComplete && (
                 <Button_
-                  text={sIsCustomAmount ? "SELECT ITEMS" : "CUSTOM REFUND AMOUNT"}
+                  text={sIsCustomAmount ? "EXIT CUSTOM REFUND" : "CUSTOM REFUND AMOUNT"}
                   onPress={toggleCustomAmount}
-                  colorGradientArr={sIsCustomAmount ? COLOR_GRADIENTS.grey : COLOR_GRADIENTS.green}
+                  colorGradientArr={sIsCustomAmount ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.green}
                   textStyle={{ fontSize: 11 }}
                   buttonStyle={{
                     paddingVertical: 6,
@@ -458,7 +455,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                 />
               )}
               <Button_
-                text="CLOSE"
+                text="EXIT REFUND SCREEN"
                 onPress={handleClose}
                 colorGradientArr={COLOR_GRADIENTS.red}
                 textStyle={{
@@ -527,6 +524,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                       : 0
                     }
                     lockedAmount={!sIsCustomAmount}
+                    shouldFocus={sIsCustomAmount && !!((sOriginalSale?.payments || [])[0]?.cash || (sOriginalSale?.payments || [])[0]?.check)}
                   />
                 </View>
                 <View
@@ -550,6 +548,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                       : 0
                     }
                     lockedAmount={!sIsCustomAmount}
+                    shouldFocus={sIsCustomAmount && !((sOriginalSale?.payments || [])[0]?.cash || (sOriginalSale?.payments || [])[0]?.check)}
                   />
                 </View>
               </View>
@@ -736,7 +735,9 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                     workordersInSale={sWorkordersInSale}
                     selectedItems={sSelectedItems}
                     onToggleItem={handleToggleItem}
+                    onClearItems={() => _setSelectedItems([])}
                     previouslyRefundedIDs={previouslyRefundedIDs}
+                    disabledItemIDs={disabledItemIDs}
                   />
                 )}
               </View>

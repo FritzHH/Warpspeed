@@ -807,7 +807,7 @@ export function NewCheckoutModalScreen() {
   }
 
   // ─── Render ───────────────────────────────────────────────
-  return (
+  return (<>
     <ScreenModal
       modalVisible={zIsCheckingOut}
       showOuterModal={true}
@@ -1232,15 +1232,18 @@ export function NewCheckoutModalScreen() {
               skipPortal={true}
             />
           )}
-          <NewRefundModalScreen
-            visible={sShowRefundModal}
-            sale={sSale}
-            initialPayment={sRefundPayment}
-            onClose={() => { _setShowRefundModal(false); _setRefundPayment(null); }}
-            onSaleUpdated={(updatedSale) => _setSale(updatedSale)}
-          />
         </View>
       )}
     />
+    {sShowRefundModal && (
+      <NewRefundModalScreen
+        visible={true}
+        sale={sSale}
+        initialPayment={sRefundPayment}
+        onClose={() => { _setShowRefundModal(false); _setRefundPayment(null); }}
+        onSaleUpdated={(updatedSale) => _setSale(updatedSale)}
+      />
+    )}
+  </>
   );
 }

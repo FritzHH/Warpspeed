@@ -11,12 +11,20 @@ export function CashRefund({
   refundComplete = false,
   suggestedAmount = 0,
   lockedAmount = false,
+  shouldFocus = false,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
   const [sStatusMessage, _setStatusMessage] = useState("");
   const [sFocused, _setFocused] = useState(false);
   const prevSuggestedRef = useRef(0);
+  const inputRef = useRef(null);
+  const prevShouldFocusRef = useRef(false);
+
+  if (shouldFocus && !prevShouldFocusRef.current) {
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }
+  prevShouldFocusRef.current = shouldFocus;
 
   // Auto-populate when suggested amount changes from item selection
   if (suggestedAmount !== prevSuggestedRef.current) {
@@ -32,6 +40,11 @@ export function CashRefund({
 
   function handleAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
+    if (result.cents > maxCashRefund) {
+      _setRefundAmountDisp(formatCurrencyDisp(maxCashRefund));
+      _setRefundAmount(maxCashRefund);
+      return;
+    }
     _setRefundAmountDisp(result.display);
     _setRefundAmount(result.cents);
   }
@@ -88,7 +101,7 @@ export function CashRefund({
             flexDirection: "row",
             alignItems: "center",
             borderWidth: 1,
-            borderColor: sFocused ? C.lightred : gray(0.15),
+            borderColor: sFocused ? C.green : gray(0.15),
             borderRadius: 6,
             paddingHorizontal: 8,
             paddingVertical: 6,
@@ -97,6 +110,7 @@ export function CashRefund({
         >
           <Text style={{ fontSize: 14, color: C.lightred, marginRight: 2 }}>$</Text>
           <TextInput
+            ref={inputRef}
             style={{
               flex: 1,
               outlineWidth: 0,

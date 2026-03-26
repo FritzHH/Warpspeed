@@ -226,7 +226,11 @@ export function calculateRefundLimits(originalSale, settings) {
     );
   }
 
-  let maxRefund = originalSale.total - totalPreviouslyRefunded;
+  let totalCaptured = (originalSale.payments || []).reduce(
+    (sum, p) => sum + (p.amountCaptured || 0),
+    0
+  );
+  let maxRefund = totalCaptured - totalPreviouslyRefunded;
   if (maxRefund < 0) maxRefund = 0;
 
   // If cardFeeRefund is false, subtract the card fee from the max refund

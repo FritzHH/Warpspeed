@@ -1,7 +1,8 @@
 /* eslint-disable */
 import { View, Text, ScrollView } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
-import { CheckBox_ } from "../../../../components";
+import { CheckBox_, Button_ } from "../../../../components";
+import { COLOR_GRADIENTS } from "../../../../styles";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
 function RefundItemRow({
@@ -9,6 +10,7 @@ function RefundItemRow({
   workorderNumber,
   isSelected,
   isRefunded,
+  isDisabled,
   onToggle,
 }) {
   let name =
@@ -33,16 +35,16 @@ function RefundItemRow({
           : isSelected
           ? "rgb(252, 235, 235)"
           : "transparent",
-        opacity: isRefunded ? 0.5 : 1,
+        opacity: isRefunded || isDisabled ? 0.5 : 1,
         borderRadius: 3,
       }}
     >
       <CheckBox_
         isChecked={isSelected || isRefunded}
         onCheck={() => {
-          if (!isRefunded) onToggle(line);
+          if (!isRefunded && !isDisabled) onToggle(line);
         }}
-        enabled={!isRefunded}
+        enabled={!isRefunded && !isDisabled}
         buttonStyle={{ marginRight: 8 }}
       />
       <View style={{ flex: 1 }}>
@@ -100,7 +102,9 @@ export function RefundItemSelector({
   workordersInSale = [],
   selectedItems = [],
   onToggleItem,
+  onClearItems,
   previouslyRefundedIDs = [],
+  disabledItemIDs = new Set(),
 }) {
   function isItemSelected(line) {
     return selectedItems.some((s) => s.id === line.id);
@@ -113,19 +117,40 @@ export function RefundItemSelector({
 
   return (
     <View style={{ flex: 1 }}>
-      <Text
+      <View
         style={{
-          fontSize: 13,
-          fontWeight: Fonts.weight.textHeavy,
-          color: C.text,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
           paddingHorizontal: 6,
           paddingBottom: 6,
           borderBottomWidth: 1,
           borderBottomColor: gray(0.1),
         }}
       >
-        SELECT ITEMS TO REFUND
-      </Text>
+        <Text
+          style={{
+            fontSize: 13,
+            fontWeight: Fonts.weight.textHeavy,
+            color: C.text,
+          }}
+        >
+          SELECT ITEMS TO REFUND
+        </Text>
+        <Button_
+          text="CLEAR LIST"
+          onPress={onClearItems}
+          enabled={selectedItems.length > 0}
+          colorGradientArr={COLOR_GRADIENTS.grey}
+          textStyle={{ fontSize: 10 }}
+          buttonStyle={{
+            paddingVertical: 3,
+            paddingHorizontal: 10,
+            borderRadius: 4,
+            opacity: selectedItems.length > 0 ? 1 : 0.3,
+          }}
+        />
+      </View>
 
       <ScrollView style={{ flex: 1, paddingTop: 4 }}>
         {workordersInSale.map((wo) => (
@@ -157,6 +182,7 @@ export function RefundItemSelector({
                 }
                 isSelected={isItemSelected(line)}
                 isRefunded={isItemRefunded(line)}
+                isDisabled={disabledItemIDs.has(line.id)}
                 onToggle={onToggleItem}
               />
             ))}

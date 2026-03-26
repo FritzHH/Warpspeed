@@ -19,6 +19,7 @@ export function CardRefund({
   refundComplete = false,
   suggestedAmount = 0,
   lockedAmount = false,
+  shouldFocus = false,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
@@ -27,6 +28,13 @@ export function CardRefund({
   const [sSuccessMessage, _setSuccessMessage] = useState("");
   const [sFocused, _setFocused] = useState(false);
   const prevSuggestedRef = useRef(0);
+  const inputRef = useRef(null);
+  const prevShouldFocusRef = useRef(false);
+
+  if (shouldFocus && !prevShouldFocusRef.current) {
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }
+  prevShouldFocusRef.current = shouldFocus;
 
   // Auto-populate when suggested amount changes from item selection
   if (suggestedAmount !== prevSuggestedRef.current) {
@@ -42,6 +50,17 @@ export function CardRefund({
 
   function handleAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
+    // Cap to the lesser of max card refund and selected card's available amount
+    let maxAllowed = maxCardRefund;
+    if (selectedPayment) {
+      let cardAvailable = selectedPayment.amountCaptured - (selectedPayment.amountRefunded || 0);
+      maxAllowed = Math.min(maxAllowed, cardAvailable);
+    }
+    if (result.cents > maxAllowed) {
+      _setRefundAmountDisp(formatCurrencyDisp(maxAllowed));
+      _setRefundAmount(maxAllowed);
+      return;
+    }
     _setRefundAmountDisp(result.display);
     _setRefundAmount(result.cents);
   }
@@ -175,7 +194,7 @@ export function CardRefund({
             flexDirection: "row",
             alignItems: "center",
             borderWidth: 1,
-            borderColor: sFocused ? C.lightred : gray(0.15),
+            borderColor: sFocused ? C.green : gray(0.15),
             borderRadius: 6,
             paddingHorizontal: 8,
             paddingVertical: 6,
@@ -184,6 +203,7 @@ export function CardRefund({
         >
           <Text style={{ fontSize: 14, color: C.lightred, marginRight: 2 }}>$</Text>
           <TextInput
+            ref={inputRef}
             style={{
               flex: 1,
               outlineWidth: 0,

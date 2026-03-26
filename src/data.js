@@ -167,6 +167,20 @@ export const WAIT_TIME_INCREMENTS = {
 };
 
 
+export const CUSTOMER_DEPOST_TYPES = {
+  deposit: 'deposit',
+  credit: 'credit',
+}
+export const CUSTOMER_DEPOSIT_PROTO = {
+  id: "",
+  type: "", //CUSTOMER_DEPOST_TYPES.deposit or CUSTOMER_DEPOST_TYPES.credit
+  amountCents: 0,
+  millis: "",
+  note: "",
+}
+
+
+
 ////////// names of stuff ////////////////////////////
 export const INVENTORY_CATEGORY_NAMES = {
   parts: "Parts",
@@ -335,6 +349,7 @@ export const SALE_PROTO = {
   textToPay: false,
   checkoutSessionID: "",
   receiptURL: "",
+  isDepositSale: false,
 };
 
 export const SALE_INDEX_PROTO = {
@@ -458,6 +473,7 @@ export const CUSTOMER_PROTO = {
   previousBikes: [],
   sales: [],
   millisCreated: "",
+  deposits: [],
   language: CUSTOMER_LANGUAGES.english
 };
 
@@ -502,6 +518,12 @@ export const INTAKE_BUTTON_PROTO = {
   itemsToAdd: [/*inventory item IDs*/],
 };
 
+export const INTAKE_QUICK_BUTTON_PROTO = {
+  id: "",
+  label: "",
+  inventoryItemID: "",
+};
+
 export const AUTO_CUSTOMER_NOTE_PROTO = {
   inventoryItemID: "",
   text: "",
@@ -527,6 +549,13 @@ export const PRINTER_PROTO = {
 
 export const WAIT_TIMES_PROTO = {
   id: "",
+  label: "",
+  maxWaitTimeDays: "",
+  removable: true,
+}
+
+export const CUSTOM_WAIT_TIME = {
+  id: "custom_wait_time",
   label: "",
   maxWaitTimeDays: "",
   removable: true,
@@ -724,7 +753,6 @@ export const SETTINGS_OBJ = {
       removable: true,
     },
   ],
-  intakeButtons: [/*{ ...INTAKE_BUTTON_PROTO }*/],
   quickItemButtons: [
     { id: "38trrneg", name: "Tune-Up", parentID: null, items: [], removable: true },
     { id: "38trrdfdneg", name: "Tube", parentID: null, items: ["3Rh6JaP75v1esbywt18E", "9xCMXA89wZeAt1IBfLoU"], removable: true },
@@ -797,6 +825,7 @@ export const SETTINGS_OBJ = {
       type: DISCOUNT_TYPES.dollar,
     },
   ],
+  intakeQuickButtons: [], // 2D array of rows, each row is array of INTAKE_QUICK_BUTTON_PROTO
   waitTimeLinkedStatus: {},
   waitTimeLabelCategories: [
     {
@@ -944,9 +973,9 @@ export const SETTINGS_OBJ = {
   selectedPrinterID: "",
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
-  activeLoginTimeoutSeconds: 15,
   smsConversationLockTimeout: 2, //days
   smsBlockedNumbers: [], // array of 10-digit phone strings
+  activeLoginTimeoutSeconds: 7,
   userInactivityTimeout: 60,
   idleLoginTimeoutHours: 24,
   salesTaxPercent: 6.5,

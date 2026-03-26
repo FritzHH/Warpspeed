@@ -1,13 +1,37 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
+import { Pressable_, Tooltip } from "../../../../components";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
-function PaymentRow({ payment, onRefund }) {
+function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemoveDeposit }) {
   let isCash = payment.cash;
   let isCheck = payment.check;
+  let isDeposit = payment.isDeposit;
+  let isCard = !isCash && !isCheck && !isDeposit;
+  let depositPaidByCash = isDeposit && payment.depositCash;
+  let depositPaidByCard = isDeposit && !payment.depositCash;
 
-  return (
+  function getPaymentLabel() {
+    if (isDeposit) {
+      let typeLabel = payment.depositType === "credit" ? "CREDIT" : "DEPOSIT";
+      if (depositPaidByCash) return "CASH " + typeLabel;
+      if (payment.last4) return "CARD " + typeLabel;
+      return typeLabel + " APPLIED";
+    }
+    if (isCheck) return "CHECK SALE";
+    if (isCash) return "CASH SALE";
+    return "CARD SALE";
+  }
+
+  function getAmountLabel() {
+    if (isDeposit) return "Amount applied";
+    if (isCheck) return "Check received";
+    if (isCash) return "Cash received";
+    return "Card payment received";
+  }
+
+  let content = (
     <View
       style={{
         padding: 5,
@@ -25,12 +49,12 @@ function PaymentRow({ payment, onRefund }) {
           alignItems: "center",
         }}
       >
-        <Text style={{ color: C.green }}>
-          {isCheck ? "CHECK SALE" : isCash ? "CASH SALE" : "CARD SALE"}
+        <Text style={{ color: isDeposit ? C.blue : C.green }}>
+          {getPaymentLabel()}
         </Text>
         {onRefund && (
           <TouchableOpacity
-            onPress={onRefund}
+            onPress={(e) => { e.stopPropagation(); onRefund(); }}
             style={{
               backgroundColor: C.red,
               borderRadius: 5,
@@ -45,36 +69,19 @@ function PaymentRow({ payment, onRefund }) {
         )}
       </View>
 
-      {/* Amount received */}
+      {/* Amount line */}
       <View
         style={{
           flexDirection: "row",
           justifyContent: "space-between",
         }}
       >
-        <Text style={{ color: C.text }}>Amount received</Text>
-        <Text>{formatCurrencyDisp(payment.amountCaptured, true)}</Text>
+        <Text style={{ color: C.text }}>{getAmountLabel()}</Text>
+        <Text style={{ color: C.text }}>{formatCurrencyDisp(payment.amountCaptured, true)}</Text>
       </View>
 
-      {/* Previous refunds */}
-      {!!payment.amountRefunded && (
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text style={{ color: C.red, fontSize: 13 }}>
-            Previous Refund amount
-          </Text>
-          <Text style={{ color: C.red, fontSize: 13 }}>
-            {formatCurrencyDisp(payment.amountRefunded, true)}
-          </Text>
-        </View>
-      )}
-
-      {/* Card details */}
-      {!isCash && !isCheck && payment.last4 && (
+      {/* Card details — for card payments and deposit-applied payments that were paid by card */}
+      {((isCard || depositPaidByCard) && payment.last4) ? (
         <View
           style={{
             flexDirection: "row",
@@ -93,25 +100,68 @@ function PaymentRow({ payment, onRefund }) {
             </Text>
           )}
         </View>
+      ) : null}
+
+      {/* Deposit note */}
+      {!!isDeposit && !!payment.depositNote && (
+        <Text numberOfLines={2} style={{ color: gray(0.4), fontSize: 13 }}>
+          {payment.depositNote}
+        </Text>
       )}
 
-      {/* Cash tender */}
-      {!!isCash && (
+      {/* Previous refunds */}
+      {!!payment.amountRefunded && (
         <View
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
           }}
         >
-          <Text>Amount Tendered </Text>
-          <Text>{formatCurrencyDisp(payment.amountTendered, true)}</Text>
+          <Text style={{ color: C.red, fontSize: 13 }}>
+            Previous Refund amount
+          </Text>
+          <Text style={{ color: C.red, fontSize: 13 }}>
+            {formatCurrencyDisp(payment.amountRefunded, true)}
+          </Text>
+        </View>
+      )}
+
+      {/* Cash tender */}
+      {!!isCash && !isDeposit && (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+          }}
+        >
+          <Text style={{ color: C.text }}>Amount Tendered</Text>
+          <Text style={{ color: C.text }}>{formatCurrencyDisp(payment.amountTendered, true)}</Text>
         </View>
       )}
     </View>
   );
+
+  // Build tooltip text
+  let tooltipText = "Click to print paper receipt";
+  if (isDeposit && onRemoveDeposit) {
+    tooltipText += "\nRight-click to remove deposit from sale";
+  }
+
+  return (
+    <Tooltip text={tooltipText} position="top">
+      <Pressable_
+        onPress={isDeposit
+          ? (onPrintDepositReceipt && payment.depositSaleID ? onPrintDepositReceipt : undefined)
+          : onPress || undefined}
+        onRightPress={isDeposit && onRemoveDeposit ? onRemoveDeposit : undefined}
+      >
+        {content}
+      </Pressable_>
+    </Tooltip>
+  );
 }
 
-export function PaymentsList({ payments = [], onRefund }) {
+export function PaymentsList({ payments = [], onRefund, onPrintReceipt, onPrintDepositReceipt, onRemoveDeposit }) {
   if (!payments || payments.length === 0) return null;
 
   return (
@@ -129,6 +179,9 @@ export function PaymentsList({ payments = [], onRefund }) {
             key={payment.id || idx}
             payment={payment}
             onRefund={onRefund ? () => onRefund(payment) : null}
+            onPress={onPrintReceipt ? () => onPrintReceipt(payment) : null}
+            onPrintDepositReceipt={onPrintDepositReceipt ? () => onPrintDepositReceipt(payment) : null}
+            onRemoveDeposit={onRemoveDeposit ? () => onRemoveDeposit(payment) : null}
           />
         ))}
       </View>

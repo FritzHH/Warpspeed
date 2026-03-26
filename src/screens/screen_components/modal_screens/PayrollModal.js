@@ -6,8 +6,9 @@ import {
   FlatList,
   ScrollView,
   TouchableOpacity,
+  Modal,
 } from "react-native-web";
-import { Button_, DropdownMenu, Image_, TextInput_ } from "../../../components";
+import { Button_, DropdownMenu, Image_, TimePicker_ } from "../../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
@@ -404,36 +405,27 @@ export const PayrollModal = ({ handleExit }) => {
     modifiedPunchIdsRef.current.add(punchObj.id);
   }
 
-  function handleDirectTimeEdit(item, prefix, field, value) {
+  function handleFullTimeChange(item, prefix, hour, minute, period) {
     let punch = prefix === "in" ? item.in : item.out;
     if (!punch) return;
-    let numVal = parseInt(value, 10);
-    if (isNaN(numVal)) return;
 
     let date = new Date(punch.millis);
-
-    if (field === "hour") {
-      if (numVal < 1 || numVal > 12) return;
-      let hours24;
-      if (punch.amPM === "AM") {
-        hours24 = numVal === 12 ? 0 : numVal;
-      } else {
-        hours24 = numVal === 12 ? 12 : numVal + 12;
-      }
-      date.setHours(hours24);
-    } else if (field === "minutes") {
-      if (numVal < 0 || numVal > 59) return;
-      date.setMinutes(numVal);
+    let hours24;
+    if (period === "AM") {
+      hours24 = hour === 12 ? 0 : hour;
+    } else {
+      hours24 = hour === 12 ? 12 : hour + 12;
     }
-
+    date.setHours(hours24);
+    date.setMinutes(minute);
     let newMillis = date.getTime();
-
-    let idx = sFilteredArr.findIndex((o) => o.id === punch.id);
-    if (idx === -1) return;
 
     let otherPunch = prefix === "in" ? item.out : item.in;
     if (prefix === "in" && otherPunch && newMillis >= otherPunch.millis) return;
     if (prefix === "out" && otherPunch && newMillis <= otherPunch.millis) return;
+
+    let idx = sFilteredArr.findIndex((o) => o.id === punch.id);
+    if (idx === -1) return;
 
     let filteredArr = cloneDeep(sFilteredArr);
     filteredArr[idx] = { ...filteredArr[idx], millis: newMillis };
@@ -1262,8 +1254,8 @@ export const PayrollModal = ({ handleExit }) => {
                                 onEdit={(opt) =>
                                   handleTimeEdit(item, opt)
                                 }
-                                onDirectEdit={(prefix, field, val) =>
-                                  handleDirectTimeEdit(item, prefix, field, val)
+                                onTimeChange={(prefix, hour, minute, period) =>
+                                  handleFullTimeChange(item, prefix, hour, minute, period)
                                 }
                                 iconSize={iconSize}
                               />
@@ -1347,8 +1339,8 @@ export const PayrollModal = ({ handleExit }) => {
                                 onEdit={(opt) =>
                                   handleTimeEdit(item, opt)
                                 }
-                                onDirectEdit={(prefix, field, val) =>
-                                  handleDirectTimeEdit(item, prefix, field, val)
+                                onTimeChange={(prefix, hour, minute, period) =>
+                                  handleFullTimeChange(item, prefix, hour, minute, period)
                                 }
                                 iconSize={iconSize}
                               />
@@ -1653,99 +1645,77 @@ export const PayrollModal = ({ handleExit }) => {
   );
 };
 
-/** Reusable editable time cell with up/down chevrons */
-const timeInputStyle = {
-  fontSize: 12,
-  textAlign: "center",
-  width: 24,
-  paddingVertical: 1,
-  paddingHorizontal: 2,
-  borderWidth: 1,
-  borderColor: gray(0.8),
-  borderRadius: 3,
-  outlineWidth: 0,
+/** Reusable editable time cell — date adjuster + tappable time that opens TimePicker_ */
+const EditableTimeCell = ({ timeObj, prefix, onEdit, onTimeChange, iconSize }) => {
+  const [sShowPicker, _sSetShowPicker] = useState(false);
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center" }}>
+      {/* Date adjust */}
+      <View style={{ alignItems: "center" }}>
+        <Button_
+          icon={ICONS.upChevron}
+          iconSize={iconSize}
+          onPress={() => onEdit(prefix + "-date-up")}
+          buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
+        />
+        <Text style={{ fontSize: 12, textAlign: "center", width: 20 }}>
+          {timeObj.dayOfMonth}
+        </Text>
+        <Button_
+          icon={ICONS.downChevron}
+          iconSize={iconSize}
+          onPress={() => onEdit(prefix + "-date-down")}
+          buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
+        />
+      </View>
+      {/* Tappable time display */}
+      <TouchableOpacity
+        onPress={() => _sSetShowPicker(true)}
+        style={{
+          marginLeft: 4,
+          paddingHorizontal: 6,
+          paddingVertical: 4,
+          borderRadius: 4,
+          borderWidth: 1,
+          borderColor: gray(0.75),
+          backgroundColor: gray(0.95),
+        }}
+      >
+        <Text style={{ fontSize: 12, color: C.text }}>
+          {timeObj.hour}:{String(timeObj.minutes).padStart(2, "0")} {timeObj.amPM}
+        </Text>
+      </TouchableOpacity>
+      {/* TimePicker_ modal */}
+      <Modal visible={sShowPicker} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => _sSetShowPicker(false)}>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.4)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View>
+                <TimePicker_
+                  initialHour={timeObj.hour}
+                  initialMinute={timeObj.minutes}
+                  initialPeriod={timeObj.amPM}
+                  onConfirm={({ hour, minute, period }) => {
+                    onTimeChange(prefix, hour, minute, period);
+                    _sSetShowPicker(false);
+                  }}
+                  onCancel={() => _sSetShowPicker(false)}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </View>
+  );
 };
-
-const EditableTimeCell = ({ timeObj, prefix, onEdit, onDirectEdit, iconSize }) => (
-  <View style={{ flexDirection: "row", alignItems: "center" }}>
-    {/* Date adjust */}
-    <View style={{ alignItems: "center" }}>
-      <Button_
-        icon={ICONS.upChevron}
-        iconSize={iconSize}
-        onPress={() => onEdit(prefix + "-date-up")}
-        buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
-      />
-      <Text style={{ fontSize: 12, textAlign: "center", width: 20 }}>
-        {timeObj.dayOfMonth}
-      </Text>
-      <Button_
-        icon={ICONS.downChevron}
-        iconSize={iconSize}
-        onPress={() => onEdit(prefix + "-date-down")}
-        buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
-      />
-    </View>
-    {/* Hour adjust */}
-    <View style={{ alignItems: "center", marginLeft: 4 }}>
-      <Button_
-        icon={ICONS.upChevron}
-        iconSize={iconSize}
-        onPress={() => onEdit(prefix + "-hour-up")}
-        buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
-      />
-      <TextInput_
-        value={String(timeObj.hour)}
-        onChangeText={(val) => onDirectEdit(prefix, "hour", val)}
-        style={timeInputStyle}
-        debounceMs={800}
-      />
-      <Button_
-        icon={ICONS.downChevron}
-        iconSize={iconSize}
-        onPress={() => onEdit(prefix + "-hour-down")}
-        buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
-      />
-    </View>
-    <Text style={{ paddingHorizontal: 1, fontSize: 12 }}>:</Text>
-    {/* Minutes adjust */}
-    <View style={{ alignItems: "center" }}>
-      <Button_
-        icon={ICONS.upChevron}
-        iconSize={iconSize}
-        onPress={() => onEdit(prefix + "-minutes-up")}
-        buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
-      />
-      <TextInput_
-        value={String(timeObj.minutes).padStart(2, "0")}
-        onChangeText={(val) => onDirectEdit(prefix, "minutes", val)}
-        style={timeInputStyle}
-        debounceMs={800}
-      />
-      <Button_
-        icon={ICONS.downChevron}
-        iconSize={iconSize}
-        onPress={() => onEdit(prefix + "-minutes-down")}
-        buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
-      />
-    </View>
-    {/* AM/PM toggle */}
-    <TouchableOpacity
-      onPress={() => onEdit(prefix + "-am-pm")}
-      style={{
-        paddingHorizontal: 3,
-        paddingVertical: 2,
-        borderRadius: 3,
-        backgroundColor: gray(0.9),
-        marginLeft: 2,
-      }}
-    >
-      <Text style={{ fontSize: 11, color: gray(0.5) }}>
-        {timeObj.amPM}
-      </Text>
-    </TouchableOpacity>
-  </View>
-);
 
 const PayrollSummaryItem = ({ label, value, highlight }) => (
   <View

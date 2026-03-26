@@ -8,7 +8,10 @@ import dayjs from "dayjs";
 function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
   let isCash = payment.cash;
   let isCheck = payment.check;
-  let typeLabel = isCheck ? "CHECK" : isCash ? "CASH" : "CARD";
+  let isDeposit = payment.isDeposit;
+  let typeLabel = isDeposit
+    ? (payment.depositType === "credit" ? "CREDIT" : "DEPOSIT")
+    : isCheck ? "CHECK" : isCash ? "CASH" : "CARD";
   let available = payment.amountCaptured - (payment.amountRefunded || 0);
   let fullyRefunded = available <= 0;
 
@@ -58,7 +61,7 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <View
             style={{
-              backgroundColor: isCash || isCheck ? C.green : C.blue,
+              backgroundColor: isDeposit ? C.purple : (isCash || isCheck ? C.green : C.blue),
               borderRadius: 3,
               paddingHorizontal: 5,
               paddingVertical: 1,
@@ -86,9 +89,16 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
         </View>
 
         {/* Card details */}
-        {!isCash && !isCheck && payment.last4 && (
+        {!isCash && !isCheck && !isDeposit && payment.last4 && (
           <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
             {payment.cardIssuer} ****{payment.last4} {payment.expMonth}/{payment.expYear}
+          </Text>
+        )}
+
+        {/* Deposit details */}
+        {isDeposit && !!payment.depositNote && (
+          <Text numberOfLines={1} style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
+            {payment.depositNote}
           </Text>
         )}
 
@@ -177,12 +187,12 @@ export function RefundPaymentSelector({
       <ScrollView style={{ maxHeight: 200 }}>
         {payments.map((payment, idx) => {
           let isSelected = selectedPayments.some((p) => p.id === payment.id);
-          let paymentIsCash = payment.cash || payment.check;
+          let paymentIsCash = payment.cash || payment.check || payment.isDeposit;
 
           // Disable logic
           let rowDisabled = disabled;
           if (!rowDisabled && selectedPayments.length > 0 && !isSelected) {
-            let selIsCash = selectedPayments[0].cash || selectedPayments[0].check;
+            let selIsCash = selectedPayments[0].cash || selectedPayments[0].check || selectedPayments[0].isDeposit;
             if (paymentIsCash !== selIsCash) {
               // Different type than current selection
               rowDisabled = true;

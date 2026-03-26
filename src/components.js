@@ -19,9 +19,9 @@ import React, {
   useCallback,
 } from "react";
 import { Image } from "react-native-web";
-import { gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log } from "./utils";
+import { formatCurrencyDisp, formatMillisForDisplay, generateRandomID, gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log, usdTypeMask } from "./utils";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
-import { SETTINGS_OBJ, PRIVILEDGE_LEVELS } from "./data";
+import { SETTINGS_OBJ, PRIVILEDGE_LEVELS, CUSTOMER_DEPOST_TYPES } from "./data";
 import { cloneDeep } from "lodash";
 import { DEBOUNCE_DELAY, LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "./constants";
 import {
@@ -43,6 +43,35 @@ import { dbDeleteInventoryItem, dbSaveInventoryItem } from "./db_calls_wrapper";
 
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
+
+export const StaleBanner = ({ text, style }) => {
+  const opacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <Animated.View
+      style={{
+        backgroundColor: C.orange,
+        paddingVertical: 4,
+        paddingHorizontal: 12,
+        borderRadius: 5,
+        alignItems: "center",
+        opacity,
+        ...style,
+      }}
+    >
+      <Text style={{ color: "white", fontSize: 11, fontWeight: "600" }}>{text}</Text>
+    </Animated.View>
+  );
+};
 const styles = {
   container: {
     // margin: 20,
@@ -2956,6 +2985,54 @@ export const Tooltip = ({
   );
 };
 
+export const Pressable_ = ({
+  children,
+  onPress,
+  onDoublePress,
+  onRightPress,
+  tooltip = "",
+  activeOpacity = 0.7,
+  style = {},
+}) => {
+  const clickTimer = useRef(null);
+
+  function handlePress() {
+    if (onDoublePress) {
+      if (clickTimer.current) {
+        clearTimeout(clickTimer.current);
+        clickTimer.current = null;
+        onDoublePress();
+      } else {
+        clickTimer.current = setTimeout(() => {
+          clickTimer.current = null;
+          if (onPress) onPress();
+        }, 350);
+      }
+    } else {
+      if (onPress) onPress();
+    }
+  }
+
+  function handleContextMenu(e) {
+    if (onRightPress) {
+      e.preventDefault();
+      onRightPress();
+    }
+  }
+
+  return (
+    <View onContextMenu={handleContextMenu} title={tooltip || undefined}>
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={activeOpacity}
+        style={style}
+      >
+        {children}
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 const StatusPickerRow = ({ status, idx, total, onPress }) => {
   const [sHovered, _setHovered] = useState(false);
   return (
@@ -3132,6 +3209,217 @@ export const StatusPickerModal = ({
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+    </View>
+  );
+};
+
+export const DepositModal = ({ visible, onClose, onPay }) => {
+  const [sDepositType, _sSetDepositType] = useState(CUSTOMER_DEPOST_TYPES.deposit);
+  const [sDepositAmount, _sSetDepositAmount] = useState("");
+  const [sDepositAmountCents, _sSetDepositAmountCents] = useState(0);
+  const [sDepositNote, _sSetDepositNote] = useState("");
+
+  function resetAndClose() {
+    _sSetDepositAmount("");
+    _sSetDepositAmountCents(0);
+    _sSetDepositNote("");
+    _sSetDepositType(CUSTOMER_DEPOST_TYPES.deposit);
+    onClose();
+  }
+
+  if (!visible) return null;
+  return (
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 100,
+        borderRadius: 15,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={resetAndClose}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      <View
+        style={{
+          width: 350,
+          backgroundColor: C.backgroundWhite,
+          borderRadius: 12,
+          borderWidth: 2,
+          borderColor: C.buttonLightGreenOutline,
+          padding: 20,
+        }}
+      >
+        <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 14 }}>
+          Add Deposit / Credit
+        </Text>
+        <View style={{ flexDirection: "row", marginBottom: 14 }}>
+          <CheckBox_
+            text="Deposit"
+            isChecked={sDepositType === CUSTOMER_DEPOST_TYPES.deposit}
+            onCheck={() => _sSetDepositType(CUSTOMER_DEPOST_TYPES.deposit)}
+            textStyle={{ fontSize: 14 }}
+            buttonStyle={{ marginRight: 20 }}
+          />
+          <CheckBox_
+            text="Credit"
+            isChecked={sDepositType === CUSTOMER_DEPOST_TYPES.credit}
+            onCheck={() => _sSetDepositType(CUSTOMER_DEPOST_TYPES.credit)}
+            textStyle={{ fontSize: 14 }}
+          />
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderRadius: 7, backgroundColor: C.listItemWhite, marginBottom: 10, paddingHorizontal: 10, height: 40 }}>
+          <Text style={{ fontSize: 16, color: gray(0.4), marginRight: 4 }}>$</Text>
+          <TextInput_
+            placeholder="0.00"
+            placeholderTextColor={gray(0.35)}
+            value={sDepositAmount}
+            onChangeText={(val) => {
+              let result = usdTypeMask(val);
+              _sSetDepositAmount(result.display);
+              _sSetDepositAmountCents(result.cents);
+            }}
+            debounceMs={0}
+            style={{
+              flex: 1,
+              fontSize: 16,
+              outlineWidth: 0,
+              outlineStyle: "none",
+              borderWidth: 0,
+              height: 38,
+              color: C.text,
+            }}
+          />
+        </View>
+        <TextInput_
+          placeholder="Note (optional)"
+          placeholderTextColor={gray(0.35)}
+          value={sDepositNote}
+          onChangeText={(val) => _sSetDepositNote(val)}
+          debounceMs={0}
+          multiline={true}
+          numberOfLines={5}
+          blurOnSubmit={false}
+          style={{
+            borderColor: gray(0.08),
+            borderWidth: 1,
+            borderRadius: 7,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+            fontSize: 14,
+            lineHeight: 20,
+            backgroundColor: C.listItemWhite,
+            marginBottom: 18,
+            color: C.text,
+          }}
+        />
+        <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+          <Button_
+            text="Cancel"
+            colorGradientArr={COLOR_GRADIENTS.red}
+            textStyle={{ color: C.textWhite, fontSize: 13 }}
+            buttonStyle={{ width: 90, height: 34, borderRadius: 6, marginRight: 10 }}
+            onPress={resetAndClose}
+          />
+          <Button_
+            text="Pay Amount"
+            colorGradientArr={COLOR_GRADIENTS.green}
+            textStyle={{ color: C.textWhite, fontSize: 13 }}
+            buttonStyle={{ width: 110, height: 34, borderRadius: 6 }}
+            onPress={() => {
+              if (sDepositAmountCents <= 0) return;
+              onPay({
+                type: sDepositType,
+                amountCents: sDepositAmountCents,
+                note: sDepositNote,
+              });
+              resetAndClose();
+            }}
+          />
+        </View>
+      </View>
+    </View>
+  );
+};
+
+export const DepositsList = ({ deposits }) => {
+  let activeDeposits = (deposits || []).filter((d) => d.amountCents > 0);
+  return (
+    <View style={{ marginTop: 10, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 10, padding: 10, backgroundColor: C.listItemWhite }}>
+      <Text style={{ fontSize: 15, fontWeight: "600", marginBottom: 6 }}>
+        <Text style={{ color: C.green }}>Deposits</Text>
+        <Text style={{ color: gray(0.4) }}> / </Text>
+        <Text style={{ color: C.blue }}>Credits</Text>
+      </Text>
+      {activeDeposits.length === 0 && (
+        <Text style={{ color: gray(0.4), fontSize: 12, textAlign: "center", marginTop: 4 }}>
+          No deposits on file
+        </Text>
+      )}
+      {activeDeposits.map((deposit) => (
+        <View
+          key={deposit.id}
+          style={{
+            marginBottom: 4,
+            borderRadius: 7,
+            borderLeftWidth: 4,
+            borderLeftColor: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
+            borderColor: C.buttonLightGreenOutline,
+            borderWidth: 1,
+            backgroundColor: C.listItemWhite,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View
+                style={{
+                  backgroundColor: deposit.type === CUSTOMER_DEPOST_TYPES.credit
+                    ? lightenRGBByPercent(C.blue, 70)
+                    : lightenRGBByPercent(C.green, 70),
+                  paddingHorizontal: 6,
+                  paddingVertical: 1,
+                  borderRadius: 8,
+                  marginRight: 6,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "600",
+                    color: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
+                  }}
+                >
+                  {deposit.type === CUSTOMER_DEPOST_TYPES.credit ? "Credit" : "Deposit"}
+                </Text>
+              </View>
+              {!!deposit.note && (
+                <Text numberOfLines={1} style={{ fontSize: 11, color: gray(0.5), flex: 1 }}>
+                  {deposit.note}
+                </Text>
+              )}
+            </View>
+            <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 2 }}>
+              {formatMillisForDisplay(deposit.millis)}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+            {"$" + formatCurrencyDisp(deposit.amountCents)}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 };

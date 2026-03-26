@@ -11,6 +11,7 @@ export const ROUTES = {
   display: "/display",
   translate: "/translate",
   intake: "/intake",
+  stand: "/stand",
   customerWorkorder: "/wo/:pin",
   mobile: {
     home: "/",

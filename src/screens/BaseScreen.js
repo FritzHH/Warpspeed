@@ -33,6 +33,7 @@ import {
 import { FaceDetectionClientComponent } from "../faceDetection";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
+import { ClosedWorkorderModal } from "./screen_components/modal_screens/ClosedWorkorderModal";
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode } from "../utils";
 import { newCheckoutGetStripeReaders } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -251,6 +252,11 @@ export function BaseScreen() {
 
   // subscribe to database listeners
   useEffect(() => {
+    // Workorders first — small collection, needed immediately for UI
+    dbListenToOpenWorkorders((data) => {
+      useOpenWorkordersStore.getState().setOpenWorkorders(data);
+    });
+
     // tested!!
     dbListenToSettings((data) => {
       // log("settings", data.users[0].faceDescriptor);
@@ -266,13 +272,6 @@ export function BaseScreen() {
     dbListenToInventory((data) => {
       useInventoryStore.getState().setItems(data);
       // log("inventory", data);
-    });
-
-    /// not tested :(
-
-    dbListenToOpenWorkorders((data) => {
-      // log("incoming workorder listen", data);
-      useOpenWorkordersStore.getState().setOpenWorkorders(data);
     });
 
     // Recover any pending auto-text messages from localStorage (crash recovery)
@@ -303,6 +302,7 @@ export function BaseScreen() {
           50% { opacity: 0.3; }
         }
       `}</style>
+      <ClosedWorkorderModal />
       <NewCheckoutModalScreen />
       <NewRefundModalScreen
         visible={sRefundModalVisible}

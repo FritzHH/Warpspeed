@@ -10,11 +10,109 @@ import {
   PAUSE_USER_CLOCK_IN_CHECK_MILLIS,
 } from "./constants";
 import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
-import { Button_ } from "./components";
+import { Button_, SmallLoadingIndicator } from "./components";
 import { C, COLOR_GRADIENTS } from "./styles";
 
 const MODEL_URL = "./models";
-const LOGOUT_GRACE_PERIOD_MS = 15000; // 15s before clearing user on no-match/no-face
+const DEFAULT_LOGOUT_GRACE_SECONDS = 7;
+
+// IndexedDB cache for model weight shards ////////////////////////////////////
+const CACHE_DB_NAME = "faceapi-model-cache";
+const CACHE_DB_VERSION = 1;
+const CACHE_STORE_NAME = "shards";
+const MODEL_CACHE_VERSION = "v1"; // bump when model files in public/models/ change
+
+function openCacheDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(CACHE_DB_NAME, CACHE_DB_VERSION);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(CACHE_STORE_NAME)) {
+        db.createObjectStore(CACHE_STORE_NAME);
+      }
+    };
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+function getCachedShard(db, key) {
+  return new Promise((resolve) => {
+    const tx = db.transaction(CACHE_STORE_NAME, "readonly");
+    const store = tx.objectStore(CACHE_STORE_NAME);
+    const request = store.get(key);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => resolve(null);
+  });
+}
+
+function setCachedShard(db, key, buffer) {
+  return new Promise((resolve) => {
+    const tx = db.transaction(CACHE_STORE_NAME, "readwrite");
+    const store = tx.objectStore(CACHE_STORE_NAME);
+    const request = store.put(buffer, key);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+  });
+}
+
+async function clearStaleCache(db) {
+  try {
+    const tx = db.transaction(CACHE_STORE_NAME, "readwrite");
+    const store = tx.objectStore(CACHE_STORE_NAME);
+    const allKeys = await new Promise((resolve) => {
+      const req = store.getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+    for (const key of allKeys) {
+      if (typeof key === "string" && !key.startsWith(MODEL_CACHE_VERSION + ":")) {
+        store.delete(key);
+      }
+    }
+  } catch (e) {
+    // ignore — stale entries don't affect correctness
+  }
+}
+
+async function loadModelCached(net, modelName, db) {
+  const manifestUri = MODEL_URL + "/" + modelName + "-weights_manifest.json";
+  const manifestResponse = await fetch(manifestUri);
+  const manifest = await manifestResponse.json();
+
+  const cachedFetchWeights = async (fetchUrls) => {
+    return Promise.all(
+      fetchUrls.map(async (url) => {
+        const filename = url.split("/").pop();
+        const cacheKey = MODEL_CACHE_VERSION + ":" + filename;
+
+        if (db) {
+          try {
+            const cached = await getCachedShard(db, cacheKey);
+            if (cached) {
+              log("Face model cache hit: " + filename);
+              return cached;
+            }
+          } catch (e) { /* fall through to network */ }
+        }
+
+        log("Face model cache miss: " + filename);
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+
+        if (db) {
+          setCachedShard(db, cacheKey, buffer).catch(() => {});
+        }
+
+        return buffer;
+      })
+    );
+  };
+
+  const loadWeightsFn = faceapi.tf.io.weightsLoaderFactory(cachedFetchWeights);
+  const weightMap = await loadWeightsFn(manifest, MODEL_URL + "/");
+  net.loadFromWeightMap(weightMap);
+}
 
 export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // store subscriptions ////////////////////////////////////////////////////
@@ -27,6 +125,9 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   const zPunchClock = useLoginStore(
     useCallback((state) => state.punchClock, [])
   );
+  const zActiveLoginTimeout = useSettingsStore(
+    useCallback((state) => state.settings?.activeLoginTimeoutSeconds, [])
+  );
 
   // refs — stable references for use inside the interval callback //////////
   const videoRef = useRef(null);
@@ -35,6 +136,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   const pauseRef = useRef(false);
   const usersRef = useRef(zUsers);
   const punchClockRef = useRef(zPunchClock);
+  const activeLoginTimeoutRef = useRef(zActiveLoginTimeout);
   const descriptorErrorsRef = useRef(new Set()); // track users with logged errors
   const lastMatchRef = useRef({ userId: null, timestamp: 0 }); // grace period tracking
 
@@ -45,6 +147,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // keep refs in sync with store values ////////////////////////////////////
   useEffect(() => { usersRef.current = zUsers; }, [zUsers]);
   useEffect(() => { punchClockRef.current = zPunchClock; }, [zPunchClock]);
+  useEffect(() => { activeLoginTimeoutRef.current = zActiveLoginTimeout; }, [zActiveLoginTimeout]);
 
   // 1. Load models + start video //////////////////////////////////////////
   useEffect(() => {
@@ -52,13 +155,22 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
     async function setup() {
       try {
+        let db = null;
+        try {
+          db = await openCacheDB();
+          await clearStaleCache(db);
+        } catch (e) {
+          log("IndexedDB unavailable, loading models from network:", e);
+        }
+
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+          loadModelCached(faceapi.nets.tinyFaceDetector, "tiny_face_detector_model", db),
+          loadModelCached(faceapi.nets.faceLandmark68Net, "face_landmark_68_model", db),
+          loadModelCached(faceapi.nets.faceRecognitionNet, "face_recognition_model", db),
+          startVideo(),
         ]);
 
-        await startVideo();
+        if (db) db.close();
         useLoginStore.getState().setWebcamDetected(true);
         useLoginStore.getState().setCameraStatus("ready");
 
@@ -126,7 +238,8 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       } else {
         // no match or no face — check grace period before clearing
         const { userId, timestamp } = lastMatchRef.current;
-        if (userId && (Date.now() - timestamp < LOGOUT_GRACE_PERIOD_MS)) {
+        const graceMs = (activeLoginTimeoutRef.current || DEFAULT_LOGOUT_GRACE_SECONDS) * 1000;
+        if (userId && (Date.now() - timestamp < graceMs)) {
           return; // still within grace period, keep current user
         }
         // grace period expired — clear user
@@ -277,6 +390,9 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       />
       {!zRunBackgroundRecognition && (
         <View style={{ alignItems: "center" }}>
+          {!sReady && (
+            <SmallLoadingIndicator text="Loading recognition" color="#007AFF" />
+          )}
           <Text style={{ marginBottom: 20, color: "#007AFF", fontSize: 18, fontWeight: 400 }}>
             {sStatus}
           </Text>

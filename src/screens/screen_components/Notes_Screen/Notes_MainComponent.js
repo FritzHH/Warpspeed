@@ -216,7 +216,7 @@ export function Notes_MainComponent() {
                 textAlign: "center",
               }}
             >
-              Click Here
+                Click to add
             </Text>
             </TouchableOpacity_>
           </Tooltip>
@@ -369,7 +369,7 @@ export function Notes_MainComponent() {
                   textAlign: "center",
                 }}
               >
-                Click Here
+                Click to add
               </Text>
             </TouchableOpacity_>
           </Tooltip>

@@ -15,20 +15,22 @@ import {
   formatMillisForDisplay,
   formatPhoneWithDashes,
   gray,
-  lightenRGBByPercent,
   removeDashesFromPhone,
   resolveStatus,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useState, useEffect, useRef } from "react";
 import {
+  useCheckoutStore,
   useCurrentCustomerStore,
   useLoginStore,
   useOpenWorkordersStore,
   useSettingsStore,
+  useTabNamesStore,
+  useWorkorderPreviewStore,
 } from "../../../stores";
-import { CONTACT_RESTRICTIONS, CUSTOMER_LANGUAGES, CUSTOMER_PROTO } from "../../../data";
-import { Button_, CheckBox_, DropdownMenu, SmallLoadingIndicator, TextInput_ } from "../../../components";
+import { CONTACT_RESTRICTIONS, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, TAB_NAMES } from "../../../data";
+import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, SmallLoadingIndicator, TextInput_ } from "../../../components";
 import {
   dbSaveCustomer,
   dbGetCustomer,
@@ -66,6 +68,7 @@ export const CustomerInfoScreenModalComponent = ({
   const [sWoLoading, _sSetWoLoading] = useState(false);
   const [sSalesLoading, _sSetSalesLoading] = useState(false);
   const [sDetailView, _sSetDetailView] = useState(null);
+  const [sShowDepositModal, _sSetShowDepositModal] = useState(false);
   const mountedRef = useRef(true);
 
   // Fetch fresh customer on mount (background refresh even if we have cached data)
@@ -198,6 +201,27 @@ export const CustomerInfoScreenModalComponent = ({
   async function autoLoadWorkordersAndSales(customer) {
     let loadedWOs = await loadWorkorders(customer);
     await loadSales(customer, loadedWOs);
+  }
+
+  function navigateToWorkorder(wo) {
+    const store = useOpenWorkordersStore.getState();
+    const openWOs = store.getWorkorders() || [];
+    const isOpen = openWOs.some((o) => o.id === wo.id);
+
+    if (isOpen) {
+      // Open workorder — navigate to it
+      store.setOpenWorkorderID(wo.id);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.workorder,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+        optionsTabName: TAB_NAMES.optionsTab.inventory,
+      });
+      useWorkorderPreviewStore.getState().setPreviewObj(null);
+      if (handleButton2Press) handleButton2Press();
+    } else {
+      // Completed workorder — open in closed workorder modal
+      store.setClosedWorkorderModalObj(wo);
+    }
   }
 
   function setCustomerInfo(customerInfo) {
@@ -431,29 +455,47 @@ export const CustomerInfoScreenModalComponent = ({
                   borderWidth: 1,
                   borderColor: gray(0.1),
                 }}
-                icon={ICONS.check}
+                icon={ICONS.gears1}
                 iconSize={19}
                 textStyle={{ color: C.textWhite }}
                 text={button1Text}
               />
             )}
-            {!!button2Text && (
+            {!isNewCustomer && (
               <Button_
-                icon={ICONS.close1}
-                colorGradientArr={COLOR_GRADIENTS.blue}
-                onPress={handleButton2Press}
+                onPress={() => _sSetShowDepositModal(true)}
+                colorGradientArr={COLOR_GRADIENTS.green}
+                icon={ICONS.greenDollar}
                 buttonStyle={{
                   marginTop: 30,
                   marginLeft: 20,
-                  height: 40,
+                  height: 36,
                   width: 200,
                 }}
-                iconSize={17}
-                textStyle={{ marginLeft: 15, color: C.textWhite }}
-                text={button2Text}
+                iconSize={16}
+                textStyle={{ color: C.textWhite, fontSize: 13 }}
+                text={"Add Deposit / Credit"}
               />
             )}
           </View>
+          <View style={{ flex: 1 }} />
+          {!!button2Text && (
+            <Button_
+              icon={ICONS.close1}
+              colorGradientArr={COLOR_GRADIENTS.blue}
+              onPress={handleButton2Press}
+              buttonStyle={{
+                marginTop: 30,
+                marginLeft: 20,
+                marginBottom: 10,
+                height: 40,
+                width: 200,
+              }}
+              iconSize={17}
+              textStyle={{ marginLeft: 15, color: C.textWhite }}
+              text={button2Text}
+            />
+          )}
         </View>
         {!isNewCustomer && !sDetailView && (
           <View
@@ -476,7 +518,12 @@ export const CustomerInfoScreenModalComponent = ({
             {!sWoLoading && sWorkorders.length > 0 && (
               <WorkordersList
                 workorders={sWorkorders}
-                onSelect={(wo) => _sSetDetailView({ type: "workorder", data: wo })}
+                onSelect={(wo) => {
+                  // TESTING: open closed workorder viewer for all cards
+                  // PRODUCTION: only open for cards without paymentComplete
+                  // if (!wo.paymentComplete) { useOpenWorkordersStore.getState().setClosedWorkorderModalObj(wo); } else navigateToWorkorder(wo);
+                  useOpenWorkordersStore.getState().setClosedWorkorderModalObj(wo);
+                }}
               />
             )}
             {!sWoLoading &&
@@ -491,33 +538,39 @@ export const CustomerInfoScreenModalComponent = ({
         {!isNewCustomer && !sDetailView && (
           <View
             style={{
-              width: 400,
+              width: 550,
               height: "100%",
+              paddingHorizontal: 15,
               paddingVertical: 5,
             }}
           >
-            <Button_
-              icon={ICONS.dollarYellow}
-              iconSize={20}
-              text={"LOAD SALES"}
-              textStyle={{ color: gray(0.45), fontSize: 13 }}
-              buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
-              onPress={() => loadSales()}
-            />
-            {sSalesLoading && <LoadingOverlay text="Loading sales..." />}
-            {!sSalesLoading && sSales.length > 0 && (
-              <SalesList
-                sales={sSales}
-                onSelect={(sale) => _sSetDetailView({ type: "sale", data: sale })}
+            {/* Sales section — scrollable, shrinks to make room for deposits */}
+            <View style={{ flex: 1, minHeight: 0 }}>
+              <Button_
+                icon={ICONS.dollarYellow}
+                iconSize={20}
+                text={"LOAD SALES"}
+                textStyle={{ color: gray(0.45), fontSize: 13 }}
+                buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
+                onPress={() => loadSales()}
               />
-            )}
-            {!sSalesLoading &&
-              sSales.length === 0 &&
-              (sCustomerInfo.sales || []).length === 0 && (
-                <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
-                  No sales on file
-                </Text>
+              {sSalesLoading && <LoadingOverlay text="Loading sales..." />}
+              {!sSalesLoading && sSales.length > 0 && (
+                <SalesList
+                  sales={sSales}
+                  onSelect={(sale) => _sSetDetailView({ type: "sale", data: sale })}
+                />
               )}
+              {!sSalesLoading &&
+                sSales.length === 0 &&
+                (sCustomerInfo.sales || []).length === 0 && (
+                  <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
+                    No sales on file
+                  </Text>
+                )}
+            </View>
+            {/* Deposits section — always visible below sales */}
+            <DepositsList deposits={sCustomerInfo.deposits || []} />
           </View>
         )}
         {!isNewCustomer && sDetailView && (
@@ -537,6 +590,16 @@ export const CustomerInfoScreenModalComponent = ({
             )}
           </View>
         )}
+        <DepositModal
+          visible={sShowDepositModal}
+          onClose={() => _sSetShowDepositModal(false)}
+          onPay={(depositInfo) => {
+            _sSetShowDepositModal(false);
+            if (handleButton2Press) handleButton2Press();
+            useCheckoutStore.getState().setDepositInfo(depositInfo);
+            useCheckoutStore.getState().setIsCheckingOut(true);
+          }}
+        />
       </View>
     </TouchableWithoutFeedback>
   );

@@ -1,0 +1,8 @@
+{
+  "name": "lightspeed-import",
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "lodash": "^4.17.21"
+  }
+}

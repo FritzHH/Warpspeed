@@ -18,6 +18,7 @@ import {
   lightenRGBByPercent,
   formatCurrencyDisp,
   generateEAN13Barcode,
+  generateRandomID,
   log,
   printBuilder,
   gray,
@@ -27,8 +28,8 @@ import {
   findTemplateByType,
   applyDiscountToWorkorderItem,
 } from "../../../../utils";
-import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES } from "../../../../data";
-import { dbSavePrintObj, dbGetCompletedWorkorder } from "../../../../db_calls_wrapper";
+import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, PAYMENT_OBJECT_PROTO, CUSTOMER_DEPOST_TYPES } from "../../../../data";
+import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale } from "../../../../db_calls_wrapper";
 import {
   createNewSale,
   updateSaleWithTotals,
@@ -110,6 +111,7 @@ function broadcastSaleToDisplay(sale, combinedWOs, addedItems, customerFirst, cu
 export function NewCheckoutModalScreen() {
   // ─── Zustand Store Access ─────────────────────────────────
   const zIsCheckingOut = useCheckoutStore((state) => state.isCheckingOut);
+  const zDepositInfo = useCheckoutStore((state) => state.depositInfo);
   const zOpenWorkorder = useOpenWorkordersStore((state) =>
     state.workorders.find((o) => o.id === state.openWorkorderID) || null
   );
@@ -139,6 +141,7 @@ export function NewCheckoutModalScreen() {
   const [sSessionStartPaymentCount, _setSessionStartPaymentCount] = useState(0);
 
   // ─── Derived Values ───────────────────────────────────────
+  let isDepositMode = !!zDepositInfo;
   let isStandalone = !zOpenWorkorder;
   let saleComplete = sSale?.paymentComplete || false;
   let amountLeftToPay = (sSale?.total || 0) - (sSale?.amountCaptured || 0);
@@ -158,7 +161,10 @@ export function NewCheckoutModalScreen() {
 
     // Check if we're opening a partial sale from ticket search
     let viewOnlySale = useCheckoutStore.getState().viewOnlySale;
-    if (viewOnlySale) {
+    let depositInfo = useCheckoutStore.getState().depositInfo;
+    if (depositInfo) {
+      initializeDepositCheckout(depositInfo);
+    } else if (viewOnlySale) {
       initializeFromViewOnlySale(viewOnlySale);
     } else {
       initializeCheckout();
@@ -224,6 +230,31 @@ export function NewCheckoutModalScreen() {
     newCheckoutSaveActiveSale(sale);
 
     // Fetch card readers
+    fetchReaders();
+  }
+
+  function initializeDepositCheckout(depositInfo) {
+    let createdBy = zCurrentUser?.first
+      ? zCurrentUser.first + " " + (zCurrentUser.last || "")
+      : "";
+    let sale = createNewSale(zSettings, createdBy);
+    sale.subtotal = depositInfo.amountCents;
+    sale.tax = 0;
+    sale.discount = 0;
+    sale.salesTaxPercent = 0;
+    sale.cardFeePercent = zSettings?.useCardFee ? zSettings.cardFeePercent || 0 : 0;
+    sale.cardFee = sale.cardFeePercent > 0
+      ? Math.round(depositInfo.amountCents * (sale.cardFeePercent / 100))
+      : 0;
+    sale.total = sale.subtotal + sale.cardFee;
+    sale.isDepositSale = true;
+    sale.depositType = depositInfo.type || "";
+    sale.depositNote = depositInfo.note || "";
+    sale.customerID = zCustomer?.id || "";
+    _setCombinedWorkorders([]);
+    _setAddedItems([]);
+    _setSale(sale);
+    newCheckoutSaveActiveSale(sale);
     fetchReaders();
   }
 
@@ -408,6 +439,104 @@ export function NewCheckoutModalScreen() {
     newCheckoutSaveActiveSale(updated);
   }
 
+  // ─── Deposit / Credit Application ───────────────────────
+  function handleApplyDeposit(deposit) {
+    if (!sSale || sSale.paymentComplete) return;
+    let amountNeeded = (sSale.total || 0) - (sSale.amountCaptured || 0);
+    if (amountNeeded <= 0) return;
+
+    let appliedAmount = Math.min(deposit.amountCents, amountNeeded);
+    let remainder = deposit.amountCents - appliedAmount;
+
+    // Create a payment object for this deposit
+    let payment = {
+      ...cloneDeep(PAYMENT_OBJECT_PROTO),
+      id: generateRandomID(),
+      amountCaptured: appliedAmount,
+      amountTendered: appliedAmount,
+      isDeposit: true,
+      depositId: deposit.id,
+      depositType: deposit.type,
+      depositNote: deposit.note || "",
+      depositCash: !!deposit.cash,
+      depositSaleID: deposit.saleID || "",
+      depositOriginalAmount: deposit.amountCents,
+      last4: deposit.last4 || "",
+      cardType: deposit.cardType || "",
+      cardIssuer: deposit.cardIssuer || "",
+      millis: Date.now(),
+    };
+
+    // Update customer deposits: reduce or remove the used deposit
+    let customerDeposits = cloneDeep(zCustomer?.deposits || []);
+    let idx = customerDeposits.findIndex((d) => d.id === deposit.id);
+    if (idx >= 0) {
+      if (remainder > 0) {
+        customerDeposits[idx] = { ...customerDeposits[idx], amountCents: remainder };
+      } else {
+        customerDeposits.splice(idx, 1);
+      }
+    }
+    useCurrentCustomerStore.getState().setCustomer({ ...zCustomer, deposits: customerDeposits });
+
+    // Feed into the existing payment capture flow
+    handlePaymentCapture(payment);
+  }
+
+  function handleRemoveDeposit(payment) {
+    if (!sSale || sSale.paymentComplete) return;
+    if (!payment.isDeposit) return;
+
+    // Remove deposit payment from sale
+    let sale = cloneDeep(sSale);
+    sale.payments = sale.payments.filter((p) => p.id !== payment.id);
+    sale.amountCaptured = sale.amountCaptured - payment.amountCaptured;
+    _setSale(sale);
+    newCheckoutSaveActiveSale(sale);
+
+    // Restore the deposit on the customer
+    let customerDeposits = cloneDeep(zCustomer?.deposits || []);
+    let existing = customerDeposits.find((d) => d.id === payment.depositId);
+    if (existing) {
+      // Deposit was partially used — restore the applied amount
+      existing.amountCents = existing.amountCents + payment.amountCaptured;
+    } else {
+      // Deposit was fully consumed — re-add it
+      customerDeposits.push({
+        id: payment.depositId,
+        type: payment.depositType,
+        amountCents: payment.depositOriginalAmount || payment.amountCaptured,
+        millis: payment.millis,
+        note: payment.depositNote || "",
+        saleID: payment.depositSaleID || "",
+        cash: payment.depositCash || false,
+        last4: payment.last4 || "",
+        cardType: payment.cardType || "",
+        cardIssuer: payment.cardIssuer || "",
+      });
+    }
+    useCurrentCustomerStore.getState().setCustomer({ ...zCustomer, deposits: customerDeposits });
+  }
+
+  async function handlePrintDepositReceipt(payment) {
+    if (!payment.depositSaleID) return;
+    let sale = await dbGetCompletedSale(payment.depositSaleID);
+    if (!sale) return;
+    let settings = useSettingsStore.getState().getSettings();
+    let printerID = settings?.printerCloudId || "";
+    if (!printerID) return;
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+    let customerInfo = {
+      first: zCustomer?.first || "",
+      last: zCustomer?.last || "",
+      phone: zCustomer?.customerCell || "",
+      id: zCustomer?.id || "",
+    };
+    let emptyWO = { workorderLines: [], taxFree: false, status: "" };
+    let receipt = printBuilder.sale(sale, sale.payments || [], customerInfo, emptyWO, 0, _ctx);
+    dbSavePrintObj(receipt, printerID);
+  }
+
   // ─── Payment Handling ─────────────────────────────────────
   function handlePaymentCapture(payment) {
     // Guard: if sale is already marked complete locally, skip
@@ -452,7 +581,65 @@ export function NewCheckoutModalScreen() {
     }
   }
 
+  async function handleDepositSaleComplete(sale) {
+    if (sDevSkip) {
+      log("sDevSkip: deposit sale complete locally, skipping DB/print/SMS", sale);
+      return;
+    }
+    let depositInfo = useCheckoutStore.getState().depositInfo;
+    if (!depositInfo) return;
+
+    // Create the deposit and add to customer
+    let primaryPayment = (sale.payments || [])[0];
+    let newDeposit = {
+      id: generateRandomID(),
+      type: depositInfo.type,
+      amountCents: depositInfo.amountCents,
+      millis: Date.now(),
+      note: depositInfo.note || "",
+      saleID: sale.id || "",
+      cash: !!primaryPayment?.cash,
+      last4: primaryPayment?.last4 || "",
+      cardType: primaryPayment?.cardType || "",
+      cardIssuer: primaryPayment?.cardIssuer || "",
+    };
+    let updatedCustomer = cloneDeep(zCustomer) || {};
+    updatedCustomer.deposits = [...(updatedCustomer.deposits || []), newDeposit];
+    useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+    dbSaveCustomer(updatedCustomer);
+
+    // Complete the sale
+    await newCheckoutCompleteSale(sale);
+
+    // Save sale index
+    let customerInfo = {
+      first: zCustomer?.first || "",
+      last: zCustomer?.last || "",
+      phone: zCustomer?.customerCell || "",
+      id: zCustomer?.id || "",
+    };
+    saveSaleIndex(sale, customerInfo, [], false);
+
+    // Print receipt
+    let settings = useSettingsStore.getState().getSettings();
+    let printerID = settings?.printerCloudId || "";
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+    let emptyWO = { workorderLines: [], taxFree: false, status: "" };
+    let saleReceipt = printBuilder.sale(sale, sale.payments || [], customerInfo, emptyWO, 0, _ctx);
+    if (settings?.autoPrintSalesReceipt && printerID) {
+      dbSavePrintObj(saleReceipt, printerID);
+    }
+    if (saleReceipt.popCashRegister && !settings?.autoPrintSalesReceipt && printerID) {
+      dbSavePrintObj({ popCashRegister: true }, printerID);
+    }
+  }
+
   async function handleSaleComplete(sale) {
+    // Deposit sale — separate completion path
+    if (sale.isDepositSale) {
+      handleDepositSaleComplete(sale);
+      return;
+    }
     // DEV: skip all DB writes, printing, SMS — freeze UI for layout work
     if (sDevSkip) {
       log("sDevSkip: sale complete locally, skipping DB/print/SMS", sale);
@@ -730,6 +917,7 @@ export function NewCheckoutModalScreen() {
       stripeStore._cardTimeout = null;
     }
     stripeStore.resetCardTransaction();
+    useCheckoutStore.getState().setDepositInfo(null);
     useCheckoutStore.getState().setViewOnlySale(null);
     useCheckoutStore.getState().setIsCheckingOut(false);
   }
@@ -766,6 +954,20 @@ export function NewCheckoutModalScreen() {
 
     const printerID = zSettings?.printerCloudId || "8C:77:3B:60:33:22_Star MCP31";
     dbSavePrintObj(toPrint, printerID);
+  }
+
+  function handlePrintReceipt() {
+    if (!sSale) return;
+    let isDeposit = sSale.isDepositSale;
+    let primaryWO = isDeposit ? null : sCombinedWorkorders[0];
+    let customer = isDeposit
+      ? { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" }
+      : { first: primaryWO?.customerFirst || "", last: primaryWO?.customerLast || "", customerCell: primaryWO?.customerCell || "", email: primaryWO?.customerEmail || "", id: primaryWO?.customerID || "" };
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
+    let wo = isDeposit ? { workorderLines: [], taxFree: false, status: "" } : primaryWO;
+    let receipt = printBuilder.sale(sSale, sSale.payments || [], customer, wo, zSettings?.salesTaxPercent, _ctx);
+    let printerID = zSettings?.printerCloudId || "";
+    if (printerID) dbSavePrintObj(receipt, printerID);
   }
 
   function handlePopRegister() {
@@ -892,6 +1094,115 @@ export function NewCheckoutModalScreen() {
               )}
             </View>
 
+            {isDepositMode ? (
+              /* ── DEPOSIT MODE: Combined middle+right ───── */
+              <View style={{ flex: 1, paddingLeft: 10 }}>
+                {/* Deposit Summary Card */}
+                <View
+                  style={{
+                    borderWidth: 2,
+                    borderColor: zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
+                    borderRadius: 8,
+                    padding: 14,
+                    backgroundColor: C.backgroundListWhite,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                    <View
+                      style={{
+                        backgroundColor: zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit
+                          ? lightenRGBByPercent(C.blue, 70)
+                          : lightenRGBByPercent(C.green, 70),
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 8,
+                        marginRight: 10,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: "600",
+                          color: zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
+                        }}
+                      >
+                        {zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit ? "Credit" : "Deposit"}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 24, fontWeight: "700", color: C.text }}>
+                      {"$" + formatCurrencyDisp(zDepositInfo?.amountCents || 0)}
+                    </Text>
+                  </View>
+                  {!!zDepositInfo?.note && (
+                    <Text style={{ fontSize: 15, color: gray(0.5), marginBottom: 4, flexWrap: "wrap" }}>
+                      {zDepositInfo.note}
+                    </Text>
+                  )}
+                  {zCustomer && (
+                    <Text style={{ fontSize: 15, color: C.text }}>
+                      {zCustomer.first} {zCustomer.last}
+                    </Text>
+                  )}
+                </View>
+
+                <SaleTotals
+                  sale={sSale}
+                  cashChangeNeeded={sCashChangeNeeded}
+                  settings={zSettings}
+                />
+
+                <View style={{ flex: 1, marginTop: 3 }}>
+                  <PaymentsList
+                    payments={sSale?.payments}
+                    onRefund={(payment) => { _setRefundPayment(payment); _setShowRefundModal(true); }}
+                    onPrintReceipt={handlePrintReceipt}
+                  />
+                </View>
+
+                {/* Bottom Buttons */}
+                <View
+                  style={{
+                    width: "100%",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.backgroundListWhite,
+                    borderRadius: 6,
+                    paddingVertical: 2,
+                    paddingHorizontal: 3,
+                    marginTop: 5,
+                  }}
+                >
+                  <Button_
+                    enabled={saleComplete || !sessionHasNewPayments}
+                    colorGradientArr={COLOR_GRADIENTS.red}
+                    text={saleComplete ? "CLOSE" : "CANCEL"}
+                    onPress={closeModal}
+                    textStyle={{ color: C.textWhite, fontSize: 13 }}
+                    buttonStyle={{ width: 80, height: 30, borderRadius: 6, marginRight: 10 }}
+                  />
+                  {saleComplete && (
+                    <Button_
+                      colorGradientArr={COLOR_GRADIENTS.greenblue}
+                      text="REPRINT"
+                      onPress={handleReprint}
+                      textStyle={{ color: C.textWhite }}
+                      buttonStyle={{ width: 100, borderRadius: 6, marginRight: 10 }}
+                    />
+                  )}
+                  <Tooltip text="Pop register" position="top">
+                    <Button_
+                      onPress={handlePopRegister}
+                      icon={ICONS.openCashRegister}
+                      iconSize={30}
+                    />
+                  </Tooltip>
+                </View>
+              </View>
+            ) : (
+              <>
             {/* ── MIDDLE COLUMN: Totals & Payments ──────── */}
             <View
               style={{
@@ -964,6 +1275,75 @@ export function NewCheckoutModalScreen() {
                 </View>
               )}
 
+              {/* Customer Deposits / Credits */}
+              {(() => {
+                let availableDeposits = (zCustomer?.deposits || []).filter((d) => d.amountCents > 0);
+                let saleComplete = sSale?.paymentComplete;
+                if (availableDeposits.length === 0 || saleComplete) return null;
+                return (
+                  <ScrollView
+                    style={{
+                      maxHeight: 60,
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 6,
+                      backgroundColor: C.backgroundListWhite,
+                      marginTop: 5,
+                      paddingHorizontal: 6,
+                      paddingVertical: 3,
+                    }}
+                  >
+                    {availableDeposits.map((deposit) => (
+                      <View
+                        key={deposit.id}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingVertical: 2,
+                        }}
+                      >
+                        <CheckBox_
+                          text=""
+                          isChecked={false}
+                          onCheck={() => handleApplyDeposit(deposit)}
+                          buttonStyle={{ marginRight: 4 }}
+                          iconSize={16}
+                        />
+                        <View
+                          style={{
+                            backgroundColor: deposit.type === CUSTOMER_DEPOST_TYPES.credit
+                              ? lightenRGBByPercent(C.blue, 70)
+                              : lightenRGBByPercent(C.green, 70),
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                            borderRadius: 6,
+                            marginRight: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              fontWeight: "600",
+                              color: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
+                            }}
+                          >
+                            {deposit.type === CUSTOMER_DEPOST_TYPES.credit ? "Credit" : "Deposit"}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: C.text, marginRight: 6 }}>
+                          {"$" + formatCurrencyDisp(deposit.amountCents)}
+                        </Text>
+                        {!!deposit.note && (
+                          <Text numberOfLines={1} style={{ fontSize: 10, color: gray(0.5), flex: 1 }}>
+                            {deposit.note}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                  </ScrollView>
+                );
+              })()}
+
               {/* Sale Totals (includes Amount Left To Pay + Change) */}
               <SaleTotals
                 sale={sSale}
@@ -984,6 +1364,9 @@ export function NewCheckoutModalScreen() {
                 <PaymentsList
                   payments={sSale?.payments}
                   onRefund={(payment) => { _setRefundPayment(payment); _setShowRefundModal(true); }}
+                  onPrintReceipt={handlePrintReceipt}
+                  onPrintDepositReceipt={handlePrintDepositReceipt}
+                  onRemoveDeposit={!saleComplete ? handleRemoveDeposit : null}
                 />
 
               </View>
@@ -1108,6 +1491,8 @@ export function NewCheckoutModalScreen() {
                 )}
               </ScrollView>
             </View>
+              </>
+            )}
           </View>
 
           {/* Tax-Free Confirmation Overlay (inline to avoid z-index issues with global AlertBox_) */}

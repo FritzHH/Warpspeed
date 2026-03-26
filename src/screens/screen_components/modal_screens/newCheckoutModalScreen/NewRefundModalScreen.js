@@ -66,11 +66,12 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
   });
 
   // Calculate card payments total and cash payments total
+  // Deposit-applied payments are refunded as cash (the deposit was consumed)
   let cardPaymentsTotal = 0;
   let cashPaymentsTotal = 0;
   (sOriginalSale?.payments || []).forEach((p) => {
     let available = p.amountCaptured - (p.amountRefunded || 0);
-    if (p.cash || p.check) {
+    if (p.cash || p.check || p.isDeposit) {
       cashPaymentsTotal += available;
     } else {
       cardPaymentsTotal += available;
@@ -213,7 +214,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
   }
 
   // ─── Payment Selection ────────────────────────────────────
-  let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].cash || sSelectedPayments[0].check);
+  let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].cash || sSelectedPayments[0].check || sSelectedPayments[0].isDeposit);
   let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
 
   function handleSelectPayment(payment) {
@@ -222,10 +223,10 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
       _setSelectedPayments(sSelectedPayments.filter((p) => p.id !== payment.id));
       return;
     }
-    // Block mixed cash/card selection
-    let incomingIsCash = payment.cash || payment.check;
+    // Block mixed cash/card selection (deposits refund as cash)
+    let incomingIsCash = payment.cash || payment.check || payment.isDeposit;
     if (sSelectedPayments.length > 0) {
-      let currentIsCash = sSelectedPayments[0].cash || sSelectedPayments[0].check;
+      let currentIsCash = sSelectedPayments[0].cash || sSelectedPayments[0].check || sSelectedPayments[0].isDeposit;
       if (incomingIsCash !== currentIsCash) {
         useAlertScreenStore.getState().setValues({
           title: "Cannot Mix Refund Types",
@@ -251,9 +252,9 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
     if (entering) {
       _setSelectedItems([]);
       _setSelectedPayments([]);
-      // Auto-select if only one available card payment
+      // Auto-select if only one available card payment (exclude deposits)
       let availableCards = (sOriginalSale?.payments || []).filter(
-        (p) => !p.cash && !p.check && (p.amountCaptured - (p.amountRefunded || 0)) > 0
+        (p) => !p.cash && !p.check && !p.isDeposit && (p.amountCaptured - (p.amountRefunded || 0)) > 0
       );
       _setCustomCardPayment(availableCards.length === 1 ? availableCards[0] : null);
     } else {
@@ -299,7 +300,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
     } else if (type === "cash") {
       let remaining = amount;
       sale.payments = sale.payments.map((p) => {
-        if (remaining <= 0 || (!p.cash && !p.check)) return p;
+        if (remaining <= 0 || (!p.cash && !p.check && !p.isDeposit)) return p;
         let available = p.amountCaptured - (p.amountRefunded || 0);
         let deduct = Math.min(remaining, available);
         remaining -= deduct;
@@ -514,7 +515,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                       : 0
                     }
                     lockedAmount={!sIsCustomAmount}
-                    shouldFocus={sIsCustomAmount && !!((sOriginalSale?.payments || [])[0]?.cash || (sOriginalSale?.payments || [])[0]?.check)}
+                    shouldFocus={sIsCustomAmount && !!((sOriginalSale?.payments || [])[0]?.cash || (sOriginalSale?.payments || [])[0]?.check || (sOriginalSale?.payments || [])[0]?.isDeposit)}
                   />
                 </View>
                 <View
@@ -525,7 +526,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                     selectedPayment={
                       sIsCustomAmount ? sCustomCardPayment
                       : hasItemSelection && hasCardPayments
-                        ? (sOriginalSale?.payments || []).find((p) => !p.cash && !p.check)
+                        ? (sOriginalSale?.payments || []).find((p) => !p.cash && !p.check && !p.isDeposit)
                         : selectedIsCard ? sSelectedPayments[0] : null
                     }
                     maxCardRefund={maxCardRefund}
@@ -538,7 +539,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                       : 0
                     }
                     lockedAmount={!sIsCustomAmount}
-                    shouldFocus={sIsCustomAmount && !((sOriginalSale?.payments || [])[0]?.cash || (sOriginalSale?.payments || [])[0]?.check)}
+                    shouldFocus={sIsCustomAmount && !((sOriginalSale?.payments || [])[0]?.cash || (sOriginalSale?.payments || [])[0]?.check || (sOriginalSale?.payments || [])[0]?.isDeposit)}
                   />
                 </View>
               </View>
@@ -592,7 +593,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                         SELECT CARD FOR REFUND
                       </Text>
                       {(sOriginalSale?.payments || [])
-                        .filter((p) => !p.cash && !p.check)
+                        .filter((p) => !p.cash && !p.check && !p.isDeposit)
                         .map((payment, idx) => {
                           let available = payment.amountCaptured - (payment.amountRefunded || 0);
                           let fullyRefunded = available <= 0;

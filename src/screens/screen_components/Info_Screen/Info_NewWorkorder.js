@@ -602,18 +602,20 @@ export function NewWorkorderComponent({}) {
             ),
             [sCustomerInfo, buttonVisible]
           )}
-          <Button_
-            icon={ICONS.reset1}
-            buttonStyle={{ marginTop: 10, paddingHorizontal: 0 }}
-            onPress={() => {
-              if (sSearchFieldName === "phone") {
-                _setSearchFieldName("name");
-              } else {
-                _setSearchFieldName("phone");
-              }
-              handleTextChange("");
-            }}
-          />
+          <Tooltip text={sSearchFieldName === "phone" ? "Search by name" : "Search by phone"} position="top">
+            <Button_
+              icon={ICONS.reset1}
+              buttonStyle={{ marginTop: 10, paddingHorizontal: 0 }}
+              onPress={() => {
+                if (sSearchFieldName === "phone") {
+                  _setSearchFieldName("name");
+                } else {
+                  _setSearchFieldName("phone");
+                }
+                handleTextChange("");
+              }}
+            />
+          </Tooltip>
         </View>
       </View>
       <View

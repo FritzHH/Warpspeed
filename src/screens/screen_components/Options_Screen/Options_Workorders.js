@@ -86,6 +86,16 @@ function computeWaitInfo(workorder) {
     return result;
   }
 
+  // Split before day name if a prefix exists (e.g. "First half Sunday" → "First half\nSunday")
+  let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  for (let day of dayNames) {
+    if (label.endsWith(day) && label.length > day.length) {
+      let prefix = label.slice(0, label.length - day.length).trim();
+      result.waitEndDay = prefix + "\n" + day;
+      return result;
+    }
+  }
+
   // Everything else: just show the label as-is (day name or short date)
   result.waitEndDay = label;
   return result;

@@ -4,11 +4,13 @@ curl https://api.stripe.com/v1/terminal/readers -u "YOUR_STRIPE_SECRET_KEY"  -d 
 
 curl -X POST https://api.stripe.com/v1/test_helpers/terminal/readers/tmr_GcDlgAztNKl8gV/present_payment_method  -u "YOUR_STRIPE_SECRET_KEY"
 
-
+BonitaBikes.1236
 
 
 i see a lot of blinking items on the checkout screen when i make a changes to the workorder or tax free or other items. seems to be a re-rendering issue in a lot of places. without just being hacky and wrapping everything in useMemo's what can we do to reduce this? most likely a zustand issue.
 
 
 
-move the REFUND indicator in the top left to the top middle of the screen. change the text to to "REFUND SCREEN"
+go back and edit the Payments cards in the checkout screen as follows: if the payment was a deposit, the top line is DEPOSIT APPLIED. if credit, it is CREDIT APPLIED. the next line down should read "Cash received" if it was cash or "Card payment received" if card, then show the amount on the right side as it does now. the next line down down should not render if it is a cash payment. if it is a card payment, show the last 4, card type/name. then make the entire card clickable. on click, a receipt will be printed (print server only, no communications sent). add a tooltip to the card that says "Click to print paper receipt". i want you to do this to all the payments cards so that sales receipts can be printed for any payment, on command
+
+

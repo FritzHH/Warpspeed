@@ -11,6 +11,7 @@ import {
   gray,
 } from "../../../utils";
 import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
+import { DISCOUNT_TYPES } from "../../../constants";
 import { useSettingsStore } from "../../../stores";
 import { cloneDeep } from "lodash";
 
@@ -141,6 +142,18 @@ export const CustomItemModal = ({
     onClose();
   }
 
+  // Compute discounted price preview
+  let discountedCents = null;
+  if (sDiscountObj && sPriceCents > 0) {
+    if (sDiscountObj.type === DISCOUNT_TYPES.percent) {
+      let multiplier = 1 - Number("." + sDiscountObj.value);
+      discountedCents = Math.round(sPriceCents * multiplier);
+    } else {
+      discountedCents = sPriceCents - (sDiscountObj.value || 0);
+      if (discountedCents < 0) discountedCents = 0;
+    }
+  }
+
   const canSave = sName.trim().length > 0 && sPriceCents > 0;
 
   return createPortal(
@@ -245,6 +258,7 @@ export const CustomItemModal = ({
                     fontSize: 15,
                     color: C.text,
                     outlineWidth: 0,
+                    outlineStyle: "none",
                     backgroundColor: C.listItemWhite,
                     textAlign: "center",
                   }}
@@ -286,6 +300,7 @@ export const CustomItemModal = ({
                   fontSize: 15,
                   color: C.text,
                   outlineWidth: 0,
+                  outlineStyle: "none",
                   backgroundColor: C.listItemWhite,
                   textAlign: "right",
                 }}
@@ -368,6 +383,42 @@ export const CustomItemModal = ({
               onSelect={handleDiscountSelect}
             />
           </View>
+
+          {/* Discount preview */}
+          {discountedCents !== null && (
+            <View
+              style={{
+                marginTop: 10,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: gray(0.5),
+                  textDecorationLine: "line-through",
+                }}
+              >
+                {"$" + usdTypeMask(sPriceCents, { withDollar: false }).display}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "600",
+                  color: C.green,
+                }}
+              >
+                {"$" + usdTypeMask(discountedCents, { withDollar: false }).display}
+              </Text>
+              <Text style={{ fontSize: 12, color: C.lightred }}>
+                {sDiscountObj.type === DISCOUNT_TYPES.percent
+                  ? sDiscountObj.value + "% off"
+                  : "$" + usdTypeMask(sDiscountObj.value, { withDollar: false }).display + " off"}
+              </Text>
+            </View>
+          )}
 
           {/* Action Buttons */}
           <View

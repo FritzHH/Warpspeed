@@ -1,6 +1,7 @@
 /* eslint-disable */
 
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import {
   CUSTOMER_PROTO,
   INVENTORY_ITEM_PROTO,
@@ -37,6 +38,47 @@ import {
   dbSendSMS,
 } from "./db_calls_wrapper";
 
+// IndexedDB storage adapter for Zustand persist (used by inventory — too large for localStorage)
+const idbStorage = (() => {
+  const DB_NAME = "warpspeed_persist";
+  const STORE_NAME = "keyval";
+  const open = () => new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return {
+    getItem: async (key) => {
+      const db = await open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const req = tx.objectStore(STORE_NAME).get(key);
+        req.onsuccess = () => resolve(req.result ?? null);
+        req.onerror = () => reject(req.error);
+      });
+    },
+    setItem: async (key, value) => {
+      const db = await open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    },
+    removeItem: async (key) => {
+      const db = await open();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        tx.objectStore(STORE_NAME).delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    },
+  };
+})();
+
 // internal use  /////////////////////////////////////////////////////
 
 export const useLayoutStore = create((set, get) => ({
@@ -46,7 +88,10 @@ export const useLayoutStore = create((set, get) => ({
   simHeight: 844,
   useSimulator: false,
   isMobile: false,
+  deviceType: "desktop", // "mobile" | "tablet" | "desktop"
 
+  getDeviceType: () => get().deviceType,
+  setDeviceType: (deviceType) => set({ deviceType }),
   getDimensions: () => {
     let width = get().width;
     let height = get().height;
@@ -62,39 +107,51 @@ export const useLayoutStore = create((set, get) => ({
   setIsMobile: (isMobile) => set({ isMobile }),
 }));
 
-export const useTabNamesStore = create((set, get) => ({
-  infoTabName: TAB_NAMES.infoTab.customer,
-  itemsTabName: TAB_NAMES.itemsTab.empty,
-  optionsTabName: TAB_NAMES.optionsTab.workorders,
+export const useTabNamesStore = create(
+  persist(
+    (set, get) => ({
+      infoTabName: TAB_NAMES.infoTab.customer,
+      itemsTabName: TAB_NAMES.itemsTab.empty,
+      optionsTabName: TAB_NAMES.optionsTab.workorders,
 
-  getItemsTabName: () => get().itemsTabName,
-  getOptionsTabName: () => get().optionsTabName,
-  getInfoTabName: () => get().infoTabName,
+      getItemsTabName: () => get().itemsTabName,
+      getOptionsTabName: () => get().optionsTabName,
+      getInfoTabName: () => get().infoTabName,
 
-  setItems: (obj) => set({ ...obj }),
-  setInfoTabName: (name) => {
-    set((state) => ({ infoTabName: name }));
-  },
-  setItemsTabName: (name) => {
-    set((state) => ({ itemsTabName: name }));
-  },
-  setOptionsTabName: (name) => {
-    set((state) => ({ optionsTabName: name }));
-  },
+      setItems: (obj) => { set({ ...obj }); },
+      setInfoTabName: (name) => {
+        set((state) => ({ infoTabName: name }));
+      },
+      setItemsTabName: (name) => {
+        set((state) => ({ itemsTabName: name }));
+      },
+      setOptionsTabName: (name) => {
+        set((state) => ({ optionsTabName: name }));
+      },
 
-  // Dashboard_Admin persistent navigation state
-  dashboardExpand: null,
-  getDashboardExpand: () => get().dashboardExpand,
-  setDashboardExpand: (val) => set({ dashboardExpand: val }),
+      // Dashboard_Admin persistent navigation state
+      dashboardExpand: null,
+      getDashboardExpand: () => get().dashboardExpand,
+      setDashboardExpand: (val) => set({ dashboardExpand: val }),
 
-  dashboardQBParentID: null,
-  getDashboardQBParentID: () => get().dashboardQBParentID,
-  setDashboardQBParentID: (val) => set({ dashboardQBParentID: val }),
+      dashboardQBParentID: null,
+      getDashboardQBParentID: () => get().dashboardQBParentID,
+      setDashboardQBParentID: (val) => set({ dashboardQBParentID: val }),
 
-  dashboardQBMenuPath: [],
-  getDashboardQBMenuPath: () => get().dashboardQBMenuPath,
-  setDashboardQBMenuPath: (val) => set({ dashboardQBMenuPath: val }),
-}));
+      dashboardQBMenuPath: [],
+      getDashboardQBMenuPath: () => get().dashboardQBMenuPath,
+      setDashboardQBMenuPath: (val) => set({ dashboardQBMenuPath: val }),
+    }),
+    {
+      name: "warpspeed_tabs",
+      partialize: (s) => ({
+        infoTabName: s.infoTabName,
+        itemsTabName: s.itemsTabName,
+        optionsTabName: s.optionsTabName,
+      }),
+    }
+  )
+);
 
 export const useInvModalStore = create((set, get) => ({
   currentFocusName: null,
@@ -164,6 +221,7 @@ export const useCheckoutStore = create((set, get) => ({
   loading: false,
   viewOnlySale: null,
   isViewOnly: false,
+  depositInfo: null,
 
   getMessage: () => get().message,
   getLoading: () => get().loading,
@@ -175,6 +233,7 @@ export const useCheckoutStore = create((set, get) => ({
   setLoading: (loading) => set({ loading }),
   // setSaleObj: (saleObj) => set({ saleObj }),
   setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),
+  setDepositInfo: (depositInfo) => set({ depositInfo }),
   setViewOnlySale: (sale) => set({ viewOnlySale: sale, isViewOnly: !!sale?.paymentComplete }),
   setReceiptScan: (receiptScan, callback) => {
     set({ receiptScan });
@@ -481,7 +540,9 @@ export const useStripePaymentStore = create((set, get) => ({
   // _cardTimeout: null      — payment timeout ID
 }));
 
-export const useLoginStore = create((set, get) => ({
+export const useLoginStore = create(
+  persist(
+    (set, get) => ({
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
@@ -640,115 +701,124 @@ export const useLoginStore = create((set, get) => ({
       set({ postLoginFunctionCallback: null });
     }
   },
-}));
-
-export const useInventoryStore = create((set, get) => ({
-  inventoryArr: [],
-  getInventoryArr: () => get().inventoryArr,
-  // modItem: (item, option) => {
-  //   if (option === "change")
-  //     return set((state) => ({
-  //       inventoryArr: changeItem(get().inventoryArr, item),
-  //     }));
-  //   if (option === "add")
-  //     return set((state) => ({
-  //       inventoryArr: addItem(get().inventoryArr, item),
-  //     }));
-  //   if (option === "remove")
-  //     return set((state) => ({
-  //       inventoryArr: removeItem(get().inventoryArr, item),
-  //     }));
-  // },
-  getInventoryItem: (itemID) => {
-    return get().inventoryArr.find((o) => o.id === itemID);
-  },
-  removeItem: (item, sendToDB = true, batch = true) => {
-    let inventoryArr = cloneDeep(get().inventoryArr);
-    let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
-    inventoryArr = inventoryArr.filter((o) => o.id === item.id);
-    set({ inventoryArr });
-
-    if (sendToDB) dbSaveInventoryItem(item);
-  },
-  setItem: (item, sendToDB = true, batch = true) => {
-    // clog("item", item);
-    let inventoryArr = cloneDeep(get().inventoryArr);
-    let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
-    if (invItemIdx >= 0) {
-      inventoryArr[invItemIdx] = item;
-    } else {
-      inventoryArr.push(item);
+    }),
+    {
+      name: "warpspeed_punch_clock",
+      partialize: (s) => ({ punchClock: s.punchClock }),
     }
-    set({ inventoryArr });
-    if (sendToDB) dbSaveInventoryItem(item, batch);
-  },
-  setItems: (inventoryArr) => set({ inventoryArr }),
-}));
+  )
+);
 
-export const useCurrentCustomerStore = create((set, get) => ({
-  customer: { ...CUSTOMER_PROTO },
-  sales: [],
-  workorders: [],
-  salesLoading: false,
-  workordersLoading: false,
-  getCustomer: () => get().customer,
-  getWorkorders: () => get().workorders,
-  getSales: () => get().sales,
-  getSalesLoading: () => get().salesLoading,
-  getWorkordersLoading: () => get().workordersLoading,
+export const useInventoryStore = create(
+  persist(
+    (set, get) => ({
+      inventoryArr: [],
+      getInventoryArr: () => get().inventoryArr,
+      getInventoryItem: (itemID) => {
+        return get().inventoryArr.find((o) => o.id === itemID);
+      },
+      removeItem: (item, sendToDB = true, batch = true) => {
+        let inventoryArr = cloneDeep(get().inventoryArr);
+        let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
+        inventoryArr = inventoryArr.filter((o) => o.id === item.id);
+        set({ inventoryArr });
 
-  setCustomerField: (fieldName, value, saveToDB = true) => {
-    // log({ ...get().customer, [fieldName]: value });
-    set({ customer: { ...get().customer, [fieldName]: value } });
-    if (saveToDB) dbSaveCustomer({ ...get().customer, [fieldName]: value });
-  },
-  setCustomer: (customer, sendToDB = true) => {
-    set({ customer });
-    // log(get().customer, customer)
-    if (sendToDB) dbSaveCustomer(customer);
-  },
+        if (sendToDB) dbSaveInventoryItem(item);
+      },
+      setItem: (item, sendToDB = true, batch = true) => {
+        // clog("item", item);
+        let inventoryArr = cloneDeep(get().inventoryArr);
+        let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
+        if (invItemIdx >= 0) {
+          inventoryArr[invItemIdx] = item;
+        } else {
+          inventoryArr.push(item);
+        }
+        set({ inventoryArr });
+        if (sendToDB) dbSaveInventoryItem(item, batch);
+      },
+      setItems: (inventoryArr) => set({ inventoryArr }),
+    }),
+    {
+      name: "warpspeed_inventory",
+      storage: idbStorage,
+      partialize: (s) => ({ inventoryArr: s.inventoryArr }),
+    }
+  )
+);
 
-  loadWorkorders: () => {
-    set({ workordersLoading: true });
-    const woIDs = get().customer.workorders || [];
-    if (woIDs.length === 0) { set({ workordersLoading: false }); return; }
-    let target = woIDs.length;
-    let count = 0;
-    const openWorkorders = useOpenWorkordersStore.getState().getWorkorders();
-    const done = () => { count++; if (count >= target) set({ workordersLoading: false }); };
-    woIDs.forEach((workorderID) => {
-      const local = openWorkorders.find((wo) => wo.id === workorderID);
-      if (local) {
-        set({ workorders: replaceOrAddToArr(get().workorders, local) });
-        done();
-      } else {
-        dbGetCompletedWorkorder(workorderID)
-          .then((workorder) => {
-            if (workorder) set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
+export const useCurrentCustomerStore = create(
+  persist(
+    (set, get) => ({
+      customer: { ...CUSTOMER_PROTO },
+      sales: [],
+      workorders: [],
+      salesLoading: false,
+      workordersLoading: false,
+      getCustomer: () => get().customer,
+      getWorkorders: () => get().workorders,
+      getSales: () => get().sales,
+      getSalesLoading: () => get().salesLoading,
+      getWorkordersLoading: () => get().workordersLoading,
+
+      setCustomerField: (fieldName, value, saveToDB = true) => {
+        // log({ ...get().customer, [fieldName]: value });
+        set({ customer: { ...get().customer, [fieldName]: value } });
+        if (saveToDB) dbSaveCustomer({ ...get().customer, [fieldName]: value });
+      },
+      setCustomer: (customer, sendToDB = true) => {
+        set({ customer });
+        // log(get().customer, customer)
+        if (sendToDB) dbSaveCustomer(customer);
+      },
+
+      loadWorkorders: () => {
+        set({ workordersLoading: true });
+        const woIDs = get().customer.workorders || [];
+        if (woIDs.length === 0) { set({ workordersLoading: false }); return; }
+        let target = woIDs.length;
+        let count = 0;
+        const openWorkorders = useOpenWorkordersStore.getState().getWorkorders();
+        const done = () => { count++; if (count >= target) set({ workordersLoading: false }); };
+        woIDs.forEach((workorderID) => {
+          const local = openWorkorders.find((wo) => wo.id === workorderID);
+          if (local) {
+            set({ workorders: replaceOrAddToArr(get().workorders, local) });
             done();
-          })
-          .catch(() => { done(); });
-      }
-    });
-  },
+          } else {
+            dbGetCompletedWorkorder(workorderID)
+              .then((workorder) => {
+                if (workorder) set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
+                done();
+              })
+              .catch(() => { done(); });
+          }
+        });
+      },
 
-  loadSales: () => {
-    set({ salesLoading: true });
-    const saleIDs = get().customer.sales || [];
-    if (saleIDs.length === 0) { set({ salesLoading: false }); return; }
-    let target = saleIDs.length;
-    let count = 0;
-    const done = () => { count++; if (count >= target) set({ salesLoading: false }); };
-    saleIDs.forEach((salesID) => {
-      dbGetCompletedSale(salesID)
-        .then((sale) => {
-          if (sale) set({ sales: replaceOrAddToArr(get().sales, sale) });
-          done();
-        })
-        .catch(() => { done(); });
-    });
-  },
-}));
+      loadSales: () => {
+        set({ salesLoading: true });
+        const saleIDs = get().customer.sales || [];
+        if (saleIDs.length === 0) { set({ salesLoading: false }); return; }
+        let target = saleIDs.length;
+        let count = 0;
+        const done = () => { count++; if (count >= target) set({ salesLoading: false }); };
+        saleIDs.forEach((salesID) => {
+          dbGetCompletedSale(salesID)
+            .then((sale) => {
+              if (sale) set({ sales: replaceOrAddToArr(get().sales, sale) });
+              done();
+            })
+            .catch(() => { done(); });
+        });
+      },
+    }),
+    {
+      name: "warpspeed_customer",
+      partialize: (s) => ({ customer: s.customer }),
+    }
+  )
+);
 
 export const useCustMessagesStore = create((set, get) => ({
   incomingMessages: [],
@@ -992,93 +1062,107 @@ function appendToChangeLog(workorder, fieldName, oldVal, newVal) {
   return entries;
 }
 
-export const useOpenWorkordersStore = create((set, get) => ({
-  workorders: [],
-  workordersLoaded: false,
-  openWorkorder: null,
-  openWorkorderID: null,
-  workorderPreviewID: null,
-  lockedWorkorderID: null,
+export const useOpenWorkordersStore = create(
+  persist(
+    (set, get) => ({
+      workorders: [],
+      workordersLoaded: false,
+      openWorkorder: null,
+      openWorkorderID: null,
+      workorderPreviewID: null,
+      lockedWorkorderID: null,
+      closedWorkorderModalObj: null,
 
-  getOpenWorkorder: () => {
-    let id = get().openWorkorderID;
-    return get().workorders.find((o) => o.id === id);
-  },
-  getWorkorders: () => get().workorders,
-  getPreviewWorkorder: () => {
-    let id = get().workorderPreviewID;
-    return get().workorders.find((o) => o.id === id)
-  },
-  getWorkorderPreviewID: () => get().workorderPreviewID,
+      getOpenWorkorder: () => {
+        let id = get().openWorkorderID;
+        return get().workorders.find((o) => o.id === id);
+      },
+      getWorkorders: () => get().workorders,
+      getPreviewWorkorder: () => {
+        let id = get().workorderPreviewID;
+        return get().workorders.find((o) => o.id === id)
+      },
+      getWorkorderPreviewID: () => get().workorderPreviewID,
 
-  setWorkorderPreviewID: (workorderPreviewID) => set({ workorderPreviewID }),
-  getLockedWorkorderID: () => get().lockedWorkorderID,
-  setLockedWorkorderID: (lockedWorkorderID) => set({ lockedWorkorderID }),
-  setOpenWorkorderID: (openWorkorderID) => {
-    set({ openWorkorderID, workorderPreviewID: null });
-    if (openWorkorderID) {
-      let wo = get().workorders.find((o) => o.id === openWorkorderID);
-      if (wo) broadcastWorkorderToDisplay(wo);
-    } else {
-      broadcastClear();
+      setWorkorderPreviewID: (workorderPreviewID) => set({ workorderPreviewID }),
+      getLockedWorkorderID: () => get().lockedWorkorderID,
+      setLockedWorkorderID: (lockedWorkorderID) => set({ lockedWorkorderID }),
+      getClosedWorkorderModalObj: () => get().closedWorkorderModalObj,
+      setClosedWorkorderModalObj: (closedWorkorderModalObj) => set({ closedWorkorderModalObj }),
+      setOpenWorkorderID: (openWorkorderID) => {
+        set({ openWorkorderID, workorderPreviewID: null });
+        if (openWorkorderID) {
+          let wo = get().workorders.find((o) => o.id === openWorkorderID);
+          if (wo) broadcastWorkorderToDisplay(wo);
+        } else {
+          broadcastClear();
+        }
+      },
+      setOpenWorkorders: (workorders) => {
+        let incomingIDs = new Set(workorders.map((wo) => wo.id));
+        // Keep local-only workorders that haven't made it to DB yet
+        let localOnly = get().workorders.filter(
+          (wo) => (wo.isStandaloneSale || wo._unsaved) && !incomingIDs.has(wo.id)
+        );
+        set({ workorders: [...workorders, ...localOnly], workordersLoaded: true });
+      },
+      setWorkorder: (wo, saveToDB = true, batch = true) => {
+        if (wo.isStandaloneSale) wo = { ...wo, lastInteractionMillis: Date.now() };
+        set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
+        if (saveToDB && !wo.isStandaloneSale) dbSaveOpenWorkorder(wo);
+        if (wo.id === get().openWorkorderID) broadcastWorkorderToDisplay(wo);
+      },
+      setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
+        if (!workorderID) workorderID = get().openWorkorderID;
+        if (get().lockedWorkorderID === workorderID) return;
+        let workorder = get().workorders.find((o) => o.id === workorderID);
+
+        // changelog: append entries for discrete fields, debounce text fields
+        let logEntries = appendToChangeLog(workorder, fieldName, workorder[fieldName], fieldVal);
+
+        workorder = { ...workorder, [fieldName]: fieldVal };
+        if (logEntries && logEntries.length > 0) {
+          workorder.changeLog = [...(workorder.changeLog || []), ...logEntries];
+        }
+        if (workorder.isStandaloneSale) workorder.lastInteractionMillis = Date.now();
+        let wasUnsaved = workorder._unsaved;
+        if (workorder._unsaved) delete workorder._unsaved;
+
+        set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
+        if (saveToDB && !workorder.isStandaloneSale) {
+          if (wasUnsaved) {
+            // First save — write immediately so Firestore listener includes it
+            // before the debounce window allows setOpenWorkorders to wipe it
+            dbSaveOpenWorkorder(workorder, null, true);
+          } else {
+            debouncedSaveWorkorder(workorder);
+          }
+        }
+        if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
+      },
+
+      removeWorkorder: (workorderID, saveToDB = true, batch = true) => {
+        let workorders = get().workorders.filter((o) => o.id !== workorderID);
+        set({ workorders });
+
+        if (get().openWorkorderID === workorderID) {
+          set({ openWorkorderID: null });
+        }
+
+        if (saveToDB && !workorderID.isStandaloneSale) {
+          dbDeleteWorkorder(workorderID);
+        }
+      },
+    }),
+    {
+      name: "warpspeed_workorders",
+      partialize: (s) => ({
+        workorders: s.workorders,
+        openWorkorderID: s.openWorkorderID,
+      }),
     }
-  },
-  setOpenWorkorders: (workorders) => {
-    let incomingIDs = new Set(workorders.map((wo) => wo.id));
-    // Keep local-only workorders that haven't made it to DB yet
-    let localOnly = get().workorders.filter(
-      (wo) => (wo.isStandaloneSale || wo._unsaved) && !incomingIDs.has(wo.id)
-    );
-    set({ workorders: [...workorders, ...localOnly], workordersLoaded: true });
-  },
-  setWorkorder: (wo, saveToDB = true, batch = true) => {
-    if (wo.isStandaloneSale) wo = { ...wo, lastInteractionMillis: Date.now() };
-    set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
-    if (saveToDB && !wo.isStandaloneSale) dbSaveOpenWorkorder(wo);
-    if (wo.id === get().openWorkorderID) broadcastWorkorderToDisplay(wo);
-  },
-  setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
-    if (!workorderID) workorderID = get().openWorkorderID;
-    if (get().lockedWorkorderID === workorderID) return;
-    let workorder = get().workorders.find((o) => o.id === workorderID);
-
-    // changelog: append entries for discrete fields, debounce text fields
-    let logEntries = appendToChangeLog(workorder, fieldName, workorder[fieldName], fieldVal);
-
-    workorder = { ...workorder, [fieldName]: fieldVal };
-    if (logEntries && logEntries.length > 0) {
-      workorder.changeLog = [...(workorder.changeLog || []), ...logEntries];
-    }
-    if (workorder.isStandaloneSale) workorder.lastInteractionMillis = Date.now();
-    let wasUnsaved = workorder._unsaved;
-    if (workorder._unsaved) delete workorder._unsaved;
-
-    set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
-    if (saveToDB && !workorder.isStandaloneSale) {
-      if (wasUnsaved) {
-        // First save — write immediately so Firestore listener includes it
-        // before the debounce window allows setOpenWorkorders to wipe it
-        dbSaveOpenWorkorder(workorder, null, true);
-      } else {
-        debouncedSaveWorkorder(workorder);
-      }
-    }
-    if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
-  },
-
-  removeWorkorder: (workorderID, saveToDB = true, batch = true) => {
-    let workorders = get().workorders.filter((o) => o.id !== workorderID);
-    set({ workorders });
-
-    if (get().openWorkorderID === workorderID) {
-      set({ openWorkorderID: null });
-    }
-
-    if (saveToDB && !workorderID.isStandaloneSale) {
-      dbDeleteWorkorder(workorderID);
-    }
-  },
-}));
+  )
+);
 
 export const useWorkorderPreviewStore = create((set, get) => ({
   previewObj: null,
@@ -1086,29 +1170,37 @@ export const useWorkorderPreviewStore = create((set, get) => ({
   setPreviewObj: (obj) => set((state) => ({ previewObj: obj })),
 }));
 
-export const useSettingsStore = create((set, get) => ({
-  // settingsObj: null,
-  settings: null,
+export const useSettingsStore = create(
+  persist(
+    (set, get) => ({
+      // settingsObj: null,
+      settings: null,
 
-  // getSettingsObj: () => get().settingsObj,
-  getSettings: () => get().settings,
+      // getSettingsObj: () => get().settingsObj,
+      getSettings: () => get().settings,
 
-  setSettings: (settings, batch = true, sendToDB = true) => {
-    // clog(settingsObj);
-    // set({ settingsObj: settings });
-    set({ settings });
+      setSettings: (settings, batch = true, sendToDB = true) => {
+        // clog(settingsObj);
+        // set({ settingsObj: settings });
+        set({ settings });
 
-    if (sendToDB) {
-      // log("savingsetting");
-      dbSaveSettings(settings);
+        if (sendToDB) {
+          // log("savingsetting");
+          dbSaveSettings(settings);
+        }
+      },
+
+      setField: (fieldName, fieldVal, sendToDB = true) => {
+        set({ settings: { ...get().settings, [fieldName]: fieldVal } });
+        if (sendToDB) dbSaveSettingsField(fieldName, fieldVal);
+      },
+    }),
+    {
+      name: "warpspeed_settings",
+      partialize: (s) => ({ settings: s.settings }),
     }
-  },
-
-  setField: (fieldName, fieldVal, sendToDB = true) => {
-    set({ settings: { ...get().settings, [fieldName]: fieldVal } });
-    if (sendToDB) dbSaveSettingsField(fieldName, fieldVal);
-  },
-}));
+  )
+);
 
 export const useUploadProgressStore = create((set, get) => ({
   // null | { completed, total, failed, done }
@@ -1168,4 +1260,14 @@ function addItem(arr, item) {
 
 function removeItem(arr, item) {
   return arr.filter((o) => o.id !== item.id);
+}
+
+// Clear all persisted Zustand stores (called on logout)
+export function clearPersistedStores() {
+  useOpenWorkordersStore.persist.clearStorage();
+  useCurrentCustomerStore.persist.clearStorage();
+  useTabNamesStore.persist.clearStorage();
+  useInventoryStore.persist.clearStorage();
+  useSettingsStore.persist.clearStorage();
+  useLoginStore.persist.clearStorage();
 }

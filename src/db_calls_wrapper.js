@@ -36,7 +36,7 @@ import {
   firestoreBatchWrite,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
-import { useSettingsStore, useLoginStore, useOpenWorkordersStore } from "./stores";
+import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores } from "./stores";
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -2272,9 +2272,15 @@ const TENANT_CACHE_KEY = "warpspeed_tenant";
  * @returns {Promise<Object>} { tenantID, storeID, settings }
  */
 export async function loadTenantAndSettings(uid) {
-  // 1. Try localStorage cache first for instant restore
+  // 1. Try Zustand persisted settings first (instant from localStorage)
   const cached = localStorageWrapper.getItem(TENANT_CACHE_KEY);
   if (cached?.tenantID && cached?.storeID) {
+    const persisted = useSettingsStore.getState().settings;
+    if (persisted?.tenantID === cached.tenantID && persisted?.storeID === cached.storeID) {
+      // Settings already rehydrated from Zustand persist — skip network call
+      return { tenantID: cached.tenantID, storeID: cached.storeID, settings: persisted };
+    }
+    // Zustand cache miss — fetch from Firestore
     const settings = await dbGetSettings(cached.tenantID, cached.storeID);
     if (settings) {
       useSettingsStore.getState().setSettings(settings, false, false);
@@ -2357,6 +2363,7 @@ export async function dbLogout(options = {}) {
   try {
     log("Starting sign out process");
     localStorageWrapper.removeItem(TENANT_CACHE_KEY);
+    clearPersistedStores();
     await authSignOut();
     log("Sign out successful");
     return { success: true, message: "User signed out successfully" };

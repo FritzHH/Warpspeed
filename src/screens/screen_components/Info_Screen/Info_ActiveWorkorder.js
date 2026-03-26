@@ -31,6 +31,8 @@ import {
   StatusPickerModal,
   Tooltip,
   CheckBox_,
+  Pressable_,
+  StaleBanner,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -44,6 +46,7 @@ import {
   CONTACT_RESTRICTIONS,
   RECEIPT_TYPES,
   WAIT_TIMES_PROTO,
+  CUSTOM_WAIT_TIME,
   CUSTOMER_LANGUAGES,
 } from "../../../data";
 import { MILLIS_IN_DAY, build_db_path } from "../../../constants";
@@ -77,6 +80,7 @@ export const ActiveWorkorderComponent = ({}) => {
   });
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
   const zIsLocked = useOpenWorkordersStore((state) => !!state.lockedWorkorderID && state.lockedWorkorderID === (state.workorderPreviewID || state.openWorkorderID));
+  const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
   const zCustomerLanguage = useCurrentCustomerStore((state) => state.customer?.language || "");
   const zCustomer = {
     first: zOpenWorkorder?.customerFirst || "",
@@ -116,7 +120,8 @@ export const ActiveWorkorderComponent = ({}) => {
   useEffect(() => {
     let statusObj = (zSettings?.statuses || []).find((s) => s.id === zOpenWorkorder?.status);
     let waitLabel = zOpenWorkorder?.waitTime?.label || "";
-    let needsBlink = statusObj?.requireWaitTime && waitLabel.length <= 3;
+    let maxDays = zOpenWorkorder?.waitTime?.maxWaitTimeDays;
+    let needsBlink = statusObj?.requireWaitTime && (waitLabel.length <= 3 || maxDays === 0 || maxDays === "0");
     if (!needsBlink) {
       _setWaitTimeBlink(false);
       return;
@@ -126,7 +131,7 @@ export const ActiveWorkorderComponent = ({}) => {
       _setWaitTimeBlink((prev) => !prev);
     }, 500);
     return () => clearInterval(interval);
-  }, [zOpenWorkorder?.status, zOpenWorkorder?.waitTime?.label, zSettings?.statuses]);
+  }, [zOpenWorkorder?.status, zOpenWorkorder?.waitTime?.label, zOpenWorkorder?.waitTime?.maxWaitTimeDays, zSettings?.statuses]);
 
   function updateWaitDays(newDays) {
     _setWaitDays(newDays);
@@ -403,8 +408,7 @@ export const ActiveWorkorderComponent = ({}) => {
     dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Star MCP31");
   }
 
-  function handleIntakeRightClick(e) {
-    e.preventDefault();
+  function handleIntakeRightClick() {
     useAlertScreenStore.getState().setValues({
       title: "Print Only",
       message: "Print the intake receipt without sending SMS or email?",
@@ -604,6 +608,13 @@ export const ActiveWorkorderComponent = ({}) => {
             )}
           </View>
         </View>
+
+        {!zWorkordersLoaded && zOpenWorkorder && (
+          <StaleBanner
+            text="Waiting on customer refresh...."
+            style={{ marginTop: 8, width: "100%" }}
+          />
+        )}
 
         <View pointerEvents={isDonePaid ? "none" : "auto"} style={{ width: "100%" }}>
           <View
@@ -951,6 +962,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <TextInput_
                 placeholder={"0"}
                 editable={!isDonePaid}
+                inputMode="numeric"
                 style={{
                   width: 50,
                   borderWidth: 1,
@@ -971,8 +983,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   if (val !== "" && !checkInputForNumbersOnly(val)) return;
                   let days = val === "" ? "" : Number(val);
                   let waitObj = {
-                    ...WAIT_TIMES_PROTO,
-                    id: zOpenWorkorder?.waitTime?.id || generateRandomID(),
+                    ...CUSTOM_WAIT_TIME,
                     label: val === "" ? "" : val + (days === 1 ? " Day" : " Days"),
                     maxWaitTimeDays: days,
                   };
@@ -1011,8 +1022,22 @@ export const ActiveWorkorderComponent = ({}) => {
             </View>
             {(() => {
               let estimateLabel = calculateWaitEstimateLabel(zOpenWorkorder, useSettingsStore.getState().getSettings());
+              let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
               return estimateLabel ? (
-                <Text style={{ color: gray(0.5), fontSize: 13, fontStyle: "italic", marginTop: 4, width: "100%" }}>
+                <Text
+                  style={{
+                    color: gray(0.5),
+                    fontSize: 13,
+                    fontStyle: "italic",
+                    marginTop: 4,
+                    width: "100%",
+                    backgroundColor: sWaitTimeBlink && isMissing ? "rgba(255, 255, 0, 0.35)" : "transparent",
+                    transition: "background-color 300ms ease",
+                    borderRadius: 3,
+                    paddingHorizontal: 4,
+                    paddingVertical: 2,
+                  }}
+                >
                   {estimateLabel}
                 </Text>
               ) : null;
@@ -1342,17 +1367,18 @@ export const ActiveWorkorderComponent = ({}) => {
             onPress={handleWorkorderPrintPress}
           />
         </Tooltip>
-        <Tooltip text="Send intake receipt. Right-click to print only" position="top">
-          <View onContextMenu={handleIntakeRightClick}>
-            <Button_
-              icon={ICONS.receipt}
-              iconSize={35}
-              iconStyle={{ paddingHorizontal: 0 }}
-              buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
-              onPress={handleIntakePrintPress}
-            />
-          </View>
-        </Tooltip>
+        <Pressable_
+          onPress={handleIntakePrintPress}
+          onRightPress={handleIntakeRightClick}
+          tooltip="Send intake receipt. Right-click to print only"
+        >
+          <Button_
+            icon={ICONS.receipt}
+            iconSize={35}
+            iconStyle={{ paddingHorizontal: 0 }}
+            buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
+          />
+        </Pressable_>
         <Tooltip text="New sale" position="top">
           <Button_
             icon={ICONS.cashRegister}

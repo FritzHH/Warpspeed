@@ -213,10 +213,16 @@ export function InventoryComponent({}) {
       console.log("  -> adding to workorder:", openWorkorder.id);
       let workorderLines = openWorkorder.workorderLines;
       if (!workorderLines) workorderLines = [];
-      let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-      lineItem.inventoryItem = item;
-      lineItem.id = generateEAN13Barcode();
-      workorderLines = [...workorderLines, lineItem];
+      const existingIndex = workorderLines.findIndex((l) => l.inventoryItem?.id === item.id);
+      if (existingIndex !== -1) {
+        workorderLines = cloneDeep(workorderLines);
+        workorderLines[existingIndex].qty = (workorderLines[existingIndex].qty || 1) + 1;
+      } else {
+        let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
+        lineItem.inventoryItem = item;
+        lineItem.id = generateEAN13Barcode();
+        workorderLines = [...workorderLines, lineItem];
+      }
       useOpenWorkordersStore
         .getState()
         .setField("workorderLines", workorderLines);

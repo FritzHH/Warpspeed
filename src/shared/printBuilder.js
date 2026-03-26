@@ -406,6 +406,7 @@ var printBuilder = {
     });
     receipt.cashChangeGiven = cashChange;
     receipt.cashChangeGivenDisplay = cashChange ? "$" + (cashChange / 100).toFixed(2) : "";
+    receipt.depositsApplied = (payments || []).filter(function (p) { return p.isDeposit; });
     var txDate = workorder?.finishedOnMillis ? new Date(Number(workorder.finishedOnMillis)) : new Date();
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     return receipt;

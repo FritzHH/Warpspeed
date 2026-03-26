@@ -65,7 +65,7 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, INTAKE_BUTTON_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO } from "../../../../data";
+import { APP_USER, INTAKE_BUTTON_PROTO, INTAKE_QUICK_BUTTON_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -86,6 +86,7 @@ const TAB_NAMES = {
   storeInfo: "Store Info",
   quickItems: "Quick Item Buttons",
   intakeButtons: "Intake Buttons",
+  standButtons: "Stand Buttons",
   sales: "Sales Reports",
   payroll: "Payroll",
   ordering: "Ordering",
@@ -117,6 +118,7 @@ export function Dashboard_Admin({}) {
     DROPDOWN_ORDERING_SELECTION_NAMES.importOrder
   );
   const [sIntakeEditButtonObj, _setIntakeEditButtonObj] = useState(null);
+  const [sStandEditButtonObj, _setStandEditButtonObj] = useState(null);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -218,6 +220,20 @@ export function Dashboard_Admin({}) {
           }}
         />
       )}
+      {!!sStandEditButtonObj && (
+        <StandButtonInventoryModal
+          buttonObj={sStandEditButtonObj}
+          onClose={() => _setStandEditButtonObj(null)}
+          onSave={(updatedBtn) => {
+            let rows = zSettingsObj?.intakeQuickButtons || [];
+            let updatedRows = rows.map((row) =>
+              row.map((btn) => (btn.id === updatedBtn.id ? updatedBtn : btn))
+            );
+            handleSettingsFieldChange("intakeQuickButtons", updatedRows);
+            _setStandEditButtonObj(null);
+          }}
+        />
+      )}
 
       <View
         style={{
@@ -274,6 +290,24 @@ export function Dashboard_Admin({}) {
                 fontWeight: sExpand === TAB_NAMES.intakeButtons ? 500 : null,
                 color:
                   sExpand === TAB_NAMES.intakeButtons ? C.green : gray(0.6),
+              }}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.standButtons}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.standButtons
+                    ? null
+                    : TAB_NAMES.standButtons
+                )
+              }
+              text={TAB_NAMES.standButtons}
+              icon={ICONS.tools1}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.standButtons ? 500 : null,
+                color:
+                  sExpand === TAB_NAMES.standButtons ? C.green : gray(0.6),
               }}
             />
             <VerticalSpacer />
@@ -901,6 +935,13 @@ export function Dashboard_Admin({}) {
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
               _setIntakeEditButtonObj={_setIntakeEditButtonObj}
+            />
+          )}
+          {sExpand === TAB_NAMES.standButtons && (
+            <StandButtonsEditorComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+              _setStandEditButtonObj={_setStandEditButtonObj}
             />
           )}
           {sExpand === TAB_NAMES.ordering && (
@@ -2786,8 +2827,8 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
 // end compile into ListOptionsComponent /////////////////////////////////////////
 
 const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
-  const [sOpenPicker, _sSetOpenPicker] = useState(false);
-  const [sClosePicker, _sSetClosePicker] = useState(false);
+  const [sPickerDay, _sSetPickerDay] = useState(null);
+  const [sPickerType, _sSetPickerType] = useState(null);
 
   if (!zSettingsObj) return null;
   return (
@@ -3144,408 +3185,155 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           }}
         >
           {zSettingsObj?.storeHours.standard.map((item, idx) => {
-            if (idx === 0) {
-              const openParts = item.open.split(" ");
-              const [openH, openM] = openParts[0].split(":").map(Number);
-              const openP = openParts[1] || "AM";
-              const closeParts = item.close.split(" ");
-              const [closeH, closeM] = closeParts[0].split(":").map(Number);
-              const closeP = closeParts[1] || "PM";
+            const openParts = item.open.split(" ");
+            const [openH, openM] = openParts[0].split(":").map(Number);
+            const openP = openParts[1] || "AM";
+            const closeParts = item.close.split(" ");
+            const [closeH, closeM] = closeParts[0].split(":").map(Number);
+            const closeP = closeParts[1] || "PM";
+            const isOpenPicker = sPickerDay === item.id && sPickerType === "open";
+            const isClosePicker = sPickerDay === item.id && sPickerType === "close";
 
-              return (
-                <View key={item.id}>
+            const closePicker = () => { _sSetPickerDay(null); _sSetPickerType(null); };
+
+            const saveTime = (field, hour, minute, period) => {
+              const timeStr = hour + ":" + String(minute).padStart(2, "0") + " " + period;
+              let standardStoreHours = zSettingsObj.storeHours.standard.map((o) => {
+                if (o.id === item.id) return { ...o, [field]: timeStr };
+                return o;
+              });
+              handleSettingsFieldChange("storeHours", {
+                standard: standardStoreHours,
+                special: zSettingsObj.storeHours.special,
+              });
+              closePicker();
+            };
+
+            return (
+              <View key={item.id}>
+                <View
+                  style={{
+                    width: "100%",
+                    flexDirection: "row",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      alignItems: "center",
+                      width: "25%",
+                      textAlign: "right",
+                      paddingRight: 20,
+                    }}
+                  >
+                    {getDayOfWeekFrom0To7Input(idx)}
+                  </Text>
                   <View
                     style={{
-                      width: "100%",
+                      width: "55%",
                       flexDirection: "row",
-                      justifyContent: "center",
                       alignItems: "center",
                     }}
                   >
-                    <Text
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (isOpenPicker) { closePicker(); }
+                        else { _sSetPickerDay(item.id); _sSetPickerType("open"); }
+                      }}
                       style={{
-                        alignItems: "center",
-                        width: "25%",
-                        textAlign: "right",
-                        paddingRight: 20,
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 5,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        backgroundColor: isOpenPicker ? "#e8f0fe" : "transparent",
                       }}
                     >
-                      {getDayOfWeekFrom0To7Input(idx)}
-                    </Text>
-                    <View
+                      <Text style={{ fontSize: 15 }}>{item.open}</Text>
+                    </TouchableOpacity>
+                    <Image_
+                      style={{ width: 22, height: 12, marginHorizontal: 10 }}
+                      icon={ICONS.rightArrowBlue}
+                    />
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (isClosePicker) { closePicker(); }
+                        else { _sSetPickerDay(item.id); _sSetPickerType("close"); }
+                      }}
                       style={{
-                        width: "55%",
-                        flexDirection: "row",
-                        alignItems: "center",
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 5,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        backgroundColor: isClosePicker ? "#e8f0fe" : "transparent",
                       }}
                     >
-                      <TouchableOpacity
-                        onPress={() => {
-                          _sSetOpenPicker(!sOpenPicker);
-                          _sSetClosePicker(false);
-                        }}
-                        style={{
-                          borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          borderRadius: 5,
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          backgroundColor: sOpenPicker ? "#e8f0fe" : "transparent",
-                        }}
-                      >
-                        <Text style={{ fontSize: 15 }}>{item.open}</Text>
-                      </TouchableOpacity>
-                      <Image_
-                        style={{ width: 22, height: 12, marginHorizontal: 10 }}
-                        icon={ICONS.rightArrowBlue}
-                      />
-                      <TouchableOpacity
-                        onPress={() => {
-                          _sSetClosePicker(!sClosePicker);
-                          _sSetOpenPicker(false);
-                        }}
-                        style={{
-                          borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          borderRadius: 5,
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          backgroundColor: sClosePicker ? "#e8f0fe" : "transparent",
-                        }}
-                      >
-                        <Text style={{ fontSize: 15 }}>{item.close}</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <View
-                      style={{
-                        width: "20%",
-                        alignItems: "flex-end",
-                      }}
-                    >
-                      <CheckBox_
-                        buttonStyle={{ marginLeft: 20 }}
-                        text={"Open"}
-                        isChecked={item.isOpen}
-                        onCheck={() => {
-                          let standardStoreHours =
-                            zSettingsObj.storeHours.standard.map((o) => {
-                              if (o.id === item.id) {
-                                return { ...o, isOpen: !o.isOpen };
-                              }
-                              return o;
-                            });
-                          handleSettingsFieldChange("storeHours", {
-                            standard: standardStoreHours,
-                            special: zSettingsObj.storeHours.special,
-                          });
-                        }}
-                      />
-                    </View>
+                      <Text style={{ fontSize: 15 }}>{item.close}</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Modal visible={sOpenPicker} transparent animationType="fade">
-                    <TouchableWithoutFeedback onPress={() => _sSetOpenPicker(false)}>
-                      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" }}>
-                        <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                          <View>
-                            <TimePicker_
-                              initialHour={openH}
-                              initialMinute={openM}
-                              initialPeriod={openP}
-                              onConfirm={({ hour, minute, period }) => {
-                                const timeStr =
-                                  hour +
-                                  ":" +
-                                  String(minute).padStart(2, "0") +
-                                  " " +
-                                  period;
-                                let standardStoreHours =
-                                  zSettingsObj.storeHours.standard.map((o) => {
-                                    if (o.id === item.id)
-                                      return { ...o, open: timeStr };
-                                    return o;
-                                  });
-                                handleSettingsFieldChange("storeHours", {
-                                  standard: standardStoreHours,
-                                  special: zSettingsObj.storeHours.special,
-                                });
-                                _sSetOpenPicker(false);
-                              }}
-                              onCancel={() => _sSetOpenPicker(false)}
-                            />
-                          </View>
-                        </TouchableWithoutFeedback>
-                      </View>
-                    </TouchableWithoutFeedback>
-                  </Modal>
-                  <Modal visible={sClosePicker} transparent animationType="fade">
-                    <TouchableWithoutFeedback onPress={() => _sSetClosePicker(false)}>
-                      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" }}>
-                        <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                          <View>
-                            <TimePicker_
-                              initialHour={closeH}
-                              initialMinute={closeM}
-                              initialPeriod={closeP}
-                              onConfirm={({ hour, minute, period }) => {
-                                const timeStr =
-                                  hour +
-                                  ":" +
-                                  String(minute).padStart(2, "0") +
-                                  " " +
-                                  period;
-                                let standardStoreHours =
-                                  zSettingsObj.storeHours.standard.map((o) => {
-                                    if (o.id === item.id)
-                                      return { ...o, close: timeStr };
-                                    return o;
-                                  });
-                                handleSettingsFieldChange("storeHours", {
-                                  standard: standardStoreHours,
-                                  special: zSettingsObj.storeHours.special,
-                                });
-                                _sSetClosePicker(false);
-                              }}
-                              onCancel={() => _sSetClosePicker(false)}
-                            />
-                          </View>
-                        </TouchableWithoutFeedback>
-                      </View>
-                    </TouchableWithoutFeedback>
-                  </Modal>
+                  <View
+                    style={{
+                      width: "20%",
+                      alignItems: "flex-end",
+                    }}
+                  >
+                    <CheckBox_
+                      buttonStyle={{ marginLeft: 20 }}
+                      text={"Open"}
+                      isChecked={item.isOpen}
+                      onCheck={() => {
+                        let standardStoreHours =
+                          zSettingsObj.storeHours.standard.map((o) => {
+                            if (o.id === item.id) {
+                              return { ...o, isOpen: !o.isOpen };
+                            }
+                            return o;
+                          });
+                        handleSettingsFieldChange("storeHours", {
+                          standard: standardStoreHours,
+                          special: zSettingsObj.storeHours.special,
+                        });
+                      }}
+                    />
+                  </View>
                 </View>
-              );
-            }
-
-            return (
-            <View
-              key={item.id}
-              style={{
-                width: "100%",
-                flexDirection: "row",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  alignItems: "center",
-                  width: "25%",
-                  textAlign: "right",
-                  paddingRight: 20,
-                }}
-              >
-                {getDayOfWeekFrom0To7Input(idx)}
-              </Text>
-              <View
-                style={{
-                  width: "55%",
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  type="number"
-                  min={0}
-                  max={23}
-                  onChange={(e) => {
-                    let val = e.target.value;
-                    let standardStoreHours =
-                      zSettingsObj.storeHours.standard.map((o) => {
-                        if (o.id === item.id) {
-                          let amPMSplit = o.open.split(" ");
-                          let amPM = amPMSplit[1];
-                          let hourMinSplit = amPMSplit[0].split(":");
-                          hourMinSplit[0] = val;
-                          if (val >= 12) amPM = "PM";
-                          return {
-                            ...o,
-                            open: val + ":" + hourMinSplit[1] + " " + amPM,
-                          };
-                        }
-                        return o;
-                      });
-
-                    handleSettingsFieldChange("storeHours", {
-                      standard: standardStoreHours,
-                      special: zSettingsObj.storeHours.special,
-                    });
-                  }}
-                  style={{
-                    textAlign: "right",
-                    paddingRight: 2,
-                    backgroundColor: "transparent",
-                    width: 50,
-                    fontSize: 15,
-                    marginTop: 3,
-                    marginBottom: 3,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    marginRight: 2,
-                    outline: "none",
-                  }}
-                  value={item.open.split(":")[0]}
-                />
-                <Text>:</Text>
-                <input
-                  type="number"
-                  min={0}
-                  max={59}
-                  onChange={(e) => {
-                    let val = e.target.value;
-                    let standardStoreHours =
-                      zSettingsObj.storeHours.standard.map((o) => {
-                        if (o.id === item.id) {
-                          let amPMSplit = o.open.split(" ");
-                          let amPM = amPMSplit[1];
-                          let hourMinSplit = amPMSplit[0].split(":");
-                          return {
-                            ...o,
-                            open: hourMinSplit[0] + ":" + val + " " + amPM,
-                          };
-                        }
-                        return o;
-                      });
-
-                    handleSettingsFieldChange("storeHours", {
-                      standard: standardStoreHours,
-                      special: zSettingsObj.storeHours.special,
-                    });
-                  }}
-                  style={{
-                    textAlign: "left",
-                    paddingLeft: 2,
-                    backgroundColor: "transparent",
-                    width: 50,
-                    fontSize: 15,
-                    marginTop: 3,
-                    marginBottom: 3,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    marginLeft: 2,
-                    outline: "none",
-                  }}
-                  value={item.open.split(":")[1].split(" ")[0]}
-                />
-                <Image_
-                  style={{ width: 22, height: 12, marginHorizontal: 10 }}
-                  // size={13}
-                  icon={ICONS.rightArrowBlue}
-                />
-                <input
-                  type="number"
-                  min={0}
-                  max={23}
-                  onChange={(e) => {
-                    let val = e.target.value;
-                    let standardStoreHours =
-                      zSettingsObj.storeHours.standard.map((o) => {
-                        if (o.id === item.id) {
-                          let amPMSplit = o.close.split(" ");
-                          let amPM = amPMSplit[1];
-                          let hourMinSplit = amPMSplit[0].split(":");
-                          hourMinSplit[0] = val;
-                          if (val >= 12) amPM = "PM";
-                          return {
-                            ...o,
-                            close: val + ":" + hourMinSplit[1] + " " + amPM,
-                          };
-                        }
-                        return o;
-                      });
-
-                    handleSettingsFieldChange("storeHours", {
-                      standard: standardStoreHours,
-                      special: zSettingsObj.storeHours.special,
-                    });
-                  }}
-                  style={{
-                    textAlign: "right",
-                    paddingRight: 2,
-                    backgroundColor: "transparent",
-                    width: 50,
-                    fontSize: 15,
-                    marginTop: 3,
-                    marginBottom: 3,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    marginRight: 2,
-                    outline: "none",
-                  }}
-                  value={item.close.split(":")[0]}
-                />
-                <Text>:</Text>
-                <input
-                  type="number"
-                  min={0}
-                  max={59}
-                  onChange={(e) => {
-                    let val = e.target.value;
-                    let standardStoreHours =
-                      zSettingsObj.storeHours.standard.map((o) => {
-                        if (o.id === item.id) {
-                          let amPMSplit = o.close.split(" ");
-                          let amPM = amPMSplit[1];
-                          let hourMinSplit = amPMSplit[0].split(":");
-                          return {
-                            ...o,
-                            close: hourMinSplit[0] + ":" + val + " " + amPM,
-                          };
-                        }
-                        return o;
-                      });
-
-                    handleSettingsFieldChange("storeHours", {
-                      standard: standardStoreHours,
-                      special: zSettingsObj.storeHours.special,
-                    });
-                  }}
-                  style={{
-                    textAlign: "left",
-                    paddingLeft: 2,
-                    backgroundColor: "transparent",
-                    width: 50,
-                    fontSize: 15,
-                    marginTop: 3,
-                    marginBottom: 3,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    marginLeft: 2,
-                    outline: "none",
-                  }}
-                  value={item.close.split(":")[1].split(" ")[0]}
-                />
+                <Modal visible={isOpenPicker} transparent animationType="fade">
+                  <TouchableWithoutFeedback onPress={closePicker}>
+                    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                      <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                        <View>
+                          <TimePicker_
+                            initialHour={openH}
+                            initialMinute={openM}
+                            initialPeriod={openP}
+                            onConfirm={({ hour, minute, period }) => saveTime("open", hour, minute, period)}
+                            onCancel={closePicker}
+                          />
+                        </View>
+                      </TouchableWithoutFeedback>
+                    </View>
+                  </TouchableWithoutFeedback>
+                </Modal>
+                <Modal visible={isClosePicker} transparent animationType="fade">
+                  <TouchableWithoutFeedback onPress={closePicker}>
+                    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                      <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                        <View>
+                          <TimePicker_
+                            initialHour={closeH}
+                            initialMinute={closeM}
+                            initialPeriod={closeP}
+                            onConfirm={({ hour, minute, period }) => saveTime("close", hour, minute, period)}
+                            onCancel={closePicker}
+                          />
+                        </View>
+                      </TouchableWithoutFeedback>
+                    </View>
+                  </TouchableWithoutFeedback>
+                </Modal>
               </View>
-              <View
-                style={{
-                  width: "20%",
-                  // backgroundColor: "green",
-                  alignItems: "flex-end",
-                }}
-              >
-                <CheckBox_
-                  buttonStyle={{ marginLeft: 20 }}
-                  text={"Open"}
-                  isChecked={item.isOpen}
-                  onCheck={() => {
-                    let standardStoreHours =
-                      zSettingsObj.storeHours.standard.map((o) => {
-                        if (o.id === item.id) {
-                          return { ...o, isOpen: !o.isOpen };
-                        }
-                        return o;
-                      });
-                    handleSettingsFieldChange("storeHours", {
-                      standard: standardStoreHours,
-                      special: zSettingsObj.storeHours.special,
-                    });
-                  }}
-                />
-              </View>
-            </View>
             );
           })}
         </View>
@@ -4374,6 +4162,8 @@ const QuickItemButtonsComponent = ({
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
   const [sEditingID, _setEditingID] = useState(null);
+  const [sShowInvSearchModal, _setShowInvSearchModal] = useState(false);
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
 
   function getDescendantIDs(buttonID, allButtons) {
     let descendants = [];
@@ -4434,6 +4224,211 @@ const QuickItemButtonsComponent = ({
     });
     handleSettingsFieldChange("quickItemButtons", quickButtonsArr);
     _setEditingID(newID);
+  }
+
+  function handleAddItemsToButton(itemIDs) {
+    if (!sCurrentParentID) return;
+    let updated = (zSettingsObj?.quickItemButtons || []).map((b) => {
+      if (b.id !== sCurrentParentID) return b;
+      let existing = b.items || [];
+      let newIDs = itemIDs.filter((id) => !existing.includes(id));
+      return { ...b, items: [...existing, ...newIDs] };
+    });
+    handleSettingsFieldChange("quickItemButtons", updated);
+  }
+
+  function InventorySearchModal() {
+    const [sInvSearch, _setInvSearch] = useState("");
+    const [sInvResults, _setInvResults] = useState([]);
+    const [sSelectedIDs, _setSelectedIDs] = useState(new Set());
+
+    const parentBtn = (zSettingsObj?.quickItemButtons || []).find((b) => b.id === sCurrentParentID);
+    const parentName = parentBtn?.name || "(unnamed)";
+
+    function doSearch(val) {
+      _setInvSearch(val);
+      if (!val || val.length < 3) { _setInvResults([]); return; }
+      _setInvResults(searchInventory(val, zInventoryArr));
+    }
+
+    function clearSearch() {
+      _setInvSearch("");
+      _setInvResults([]);
+    }
+
+    function toggleSelected(id) {
+      _setSelectedIDs((prev) => {
+        let next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+    }
+
+    function handleSingleSelect(id) {
+      handleAddItemsToButton([id]);
+      _setShowInvSearchModal(false);
+    }
+
+    function handleMultiSelect() {
+      if (sSelectedIDs.size === 0) return;
+      handleAddItemsToButton([...sSelectedIDs]);
+      _setShowInvSearchModal(false);
+    }
+
+    return createPortal(
+      <div
+        style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.45)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 9999,
+        }}
+        onClick={() => _setShowInvSearchModal(false)}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: 550,
+            height: window.innerHeight - 100,
+            backgroundColor: C.backgroundWhite,
+            borderRadius: 12,
+            border: "1px solid " + C.buttonLightGreenOutline,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderBottomWidth: 1,
+              borderBottomColor: gray(0.1),
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "bold", color: C.text }}>
+              {"Add items to "}
+              <Text style={{ color: C.green }}>{parentName}</Text>
+            </Text>
+            <Button_
+              icon={ICONS.close1}
+              iconSize={28}
+              onPress={() => _setShowInvSearchModal(false)}
+              buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0, marginBottom: 0 }}
+            />
+          </View>
+
+          {/* Search bar */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+            }}
+          >
+            <Button_
+              icon={ICONS.reset1}
+              iconSize={20}
+              onPress={clearSearch}
+              useColorGradient={false}
+            />
+            <TextInput_
+              autoFocus={true}
+              style={{
+                flex: 1,
+                borderBottomWidth: 1,
+                borderBottomColor: gray(0.2),
+                fontSize: 18,
+                color: C.text,
+                outlineWidth: 0,
+                outlineStyle: "none",
+                paddingVertical: 4,
+                marginLeft: 8,
+              }}
+              placeholder="Search inventory"
+              placeholderTextColor={gray(0.2)}
+              value={sInvSearch}
+              onChangeText={doSearch}
+            />
+          </View>
+
+          {/* Select Items button — always visible, disabled when 0 selected */}
+          <View style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+            <Button_
+              text={sSelectedIDs.size > 0 ? "Select Items (" + sSelectedIDs.size + ")" : "Select Items"}
+              onPress={handleMultiSelect}
+              enabled={sSelectedIDs.size > 0}
+              colorGradientArr={COLOR_GRADIENTS.green}
+              buttonStyle={{ borderRadius: 6, paddingVertical: 8, opacity: sSelectedIDs.size > 0 ? 1 : 0.4 }}
+              textStyle={{ fontSize: 13, color: C.textWhite }}
+            />
+          </View>
+
+          {/* Results */}
+          <FlatList
+            data={sInvResults}
+            keyExtractor={(item) => item.id}
+            style={{ flex: 1, paddingHorizontal: 8 }}
+            renderItem={({ item, index }) => {
+              let isChecked = sSelectedIDs.has(item.id);
+              return (
+                <div
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    borderRadius: 6,
+                    border: "1px solid " + gray(0.12),
+                    backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
+                    marginBottom: 2,
+                    paddingTop: 6,
+                    paddingBottom: 6,
+                    paddingLeft: 6,
+                    paddingRight: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <CheckBox_
+                    isChecked={isChecked}
+                    onCheck={() => toggleSelected(item.id)}
+                    buttonStyle={{ marginRight: 4 }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => handleSingleSelect(item.id)}
+                    style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+                  >
+                    <View style={{ flex: 1, paddingLeft: 4 }}>
+                      <Text style={{ fontSize: 14, color: C.text }} numberOfLines={1}>
+                        {item.informalName || item.formalName}
+                      </Text>
+                      {!!item.informalName && (
+                        <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
+                          {item.formalName}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 13, color: C.text, marginLeft: 8 }}>
+                      {"$" + formatCurrencyDisp(item.price)}
+                    </Text>
+                  </TouchableOpacity>
+                </div>
+              );
+            }}
+          />
+        </div>
+      </div>,
+      document.body
+    );
   }
 
   function reorderSubButtons(fromIdx, toIdx) {
@@ -4648,8 +4643,10 @@ const QuickItemButtonsComponent = ({
         <BoxContainerInnerComponent
           style={{ width: "100%", alignItems: "center", borderWidth: 0, flex: 1 }}
         >
-          <View style={{ width: "100%", alignItems: "flex-start" }}>
-            <BoxButton1 onPress={handleAdd} style={{ marginBottom: 10 }} />
+          <View style={{ width: "100%", alignItems: "flex-start", flexDirection: "row", marginBottom: 10 }}>
+            <Tooltip text="Add sub-menu" position="right">
+              <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={22} />
+            </Tooltip>
           </View>
           <View
             style={{
@@ -4770,8 +4767,19 @@ const QuickItemButtonsComponent = ({
             </View>
           </View>
 
-          {/* Add button */}
-          <BoxButton1 onPress={handleAdd} />
+          {/* Add buttons */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+            <Tooltip text="Add item" position="right">
+              <BoxButton1 onPress={() => _setShowInvSearchModal(true)} iconSize={40} />
+            </Tooltip>
+            <View style={{ marginLeft: 8 }}>
+              <Tooltip text="Add sub-menu" position="right">
+                <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={22} />
+              </Tooltip>
+            </View>
+          </View>
+
+          {sShowInvSearchModal && <InventorySearchModal />}
 
           {/* Flex-wrap grid of sub-buttons */}
           <div
@@ -6285,6 +6293,91 @@ const ImportComponent = () => {
             All items from Lightspeed CSV
           </Text>
         </TouchableOpacity>
+        {/* --- Clear DB --- */}
+        <TouchableOpacity
+          onPress={async () => {
+            if (!window.confirm("Clear ALL customers, workorders, and sales from the database? This cannot be undone.")) return;
+            _setLookupLoading(true);
+            _setLsResult("");
+            try {
+              console.log("[Clear DB] Clearing collections...");
+              const results = await Promise.all([
+                dbClearCollection("customers"),
+                dbClearCollection("open-workorders"),
+                dbClearCollection("completed-workorders"),
+                dbClearCollection("completed-sales"),
+                dbClearCollection("active-sales"),
+              ]);
+              const total = results.reduce((sum, r) => sum + (r.deletedCount || 0), 0);
+              console.log("[Clear DB] Done. Deleted " + total + " documents.");
+              _setLsResult("Cleared " + total + " documents (customers, workorders, sales)");
+            } catch (e) {
+              console.error("[Clear DB] Error:", e);
+              _setLsResult("Clear DB error: " + e.message);
+            } finally {
+              _setLookupLoading(false);
+            }
+          }}
+          disabled={sLookupLoading}
+          style={{
+            width: 300,
+            paddingVertical: 14,
+            borderRadius: 10,
+            borderWidth: 2,
+            borderColor: C.lightred,
+            backgroundColor: sLookupLoading ? gray(0.85) : C.listItemWhite,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 10,
+            opacity: sLookupLoading ? 0.5 : 1,
+          }}
+        >
+          <Text style={{ fontSize: 15, color: C.lightred, fontWeight: "700" }}>
+            {sLookupLoading ? "Clearing..." : "Clear DB"}
+          </Text>
+          <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 3 }}>
+            Customers, workorders, sales
+          </Text>
+        </TouchableOpacity>
+        {/* --- Clear Inventory --- */}
+        <TouchableOpacity
+          onPress={async () => {
+            if (!window.confirm("Clear ALL inventory items from the database? This cannot be undone.")) return;
+            _setLookupLoading(true);
+            _setLsResult("");
+            try {
+              console.log("[Clear Inventory] Clearing...");
+              const result = await dbClearCollection("inventory");
+              console.log("[Clear Inventory] Done. Deleted " + (result.deletedCount || 0) + " items.");
+              _setLsResult("Cleared " + (result.deletedCount || 0) + " inventory items");
+            } catch (e) {
+              console.error("[Clear Inventory] Error:", e);
+              _setLsResult("Clear Inventory error: " + e.message);
+            } finally {
+              _setLookupLoading(false);
+            }
+          }}
+          disabled={sLookupLoading}
+          style={{
+            width: 300,
+            paddingVertical: 14,
+            borderRadius: 10,
+            borderWidth: 2,
+            borderColor: C.lightred,
+            backgroundColor: sLookupLoading ? gray(0.85) : C.listItemWhite,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 20,
+            opacity: sLookupLoading ? 0.5 : 1,
+          }}
+        >
+          <Text style={{ fontSize: 15, color: C.lightred, fontWeight: "700" }}>
+            {sLookupLoading ? "Clearing..." : "Clear Inventory"}
+          </Text>
+          <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 3 }}>
+            All inventory items
+          </Text>
+        </TouchableOpacity>
         <View style={{ width: "100%", height: 1, backgroundColor: C.buttonLightGreenOutline, marginBottom: 10 }} />
         {/* --- Lightspeed Connection --- */}
         <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 10 }}>
@@ -7784,4 +7877,676 @@ const SPOOF_WORKORDER = {
   customerID: "011460657456",
   customerFirst: "Fritz",
   startedOnMillis: 1774312878862,
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Stand Buttons Editor Component
+////////////////////////////////////////////////////////////////////////////////
+
+const StandButtonsEditorComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+  _setStandEditButtonObj,
+}) => {
+  const [sDragSource, _setDragSource] = useState(null);
+  const [sDragTarget, _setDragTarget] = useState(null);
+
+  let rows = zSettingsObj?.intakeQuickButtons || [];
+  // Handle legacy flat format
+  if (rows.length > 0 && !Array.isArray(rows[0])) {
+    rows = [];
+  }
+
+  function saveRows(updatedRows) {
+    // Filter out empty rows
+    let cleaned = updatedRows.filter((row) => row.length > 0);
+    handleSettingsFieldChange("intakeQuickButtons", cleaned);
+  }
+
+  function handleAddRow() {
+    saveRows([...rows, []]);
+  }
+
+  function handleDeleteButton(rowIdx, btnIdx) {
+    let updated = rows.map((row) => [...row]);
+    updated[rowIdx].splice(btnIdx, 1);
+    saveRows(updated);
+  }
+
+  function handleLabelChange(rowIdx, btnIdx, val) {
+    let updated = rows.map((row) => [...row]);
+    updated[rowIdx][btnIdx] = { ...updated[rowIdx][btnIdx], label: val };
+    handleSettingsFieldChange("intakeQuickButtons", updated);
+  }
+
+  function handleReorder(fromRow, fromBtn, toRow, toBtn) {
+    if (
+      fromRow === null ||
+      fromBtn === null ||
+      toRow === null ||
+      toBtn === null
+    )
+      return;
+    if (fromRow === toRow && fromBtn === toBtn) return;
+    let updated = rows.map((row) => [...row]);
+    let [dragged] = updated[fromRow].splice(fromBtn, 1);
+    // If source row became empty and target row is after it, adjust index
+    if (updated[fromRow].length === 0 && toRow > fromRow) {
+      updated.splice(fromRow, 1);
+      updated[toRow - 1].splice(toBtn, 0, dragged);
+    } else {
+      updated[toRow].splice(toBtn, 0, dragged);
+      // Clean up empty rows
+      updated = updated.filter((row) => row.length > 0);
+    }
+    handleSettingsFieldChange("intakeQuickButtons", updated);
+  }
+
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent
+        style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+      >
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: gray(0.45),
+              marginBottom: 12,
+              textAlign: "center",
+            }}
+          >
+            This is a preview of the tablet stand layout. Drag buttons to
+            reorder. Press + on a row to add a button.
+          </Text>
+
+          {/* Tablet mock frame */}
+          <div
+            style={{
+              width: 400,
+              minHeight: 650,
+              borderWidth: 3,
+              borderStyle: "solid",
+              borderColor: gray(0.3),
+              borderRadius: 20,
+              backgroundColor: C.backgroundWhite,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              padding: 12,
+              boxSizing: "border-box",
+            }}
+          >
+            {/* Header placeholder */}
+            <div
+              style={{
+                height: 36,
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderColor: gray(0.15),
+                borderRadius: 6,
+                display: "flex",
+                alignItems: "center",
+                paddingLeft: 10,
+                marginBottom: 8,
+              }}
+            >
+              <Text style={{ fontSize: 12, color: gray(0.35) }}>
+                Select Workorder...
+              </Text>
+            </div>
+
+            {/* Items placeholder */}
+            <div
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderStyle: "dashed",
+                borderColor: gray(0.15),
+                borderRadius: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 8,
+                minHeight: 120,
+              }}
+            >
+              <Text style={{ fontSize: 11, color: gray(0.3) }}>
+                Line Items Area
+              </Text>
+            </div>
+
+            {/* Quick Buttons area */}
+            <div
+              style={{
+                borderTopWidth: 1,
+                borderTopStyle: "solid",
+                borderTopColor: gray(0.15),
+                paddingTop: 8,
+              }}
+            >
+              {rows.map((row, rowIdx) => (
+                <div
+                  key={rowIdx}
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  {row.map((btn, btnIdx) => (
+                    <StandButtonCard
+                      key={btn.id}
+                      btn={btn}
+                      rowIdx={rowIdx}
+                      btnIdx={btnIdx}
+                      sDragSource={sDragSource}
+                      sDragTarget={sDragTarget}
+                      _setDragSource={_setDragSource}
+                      _setDragTarget={_setDragTarget}
+                      handleReorder={handleReorder}
+                      handleLabelChange={handleLabelChange}
+                      handleDeleteButton={handleDeleteButton}
+                      handleEditPress={() => _setStandEditButtonObj(btn)}
+                    />
+                  ))}
+                  {/* Add button to this row */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      let newBtn = {
+                        ...cloneDeep(INTAKE_QUICK_BUTTON_PROTO),
+                        id: generateRandomID(),
+                      };
+                      let updated = rows.map((r) => [...r]);
+                      updated[rowIdx].push(newBtn);
+                      handleSettingsFieldChange("intakeQuickButtons", updated);
+                      _setStandEditButtonObj(newBtn);
+                    }}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: C.green,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginLeft: 4,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        fontSize: 18,
+                        fontWeight: "700",
+                        marginTop: -2,
+                      }}
+                    >
+                      +
+                    </Text>
+                  </TouchableOpacity>
+                </div>
+              ))}
+
+              {rows.length === 0 && (
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: gray(0.35),
+                    textAlign: "center",
+                    paddingVertical: 16,
+                  }}
+                >
+                  No rows yet. Press "Add Row" below.
+                </Text>
+              )}
+            </div>
+
+            {/* Add Row button */}
+            <TouchableOpacity
+              onPress={handleAddRow}
+              style={{
+                marginTop: 6,
+                paddingVertical: 8,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 6,
+                alignItems: "center",
+                backgroundColor: C.listItemWhite,
+              }}
+            >
+              <Text style={{ fontSize: 12, color: C.green, fontWeight: "600" }}>
+                + Add Row
+              </Text>
+            </TouchableOpacity>
+          </div>
+        </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Stand Button Card (draggable)
+////////////////////////////////////////////////////////////////////////////////
+
+const StandButtonCard = ({
+  btn,
+  rowIdx,
+  btnIdx,
+  sDragSource,
+  sDragTarget,
+  _setDragSource,
+  _setDragTarget,
+  handleReorder,
+  handleLabelChange,
+  handleDeleteButton,
+  handleEditPress,
+}) => {
+  const [sIsEditingLabel, _setIsEditingLabel] = useState(false);
+
+  let isOver =
+    sDragTarget &&
+    sDragTarget.rowIdx === rowIdx &&
+    sDragTarget.btnIdx === btnIdx;
+  let isDragging =
+    sDragSource &&
+    sDragSource.rowIdx === rowIdx &&
+    sDragSource.btnIdx === btnIdx;
+
+  return (
+    <div
+      draggable
+      onDragStart={() => _setDragSource({ rowIdx, btnIdx })}
+      onDragOver={(e) => {
+        e.preventDefault();
+        _setDragTarget({ rowIdx, btnIdx });
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        if (sDragSource) {
+          handleReorder(
+            sDragSource.rowIdx,
+            sDragSource.btnIdx,
+            rowIdx,
+            btnIdx
+          );
+        }
+        _setDragSource(null);
+        _setDragTarget(null);
+      }}
+      onDragEnd={() => {
+        _setDragSource(null);
+        _setDragTarget(null);
+      }}
+      style={{
+        flex: 1,
+        minHeight: 44,
+        margin: 3,
+        padding: 6,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: isOver ? 2 : 1,
+        borderStyle: "solid",
+        borderColor: isOver ? C.blue : C.buttonLightGreenOutline,
+        borderRadius: 8,
+        backgroundColor: C.listItemWhite,
+        position: "relative",
+        cursor: "grab",
+        opacity: isDragging ? 0.5 : 1,
+        boxSizing: "border-box",
+      }}
+    >
+      {/* Delete button (top-right) */}
+      <TouchableOpacity
+        onPress={() => handleDeleteButton(rowIdx, btnIdx)}
+        style={{
+          position: "absolute",
+          top: 2,
+          right: 2,
+          width: 16,
+          height: 16,
+          borderRadius: 8,
+          backgroundColor: gray(0.12),
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text style={{ fontSize: 10, color: C.lightred, fontWeight: "700" }}>
+          ×
+        </Text>
+      </TouchableOpacity>
+
+      {/* Edit button (top-left) */}
+      <TouchableOpacity
+        onPress={handleEditPress}
+        style={{
+          position: "absolute",
+          top: 2,
+          left: 2,
+          width: 16,
+          height: 16,
+          borderRadius: 8,
+          backgroundColor: gray(0.12),
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Image_ icon={ICONS.editPencil} size={9} />
+      </TouchableOpacity>
+
+      {/* Label */}
+      {sIsEditingLabel ? (
+        <TextInput_
+          style={{
+            fontSize: 11,
+            color: C.text,
+            textAlign: "center",
+            borderBottomWidth: 1,
+            borderBottomColor: gray(0.3),
+            paddingVertical: 2,
+            width: "100%",
+            outlineWidth: 0,
+            outlineStyle: "none",
+          }}
+          value={btn.label || ""}
+          onChangeText={(val) => handleLabelChange(rowIdx, btnIdx, val)}
+          onBlur={() => _setIsEditingLabel(false)}
+          autoFocus
+          placeholder="Label..."
+          placeholderTextColor={gray(0.3)}
+        />
+      ) : (
+        <TouchableOpacity onPress={() => _setIsEditingLabel(true)}>
+          <Text
+            style={{
+              fontSize: 11,
+              color: btn.label ? C.text : gray(0.35),
+              textAlign: "center",
+              fontWeight: "500",
+            }}
+            numberOfLines={2}
+          >
+            {btn.label || "(tap to name)"}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </div>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Stand Button Inventory Modal
+////////////////////////////////////////////////////////////////////////////////
+
+const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
+  const zInventory = useInventoryStore((state) => state.inventoryArr);
+  const [sSearchString, _setSearchString] = useState("");
+  const [sSearchResults, _setSearchResults] = useState([]);
+  const [sSelectedItemID, _setSelectedItemID] = useState(
+    buttonObj.inventoryItemID || ""
+  );
+  const [sLabel, _setLabel] = useState(buttonObj.label || "");
+
+  function handleSearch(val) {
+    _setSearchString(val);
+    if (!val || val.length < 3) {
+      _setSearchResults([]);
+      return;
+    }
+    _setSearchResults(searchInventory(val, zInventory));
+  }
+
+  function handleSelectItem(invItem) {
+    _setSelectedItemID(invItem.id);
+    _setLabel(invItem.informalName || invItem.formalName || "");
+    _setSearchString("");
+    _setSearchResults([]);
+  }
+
+  function resolveItem(itemId) {
+    return zInventory.find((o) => o.id === itemId);
+  }
+
+  let resolvedItem = sSelectedItemID ? resolveItem(sSelectedItemID) : null;
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 500,
+          height: "70vh",
+          backgroundColor: "white",
+          borderRadius: 12,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: gray(0.15),
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.text,
+            }}
+          >
+            Stand Button — Select Item
+          </Text>
+          <TouchableOpacity onPress={onClose}>
+            <Image_ icon={ICONS.close1} size={18} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Label input */}
+        <View style={{ padding: 16, paddingBottom: 8 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.blue,
+              marginBottom: 4,
+            }}
+          >
+            BUTTON LABEL
+          </Text>
+          <TextInput_
+            style={{
+              borderBottomColor: gray(0.3),
+              borderBottomWidth: 1,
+              width: "100%",
+              fontSize: 14,
+              color: C.text,
+              paddingVertical: 6,
+              outlineWidth: 0,
+              outlineStyle: "none",
+            }}
+            value={sLabel}
+            onChangeText={_setLabel}
+            placeholder="Button label..."
+            placeholderTextColor={gray(0.3)}
+          />
+        </View>
+
+        {/* Currently selected item */}
+        {resolvedItem && (
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginBottom: 8,
+              flexDirection: "row",
+              alignItems: "center",
+              paddingVertical: 8,
+              paddingHorizontal: 10,
+              backgroundColor: "rgb(230, 240, 252)",
+              borderRadius: 4,
+              borderLeftWidth: 3,
+              borderLeftColor: C.blue,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, color: C.text }}>
+                {resolvedItem.informalName ||
+                  resolvedItem.formalName ||
+                  "Unknown"}
+              </Text>
+              <Text style={{ fontSize: 11, color: C.lightText }}>
+                ${formatCurrencyDisp(resolvedItem.price || 0)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                _setSelectedItemID("");
+                _setLabel("");
+              }}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                backgroundColor: gray(0.08),
+                borderRadius: 4,
+              }}
+            >
+              <Text style={{ fontSize: 10, color: C.lightred }}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Search input */}
+        <View style={{ padding: 16, paddingTop: 8, paddingBottom: 8 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.blue,
+              marginBottom: 4,
+            }}
+          >
+            SEARCH INVENTORY
+          </Text>
+          <TextInput_
+            style={{
+              borderBottomColor: gray(0.3),
+              borderBottomWidth: 1,
+              width: "100%",
+              fontSize: 14,
+              color: C.text,
+              paddingVertical: 6,
+              outlineWidth: 0,
+              outlineStyle: "none",
+            }}
+            value={sSearchString}
+            onChangeText={handleSearch}
+            placeholder="Search inventory (min 3 chars)..."
+            placeholderTextColor={gray(0.3)}
+            autoFocus
+          />
+        </View>
+
+        {/* Search results */}
+        <ScrollView
+          style={{
+            flex: 1,
+            marginHorizontal: 16,
+            marginBottom: 8,
+            borderWidth: sSearchResults.length > 0 ? 1 : 0,
+            borderColor: gray(0.1),
+            borderRadius: 4,
+            backgroundColor: "white",
+          }}
+        >
+          {sSearchResults.map((item, idx) => (
+            <TouchableOpacity
+              key={item.id || idx}
+              onPress={() => handleSelectItem(item)}
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: 8,
+                borderBottomWidth: 1,
+                borderBottomColor: gray(0.08),
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, color: C.text }}>
+                  {item.informalName || item.formalName || "Unknown"}
+                </Text>
+                {!!item.brand && (
+                  <Text style={{ fontSize: 11, color: gray(0.5) }}>
+                    {item.brand}
+                  </Text>
+                )}
+              </View>
+              <Text style={{ fontSize: 13, color: C.text }}>
+                ${formatCurrencyDisp(item.price || 0)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Footer with Save/Cancel */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "flex-end",
+            padding: 16,
+            borderTopWidth: 1,
+            borderTopColor: gray(0.15),
+          }}
+        >
+          <Button_
+            text="Cancel"
+            onPress={onClose}
+            buttonStyle={{
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              marginRight: 10,
+              backgroundColor: gray(0.15),
+            }}
+            textStyle={{ color: C.text }}
+          />
+          <Button_
+            text="Save"
+            colorGradientArr={COLOR_GRADIENTS.green}
+            onPress={() =>
+              onSave({
+                ...buttonObj,
+                label: sLabel,
+                inventoryItemID: sSelectedItemID,
+              })
+            }
+            buttonStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
+          />
+        </View>
+      </div>
+    </div>,
+    document.body
+  );
 };

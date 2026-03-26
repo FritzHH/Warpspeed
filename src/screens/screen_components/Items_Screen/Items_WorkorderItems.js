@@ -20,6 +20,7 @@ import {
   DropdownMenu,
   TextInput_,
   Tooltip,
+  StaleBanner,
 } from "../../../components";
 import { C, ICONS } from "../../../styles";
 import { EmptyItemsComponent } from "./Items_Empty";
@@ -58,7 +59,6 @@ export const Items_WorkorderItemsTab = ({}) => {
     deepEqual
   );
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
-
   // Fix 3: deepEqual prevents re-renders from unrelated inventory changes
   const zInventoryArr = useInventoryStore((state) => state.inventoryArr, deepEqual);
 
@@ -66,6 +66,8 @@ export const Items_WorkorderItemsTab = ({}) => {
   const zSalesTaxPercent = useSettingsStore((state) => state.settings?.salesTaxPercent);
   const zDiscounts = useSettingsStore((state) => state.settings?.discounts, deepEqual);
   const zStatuses = useSettingsStore((state) => state.settings?.statuses, deepEqual);
+
+  const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
 
@@ -442,6 +444,14 @@ export const Items_WorkorderItemsTab = ({}) => {
           </Text>
         </View>
       )}
+
+      {!zWorkordersLoaded && zOpenWorkorder && (
+        <StaleBanner
+          text="Waiting on workorder refresh...."
+          style={{ marginHorizontal: 8, marginTop: 3 }}
+        />
+      )}
+
       <FlatList
         style={{ marginTop: 3, marginRight: 5 }}
         data={zOpenWorkorder.workorderLines}

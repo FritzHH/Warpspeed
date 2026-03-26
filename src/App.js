@@ -13,6 +13,7 @@ import { MobileMessagesScreen } from "./screens/mobile/MobileMessagesScreen";
 import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
+import { BikeStandScreen } from "./screens/BikeStandScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { CustomerWorkorderScreen } from "./screens/CustomerWorkorderScreen";
 import {
@@ -47,48 +48,62 @@ document.addEventListener("visibilitychange", () => {
 });
 setInterval(checkForAppUpdate, 5 * 60 * 1000);
 
+// Redirects tablet → /stand, mobile → / (workorders), desktop → shows HomeScreen
+function DeviceAwareHome({ user }) {
+  const deviceType = useLayoutStore((state) => state.deviceType);
+  if (deviceType === "tablet" && user) {
+    return <Navigate to={ROUTES.stand} replace />;
+  }
+  if (deviceType === "mobile" && user) {
+    return <Navigate to={ROUTES.dashboard} replace />;
+  }
+  return <HomeScreen />;
+}
+
 /////////////////////////////////////
 function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionError, setSessionError] = useState("");
   const setIsMobile = useLayoutStore((state) => state.setIsMobile);
+  const setDeviceType = useLayoutStore((state) => state.setDeviceType);
   const isMobile = useLayoutStore((state) => state.isMobile);
 
-  // Detect if app is running on mobile device or desktop browser
+  // Detect if app is running on mobile, tablet, or desktop
   useEffect(() => {
     const detectDevice = () => {
-      // Check if running on mobile device
-      const isMobileDevice =
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-          navigator.userAgent
-        );
+      const ua = navigator.userAgent;
+      const w = window.innerWidth;
+      const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
-      // Also check screen width as secondary indicator
-      const isMobileWidth = window.innerWidth <= 768;
+      // iPad reports as Mac in newer iOS — detect via touch + Mac UA
+      const isIPad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && isTouch);
+      const isAndroidTablet = /Android/i.test(ua) && !/Mobile/i.test(ua);
+      const isPhone = /iPhone|iPod|BlackBerry|IEMobile|Opera Mini|webOS/i.test(ua) ||
+        (/Android/i.test(ua) && /Mobile/i.test(ua));
 
-      // Set isMobile if either condition is true
-      const mobile = isMobileDevice || isMobileWidth;
+      let deviceType;
+      if (isIPad || isAndroidTablet || (isTouch && w > 480 && w <= 1024)) {
+        deviceType = "tablet";
+      } else if (isPhone || w <= 480) {
+        deviceType = "mobile";
+      } else {
+        deviceType = "desktop";
+      }
+
+      const mobile = deviceType === "mobile";
       setIsMobile(mobile);
-      // useLayoutStore.setIsMobile(mobile)
-      // useLayoutStore.setwindow
+      setDeviceType(deviceType);
 
       log(
-        `Device detected: ${mobile ? "Mobile" : "Desktop"} (${window.innerWidth
-        }×${window.innerHeight})`
+        `Device detected: ${deviceType} (${w}×${window.innerHeight})`
       );
     };
 
-    // Initial detection
     detectDevice();
-
-    // Re-detect on window resize
     window.addEventListener("resize", detectDevice);
-
-    return () => {
-      window.removeEventListener("resize", detectDevice);
-    };
-  }, [setIsMobile]);
+    return () => window.removeEventListener("resize", detectDevice);
+  }, [setIsMobile, setDeviceType]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (firebaseUser) => {
@@ -175,8 +190,8 @@ function App() {
           )}
         </Route>
 
-        {/* Public route - Home (links to all routes) */}
-        <Route path={ROUTES.home} element={<HomeScreen />} />
+        {/* Public route - Home (auto-redirects by device type) */}
+        <Route path={ROUTES.home} element={<DeviceAwareHome user={user} />} />
 
         {/* Public route - Customer Display */}
         <Route path={ROUTES.display} element={<CustomerDisplayScreen />} />
@@ -193,6 +208,16 @@ function App() {
           element={
             <ProtectedRoute user={user}>
               <IntakeScreen />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected route - Bike Stand Screen */}
+        <Route
+          path={ROUTES.stand}
+          element={
+            <ProtectedRoute user={user}>
+              <BikeStandScreen />
             </ProtectedRoute>
           }
         />

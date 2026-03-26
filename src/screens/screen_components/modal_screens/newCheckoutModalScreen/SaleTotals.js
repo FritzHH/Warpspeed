@@ -183,7 +183,7 @@ export function SaleTotals({
             style={{
               fontSize: 18,
               fontWeight: 500,
-              color: gray(0.6),
+              color: C.green,
             }}
           >
             {"AMOUNT LEFT TO PAY:   $" + formatCurrencyDisp(amountRemaining)}

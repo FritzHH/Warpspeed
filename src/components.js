@@ -2435,6 +2435,218 @@ export function TimeSpinner({
   );
 }
 
+export const TimePicker_ = ({
+  initialHour = 12,
+  initialMinute = 0,
+  initialPeriod = "PM",
+  onConfirm = () => {},
+  onCancel = () => {},
+  style = {},
+}) => {
+  const [sHour, _sSetHour] = useState(initialHour);
+  const [sMinute, _sSetMinute] = useState(initialMinute);
+  const [sPeriod, _sSetPeriod] = useState(initialPeriod);
+
+  const hourRef = useRef(null);
+  const minuteRef = useRef(null);
+  const hourReady = useRef(false);
+  const minuteReady = useRef(false);
+  const hourTimer = useRef(null);
+  const minuteTimer = useRef(null);
+
+  const ITEM_H = 36;
+  const VISIBLE = 7;
+  const PAD = Math.floor(VISIBLE / 2);
+  const COL_W = 64;
+  const BLUE = "#2979FF";
+
+  const hours = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const mins = [];
+  for (let i = 0; i < 60; i++) mins.push(i);
+
+  const snapScroll = (e, items, ref, setter) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const idx = Math.max(0, Math.min(items.length - 1, Math.round(y / ITEM_H)));
+    ref.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+    setter(items[idx]);
+  };
+
+  const nudge = (ref, items, current, setter, dir) => {
+    const idx = items.indexOf(current) + dir;
+    if (idx >= 0 && idx < items.length) {
+      ref.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+      setter(items[idx]);
+    }
+  };
+
+  const renderScrollColumn = (items, selected, ref, setter, formatFn, readyRef, initVal, timerRef) => {
+    const selIdx = items.indexOf(selected);
+    return (
+      <View style={{ width: COL_W, alignItems: "center" }}>
+        <TouchableOpacity
+          onPress={() => nudge(ref, items, selected, setter, -1)}
+          style={{ height: 22, justifyContent: "center", alignItems: "center", width: COL_W }}
+        >
+          <Text style={{ fontSize: 9, color: gray(0.5) }}>▲</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: ITEM_H * VISIBLE, overflow: "hidden" }}>
+          <ScrollView
+            ref={ref}
+            showsVerticalScrollIndicator={false}
+            snapToInterval={ITEM_H}
+            decelerationRate="fast"
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              clearTimeout(timerRef.current);
+              const y = e.nativeEvent.contentOffset.y;
+              timerRef.current = setTimeout(() => {
+                const idx = Math.max(0, Math.min(items.length - 1, Math.round(y / ITEM_H)));
+                ref.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+                setter(items[idx]);
+              }, 75);
+            }}
+            onLayout={() => {
+              if (!readyRef.current) {
+                readyRef.current = true;
+                const idx = items.indexOf(initVal);
+                ref.current?.scrollTo({ y: Math.max(0, idx) * ITEM_H, animated: false });
+              }
+            }}
+            contentContainerStyle={{ paddingVertical: ITEM_H * PAD }}
+          >
+            {items.map((item, i) => {
+              const dist = Math.abs(i - selIdx);
+              return (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => {
+                    ref.current?.scrollTo({ y: i * ITEM_H, animated: true });
+                    setter(item);
+                  }}
+                  style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={{
+                      fontSize: i === selIdx ? 19 : 17,
+                      fontWeight: i === selIdx ? "600" : "400",
+                      color: i === selIdx ? "#fff" : gray(0.55),
+                    }}
+                  >
+                    {formatFn(item)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => nudge(ref, items, selected, setter, 1)}
+          style={{ height: 22, justifyContent: "center", alignItems: "center", width: COL_W }}
+        >
+          <Text style={{ fontSize: 9, color: gray(0.5) }}>▼</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const confirmResult = () => {
+    const h24 = sPeriod === "PM" ? (sHour === 12 ? 12 : sHour + 12) : (sHour === 12 ? 0 : sHour);
+    onConfirm({
+      hour: sHour,
+      minute: sMinute,
+      period: sPeriod,
+      totalMinutes: h24 * 60 + sMinute,
+    });
+  };
+
+  return (
+    <View style={[{ backgroundColor: "#fff", borderRadius: 10, paddingVertical: 4, width: COL_W * 3 + 16 }, style]}>
+      <View style={{ position: "relative", paddingHorizontal: 8 }}>
+        {/* Blue highlight bar */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 4,
+            right: 4,
+            top: 22 + PAD * ITEM_H,
+            height: ITEM_H,
+            backgroundColor: BLUE,
+            borderRadius: 8,
+            zIndex: 0,
+          }}
+        />
+
+        <View style={{ flexDirection: "row", zIndex: 1 }}>
+          {renderScrollColumn(hours, sHour, hourRef, _sSetHour, (h) => String(h), hourReady, initialHour, hourTimer)}
+          {renderScrollColumn(mins, sMinute, minuteRef, _sSetMinute, (m) => String(m).padStart(2, "0"), minuteReady, initialMinute, minuteTimer)}
+
+          {/* AM/PM column */}
+          <View style={{ width: COL_W, alignItems: "center" }}>
+            <View style={{ height: 22 }} />
+            <View style={{ height: ITEM_H * VISIBLE, overflow: "hidden" }}>
+              <View style={{ marginTop: sPeriod === "AM" ? PAD * ITEM_H : (PAD - 1) * ITEM_H }}>
+                <TouchableOpacity
+                  onPress={() => _sSetPeriod("AM")}
+                  style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}
+                >
+                  <Text
+                    style={{
+                      fontSize: sPeriod === "AM" ? 19 : 17,
+                      fontWeight: sPeriod === "AM" ? "600" : "400",
+                      color: sPeriod === "AM" ? "#fff" : gray(0.55),
+                    }}
+                  >
+                    AM
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => _sSetPeriod("PM")}
+                  style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}
+                >
+                  <Text
+                    style={{
+                      fontSize: sPeriod === "PM" ? 19 : 17,
+                      fontWeight: sPeriod === "PM" ? "600" : "400",
+                      color: sPeriod === "PM" ? "#fff" : gray(0.55),
+                    }}
+                  >
+                    PM
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={{ height: 22 }} />
+          </View>
+        </View>
+      </View>
+
+      {/* Bottom buttons */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-evenly",
+          paddingTop: 10,
+          paddingBottom: 6,
+          borderTopWidth: 1,
+          borderColor: "#eee",
+          marginTop: 4,
+        }}
+      >
+        <TouchableOpacity onPress={confirmResult} style={{ padding: 8 }}>
+          <Image_ style={{ width: 27, height: 27 }} icon={ICONS.check} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onCancel} style={{ padding: 8 }}>
+          <Image_ style={{ width: 23, height: 23 }} icon={ICONS.close1} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 export function SliderButton_({
   onConfirm,
   toConfirmLabel = "Slide to confirm",

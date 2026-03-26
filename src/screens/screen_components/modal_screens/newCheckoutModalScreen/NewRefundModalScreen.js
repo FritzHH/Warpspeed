@@ -413,62 +413,52 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
               )}
             </View>
 
-            {/* Center: REFUND SCREEN indicator */}
+            {/* Center: Custom refund button or REFUND SCREEN label */}
             <View
               style={{
-                backgroundColor: C.lightred,
-                borderRadius: 6,
-                paddingHorizontal: 14,
-                paddingVertical: 4,
                 position: "absolute",
                 left: "50%",
                 transform: [{ translateX: "-50%" }],
               }}
             >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: Fonts.weight.textHeavy,
-                  color: "white",
-                  letterSpacing: 1,
-                }}
-              >
-                REFUND SCREEN
-              </Text>
-            </View>
-
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              {/* Toggle custom amount mode */}
-              {sOriginalSale && !sRefundComplete && (
+              {sOriginalSale && !sRefundComplete ? (
                 <Button_
                   text={sIsCustomAmount ? "EXIT CUSTOM REFUND" : "CUSTOM REFUND AMOUNT"}
                   onPress={toggleCustomAmount}
                   colorGradientArr={sIsCustomAmount ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.green}
-                  textStyle={{ fontSize: 11 }}
+                  textStyle={{ fontSize: 12, fontWeight: Fonts.weight.textHeavy, letterSpacing: 1 }}
                   buttonStyle={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    paddingHorizontal: 14,
                     borderRadius: 6,
                   }}
                 />
+              ) : (
+                <View
+                  style={{
+                    backgroundColor: C.lightred,
+                    borderRadius: 6,
+                    paddingHorizontal: 14,
+                    paddingVertical: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: Fonts.weight.textHeavy,
+                      color: "white",
+                      letterSpacing: 1,
+                    }}
+                  >
+                    REFUND SCREEN
+                  </Text>
+                </View>
               )}
-              <Button_
-                text="EXIT REFUND SCREEN"
-                onPress={handleClose}
-                colorGradientArr={COLOR_GRADIENTS.red}
-                textStyle={{
-                  fontSize: 11,
-                  fontWeight: Fonts.weight.textHeavy,
-                }}
-                buttonStyle={{
-                  paddingVertical: 6,
-                  paddingHorizontal: 14,
-                  borderRadius: 6,
-                }}
-              />
             </View>
+
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            />
           </View>
 
           {/* ── Loading State ───────────────────────────── */}
@@ -702,6 +692,22 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                     </View>
                   )}
                 </ScrollView>
+
+                <Button_
+                  text="EXIT REFUND SCREEN"
+                  onPress={handleClose}
+                  colorGradientArr={COLOR_GRADIENTS.red}
+                  textStyle={{
+                    fontSize: 11,
+                    fontWeight: Fonts.weight.textHeavy,
+                  }}
+                  buttonStyle={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 14,
+                    borderRadius: 6,
+                    margin: 10,
+                  }}
+                />
               </View>
 
               {/* ── RIGHT COLUMN: Item Selector ──────────── */}

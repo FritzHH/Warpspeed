@@ -54,6 +54,7 @@ import {
   NumberSpinner_,
   ScreenModal,
   TextInput_,
+  TimePicker_,
   TimeSpinner,
   Tooltip,
   StatusPickerModal,
@@ -2785,6 +2786,9 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
 // end compile into ListOptionsComponent /////////////////////////////////////////
 
 const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const [sOpenPicker, _sSetOpenPicker] = useState(false);
+  const [sClosePicker, _sSetClosePicker] = useState(false);
+
   if (!zSettingsObj) return null;
   return (
     <BoxContainerOuterComponent style={{ marginBottom: 20 }}>
@@ -3139,8 +3143,182 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             width: "100%",
           }}
         >
-          {zSettingsObj?.storeHours.standard.map((item, idx) => (
+          {zSettingsObj?.storeHours.standard.map((item, idx) => {
+            if (idx === 0) {
+              const openParts = item.open.split(" ");
+              const [openH, openM] = openParts[0].split(":").map(Number);
+              const openP = openParts[1] || "AM";
+              const closeParts = item.close.split(" ");
+              const [closeH, closeM] = closeParts[0].split(":").map(Number);
+              const closeP = closeParts[1] || "PM";
+
+              return (
+                <View key={item.id}>
+                  <View
+                    style={{
+                      width: "100%",
+                      flexDirection: "row",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        alignItems: "center",
+                        width: "25%",
+                        textAlign: "right",
+                        paddingRight: 20,
+                      }}
+                    >
+                      {getDayOfWeekFrom0To7Input(idx)}
+                    </Text>
+                    <View
+                      style={{
+                        width: "55%",
+                        flexDirection: "row",
+                        alignItems: "center",
+                      }}
+                    >
+                      <TouchableOpacity
+                        onPress={() => {
+                          _sSetOpenPicker(!sOpenPicker);
+                          _sSetClosePicker(false);
+                        }}
+                        style={{
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          backgroundColor: sOpenPicker ? "#e8f0fe" : "transparent",
+                        }}
+                      >
+                        <Text style={{ fontSize: 15 }}>{item.open}</Text>
+                      </TouchableOpacity>
+                      <Image_
+                        style={{ width: 22, height: 12, marginHorizontal: 10 }}
+                        icon={ICONS.rightArrowBlue}
+                      />
+                      <TouchableOpacity
+                        onPress={() => {
+                          _sSetClosePicker(!sClosePicker);
+                          _sSetOpenPicker(false);
+                        }}
+                        style={{
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          paddingHorizontal: 10,
+                          paddingVertical: 4,
+                          backgroundColor: sClosePicker ? "#e8f0fe" : "transparent",
+                        }}
+                      >
+                        <Text style={{ fontSize: 15 }}>{item.close}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View
+                      style={{
+                        width: "20%",
+                        alignItems: "flex-end",
+                      }}
+                    >
+                      <CheckBox_
+                        buttonStyle={{ marginLeft: 20 }}
+                        text={"Open"}
+                        isChecked={item.isOpen}
+                        onCheck={() => {
+                          let standardStoreHours =
+                            zSettingsObj.storeHours.standard.map((o) => {
+                              if (o.id === item.id) {
+                                return { ...o, isOpen: !o.isOpen };
+                              }
+                              return o;
+                            });
+                          handleSettingsFieldChange("storeHours", {
+                            standard: standardStoreHours,
+                            special: zSettingsObj.storeHours.special,
+                          });
+                        }}
+                      />
+                    </View>
+                  </View>
+                  <Modal visible={sOpenPicker} transparent animationType="fade">
+                    <TouchableWithoutFeedback onPress={() => _sSetOpenPicker(false)}>
+                      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                        <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                          <View>
+                            <TimePicker_
+                              initialHour={openH}
+                              initialMinute={openM}
+                              initialPeriod={openP}
+                              onConfirm={({ hour, minute, period }) => {
+                                const timeStr =
+                                  hour +
+                                  ":" +
+                                  String(minute).padStart(2, "0") +
+                                  " " +
+                                  period;
+                                let standardStoreHours =
+                                  zSettingsObj.storeHours.standard.map((o) => {
+                                    if (o.id === item.id)
+                                      return { ...o, open: timeStr };
+                                    return o;
+                                  });
+                                handleSettingsFieldChange("storeHours", {
+                                  standard: standardStoreHours,
+                                  special: zSettingsObj.storeHours.special,
+                                });
+                                _sSetOpenPicker(false);
+                              }}
+                              onCancel={() => _sSetOpenPicker(false)}
+                            />
+                          </View>
+                        </TouchableWithoutFeedback>
+                      </View>
+                    </TouchableWithoutFeedback>
+                  </Modal>
+                  <Modal visible={sClosePicker} transparent animationType="fade">
+                    <TouchableWithoutFeedback onPress={() => _sSetClosePicker(false)}>
+                      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                        <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                          <View>
+                            <TimePicker_
+                              initialHour={closeH}
+                              initialMinute={closeM}
+                              initialPeriod={closeP}
+                              onConfirm={({ hour, minute, period }) => {
+                                const timeStr =
+                                  hour +
+                                  ":" +
+                                  String(minute).padStart(2, "0") +
+                                  " " +
+                                  period;
+                                let standardStoreHours =
+                                  zSettingsObj.storeHours.standard.map((o) => {
+                                    if (o.id === item.id)
+                                      return { ...o, close: timeStr };
+                                    return o;
+                                  });
+                                handleSettingsFieldChange("storeHours", {
+                                  standard: standardStoreHours,
+                                  special: zSettingsObj.storeHours.special,
+                                });
+                                _sSetClosePicker(false);
+                              }}
+                              onCancel={() => _sSetClosePicker(false)}
+                            />
+                          </View>
+                        </TouchableWithoutFeedback>
+                      </View>
+                    </TouchableWithoutFeedback>
+                  </Modal>
+                </View>
+              );
+            }
+
+            return (
             <View
+              key={item.id}
               style={{
                 width: "100%",
                 flexDirection: "row",
@@ -3368,7 +3546,8 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                 />
               </View>
             </View>
-          ))}
+            );
+          })}
         </View>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>

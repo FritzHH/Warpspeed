@@ -9,10 +9,10 @@ import {
   log,
   resolveStatus,
 } from "../../../utils";
-import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_ } from "../../../components";
-import { C, Colors, ICONS } from "../../../styles";
+import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_, Button_, TextInput_ } from "../../../components";
+import { C, Colors, Fonts, ICONS } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { sortBy } from "lodash";
 import {
   useCurrentCustomerStore,
@@ -141,6 +141,8 @@ export function WorkordersComponent({}) {
   const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zSettings = useSettingsStore((state) => state.settings);
 
+  const [sSearchTerm, _setSearchTerm] = useState("");
+
   ///////////////////////////////////////////////////////////////////
 
   ///////////////////////////////////////////////////////////////////////////////////
@@ -243,6 +245,24 @@ export function WorkordersComponent({}) {
     return finalArr;
   }
 
+  function filterWorkorders(workorders) {
+    if (!sSearchTerm || sSearchTerm.length < 2) return workorders;
+    let term = sSearchTerm.toLowerCase();
+    return workorders.filter((wo) => {
+      let first = (wo.customerFirst || "").toLowerCase();
+      let last = (wo.customerLast || "").toLowerCase();
+      let brand = (wo.brand || "").toLowerCase();
+      let phone = (wo.customerCell || "").replace(/\D/g, "");
+      let searchDigits = term.replace(/\D/g, "");
+      return (
+        first.includes(term) ||
+        last.includes(term) ||
+        brand.includes(term) ||
+        (searchDigits.length >= 2 && phone.includes(searchDigits))
+      );
+    });
+  }
+
   function onMouseEnter(workorder) {
     if (exitTimerRef.current) {
       clearTimeout(exitTimerRef.current);
@@ -301,17 +321,46 @@ export function WorkordersComponent({}) {
     >
       <View
         style={{
-          height: "4%",
           paddingVertical: 5,
-          justifyContent: "flex-end",
           flexDirection: "row",
           alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
+          <Button_
+            icon={ICONS.reset1}
+            iconSize={20}
+            onPress={() => _setSearchTerm("")}
+            useColorGradient={false}
+          />
+          <TextInput_
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: gray(0.2),
+              fontSize: 15,
+              color: C.text,
+              outlineWidth: 0,
+              outlineStyle: "none",
+              flex: 1,
+              marginLeft: 8,
+              marginRight: 12,
+            }}
+            placeholder="Search workorders"
+            placeholderTextColor={gray(0.2)}
+            value={sSearchTerm}
+            onChangeText={(val) => _setSearchTerm(val)}
+          />
+        </View>
         <CheckBox_
           isChecked={sAllowPreview}
           onCheck={handleTogglePreview}
-          viewStyle={{ alignSelf: "flex-end" }}
           text={"Preview On"}
           iconSize={10}
           buttonStyle={{
@@ -329,7 +378,7 @@ export function WorkordersComponent({}) {
           height: "96%",
           backgroundColor: null,
         }}
-        data={sortWorkorders(zOpenWorkorders)}
+        data={filterWorkorders(sortWorkorders(zOpenWorkorders))}
         keyExtractor={(item, index) => index}
         ListEmptyComponent={() => (
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>

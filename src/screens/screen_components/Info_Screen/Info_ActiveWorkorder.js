@@ -315,6 +315,10 @@ export const ActiveWorkorderComponent = ({}) => {
         startedByLast: _currentUser?.last,
         status: SETTINGS_OBJ.statuses[0]?.id || "",
       });
+      // Add workorder ID to customer's workorders array and save
+      let updatedCustomer = { ...customer, workorders: [...(customer.workorders || []), wo.id] };
+      useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+
       useOpenWorkordersStore.getState().setWorkorder(wo, false);
       useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
       useTabNamesStore.getState().setItems({

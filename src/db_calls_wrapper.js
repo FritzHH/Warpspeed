@@ -1543,30 +1543,17 @@ export async function dbDeleteWorkorder(workorderID) {
     const path = buildWorkorderPath(tenantID, storeID, workorderID);
     log(`Deleting workorder from path: ${path}`);
 
-    const result = await firestoreDelete(path);
+    await firestoreDelete(path);
 
-    if (result.success) {
-      log(`Successfully deleted workorder with ID: ${workorderID}`);
-      return {
-        success: true,
-        message: "Workorder deleted successfully",
-        workorderID,
-        tenantID,
-        storeID,
-        path,
-      };
-    } else {
-      log(`Error deleting workorder: ${result.error}`);
-      return {
-        success: false,
-        error: result.error,
-        message: "Failed to delete workorder",
-        workorderID: null,
-        tenantID,
-        storeID,
-        path,
-      };
-    }
+    log(`Successfully deleted workorder with ID: ${workorderID}`);
+    return {
+      success: true,
+      message: "Workorder deleted successfully",
+      workorderID,
+      tenantID,
+      storeID,
+      path,
+    };
   } catch (error) {
     log("Error in dbDeleteWorkorder:", error);
     return {

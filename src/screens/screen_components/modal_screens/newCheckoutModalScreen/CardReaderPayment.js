@@ -630,7 +630,7 @@ export function CardReaderPayment({
               enabled={zCardStatus !== "clearing"}
               colorGradientArr={COLOR_GRADIENTS.red}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90 }}
+              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, borderRadius: 6 }}
             />
           </Tooltip>
         </View>
@@ -641,7 +641,7 @@ export function CardReaderPayment({
             enabled={!startDisabled}
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
-            buttonStyle={{ cursor: startDisabled ? "default" : "inherit" }}
+            buttonStyle={{ cursor: startDisabled ? "default" : "inherit", borderRadius: 6 }}
           />
         </View>
         <View style={{ width: "33%", alignItems: "flex-end", paddingRight: 7 }}>
@@ -652,7 +652,7 @@ export function CardReaderPayment({
               enabled={!isProcessing}
               colorGradientArr={COLOR_GRADIENTS.blue}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, cursor: isProcessing ? "default" : "inherit" }}
+              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, cursor: isProcessing ? "default" : "inherit", borderRadius: 6 }}
             />
           )}
         </View>

@@ -8,3 +8,7 @@ curl -X POST https://api.stripe.com/v1/test_helpers/terminal/readers/tmr_GcDlgAz
 
 
 i see a lot of blinking items on the checkout screen when i make a changes to the workorder or tax free or other items. seems to be a re-rendering issue in a lot of places. without just being hacky and wrapping everything in useMemo's what can we do to reduce this? most likely a zustand issue.
+
+
+
+move the REFUND indicator in the top left to the top middle of the screen. change the text to to "REFUND SCREEN"

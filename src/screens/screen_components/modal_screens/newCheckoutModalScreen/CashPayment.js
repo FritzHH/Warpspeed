@@ -344,7 +344,7 @@ export function CashPayment({
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
             buttonStyle={{
-              cursor: canComplete ? "inherit" : "default",
+              cursor: canComplete ? "inherit" : "default", borderRadius: 6
             }}
           />
         );

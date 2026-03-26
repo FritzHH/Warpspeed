@@ -43,37 +43,27 @@ function TotalRow({ label, value, color, bold, fontSize = 13 }) {
 export function RefundTotals({
   originalSale,
   selectedItemsTotal = 0,
+  itemRefundTotal = 0,
+  selectedPaymentsTotal = 0,
   customRefundAmount = 0,
   previouslyRefunded = 0,
   maxRefundAllowed = 0,
   cardFeeDeduction = 0,
   settings,
   isCustomAmount = false,
+  hasItemSelection = false,
   onCustomAmountChange,
   refundComplete = false,
 }) {
   const [sFocused, _setFocused] = useState(false);
   const [sCustomDisp, _setCustomDisp] = useState("");
 
-  let currentRefundAmount = isCustomAmount
+  // Grand total: items take priority, then payments, then custom
+  let grandTotalRefund = isCustomAmount
     ? customRefundAmount
-    : selectedItemsTotal;
-
-  // Apply tax to selected items
-  let taxRate = settings?.salesTaxPercent || 0;
-  let refundTax = isCustomAmount ? 0 : Math.round(selectedItemsTotal * (taxRate / 100));
-  let totalRefundRequested = isCustomAmount
-    ? customRefundAmount
-    : selectedItemsTotal + refundTax;
-
-  // Card fee refund
-  let cardFeeRefundAmount = 0;
-  if (settings?.cardFeeRefund && originalSale?.cardFee > 0 && totalRefundRequested > 0) {
-    let refundRatio = totalRefundRequested / (originalSale.total - (originalSale.cardFee || 0));
-    cardFeeRefundAmount = Math.round((originalSale.cardFee || 0) * refundRatio);
-  }
-
-  let grandTotalRefund = totalRefundRequested + cardFeeRefundAmount;
+    : hasItemSelection
+    ? itemRefundTotal
+    : selectedPaymentsTotal;
 
   // Exceeds limit check
   let exceedsLimit = grandTotalRefund > maxRefundAllowed;
@@ -138,20 +128,30 @@ export function RefundTotals({
         }}
       />
 
-      {/* Current Refund */}
-      {!isCustomAmount && selectedItemsTotal > 0 && (
+      {/* Selected Items Total */}
+      {!isCustomAmount && hasItemSelection && (
         <>
           <TotalRow
-            label="SELECTED ITEMS SUBTOTAL"
+            label="SELECTED ITEMS"
             value={selectedItemsTotal}
           />
-          {refundTax > 0 && (
+          {settings?.salesTaxPercent > 0 && (
             <TotalRow
-              label={`SALES TAX (${taxRate}%)`}
-              value={refundTax}
+              label={`TAX (${settings.salesTaxPercent}%)`}
+              value={itemRefundTotal - selectedItemsTotal}
+              fontSize={11}
+              color={C.lightText}
             />
           )}
         </>
+      )}
+
+      {/* Selected Payments Total */}
+      {!isCustomAmount && !hasItemSelection && selectedPaymentsTotal > 0 && (
+        <TotalRow
+          label="SELECTED PAYMENTS"
+          value={selectedPaymentsTotal}
+        />
       )}
 
       {/* Custom Amount Input */}
@@ -192,15 +192,6 @@ export function RefundTotals({
             />
           </View>
         </View>
-      )}
-
-      {/* Card Fee Refund */}
-      {cardFeeRefundAmount > 0 && (
-        <TotalRow
-          label="CARD FEE REFUND"
-          value={cardFeeRefundAmount}
-          color={C.blue}
-        />
       )}
 
       {/* Divider */}

@@ -283,29 +283,11 @@ export const Items_WorkorderItemsTab = ({}) => {
   function handleDeleteWorkorder() {
     useLoginStore.getState().requireLogin(() => {
     const deleteFun = () => {
-      const store = useOpenWorkordersStore.getState();
       const isStandalone = zOpenWorkorder.isStandaloneSale;
 
-      store.removeWorkorder(zOpenWorkorder.id);
+      useOpenWorkordersStore.getState().removeWorkorder(zOpenWorkorder.id);
 
-      if (!isStandalone) {
-        const remainingWorkorders = store.workorders.filter(
-          (wo) => !wo.isStandaloneSale
-        );
-        const previousWorkorder = remainingWorkorders[0] ?? null;
-
-        if (previousWorkorder) {
-          store.setOpenWorkorderID(previousWorkorder.id);
-          useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.workorder,
-            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-            optionsTabName: TAB_NAMES.optionsTab.inventory,
-          });
-          return;
-        }
-      }
-
-      store.setOpenWorkorderID(null);
+      useOpenWorkordersStore.getState().setOpenWorkorderID(null);
       useCurrentCustomerStore.getState().setCustomer({ ...CUSTOMER_PROTO }, false);
       useTabNamesStore.getState().setItems({
         itemsTabName: TAB_NAMES.itemsTab.empty,

@@ -10,6 +10,7 @@ export function CashRefund({
   onProcessRefund,
   refundComplete = false,
   suggestedAmount = 0,
+  lockedAmount = false,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
@@ -55,6 +56,7 @@ export function CashRefund({
   }
 
   let isEnabled = !refundComplete && maxCashRefund > 0;
+  let inputEditable = isEnabled && !lockedAmount;
 
   return (
     <View
@@ -109,7 +111,7 @@ export function CashRefund({
             placeholderTextColor={gray(0.3)}
             onFocus={() => _setFocused(true)}
             onBlur={() => _setFocused(false)}
-            editable={isEnabled}
+            editable={inputEditable}
           />
         </View>
       </View>

@@ -302,7 +302,6 @@ export const ActiveWorkorderComponent = ({}) => {
 
   function handleCustomerNewWorkorderPress(customer) {
     useLoginStore.getState().requireLogin(() => {
-      _setShowCustomerInfoScreen(false);
       let _currentUser = useLoginStore.getState().currentUser;
       let wo = createNewWorkorder({
         customerID: customer.id,
@@ -318,6 +317,12 @@ export const ActiveWorkorderComponent = ({}) => {
       });
       useOpenWorkordersStore.getState().setWorkorder(wo, false);
       useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.workorder,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+        optionsTabName: TAB_NAMES.optionsTab.inventory,
+      });
+      _setShowCustomerInfoScreen(false);
     });
   }
 

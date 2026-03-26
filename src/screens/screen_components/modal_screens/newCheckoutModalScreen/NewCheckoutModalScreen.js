@@ -61,7 +61,7 @@ import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
 import { NewRefundModalScreen } from "./NewRefundModalScreen";
 
 // DEV FLAG default — toggled via on-screen switch
-let _devSkipCompletion = true;
+let _devSkipCompletion = false;
 
 // Map CUSTOMER_LANGUAGES keys to Google Translate ISO codes
 const LANG_TO_ISO = { spanish: "es", english: "en" };
@@ -135,6 +135,8 @@ export function NewCheckoutModalScreen() {
   const [sNewItemModal, _setNewItemModal] = useState(null);
   const [sDevSkip, _setDevSkip] = useState(_devSkipCompletion);
   const [sShowRefundModal, _setShowRefundModal] = useState(false);
+  const [sRefundPayment, _setRefundPayment] = useState(null);
+  const [sSessionStartPaymentCount, _setSessionStartPaymentCount] = useState(0);
 
   // ─── Derived Values ───────────────────────────────────────
   let isStandalone = !zOpenWorkorder;
@@ -145,6 +147,7 @@ export function NewCheckoutModalScreen() {
   if (cashAmountLeftToPay < 0) cashAmountLeftToPay = 0;
   let custFirst = zOpenWorkorder?.customerFirst || "";
   let custLast = zOpenWorkorder?.customerLast || "";
+  let sessionHasNewPayments = (sSale?.payments?.length || 0) > sSessionStartPaymentCount;
 
   // ─── Initialization ──────────────────────────────────────
   // Called once when the modal opens. We use a flag to avoid
@@ -189,6 +192,7 @@ export function NewCheckoutModalScreen() {
           _setAddedItems(existingSale.addedItems);
         }
 
+        _setSessionStartPaymentCount(existingSale.payments?.length || 0);
         _setSale(existingSale);
         broadcastSaleToDisplay(existingSale, combined, existingSale.addedItems || [], custFirst, custLast);
         fetchReaders();
@@ -588,7 +592,7 @@ export function NewCheckoutModalScreen() {
         formatCurrencyDisp(remaining) +
         "? A receipt will be printed and the customer can return to pay the rest.",
       btn1Text: "Yes, Close",
-      btn1Handler: async () => {
+      handleBtn1Press: async () => {
         useAlertScreenStore.getState().setValues({ showAlert: false });
 
         const primaryWO = sCombinedWorkorders[0];
@@ -667,7 +671,7 @@ export function NewCheckoutModalScreen() {
         resetAndClose();
       },
       btn2Text: "Go Back",
-      btn2Handler: () => {
+      handleBtn2Press: () => {
         useAlertScreenStore.getState().setValues({ showAlert: false });
       },
     });
@@ -686,12 +690,12 @@ export function NewCheckoutModalScreen() {
         message:
           "This sale has partial payments recorded. They have been saved and you can resume later.",
         btn1Text: "Close Anyway",
-        btn1Handler: () => {
+        handleBtn1Press: () => {
           resetAndClose();
           useAlertScreenStore.getState().setValues({ showAlert: false });
         },
         btn2Text: "Go Back",
-        btn2Handler: () => {
+        handleBtn2Press: () => {
           useAlertScreenStore.getState().setValues({ showAlert: false });
         },
       });
@@ -714,6 +718,7 @@ export function NewCheckoutModalScreen() {
     _setReaderError("");
     _setInitialized(false);
     _setReceiptLanguage("english");
+    _setSessionStartPaymentCount(0);
     // Clean up card payment state + listeners
     let stripeStore = useStripePaymentStore.getState();
     if (stripeStore._cardListeners) {
@@ -817,7 +822,7 @@ export function NewCheckoutModalScreen() {
             backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
             width: "85%",
             height: "90%",
-            borderRadius: 15,
+            borderRadius: 6,
             ...SHADOW_RADIUS_PROTO,
             shadowColor: C.green,
             overflow: "hidden",
@@ -900,7 +905,7 @@ export function NewCheckoutModalScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 10,
+                    borderRadius: 6,
                     paddingVertical: 5,
                     paddingHorizontal: 10,
                     backgroundColor: C.backgroundListWhite,
@@ -978,7 +983,7 @@ export function NewCheckoutModalScreen() {
 
                 <PaymentsList
                   payments={sSale?.payments}
-                  onRefund={saleComplete ? () => _setShowRefundModal(true) : null}
+                  onRefund={(payment) => { _setRefundPayment(payment); _setShowRefundModal(true); }}
                 />
 
               </View>
@@ -994,7 +999,7 @@ export function NewCheckoutModalScreen() {
                   borderWidth: 1,
                   borderColor: C.buttonLightGreenOutline,
                   backgroundColor: C.backgroundListWhite,
-                  borderRadius: 10,
+                  borderRadius: 6,
                   paddingVertical: 2,
                   paddingHorizontal: 3,
                   marginTop: 5
@@ -1029,25 +1034,22 @@ export function NewCheckoutModalScreen() {
                     openUpward={true}
                   />
                 </View>
-                {!saleComplete && (sSale?.payments.length > 0) && (
+                {!saleComplete && sessionHasNewPayments && (
                   <Button_
                     colorGradientArr={COLOR_GRADIENTS.greenblue}
                     text="PARTIAL PAYMENT"
                     onPress={handlePartialPayment}
                     textStyle={{ color: C.textWhite, fontSize: 13 }}
-                    buttonStyle={{ width: 130, height: 35 }}
+                    buttonStyle={{ width: 130, height: 35, borderRadius: 6 }}
                   />
                 )}
                 <Button_
-                  enabled={
-                    saleComplete ||
-                    (!(sSale?.amountCaptured > 0) && !saleComplete)
-                  }
+                  enabled={saleComplete || !sessionHasNewPayments}
                   colorGradientArr={COLOR_GRADIENTS.red}
                   text={saleComplete ? "CLOSE" : "CANCEL"}
                   onPress={closeModal}
                   textStyle={{ color: C.textWhite, fontSize: 13 }}
-                  buttonStyle={{ width: 80, height: 30, }}
+                  buttonStyle={{ width: 80, height: 30, borderRadius: 6 }}
                 />
                 {saleComplete && (
                   <Button_
@@ -1055,7 +1057,7 @@ export function NewCheckoutModalScreen() {
                     text="REPRINT"
                     onPress={handleReprint}
                     textStyle={{ color: C.textWhite }}
-                    buttonStyle={{ width: 100 }}
+                    buttonStyle={{ width: 100, borderRadius: 6 }}
                   />
                 )}
                 <Tooltip text="Pop register" position="top">
@@ -1120,14 +1122,14 @@ export function NewCheckoutModalScreen() {
                 backgroundColor: "rgba(0, 0, 0, 0.4)",
                 justifyContent: "center",
                 alignItems: "center",
-                borderRadius: 15,
+                borderRadius: 6,
                 zIndex: 100,
               }}
             >
               <View
                 style={{
                   backgroundColor: C.backgroundWhite,
-                  borderRadius: 15,
+                  borderRadius: 6,
                   alignItems: "center",
                   justifyContent: "space-around",
                   minWidth: "32%",
@@ -1197,14 +1199,14 @@ export function NewCheckoutModalScreen() {
                 backgroundColor: "rgba(0, 0, 0, 0.35)",
                 justifyContent: "center",
                 alignItems: "center",
-                borderRadius: 15,
+                borderRadius: 6,
                 zIndex: 100,
               }}
             >
               <View
                 style={{
                   backgroundColor: C.backgroundWhite,
-                  borderRadius: 15,
+                  borderRadius: 6,
                   alignItems: "center",
                   justifyContent: "center",
                   paddingVertical: 30,
@@ -1233,7 +1235,8 @@ export function NewCheckoutModalScreen() {
           <NewRefundModalScreen
             visible={sShowRefundModal}
             sale={sSale}
-            onClose={() => _setShowRefundModal(false)}
+            initialPayment={sRefundPayment}
+            onClose={() => { _setShowRefundModal(false); _setRefundPayment(null); }}
             onSaleUpdated={(updatedSale) => _setSale(updatedSale)}
           />
         </View>

@@ -128,7 +128,7 @@ export function PaymentsList({ payments = [], onRefund }) {
           <PaymentRow
             key={payment.id || idx}
             payment={payment}
-            onRefund={onRefund ? () => onRefund() : null}
+            onRefund={onRefund ? () => onRefund(payment) : null}
           />
         ))}
       </View>

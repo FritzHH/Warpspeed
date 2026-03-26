@@ -18,6 +18,7 @@ export function CardRefund({
   settings,
   refundComplete = false,
   suggestedAmount = 0,
+  lockedAmount = false,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
@@ -113,6 +114,7 @@ export function CardRefund({
     !sProcessing &&
     !!selectedPayment &&
     maxCardRefund > 0;
+  let inputEditable = isEnabled && !lockedAmount;
 
   let available = selectedPayment
     ? selectedPayment.amountCaptured - (selectedPayment.amountRefunded || 0)
@@ -196,7 +198,7 @@ export function CardRefund({
             placeholderTextColor={gray(0.3)}
             onFocus={() => _setFocused(true)}
             onBlur={() => _setFocused(false)}
-            editable={isEnabled}
+            editable={inputEditable}
           />
         </View>
       </View>

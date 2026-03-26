@@ -1015,7 +1015,7 @@ export const useOpenWorkordersStore = create((set, get) => ({
   getLockedWorkorderID: () => get().lockedWorkorderID,
   setLockedWorkorderID: (lockedWorkorderID) => set({ lockedWorkorderID }),
   setOpenWorkorderID: (openWorkorderID) => {
-    set({ openWorkorderID });
+    set({ openWorkorderID, workorderPreviewID: null });
     if (openWorkorderID) {
       let wo = get().workorders.find((o) => o.id === openWorkorderID);
       if (wo) broadcastWorkorderToDisplay(wo);

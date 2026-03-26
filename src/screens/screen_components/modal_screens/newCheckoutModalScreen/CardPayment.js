@@ -234,7 +234,7 @@ function CardPaymentForm({
         paddingTop: 15,
         width: "100%",
         height: "48%",
-        borderRadius: 15,
+        borderRadius: 6,
         ...SHADOW_RADIUS_PROTO,
         justifyContent: "space-between",
         paddingBottom: 15,

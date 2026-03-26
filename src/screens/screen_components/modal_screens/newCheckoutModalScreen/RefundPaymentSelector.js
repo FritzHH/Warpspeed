@@ -3,6 +3,7 @@ import { View, Text, ScrollView } from "react-native-web";
 import { TouchableOpacity } from "react-native";
 import { C, Fonts } from "../../../../styles";
 import { formatCurrencyDisp, gray } from "../../../../utils";
+import dayjs from "dayjs";
 
 function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
   let isCash = payment.cash;
@@ -14,7 +15,7 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
   return (
     <TouchableOpacity
       onPress={() => {
-        if (!isDisabled && !fullyRefunded && !isCash && !isCheck) onSelect(payment);
+        if (!isDisabled && !fullyRefunded) onSelect(payment);
       }}
       style={{
         flexDirection: "row",
@@ -29,7 +30,7 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
           ? gray(0.04)
           : "transparent",
         borderRadius: 4,
-        opacity: fullyRefunded ? 0.5 : 1,
+        opacity: fullyRefunded || isDisabled ? 0.4 : 1,
       }}
     >
       {/* Selection indicator */}
@@ -37,23 +38,19 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
         style={{
           width: 16,
           height: 16,
-          borderRadius: 8,
+          borderRadius: 3,
           borderWidth: 2,
           borderColor: isSelected ? C.blue : gray(0.2),
+          backgroundColor: isSelected ? C.blue : "transparent",
           marginRight: 10,
           alignItems: "center",
           justifyContent: "center",
         }}
       >
         {isSelected && (
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: C.blue,
-            }}
-          />
+          <Text style={{ color: "white", fontSize: 11, fontWeight: "700", marginTop: -1 }}>
+            ✓
+          </Text>
         )}
       </View>
 
@@ -122,7 +119,7 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
           </Text>
         )}
 
-        {(isCash || isCheck) && !fullyRefunded && (
+        {!!payment.millis && (
           <Text
             style={{
               fontSize: 10,
@@ -131,7 +128,13 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
               marginTop: 2,
             }}
           >
-            Cash/check — use cash refund
+            {(() => {
+              let d = dayjs(payment.millis);
+              let day = d.date();
+              let suffix = day % 10 === 1 && day !== 11 ? "st" : day % 10 === 2 && day !== 12 ? "nd" : day % 10 === 3 && day !== 13 ? "rd" : "th";
+              let fmt = d.year() === dayjs().year() ? "ddd, MMM " : "ddd, MMM ";
+              return d.format(fmt) + day + suffix + (d.year() !== dayjs().year() ? ", " + d.year() : "");
+            })()}
           </Text>
         )}
       </View>
@@ -141,7 +144,7 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
 
 export function RefundPaymentSelector({
   payments = [],
-  selectedPayment,
+  selectedPayments = [],
   onSelectPayment,
   disabled = false,
 }) {
@@ -168,19 +171,37 @@ export function RefundPaymentSelector({
           marginBottom: 6,
         }}
       >
-        Select a card payment to refund against
+        Select payments to refund
       </Text>
 
       <ScrollView style={{ maxHeight: 200 }}>
-        {payments.map((payment, idx) => (
-          <PaymentSelectRow
-            key={payment.id || idx}
-            payment={payment}
-            isSelected={selectedPayment?.id === payment.id}
-            onSelect={onSelectPayment}
-            isDisabled={disabled}
-          />
-        ))}
+        {payments.map((payment, idx) => {
+          let isSelected = selectedPayments.some((p) => p.id === payment.id);
+          let paymentIsCash = payment.cash || payment.check;
+
+          // Disable logic
+          let rowDisabled = disabled;
+          if (!rowDisabled && selectedPayments.length > 0 && !isSelected) {
+            let selIsCash = selectedPayments[0].cash || selectedPayments[0].check;
+            if (paymentIsCash !== selIsCash) {
+              // Different type than current selection
+              rowDisabled = true;
+            } else if (!paymentIsCash) {
+              // Card: only one card at a time
+              rowDisabled = true;
+            }
+          }
+
+          return (
+            <PaymentSelectRow
+              key={payment.id || idx}
+              payment={payment}
+              isSelected={isSelected}
+              onSelect={onSelectPayment}
+              isDisabled={rowDisabled}
+            />
+          );
+        })}
       </ScrollView>
     </View>
   );

@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import {
   calculateWaitEstimateLabel,
   capitalizeFirstLetterOfString,
+  formatCurrencyDisp,
   formatMillisForDisplay,
   gray,
   lightenRGBByPercent,
@@ -153,6 +154,16 @@ export function WorkordersComponent({}) {
   const zUsers = useSettingsStore((state) => state.settings?.users, deepEqual);
 
   const [sSearchTerm, _setSearchTerm] = useState("");
+
+  // Sale IDs shared by 2+ workorders (linked/combined sales)
+  let linkedSaleIDs = new Set();
+  let saleIDCounts = {};
+  for (let wo of zOpenWorkorders) {
+    if (wo.activeSaleID) {
+      saleIDCounts[wo.activeSaleID] = (saleIDCounts[wo.activeSaleID] || 0) + 1;
+      if (saleIDCounts[wo.activeSaleID] > 1) linkedSaleIDs.add(wo.activeSaleID);
+    }
+  }
 
   ///////////////////////////////////////////////////////////////////
 
@@ -474,6 +485,16 @@ export function WorkordersComponent({}) {
                         >
                           {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
                         </Text>
+                        {!!(workorder.amountPaidNonDeposit || workorder.amountPaid) && (
+                          <Text style={{ fontSize: 12, color: C.green, marginLeft: 6, fontWeight: "500" }}>
+                            {"Paid $" + formatCurrencyDisp(workorder.amountPaidNonDeposit || workorder.amountPaid)}
+                          </Text>
+                        )}
+                        {!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID) && (
+                          <Text style={{ fontSize: 12, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
+                            Linked
+                          </Text>
+                        )}
                       </View>
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <Text

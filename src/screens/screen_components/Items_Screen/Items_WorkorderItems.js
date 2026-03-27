@@ -20,9 +20,7 @@ import {
   DropdownMenu,
   TextInput_,
   Tooltip,
-  Pressable_,
   StaleBanner,
-  DepositModal,
 } from "../../../components";
 import { C, ICONS } from "../../../styles";
 import { EmptyItemsComponent } from "./Items_Empty";
@@ -89,7 +87,6 @@ export const Items_WorkorderItemsTab = ({}) => {
     useState(false);
 
   const [sEditingCustomLine, _setEditingCustomLine] = useState(null);
-  const [sShowDepositModal, _setShowDepositModal] = useState(false);
 
   // dev
   const checkoutBtnRef = useRef();
@@ -405,7 +402,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             {"TOTAL: "}
             <Text style={{ fontWeight: 500, fontSize: 15, color: gray(0.65) }}>$0.00</Text>
           </Text>
-          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
+          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline, justifyContent: "center" }} />
           <Tooltip text="Check out workorder" position="top">
             <Button_
               ref={checkoutBtnRef}
@@ -459,13 +456,13 @@ export const Items_WorkorderItemsTab = ({}) => {
         />
       )}
 
-      {hasActiveSale && (
+      {/* {hasActiveSale && (
         <StaleBanner
           text="Sale in Progress — Workorder Locked"
           style={{ marginHorizontal: 8, marginTop: 3, backgroundColor: "black" }}
           textStyle={{ color: "#FFD600" }}
         />
-      )}
+      )} */}
 
       <FlatList
         style={{ marginTop: 3, marginRight: 5 }}
@@ -608,29 +605,51 @@ export const Items_WorkorderItemsTab = ({}) => {
           }}
         />
 
-        <Text
-          style={{
-            fontSize: 13,
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 15,
-            borderWidth: 1,
-            paddingHorizontal: 14,
-            paddingVertical: 3,
-            color: "gray",
-          }}
-        >
-          {"TOTAL: "}
-          <Text
-            style={{
-              marginRight: 10,
-              fontWeight: 500,
-              color: C.text,
-              fontSize: 15,
-            }}
-          >
-            {"$" + formatCurrencyDisp(sTotals.finalTotal)}
-          </Text>
-        </Text>
+        {(() => {
+          let paidNonDeposit = zOpenWorkorder?.amountPaidNonDeposit || zOpenWorkorder?.amountPaid || 0;
+          let hasPayments = paidNonDeposit > 0;
+          let remaining = hasPayments ? Math.max(0, sTotals.finalTotal - paidNonDeposit) : 0;
+          return (
+            <View
+              style={{
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 15,
+                borderWidth: 1,
+                paddingHorizontal: 14,
+                paddingVertical: 3,
+                alignItems: "center",
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={{ fontSize: hasPayments ? 13 : 13, color: "gray" }}>{"TOTAL: "}</Text>
+                <Text
+                  style={{
+                    fontWeight: 500,
+                    color: hasPayments ? gray(0.5) : C.text,
+                    fontSize: hasPayments ? 14 : 15,
+                    textDecorationLine: hasPayments ? "line-through" : "none",
+                  }}
+                >
+                  {"$" + formatCurrencyDisp(sTotals.finalTotal)}
+                </Text>
+              </View>
+              {hasPayments && (
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, color: "gray" }}>{"REMAINING: "}</Text>
+                  <Text
+                    style={{
+                      fontWeight: 500,
+                      color: C.green,
+                      fontSize: 14,
+                    }}
+                  >
+                    {"$" + formatCurrencyDisp(remaining)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          );
+        })()}
         <View
           style={{
             width: 1,
@@ -638,34 +657,15 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
-        <View style={{ position: "relative" }}>
-          <Tooltip text="Right click deposit" position="top">
-            <Pressable_
-              onRightPress={() => useLoginStore.getState().requireLogin(() => _setShowDepositModal(true))}
-            >
-              <Button_
-                ref={checkoutBtnRef}
-                textStyle={{ color: C.textWhite, fontSize: 16 }}
-                icon={ICONS.shoppingCart}
-                iconSize={34}
-                enabled={!isDonePaid}
-                buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
-                onPress={() => useLoginStore.getState().requireLogin(() => useCheckoutStore.getState().setIsCheckingOut(true))}
-              />
-            </Pressable_>
-          </Tooltip>
-          <DepositModal
-            visible={sShowDepositModal}
-            inline
-            inlineStyle={{ bottom: 0, right: "100%", marginRight: 10 }}
-            onClose={() => _setShowDepositModal(false)}
-            onPay={(depositInfo) => {
-              _setShowDepositModal(false);
-              useCheckoutStore.getState().setDepositInfo(depositInfo);
-              useCheckoutStore.getState().setIsCheckingOut(true);
-            }}
-          />
-        </View>
+        <Button_
+          ref={checkoutBtnRef}
+          textStyle={{ color: C.textWhite, fontSize: 16 }}
+          icon={ICONS.shoppingCart}
+          iconSize={34}
+          enabled={!isDonePaid}
+          buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
+          onPress={() => useLoginStore.getState().requireLogin(() => useCheckoutStore.getState().setIsCheckingOut(true))}
+        />
       </View>
       {sEditingCustomLine && (
         <CustomItemModal

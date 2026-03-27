@@ -322,13 +322,13 @@ export function InventoryComponent({}) {
         flex: 1,
       }}
     >
-      {isInventoryLocked && (
+      {/* {isInventoryLocked && (
         <StaleBanner
           text="Sale in Progress — Workorder Locked"
           style={{ marginHorizontal: 4, marginTop: 3, marginBottom: 3, backgroundColor: "black" }}
           textStyle={{ color: "#FFD600" }}
         />
-      )}
+      )} */}
       <View
         style={{ flex: 1, opacity: isInventoryLocked ? 0.4 : 1 }}
         pointerEvents={isInventoryLocked ? "none" : "auto"}

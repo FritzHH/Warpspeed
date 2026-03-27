@@ -520,10 +520,10 @@ export function CardReaderPayment({
           justifyContent: "space-between",
         }}
       >
-        <Text style={{ fontSize: 25, color: gray(0.6), fontWeight: 500 }}>
+        <Text style={{ fontSize: 16, color: gray(0.6), fontWeight: 500 }}>
           CARD SALE
         </Text>
-        <View style={{ flex: 1, alignItems: "center" }}>
+        <View style={{ flex: 1, alignItems: "flex-end" }}>
           <DropdownMenu
             dataArr={readerDropdownData}
             onSelect={handleReaderSelect}

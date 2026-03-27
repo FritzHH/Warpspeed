@@ -57,7 +57,7 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
             <TouchableOpacity
               onPress={(e) => { e.stopPropagation(); onRefund(); }}
               style={{
-                backgroundColor: isDeposit ? (depositPaidByCash ? C.orange : C.blue) : C.blue,
+                backgroundColor: isDeposit ? (depositPaidByCash ? C.orange : C.blue) : (isCash ? C.green : C.blue),
                 borderRadius: 5,
                 paddingVertical: 2,
                 paddingHorizontal: 8,

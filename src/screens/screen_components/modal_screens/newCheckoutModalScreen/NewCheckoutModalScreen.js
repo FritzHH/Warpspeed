@@ -2,7 +2,7 @@
 import { View, Text, ScrollView, Image } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_ } from "../../../../components";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator } from "../../../../components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   useCheckoutStore,
@@ -772,18 +772,21 @@ export function NewCheckoutModalScreen() {
 
     for (let wo of sCombinedWorkorders) {
       let updated = cloneDeep(wo);
-      let oldStatusLabel = resolveStatus(wo.status, statuses)?.label || wo.status || "";
-      let newStatusLabel = resolveStatus("sale_in_progress", statuses)?.label || "Sale In Progress";
+      // let oldStatusLabel = resolveStatus(wo.status, statuses)?.label || wo.status || "";
+      // let newStatusLabel = resolveStatus("sale_in_progress", statuses)?.label || "Sale In Progress";
 
       updated.activeSaleID = sale.id;
       updated.saleID = sale.id;
       updated.amountPaid = sale.amountCaptured;
-      updated.status = "sale_in_progress";
+      updated.amountPaidNonDeposit = (sale.payments || [])
+        .filter((p) => !p.isDeposit)
+        .reduce((sum, p) => sum + (p.amountCaptured || 0), 0);
+      // updated.status = "sale_in_progress";
 
       let entries = [];
-      if (wo.status !== "sale_in_progress") {
-        entries.push({ timestamp, user, field: "status", action: "changed", from: oldStatusLabel, to: newStatusLabel });
-      }
+      // if (wo.status !== "sale_in_progress") {
+      //   entries.push({ timestamp, user, field: "status", action: "changed", from: oldStatusLabel, to: newStatusLabel });
+      // }
       entries.push({ timestamp, user, field: "payment", action: "recorded", from: "", to: paymentLabel + " " + formatCurrencyDisp(payment?.amountCaptured || 0, true) });
 
       updated.changeLog = [...(updated.changeLog || []), ...entries];
@@ -1284,6 +1287,21 @@ export function NewCheckoutModalScreen() {
             overflow: "hidden",
           }}
         >
+          {/* Loading overlay */}
+          {!sSale && (
+            <View
+              style={{
+                position: "absolute",
+                top: 0, left: 0, right: 0, bottom: 0,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
+                zIndex: 998,
+              }}
+            >
+              <LoadingIndicator />
+            </View>
+          )}
           {/* Celebration overlay */}
           {sShowCelebration && (
             <View
@@ -1749,13 +1767,14 @@ export function NewCheckoutModalScreen() {
               }}
             >
               <ScrollView style={{ flex: 1 }}>
-                {hasRealPayments ? (
+                {/* {hasRealPayments ? (
                   <StaleBanner
                     text="Sale In Progress"
                           style={{ height: 60, justifyContent: "center", width: "100%", backgroundColor: "black" }}
                           textStyle={{ fontSize: 21, color: "yellow" }}
                   />
-                ) : (
+                ) : ( */}
+                {(
                   <InventorySearch
                     addedItems={sAddedItems}
                     onAddItem={handleAddItem}

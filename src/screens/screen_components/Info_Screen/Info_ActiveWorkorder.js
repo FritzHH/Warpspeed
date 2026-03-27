@@ -946,7 +946,7 @@ export const ActiveWorkorderComponent = ({}) => {
               return (
                 <StatusPickerModal
                   statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned)}
-                  enabled={!isDonePaid && zOpenWorkorder?.status !== "sale_in_progress"}
+                  enabled={!isDonePaid}
                   onSelect={(val) => {
                     const store = useOpenWorkordersStore.getState();
                     store.setField("status", val.id, zOpenWorkorder.id);

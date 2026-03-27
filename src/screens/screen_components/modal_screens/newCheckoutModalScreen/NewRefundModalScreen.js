@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
-import { useState } from "react";
+import { useState, memo, useMemo } from "react";
 import { cloneDeep } from "lodash";
 import { ScreenModal, SHADOW_RADIUS_PROTO, Button_ } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
@@ -42,7 +42,7 @@ import { RefundTotals } from "./RefundTotals";
 import { RefundItemSelector } from "./RefundItemSelector";
 import { RefundPaymentSelector } from "./RefundPaymentSelector";
 
-export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialPayment, onClose, onSaleUpdated }) {
+export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialPayment, onClose, onSaleUpdated }) {
   const zSalesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent);
   const zCardFeeRefund = useSettingsStore((s) => s.settings?.cardFeeRefund);
 
@@ -62,7 +62,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
 
   // ─── Derived Values ───────────────────────────────────────
   let refundLimits = calculateRefundLimits(sOriginalSale, { cardFeeRefund: zCardFeeRefund });
-  let previouslyRefundedIDs = getPreviouslyRefundedLineIDs(sOriginalSale);
+  let previouslyRefundedIDs = useMemo(() => getPreviouslyRefundedLineIDs(sOriginalSale), [sOriginalSale]);
 
   // Calculate selected items subtotal
   let selectedItemsTotal = 0;
@@ -122,8 +122,8 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
   let hasCashPayments = cashPaymentsTotal > 0;
 
   // Compute which items would exceed the refund limit if added
-  let disabledItemIDs = new Set();
-  {
+  let disabledItemIDs = useMemo(() => {
+    let set = new Set();
     let taxRate = zSalesTaxPercent || 0;
     sWorkordersInSale.forEach((wo) => {
       (wo.workorderLines || []).forEach((line) => {
@@ -135,11 +135,12 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
         let newItemsTotal = selectedItemsTotal + itemPrice;
         let newTotalWithTax = newItemsTotal + Math.round(newItemsTotal * (taxRate / 100));
         if (newTotalWithTax > refundLimits.maxRefund) {
-          disabledItemIDs.add(line.id);
+          set.add(line.id);
         }
       });
     });
-  }
+    return set;
+  }, [sSelectedItems, sWorkordersInSale, previouslyRefundedIDs, selectedItemsTotal, zSalesTaxPercent, refundLimits.maxRefund]);
 
   // ─── Initialization ──────────────────────────────────────
   if (visible && !sInitialized && (saleID || saleProp)) {
@@ -828,4 +829,4 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
       )}
     />
   );
-}
+});

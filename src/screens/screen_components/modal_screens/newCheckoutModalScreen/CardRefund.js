@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import { Button_ } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
@@ -11,7 +11,7 @@ import {
 } from "../../../../utils";
 import { newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
 
-export function CardRefund({
+export const CardRefund = memo(function CardRefund({
   selectedPayment,
   maxCardRefund = 0,
   onProcessRefund,
@@ -266,4 +266,4 @@ export function CardRefund({
       />
     </View>
   );
-}
+});

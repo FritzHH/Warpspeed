@@ -1,10 +1,11 @@
 /* eslint-disable */
+import { memo } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
 import { Tooltip, Pressable_ } from "../../../../components";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
-function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemoveDeposit }) {
+const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemoveDeposit }) {
   let isCash = payment.cash;
   let isCheck = payment.check;
   let isDeposit = payment.isDeposit;
@@ -170,9 +171,9 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
       </Pressable_>
     </Tooltip>
   );
-}
+});
 
-export function PaymentsList({ payments = [], onRefund, onPrintReceipt, onPrintDepositReceipt, onRemoveDeposit }) {
+export const PaymentsList = memo(function PaymentsList({ payments = [], onRefund, onPrintReceipt, onPrintDepositReceipt, onRemoveDeposit }) {
   if (!payments || payments.length === 0) return null;
   return (
     <View
@@ -196,4 +197,4 @@ export function PaymentsList({ payments = [], onRefund, onPrintReceipt, onPrintD
       </View>
     </View>
   );
-}
+});

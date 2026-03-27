@@ -1,11 +1,12 @@
 /* eslint-disable */
+import { memo } from "react";
 import { View, Text, ScrollView } from "react-native-web";
 import { TouchableOpacity } from "react-native";
 import { C, Fonts } from "../../../../styles";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 import dayjs from "dayjs";
 
-function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
+const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
   let isCash = payment.cash;
   let isCheck = payment.check;
   let isDeposit = payment.isDeposit;
@@ -150,9 +151,9 @@ function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
       </View>
     </TouchableOpacity>
   );
-}
+});
 
-export function RefundPaymentSelector({
+export const RefundPaymentSelector = memo(function RefundPaymentSelector({
   payments = [],
   selectedPayments = [],
   onSelectPayment,
@@ -215,4 +216,4 @@ export function RefundPaymentSelector({
       </ScrollView>
     </View>
   );
-}
+});

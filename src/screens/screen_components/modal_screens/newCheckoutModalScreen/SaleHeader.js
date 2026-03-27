@@ -1,10 +1,11 @@
 /* eslint-disable */
+import { memo } from "react";
 import { View, Text } from "react-native-web";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { Button_ } from "../../../../components";
 import { gray } from "../../../../utils";
 
-export function SaleHeader({
+export const SaleHeader = memo(function SaleHeader({
   sale,
   customer,
   onClose,
@@ -49,4 +50,4 @@ export function SaleHeader({
       />
     </View>
   );
-}
+});

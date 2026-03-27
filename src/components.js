@@ -2193,7 +2193,7 @@ export const Button_ = ({
             borderRadius: 15,
             paddingVertical: 5,
             paddingHorizontal: 15,
-            paddingLeft: icon ? 10 : 15,
+            ...(icon ? { paddingLeft: 10 } : {}),
             ...shadowStyle,
             ...buttonStyle,
             backgroundColor: icon && !text ? null : getBackgroundColor(),

@@ -1,4 +1,5 @@
 /* eslint-disable */
+import { memo } from "react";
 import { View, Text, ScrollView } from "react-native-web";
 import { C, Fonts, ICONS } from "../../../../styles";
 import { CheckBox_, Image_, Button_, DropdownMenu } from "../../../../components";
@@ -13,7 +14,7 @@ import {
 import { cloneDeep } from "lodash";
 import { useSettingsStore } from "../../../../stores";
 
-export function WorkorderCombiner({
+export const WorkorderCombiner = memo(function WorkorderCombiner({
   combinedWorkorders = [],
   otherCustomerWorkorders = [],
   onToggle,
@@ -449,4 +450,4 @@ export function WorkorderCombiner({
       })}
     </View>
   );
-}
+});

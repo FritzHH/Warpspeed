@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, ScrollView } from "react-native-web";
 import { TouchableOpacity } from "react-native";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { cloneDeep } from "lodash";
 import { TextInput_, Button_, DropdownMenu, Tooltip } from "../../../../components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
@@ -141,7 +141,7 @@ function SearchResultRow({ item, onAdd }) {
   );
 }
 
-export function InventorySearch({
+export const InventorySearch = memo(function InventorySearch({
   addedItems = [],
   onAddItem,
   onRemoveItem,
@@ -320,4 +320,4 @@ export function InventorySearch({
 
     </View>
   );
-}
+});

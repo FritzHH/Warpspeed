@@ -1,11 +1,11 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import { Button_ } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp, gray } from "../../../../utils";
 
-export function CashRefund({
+export const CashRefund = memo(function CashRefund({
   maxCashRefund = 0,
   onProcessRefund,
   refundComplete = false,
@@ -161,4 +161,4 @@ export function CashRefund({
       />
     </View>
   );
-}
+});

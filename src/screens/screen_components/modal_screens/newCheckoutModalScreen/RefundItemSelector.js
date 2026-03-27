@@ -1,11 +1,12 @@
 /* eslint-disable */
+import { memo } from "react";
 import { View, Text, ScrollView } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
 import { CheckBox_, Button_ } from "../../../../components";
 import { COLOR_GRADIENTS } from "../../../../styles";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
-function RefundItemRow({
+const RefundItemRow = memo(function RefundItemRow({
   line,
   workorderNumber,
   isSelected,
@@ -96,9 +97,9 @@ function RefundItemRow({
       </Text>
     </View>
   );
-}
+});
 
-export function RefundItemSelector({
+export const RefundItemSelector = memo(function RefundItemSelector({
   workordersInSale = [],
   selectedItems = [],
   onToggleItem,
@@ -199,4 +200,4 @@ export function RefundItemSelector({
       </ScrollView>
     </View>
   );
-}
+});

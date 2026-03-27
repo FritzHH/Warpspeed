@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput, Animated, Image } from "react-native-web";
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import { Button_, SHADOW_RADIUS_PROTO, SmallLoadingIndicator } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp, log, gray } from "../../../../utils";
@@ -486,10 +486,10 @@ function CardPaymentForm({
 }
 
 // Wrapper provides Stripe Elements context
-export function CardPayment(props) {
+export const CardPayment = memo(function CardPayment(props) {
   return (
     <Elements stripe={stripePromise}>
       <CardPaymentForm {...props} />
     </Elements>
   );
-}
+});

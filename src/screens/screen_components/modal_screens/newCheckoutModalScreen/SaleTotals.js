@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, Animated } from "react-native-web";
-import { useRef } from "react";
+import { useRef, memo } from "react";
 import { C, Fonts } from "../../../../styles";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
@@ -63,7 +63,7 @@ function Divider() {
   );
 }
 
-export function PaymentStatus({ sale, amountRemaining }) {
+export const PaymentStatus = memo(function PaymentStatus({ sale, amountRemaining }) {
   const successScale = useRef(new Animated.Value(0)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
   const successPulse = useRef(new Animated.Value(1)).current;
@@ -146,9 +146,9 @@ export function PaymentStatus({ sale, amountRemaining }) {
       )}
     </View>
   );
-}
+});
 
-export function SaleTotals({
+export const SaleTotals = memo(function SaleTotals({
   sale,
   cashChangeNeeded,
   settings,
@@ -270,4 +270,4 @@ export function SaleTotals({
       )}
     </View>
   );
-}
+});

@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { C, Fonts } from "../../../../styles";
 import {
   formatCurrencyDisp,
@@ -40,7 +40,7 @@ function TotalRow({ label, value, color, bold, fontSize = 13 }) {
   );
 }
 
-export function RefundTotals({
+export const RefundTotals = memo(function RefundTotals({
   originalSale,
   selectedItemsTotal = 0,
   itemRefundTotal = 0,
@@ -259,4 +259,4 @@ export function RefundTotals({
       )}
     </View>
   );
-}
+});

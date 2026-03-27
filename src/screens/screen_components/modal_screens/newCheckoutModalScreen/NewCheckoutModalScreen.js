@@ -67,6 +67,9 @@ import { NewRefundModalScreen } from "./NewRefundModalScreen";
 // DEV FLAG default — toggled via on-screen switch
 let _devSkipCompletion = false;
 
+// Stable empty array reference to prevent re-renders from || [] patterns
+const EMPTY_ARR = [];
+
 // Map CUSTOMER_LANGUAGES keys to Google Translate ISO codes
 const LANG_TO_ISO = { spanish: "es", english: "en" };
 function getTranslateCode(langKey) {
@@ -231,12 +234,10 @@ export function NewCheckoutModalScreen() {
   const zOpenWorkorder = useOpenWorkordersStore((state) =>
     state.workorders.find((o) => o.id === state.openWorkorderID) || null
   );
-  const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zInventory = useInventoryStore((state) => state.inventoryArr);
   const zSettings = useSettingsStore((state) => state.settings);
-  const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zCustomer = useCurrentCustomerStore((state) => state.customer);
-  const zStripeReaders = useStripePaymentStore((state) => state.readersArr) || [];
+  const zStripeReaders = useStripePaymentStore((state) => state.readersArr || []);
 
   // ─── Local State ──────────────────────────────────────────
   const [sSale, _setSale] = useState(null);
@@ -290,8 +291,9 @@ export function NewCheckoutModalScreen() {
   }
 
   async function initializeCheckout() {
-    let createdBy = zCurrentUser?.first
-      ? zCurrentUser.first + " " + (zCurrentUser.last || "")
+    let currentUser = useLoginStore.getState().currentUser;
+    let createdBy = currentUser?.first
+      ? currentUser.first + " " + (currentUser.last || "")
       : "";
 
     // Fetch fresh customer from DB to ensure deposits/credits are current
@@ -314,7 +316,7 @@ export function NewCheckoutModalScreen() {
         if (existingSale.workorderIDs?.length > 1) {
           for (let woID of existingSale.workorderIDs) {
             if (woID === zOpenWorkorder.id) continue;
-            let otherWO = (zOpenWorkorders || []).find((w) => w.id === woID);
+            let otherWO = (useOpenWorkordersStore.getState().workorders || []).find((w) => w.id === woID);
             if (otherWO) combined.push(cloneDeep(otherWO));
           }
         }
@@ -425,8 +427,9 @@ export function NewCheckoutModalScreen() {
   }
 
   function initializeDepositCheckout(depositInfo) {
-    let createdBy = zCurrentUser?.first
-      ? zCurrentUser.first + " " + (zCurrentUser.last || "")
+    let currentUser = useLoginStore.getState().currentUser;
+    let createdBy = currentUser?.first
+      ? currentUser.first + " " + (currentUser.last || "")
       : "";
     let sale = createNewSale(zSettings, createdBy);
     sale.subtotal = depositInfo.amountCents;
@@ -541,8 +544,8 @@ export function NewCheckoutModalScreen() {
 
   // Other open workorders for the same customer
   function getOtherCustomerWorkorders() {
-    if (!zOpenWorkorder?.customerID) return [];
-    return (zOpenWorkorders || []).filter(
+    if (!zOpenWorkorder?.customerID) return EMPTY_ARR;
+    return (useOpenWorkordersStore.getState().workorders || []).filter(
       (wo) =>
         wo.customerID === zOpenWorkorder.customerID &&
         wo.id !== zOpenWorkorder.id
@@ -1838,7 +1841,7 @@ export function NewCheckoutModalScreen() {
                     onQtyChange={handleItemQtyChange}
                     onDiscountChange={handleItemDiscount}
                     inventory={zInventory}
-                    discounts={zSettings?.discounts || []}
+                    discounts={zSettings?.discounts || EMPTY_ARR}
                     onOpenNewItemModal={(item) => _setNewItemModal(item)}
                   />
                 )}

@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import { Button_, CheckBox_, SHADOW_RADIUS_PROTO } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
@@ -10,7 +10,7 @@ import {
 } from "../../../../utils";
 import { buildCashPayment } from "./newCheckoutUtils";
 
-export function CashPayment({
+export const CashPayment = memo(function CashPayment({
   amountLeftToPay = 0,
   onPaymentCapture,
   acceptChecks = false,
@@ -351,4 +351,4 @@ export function CashPayment({
       })()}
     </View>
   );
-}
+});

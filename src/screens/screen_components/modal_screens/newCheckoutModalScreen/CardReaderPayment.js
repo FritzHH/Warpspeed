@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput, Animated, Image } from "react-native-web";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, memo } from "react";
 import { Button_, DropdownMenu, SHADOW_RADIUS_PROTO, SmallLoadingIndicator, Tooltip } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
@@ -105,7 +105,7 @@ function cleanupStoreListeners() {
   }
 }
 
-export function CardReaderPayment({
+export const CardReaderPayment = memo(function CardReaderPayment({
   amountLeftToPay = 0,
   onPaymentCapture,
   stripeReaders = [],
@@ -572,7 +572,7 @@ export function CardReaderPayment({
             enabled={isEnabled}
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}
-            buttonStyle={{ height: 20, paddingHorizontal: 8, borderRadius: 4 }}
+            buttonStyle={{ height: 18, borderRadius: 4 }}
           />
         </View>
       </View>
@@ -638,4 +638,4 @@ export function CardReaderPayment({
       </View>
     </View>
   );
-}
+});

@@ -427,9 +427,11 @@ export const Items_WorkorderItemsTab = ({}) => {
         justifyContent: "center",
         backgroundColor: zIsPreview
           ? lightenRGBByPercent(C.lightred, 80)
-          : (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.saleID)
-            ? lightenRGBByPercent(C.red, 60)
-            : undefined,
+          : hasActiveSale
+            ? lightenRGBByPercent(C.green, 80)
+            : (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.saleID)
+              ? lightenRGBByPercent(C.red, 60)
+              : undefined,
       }}
     >
       {isDonePaid && (

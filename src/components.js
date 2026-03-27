@@ -1255,6 +1255,41 @@ export const LoginModalScreen = ({ modalVisible }) => {
   const [sError, _setError] = useState("");
   const [sSuccess, _setSuccess] = useState(false);
 
+  // Poll login status every 500ms — facial recognition may log the user in while modal is open
+  useEffect(() => {
+    if (!modalVisible || sSuccess) return;
+    const interval = setInterval(() => {
+      let store = useLoginStore.getState();
+      let user = store.currentUser;
+      if (!user) return;
+      let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
+      let diff = (Date.now() - store.lastActionMillis) / 1000;
+      if (diff > timeout) return;
+      // Check privilege if required
+      if (store.adminPrivilege) {
+        let perm = user.permissions?.name || user.permissions;
+        let level = store.adminPrivilege;
+        let hasAccess = false;
+        if (level === PRIVILEDGE_LEVELS.user) hasAccess = true;
+        if (level === PRIVILEDGE_LEVELS.superUser &&
+          (perm === PRIVILEDGE_LEVELS.superUser || perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
+          hasAccess = true;
+        if (level === PRIVILEDGE_LEVELS.admin &&
+          (perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
+          hasAccess = true;
+        if (level === PRIVILEDGE_LEVELS.owner && perm === PRIVILEDGE_LEVELS.owner)
+          hasAccess = true;
+        if (!hasAccess) return;
+      }
+      // User is logged in with sufficient privileges — auto-close instantly
+      clearInterval(interval);
+      _setPin("");
+      _setError("");
+      store.setShowLoginScreen(false);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [modalVisible, sSuccess]);
+
   function handleClose() {
     _setPin("");
     _setError("");

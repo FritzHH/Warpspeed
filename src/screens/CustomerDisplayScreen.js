@@ -11,7 +11,7 @@ import {
   DISPLAY_STATUS,
 } from "../broadcastChannel";
 import { formatCurrencyDisp, formatPhoneForDisplay, gray } from "../utils";
-import { C, Fonts } from "../styles";
+import { C, Fonts, ICONS } from "../styles";
 
 const logo = require("../resources/bblogo_trans_high.png");
 
@@ -216,51 +216,192 @@ function CustomerInfoSection({ customer }) {
   );
 }
 
-function WorkorderOverlay({ data }) {
+function IconRow({ icon, children, iconSize = 20 }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 5 }}>
+      <Image source={icon} style={{ width: iconSize, height: iconSize, marginRight: 10, opacity: 0.8 }} />
+      <View style={{ flex: 1 }}>{children}</View>
+    </View>
+  );
+}
+
+function SectionDivider() {
+  return <View style={{ height: 1, backgroundColor: C.buttonLightGreenOutline, marginHorizontal: 16, marginVertical: 8 }} />;
+}
+
+function ColorPill({ colorObj }) {
+  if (!colorObj || !colorObj.label) return null;
+  return (
+    <View style={{
+      backgroundColor: colorObj.backgroundColor || gray(0.15),
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 4,
+      marginRight: 8,
+    }}>
+      <Text style={{ fontSize: 13, fontWeight: "600", color: colorObj.textColor || "#000" }}>
+        {colorObj.label}
+      </Text>
+    </View>
+  );
+}
+
+function formatDateShort(millis) {
+  if (!millis) return "";
+  let d = new Date(Number(millis));
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function WorkorderOverlay({ data, isTall }) {
   let lines = data?.workorderLines || [];
   let totals = data?.totals || {};
-  let customer = data?.customer || null;
-  let isStandalone = !customer || (!customer.first && !customer.last);
-
-  let header = data
-    ? [data.customerFirst, data.customerLast].filter(Boolean).join(" ") || "Workorder"
-    : "Workorder";
+  let status = data?.status || {};
+  let customerFirst = data?.customerFirst || "";
+  let amountPaid = data?.amountPaid || 0;
+  let paymentComplete = data?.paymentComplete || false;
+  let hasColors = (data?.color1 && data.color1.label) || (data?.color2 && data.color2.label);
+  let bikeDesc = [data?.brand, data?.model, data?.description].filter(Boolean).join(" — ");
 
   return (
-    <OverlayPanel header={header}>
-      {!isStandalone && (
-        <>
-          <CustomerInfoSection customer={customer} />
-          <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.08)", marginHorizontal: 20 }} />
-        </>
+    <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.92)", justifyContent: "space-between" }}>
+
+      {/* Greeting */}
+      {!!customerFirst && (
+        <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
+          <Text style={{ fontSize: isTall ? 28 : 24, fontWeight: "700", color: C.text }}>
+            {"Hi " + customerFirst + "!"}
+          </Text>
+        </View>
       )}
+
+      {/* Status badge */}
+      <View style={{
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: status.backgroundColor || gray(0.15),
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        marginHorizontal: 12,
+        marginTop: 6,
+        borderRadius: 10,
+      }}>
+        <Image source={ICONS.workorder} style={{ width: 22, height: 22, marginRight: 10, tintColor: status.textColor || "#000" }} />
+        <Text style={{ fontSize: 18, fontWeight: "700", color: status.textColor || "#000" }}>
+          {status.label || "In Progress"}
+        </Text>
+      </View>
+
+      <SectionDivider />
+
+      {/* Bike info */}
+      {!!bikeDesc && (
+        <IconRow icon={ICONS.bicycle} iconSize={24}>
+          <Text style={{ fontSize: isTall ? 20 : 18, color: C.text, fontWeight: "500" }} numberOfLines={2}>
+            {bikeDesc}
+          </Text>
+        </IconRow>
+      )}
+
+      {/* Color swatches */}
+      {hasColors && (
+        <IconRow icon={ICONS.colorWheel}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <ColorPill colorObj={data.color1} />
+            <ColorPill colorObj={data.color2} />
+          </View>
+        </IconRow>
+      )}
+
+      {/* Wait time + Date — side by side on portrait, stacked on landscape */}
+      {(!!data?.waitTimeEstimateLabel || !!data?.startedOnMillis) && (
+        <View style={{ flexDirection: isTall ? "row" : "column", paddingHorizontal: 0 }}>
+          {!!data.waitTimeEstimateLabel && (
+            <View style={{ flex: isTall ? 1 : undefined }}>
+              <IconRow icon={ICONS.clock}>
+                <Text style={{ fontSize: 16, color: C.text }}>
+                  {data.waitTimeEstimateLabel}
+                </Text>
+              </IconRow>
+            </View>
+          )}
+          {!!data.startedOnMillis && (
+            <View style={{ flex: isTall ? 1 : undefined }}>
+              <IconRow icon={ICONS.workorder} iconSize={18}>
+                <Text style={{ fontSize: 14, color: gray(0.5) }}>
+                  {"Checked in " + formatDateShort(data.startedOnMillis)}
+                </Text>
+              </IconRow>
+            </View>
+          )}
+        </View>
+      )}
+
+      <SectionDivider />
+
+      {/* Items header */}
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 4 }}>
+        <Image source={ICONS.tools1} style={{ width: 20, height: 20, marginRight: 8, opacity: 0.7 }} />
+        <Text style={{ fontSize: 16, fontWeight: "700", color: C.green }}>
+          Items
+        </Text>
+        <Text style={{ fontSize: 14, color: gray(0.4), marginLeft: 8 }}>
+          {"(" + (totals.runningQty || lines.length) + ")"}
+        </Text>
+      </View>
+
+      {/* Scrollable items list */}
       <ScrollView style={{ flex: 1 }}>
         {lines.map((line, i) => (
-          <OverlayLineItemRow key={line.id || i} item={line} />
+          <View key={line.id || i} style={{ backgroundColor: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.02)" }}>
+            <OverlayLineItemRow item={line} />
+          </View>
         ))}
       </ScrollView>
 
+      {/* Totals section */}
       {lines.length > 0 && (
-        <View style={{ paddingVertical: 12 }}>
-          <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.12)", marginHorizontal: 20, marginBottom: 12 }} />
+        <View style={{ paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.buttonLightGreenOutline }}>
           <OverlayTotalRow label="Subtotal" value={totals.runningSubtotal || 0} />
           {(totals.runningDiscount || 0) > 0 && (
             <OverlayTotalRow
-              label="Total Discounts"
-              value={`-$${formatCurrencyDisp(totals.runningDiscount)}`}
+              label="Discounts"
+              value={"-$" + formatCurrencyDisp(totals.runningDiscount)}
               color={discountTextColor}
             />
           )}
           <OverlayTotalRow
-            label={`Sales Tax (${totals.salesTaxPercent || 0}%)`}
+            label={"Tax (" + (totals.salesTaxPercent || 0) + "%)"}
             value={totals.runningTax || 0}
           />
-          <View style={{ height: 8, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.12)", marginHorizontal: 20 }} />
-          <View style={{ height: 8 }} />
-          <OverlayTotalRow label="Total:" value={totals.runningTotal || 0} bold />
+          <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.12)", marginHorizontal: 20, marginVertical: 6 }} />
+          <OverlayTotalRow label="Total" value={totals.runningTotal || 0} bold />
+
+          {/* Amount paid / Balance due */}
+          {amountPaid > 0 && !paymentComplete && (
+            <>
+              <OverlayTotalRow label="Paid" value={amountPaid} color={C.green} />
+              <OverlayTotalRow label="Balance Due" value={(totals.runningTotal || 0) - amountPaid} bold />
+            </>
+          )}
+
+          {/* PAID badge */}
+          {paymentComplete && (
+            <View style={{
+              backgroundColor: C.green,
+              borderRadius: 8,
+              paddingVertical: 10,
+              marginHorizontal: 20,
+              marginTop: 8,
+              alignItems: "center",
+            }}>
+              <Text style={{ fontSize: 22, fontWeight: "800", color: "#fff", letterSpacing: 2 }}>
+                PAID
+              </Text>
+            </View>
+          )}
         </View>
       )}
-    </OverlayPanel>
+    </View>
   );
 }
 
@@ -513,7 +654,7 @@ export function CustomerDisplayScreen() {
   if (sType === DISPLAY_MSG_TYPES.SALE) {
     overlayContent = <SaleOverlay data={sDisplayData} />;
   } else if (sType === DISPLAY_MSG_TYPES.WORKORDER) {
-    overlayContent = <WorkorderOverlay data={sDisplayData} />;
+    overlayContent = <WorkorderOverlay data={sDisplayData} isTall={sIsTall} />;
   }
 
   return (

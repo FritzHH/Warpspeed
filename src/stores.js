@@ -931,6 +931,65 @@ export function broadcastWorkorderToDisplay(wo) {
   });
 }
 
+// Manual broadcast — sends full workorder data to customer display (no 5-min filter)
+export function broadcastFullWorkorderToDisplay(wo) {
+  if (!wo || !wo.workorderLines || wo.workorderLines.length === 0) {
+    broadcastClear();
+    return;
+  }
+
+  let settings = useSettingsStore.getState().getSettings();
+  let salesTaxPercent = settings?.salesTaxPercent || 0;
+
+  let lines = (wo.workorderLines || []).map((line) => ({
+    id: line.id,
+    qty: line.qty,
+    inventoryItem: {
+      formalName: line.inventoryItem?.formalName || "",
+      price: line.inventoryItem?.price || 0,
+    },
+    discountObj: line.discountObj
+      ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
+      : null,
+  }));
+
+  let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
+
+  broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
+    customerFirst: wo.customerFirst || "",
+    customerLast: wo.customerLast || "",
+    brand: wo.brand || "",
+    model: wo.model || "",
+    description: wo.description || "",
+    workorderLines: lines,
+    customer: {
+      first: wo.customerFirst || "",
+      last: wo.customerLast || "",
+      customerCell: wo.customerCell || "",
+      customerLandline: wo.customerLandline || "",
+      email: wo.customerEmail || "",
+    },
+    totals: {
+      runningSubtotal: totals.runningSubtotal,
+      runningDiscount: totals.runningDiscount,
+      runningTax: totals.runningTax,
+      runningTotal: totals.finalTotal,
+      runningQty: totals.runningQty,
+      salesTaxPercent: salesTaxPercent,
+    },
+    // Extended fields for rich display
+    status: resolveStatus(wo.status, settings?.statuses || []),
+    color1: wo.color1 || null,
+    color2: wo.color2 || null,
+    waitTime: wo.waitTime || "",
+    waitTimeEstimateLabel: wo.waitTimeEstimateLabel || "",
+    startedOnMillis: wo.startedOnMillis || "",
+    workorderNumber: wo.workorderNumber || "",
+    amountPaid: wo.amountPaid || 0,
+    paymentComplete: wo.paymentComplete || false,
+  });
+}
+
 // changelog helpers /////////////////////////////////////////////////////
 const NEWLY_CREATED_STATUS_ID = "34kttekj";
 const CHANGELOG_TEXT_FIELDS = ["brand", "description", "partOrdered", "partSource"];

@@ -82,6 +82,16 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
         <Text style={{ color: C.text }}>{formatCurrencyDisp(payment.amountCaptured, true)}</Text>
       </View>
 
+      {/* Partial application indicator */}
+      {!!isDeposit && payment.depositOriginalAmount && payment.amountCaptured < payment.depositOriginalAmount && (
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: gray(0.4), fontSize: 11 }}>
+            {"of " + formatCurrencyDisp(payment.depositOriginalAmount, true) + " total"}
+          </Text>
+          <Text style={{ color: C.blue, fontSize: 11, fontWeight: "500" }}>PARTIAL</Text>
+        </View>
+      )}
+
       {/* Card details — for card payments and deposit-applied payments that were paid by card */}
       {((isCard || depositPaidByCard) && payment.last4) ? (
         <View
@@ -145,7 +155,7 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
 
   // Build tooltip text
   let tooltipText = isDeposit && onRemoveDeposit
-    ? "- Click to print paper receipt\n- Right-click to remove deposit from sale"
+    ? "- Click to print paper receipt\n- Right-click to adjust or remove deposit"
     : "Click to print paper receipt";
 
   let handlePress = isDeposit

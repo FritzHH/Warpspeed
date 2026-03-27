@@ -33,7 +33,7 @@ export const Colors = {
 export const C = {
   green: "rgb(33, 148, 86)",
   purple: "",
-  orange: "#e67e22",
+  orange: "rgb(230, 126, 34)",
   blue: "rgb(53, 135, 210)",
   lightred: "rgb(227, 116, 112)",
   cursorRed: "#ff6b6b",
@@ -150,6 +150,8 @@ export const ICONS = {
   airplane: require(ASSETS_PATH + "airplane.png"),
   popperCelebration: require(ASSETS_PATH + "popperCelebration.gif"),
   guyCelebrating: require(ASSETS_PATH + "guyCelebrating.gif"),
+  display: require(ASSETS_PATH + "display.png"),
+  thoughtBubble: require(ASSETS_PATH + "thoughtBubble.png"),
 };
 
 // rgb(64, 174, 113)

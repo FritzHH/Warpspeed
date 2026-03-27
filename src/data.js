@@ -164,6 +164,14 @@ export const NONREMOVABLE_STATUSES = [
     removable: false,
     requireWaitTime: false,
   },
+  {
+    id: "part_ordered",
+
+    textColor: "white",
+    backgroundColor: "orange",
+    label: "Part Ordered",
+    removable: false,
+  },
 
 ];
 
@@ -426,6 +434,7 @@ export const WORKORDER_PROTO = {
   finishedOnMillis: "",
   partOrdered: "",
   partSource: "",
+  partToBeOrdered: false,
   partOrderEstimateMillis: "",
   partOrderedMillis: "",
   workorderLines: [],
@@ -755,14 +764,7 @@ export const SETTINGS_OBJ = {
       label: "Order Part for Customer",
       removable: true,
     },
-    {
-      id: "kerj3krj",
-  
-      textColor: "white",
-      backgroundColor: "orange",
-      label: "Part Ordered",
-      removable: true,
-    },
+
     {
       id: "ek3rkeng",
       textColor: "white",

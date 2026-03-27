@@ -16,6 +16,7 @@ import {
   useCustomerSearchStore,
   useTabNamesStore,
   useSettingsStore,
+  broadcastFullWorkorderToDisplay,
 } from "../../stores";
 import { C, ICONS, Fonts, COLOR_GRADIENTS } from "../../styles";
 import { ROUTES } from "../../routes";
@@ -29,10 +30,12 @@ import {
   broadcastTranslateClear,
   TRANSLATE_MSG_TYPES,
 } from "../../broadcastChannel";
+import { DevNotesModal } from "../screen_components/modal_screens/DevNotesModal";
 
 export const Items_Section = React.memo(({}) => {
   // setters ///////////////////////////////////////////////////////////////////
   const [sShowTranslateModal, _sSetShowTranslateModal] = useState(false);
+  const [sShowDevNotes, _sSetShowDevNotes] = useState(false);
 
   // getters ///////////////////////////////////////////////////////////////////
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
@@ -64,11 +67,18 @@ export const Items_Section = React.memo(({}) => {
   // log("----------------------Items section render");
   return (
     <View style={{ flex: 1 }}>
-      <TabBar onTranslatePress={() => _sSetShowTranslateModal(true)} />
+      <TabBar
+        onTranslatePress={() => _sSetShowTranslateModal(true)}
+        onDevNotesPress={() => _sSetShowDevNotes(true)}
+      />
       {ScreenComponent()}
       <TranslateModal
         visible={sShowTranslateModal}
         onClose={() => _sSetShowTranslateModal(false)}
+      />
+      <DevNotesModal
+        visible={sShowDevNotes}
+        onClose={() => _sSetShowDevNotes(false)}
       />
     </View>
   );
@@ -314,7 +324,7 @@ const TranslateModal = ({ visible, onClose }) => {
   );
 };
 
-const TabBar = ({ onTranslatePress }) => {
+const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
   const zIsStandaloneSale = useOpenWorkordersStore(
@@ -376,6 +386,14 @@ const TabBar = ({ onTranslatePress }) => {
           alignItems: "center",
         }}
       >
+        <Tooltip text="Notes for the app dev" position="bottom">
+          <TouchableOpacity
+            onPress={onDevNotesPress}
+            style={{ paddingHorizontal: 10, justifyContent: "center" }}
+          >
+            <Image_ icon={ICONS.thoughtBubble} size={22} />
+          </TouchableOpacity>
+        </Tooltip>
         <Tooltip text="Send translated text to customer display" position="bottom">
           <TouchableOpacity
             onPress={onTranslatePress}
@@ -384,6 +402,19 @@ const TabBar = ({ onTranslatePress }) => {
             <Image_ icon={ICONS.paperPlane} size={22} />
           </TouchableOpacity>
         </Tooltip>
+        {!!zOpenWorkorderID && !zIsStandaloneSale && localStorage.getItem("warpspeed_has_secondary_display") === "true" && (
+          <Tooltip text="Show workorder on customer display" position="bottom">
+            <TouchableOpacity
+              onPress={() => {
+                let wo = useOpenWorkordersStore.getState().workorders.find((o) => o.id === zOpenWorkorderID);
+                if (wo) broadcastFullWorkorderToDisplay(wo);
+              }}
+              style={{ paddingHorizontal: 10, justifyContent: "center" }}
+            >
+              <Image_ icon={ICONS.display} size={22} />
+            </TouchableOpacity>
+          </Tooltip>
+        )}
         <TouchableOpacity
           onPress={() => (window.location.href = ROUTES.home)}
           style={{ paddingHorizontal: 10, justifyContent: "center", marginTop: 4 }}

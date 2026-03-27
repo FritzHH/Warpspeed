@@ -4,6 +4,7 @@ import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
   checkInputForNumbersOnly,
+  formatCurrencyDisp,
   formatMillisForDisplay,
   formatPhoneWithDashes,
   createNewWorkorder,
@@ -82,6 +83,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const zIsLocked = useOpenWorkordersStore((state) => !!state.lockedWorkorderID && state.lockedWorkorderID === (state.workorderPreviewID || state.openWorkorderID));
   const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
   const zCustomerLanguage = useCurrentCustomerStore((state) => state.customer?.language || "");
+  const zCustomerDeposits = useCurrentCustomerStore((state) => state.customer?.deposits || []);
   const zCustomer = {
     first: zOpenWorkorder?.customerFirst || "",
     last: zOpenWorkorder?.customerLast || "",
@@ -503,11 +505,13 @@ export const ActiveWorkorderComponent = ({}) => {
         paddingBottom: 11,
         paddingTop: 5,
         paddingHorizontal: 5,
-        backgroundColor: (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.saleID)
-          ? lightenRGBByPercent(C.red, 60)
-          : (zIsPreview || zIsLocked)
-            ? lightenRGBByPercent(C.lightred, 80)
-            : C.backgroundWhite,
+        backgroundColor: zOpenWorkorder?.activeSaleID
+          ? lightenRGBByPercent(C.green, 80)
+          : (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.saleID)
+            ? lightenRGBByPercent(C.red, 60)
+            : (zIsPreview || zIsLocked)
+              ? lightenRGBByPercent(C.lightred, 80)
+              : C.backgroundWhite,
         borderRadius: 7,
       }}
     >
@@ -529,6 +533,34 @@ export const ActiveWorkorderComponent = ({}) => {
             borderRadius: 7,
           }}
         >
+          {/* Deposits / Credits on file */}
+          {(() => {
+            let deps = zCustomerDeposits.filter((d) => d.amountCents > 0);
+            if (deps.length === 0) return null;
+            let totalDeposit = deps.filter((d) => d.type === "deposit").reduce((s, d) => s + d.amountCents, 0);
+            let totalCredit = deps.filter((d) => d.type === "credit").reduce((s, d) => s + d.amountCents, 0);
+            if (totalDeposit === 0 && totalCredit === 0) return null;
+            return (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", width: "95%", paddingHorizontal: 5, paddingVertical: 1 }}>
+                {totalDeposit > 0 ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <View style={{ backgroundColor: lightenRGBByPercent(C.green, 70), paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: C.green }}>Deposit</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: C.green }}>{formatCurrencyDisp(totalDeposit, true)}</Text>
+                  </View>
+                ) : <View />}
+                {totalCredit > 0 ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <View style={{ backgroundColor: lightenRGBByPercent(C.blue, 70), paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: C.blue }}>Credit</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: C.blue }}>{formatCurrencyDisp(totalCredit, true)}</Text>
+                  </View>
+                ) : <View />}
+              </View>
+            );
+          })()}
           <Tooltip text="View/edit customer" position="top">
             <ScreenModal
               modalVisible={sShowCustomerInfoScreen}
@@ -541,7 +573,7 @@ export const ActiveWorkorderComponent = ({}) => {
               buttonStyle={{
                 alignItems: "center",
                 justifyContent: "center",
-                paddingVertical: 5,
+                paddingVertical: 2,
                 borderRadius: 5,
                 paddingHorizontal: 20,
                 backgroundColor: "transparent",
@@ -623,7 +655,7 @@ export const ActiveWorkorderComponent = ({}) => {
         <View pointerEvents={isDonePaid ? "none" : "auto"} style={{ width: "100%" }}>
           <View
             style={{
-              marginTop: 20,
+              marginTop: 10,
               borderColor: gray(0.05),
               paddingHorizontal: 8,
               paddingVertical: 8,
@@ -922,6 +954,10 @@ export const ActiveWorkorderComponent = ({}) => {
                     if (val.id === "33knktg") {
                       store.setField("finishedOnMillis", Date.now(), zOpenWorkorder.id);
                     }
+                    // When "Part Ordered" status is selected, clear the "to be ordered" checkbox
+                    if (val.id === "part_ordered") {
+                      store.setField("partToBeOrdered", false, zOpenWorkorder.id);
+                    }
                     // Auto-populate linked wait time if one is configured for this status
                     const linked = zSettings?.waitTimeLinkedStatus?.[val.id];
                     if (linked) {
@@ -1071,7 +1107,7 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
             >
               <TextInput_
-                placeholder={"Part Ordered"}
+                placeholder={"Part name/description"}
                 editable={!isDonePaid}
                 style={{
                   width: "100%",
@@ -1158,27 +1194,28 @@ export const ActiveWorkorderComponent = ({}) => {
               </View>
             </View>
 
-            {/* Estimated wait days picker */}
+            {/* Estimated wait days picker + To be ordered checkbox */}
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
+                justifyContent: "space-between",
                 width: "100%",
                 marginTop: 11,
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", opacity: zOpenWorkorder?.partToBeOrdered ? 0.35 : 1 }}>
                 <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>
                   Estimated delivery
                 </Text>
                 <TouchableOpacity
-                  disabled={isDonePaid}
+                  disabled={isDonePaid || !!zOpenWorkorder?.partToBeOrdered}
                   onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
                   style={{
                     width: 20,
                     height: 20,
                     borderRadius: 4,
-                    backgroundColor: isDonePaid ? gray(0.85) : C.buttonLightGreen,
+                    backgroundColor: (isDonePaid || zOpenWorkorder?.partToBeOrdered) ? gray(0.85) : C.buttonLightGreen,
                     justifyContent: "center",
                     alignItems: "center",
                   }}
@@ -1197,25 +1234,34 @@ export const ActiveWorkorderComponent = ({}) => {
                   {sWaitDays + " days"}
                 </Text>
                 <TouchableOpacity
-                  disabled={isDonePaid}
+                  disabled={isDonePaid || !!zOpenWorkorder?.partToBeOrdered}
                   onPress={() => updateWaitDays(sWaitDays + 1)}
                   style={{
                     width: 20,
                     height: 20,
                     borderRadius: 4,
-                    backgroundColor: isDonePaid ? gray(0.85) : C.buttonLightGreen,
+                    backgroundColor: (isDonePaid || zOpenWorkorder?.partToBeOrdered) ? gray(0.85) : C.buttonLightGreen,
                     justifyContent: "center",
                     alignItems: "center",
                   }}
                 >
                   <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</Text>
                 </TouchableOpacity>
-                {!!zOpenWorkorder?.partOrderEstimateMillis && (
+                {!!zOpenWorkorder?.partOrderEstimateMillis && !zOpenWorkorder?.partToBeOrdered && (
                   <Text style={{ fontSize: 14, color: gray(0.45), marginLeft: 8 }}>
                     {formatMillisForDisplay(zOpenWorkorder.partOrderEstimateMillis)}
                   </Text>
                 )}
               </View>
+              <CheckBox_
+                text="To be ordered"
+                isChecked={!!zOpenWorkorder?.partToBeOrdered}
+                disabled={isDonePaid}
+                onCheck={() => {
+                  useOpenWorkordersStore.getState().setField("partToBeOrdered", !zOpenWorkorder?.partToBeOrdered, zOpenWorkorder.id);
+                }}
+                textStyle={{ fontSize: 13, color: gray(0.45) }}
+              />
             </View>
           </View>
         </View>
@@ -1237,12 +1283,12 @@ export const ActiveWorkorderComponent = ({}) => {
       `}</style>
       <View
         style={{
-          backgroundColor: C.backgroundListWhite,
+          backgroundColor: 'transparent',
           borderRadius: 10,
           borderColor: C.listItemBorder,
-          borderWidth: 1,
+          borderWidth: 0,
           paddingHorizontal: 25,
-          paddingTop: 4, paddingBottom: 0,
+          // paddingTop: 4, paddingBottom: 0,
           marginBottom: 0,
           alignItems: "center",
         }}

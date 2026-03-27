@@ -341,7 +341,7 @@ function applyVars(template, vars) {
   return result;
 }
 
-export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels) {
+export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels, langCode) {
   if (!sale || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
@@ -368,7 +368,17 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
     // SMS — upload PDF and send link in one call
     if (smsTemplate && settings.autoSMSSalesReceipt && customer?.customerCell) {
       const vars = { firstName, storeName, total, link: "{link}" };
-      const msg = applyVars(smsTemplate.content || smsTemplate.message || "", vars);
+      let msg = applyVars(smsTemplate.content || smsTemplate.message || "", vars);
+      // Translate SMS message if non-English language
+      if (langCode && msg) {
+        try {
+          const { translateText } = await import("../../../../db_calls");
+          const result = await translateText({ text: msg, targetLanguage: langCode });
+          if (result?.data?.translatedText) msg = result.data.translatedText;
+        } catch (e) {
+          log("SMS translation failed, sending in English:", e);
+        }
+      }
       const result = await dbUploadPDFAndSendSMS({
         base64,
         storagePath,
@@ -392,11 +402,25 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
   // Email
   if (emailTemplate && settings.autoEmailSalesReceipt && customer?.email) {
     const vars = { firstName, storeName, total, link: receiptURL };
-    const subject = applyVars(emailTemplate.subject || "", vars);
+    let subject = applyVars(emailTemplate.subject || "", vars);
     const receiptLink = receiptURL
       ? "<p style='margin:24px 0'><a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Receipt</a></p>"
       : "";
-    const html = applyVars(emailTemplate.content || emailTemplate.body || "", { ...vars, receiptLink });
+    let html = applyVars(emailTemplate.content || emailTemplate.body || "", { ...vars, receiptLink });
+    // Translate email if non-English language
+    if (langCode) {
+      try {
+        const { translateText } = await import("../../../../db_calls");
+        const [subjectResult, bodyResult] = await Promise.all([
+          translateText({ text: subject, targetLanguage: langCode }),
+          translateText({ text: html, targetLanguage: langCode }),
+        ]);
+        if (subjectResult?.data?.translatedText) subject = subjectResult.data.translatedText;
+        if (bodyResult?.data?.translatedText) html = bodyResult.data.translatedText;
+      } catch (e) {
+        log("Email translation failed, sending in English:", e);
+      }
+    }
     dbSendEmail(customer.email, subject, html);
     log("Sent sale receipt email to", customer.email);
   }

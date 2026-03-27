@@ -198,3 +198,4 @@ export const PaymentsList = memo(function PaymentsList({ payments = [], onRefund
     </View>
   );
 });
+

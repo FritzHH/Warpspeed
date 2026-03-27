@@ -50,6 +50,7 @@ import {
   newCheckoutGetStripeReaders,
   newCheckoutDeleteActiveSale,
   saveSaleIndex,
+  saveItemSales,
 } from "./newCheckoutFirebaseCalls";
 
 import { SaleHeader } from "./SaleHeader";
@@ -237,7 +238,7 @@ export function NewCheckoutModalScreen() {
   const zInventory = useInventoryStore((state) => state.inventoryArr);
   const zSettings = useSettingsStore((state) => state.settings);
   const zCustomer = useCurrentCustomerStore((state) => state.customer);
-  const zStripeReaders = useStripePaymentStore((state) => state.readersArr || []);
+  const zStripeReaders = useStripePaymentStore((state) => state.readersArr || EMPTY_ARR);
 
   // ─── Local State ──────────────────────────────────────────
   const [sSale, _setSale] = useState(null);
@@ -985,9 +986,12 @@ export function NewCheckoutModalScreen() {
       phone: primaryWO?.customerCell || "",
       id: primaryWO?.customerID || "",
     };
-    const allLines = sCombinedWorkorders.flatMap((wo) => wo.workorderLines || []);
+    const allLines = sCombinedWorkorders.flatMap((wo) =>
+      (wo.workorderLines || []).map((line) => ({ ...line, _workorderID: wo.id }))
+    );
     const isStandalone = primaryWO?.isStandaloneSale || false;
     saveSaleIndex(sale, customerInfo, allLines, isStandalone);
+    saveItemSales(sale, allLines);
 
     // Receipt actions based on settings
     const customerForReceipt = {
@@ -997,7 +1001,7 @@ export function NewCheckoutModalScreen() {
       email: primaryWO?.customerEmail || "",
       id: primaryWO?.customerID || "",
     };
-    const printerID = settings?.selectedPrinterID || "8C:77:3B:60:33:22_Star MCP31";
+    const printerID = settings?.selectedPrinterID || "";
 
     // Build receipt context
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
@@ -1053,7 +1057,7 @@ export function NewCheckoutModalScreen() {
     const canSMS = customerForReceipt.customerCell && smsContent.trim();
     const canEmail = customerForReceipt.email && emailContent.trim();
     if (canSMS || canEmail) {
-      sendSaleReceipt(sale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels);
+      sendSaleReceipt(sale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode);
     }
   }
 
@@ -1074,7 +1078,7 @@ export function NewCheckoutModalScreen() {
         id: primaryWO?.customerID || "",
       };
       const settings = useSettingsStore.getState().getSettings();
-      const printerID = settings?.selectedPrinterID || "8C:77:3B:60:33:22_Star MCP31";
+      const printerID = settings?.selectedPrinterID || "";
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
       let saleReceipt = printBuilder.sale(sSale, sSale.payments, customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
       return { saleReceipt, customerForReceipt, primaryWO, settings, printerID };
@@ -1127,7 +1131,7 @@ export function NewCheckoutModalScreen() {
       const canSMS = customerForReceipt.customerCell && smsContent.trim();
       const canEmail = customerForReceipt.email && emailContent.trim();
       if (canSMS || canEmail) {
-        sendSaleReceipt(sSale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels);
+        sendSaleReceipt(sSale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode);
       }
     }
 
@@ -1251,7 +1255,7 @@ export function NewCheckoutModalScreen() {
       }
     }
 
-    const printerID = zSettings?.selectedPrinterID || "8C:77:3B:60:33:22_Star MCP31";
+    const printerID = zSettings?.selectedPrinterID || "";
     dbSavePrintObj(toPrint, printerID);
   }
 

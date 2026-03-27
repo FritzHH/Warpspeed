@@ -5,10 +5,12 @@ import {
   firestoreDelete,
   firestoreSubscribe,
   firestoreQuery,
+  firestoreBatchWrite,
 } from "../../../../db_calls";
 import { useSettingsStore, useOpenWorkordersStore } from "../../../../stores";
 import { log } from "../../../../utils";
-import { SALE_INDEX_PROTO } from "../../../../data";
+import { SALE_INDEX_PROTO, ITEM_SALE_PROTO } from "../../../../data";
+import { generateRandomID } from "../../../../utils";
 import { cloneDeep } from "lodash";
 
 // ─── Callable Function References ─────────────────────────────
@@ -495,5 +497,85 @@ export async function querySalesIndex(startMillis, endMillis) {
   } catch (error) {
     log("querySalesIndex error:", error);
     return [];
+  }
+}
+
+// ─── Item Sales Tracking ─────────────────────────────────────────────
+
+export async function saveItemSales(sale, workorderLines) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !sale?.id) {
+      log("saveItemSales: missing tenantID/storeID/sale.id");
+      return { success: false };
+    }
+
+    const items = [];
+    for (const line of (workorderLines || [])) {
+      const inv = line.inventoryItem || {};
+      const qty = Number(line.qty) || 1;
+      const docID = generateRandomID();
+
+      let entry = cloneDeep(ITEM_SALE_PROTO);
+      entry.id = docID;
+      entry.saleID = sale.id;
+      entry.millis = Number(sale.millis) || Date.now();
+      entry.itemID = line.id || "";
+      entry.inventoryItemID = inv.customPart || inv.customLabor ? "" : (inv.id || "");
+      entry.name = inv.formalName || inv.informalName || "";
+      entry.category = inv.category || "";
+      entry.customPart = !!inv.customPart;
+      entry.customLabor = !!inv.customLabor;
+      entry.minutes = inv.customLabor ? (Number(inv.minutes) || 0) : 0;
+      entry.qty = qty;
+      entry.price = inv.price || 0;
+      entry.salePrice = inv.salePrice || 0;
+      entry.discountObj = line.discountObj || null;
+
+      items.push({
+        path: `tenants/${tenantID}/stores/${storeID}/item-sales/${docID}`,
+        data: entry,
+      });
+    }
+
+    if (items.length === 0) return { success: true };
+    await firestoreBatchWrite(items);
+    return { success: true };
+  } catch (error) {
+    log("saveItemSales error:", error);
+    return { success: false, error };
+  }
+}
+
+export async function markItemSalesRefunded(saleID, refundedLines) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !saleID) {
+      log("markItemSalesRefunded: missing tenantID/storeID/saleID");
+      return { success: false };
+    }
+
+    const collectionPath = `tenants/${tenantID}/stores/${storeID}/item-sales`;
+    const docs = await firestoreQuery(collectionPath, [
+      { field: "saleID", operator: "==", value: saleID },
+    ]);
+    if (!docs || docs.length === 0) return { success: true };
+
+    const refundedItemIDs = new Set(
+      (refundedLines || []).map((l) => l.id).filter(Boolean)
+    );
+    const toUpdate = docs.filter((d) => !d.refunded && refundedItemIDs.has(d.itemID));
+    if (toUpdate.length === 0) return { success: true };
+
+    const updates = toUpdate.map((d) => ({
+      path: `${collectionPath}/${d.id}`,
+      data: { ...d, refunded: true },
+    }));
+
+    await firestoreBatchWrite(updates);
+    return { success: true };
+  } catch (error) {
+    log("markItemSalesRefunded error:", error);
+    return { success: false, error };
   }
 }

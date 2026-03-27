@@ -147,7 +147,7 @@ export const CashPayment = memo(function CashPayment({
         style={{
           fontSize: 25,
           color: gray(0.6),
-          fontWeight: 500,
+          fontWeight: 600,
         }}
       >
         {sIsCheck ? "CHECK SALE" : "CASH SALE"}

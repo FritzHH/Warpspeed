@@ -17,6 +17,7 @@ import {
   newCheckoutCancelStripePayment,
   newCheckoutListenToPaymentUpdates,
 } from "./newCheckoutFirebaseCalls";
+import { pad } from "lodash";
 
 function PulsingText({ text }) {
   const opacity = useRef(new Animated.Value(0.3)).current;
@@ -124,10 +125,6 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   const [sCardReader, _setCardReader] = useState(null);
   const [sFocused, _setFocused] = useState("");
 
-  const successScale = useRef(new Animated.Value(0)).current;
-  const successOpacity = useRef(new Animated.Value(0)).current;
-  const successAnimStarted = useRef(false);
-
   const autoLoadedRef = useRef(false);
   const prevAmountRef = useRef(amountLeftToPay);
 
@@ -170,9 +167,9 @@ export const CardReaderPayment = memo(function CardReaderPayment({
         if (data.status === "succeeded" && (data.payment_intent || data.amount_captured)) {
           if (s._cardTimeout) { clearTimeout(s._cardTimeout); s._cardTimeout = null; }
           let payment = buildCardPayment(data);
-          s.setCardMessage(`Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`);
+          s.setCardMessage("");
           s.setCardError("");
-          s.setCardStatus("succeeded");
+          s.setCardStatus("idle");
           s.setPaymentIntentID(null);
           cleanupStoreListeners();
           if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
@@ -282,7 +279,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   }
 
   async function startPayment() {
-    if (zCardStatus !== "idle" && zCardStatus !== "succeeded") return;
+    if (zCardStatus !== "idle") return;
     if (!activeReader) {
       _zSetCardError("No card reader selected");
       return;
@@ -367,20 +364,6 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     }
   }
 
-  // ── Success animation ──
-  if (zCardStatus === "succeeded" && !successAnimStarted.current) {
-    successAnimStarted.current = true;
-    Animated.parallel([
-      Animated.spring(successScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: false }),
-      Animated.timing(successOpacity, { toValue: 1, duration: 350, useNativeDriver: false }),
-    ]).start();
-  }
-  if (zCardStatus !== "succeeded" && successAnimStarted.current) {
-    successAnimStarted.current = false;
-    successScale.setValue(0);
-    successOpacity.setValue(0);
-  }
-
   // ── Derived values ──
   let savedCardReaders = settings?.cardReaders || [];
   let readerDropdownData = stripeReaders
@@ -441,20 +424,6 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     );
   }
 
-  // Reset card component after successful payment
-  if (zCardStatus === "succeeded") {
-    useStripePaymentStore.getState().setCardStatus("idle");
-    useStripePaymentStore.getState().setCardMessage("");
-    prevAmountRef.current = amountLeftToPay;
-    if (amountLeftToPay > 0) {
-      _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
-      _setRequestedAmount(amountLeftToPay);
-    } else {
-      _setRequestedAmountDisp("");
-      _setRequestedAmount(0);
-    }
-  }
-
   let startDisabled = !isEnabled
     || sRequestedAmount < 50
     || zCardStatus === "initiating"
@@ -481,14 +450,14 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       {/* Title + Reader Selector Row */}
       <View
         style={{
-          flexDirection: "row",
+          flexDirection: "column",
           alignItems: "center",
           width: "100%",
-          justifyContent: "space-between",
-          paddingHorizontal: 30,
+          justifyContent: "center",
+          // paddingHorizontal: 30,
         }}
       >
-        <Text style={{ fontSize: 16, color: gray(0.6), fontWeight: 500 }}>
+        <Text style={{ fontSize: 25, color: gray(0.6), fontWeight: 600, marginBottom: 8 }}>
           CARD SALE
         </Text>
         <View style={{ flex: 1, alignItems: "flex-end" }}>
@@ -572,7 +541,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             enabled={isEnabled}
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}
-            buttonStyle={{ height: 18, borderRadius: 4 }}
+            buttonStyle={{ height: 18, borderRadius: 4, paddingHorizontal: 5 }}
           />
         </View>
       </View>
@@ -592,7 +561,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             {zCardError}
           </Text>
         )}
-        {!isProcessing && !!zCardMessage && zCardStatus !== "succeeded" && (
+        {!isProcessing && !!zCardMessage && (
           <Text style={{ fontSize: 13, color: C.green, fontWeight: "600", textAlign: "center" }}>
             {zCardMessage}
           </Text>

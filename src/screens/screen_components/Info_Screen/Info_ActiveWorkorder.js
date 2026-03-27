@@ -34,6 +34,7 @@ import {
   CheckBox_,
   Pressable_,
   StaleBanner,
+  PrinterAlert,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -104,6 +105,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const sUploadProgress = useUploadProgressStore((s) => s.progress);
   const [sPendingFiles, _setPendingFiles] = useState(null); // null | File[]
   const [sCompressConfirm, _setCompressConfirm] = useState(true);
+  const [sPrinterAlert, _setPrinterAlert] = useState(null); // { x, y }
 
   // Estimated wait days — local state for instant UI, debounced DB write
   const [sWaitDays, _setWaitDays] = useState(0);
@@ -337,8 +339,11 @@ export const ActiveWorkorderComponent = ({}) => {
     });
   }
 
-  function handleWorkorderPrintPress() {
-    log("WORKORDER OBJ:", JSON.stringify(zOpenWorkorder, null, 2));
+  function handleWorkorderPrintPress(e) {
+    let px = e?.nativeEvent?.pageX || e?.pageX;
+    let py = e?.nativeEvent?.pageY || e?.pageY;
+    if (px && py) _setPrinterAlert({ x: px, y: py });
+  // log("WORKORDER OBJ:", JSON.stringify(zOpenWorkorder, null, 2));
     const _settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let toPrint = printBuilder.workorder(
@@ -348,10 +353,13 @@ export const ActiveWorkorderComponent = ({}) => {
       _ctx
     );
     log("Print object:", JSON.stringify(toPrint, null, 2));
-    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Star MCP31");
+    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
   }
 
-  function handleIntakePrintPress() {
+  function handleIntakePrintPress(e) {
+    let px = e?.nativeEvent?.pageX || e?.pageX;
+    let py = e?.nativeEvent?.pageY || e?.pageY;
+    if (px && py) _setPrinterAlert({ x: px, y: py });
     const settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
 
@@ -364,7 +372,7 @@ export const ActiveWorkorderComponent = ({}) => {
         _ctx
       );
       log("INTAKE PRINT OBJ", JSON.stringify(toPrint, null, 2));
-      dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Star MCP31");
+      dbSavePrintObj(toPrint, settings?.selectedPrinterID || "");
     }
 
     // Look up templates
@@ -407,7 +415,7 @@ export const ActiveWorkorderComponent = ({}) => {
       settings?.salesTaxPercent,
       _ctx
     );
-    dbSavePrintObj(toPrint, "8C:77:3B:60:33:22_Star MCP31");
+    dbSavePrintObj(toPrint, settings?.selectedPrinterID || "");
   }
 
   function handleIntakeRightClick() {
@@ -1410,6 +1418,7 @@ export const ActiveWorkorderComponent = ({}) => {
             iconStyle={{ paddingHorizontal: 0 }}
             buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
             onPress={handleWorkorderPrintPress}
+            // onPress={}
           />
         </Tooltip>
         <Pressable_
@@ -1508,6 +1517,12 @@ export const ActiveWorkorderComponent = ({}) => {
           mode={sShowMediaModal}
         />
       )}
+      <PrinterAlert
+        visible={!!sPrinterAlert}
+        x={sPrinterAlert?.x}
+        y={sPrinterAlert?.y}
+        onDone={() => _setPrinterAlert(null)}
+      />
     </View>
   );
 };

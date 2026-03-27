@@ -630,7 +630,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               </View>
               {hasPayments && (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Text style={{ fontSize: 12, color: "gray" }}>{"REMAINING: "}</Text>
+                  <Text style={{ fontSize: 12, color: "gray" }}>{"BALANCE: "}</Text>
                   <Text
                     style={{
                       fontWeight: 500,

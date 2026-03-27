@@ -34,6 +34,7 @@ import {
   newCheckoutCompleteSale,
   newCheckoutDeleteActiveSale,
   saveRefundIndex,
+  markItemSalesRefunded,
 } from "./newCheckoutFirebaseCalls";
 
 import { CashRefund } from "./CashRefund";
@@ -326,6 +327,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       id: primaryWO?.customerID || "",
     };
     saveRefundIndex(sale, refund, customerInfo);
+    if (refund.workorderLines && refund.workorderLines.length > 0) {
+      markItemSalesRefunded(sale.id, refund.workorderLines);
+    }
 
     // Print refund receipt
     let settings = useSettingsStore.getState().getSettings();

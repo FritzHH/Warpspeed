@@ -221,6 +221,7 @@ export const CustomItemModal = ({
             placeholder={isLabor ? "Labor description" : "Part name"}
             value={sName}
             onChangeText={(val) => _setName(val.length === 1 ? val.toUpperCase() : val.charAt(0).toUpperCase() + val.slice(1))}
+            autoFocus={true}
             style={{
               borderWidth: 1,
               borderColor: C.buttonLightGreenOutline,

@@ -9,6 +9,7 @@ import {
   useCheckoutStore,
   useWorkorderPreviewStore,
   useTicketSearchStore,
+  useSettingsStore,
 } from "../../../stores";
 
 import {
@@ -287,7 +288,7 @@ export const StandaloneSaleComponent = ({}) => {
             onPress={() =>
               dbSavePrintObj(
                 { id: generateEAN13Barcode(), receiptType: RECEIPT_TYPES.register },
-                "8C:77:3B:60:33:22_Star MCP31"
+                useSettingsStore.getState().getSettings()?.selectedPrinterID || ""
               )
             }
           />
@@ -297,7 +298,7 @@ export const StandaloneSaleComponent = ({}) => {
             icon={ICONS.receipt}
             iconSize={40}
             onPress={() =>
-              dbSavePrintObj(printBuilder.test(), "8C:77:3B:60:33:22_Star MCP31")
+              dbSavePrintObj(printBuilder.test(), useSettingsStore.getState().getSettings()?.selectedPrinterID || "")
             }
           />
         </Tooltip>

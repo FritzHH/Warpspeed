@@ -120,6 +120,7 @@ export function Dashboard_Admin({}) {
   );
   const [sIntakeEditButtonObj, _setIntakeEditButtonObj] = useState(null);
   const [sStandEditButtonObj, _setStandEditButtonObj] = useState(null);
+  const [sShowStandButtonsModal, _setShowStandButtonsModal] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -233,6 +234,71 @@ export function Dashboard_Admin({}) {
           }}
         />
       )}
+      {sShowStandButtonsModal &&
+        createPortal(
+          <div
+            onClick={() => _setShowStandButtonsModal(false)}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 9998,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: 480,
+                maxHeight: "90vh",
+                backgroundColor: "white",
+                borderRadius: 12,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              {/* Header */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: 16,
+                  borderBottomWidth: 1,
+                  borderBottomColor: gray(0.15),
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: Fonts.weight.textHeavy,
+                    color: C.text,
+                  }}
+                >
+                  Stand Buttons Editor
+                </Text>
+                <TouchableOpacity onPress={() => _setShowStandButtonsModal(false)}>
+                  <Image_ icon={ICONS.close1} size={18} />
+                </TouchableOpacity>
+              </View>
+              {/* Body */}
+              <div style={{ flex: 1, overflowY: "auto", padding: 0 }}>
+                <StandButtonsEditorComponent
+                  zSettingsObj={zSettingsObj}
+                  handleSettingsFieldChange={handleSettingsFieldChange}
+                  _setStandEditButtonObj={_setStandEditButtonObj}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       <View
         style={{
@@ -527,7 +593,6 @@ export function Dashboard_Admin({}) {
         <ScrollView
           style={{
             width: "70%",
-            flex: sExpand === TAB_NAMES.quickItems ? 1 : undefined,
           }}
           contentContainerStyle={{ alignItems: "center" }}
         >
@@ -596,7 +661,7 @@ export function Dashboard_Admin({}) {
                   customerNotes: ["Customer requested rush service", "Pickup after 5pm"],
                   internalNotes: ["Rear derailleur cable frayed — replaced"],
                 };
-                dbSavePrintObj(printObj, "8C:77:3B:60:33:22_Star MCP31");
+                dbSavePrintObj(printObj, zSettingsObj?.selectedPrinterID || "");
               }}
               style={{
                 paddingVertical: 10,
@@ -743,7 +808,7 @@ export function Dashboard_Admin({}) {
                   log("SPOOF SALE RECEIPT", JSON.stringify(receiptData, null, 2));
 
                   // Send to thermal printer
-                  dbSavePrintObj(receiptData, "8C:77:3B:60:33:22_Star MCP31");
+                  dbSavePrintObj(receiptData, zSettingsObj?.selectedPrinterID || "");
 
                   // Generate and upload PDF
                   const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
@@ -956,11 +1021,18 @@ export function Dashboard_Admin({}) {
             />
           )}
           {sExpand === TAB_NAMES.standButtons && (
-            <StandButtonsEditorComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-              _setStandEditButtonObj={_setStandEditButtonObj}
-            />
+            <BoxContainerOuterComponent>
+              <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center", borderWidth: 0 }}>
+                <Button_
+                  text="Open Stand Buttons Editor"
+                  icon={ICONS.display}
+                  iconSize={18}
+                  onPress={() => _setShowStandButtonsModal(true)}
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  style={{ paddingHorizontal: 24, paddingVertical: 10 }}
+                />
+              </BoxContainerInnerComponent>
+            </BoxContainerOuterComponent>
           )}
           {sExpand === TAB_NAMES.ordering && (
             <OrderingComponent
@@ -4179,6 +4251,8 @@ const QuickItemButtonsComponent = ({
   };
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
+  const [sItemDragIdx, _setItemDragIdx] = useState(null);
+  const [sItemDragOverIdx, _setItemDragOverIdx] = useState(null);
   const [sEditingID, _setEditingID] = useState(null);
   const [sShowInvSearchModal, _setShowInvSearchModal] = useState(false);
   const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
@@ -4466,11 +4540,25 @@ const QuickItemButtonsComponent = ({
     handleSettingsFieldChange("quickItemButtons", result);
   }
 
+  function reorderItems(fromIdx, toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+    let updated = allButtons.map((b) => {
+      if (b.id !== sCurrentParentID) return b;
+      let items = [...(b.items || [])];
+      let [dragged] = items.splice(fromIdx, 1);
+      items.splice(toIdx, 0, dragged);
+      return { ...b, items };
+    });
+    handleSettingsFieldChange("quickItemButtons", updated);
+  }
+
   let allButtons = zSettingsObj?.quickItemButtons || [];
   let topLevelButtons = allButtons.filter((b) => !b.parentID);
   let currentChildren = allButtons.filter(
     (b) => b.parentID === sCurrentParentID
   );
+  let parentButton = sCurrentParentID ? allButtons.find((b) => b.id === sCurrentParentID) : null;
+  let parentItems = (parentButton?.items || []).map((id) => zInventoryArr.find((o) => o.id === id)).filter(Boolean);
 
   function renderButtonCard(btn, idx, isDraggable, isColumn) {
     let isEditing = sEditingID === btn.id;
@@ -4526,7 +4614,7 @@ const QuickItemButtonsComponent = ({
               ? C.blue
               : C.buttonLightGreenOutline,
           borderRadius: 8,
-          backgroundColor: isEditing ? "rgb(245,166,35)" : C.listItemWhite,
+          backgroundColor: isEditing ? "rgb(245,166,35)" : isColumn ? C.listItemWhite : C.backgroundGreen,
           alignItems: "center",
           justifyContent: isColumn ? "flex-start" : "center",
           position: "relative",
@@ -4661,9 +4749,9 @@ const QuickItemButtonsComponent = ({
         <BoxContainerInnerComponent
           style={{ width: "100%", alignItems: "center", borderWidth: 0, flex: 1 }}
         >
-          <View style={{ width: "100%", alignItems: "flex-start", flexDirection: "row", marginBottom: 10 }}>
-            <Tooltip text="Add sub-menu" position="right">
-              <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={22} />
+          <View style={{ width: "100%", alignItems: "center", flexDirection: "row", marginBottom: 10 }}>
+            <Tooltip text="Add quick-item buttonsss" position="right">
+              <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={40} />
             </Tooltip>
           </View>
           <View
@@ -4792,7 +4880,7 @@ const QuickItemButtonsComponent = ({
             </Tooltip>
             <View style={{ marginLeft: 8 }}>
               <Tooltip text="Add sub-menu" position="right">
-                <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={22} />
+                <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={40} />
               </Tooltip>
             </View>
           </View>
@@ -4812,6 +4900,67 @@ const QuickItemButtonsComponent = ({
               renderButtonCard(btn, idx, true)
             )}
           </div>
+
+          {/* Inventory items linked to this button */}
+          {parentItems.length > 0 && (
+            <View style={{ marginTop: 10, width: "100%" }}>
+              <Text style={{ fontSize: 12, fontWeight: "bold", color: gray(0.5), marginBottom: 6 }}>
+                ITEMS ({parentItems.length})
+              </Text>
+              {parentItems.map((inv, i) => (
+                <div
+                  key={inv.id}
+                  draggable
+                  onDragStart={() => _setItemDragIdx(i)}
+                  onDragOver={(e) => { e.preventDefault(); _setItemDragOverIdx(i); }}
+                  onDragEnd={() => { _setItemDragIdx(null); _setItemDragOverIdx(null); }}
+                  onDrop={(e) => { e.preventDefault(); reorderItems(sItemDragIdx, i); _setItemDragIdx(null); _setItemDragOverIdx(null); }}
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingTop: 6,
+                    paddingBottom: 6,
+                    paddingLeft: 8,
+                    paddingRight: 8,
+                    borderRadius: 6,
+                    borderWidth: sItemDragOverIdx === i && sItemDragIdx !== null && sItemDragIdx !== i ? 2 : 1,
+                    borderStyle: "solid",
+                    borderColor: sItemDragOverIdx === i && sItemDragIdx !== null && sItemDragIdx !== i ? C.blue : C.buttonLightGreenOutline,
+                    backgroundColor: i % 2 === 0 ? C.backgroundListWhite : C.listItemWhite,
+                    marginBottom: 2,
+                    cursor: "grab",
+                    opacity: sItemDragIdx === i ? 0.5 : 1,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, color: C.text }} numberOfLines={1}>
+                      {inv.informalName || inv.formalName}
+                    </Text>
+                    {!!inv.informalName && (
+                      <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
+                        {inv.formalName}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
+                    {"$" + formatCurrencyDisp(inv.price)}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      let updated = allButtons.map((b) => {
+                        if (b.id !== sCurrentParentID) return b;
+                        return { ...b, items: (b.items || []).filter((id) => id !== inv.id) };
+                      });
+                      handleSettingsFieldChange("quickItemButtons", updated);
+                    }}
+                  >
+                    <Image_ icon={ICONS.close1} size={14} />
+                  </TouchableOpacity>
+                </div>
+              ))}
+            </View>
+          )}
         </View>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
@@ -5825,48 +5974,116 @@ const ImportComponent = () => {
     _setLookupLoading(true);
     _setLsResult("");
     try {
-      const data = await loadAndCacheLightspeedData();
-      const itemRows = parseCSV(data.itemsText);
-      const activeItems = itemRows.filter(row => row.archived !== "true" && row.description);
+      console.log("[Inventory Import] Loading inventory.csv...");
+      const invText = await fetch("/lightspeed/inventory.csv").then(r => r.text());
+      const itemRows = parseCSV(invText);
+      const activeItems = itemRows.filter(row => row["Description"]);
+      console.log("[Inventory Import] Parsed " + itemRows.length + " rows, " + activeItems.length + " active items.");
 
-      const settings = useSettingsStore.getState().settings;
-      const tenantID = settings?.tenantID;
-      const storeID = settings?.storeID;
-      if (!tenantID || !storeID) { _setLsResult("Error: missing tenantID or storeID"); _setLookupLoading(false); return; }
+      const stripDollar = (val) => (val || "").replace(/[$,]/g, "");
 
-      const mapped = activeItems.map(item => {
-        const isLabor = (item.description || "").toLowerCase().includes("labor");
-        const id = item.itemID || generateRandomID();
-        return {
+      const toImport = [];
+      const skipped = [];
+      for (const item of activeItems) {
+        const desc = item["Description"] || "";
+        if (desc.includes("Discontinued")) continue;
+        const descLower = desc.toLowerCase();
+        const isLabor = descLower.includes("labor") || descLower.includes("install");
+        const upc = (item["UPC"] || "").trim();
+        const systemId = (item["System ID"] || "").trim();
+        const id = upc || systemId || generateRandomID();
+        const isTube = desc.includes("TUBE ");
+        const tubeCost = dollarsToCents(stripDollar(item["Default Cost"]));
+        const price = isTube ? (tubeCost > 600 ? 1878 : 939) : dollarsToCents(stripDollar(item["Price"]));
+        const mapped = {
           id,
-          formalName: item.description || "",
+          formalName: desc,
           informalName: "",
           brand: "",
-          price: dollarsToCents(item.defaultCost),
+          price,
           salePrice: 0,
-          cost: dollarsToCents(item.avgCost || item.defaultCost),
+          cost: dollarsToCents(stripDollar(item["Default Cost"])),
           category: isLabor ? "Labor" : "Part",
-          upc: item.upc || "",
-          ean: item.ean || "",
-          customSku: item.customSku || "",
-          manufacturerSku: item.manufacturerSku || "",
+          upc: upc,
+          ean: (item["EAN"] || "").trim(),
+          customSku: (item["Custom SKU"] || "").trim(),
+          manufacturerSku: (item["Manufact. SKU"] || "").trim(),
           minutes: 0,
-          customPart: false,
-          customLabor: false,
+          customPart: !isLabor,
+          customLabor: isLabor,
         };
+        if (price > 0) {
+          toImport.push(mapped);
+        } else {
+          skipped.push(mapped);
+        }
+      }
+      skipped.sort((a, b) => {
+        const aName = a.formalName.toLowerCase();
+        const bName = b.formalName.toLowerCase();
+        const aIsLabor = aName.includes("labor");
+        const bIsLabor = bName.includes("labor");
+        const aIsPart = aName.includes("part");
+        const bIsPart = bName.includes("part");
+        // Group: Labor first, Part second, Other last
+        const aGroup = aIsLabor ? 0 : aIsPart ? 1 : 2;
+        const bGroup = bIsLabor ? 0 : bIsPart ? 1 : 2;
+        if (aGroup !== bGroup) return aGroup - bGroup;
+        return a.formalName.localeCompare(b.formalName);
+      });
+      console.log("[Inventory Import] " + toImport.length + " items to import, " + skipped.length + " skipped (no price). Writing to Firestore...");
+
+      await dbBatchWrite(toImport, "inventory", (done, total) => {
+        console.log("[Inventory Import] inventory: " + done + "/" + total + " written.");
       });
 
-      // Write in parallel batches of 50
-      const BATCH_SIZE = 50;
-      for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
-        const batch = mapped.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(item => {
-          const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INVENTORY}/${item.id}`;
-          return firestoreWrite(path, item);
-        }));
+      // Download inventory_imported.csv
+      {
+        toImport.sort((a, b) => {
+          const aName = a.formalName.toLowerCase();
+          const bName = b.formalName.toLowerCase();
+          const aGroup = aName.includes("labor") ? 0 : aName.includes("part") ? 1 : 2;
+          const bGroup = bName.includes("labor") ? 0 : bName.includes("part") ? 1 : 2;
+          if (aGroup !== bGroup) return aGroup - bGroup;
+          return a.formalName.localeCompare(b.formalName);
+        });
+        const esc = (v) => '"' + String(v || "").replace(/"/g, '""') + '"';
+        const csvHeader = "Category,Description,Price,Cost,UPC,EAN,Custom SKU,Manufact. SKU";
+        const csvRows = toImport.map(item =>
+          [item.category, esc(item.formalName), (item.price / 100).toFixed(2), (item.cost / 100).toFixed(2), esc(item.upc), esc(item.ean), esc(item.customSku), esc(item.manufacturerSku)].join(",")
+        );
+        const csvContent = csvHeader + "\n" + csvRows.join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "inventory_imported.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        console.log("[Inventory Import] inventory_imported.csv downloaded (" + toImport.length + " items).");
       }
 
-      _setLsResult("Inventory Import: " + mapped.length + " items saved");
+      if (skipped.length > 0) {
+        console.log("[Inventory Import] Generating CSV for " + skipped.length + " skipped items...");
+        const csvHeader = "Group,Description,Price,Cost,UPC,EAN,Custom SKU,Manufact. SKU";
+        const csvRows = skipped.map(item => {
+          const group = item.formalName.toLowerCase().includes("labor") ? "Labor" : item.formalName.toLowerCase().includes("part") ? "Part" : "Other";
+          const esc = (v) => '"' + String(v || "").replace(/"/g, '""') + '"';
+          return [group, esc(item.formalName), item.price, item.cost, esc(item.upc), esc(item.ean), esc(item.customSku), esc(item.manufacturerSku)].join(",");
+        });
+        const csvContent = csvHeader + "\n" + csvRows.join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "inventory_skipped_items.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        console.log("[Inventory Import] Skipped items CSV downloaded.");
+      }
+
+      console.log("[Inventory Import] Complete. " + toImport.length + " imported, " + skipped.length + " skipped.");
+      _setLsResult("Inventory Import: " + toImport.length + " imported, " + skipped.length + " skipped (no price)");
     } catch (e) {
       console.error("[Inventory Import] Error:", e);
       _setLsResult("Error: " + e.message);
@@ -5940,7 +6157,7 @@ const ImportComponent = () => {
           formalName: item.description || "",
           informalName: "",
           brand: "",
-          price: dollarsToCents(item.defaultCost),
+          price: dollarsToCents(item.price || item.defaultCost),
           salePrice: 0,
           cost: dollarsToCents(item.avgCost || item.defaultCost),
           category: isLabor ? "Labor" : "Part",
@@ -6083,7 +6300,7 @@ const ImportComponent = () => {
           formalName: item.description || "",
           informalName: "",
           brand: "",
-          price: dollarsToCents(item.defaultCost),
+          price: dollarsToCents(item.price || item.defaultCost),
           salePrice: 0,
           cost: dollarsToCents(item.avgCost || item.defaultCost),
           category: isLabor ? "Labor" : "Part",

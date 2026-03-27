@@ -152,6 +152,7 @@ export const ICONS = {
   guyCelebrating: require(ASSETS_PATH + "guyCelebrating.gif"),
   display: require(ASSETS_PATH + "display.png"),
   thoughtBubble: require(ASSETS_PATH + "thoughtBubble.png"),
+  print: require(ASSETS_PATH + "print.png"),
 };
 
 // rgb(64, 174, 113)

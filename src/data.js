@@ -395,6 +395,24 @@ export const SALE_INDEX_PROTO = {
   paymentType: "",
 };
 
+export const ITEM_SALE_PROTO = {
+  id: "",
+  saleID: "",
+  millis: 0,
+  itemID: "",
+  inventoryItemID: "",
+  name: "",
+  category: "",
+  customPart: false,
+  customLabor: false,
+  minutes: 0,
+  qty: 1,
+  price: 0,
+  salePrice: 0,
+  discountObj: null,
+  refunded: false,
+};
+
 // workorder stuff ////////////////////////////////////////////////////
 export const WORKORDER_PROTO = {
   workorderNumber: "",

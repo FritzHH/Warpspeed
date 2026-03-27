@@ -72,6 +72,55 @@ export const StaleBanner = ({ text, style, textStyle }) => {
     </Animated.View>
   );
 };
+
+export const PrinterAlert = ({ visible, x, y, onDone }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    scale.setValue(1);
+    opacity.setValue(1);
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.3, duration: 400, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    const timer = setTimeout(() => {
+      pulse.stop();
+      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
+        if (onDone) onDone();
+      });
+    }, 2000);
+    return () => { pulse.stop(); clearTimeout(timer); };
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return ReactDOM.createPortal(
+    <Animated.View
+      style={{
+        position: "fixed",
+        left: (x || 0) - 25,
+        top: (y || 0) - 25,
+        width: 50,
+        height: 50,
+        justifyContent: "center",
+        alignItems: "center",
+        opacity,
+        transform: [{ scale }],
+        zIndex: 99999,
+        pointerEvents: "none",
+      }}
+    >
+      <Image_ source={ICONS.print} width={40} height={40} />
+    </Animated.View>,
+    document.body
+  );
+};
+
 const styles = {
   container: {
     // margin: 20,
@@ -2133,11 +2182,11 @@ export const Button_ = ({
     );
   }
 
-  function handleButtonPress() {
+  function handleButtonPress(e) {
     if (!enabled) return;
     if (visible) {
       _setMouseOver(false);
-      onPress();
+      onPress(e);
     }
   }
 
@@ -2180,7 +2229,7 @@ export const Button_ = ({
           _setMouseOver(false);
         }}
         // on={() => log("here")}
-        onPress={() => (enabled ? handleButtonPress() : null)}
+        onPress={(e) => (enabled ? handleButtonPress(e) : null)}
         onLongPress={visible ? onLongPress : () => {}}
       >
         <GradientView
@@ -2193,7 +2242,7 @@ export const Button_ = ({
             borderRadius: 15,
             paddingVertical: 5,
             paddingHorizontal: 15,
-            ...(icon ? { paddingLeft: 10 } : {}),
+            paddingLeft: icon ? 10 : null,
             ...shadowStyle,
             ...buttonStyle,
             backgroundColor: icon && !text ? null : getBackgroundColor(),
@@ -3017,20 +3066,20 @@ export const Pressable_ = ({
 }) => {
   const clickTimer = useRef(null);
 
-  function handlePress() {
+  function handlePress(e) {
     if (onDoublePress) {
       if (clickTimer.current) {
         clearTimeout(clickTimer.current);
         clickTimer.current = null;
-        onDoublePress();
+        onDoublePress(e);
       } else {
         clickTimer.current = setTimeout(() => {
           clickTimer.current = null;
-          if (onPress) onPress();
+          if (onPress) onPress(e);
         }, 350);
       }
     } else {
-      if (onPress) onPress();
+      if (onPress) onPress(e);
     }
   }
 

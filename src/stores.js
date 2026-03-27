@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   CUSTOMER_PROTO,
+  FRITZ_USER_OBJ,
   INVENTORY_ITEM_PROTO,
   PRIVILEDGE_LEVELS,
   TAB_NAMES,
@@ -546,11 +547,11 @@ export const useLoginStore = create(
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
-  // currentUser: cloneDeep(FRITZ_USER_OBJ), //testing
-  currentUser: null,
+  currentUser: cloneDeep(FRITZ_USER_OBJ), //testing
+  // currentUser: null,
   punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
-  lastActionMillis: 0,
+  lastActionMillis: Date.now(), //testing
   postLoginFunctionCallback: null,
   showLoginScreen: false,
   cameraStatus: "loading", // "loading" | "ready" | "failed" | "idle" | "matched"
@@ -626,6 +627,12 @@ export const useLoginStore = create(
     let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
     let userObj = get().currentUser;
 
+    // DEV: skip timeout for testing user
+    if (userObj?.id === FRITZ_USER_OBJ.id) {
+      set({ lastActionMillis: now });
+      diffSeconds = 0;
+    }
+
     if (!userObj || diffSeconds > timeout) {
       // If we know who the user is (face recognized) but they're not clocked in,
       // offer clock-in as a way to authenticate — clocking in counts as logging in
@@ -670,6 +677,13 @@ export const useLoginStore = create(
     let cur = new Date().getTime();
     let diff = (cur - lastMillis) / 1000;
     let userObj = get().currentUser;
+
+    // DEV: skip timeout for testing user
+    if (userObj?.id === FRITZ_USER_OBJ.id) {
+      set({ lastActionMillis: cur });
+      diff = 0;
+    }
+
     let hasAccess = true;
 
     if (priviledgeLevel && userObj) {

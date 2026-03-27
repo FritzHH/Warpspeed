@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, FlatList, Text, TouchableOpacity } from "react-native-web";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
@@ -17,6 +17,7 @@ import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
   Button,
   Button_,
+  Image_,
   ScreenModal,
   StaleBanner,
   TouchableOpacity_,
@@ -70,6 +71,7 @@ export function InventoryComponent({}) {
   const [sMenuPath, _setMenuPath] = useState([]);
   const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
   const [sCustomItemModal, _setCustomItemModal] = useState(null); // "labor" | "part" | null
+  const barcodeModalTimerRef = useRef(null);
 
   // Timeout to batch all store updates and reduce re-renders
   useEffect(() => {
@@ -108,12 +110,16 @@ export function InventoryComponent({}) {
     if (searchTerm.length < 2) return;
     workerSearchInventory(searchTerm, (results) => {
       _setSearchResults(results);
-      // Auto-open create modal when a 12-digit number is entered and not found in inventory
-      if (/^\d{12}$/.test(searchTerm) && results.length === 0) {
-        let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-        newItem.id = generateRandomID();
-        newItem.upc = searchTerm;
-        _setModalItem(newItem);
+      // Auto-open create modal when a 12 or 13-digit barcode is entered and not found
+      if (barcodeModalTimerRef.current) clearTimeout(barcodeModalTimerRef.current);
+      if (/^\d{12,13}$/.test(searchTerm) && results.length === 0) {
+        barcodeModalTimerRef.current = setTimeout(() => {
+          let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
+          newItem.id = generateRandomID();
+          if (searchTerm.length === 12) newItem.upc = searchTerm;
+          else newItem.ean = searchTerm;
+          _setModalItem(newItem);
+        }, 1500);
       }
     });
   };
@@ -143,6 +149,30 @@ export function InventoryComponent({}) {
     let hasItems = items.length > 0;
 
     if (hasChildren) {
+      // Toggle off if clicking the already-active root button
+      if (!buttonObj.parentID && sMenuPath.length > 0 && sMenuPath[0].id === buttonObj.id) {
+        _setCurrentParentID(null);
+        _setMenuPath([]);
+        _setSelectedButtonID(null);
+        _setSearchResults([]);
+        _setSearchTerm("");
+        return;
+      }
+      // Collapse up one level if clicking the active sub-button
+      if (buttonObj.parentID && sMenuPath.some((crumb) => crumb.id === buttonObj.id)) {
+        let idx = sMenuPath.findIndex((crumb) => crumb.id === buttonObj.id);
+        let newPath = sMenuPath.slice(0, idx);
+        if (newPath.length === 0) {
+          _setCurrentParentID(sMenuPath[0].id);
+          _setMenuPath([sMenuPath[0]]);
+        } else {
+          _setCurrentParentID(newPath[newPath.length - 1].id);
+          _setMenuPath(newPath);
+        }
+        _setSelectedButtonID(null);
+        _setSearchResults([]);
+        return;
+      }
       // Button has children — show them as wrapping buttons in right panel
       if (!buttonObj.parentID) {
         // Root button: start a fresh menu path
@@ -164,12 +194,16 @@ export function InventoryComponent({}) {
         _setSearchResults([]);
       }
     } else {
-      // Leaf button (no children) — show its items in FlatList only
-      if (hasItems) {
+      // Leaf button (no children) — toggle selection
+      if (sSelectedButtonID === buttonObj.id) {
+        _setSelectedButtonID(null);
+        _setSearchResults([]);
+      } else {
         _setSelectedButtonID(buttonObj.id);
         _setSearchResults(items);
       }
-      // Do NOT change sCurrentParentID or sMenuPath
+      _setCurrentParentID(null);
+      _setMenuPath([]);
     }
     _setSearchTerm("");
   }
@@ -295,6 +329,11 @@ export function InventoryComponent({}) {
         (b) => b.parentID === sCurrentParentID
       )
     : [];
+  // Prepend the active sub-menu button so the user can press to go up (skip root-level buttons)
+  if (sCurrentParentID) {
+    let activeBtn = (zQuickItemButtons || []).find((b) => b.id === sCurrentParentID);
+    if (activeBtn && activeBtn.parentID) currentChildren = [activeBtn, ...currentChildren];
+  }
 
   // Show loading state until all data is ready and component is ready
   if (!isDataLoaded || !isReady) {
@@ -405,7 +444,7 @@ export function InventoryComponent({}) {
                 <Button_
                   key={item.id}
                   onPress={() => handleQuickButtonPress(item)}
-                  colorGradientArr={isActive ? [] : COLOR_GRADIENTS.blue}
+                  colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "part") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                   buttonStyle={{
                     borderWidth: 1,
                     borderRadius: 5,
@@ -413,9 +452,7 @@ export function InventoryComponent({}) {
                     marginBottom: 10,
                     paddingHorizontal: 2,
                     paddingLeft: 2,
-                    backgroundColor: isActive
-                      ? "rgb(245,166,35)"
-                      : undefined,
+                    backgroundColor: undefined,
                   }}
                   numLines={item.name.length > 17 ? 2 : 1}
                   textStyle={{
@@ -451,29 +488,27 @@ export function InventoryComponent({}) {
               }}
             >
               <Button_
-                onPress={handleBackPress}
-                icon={ICONS.upChevron}
-                iconSize={16}
-                text={"Up"}
+                text={"Home"}
+                icon={ICONS.home}
+                iconSize={14}
+                colorGradientArr={COLOR_GRADIENTS.blue}
+                onPress={() => {
+                  let root = sMenuPath[0];
+                  if (root) {
+                    _setCurrentParentID(root.id);
+                    _setMenuPath([root]);
+                    _setSelectedButtonID(null);
+                    _setSearchResults([]);
+                  }
+                }}
                 buttonStyle={{
                   paddingVertical: 4,
-                  paddingHorizontal: 8,
+                  paddingHorizontal: 10,
                   borderRadius: 5,
-                  borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
                   marginRight: 8,
                 }}
-                textStyle={{ fontSize: 12, color: C.text }}
+                textStyle={{ fontSize: 12 }}
               />
-              <Text
-                style={{
-                  color: gray(0.3),
-                  marginRight: 4,
-                  fontSize: 13,
-                }}
-              >
-                {"..."}
-              </Text>
               {sMenuPath.map((crumb, i) => (
                 <View
                   key={crumb.id}
@@ -527,7 +562,7 @@ export function InventoryComponent({}) {
               }}
             >
               {currentChildren.map((btn) => {
-                let isSelected = sSelectedButtonID === btn.id;
+                let isDrilledInto = btn.id === sCurrentParentID;
                 let hasChildrenBelow = zQuickItemButtons.some(
                   (b) => b.parentID === btn.id
                 );
@@ -535,7 +570,7 @@ export function InventoryComponent({}) {
                   <Button_
                     key={btn.id}
                     onPress={() => handleQuickButtonPress(btn)}
-                    colorGradientArr={isSelected ? [] : COLOR_GRADIENTS.blue}
+                    colorGradientArr={isDrilledInto ? ["rgb(245,166,35)", "rgb(245,166,35)"] : [C.green, C.green]}
                     buttonStyle={{
                       borderWidth: 1,
                       borderRadius: 5,
@@ -544,19 +579,13 @@ export function InventoryComponent({}) {
                       marginBottom: 6,
                       paddingHorizontal: 12,
                       paddingVertical: 8,
-                      backgroundColor: isSelected
-                        ? "rgb(245,166,35)"
-                        : undefined,
                     }}
                     textStyle={{
                       fontSize: getQuickButtonFontSize(btn.name, 13),
                       fontWeight: 400,
-                      color: isSelected ? "white" : C.textWhite,
+                      color: C.textWhite,
                     }}
-                    text={
-                      btn.name.toUpperCase() +
-                      (hasChildrenBelow ? " \u25B6" : "")
-                    }
+                    text={btn.name.toUpperCase() + (isDrilledInto ? " \u25B2" : " \u25B6")}
                   />
                 );
               })}
@@ -570,6 +599,12 @@ export function InventoryComponent({}) {
               flex: 1,
             }}
             data={[...sSearchResults]}
+            ListEmptyComponent={(sCurrentParentID || sSelectedButtonID) ? (
+              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
+                <Image_ icon={ICONS.info} size={40} />
+                <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>
+              </View>
+            ) : null}
             renderItem={({ item, index }) => {
               return (
                 <View

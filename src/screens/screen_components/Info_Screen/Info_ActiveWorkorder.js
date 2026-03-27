@@ -505,11 +505,7 @@ export const ActiveWorkorderComponent = ({}) => {
         paddingBottom: 11,
         paddingTop: 5,
         paddingHorizontal: 5,
-        backgroundColor: zOpenWorkorder?.activeSaleID
-          ? lightenRGBByPercent(C.green, 80)
-          : (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.saleID)
-            ? lightenRGBByPercent(C.red, 60)
-            : (zIsPreview || zIsLocked)
+        backgroundColor: (zIsPreview || zIsLocked)
               ? lightenRGBByPercent(C.lightred, 80)
               : C.backgroundWhite,
         borderRadius: 7,

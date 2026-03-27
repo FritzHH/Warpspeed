@@ -13,6 +13,7 @@ import {
   useAlertScreenStore,
   useCurrentCustomerStore,
   useStripePaymentStore,
+  useTabNamesStore,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
@@ -30,7 +31,7 @@ import {
   resolveStatus,
   usdTypeMask,
 } from "../../../../utils";
-import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, PAYMENT_OBJECT_PROTO, CUSTOMER_DEPOST_TYPES } from "../../../../data";
+import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, PAYMENT_OBJECT_PROTO, CUSTOMER_DEPOST_TYPES, TAB_NAMES } from "../../../../data";
 import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer } from "../../../../db_calls_wrapper";
 import {
   createNewSale,
@@ -55,7 +56,7 @@ import { SaleHeader } from "./SaleHeader";
 import { CashPayment } from "./CashPayment";
 import { CardPayment } from "./CardPayment";
 import { CardReaderPayment } from "./CardReaderPayment";
-import { SaleTotals } from "./SaleTotals";
+import { SaleTotals, PaymentStatus } from "./SaleTotals";
 import { PaymentsList } from "./PaymentsList";
 import { WorkorderCombiner } from "./WorkorderCombiner";
 import { InventorySearch } from "./InventorySearch";
@@ -110,13 +111,13 @@ function broadcastSaleToDisplay(sale, combinedWOs, addedItems, customerFirst, cu
   });
 }
 
-function SplitDepositModal({ payment, onConfirm, onRemove, onClose }) {
+function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose }) {
   const [sAmount, _sSetAmount] = useState("");
   const [sAmountCents, _sSetAmountCents] = useState(0);
 
-  let maxAmount = payment.amountCaptured;
+  let maxAmount = maxAvailable || payment.amountCaptured;
   let isValid = sAmountCents > 0 && sAmountCents <= maxAmount;
-  let isUnchanged = sAmountCents === maxAmount;
+  let isUnchanged = sAmountCents === payment.amountCaptured;
   let typeLabel = payment.depositType === "credit" ? "Credit" : "Deposit";
 
   return (
@@ -145,14 +146,14 @@ function SplitDepositModal({ payment, onConfirm, onRemove, onClose }) {
         </Text>
 
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-          <Text style={{ fontSize: 12, color: gray(0.5) }}>Currently applied</Text>
-          <Text style={{ fontSize: 12, color: gray(0.5) }}>{formatCurrencyDisp(maxAmount, true)}</Text>
+          <Text style={{ fontSize: 12, color: C.green }}>Currently applied</Text>
+          <Text style={{ fontSize: 12, color: C.green }}>{formatCurrencyDisp(payment.amountCaptured, true)}</Text>
         </View>
 
-        {payment.depositOriginalAmount && payment.depositOriginalAmount !== maxAmount && (
+        {maxAmount !== payment.amountCaptured && (
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-            <Text style={{ fontSize: 12, color: gray(0.4) }}>Original deposit</Text>
-            <Text style={{ fontSize: 12, color: gray(0.4) }}>{formatCurrencyDisp(payment.depositOriginalAmount, true)}</Text>
+            <Text style={{ fontSize: 12, color: gray(0.4) }}>Full amount available</Text>
+            <Text style={{ fontSize: 12, color: gray(0.4) }}>{formatCurrencyDisp(maxAmount, true)}</Text>
           </View>
         )}
 
@@ -189,13 +190,13 @@ function SplitDepositModal({ payment, onConfirm, onRemove, onClose }) {
 
         {isValid && !isUnchanged && (
           <Text style={{ fontSize: 11, color: gray(0.5), marginBottom: 8 }}>
-            {formatCurrencyDisp(maxAmount - sAmountCents, true) + " will be returned to customer"}
+            {formatCurrencyDisp(maxAmount - sAmountCents, true) + " remainder available for future use"}
           </Text>
         )}
 
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
           <Button_
-            text="Remove All"
+            text="Remove"
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 12 }}
             buttonStyle={{ height: 32, borderRadius: 6, paddingHorizontal: 10 }}
@@ -259,7 +260,7 @@ export function NewCheckoutModalScreen() {
   let isDepositMode = !!zDepositInfo;
   let isStandalone = !zOpenWorkorder;
   let saleComplete = sSale?.paymentComplete || false;
-  let amountLeftToPay = (sSale?.total || 0) - (sSale?.amountCaptured || 0);
+  let amountLeftToPay = Math.round((sSale?.total || 0) - (sSale?.amountCaptured || 0));
   if (amountLeftToPay < 0) amountLeftToPay = 0;
   let cashAmountLeftToPay = amountLeftToPay - sCardProcessingAmount;
   if (cashAmountLeftToPay < 0) cashAmountLeftToPay = 0;
@@ -683,12 +684,12 @@ export function NewCheckoutModalScreen() {
       _setSplitDepositPayment(null);
       return;
     }
-    if (newAmountCents >= payment.amountCaptured) {
+    if (newAmountCents === payment.amountCaptured) {
       _setSplitDepositPayment(null);
       return;
     }
 
-    let difference = payment.amountCaptured - newAmountCents;
+    let difference = payment.amountCaptured - newAmountCents; // positive = decrease, negative = increase
 
     // Update the payment in the sale
     let sale = cloneDeep(sSale);
@@ -702,6 +703,41 @@ export function NewCheckoutModalScreen() {
     sale.amountCaptured = sale.amountCaptured - difference;
     _setSale(sale);
     newCheckoutSaveActiveSale(sale);
+
+    // Update customer deposits: positive difference = restore, negative = consume more
+    let customerDeposits = cloneDeep(zCustomer?.deposits || []);
+    let existing = customerDeposits.find((d) => d.id === payment.depositId);
+    if (difference > 0) {
+      // Decreasing applied amount — restore difference to customer
+      if (existing) {
+        existing.amountCents = existing.amountCents + difference;
+      } else {
+        customerDeposits.push({
+          id: payment.depositId,
+          type: payment.depositType,
+          amountCents: difference,
+          millis: payment.millis,
+          note: payment.depositNote || "",
+          saleID: payment.depositSaleID || "",
+          cash: payment.depositCash || false,
+          last4: payment.last4 || "",
+          cardType: payment.cardType || "",
+          cardIssuer: payment.cardIssuer || "",
+        });
+      }
+    } else if (difference < 0) {
+      // Increasing applied amount — consume more from customer deposit
+      let consume = Math.abs(difference);
+      if (existing) {
+        existing.amountCents = Math.max(0, existing.amountCents - consume);
+        if (existing.amountCents <= 0) {
+          customerDeposits = customerDeposits.filter((d) => d.id !== payment.depositId);
+        }
+      }
+    }
+    let updatedCustomer = { ...zCustomer, deposits: customerDeposits };
+    useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+    dbSaveCustomer(updatedCustomer);
 
     _setSplitDepositPayment(null);
   }
@@ -866,6 +902,8 @@ export function NewCheckoutModalScreen() {
       for (let wo of sCombinedWorkorders) {
         useOpenWorkordersStore.getState().removeWorkorder(wo, false);
       }
+      useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
+      useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
       return;
     }
 
@@ -908,6 +946,8 @@ export function NewCheckoutModalScreen() {
       await newCheckoutCompleteWorkorder(woToComplete);
       useOpenWorkordersStore.getState().removeWorkorder(woToComplete, false); // remove from local store, don't send DB delete (already archived)
     }
+    useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
+    useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
 
     // Save completed sale to Cloud Storage
     await newCheckoutCompleteSale(sale);
@@ -1098,6 +1138,7 @@ export function NewCheckoutModalScreen() {
 
     useAlertScreenStore.getState().setValues({
       showAlert: true,
+      fullScreen: true,
       title: "Partial Payment",
       message:
         "Close this sale with a remaining balance of $" +
@@ -1501,6 +1542,7 @@ export function NewCheckoutModalScreen() {
             <View
               style={{
                 width: "29%",
+                flex: 1,
                 paddingLeft: 10,
               }}
             >
@@ -1646,35 +1688,49 @@ export function NewCheckoutModalScreen() {
                 settings={zSettings}
               />
 
-              {/* Blue container — fills remaining space */}
+                    {/* Payments container */}
               <View
                 style={{
-                  flex: 1,
-                  // backgroundColor: "blue",
-                  // borderRadius: 15,
-                  marginTop: 3,
+                        flexShrink: 1,
                 }}
               >
-
-                <PaymentsList
-                  payments={sSale?.payments}
+                <ScrollView style={{ flexShrink: 1 }}>
+                      <PaymentsList
+                        payments={sSale?.payments}
                   onRefund={(payment) => { _setRefundPayment(payment); _setShowRefundModal(true); }}
                   onPrintReceipt={handlePrintReceipt}
                   onPrintDepositReceipt={handlePrintDepositReceipt}
                   onRemoveDeposit={!saleComplete ? (payment) => _setSplitDepositPayment(payment) : null}
                 />
+                </ScrollView>
 
-                {!!sSplitDepositPayment && (
-                  <SplitDepositModal
-                    payment={sSplitDepositPayment}
-                    onConfirm={(cents) => handleSplitDeposit(sSplitDepositPayment, cents)}
-                    onRemove={() => { handleRemoveDeposit(sSplitDepositPayment); _setSplitDepositPayment(null); }}
-                    onClose={() => _setSplitDepositPayment(null)}
-                  />
-                )}
+                      {!!sSplitDepositPayment && (() => {
+                        let customerRemaining = (zCustomer?.deposits || [])
+                          .filter((d) => d.id === sSplitDepositPayment.depositId)
+                          .reduce((sum, d) => sum + (d.amountCents || 0), 0);
+                        let totalDeposit = customerRemaining + sSplitDepositPayment.amountCaptured;
+                        let originalAmount = sSplitDepositPayment.depositOriginalAmount || totalDeposit;
+                        let saleRemaining = (sSale?.total || 0) - (sSale?.amountCaptured || 0) + sSplitDepositPayment.amountCaptured;
+                        let maxAvailable = Math.min(totalDeposit, originalAmount, saleRemaining);
+                        return (
+                          <SplitDepositModal
+                            payment={sSplitDepositPayment}
+                            maxAvailable={maxAvailable}
+                            onConfirm={(cents) => handleSplitDeposit(sSplitDepositPayment, cents)}
+                            onRemove={() => { handleRemoveDeposit(sSplitDepositPayment); _setSplitDepositPayment(null); }}
+                            onClose={() => _setSplitDepositPayment(null)}
+                          />
+                        );
+                      })()}
+
+                      <PaymentStatus
+                        sale={sSale}
+                        amountRemaining={Math.max(0, (sSale?.total || 0) - (sSale?.amountCaptured || 0))}
+                      />
 
               </View>
 
+              <View style={{ flex: 1 }} />
 
               {/* Bottom Buttons: Cancel/Close + Reprint */}
               <View

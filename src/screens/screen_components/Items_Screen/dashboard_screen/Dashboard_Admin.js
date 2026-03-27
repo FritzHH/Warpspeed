@@ -792,58 +792,78 @@ export function Dashboard_Admin({}) {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={async () => {
-                const WO_ID = "049366289294";
+                const WO_IDS = ["1000000000245", "1000000000252"];
                 try {
                   const settings = useSettingsStore.getState().getSettings();
                   const { tenantID, storeID } = settings;
                   if (!tenantID || !storeID) { log("Revert: missing tenantID/storeID"); return; }
 
                   const basePath = `tenants/${tenantID}/stores/${storeID}`;
+                  let results = [];
 
-                  // 1. Find the workorder — check open-workorders first, then completed-workorders
-                  let wo = null;
-                  let wasCompleted = false;
-                  const openPath = `${basePath}/open-workorders/${WO_ID}`;
-                  wo = await firestoreRead(openPath);
-                  if (!wo) {
-                    const completedPath = `${basePath}/completed-workorders/${WO_ID}`;
-                    wo = await firestoreRead(completedPath);
-                    if (wo) wasCompleted = true;
+                  for (let WO_ID of WO_IDS) {
+                    // 1. Find the workorder — check open-workorders first, then completed-workorders
+                    let wo = null;
+                    let wasCompleted = false;
+                    const openPath = `${basePath}/open-workorders/${WO_ID}`;
+                    wo = await firestoreRead(openPath);
+                    if (!wo) {
+                      const completedPath = `${basePath}/completed-workorders/${WO_ID}`;
+                      wo = await firestoreRead(completedPath);
+                      if (wo) wasCompleted = true;
+                    }
+                    if (!wo) {
+                      results.push(WO_ID + ": not found");
+                      continue;
+                    }
+
+                    // 2. Collect all sale IDs from the workorder
+                    let saleIDs = [wo.activeSaleID, wo.saleID].filter(Boolean);
+                    let uniqueSaleIDs = [...new Set(saleIDs)];
+
+                    // 3. For each sale, delete the sale + its index + any refund indexes
+                    for (let sid of uniqueSaleIDs) {
+                      // Read the sale to find refund IDs
+                      let sale = await firestoreRead(`${basePath}/active-sales/${sid}`).catch(() => null);
+                      if (!sale) sale = await firestoreRead(`${basePath}/completed-sales/${sid}`).catch(() => null);
+                      if (sale) {
+                        // Delete refund index entries
+                        for (let refund of (sale.refunds || [])) {
+                          if (refund.id) await firestoreDelete(`${basePath}/sales-index/${refund.id}`).catch(() => {});
+                        }
+                      }
+                      // Delete sale from active + completed
+                      await firestoreDelete(`${basePath}/active-sales/${sid}`).catch(() => {});
+                      await firestoreDelete(`${basePath}/completed-sales/${sid}`).catch(() => {});
+                      // Delete sale index entry
+                      await firestoreDelete(`${basePath}/sales-index/${sid}`).catch(() => {});
+                    }
+
+                    // 4. Strip all payment/sale fields from workorder
+                    wo.paymentComplete = false;
+                    wo.amountPaid = 0;
+                    wo.amountPaidNonDeposit = 0;
+                    wo.activeSaleID = "";
+                    wo.saleID = "";
+                    wo.endedOnMillis = "";
+                    wo.status = "finished";
+                    wo.changeLog = (wo.changeLog || []).filter((e) => e.field !== "payment");
+
+                    // 5. Write clean workorder to open-workorders
+                    await firestoreWrite(openPath, wo);
+
+                    // 6. Delete from completed-workorders if it was there
+                    if (wasCompleted) {
+                      await firestoreDelete(`${basePath}/completed-workorders/${WO_ID}`);
+                    }
+
+                    // 7. Update local Zustand store
+                    useOpenWorkordersStore.getState().setWorkorder(wo, false);
+                    results.push(WO_ID + ": reverted");
                   }
-                  if (!wo) {
-                    log("Revert: workorder not found in open or completed", WO_ID);
-                    useAlertScreenStore.getState().setValues({ title: "Revert Failed", message: "Workorder " + WO_ID + " not found.", btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
-                    return;
-                  }
 
-                  // 2. Delete associated sales (active + completed)
-                  let saleIDs = [wo.activeSaleID, wo.saleID].filter(Boolean);
-                  let uniqueSaleIDs = [...new Set(saleIDs)];
-                  for (let sid of uniqueSaleIDs) {
-                    await firestoreDelete(`${basePath}/active-sales/${sid}`).catch(() => {});
-                    await firestoreDelete(`${basePath}/completed-sales/${sid}`).catch(() => {});
-                  }
-
-                  // 3. Strip payment/sale fields from workorder
-                  wo.paymentComplete = false;
-                  wo.amountPaid = 0;
-                  wo.activeSaleID = "";
-                  wo.saleID = "";
-                  wo.endedOnMillis = "";
-
-                  // 4. Write clean workorder to open-workorders
-                  await firestoreWrite(openPath, wo);
-
-                  // 5. Delete from completed-workorders if it was there
-                  if (wasCompleted) {
-                    await firestoreDelete(`${basePath}/completed-workorders/${WO_ID}`);
-                  }
-
-                  // 6. Update local Zustand store
-                  useOpenWorkordersStore.getState().setWorkorder(wo, false);
-
-                  log("Revert complete for", WO_ID);
-                  useAlertScreenStore.getState().setValues({ title: "Reverted", message: "Workorder " + WO_ID + " reset to fresh state in open-workorders.", btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
+                  log("Revert complete:", results);
+                  useAlertScreenStore.getState().setValues({ title: "Reverted", message: results.join("\n"), btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
                 } catch (e) {
                   log("Revert error:", e);
                   useAlertScreenStore.getState().setValues({ title: "Revert Error", message: e.message, btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
@@ -862,7 +882,7 @@ export function Dashboard_Admin({}) {
               }}
             >
               <Text style={{ fontSize: 13, color: C.red, fontWeight: "700" }}>
-                Revert Sale (049366289294)
+                Revert Sales (245 + 252)
               </Text>
             </TouchableOpacity>
           </>)}

@@ -325,7 +325,7 @@ export const useAlertScreenStore = create((set, get) => ({
   canExitOnOuterClick: true,
   pauseOnBaseComponent: false,
   useCancelButton: false,
-  fullScreen: false,
+  fullScreen: true,
 
   getPauseOnBaseComponent: () => get().pauseOnBaseComponent,
   getMessage: () => get().message,
@@ -457,7 +457,7 @@ export const useAlertScreenStore = create((set, get) => ({
       canExitOnOuterClick: true,
       pauseOnBaseComponent: false,
       useCancelButton: false,
-      fullScreen: false,
+      fullScreen: true,
     }));
   },
 }));

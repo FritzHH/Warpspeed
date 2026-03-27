@@ -123,14 +123,14 @@ export function calculateSaleTotals(combinedWorkorders, addedItems, settings) {
   let grandTotal = totalBeforeCardFee + cardFee;
 
   return {
-    subtotal: totalSubtotal,
-    discount: totalDiscount,
-    discountedTotal,
+    subtotal: Math.round(totalSubtotal),
+    discount: Math.round(totalDiscount),
+    discountedTotal: Math.round(discountedTotal),
     tax,
     cardFee,
     cardFeePercent: settings?.useCardFee ? settings.cardFeePercent : 0,
     salesTaxPercent,
-    total: grandTotal,
+    total: Math.round(grandTotal),
     qty: totalQty,
   };
 }

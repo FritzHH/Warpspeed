@@ -222,7 +222,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
     if (showAlert) {
       _setAnimation("fade"); // Fade in when opening
     } else {
-      _setAnimation("slide"); // Slide out when closing
+      _setAnimation("fade"); // Slide out when closing
     }
   }, [showAlert]);
 
@@ -237,34 +237,21 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
       <Modal animationType={sAnimation} visible={showAlert} transparent>
         <View
           style={{
-            // backgroundColor: "rgba(0, 0, 0, 0.8)",
-            // back
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
             alignItems: "center",
             justifyContent: "center",
-            alignSelf: "center",
-            justifySelf: "center",
             width: "100%",
             height: "100%",
           }}
         >
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              minWidth: zFullScreen ? "100%" : "40%",
-              minHeight: zFullScreen ? "100%" : "40%",
-              backgroundColor: "rgba(0, 0, 0, 0.4)",
-              borderRadius: zFullScreen ? 0 : 15,
-            }}
-          >
             <View
               style={{
                 backgroundColor: C.backgroundWhite,
                 borderRadius: 15,
                 alignItems: "center",
                 justifyContent: "space-around",
-                minWidth: zFullScreen ? "32%" : "80%",
-                minHeight: zFullScreen ? "24%" : "60%",
+              minWidth: "32%",
+              minHeight: "24%",
                 ...zAlertBoxStyle,
               }}
             >
@@ -374,7 +361,6 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                     }}
                   />
                 )}
-              </View>
             </View>
           </View>
         </View>
@@ -481,7 +467,7 @@ export const ScreenModal = ({
     if (isVisible) {
       _setAnimation("fade"); // Fade in when opening
     } else {
-      _setAnimation("slide"); // Slide out when closing
+      _setAnimation("fade"); // Slide out when closing
     }
   }, [modalVisible, sInternalModalShow]);
 

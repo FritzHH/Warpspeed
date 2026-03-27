@@ -472,7 +472,25 @@ var printBuilder = {
     receipt = Object.assign({}, receipt, sale);
     receipt.barcode = sale.id;
     receipt.receiptType = RECEIPT_TYPES.sales;
-    receipt.payments = payments;
+    receipt.payments = (payments || []).map(function (p) {
+      var type = p.cash ? "Cash" : p.check ? "Check" : p.isDeposit ? "Deposit" : "Card";
+      return Object.assign({}, p, { paymentType: type });
+    });
+    receipt.paymentMethod = (function () {
+      var types = [];
+      var hasCard = false, hasCash = false, hasCheck = false, hasDeposit = false;
+      (payments || []).forEach(function (p) {
+        if (p.cash) hasCash = true;
+        else if (p.check) hasCheck = true;
+        else if (p.isDeposit) hasDeposit = true;
+        else hasCard = true;
+      });
+      if (hasCash) types.push("Cash");
+      if (hasCard) types.push("Card");
+      if (hasCheck) types.push("Check");
+      if (hasDeposit) types.push("Deposit");
+      return types.join(" / ") || "None";
+    })();
     receipt.popCashRegister = (payments || []).some(function (p) {
       return p.cash && p.amountTendered > p.amountCaptured;
     });

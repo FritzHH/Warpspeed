@@ -55,7 +55,7 @@ export function InventoryComponent({}) {
     return id ? state.workorders.find((o) => o.id === id) : null;
   });
   const zStatuses = useSettingsStore((state) => state.settings?.statuses);
-  const isInventoryLocked = !!zOpenWorkorder?.activeSaleID ||
+  const isInventoryLocked =
     resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
 
   // Check if all required data is loaded
@@ -212,7 +212,6 @@ export function InventoryComponent({}) {
     if (openWorkorder) {
       const statuses = useSettingsStore.getState().settings?.statuses;
       if (resolveStatus(openWorkorder.status, statuses)?.label?.toLowerCase() === "done & paid") return;
-      if (openWorkorder.activeSaleID) return;
     }
     if (!openWorkorder) {
       console.log("  -> no open workorder, opening modal, sModalItem was:", sModalItem?.id);
@@ -272,7 +271,6 @@ export function InventoryComponent({}) {
   function handleCustomItemSave(lineItem) {
     const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
     if (!openWorkorder) return;
-    if (openWorkorder.activeSaleID) return;
     useLoginStore.getState().requireLogin(() => {
       let workorderLines = openWorkorder.workorderLines || [];
       workorderLines = [...workorderLines, lineItem];

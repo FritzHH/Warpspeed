@@ -1,15 +1,18 @@
 
 
-curl https://api.stripe.com/v1/terminal/readers -u "YOUR_STRIPE_SECRET_KEY"  -d "registration_code=simulated-wpe" -d "label=Simulated Reader" -d "location=tml_GcCW7wAKXh6PX8"
-
-curl -X POST https://api.stripe.com/v1/test_helpers/terminal/readers/tmr_GcDlgAztNKl8gV/present_payment_method  -u "YOUR_STRIPE_SECRET_KEY"
+curl -X POST https://api.stripe.com/v1/test_helpers/terminal/readers/tmr_GcDlgAztNKl8gV/present_payment_method  -u "sk_test_51RRLB9QIJQpcXP9d9mOGCLlZruXWYHFS9C3JDbOl1h7UdXRyYwavFy0B6NgO6e9OT8JyQlhmBsQBGlWzE5rgA8uL00KecfPx8d"
 
 BonitaBikes.1236
 
+- more information on credit card receipt, look at lightspeed
+-
 
-i see a lot of blinking items on the checkout screen when i make a changes to the workorder or tax free or other items. seems to be a re-rendering issue in a lot of places. without just being hacky and wrapping everything in useMemo's what can we do to reduce this? most likely a zustand issue.
 
 
 
-now go to the customer screen and add a color-matched refund button to the top right corner of the deposits/credits cards. 
+if there are no deposits or credits on file show the deposits/credits container but instead of having contents, it is an info graphic saying no deposits/credits on file
+
+
+
+
 

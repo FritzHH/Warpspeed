@@ -402,17 +402,6 @@ export function CardReaderPayment({
     _setRequestedAmount(amountLeftToPay);
   }
 
-  if (autoLoadedRef.current && amountLeftToPay !== prevAmountRef.current) {
-    prevAmountRef.current = amountLeftToPay;
-    if (amountLeftToPay > 0) {
-      _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
-      _setRequestedAmount(amountLeftToPay);
-    } else {
-      _setRequestedAmountDisp("");
-      _setRequestedAmount(0);
-    }
-  }
-
   if (!hasOnlineReaders) {
     return (
       <View
@@ -452,40 +441,18 @@ export function CardReaderPayment({
     );
   }
 
-  // ── Success celebration ──
-  let celebrationGif = saleComplete ? ICONS.guyCelebrating : ICONS.popperCelebration;
-
+  // Reset card component after successful payment
   if (zCardStatus === "succeeded") {
-    return (
-      <View
-        style={{
-          alignItems: "center",
-          width: "100%",
-          height: "48%",
-          borderRadius: 15,
-          ...SHADOW_RADIUS_PROTO,
-          justifyContent: "center",
-          paddingHorizontal: 15,
-        }}
-      >
-        <Animated.View
-          style={{
-            alignItems: "center",
-            opacity: successOpacity,
-            transform: [{ scale: successScale }],
-          }}
-        >
-          <Image
-            source={celebrationGif}
-            style={{ width: 100, height: 100, marginBottom: 14, backgroundColor: "transparent" }}
-            resizeMode="contain"
-          />
-          <Text style={{ fontSize: 15, color: C.green, fontWeight: "600", textAlign: "center" }}>
-            {zCardMessage}
-          </Text>
-        </Animated.View>
-      </View>
-    );
+    useStripePaymentStore.getState().setCardStatus("idle");
+    useStripePaymentStore.getState().setCardMessage("");
+    prevAmountRef.current = amountLeftToPay;
+    if (amountLeftToPay > 0) {
+      _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
+      _setRequestedAmount(amountLeftToPay);
+    } else {
+      _setRequestedAmountDisp("");
+      _setRequestedAmount(0);
+    }
   }
 
   let startDisabled = !isEnabled
@@ -516,8 +483,9 @@ export function CardReaderPayment({
         style={{
           flexDirection: "row",
           alignItems: "center",
-          width: "90%",
+          width: "100%",
           justifyContent: "space-between",
+          paddingHorizontal: 30,
         }}
       >
         <Text style={{ fontSize: 16, color: gray(0.6), fontWeight: 500 }}>
@@ -540,8 +508,9 @@ export function CardReaderPayment({
               borderWidth: 1,
               borderColor: C.buttonLightGreenOutline,
               backgroundColor: C.listItemWhite,
+              // width: 150
             }}
-            buttonTextStyle={{ fontSize: 11 }}
+            buttonTextStyle={{ fontSize: 11, width: '100%' }}
           />
         </View>
       </View>
@@ -553,43 +522,57 @@ export function CardReaderPayment({
       )}
 
       {/* Payment Amount Input */}
-      <View
-        style={{
-          borderColor: C.buttonLightGreenOutline,
-          borderRadius: 10,
-          borderWidth: 2,
-          backgroundColor: C.listItemWhite,
-          paddingVertical: 10,
-          paddingHorizontal: 10,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingBottom: 6,
-          paddingRight: 7,
-          marginTop: 5,
-        }}
-      >
-        <Text style={{ fontSize: 15 }}>$</Text>
-        <View style={{ width: 100, alignItems: "flex-end", paddingRight: 5 }}>
-          <TextInput
-            onFocus={() => {
-              _setFocused("amount");
-              _setRequestedAmountDisp("");
-              _setRequestedAmount(0);
+      <View style={{ marginTop: 5 }}>
+        <View
+          style={{
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 10,
+            borderWidth: 2,
+            backgroundColor: C.listItemWhite,
+            paddingVertical: 10,
+            paddingHorizontal: 10,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingBottom: 6,
+            paddingRight: 7,
+          }}
+        >
+          <Text style={{ fontSize: 15 }}>$</Text>
+          <View style={{ width: 100, alignItems: "flex-end", paddingRight: 5 }}>
+            <TextInput
+              onFocus={() => {
+                _setFocused("amount");
+                _setRequestedAmountDisp("");
+                _setRequestedAmount(0);
+              }}
+              style={{
+                fontSize: 20,
+                outlineWidth: 0,
+                outlineStyle: "none",
+                color: C.text,
+                paddingRight: 2,
+                textAlign: "right",
+              }}
+              placeholder="0.00"
+              placeholderTextColor={gray(0.3)}
+              value={sRequestedAmountDisp}
+              onChangeText={handleAmountChange}
+              editable={isEnabled}
+            />
+          </View>
+        </View>
+        <View style={{ alignItems: "flex-end", marginTop: 3 }}>
+          <Button_
+            text="MAX"
+            onPress={() => {
+              _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
+              _setRequestedAmount(amountLeftToPay);
             }}
-            style={{
-              fontSize: 20,
-              outlineWidth: 0,
-              outlineStyle: "none",
-              color: C.text,
-              paddingRight: 2,
-              textAlign: "right",
-            }}
-            placeholder="0.00"
-            placeholderTextColor={gray(0.3)}
-            value={sRequestedAmountDisp}
-            onChangeText={handleAmountChange}
-            editable={isEnabled}
+            enabled={isEnabled}
+            colorGradientArr={COLOR_GRADIENTS.green}
+            textStyle={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}
+            buttonStyle={{ height: 20, paddingHorizontal: 8, borderRadius: 4 }}
           />
         </View>
       </View>

@@ -63,11 +63,7 @@ function Divider() {
   );
 }
 
-export function SaleTotals({
-  sale,
-  cashChangeNeeded,
-  settings,
-}) {
+export function PaymentStatus({ sale, amountRemaining }) {
   const successScale = useRef(new Animated.Value(0)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
   const successPulse = useRef(new Animated.Value(1)).current;
@@ -89,6 +85,75 @@ export function SaleTotals({
       ).start();
     });
   }
+
+  return (
+    <View
+      style={{
+        width: "100%",
+        alignItems: "flex-end",
+        marginTop: 15,
+      }}
+    >
+      {/* Amount Paid */}
+      {sale.amountCaptured > 0 && !sale.paymentComplete && (
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: 500,
+            color: gray(0.6),
+          }}
+        >
+          {"AMOUNT PAID:   $" + formatCurrencyDisp(sale.amountCaptured)}
+        </Text>
+      )}
+
+      {/* Amount Remaining */}
+      {amountRemaining > 0 && (
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: 500,
+            color: C.green,
+          }}
+        >
+          {"AMOUNT LEFT TO PAY:   $" + formatCurrencyDisp(amountRemaining)}
+        </Text>
+      )}
+
+      {/* Sale Complete */}
+      {sale.paymentComplete && (
+        <Animated.View
+          style={{
+            backgroundColor: C.green,
+            borderRadius: 10,
+            paddingVertical: 8,
+            paddingHorizontal: 20,
+            opacity: successOpacity,
+            transform: [{ scale: Animated.multiply(successScale, successPulse) }],
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "700",
+              color: C.textWhite,
+              textAlign: "center",
+            }}
+          >
+            PAYMENT COMPLETE
+          </Text>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+export function SaleTotals({
+  sale,
+  cashChangeNeeded,
+  settings,
+}) {
+  if (!sale) return null;
 
   let hasDiscount = (sale.discount || 0) > 0;
   let hasCardFee = (sale.cardFee || 0) > 0;
@@ -156,65 +221,6 @@ export function SaleTotals({
         />
       </View>
 
-      {/* Status Info (outside the box, right-aligned) */}
-      <View
-        style={{
-          width: "100%",
-          alignItems: "flex-end",
-          marginTop: 15,
-        }}
-      >
-        {/* Amount Paid */}
-        {sale.amountCaptured > 0 && !sale.paymentComplete && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: gray(0.6),
-            }}
-          >
-            {"AMOUNT PAID:   $" + formatCurrencyDisp(sale.amountCaptured)}
-          </Text>
-        )}
-
-        {/* Amount Remaining */}
-        {amountRemaining > 0 && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: C.green,
-            }}
-          >
-            {"AMOUNT LEFT TO PAY:   $" + formatCurrencyDisp(amountRemaining)}
-          </Text>
-        )}
-
-        {/* Sale Complete */}
-        {sale.paymentComplete && (
-          <Animated.View
-            style={{
-              backgroundColor: C.green,
-              borderRadius: 10,
-              paddingVertical: 8,
-              paddingHorizontal: 20,
-              opacity: successOpacity,
-              transform: [{ scale: Animated.multiply(successScale, successPulse) }],
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "700",
-                color: C.textWhite,
-                textAlign: "center",
-              }}
-            >
-              PAYMENT COMPLETE
-            </Text>
-          </Animated.View>
-        )}
-      </View>
 
       {/* Cash Change */}
       {cashChangeNeeded > 0 && (

@@ -1,0 +1,3 @@
+@echo off
+curl -X POST https://api.stripe.com/v1/test_helpers/terminal/readers/tmr_GcDlgAztNKl8gV/present_payment_method -u "sk_test_51RRLB9QIJQpcXP9d9mOGCLlZruXWYHFS9C3JDbOl1h7UdXRyYwavFy0B6NgO6e9OT8JyQlhmBsQBGlWzE5rgA8uL00KecfPx8d:BonitaBikes.1236"
+pause

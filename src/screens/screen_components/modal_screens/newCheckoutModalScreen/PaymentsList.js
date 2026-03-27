@@ -101,10 +101,7 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
           }}
         >
           <Text style={{ color: gray(0.4), fontSize: 13 }}>
-            {(payment.cardType || payment.cardIssuer || "").split(" ")[0]}
-          </Text>
-          <Text style={{ color: gray(0.4), fontSize: 13 }}>
-            {"***" + payment.last4}
+            {(payment.cardType || payment.cardIssuer || "").split(" ")[0].toUpperCase() + "  ***" + payment.last4}
           </Text>
           {payment.expMonth && (
             <Text style={{ color: gray(0.4), fontSize: 13 }}>
@@ -177,16 +174,14 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
 
 export function PaymentsList({ payments = [], onRefund, onPrintReceipt, onPrintDepositReceipt, onRemoveDeposit }) {
   if (!payments || payments.length === 0) return null;
-
   return (
     <View
       style={{
-        marginTop: 15,
+        marginTop: 10,
         alignItems: "center",
         width: "100%",
       }}
     >
-      <Text style={{ color: C.green }}>PAYMENTS</Text>
       <View style={{ width: "100%" }}>
         {payments.map((payment, idx) => (
           <PaymentRow

@@ -70,8 +70,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
-  const hasActiveSale = !!zOpenWorkorder?.activeSaleID;
-  const isLocked = isDonePaid || hasActiveSale;
+  const isLocked = isDonePaid;
 
   ///////////////////////////////////////////////////////////////////////////
   const [sTotalDiscount, _setTotalDiscount] = useState("");
@@ -653,15 +652,17 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
-        <Button_
-          ref={checkoutBtnRef}
-          textStyle={{ color: C.textWhite, fontSize: 16 }}
-          icon={ICONS.shoppingCart}
-          iconSize={34}
-          enabled={!isDonePaid}
-          buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
-          onPress={() => useLoginStore.getState().requireLogin(() => useCheckoutStore.getState().setIsCheckingOut(true))}
-        />
+        <Tooltip text="Check out workorder" position="top">
+          <Button_
+            ref={checkoutBtnRef}
+            textStyle={{ color: C.textWhite, fontSize: 16 }}
+            icon={ICONS.shoppingCart}
+            iconSize={34}
+            enabled={!isDonePaid}
+            buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
+            onPress={() => useLoginStore.getState().requireLogin(() => useCheckoutStore.getState().setIsCheckingOut(true))}
+          />
+        </Tooltip>
       </View>
       {sEditingCustomLine && (
         <CustomItemModal

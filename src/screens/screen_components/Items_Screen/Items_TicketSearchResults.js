@@ -60,7 +60,7 @@ export function Items_TicketSearchResults({}) {
 
   function renderWorkorderCard(item) {
     let wo = item.data;
-    let isPaid = wo.paymentComplete || (wo.sales && wo.sales.length > 0);
+    let isPaid = wo.paymentComplete || !!wo.saleID;
     return (
       <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
         <View style={{ flex: 1 }}>

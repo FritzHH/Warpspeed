@@ -105,6 +105,7 @@ export function RefundItemSelector({
   onClearItems,
   previouslyRefundedIDs = [],
   disabledItemIDs = new Set(),
+  hasPaymentSelection = false,
 }) {
   function isItemSelected(line) {
     return selectedItems.some((s) => s.id === line.id);
@@ -128,15 +129,22 @@ export function RefundItemSelector({
           borderBottomColor: gray(0.1),
         }}
       >
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: Fonts.weight.textHeavy,
-            color: C.text,
-          }}
-        >
-          SELECT ITEMS TO REFUND
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.text,
+            }}
+          >
+            SELECT ITEMS TO REFUND
+          </Text>
+          {hasPaymentSelection && (
+            <Text style={{ fontSize: 11, color: C.orange, fontWeight: Fonts.weight.textHeavy }}>
+              UNCHECK ALL PAYMENTS TO SELECT ITEMS
+            </Text>
+          )}
+        </View>
         <Button_
           text="CLEAR LIST"
           onPress={onClearItems}
@@ -182,7 +190,7 @@ export function RefundItemSelector({
                 }
                 isSelected={isItemSelected(line)}
                 isRefunded={isItemRefunded(line)}
-                isDisabled={disabledItemIDs.has(line.id)}
+                isDisabled={hasPaymentSelection || disabledItemIDs.has(line.id)}
                 onToggle={onToggleItem}
               />
             ))}

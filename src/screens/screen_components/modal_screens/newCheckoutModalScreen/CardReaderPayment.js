@@ -1,8 +1,8 @@
 /* eslint-disable */
-import { View, Text, TextInput, Animated } from "react-native-web";
+import { View, Text, TextInput, Animated, Image } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import { Button_, DropdownMenu, SHADOW_RADIUS_PROTO, SmallLoadingIndicator, Tooltip } from "../../../../components";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   usdTypeMask,
   formatCurrencyDisp,
@@ -126,7 +126,6 @@ export function CardReaderPayment({
 
   const successScale = useRef(new Animated.Value(0)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
-  const successPulse = useRef(new Animated.Value(1)).current;
   const successAnimStarted = useRef(false);
 
   const autoLoadedRef = useRef(false);
@@ -372,22 +371,14 @@ export function CardReaderPayment({
   if (zCardStatus === "succeeded" && !successAnimStarted.current) {
     successAnimStarted.current = true;
     Animated.parallel([
-      Animated.spring(successScale, { toValue: 1, friction: 4, tension: 80, useNativeDriver: false }),
-      Animated.timing(successOpacity, { toValue: 1, duration: 300, useNativeDriver: false }),
-    ]).start(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(successPulse, { toValue: 1.06, duration: 800, useNativeDriver: false }),
-          Animated.timing(successPulse, { toValue: 1, duration: 800, useNativeDriver: false }),
-        ])
-      ).start();
-    });
+      Animated.spring(successScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: false }),
+      Animated.timing(successOpacity, { toValue: 1, duration: 350, useNativeDriver: false }),
+    ]).start();
   }
   if (zCardStatus !== "succeeded" && successAnimStarted.current) {
     successAnimStarted.current = false;
     successScale.setValue(0);
     successOpacity.setValue(0);
-    successPulse.setValue(1);
   }
 
   // ── Derived values ──
@@ -461,6 +452,42 @@ export function CardReaderPayment({
     );
   }
 
+  // ── Success celebration ──
+  let celebrationGif = saleComplete ? ICONS.guyCelebrating : ICONS.popperCelebration;
+
+  if (zCardStatus === "succeeded") {
+    return (
+      <View
+        style={{
+          alignItems: "center",
+          width: "100%",
+          height: "48%",
+          borderRadius: 15,
+          ...SHADOW_RADIUS_PROTO,
+          justifyContent: "center",
+          paddingHorizontal: 15,
+        }}
+      >
+        <Animated.View
+          style={{
+            alignItems: "center",
+            opacity: successOpacity,
+            transform: [{ scale: successScale }],
+          }}
+        >
+          <Image
+            source={celebrationGif}
+            style={{ width: 100, height: 100, marginBottom: 14, backgroundColor: "transparent" }}
+            resizeMode="contain"
+          />
+          <Text style={{ fontSize: 15, color: C.green, fontWeight: "600", textAlign: "center" }}>
+            {zCardMessage}
+          </Text>
+        </Animated.View>
+      </View>
+    );
+  }
+
   let startDisabled = !isEnabled
     || sRequestedAmount < 50
     || zCardStatus === "initiating"
@@ -496,7 +523,7 @@ export function CardReaderPayment({
         <Text style={{ fontSize: 25, color: gray(0.6), fontWeight: 500 }}>
           CARD SALE
         </Text>
-        <View style={{ width: "45%" }}>
+        <View style={{ flex: 1, alignItems: "center" }}>
           <DropdownMenu
             dataArr={readerDropdownData}
             onSelect={handleReaderSelect}
@@ -568,56 +595,25 @@ export function CardReaderPayment({
       </View>
 
       {/* Status Messages */}
-      <View style={{ alignItems: "center", justifyContent: "center" }}>
+      <View style={{ alignItems: "center", justifyContent: "center", minHeight: 30 }}>
         {isProcessing && (
-          <SmallLoadingIndicator color={C.green} text="" message="" containerStyle={{ padding: 2 }} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <SmallLoadingIndicator color={C.green} text="" message="" containerStyle={{ padding: 2 }} />
+            {!!zCardMessage && (
+              <Text style={{ fontSize: 13, color: gray(0.5), fontWeight: "600" }}>{zCardMessage}</Text>
+            )}
+          </View>
         )}
-        {zCardError ? (
-          <View
-            style={{
-              backgroundColor: "rgba(220,50,50,0.1)",
-              borderRadius: 8,
-              paddingVertical: 5,
-              paddingHorizontal: 14,
-              marginTop: 2,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: C.lightred, fontWeight: "500", textAlign: "center" }}>
-              {zCardError}
-            </Text>
-          </View>
-        ) : null}
-        {zCardMessage && zCardStatus === "succeeded" ? (
-          <Animated.View
-            style={{
-              backgroundColor: C.green,
-              borderRadius: 10,
-              paddingVertical: 8,
-              paddingHorizontal: 20,
-              marginTop: 4,
-              opacity: successOpacity,
-              transform: [{ scale: Animated.multiply(successScale, successPulse) }],
-            }}
-          >
-            <Text style={{ fontSize: 15, color: C.textWhite, fontWeight: "700", textAlign: "center" }}>
-              {zCardMessage}
-            </Text>
-          </Animated.View>
-        ) : zCardMessage ? (
-          <View
-            style={{
-              backgroundColor: "rgba(0,160,0,0.1)",
-              borderRadius: 8,
-              paddingVertical: 5,
-              paddingHorizontal: 14,
-              marginTop: 2,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: C.green, fontWeight: "500", textAlign: "center" }}>
-              {zCardMessage}
-            </Text>
-          </View>
-        ) : null}
+        {!isProcessing && !!zCardError && (
+          <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "600", textAlign: "center" }}>
+            {zCardError}
+          </Text>
+        )}
+        {!isProcessing && !!zCardMessage && zCardStatus !== "succeeded" && (
+          <Text style={{ fontSize: 13, color: C.green, fontWeight: "600", textAlign: "center" }}>
+            {zCardMessage}
+          </Text>
+        )}
       </View>
 
       {/* Action Buttons */}

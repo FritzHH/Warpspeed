@@ -432,6 +432,7 @@ export const ActiveWorkorderComponent = ({}) => {
     const storeName = settings?.storeInfo?.displayName || "our store";
     const brand = workorder?.brand || "";
     const description = workorder?.model || workorder?.description || "";
+    const workorderLink = workorder?.customerPin ? (window.location.origin + "/wo/" + workorder.customerPin) : "";
 
     function applyVars(template, v) {
       let result = template;
@@ -452,7 +453,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
       // SMS — upload PDF and send link in one call
       if (smsTemplate && settings.autoSMSIntakeReceipt && customer.customerCell) {
-        const vars = { firstName, storeName, brand, description, link: "{link}" };
+        const vars = { firstName, storeName, brand, description, link: "{link}", workorderLink };
         const msg = applyVars(smsTemplate.content || smsTemplate.message || smsTemplate.text || "", vars);
         const result = await dbUploadPDFAndSendSMS({
           base64,
@@ -482,7 +483,10 @@ export const ActiveWorkorderComponent = ({}) => {
       const receiptLink = receiptURL
         ? "<p style='margin:24px 0'>" + linkHtml + "</p>"
         : "";
-      const vars = { firstName, storeName, brand, description, link: linkHtml || receiptURL, receiptLink };
+      const workorderLinkHtml = workorderLink
+        ? "<p style='margin:16px 0'><a href='" + workorderLink + "' style='display:inline-block;padding:12px 24px;background-color:#2196F3;color:white;text-decoration:none;border-radius:6px;font-size:14px'>Track Your Workorder</a></p>"
+        : "";
+      const vars = { firstName, storeName, brand, description, link: linkHtml || receiptURL, receiptLink, workorderLink: workorderLinkHtml || workorderLink };
       const subject = applyVars(emailTemplate.subject || "", vars);
       const html = applyVars(emailTemplate.content || emailTemplate.body || "", vars);
       dbSendEmail(customer.email, subject, html);
@@ -499,7 +503,7 @@ export const ActiveWorkorderComponent = ({}) => {
         paddingBottom: 11,
         paddingTop: 5,
         paddingHorizontal: 5,
-        backgroundColor: (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.sales?.length > 0)
+        backgroundColor: (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.saleID)
           ? lightenRGBByPercent(C.red, 60)
           : (zIsPreview || zIsLocked)
             ? lightenRGBByPercent(C.lightred, 80)
@@ -909,8 +913,8 @@ export const ActiveWorkorderComponent = ({}) => {
               const rs = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses);
               return (
                 <StatusPickerModal
-                  statuses={zSettings.statuses}
-                  enabled={!isDonePaid}
+                  statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned)}
+                  enabled={!isDonePaid && zOpenWorkorder?.status !== "sale_in_progress"}
                   onSelect={(val) => {
                     const store = useOpenWorkordersStore.getState();
                     store.setField("status", val.id, zOpenWorkorder.id);
@@ -1238,10 +1242,9 @@ export const ActiveWorkorderComponent = ({}) => {
           borderColor: C.listItemBorder,
           borderWidth: 1,
           paddingHorizontal: 25,
-          paddingVertical: 4,
-          marginBottom: 8,
+          paddingTop: 4, paddingBottom: 0,
+          marginBottom: 0,
           alignItems: "center",
-          overflow: "hidden",
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>

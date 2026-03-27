@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
-import { Tooltip } from "../../../../components";
+import { Tooltip, Pressable_ } from "../../../../components";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
 function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemoveDeposit }) {
@@ -49,23 +49,25 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
           alignItems: "center",
         }}
       >
-        <Text style={{ color: isDeposit ? C.blue : C.green }}>
+        <Text style={{ color: isDeposit ? (depositPaidByCash ? C.orange : C.blue) : C.green }}>
           {getPaymentLabel()}
         </Text>
         {onRefund && (
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); onRefund(); }}
-            style={{
-              backgroundColor: C.red,
-              borderRadius: 5,
-              paddingVertical: 2,
-              paddingHorizontal: 8,
-            }}
-          >
-            <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>
-              REFUND
-            </Text>
-          </TouchableOpacity>
+          <Tooltip text="Refund this payment" position="top">
+            <TouchableOpacity
+              onPress={(e) => { e.stopPropagation(); onRefund(); }}
+              style={{
+                backgroundColor: isDeposit ? (depositPaidByCash ? C.orange : C.blue) : C.blue,
+                borderRadius: 5,
+                paddingVertical: 2,
+                paddingHorizontal: 8,
+              }}
+            >
+              <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>
+                REFUND
+              </Text>
+            </TouchableOpacity>
+          </Tooltip>
         )}
       </View>
 
@@ -142,10 +144,9 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
   );
 
   // Build tooltip text
-  let tooltipText = "Click to print paper receipt";
-  if (isDeposit && onRemoveDeposit) {
-    tooltipText += "\nRight-click to remove deposit from sale";
-  }
+  let tooltipText = isDeposit && onRemoveDeposit
+    ? "- Click to print paper receipt\n- Right-click to remove deposit from sale"
+    : "Click to print paper receipt";
 
   let handlePress = isDeposit
     ? (onPrintDepositReceipt && payment.depositSaleID ? onPrintDepositReceipt : undefined)
@@ -153,13 +154,13 @@ function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemov
 
   return (
     <Tooltip text={tooltipText} position="top">
-      <TouchableOpacity
+      <Pressable_
         onPress={handlePress}
-        onContextMenu={isDeposit && onRemoveDeposit ? (e) => { e.preventDefault(); onRemoveDeposit(); } : undefined}
+        onRightPress={isDeposit && onRemoveDeposit ? onRemoveDeposit : undefined}
         activeOpacity={handlePress ? 0.6 : 1}
       >
         {content}
-      </TouchableOpacity>
+      </Pressable_>
     </Tooltip>
   );
 }

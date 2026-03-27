@@ -12,6 +12,7 @@ const RECEIPT_TYPES = {
   intake: "Intake",
   register: "pop-register",
   test: "Test",
+  refund: "Refund",
 };
 
 const RECEIPT_PROTO = {
@@ -342,7 +343,7 @@ function createPrintBase(workorder, customer, salesTaxPercent, context) {
   r.color1 = workorder.color1?.label || "";
   r.color2 = workorder.color2?.label || "";
   r.barcode = r.id;
-  r.shopName = SHOP_NAME;
+  r.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
   r.waitTime = workorder.waitTime?.label;
   r.waitTimeEstimateLabel = calculateWaitEstimateLabel(workorder, _settings) || "";
   if (workorder.partOrderEstimateMillis) {
@@ -389,6 +390,83 @@ var printBuilder = {
     receipt.receiptType = RECEIPT_TYPES.intake;
     return receipt;
   },
+  refund: function (refund, sale, customer, workorder, salesTaxPercent, context) {
+    var _ctx = context || {};
+    var _settings = _ctx.settings || {};
+    var currentUser = _ctx.currentUser || {};
+
+    var receipt = Object.assign({}, RECEIPT_PROTO);
+    receipt.receiptType = RECEIPT_TYPES.refund;
+    receipt.barcode = refund.id;
+    receipt.id = refund.id;
+    receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
+    receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
+    receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
+    receipt.salesTaxPercent = salesTaxPercent;
+    receipt.taxFree = !!workorder?.taxFree;
+
+    // Customer info
+    receipt.customerFirstName = customer?.first || customer?.customerFirstName || "";
+    receipt.customerLastName = customer?.last || customer?.customerLastName || "";
+    receipt.customerCell = customer?.phone || customer?.customerCell || "";
+    receipt.customerEmail = customer?.email || customer?.customerEmail || "";
+    receipt.customerContact = formatPhoneForDisplay(receipt.customerCell) || receipt.customerEmail;
+
+    // User who processed the refund
+    var userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
+    var userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
+    receipt.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
+
+    // Refund-specific fields
+    receipt.refundAmount = refund.amountRefunded || 0;
+    receipt.refundType = refund.type || ""; // "cash" or "card"
+    receipt.refundNotes = refund.notes || "";
+    receipt.originalSaleID = sale?.id || "";
+    receipt.originalSaleTotal = sale?.total || 0;
+    receipt.cardRefundID = refund.cardRefundID || "";
+
+    // Refunded line items
+    if (refund.workorderLines && refund.workorderLines.length > 0) {
+      receipt.workorderLines = refund.workorderLines.map(function (line) {
+        var parsed = Object.assign({}, line);
+        parsed.itemName = line.inventoryItem?.formalName || line.inventoryItem?.informalName || "";
+        parsed.price = line.inventoryItem?.price || 0;
+        parsed.discountName = line.discountObj?.name;
+        parsed.discountSavings = line.discountObj?.savings;
+        parsed.finalPrice = line.discountObj?.newPrice != null
+          ? line.discountObj.newPrice
+          : line.inventoryItem?.price || 0;
+        parsed.qty = line.qty || 1;
+        return parsed;
+      });
+
+      // Calculate refund totals from items
+      var totals = calculateRunningTotals(
+        workorder || { workorderLines: [] },
+        salesTaxPercent,
+        refund.workorderLines,
+        true,
+        !!workorder?.taxFree
+      );
+      receipt.subtotal = totals.runningTotal;
+      receipt.discount = totals.runningDiscount;
+      receipt.tax = totals.runningTax;
+      receipt.total = totals.finalTotal;
+    } else {
+      // Payment-based or custom amount refund (no items)
+      receipt.workorderLines = [];
+      receipt.subtotal = refund.amountRefunded || 0;
+      receipt.discount = 0;
+      receipt.tax = 0;
+      receipt.total = refund.amountRefunded || 0;
+    }
+
+    // Transaction timestamp
+    var txDate = refund.millis ? new Date(Number(refund.millis)) : new Date();
+    receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+    return receipt;
+  },
   sale: function (sale, payments, customer, workorder, salesTaxPercent, context) {
     var receipt = createPrintBase(workorder, customer, salesTaxPercent, context);
     receipt = Object.assign({}, receipt, sale);
@@ -409,6 +487,13 @@ var printBuilder = {
     receipt.depositsApplied = (payments || []).filter(function (p) { return p.isDeposit; });
     var txDate = workorder?.finishedOnMillis ? new Date(Number(workorder.finishedOnMillis)) : new Date();
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+    // Deposit/credit sale fields
+    receipt.isDepositSale = !!sale.isDepositSale;
+    receipt.depositType = sale.depositType || "";
+    receipt.depositNote = sale.depositNote || "";
+    receipt.depositAmountCents = sale.isDepositSale ? (sale.subtotal || 0) : 0;
+
     return receipt;
   },
 };

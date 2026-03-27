@@ -148,6 +148,8 @@ export const ICONS = {
   letterI: require(ASSETS_PATH + "letter-i.png"),
   letterR: require(ASSETS_PATH + "letter-r.png"),
   airplane: require(ASSETS_PATH + "airplane.png"),
+  popperCelebration: require(ASSETS_PATH + "popperCelebration.gif"),
+  guyCelebrating: require(ASSETS_PATH + "guyCelebrating.gif"),
 };
 
 // rgb(64, 174, 113)

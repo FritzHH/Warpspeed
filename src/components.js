@@ -2974,7 +2974,7 @@ export const Tooltip = ({
               paddingVertical: 5,
             }}
           >
-            <Text style={{ color: "white", fontSize: 12, whiteSpace: "nowrap" }}>
+            <Text style={{ color: "white", fontSize: 12, whiteSpace: "pre" }}>
               {text}
             </Text>
           </View>
@@ -3213,7 +3213,7 @@ export const StatusPickerModal = ({
   );
 };
 
-export const DepositModal = ({ visible, onClose, onPay }) => {
+export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) => {
   const [sDepositType, _sSetDepositType] = useState(CUSTOMER_DEPOST_TYPES.deposit);
   const [sDepositAmount, _sSetDepositAmount] = useState("");
   const [sDepositAmountCents, _sSetDepositAmountCents] = useState(0);
@@ -3228,26 +3228,8 @@ export const DepositModal = ({ visible, onClose, onPay }) => {
   }
 
   if (!visible) return null;
-  return (
-    <View
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 100,
-        borderRadius: 15,
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={resetAndClose}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-      />
+
+  let innerCard = (
       <View
         style={{
           width: 350,
@@ -3256,6 +3238,7 @@ export const DepositModal = ({ visible, onClose, onPay }) => {
           borderWidth: 2,
           borderColor: C.buttonLightGreenOutline,
           padding: 20,
+          ...(inline ? { position: "absolute", zIndex: 200, ...inlineStyle } : {}),
         }}
       >
         <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 14 }}>
@@ -3288,6 +3271,7 @@ export const DepositModal = ({ visible, onClose, onPay }) => {
               _sSetDepositAmountCents(result.cents);
             }}
             debounceMs={0}
+            autoFocus={true}
             style={{
               flex: 1,
               fontSize: 16,
@@ -3346,6 +3330,31 @@ export const DepositModal = ({ visible, onClose, onPay }) => {
           />
         </View>
       </View>
+  );
+
+  if (inline) return innerCard;
+
+  return (
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 100,
+        borderRadius: 15,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={resetAndClose}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      {innerCard}
     </View>
   );
 };
@@ -3371,7 +3380,7 @@ export const DepositsList = ({ deposits }) => {
             marginBottom: 4,
             borderRadius: 7,
             borderLeftWidth: 4,
-            borderLeftColor: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
+            borderLeftColor: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : (deposit.cash ? C.orange : C.green),
             borderColor: C.buttonLightGreenOutline,
             borderWidth: 1,
             backgroundColor: C.listItemWhite,
@@ -3388,7 +3397,7 @@ export const DepositsList = ({ deposits }) => {
                 style={{
                   backgroundColor: deposit.type === CUSTOMER_DEPOST_TYPES.credit
                     ? lightenRGBByPercent(C.blue, 70)
-                    : lightenRGBByPercent(C.green, 70),
+                    : (deposit.cash ? lightenRGBByPercent(C.orange, 70) : lightenRGBByPercent(C.green, 70)),
                   paddingHorizontal: 6,
                   paddingVertical: 1,
                   borderRadius: 8,
@@ -3399,7 +3408,7 @@ export const DepositsList = ({ deposits }) => {
                   style={{
                     fontSize: 10,
                     fontWeight: "600",
-                    color: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
+                    color: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : (deposit.cash ? C.orange : C.green),
                   }}
                 >
                   {deposit.type === CUSTOMER_DEPOST_TYPES.credit ? "Credit" : "Deposit"}

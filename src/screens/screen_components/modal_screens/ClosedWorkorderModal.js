@@ -241,9 +241,6 @@ export const ClosedWorkorderModal = () => {
     const saleIDs = [];
     if (workorder.activeSaleID) saleIDs.push(workorder.activeSaleID);
     if (workorder.saleID && !saleIDs.includes(workorder.saleID)) saleIDs.push(workorder.saleID);
-    (workorder.sales || []).forEach((sid) => {
-      if (sid && !saleIDs.includes(sid)) saleIDs.push(sid);
-    });
     if (saleIDs.length === 0) { _sSetSales([]); return; }
 
     _sSetLoadingSales(true);

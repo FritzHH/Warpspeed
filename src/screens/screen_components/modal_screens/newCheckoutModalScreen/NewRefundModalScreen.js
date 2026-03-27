@@ -6,7 +6,8 @@ import { ScreenModal, SHADOW_RADIUS_PROTO, Button_ } from "../../../../component
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import {
   useSettingsStore,
-  useAlertScreenStore,
+  useLoginStore,
+  useOpenWorkordersStore,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
@@ -14,7 +15,10 @@ import {
   log,
   gray,
   deepEqual,
+  printBuilder,
+  resolveStatus,
 } from "../../../../utils";
+import { dbSavePrintObj } from "../../../../db_calls_wrapper";
 import {
   calculateRefundLimits,
   validateRefundAmount,
@@ -27,6 +31,8 @@ import {
   newCheckoutFetchWorkordersForSale,
   newCheckoutUpdateCompletedSale,
   newCheckoutSaveActiveSale,
+  newCheckoutCompleteSale,
+  newCheckoutDeleteActiveSale,
   saveRefundIndex,
 } from "./newCheckoutFirebaseCalls";
 
@@ -201,6 +207,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
 
   // ─── Item Selection ───────────────────────────────────────
   function handleToggleItem(line) {
+    if (hasPaymentSelection) return; // items disabled when payments are selected
     let exists = sSelectedItems.find((s) => s.id === line.id);
     if (exists) {
       _setSelectedItems(sSelectedItems.filter((s) => s.id !== line.id));
@@ -208,11 +215,8 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
       if (disabledItemIDs.has(line.id)) return;
       _setSelectedItems([...sSelectedItems, cloneDeep(line)]);
     }
-    // Switch out of custom amount mode when selecting items
     _setIsCustomAmount(false);
     _setCustomCardPayment(null);
-    // Clear payment selection — items drive the refund
-    if (sSelectedPayments.length > 0) _setSelectedPayments([]);
   }
 
   // ─── Payment Selection ────────────────────────────────────
@@ -225,20 +229,13 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
       _setSelectedPayments(sSelectedPayments.filter((p) => p.id !== payment.id));
       return;
     }
+    // Clear selected items — payment selection takes over
+    if (sSelectedItems.length > 0) _setSelectedItems([]);
     // Block mixed cash/card selection (deposits refund as cash)
     let incomingIsCash = payment.cash || payment.check || payment.isDeposit;
     if (sSelectedPayments.length > 0) {
       let currentIsCash = sSelectedPayments[0].cash || sSelectedPayments[0].check || sSelectedPayments[0].isDeposit;
-      if (incomingIsCash !== currentIsCash) {
-        useAlertScreenStore.getState().setValues({
-          title: "Cannot Mix Refund Types",
-          message: "Cash and card refunds must be processed separately. Deselect the current payments first.",
-          btn1Text: "OK",
-          handleBtn1Press: () => useAlertScreenStore.getState().setValues({ showAlert: false }),
-          canExitOnOuterClick: true,
-        });
-        return;
-      }
+      if (incomingIsCash !== currentIsCash) return; // mismatched type — disabled rows handle this visually
     }
     _setSelectedPayments([...sSelectedPayments, payment]);
   }
@@ -329,10 +326,64 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
     };
     saveRefundIndex(sale, refund, customerInfo);
 
+    // Print refund receipt
+    let settings = useSettingsStore.getState().getSettings();
+    let printerID = settings?.selectedPrinterID || "";
+    if (printerID) {
+      let currentUser = useLoginStore.getState().getCurrentUser();
+      let receipt = printBuilder.refund(
+        refund,
+        sale,
+        customerInfo,
+        primaryWO || { workorderLines: [], taxFree: false },
+        zSalesTaxPercent,
+        { currentUser, settings }
+      );
+      dbSavePrintObj(receipt, printerID);
+    }
+
     // Check if fully refunded
     let newLimits = calculateRefundLimits(sale, { cardFeeRefund: zCardFeeRefund });
     if (newLimits.maxRefund <= 0) {
       _setRefundComplete(true);
+
+      if (sIsActiveSale) {
+        // Partial sale fully refunded — void it and restore workorders
+        sale.voidedByRefund = true;
+        _setOriginalSale(sale);
+        await newCheckoutCompleteSale(sale);
+
+        let _settings = useSettingsStore.getState().getSettings();
+        let statuses = _settings?.statuses || [];
+        let _user = useLoginStore.getState().currentUser?.first || "System";
+        let _ts = Date.now();
+        let finishedLabel = resolveStatus("finished", statuses)?.label || "Finished";
+        let allWorkorders = useOpenWorkordersStore.getState().getWorkorders();
+
+        for (let woID of (sale.workorderIDs || [])) {
+          let wo = allWorkorders.find((w) => w.id === woID);
+          if (!wo) continue;
+          let updated = cloneDeep(wo);
+          let oldStatusLabel = resolveStatus(wo.status, statuses)?.label || wo.status || "";
+
+          updated.status = "finished";
+          updated.activeSaleID = "";
+          updated.saleID = "";
+          updated.amountPaid = 0;
+
+          let entries = [
+            { timestamp: _ts, user: _user, field: "status", action: "changed", from: oldStatusLabel, to: finishedLabel },
+            { timestamp: _ts, user: _user, field: "payment", action: "voided", from: "", to: "Sale fully refunded — workorder restored" },
+          ];
+          updated.changeLog = [...(updated.changeLog || []), ...entries];
+          useOpenWorkordersStore.getState().setWorkorder(updated, true);
+        }
+      } else {
+        // Completed sale fully refunded — just flag it
+        sale.voidedByRefund = true;
+        _setOriginalSale(sale);
+        await newCheckoutUpdateCompletedSale(sale);
+      }
     }
 
     // Sync parent sale state (checkout modal)
@@ -575,7 +626,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                     payments={sOriginalSale?.payments || []}
                     selectedPayments={sSelectedPayments}
                     onSelectPayment={handleSelectPayment}
-                    disabled={sRefundComplete || hasItemSelection || sIsCustomAmount}
+                    disabled={sRefundComplete || sIsCustomAmount}
                   />
 
                   {/* Card picker for custom refund mode */}
@@ -747,6 +798,7 @@ export function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialP
                     onClearItems={() => _setSelectedItems([])}
                     previouslyRefundedIDs={previouslyRefundedIDs}
                     disabledItemIDs={disabledItemIDs}
+                    hasPaymentSelection={hasPaymentSelection}
                   />
                 )}
               </View>

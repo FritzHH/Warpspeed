@@ -115,7 +115,7 @@ export const COLORS = [
 
 export const NONREMOVABLE_STATUSES = [
   {
-    id: "34kttekj",
+    id: "newly_created",
     label: "Newly Created",
     textColor: "white",
     backgroundColor: "red",
@@ -123,7 +123,25 @@ export const NONREMOVABLE_STATUSES = [
     requireWaitTime: false,
   },
   {
-    id: "34kttdkfekj",
+    id: "sale_in_progress",
+    label: "Sale in Progress",
+    textColor: "yellow",
+    backgroundColor: "black",
+    removable: false,
+    requireWaitTime: false,
+    systemOwned: true
+  },
+  {
+    id: "finshied_and_paid",
+    label: "Finished & Paid",
+    textColor: "white",
+    backgroundColor: "green",
+    removable: false,
+    requireWaitTime: false,
+    systemOwned: true
+  },
+  {
+    id: "on_the_stand",
     label: "On the Stand",
     textColor: "white",
     backgroundColor: "pink",
@@ -131,7 +149,7 @@ export const NONREMOVABLE_STATUSES = [
     requireWaitTime: false,
   },
   {
-    id: "383rne3kj",
+    id: "service",
     textColor: "black",
     backgroundColor: "rgb(192,192,192)",
     label: "Service",
@@ -139,21 +157,14 @@ export const NONREMOVABLE_STATUSES = [
     requireWaitTime: false,
   },
   {
-    id: "33knktg",
+    id: "finished",
     textColor: "white",
     backgroundColor: "green",
     label: "Finished",
     removable: false,
     requireWaitTime: false,
   },
-  {
-    id: "33knkdkanctg",
-    textColor: "white",
-    backgroundColor: "green",
-    label: "Finished - No Auto Text",
-    removable: false,
-    requireWaitTime: false,
-  },
+
 ];
 
 export const CONTACT_RESTRICTIONS = {
@@ -350,6 +361,7 @@ export const SALE_PROTO = {
   checkoutSessionID: "",
   receiptURL: "",
   isDepositSale: false,
+  voidedByRefund: false,
 };
 
 export const SALE_INDEX_PROTO = {
@@ -382,7 +394,6 @@ export const WORKORDER_PROTO = {
   paymentComplete: false,
   amountPaid: 0,
   activeSaleID: "",
-  sales: [],
   endedOnMillis: "",
   saleID: "",
   isStandaloneSale: false,
@@ -729,6 +740,14 @@ export const SETTINGS_OBJ = {
   statuses: [
     ...NONREMOVABLE_STATUSES,
     {
+      id: "finished",
+      textColor: "white",
+      backgroundColor: "green",
+      label: "Finished - No Auto Text",
+      removable: true,
+      requireWaitTime: false,
+    },
+    {
       id: "1334453",
       textColor: "white",
       backgroundColor: "orange",
@@ -1047,7 +1066,7 @@ export const SETTINGS_OBJ = {
     {
       id: "default_sms_intake_receipt",
       label: "Intake Receipt",
-      content: "🔧 Hey {firstName}! Your {brand} {description} is checked in and in good hands. Here's your receipt: {link}\n\nWe'll keep you posted! — {storeName} 🚲",
+      content: "🔧 Hey {firstName}! Your {brand} {description} is checked in and in good hands. Here's your receipt: {link}\n\nTrack your workorder: {workorderLink}\n\nWe'll keep you posted! — {storeName} 🚲",
       type: "intakeReceipt",
     },
   ],
@@ -1086,7 +1105,7 @@ export const SETTINGS_OBJ = {
       id: "default_email_intake_receipt",
       label: "Intake Receipt",
       subject: "Your {brand} is checked in — {storeName}",
-      content: "Hi {firstName},\n\nYour {brand} {description} has been checked in and is in good hands. Here's a copy of your intake receipt for your records.\n\n{receiptLink}\n\nWe'll keep you updated on the progress. If you have any questions in the meantime, don't hesitate to reach out!\n\n---\n{storeName}",
+      content: "Hi {firstName},\n\nYour {brand} {description} has been checked in and is in good hands. Here's a copy of your intake receipt for your records.\n\n{receiptLink}\n\n{workorderLink}\n\nWe'll keep you updated on the progress. If you have any questions in the meantime, don't hesitate to reach out!\n\n---\n{storeName}",
       type: "intakeReceipt",
     },
   ],

@@ -20,7 +20,9 @@ import {
   DropdownMenu,
   TextInput_,
   Tooltip,
+  Pressable_,
   StaleBanner,
+  DepositModal,
 } from "../../../components";
 import { C, ICONS } from "../../../styles";
 import { EmptyItemsComponent } from "./Items_Empty";
@@ -70,6 +72,8 @@ export const Items_WorkorderItemsTab = ({}) => {
   const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
+  const hasActiveSale = !!zOpenWorkorder?.activeSaleID;
+  const isLocked = isDonePaid || hasActiveSale;
 
   ///////////////////////////////////////////////////////////////////////////
   const [sTotalDiscount, _setTotalDiscount] = useState("");
@@ -85,6 +89,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     useState(false);
 
   const [sEditingCustomLine, _setEditingCustomLine] = useState(null);
+  const [sShowDepositModal, _setShowDepositModal] = useState(false);
 
   // dev
   const checkoutBtnRef = useRef();
@@ -422,7 +427,7 @@ export const Items_WorkorderItemsTab = ({}) => {
         justifyContent: "center",
         backgroundColor: zIsPreview
           ? lightenRGBByPercent(C.lightred, 80)
-          : (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.sales?.length > 0)
+          : (zOpenWorkorder?.paymentComplete || zOpenWorkorder?.saleID)
             ? lightenRGBByPercent(C.red, 60)
             : undefined,
       }}
@@ -452,6 +457,14 @@ export const Items_WorkorderItemsTab = ({}) => {
         />
       )}
 
+      {hasActiveSale && (
+        <StaleBanner
+          text="Sale in Progress — Workorder Locked"
+          style={{ marginHorizontal: 8, marginTop: 3, backgroundColor: "black" }}
+          textStyle={{ color: "#FFD600" }}
+        />
+      )}
+
       <FlatList
         style={{ marginTop: 3, marginRight: 5 }}
         data={zOpenWorkorder.workorderLines}
@@ -475,7 +488,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               applyDiscount={applyDiscount}
               zSettingsObj={{ discounts: zDiscounts }}
               onEditCustomItem={_setEditingCustomLine}
-              isLocked={isDonePaid}
+              isLocked={isLocked}
             />
           );
         }}
@@ -500,9 +513,9 @@ export const Items_WorkorderItemsTab = ({}) => {
           <Button_
             icon={ICONS.trash}
             iconSize={22}
-            disabled={isDonePaid}
+            enabled={!isLocked}
             onPress={handleDeleteWorkorder}
-            buttonStyle={{ opacity: isDonePaid ? 0.3 : 1 }}
+            buttonStyle={{ opacity: isLocked ? 0.3 : 1 }}
           />
         </Tooltip>
         <View
@@ -516,7 +529,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           text="Tax-Free"
           isChecked={!!zOpenWorkorder.taxFree}
           onCheck={handleTaxFreeToggle}
-          enabled={!isDonePaid}
+          enabled={!isLocked}
           textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : gray(0.5) }}
         />
         <View
@@ -623,17 +636,34 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
-        <Tooltip text="Check out workorder" position="top">
-          <Button_
-            ref={checkoutBtnRef}
-            textStyle={{ color: C.textWhite, fontSize: 16 }}
-            icon={ICONS.shoppingCart}
-            iconSize={34}
-            disabled={isDonePaid}
-            buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
-            onPress={() => useLoginStore.getState().requireLogin(() => useCheckoutStore.getState().setIsCheckingOut(true))}
+        <View style={{ position: "relative" }}>
+          <Tooltip text="Right click deposit" position="top">
+            <Pressable_
+              onRightPress={() => useLoginStore.getState().requireLogin(() => _setShowDepositModal(true))}
+            >
+              <Button_
+                ref={checkoutBtnRef}
+                textStyle={{ color: C.textWhite, fontSize: 16 }}
+                icon={ICONS.shoppingCart}
+                iconSize={34}
+                enabled={!isDonePaid}
+                buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
+                onPress={() => useLoginStore.getState().requireLogin(() => useCheckoutStore.getState().setIsCheckingOut(true))}
+              />
+            </Pressable_>
+          </Tooltip>
+          <DepositModal
+            visible={sShowDepositModal}
+            inline
+            inlineStyle={{ bottom: 0, right: "100%", marginRight: 10 }}
+            onClose={() => _setShowDepositModal(false)}
+            onPay={(depositInfo) => {
+              _setShowDepositModal(false);
+              useCheckoutStore.getState().setDepositInfo(depositInfo);
+              useCheckoutStore.getState().setIsCheckingOut(true);
+            }}
           />
-        </Tooltip>
+        </View>
       </View>
       {sEditingCustomLine && (
         <CustomItemModal
@@ -709,7 +739,7 @@ export const LineItemComponent = ({
       >
         <View
           style={{
-            width: "65%",
+            width: "60%",
             justifyContent: "center",
             flexDirection: "column",
             // backgroundColor: "blue",
@@ -717,7 +747,7 @@ export const LineItemComponent = ({
         >
           <View style={{ width: "100%" }}>
             {!!(workorderLine.discountObj?.name || workorderLine.discountObj?.discountName) && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <Text style={{ color: C.green, fontSize: 12, marginRight: 5 }}>
                   {workorderLine.discountObj.name || workorderLine.discountObj.discountName}
                 </Text>
@@ -754,9 +784,9 @@ export const LineItemComponent = ({
               const showButton = !(hasIntake && hasReceipt);
 
               // Determine which note field the next click will show
-              let nextNoteLabel = "Intake notes";
+              let nextNoteLabel = "Intake notes -> Receipt Notes";
               if (!hasIntake && !hasReceipt) {
-                nextNoteLabel = sActiveNoteField === "intake" ? "Receipt notes" : "Intake notes";
+                nextNoteLabel = sActiveNoteField === "intake" ? "Receipt notes" : "Intake notes -> Receipt Notes";
               } else if (hasIntake && !hasReceipt) {
                 nextNoteLabel = "Receipt notes";
               } else if (!hasIntake && hasReceipt) {
@@ -788,6 +818,7 @@ export const LineItemComponent = ({
                           color: C.text,
                           fontWeight: "400",
                           textDecorationLine: "none",
+                          // backgroundColor: "blue",
                         }}
                         numberOfLines={2}
                       >
@@ -838,7 +869,7 @@ export const LineItemComponent = ({
         </View>
         <View
           style={{
-            width: "35%",
+            width: "40%",
             flexDirection: "row",
             justifyContent: "flex-end",
             alignItems: "center",
@@ -854,8 +885,22 @@ export const LineItemComponent = ({
               // marginRight: 5,
             }}
           >
+            {effectiveQty > 1 && <Tooltip text="Split items" position="top">
+              <Button_
+                icon={ICONS.axe}
+                iconSize={20}
+                enabled={!isLocked}
+                onPress={effectiveQty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
+                buttonStyle={{
+                  backgroundColor: "transparent",
+                  paddingRight: 2,
+                  opacity: effectiveQty > 1 ? 1 : 0,
+                }}
+              />
+            </Tooltip>
+            }
             <Button_
-              disabled={isLocked}
+              enabled={!isLocked}
               onPress={() => __modQtyPressed(workorderLine, "up", index)}
               buttonStyle={{
                 backgroundColor: "transparent",
@@ -865,7 +910,7 @@ export const LineItemComponent = ({
               iconSize={23}
             />
             <Button_
-              disabled={isLocked}
+              enabled={!isLocked}
               onPress={() => __modQtyPressed(workorderLine, "down", index)}
               buttonStyle={{
                 paddingHorizontal: 4,
@@ -966,27 +1011,14 @@ export const LineItemComponent = ({
           >
             <View
               style={{
-                flexDirection: "column",
+                flexDirection: "row",
                 alignItems: "center",
-                justifyContent: "center",
+                // justifyContent: "space-between",
                 // backgroundColor: "green",
               }
               }
             >
-              {effectiveQty > 1 && <Tooltip text="Split items" position="top">
-                <Button_
-                  icon={ICONS.axe}
-                  iconSize={20}
-                  disabled={isLocked}
-                  onPress={effectiveQty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
-                  buttonStyle={{
-                    backgroundColor: "transparent",
-                    paddingRight: 14,
-                    opacity: effectiveQty > 1 ? 1 : 0,
-                  }}
-                />
-              </Tooltip>
-              }
+
             <Tooltip text="Discounts" position="top">
               <DropdownMenu
                 buttonIcon={ICONS.dollarYellow}
@@ -1015,7 +1047,7 @@ export const LineItemComponent = ({
 
             <Tooltip text="Remove" position="top">
               <Button_
-                disabled={isLocked}
+                enabled={!isLocked}
                 onPress={() => __deleteWorkorderLine(index)}
                 icon={ICONS.trash}
                 iconSize={21}

@@ -12,12 +12,13 @@ import {
   lightenRGBByPercent,
   log,
   resolveStatus,
-  searchInventory,
 } from "../../../utils";
+import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
   Button,
   Button_,
   ScreenModal,
+  StaleBanner,
   TouchableOpacity_,
   TextInput_,
   Tooltip,
@@ -49,6 +50,13 @@ export function InventoryComponent({}) {
     (state) => state.openWorkorderID
   );
   const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
+  const zOpenWorkorder = useOpenWorkordersStore((state) => {
+    const id = state.openWorkorderID;
+    return id ? state.workorders.find((o) => o.id === id) : null;
+  });
+  const zStatuses = useSettingsStore((state) => state.settings?.statuses);
+  const isInventoryLocked = !!zOpenWorkorder?.activeSaleID ||
+    resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
 
   // Check if all required data is loaded
   const isDataLoaded = zQuickItemButtons && zInventoryArr?.length > 0;
@@ -87,7 +95,7 @@ export function InventoryComponent({}) {
       return;
     }
     if (searchTerm.length < 2) return;
-    _setSearchResults(searchInventory(searchTerm, zInventoryArr));
+    workerSearchInventory(searchTerm, (results) => _setSearchResults(results));
   }
 
   // Search function (now called by debounced TextInput_)
@@ -98,15 +106,16 @@ export function InventoryComponent({}) {
       return;
     }
     if (searchTerm.length < 2) return;
-    let results = searchInventory(searchTerm, zInventoryArr);
-    _setSearchResults(results);
-    // Auto-open create modal when a 12-digit number is entered and not found in inventory
-    if (/^\d{12}$/.test(searchTerm) && results.length === 0) {
-      let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-      newItem.id = generateRandomID();
-      newItem.upc = searchTerm;
-      _setModalItem(newItem);
-    }
+    workerSearchInventory(searchTerm, (results) => {
+      _setSearchResults(results);
+      // Auto-open create modal when a 12-digit number is entered and not found in inventory
+      if (/^\d{12}$/.test(searchTerm) && results.length === 0) {
+        let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
+        newItem.id = generateRandomID();
+        newItem.upc = searchTerm;
+        _setModalItem(newItem);
+      }
+    });
   };
 
   function handleQuickButtonPress(buttonObj) {
@@ -203,6 +212,7 @@ export function InventoryComponent({}) {
     if (openWorkorder) {
       const statuses = useSettingsStore.getState().settings?.statuses;
       if (resolveStatus(openWorkorder.status, statuses)?.label?.toLowerCase() === "done & paid") return;
+      if (openWorkorder.activeSaleID) return;
     }
     if (!openWorkorder) {
       console.log("  -> no open workorder, opening modal, sModalItem was:", sModalItem?.id);
@@ -262,6 +272,7 @@ export function InventoryComponent({}) {
   function handleCustomItemSave(lineItem) {
     const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
     if (!openWorkorder) return;
+    if (openWorkorder.activeSaleID) return;
     useLoginStore.getState().requireLogin(() => {
       let workorderLines = openWorkorder.workorderLines || [];
       workorderLines = [...workorderLines, lineItem];
@@ -311,6 +322,17 @@ export function InventoryComponent({}) {
         flex: 1,
       }}
     >
+      {isInventoryLocked && (
+        <StaleBanner
+          text="Sale in Progress — Workorder Locked"
+          style={{ marginHorizontal: 4, marginTop: 3, marginBottom: 3, backgroundColor: "black" }}
+          textStyle={{ color: "#FFD600" }}
+        />
+      )}
+      <View
+        style={{ flex: 1, opacity: isInventoryLocked ? 0.4 : 1 }}
+        pointerEvents={isInventoryLocked ? "none" : "auto"}
+      >
       <View
         style={{
           width: "100%",
@@ -684,6 +706,7 @@ export function InventoryComponent({}) {
           onSave={handleCustomItemSave}
           type={sCustomItemModal}
         />
+      </View>
       </View>
     </View>
   );

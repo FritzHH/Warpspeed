@@ -16,7 +16,7 @@ import {
   clog,
   formatCurrencyDisp,
   formatMillisForDisplay,
-  searchInventory,
+  // searchInventory moved to Web Worker
   generateRandomID,
   generateTimesForListDisplay,
   generateEAN13Barcode,
@@ -33,6 +33,7 @@ import {
   calculateRunningTotals,
   localStorageWrapper,
 } from "../../../../utils";
+import { workerSearchInventory } from "../../../../inventorySearchManager";
 import {
   // useDatabaseStore,
   useAlertScreenStore,
@@ -816,7 +817,7 @@ export function Dashboard_Admin({}) {
                   }
 
                   // 2. Delete associated sales (active + completed)
-                  let saleIDs = [wo.activeSaleID, wo.saleID, ...(wo.sales || [])].filter(Boolean);
+                  let saleIDs = [wo.activeSaleID, wo.saleID].filter(Boolean);
                   let uniqueSaleIDs = [...new Set(saleIDs)];
                   for (let sid of uniqueSaleIDs) {
                     await firestoreDelete(`${basePath}/active-sales/${sid}`).catch(() => {});
@@ -828,7 +829,6 @@ export function Dashboard_Admin({}) {
                   wo.amountPaid = 0;
                   wo.activeSaleID = "";
                   wo.saleID = "";
-                  wo.sales = [];
                   wo.endedOnMillis = "";
 
                   // 4. Write clean workorder to open-workorders
@@ -3561,7 +3561,7 @@ const WorkorderStatusesComponent = ({
     handleSettingsFieldChange("statuses", statuses);
   }
 
-  let statuses = zSettingsObj?.statuses || [];
+  let statuses = (zSettingsObj?.statuses || []).filter((s) => !s.systemOwned);
 
   return (
     <BoxContainerOuterComponent style={{}}>
@@ -4246,7 +4246,7 @@ const QuickItemButtonsComponent = ({
     function doSearch(val) {
       _setInvSearch(val);
       if (!val || val.length < 3) { _setInvResults([]); return; }
-      _setInvResults(searchInventory(val, zInventoryArr));
+      workerSearchInventory(val, (results) => _setInvResults(results));
     }
 
     function clearSearch() {
@@ -5072,7 +5072,7 @@ const IntakeButtonEditModal = ({ buttonObj, onClose, onSave }) => {
       _setSearchResults([]);
       return;
     }
-    _setSearchResults(searchInventory(val, zInventory));
+    workerSearchInventory(val, (results) => _setSearchResults(results));
   }
 
   function handleAddItem(invItem) {
@@ -6040,7 +6040,6 @@ const ImportComponent = () => {
       for (const wo of matchedWOs) {
         if (wo.customerID) customerIDSet.add(wo.customerID);
         if (wo.saleID) saleIDSet.add(wo.saleID);
-        if (wo.sales) wo.sales.forEach(sid => { if (sid) saleIDSet.add(sid); });
       }
 
       // Also collect all sales from matched customers
@@ -8293,7 +8292,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
       _setSearchResults([]);
       return;
     }
-    _setSearchResults(searchInventory(val, zInventory));
+    workerSearchInventory(val, (results) => _setSearchResults(results));
   }
 
   function handleSelectItem(invItem) {

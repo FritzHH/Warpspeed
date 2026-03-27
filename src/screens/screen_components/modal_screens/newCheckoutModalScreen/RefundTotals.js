@@ -137,7 +137,7 @@ export function RefundTotals({
           />
           {salesTaxPercent > 0 && (
             <TotalRow
-              label={`TAX (${settings.salesTaxPercent}%)`}
+              label={`TAX (${salesTaxPercent}%)`}
               value={itemRefundTotal - selectedItemsTotal}
               fontSize={11}
               color={C.lightText}

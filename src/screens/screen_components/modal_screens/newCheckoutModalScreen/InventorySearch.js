@@ -6,11 +6,11 @@ import { cloneDeep } from "lodash";
 import { TextInput_, Button_, DropdownMenu, Tooltip } from "../../../../components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
-  searchInventory,
   formatCurrencyDisp,
   generateRandomID,
   gray,
 } from "../../../../utils";
+import { workerSearchInventory } from "../../../../inventorySearchManager";
 import { INVENTORY_ITEM_PROTO } from "../../../../data";
 
 function AddedItemRow({ item, onRemove, onQtyChange, onDiscountChange, discounts }) {
@@ -184,9 +184,10 @@ export function InventorySearch({
       return;
     }
 
-    // Fuzzy search
-    let results = searchInventory(val, inventory);
-    _setSearchResults(results?.slice(0, 15) || []);
+    // Fuzzy search (off main thread)
+    workerSearchInventory(val, (results) => {
+      _setSearchResults(results?.slice(0, 15) || []);
+    });
   }
 
   function handleCreateNewItem() {

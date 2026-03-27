@@ -727,9 +727,8 @@ export function mapSales(
 
     sales.push(mappedSale);
 
-    // Backfill workorder sales arrays and saleID
+    // Backfill workorder saleID
     for (const wo of linkedWorkorders) {
-      wo.sales.push(saleID);
       wo.saleID = saleID;
       if (completed) {
         wo.paymentComplete = true;

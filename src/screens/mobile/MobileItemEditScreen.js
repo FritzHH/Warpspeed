@@ -12,7 +12,6 @@ import { cloneDeep } from "lodash";
 import { TextInput_, Button_, DropdownMenu, Image_ } from "../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import {
-  searchInventory,
   generateEAN13Barcode,
   formatCurrencyDisp,
   calculateRunningTotals,
@@ -21,6 +20,7 @@ import {
   gray,
   log,
 } from "../../utils";
+import { workerSearchInventory } from "../../inventorySearchManager";
 import {
   useOpenWorkordersStore,
   useInventoryStore,
@@ -86,8 +86,9 @@ export function MobileItemEditScreen() {
       _setSearchResults([]);
       return;
     }
-    const results = searchInventory(text, zInventoryArr);
-    _setSearchResults(results.slice(0, 20));
+    workerSearchInventory(text, (results) => {
+      _setSearchResults(results.slice(0, 20));
+    });
   }
 
   //////////////////////////////////////////////////////////////

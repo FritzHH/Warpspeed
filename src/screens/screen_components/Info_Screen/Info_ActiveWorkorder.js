@@ -83,6 +83,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
   const zIsLocked = useOpenWorkordersStore((state) => !!state.lockedWorkorderID && state.lockedWorkorderID === (state.workorderPreviewID || state.openWorkorderID));
   const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
+  const zCustomerRefreshed = useCurrentCustomerStore((state) => state.customerRefreshed);
   const zCustomerLanguage = useCurrentCustomerStore((state) => state.customer?.language || "");
   const zCustomerDeposits = useCurrentCustomerStore((state) => state.customer?.deposits || []);
   const zCustomer = {
@@ -649,7 +650,7 @@ export const ActiveWorkorderComponent = ({}) => {
           </View>
         </View>
 
-        {!zWorkordersLoaded && zOpenWorkorder && (
+        {(!zWorkordersLoaded || !zCustomerRefreshed) && zOpenWorkorder && (
           <StaleBanner
             text="Waiting on customer refresh...."
             style={{ marginTop: 8, width: "100%" }}
@@ -1210,7 +1211,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <View style={{ flexDirection: "row", alignItems: "center", opacity: zOpenWorkorder?.partToBeOrdered ? 0.35 : 1 }}>
                 <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>
-                  Estimated delivery
+                  Est. delivery
                 </Text>
                 <TouchableOpacity
                   disabled={isDonePaid || !!zOpenWorkorder?.partToBeOrdered}
@@ -1264,7 +1265,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 onCheck={() => {
                   useOpenWorkordersStore.getState().setField("partToBeOrdered", !zOpenWorkorder?.partToBeOrdered, zOpenWorkorder.id);
                 }}
-                textStyle={{ fontSize: 13, color: gray(0.45) }}
+                textStyle={{ fontSize: 12, color: gray(0.55) }}
               />
             </View>
           </View>

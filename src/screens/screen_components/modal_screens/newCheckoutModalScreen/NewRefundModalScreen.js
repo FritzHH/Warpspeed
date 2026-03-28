@@ -8,10 +8,12 @@ import {
   useSettingsStore,
   useLoginStore,
   useOpenWorkordersStore,
+  useAlertScreenStore,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
   formatCurrencyDisp,
+  findTemplateByType,
   log,
   gray,
   deepEqual,
@@ -25,6 +27,7 @@ import {
   buildRefundObject,
   getPreviouslyRefundedLineIDs,
   splitWorkorderLinesToSingleQty,
+  sendRefundReceipt,
 } from "./newCheckoutUtils";
 import {
   newCheckoutFetchCompletedSale,
@@ -35,6 +38,7 @@ import {
   newCheckoutDeleteActiveSale,
   saveRefundIndex,
   markItemSalesRefunded,
+  voidCustomerDeposit,
 } from "./newCheckoutFirebaseCalls";
 
 import { CashRefund } from "./CashRefund";
@@ -331,27 +335,63 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       markItemSalesRefunded(sale.id, refund.workorderLines);
     }
 
-    // Print refund receipt
+    // Build refund receipt
     let settings = useSettingsStore.getState().getSettings();
     let printerID = settings?.selectedPrinterID || "";
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    let _ctx = { currentUser, settings };
+    let refundReceipt = printBuilder.refund(
+      refund,
+      sale,
+      customerInfo,
+      primaryWO || { workorderLines: [], taxFree: false },
+      zSalesTaxPercent,
+      _ctx
+    );
+
+    // Always print a paper copy
     if (printerID) {
-      let currentUser = useLoginStore.getState().getCurrentUser();
-      let receipt = printBuilder.refund(
-        refund,
-        sale,
-        customerInfo,
-        primaryWO || { workorderLines: [], taxFree: false },
-        zSalesTaxPercent,
-        { currentUser, settings }
-      );
-      dbSavePrintObj(receipt, printerID);
+      dbSavePrintObj(refundReceipt, printerID);
     }
+
+    // SMS/Email — same templates as sale receipts
+    const customerForReceipt = {
+      first: customerInfo.first,
+      last: customerInfo.last,
+      customerCell: primaryWO?.customerCell || "",
+      email: primaryWO?.customerEmail || "",
+      id: customerInfo.id,
+    };
+    const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
+    const emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+
+    const smsContent = smsTemplate?.content || smsTemplate?.message || "";
+    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    let emptyParts = [];
+    if (settings?.autoSMSSalesReceipt && customerForReceipt.customerCell && !smsContent.trim()) emptyParts.push("SMS");
+    if (settings?.autoEmailSalesReceipt && customerForReceipt.email && !emailContent.trim()) emptyParts.push("email");
+    if (emptyParts.length > 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "Empty Template",
+        message: "The refund receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ", or uncheck the auto " + emptyParts.join("/") + " option in Dashboard > Printing.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    }
+
+    const canSMS = customerForReceipt.customerCell && smsContent.trim();
+    const canEmail = customerForReceipt.email && emailContent.trim();
+    if (canSMS || canEmail) {
+      sendRefundReceipt(refundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+    }
+
+    // Lock screen — one refund at a time, close and reopen for another
+    _setRefundComplete(true);
 
     // Check if fully refunded
     let newLimits = calculateRefundLimits(sale, { cardFeeRefund: zCardFeeRefund });
     if (newLimits.maxRefund <= 0) {
-      _setRefundComplete(true);
-
       if (sIsActiveSale) {
         // Partial sale fully refunded — void it and restore workorders
         sale.voidedByRefund = true;
@@ -388,6 +428,11 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
         sale.voidedByRefund = true;
         _setOriginalSale(sale);
         await newCheckoutUpdateCompletedSale(sale);
+      }
+
+      // If deposit sale fully refunded, remove deposit from customer
+      if (sale.isDepositSale) {
+        voidCustomerDeposit(sale.id);
       }
     }
 
@@ -606,6 +651,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
               <View
                 style={{
                   width: "29%",
+                  alignSelf: "stretch",
                   borderRightWidth: 1,
                   borderRightColor: gray(0.1),
                 }}
@@ -750,6 +796,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                         })}
                     </View>
                   )}
+
                 </ScrollView>
 
                 <Button_
@@ -774,7 +821,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 style={{
                   width: "42%",
                   paddingLeft: 10,
+                  opacity: sRefundComplete || sOriginalSale?.isDepositSale ? 0.3 : 1,
                 }}
+                pointerEvents={sRefundComplete || sOriginalSale?.isDepositSale ? "none" : "auto"}
               >
                 {sIsCustomAmount ? (
                   <View

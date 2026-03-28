@@ -153,6 +153,28 @@ export function updateSaleWithTotals(sale, combinedWorkorders, addedItems, setti
   return updated;
 }
 
+// ─── Recompute Sale Amounts ──────────────────────────────────
+// Call after any mutation to sale.payments or sale.refunds.
+// Derives amountCaptured, amountRefunded, paymentComplete, and status
+// from the arrays — single source of truth.
+
+export function recomputeSaleAmounts(sale) {
+  sale.amountCaptured = (sale.payments || []).reduce(
+    (sum, p) => sum + (p.amountCaptured || 0), 0
+  );
+  sale.amountRefunded = (sale.refunds || []).reduce(
+    (sum, r) => sum + (r.amountRefunded || 0), 0
+  );
+  let fullyPaid = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
+  sale.paymentComplete = fullyPaid;
+  if (fullyPaid) {
+    sale.status = "complete";
+  } else if (sale.amountCaptured > 0) {
+    sale.status = "partial";
+  }
+  return sale;
+}
+
 // ─── Build Payment Object ─────────────────────────────────────
 
 export function buildCashPayment(amountCaptured, amountTendered, isCheck) {
@@ -423,5 +445,58 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
     }
     dbSendEmail(customer.email, subject, html);
     log("Sent sale receipt email to", customer.email);
+  }
+}
+
+// ─── Send Refund Receipt (SMS + Email) ────────────────────────
+
+export async function sendRefundReceipt(refundReceiptData, customer, settings, smsTemplate, emailTemplate) {
+  if (!refundReceiptData || !settings) return;
+  const { tenantID, storeID } = useSettingsStore.getState().getSettings();
+
+  const firstName = customer?.first || "Customer";
+  const storeName = settings?.storeInfo?.displayName || "our store";
+  const total = formatCurrencyDisp(refundReceiptData.refundAmount || 0, true);
+
+  let receiptURL = "";
+  try {
+    const { generateRefundReceiptPDF } = await import("../../../../pdfGenerator");
+    let base64 = generateRefundReceiptPDF(refundReceiptData);
+    const storagePath = build_db_path.cloudStorage.saleReceiptPDF(refundReceiptData.id, tenantID, storeID);
+
+    // SMS — upload PDF and send link
+    if (smsTemplate && settings.autoSMSSalesReceipt && customer?.customerCell) {
+      const vars = { firstName, storeName, total, link: "{link}" };
+      let msg = applyVars(smsTemplate.content || smsTemplate.message || "", vars);
+      const result = await dbUploadPDFAndSendSMS({
+        base64,
+        storagePath,
+        message: msg,
+        phoneNumber: customer.customerCell,
+        customerID: customer.id || "",
+        messageID: generateRandomID(),
+      });
+      if (result?.data?.url) receiptURL = result.data.url;
+      log("Sent refund receipt SMS to", customer.customerCell);
+    } else {
+      // No SMS — still upload PDF for email link
+      const { uploadStringToStorage } = await import("../../../../db_calls");
+      const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
+      if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
+    }
+  } catch (e) {
+    log("Error generating/uploading refund receipt PDF:", e);
+  }
+
+  // Email
+  if (emailTemplate && settings.autoEmailSalesReceipt && customer?.email) {
+    const vars = { firstName, storeName, total, link: receiptURL };
+    let subject = applyVars(emailTemplate.subject || "", vars);
+    const receiptLink = receiptURL
+      ? "<p style='margin:24px 0'><a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#e53e3e;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Refund Receipt</a></p>"
+      : "";
+    let html = applyVars(emailTemplate.content || emailTemplate.body || "", { ...vars, receiptLink });
+    dbSendEmail(customer.email, subject, html);
+    log("Sent refund receipt email to", customer.email);
   }
 }

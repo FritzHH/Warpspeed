@@ -15,6 +15,7 @@ import {
   formatMillisForDisplay,
   formatPhoneWithDashes,
   gray,
+  lightenRGBByPercent,
   removeDashesFromPhone,
   resolveStatus,
 } from "../../../utils";
@@ -30,13 +31,14 @@ import {
   useWorkorderPreviewStore,
 } from "../../../stores";
 import { CONTACT_RESTRICTIONS, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, TAB_NAMES } from "../../../data";
-import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, SmallLoadingIndicator, TextInput_ } from "../../../components";
+import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, SmallLoadingIndicator, TextInput_, TouchableOpacity_ } from "../../../components";
 import {
   dbSaveCustomer,
   dbGetCustomer,
   dbGetCompletedWorkorder,
   dbGetCompletedSale,
 } from "../../../db_calls_wrapper";
+import { newCheckoutGetActiveSale } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 export const CustomerInfoScreenModalComponent = ({
   incomingCustomer = null,
@@ -146,7 +148,9 @@ export const CustomerInfoScreenModalComponent = ({
       const results = await Promise.all(
         saleIDs.map(async (id) => {
           try {
-            return await dbGetCompletedSale(id);
+            let sale = await dbGetCompletedSale(id);
+            if (!sale) sale = await newCheckoutGetActiveSale(id);
+            return sale;
           } catch (e) {
             return null;
           }
@@ -278,7 +282,7 @@ export const CustomerInfoScreenModalComponent = ({
     height: 40,
     borderColor: gray(0.08),
     borderWidth: 1,
-    marginTop: 20,
+    marginTop: 15,
     paddingHorizontal: 8,
     outlineWidth: 0,
     borderRadius: 7,
@@ -418,10 +422,10 @@ export const CustomerInfoScreenModalComponent = ({
           <TextInput_
             onChangeText={(val) => saveField("notes", capitalizeFirstLetterOfString(val))}
             placeholder="Address notes"
-            style={{ ...TEXT_INPUT_STYLE }}
+            multiline={true}
+            numberOfLines={6}
+            style={{ ...TEXT_INPUT_STYLE, height: undefined, minHeight: 40, paddingVertical: 8 }}
             value={sCustomerInfo.notes}
-            multiline
-            numberOfLines={3}
           />
           <CheckBox_
             isChecked={!!sCustomerInfo.gatedCommunity}
@@ -448,7 +452,7 @@ export const CustomerInfoScreenModalComponent = ({
                 onPress={() => handleButton1Press(sCustomerInfo)}
                 colorGradientArr={COLOR_GRADIENTS.blue}
                 buttonStyle={{
-                  marginTop: 30,
+                  marginTop: 20,
                   marginLeft: 20,
                   height: 40,
                   width: 200,
@@ -467,7 +471,7 @@ export const CustomerInfoScreenModalComponent = ({
                 colorGradientArr={COLOR_GRADIENTS.green}
                 icon={ICONS.greenDollar}
                 buttonStyle={{
-                  marginTop: 30,
+                  marginTop: 20,
                   marginLeft: 20,
                   height: 36,
                   width: 200,
@@ -478,14 +482,14 @@ export const CustomerInfoScreenModalComponent = ({
               />
             )}
           </View>
-          <View style={{ flex: 1 }} />
+          <View style={{}} />
           {!!button2Text && (
             <Button_
               icon={ICONS.close1}
               colorGradientArr={COLOR_GRADIENTS.blue}
               onPress={handleButton2Press}
               buttonStyle={{
-                marginTop: 30,
+                marginTop: 20,
                 marginLeft: 20,
                 marginBottom: 10,
                 height: 40,
@@ -507,12 +511,14 @@ export const CustomerInfoScreenModalComponent = ({
             }}
           >
             <Button_
-              icon={ICONS.workorder}
+              icon={sWoLoading ? null : ICONS.workorder}
               iconSize={18}
               textStyle={{ color: gray(0.45), fontSize: 13 }}
-              text={"LOAD WORKORDERS"}
+              text={sWoLoading ? "" : "REFRESH WORKORDERS"}
+              TextComponent={sWoLoading ? SmallLoadingIndicator : undefined}
               buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
               onPress={() => loadWorkorders()}
+              enabled={!sWoLoading}
             />
             {sWoLoading && <LoadingOverlay text="Loading workorders..." />}
             {!sWoLoading && sWorkorders.length > 0 && (
@@ -544,33 +550,41 @@ export const CustomerInfoScreenModalComponent = ({
               paddingVertical: 5,
             }}
           >
-            {/* Sales section — scrollable, shrinks to make room for deposits */}
-            <View style={{ flex: 1, minHeight: 0 }}>
-              <Button_
-                icon={ICONS.dollarYellow}
-                iconSize={20}
-                text={"LOAD SALES"}
-                textStyle={{ color: gray(0.45), fontSize: 13 }}
-                buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
-                onPress={() => loadSales()}
-              />
-              {sSalesLoading && <LoadingOverlay text="Loading sales..." />}
-              {!sSalesLoading && sSales.length > 0 && (
+            <Button_
+              icon={sSalesLoading ? null : ICONS.dollarYellow}
+              iconSize={20}
+              text={sSalesLoading ? "" : "REFRESH SALES"}
+              TextComponent={sSalesLoading ? SmallLoadingIndicator : undefined}
+              textStyle={{ color: gray(0.45), fontSize: 13 }}
+              buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
+              onPress={() => loadSales()}
+              enabled={!sSalesLoading}
+            />
+            {sSalesLoading && <LoadingOverlay text="Loading sales..." />}
+            {!sSalesLoading && sSales.length > 0 && (
+              <ScrollView style={{ flexShrink: 1 }}>
                 <SalesList
                   sales={sSales}
-                  onSelect={(sale) => _sSetDetailView({ type: "sale", data: sale })}
+                  onSelect={(sale) => useOpenWorkordersStore.getState().setSaleModalObj(sale)}
                 />
+              </ScrollView>
+            )}
+            {!sSalesLoading &&
+              sSales.length === 0 &&
+              (sCustomerInfo.sales || []).length === 0 && (
+                <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
+                  No sales on file
+                </Text>
               )}
-              {!sSalesLoading &&
-                sSales.length === 0 &&
-                (sCustomerInfo.sales || []).length === 0 && (
-                  <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
-                    No sales on file
-                  </Text>
-                )}
-            </View>
-            {/* Deposits section — always visible below sales */}
-            <DepositsList deposits={sCustomerInfo.deposits || []} />
+            {/* Deposits section — directly below sales, pushes down until bottom */}
+            <DepositsList
+              deposits={sCustomerInfo.deposits || []}
+              onPress={async (deposit) => {
+                if (!deposit.saleID) return;
+                let sale = await dbGetCompletedSale(deposit.saleID);
+                if (sale) useOpenWorkordersStore.getState().setSaleModalObj(sale);
+              }}
+            />
           </View>
         )}
         {!isNewCustomer && sDetailView && (
@@ -643,7 +657,7 @@ const WorkordersList = ({ workorders, onSelect }) => {
           const itemCount = workorder.workorderLines?.length || 0;
 
           return (
-            <TouchableOpacity
+            <TouchableOpacity_
               onPress={() => onSelect(workorder)}
               style={{
                 marginBottom: 6,
@@ -789,7 +803,7 @@ const WorkordersList = ({ workorders, onSelect }) => {
                   </Text>
                 )}
               </View>
-            </TouchableOpacity>
+            </TouchableOpacity_>
           );
         }}
       />
@@ -799,46 +813,64 @@ const WorkordersList = ({ workorders, onSelect }) => {
 
 const SalesList = ({ sales, onSelect }) => {
   return (
-    <View style={{ flex: 1, width: "100%" }}>
-      <FlatList
-        data={sales}
-        keyExtractor={(item) => item.id}
-        renderItem={(obj) => {
-          const sale = obj.item;
-          const paymentCount = sale.payments?.length || 0;
-          const primaryPayment = sale.payments?.[0];
-          const isCash = primaryPayment?.cash;
-          const hasRefunds = (sale.amountRefunded || 0) > 0;
+    <View style={{ width: "100%" }}>
+      {sales.map((sale) => {
+        const hasRefunds = (sale.amountRefunded || 0) > 0;
 
-          return (
-            <TouchableOpacity
-              onPress={() => onSelect(sale)}
+        return (
+          <TouchableOpacity_
+            key={sale.id}
+            onPress={() => onSelect(sale)}
+            style={{
+              marginBottom: 6,
+              borderRadius: 7,
+              borderLeftWidth: 4,
+              borderLeftColor: sale.paymentComplete
+                ? C.green
+                : C.lightred,
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+              backgroundColor: C.listItemWhite,
+              paddingVertical: 8,
+              paddingHorizontal: 10,
+            }}
+          >
+            {/* Row 1: Date + badges */}
+            <View
               style={{
-                marginBottom: 6,
-                borderRadius: 7,
-                borderLeftWidth: 4,
-                borderLeftColor: sale.paymentComplete
-                  ? C.green
-                  : C.lightred,
-                borderColor: C.buttonLightGreenOutline,
-                borderWidth: 1,
-                backgroundColor: C.listItemWhite,
-                paddingVertical: 8,
-                paddingHorizontal: 10,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 4,
               }}
             >
-              {/* Row 1: Date + payment complete badge */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 4,
-                }}
-              >
-                <Text style={{ color: "dimgray", fontSize: 12 }}>
-                  {formatMillisForDisplay(sale.millis)}
-                </Text>
+              <Text style={{ color: "dimgray", fontSize: 12 }}>
+                {formatMillisForDisplay(sale.millis)}
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {sale.isDepositSale && (
+                  <View
+                    style={{
+                      backgroundColor: sale.depositType === "credit"
+                        ? lightenRGBByPercent(C.blue, 70)
+                        : lightenRGBByPercent(C.orange, 70),
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      borderRadius: 8,
+                      marginRight: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: "600",
+                        color: sale.depositType === "credit" ? C.blue : C.orange,
+                      }}
+                    >
+                      {sale.depositType === "credit" ? "Credit" : "Deposit"}
+                    </Text>
+                  </View>
+                )}
                 <View
                   style={{
                     backgroundColor: sale.paymentComplete
@@ -860,16 +892,18 @@ const SalesList = ({ sales, onSelect }) => {
                   </Text>
                 </View>
               </View>
+            </View>
 
-              {/* Row 2: Totals */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 4,
-                }}
-              >
+            {/* Row 2: Totals */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 4,
+              }}
+            >
+              {!sale.isDepositSale && (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Text style={{ fontSize: 11, color: gray(0.5) }}>{"Sub: "}</Text>
                   <Text style={{ fontSize: 12, color: C.text }}>
@@ -885,58 +919,58 @@ const SalesList = ({ sales, onSelect }) => {
                     {"$" + formatCurrencyDisp(sale.tax)}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
-                  {"$" + formatCurrencyDisp(sale.total)}
-                </Text>
-              </View>
+              )}
+              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                {"$" + formatCurrencyDisp(sale.total)}
+              </Text>
+            </View>
 
-              {/* Row 3: Payment method(s) */}
-              <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}>
-                {(sale.payments || []).map((p, idx) => (
-                  <View
-                    key={p.id || idx}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      backgroundColor: gray(0.04),
-                      borderRadius: 5,
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      marginRight: 6,
-                      marginBottom: 2,
-                      borderWidth: 1,
-                      borderColor: gray(0.1),
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, color: C.text }}>
-                      {p.cash
-                        ? "Cash"
-                        : p.check
-                          ? "Check"
-                          : (p.cardType || "Card") + (p.last4 ? " ..." + p.last4 : "")}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: gray(0.4), marginLeft: 4 }}>
-                      {"$" + formatCurrencyDisp(p.amountCaptured)}
-                    </Text>
-                  </View>
-                ))}
-                {hasRefunds && (
-                  <Text style={{ fontSize: 11, color: C.lightred, marginLeft: 4 }}>
-                    {"Refunded: $" + formatCurrencyDisp(sale.amountRefunded)}
+            {/* Row 3: Payment method(s) */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}>
+              {(sale.payments || []).map((p, idx) => (
+                <View
+                  key={p.id || idx}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: gray(0.04),
+                    borderRadius: 5,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    marginRight: 6,
+                    marginBottom: 2,
+                    borderWidth: 1,
+                    borderColor: gray(0.1),
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: C.text }}>
+                    {p.cash
+                      ? "Cash"
+                      : p.check
+                        ? "Check"
+                        : (p.cardType || "Card") + (p.last4 ? " ..." + p.last4 : "")}
                   </Text>
-                )}
-              </View>
-
-              {/* Row 4: Linked workorders */}
-              {sale.workorderIDs?.length > 0 && (
-                <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 4 }}>
-                  {"WO: " + sale.workorderIDs.join(", ")}
+                  <Text style={{ fontSize: 11, color: gray(0.4), marginLeft: 4 }}>
+                    {"$" + formatCurrencyDisp(p.amountCaptured)}
+                  </Text>
+                </View>
+              ))}
+              {hasRefunds && (
+                <Text style={{ fontSize: 11, color: C.lightred, marginLeft: 4 }}>
+                  {"Refunded: $" + formatCurrencyDisp(sale.amountRefunded)}
                 </Text>
               )}
-            </TouchableOpacity>
-          );
-        }}
-      />
+            </View>
+
+            {/* Row 4: Linked workorders */}
+            {sale.workorderIDs?.length > 0 && (
+              <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 4 }}>
+                {"WO: " + sale.workorderIDs.join(", ")}
+              </Text>
+            )}
+          </TouchableOpacity_>
+        );
+      })}
     </View>
   );
 };

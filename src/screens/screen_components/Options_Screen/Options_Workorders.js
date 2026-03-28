@@ -485,9 +485,9 @@ export function WorkordersComponent({}) {
                         >
                           {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
                         </Text>
-                        {!!(workorder.amountPaidNonDeposit || workorder.amountPaid) && (
+                        {!!workorder.amountPaid && (
                           <Text style={{ fontSize: 12, color: C.green, marginLeft: 6, fontWeight: "500" }}>
-                            {"Paid $" + formatCurrencyDisp(workorder.amountPaidNonDeposit || workorder.amountPaid)}
+                            {"Paid $" + formatCurrencyDisp(workorder.amountPaid)}
                           </Text>
                         )}
                         {!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID) && (

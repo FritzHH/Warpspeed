@@ -254,7 +254,7 @@ export const CardRefund = memo(function CardRefund({
         text={sProcessing ? "PROCESSING..." : "PROCESS CARD REFUND"}
         onPress={handleProcessRefund}
         enabled={isEnabled && sRefundAmount >= 50}
-        colorGradientArr={COLOR_GRADIENTS.red}
+        colorGradientArr={COLOR_GRADIENTS.yellow}
         textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
         buttonStyle={{
           paddingVertical: 8,

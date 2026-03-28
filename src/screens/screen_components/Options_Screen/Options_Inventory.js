@@ -1,6 +1,6 @@
 /*eslint-disable*/
 import React, { useEffect, useRef, useState } from "react";
-import { View, FlatList, Text, TouchableOpacity } from "react-native-web";
+import { View, FlatList, Text, TouchableOpacity, ScrollView } from "react-native-web";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
@@ -87,6 +87,17 @@ export function InventoryComponent({}) {
     }
     _setSearchResults(arr);
   }, [zInventoryArr]);
+
+  // Auto-fire "common" button on mount once data is loaded
+  const hasAutoFiredRef = useRef(false);
+  useEffect(() => {
+    if (!isDataLoaded || hasAutoFiredRef.current) return;
+    let commonBtn = zQuickItemButtons.find((b) => b.id === "common");
+    if (commonBtn) {
+      hasAutoFiredRef.current = true;
+      handleQuickButtonPress(commonBtn);
+    }
+  }, [isDataLoaded]);
   ///////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////
 
@@ -444,7 +455,7 @@ export function InventoryComponent({}) {
                 <Button_
                   key={item.id}
                   onPress={() => handleQuickButtonPress(item)}
-                  colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "part") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
+                  colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "part" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                   buttonStyle={{
                     borderWidth: 1,
                     borderRadius: 5,
@@ -452,6 +463,7 @@ export function InventoryComponent({}) {
                     marginBottom: 10,
                     paddingHorizontal: 2,
                     paddingLeft: 2,
+                    paddingVertical: item.id === "common" ? 14 : 5,
                     backgroundColor: undefined,
                   }}
                   numLines={item.name.length > 17 ? 2 : 1}
@@ -592,138 +604,149 @@ export function InventoryComponent({}) {
             </View>
           )}
 
-          {/** Section 3: FlatList — always present, fills remaining space */}
-          <FlatList
-            style={{
-              width: "100%",
-              flex: 1,
-            }}
-            data={[...sSearchResults]}
-            ListEmptyComponent={(sCurrentParentID || sSelectedButtonID) ? (
-              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
-                <Image_ icon={ICONS.info} size={40} />
-                <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>
-              </View>
-            ) : null}
-            renderItem={({ item, index }) => {
-              return (
-                <View
-                  style={{
-                    borderRadius: 7,
-                    borderLeftColor: C.buttonLightGreenOutline,
-                    borderWidth: 1,
-                    borderLeftWidth: 2,
-                    borderColor: C.listItemBorder,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    height: "100%",
-                    backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
-                    paddingRight: 3,
-                    paddingVertical: 1,
-                    marginBottom: 2,
-                  }}
-                >
-                  {!!zOpenWorkorderID && (
-                    <View style={{ width: "5%" }}>
-                      <Button_
-                        icon={ICONS.info}
-                        iconSize={15}
-                        buttonStyle={{ width: 30 }}
-                        onPress={() => {
-                          handleInventoryInfoPress(item);
-                        }}
-                      />
-                    </View>
-                  )}
-                  <TouchableOpacity_
-                    style={{
-                      height: "100%",
-                      width: zOpenWorkorderID ? "95%" : "100%",
-                    }}
-                    onPress={() => inventoryItemSelected(item)}
-                  >
-                    <View
-                      style={{
-                        width: "100%",
-                        flexDirection: "row",
-                        height: "100%",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Text
-                        style={{
-                          width: "85%",
-                          fontSize: 15,
-                          paddingLeft: 7,
-                          paddingRight: 5,
-                          color: C.text,
-                        }}
-                      >
-                        {item.informalName || item.formalName}
-                        {!!item.informalName && (
-                          <Text style={{ fontSize: 12, color: "gray" }}>
-                            {"\n" + item.formalName}
-                          </Text>
-                        )}
-                      </Text>
-
-                      <View
-                        style={{
-                          width: "15%",
-                          height: "100%",
-                          alignItems: "flex-end",
-                          justifyContent: "center",
-                          borderLeftWidth: 1,
-                          borderColor: C.listItemBorder,
-                          paddingRight: 5,
-                          backgroundColor: C.backgroundListWhite,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            textAlign: "right",
-                            fontSize: 10,
-                            color: gray(0.4),
-                          }}
-                        >
-                          {"$ "}
-                          <Text
-                            style={{
-                              textAlignVertical: "top",
-                              fontSize: 14,
-                              color: C.text,
-                            }}
-                          >
-                            {formatCurrencyDisp(item.price)}
-                          </Text>
-                        </Text>
-                        {!!item.salePrice && (
-                          <Text
-                            style={{
-                              textAlign: "right",
-                              fontSize: 10,
-                              color: lightenRGBByPercent(C.red, 60),
-                            }}
-                          >
-                            {"$ "}
-                            <Text
-                              style={{
-                                textAlignVertical: "top",
-                                fontSize: 12,
-                                color: C.red,
-                              }}
-                            >
-                              {/* {formatCurrencyDisp(item.salePrice)} */}
-                            </Text>
+          {/** Section 3: Item list — always present, fills remaining space */}
+          {sSearchResults.length === 0 && (sCurrentParentID || sSelectedButtonID) ? (
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
+              <Image_ icon={ICONS.info} size={40} />
+              <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>
+            </View>
+          ) : (
+            <ScrollView style={{ width: "100%", flex: 1 }}>
+              {sSearchResults.map((item, index) => {
+                let activeBtn = sSelectedButtonID ? (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID) : null;
+                let dividerObj = (activeBtn?.dividers || []).find((d) => d.itemID === item.id);
+                let hasDivider = !!dividerObj && index > 0;
+                return (
+                  <React.Fragment key={item.id}>
+                    {hasDivider && (
+                      <View>
+                        <View style={{ height: 4, backgroundColor: C.buttonLightGreenOutline, borderRadius: 2 }} />
+                        {!!dividerObj?.label && (
+                          <Text style={{ fontSize: 16, color: gray(0.5), paddingVertical: 2, paddingHorizontal: 6, textAlign: "center", fontWeight: "600" }}>
+                            {dividerObj.label}
                           </Text>
                         )}
                       </View>
+                    )}
+                    <View
+                      style={{
+                        borderRadius: 7,
+                        borderLeftColor: C.buttonLightGreenOutline,
+                        borderWidth: 1,
+                        borderLeftWidth: 2,
+                        borderColor: C.listItemBorder,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
+                        paddingRight: 3,
+                        paddingVertical: 1,
+                        marginTop: index === 0 ? 0 : 5,
+                        marginBottom: 5,
+                      }}
+                    >
+                      {!!zOpenWorkorderID && (
+                        <View style={{ width: "5%" }}>
+                          <Button_
+                            icon={ICONS.info}
+                            iconSize={15}
+                            buttonStyle={{ width: 30 }}
+                            onPress={() => {
+                              handleInventoryInfoPress(item);
+                            }}
+                          />
+                        </View>
+                      )}
+                      <TouchableOpacity_
+                        style={{
+                          height: "100%",
+                          width: zOpenWorkorderID ? "95%" : "100%",
+                        }}
+                        onPress={() => inventoryItemSelected(item)}
+                      >
+                        <View
+                          style={{
+                            width: "100%",
+                            flexDirection: "row",
+                            height: "100%",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              width: "85%",
+                              fontSize: 15,
+                              paddingLeft: 7,
+                              paddingRight: 5,
+                              color: C.text,
+                            }}
+                          >
+                            {item.informalName || item.formalName}
+                            {!!item.informalName && (
+                              <Text style={{ fontSize: 12, color: "gray" }}>
+                                {"\n" + item.formalName}
+                              </Text>
+                            )}
+                          </Text>
+
+                          <View
+                            style={{
+                              width: "15%",
+                              height: "100%",
+                              alignItems: "flex-end",
+                              justifyContent: "center",
+                              borderLeftWidth: 1,
+                              borderColor: C.listItemBorder,
+                              paddingRight: 5,
+                              backgroundColor: C.backgroundListWhite,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                textAlign: "right",
+                                fontSize: 10,
+                                color: gray(0.4),
+                              }}
+                            >
+                              {"$ "}
+                              <Text
+                                style={{
+                                  textAlignVertical: "top",
+                                  fontSize: 14,
+                                  color: C.text,
+                                }}
+                              >
+                                {formatCurrencyDisp(item.price)}
+                              </Text>
+                            </Text>
+                            {!!item.salePrice && (
+                              <Text
+                                style={{
+                                  textAlign: "right",
+                                  fontSize: 10,
+                                  color: lightenRGBByPercent(C.red, 60),
+                                }}
+                              >
+                                {"$ "}
+                                <Text
+                                  style={{
+                                    textAlignVertical: "top",
+                                    fontSize: 12,
+                                    color: C.red,
+                                  }}
+                                >
+                                  {/* {formatCurrencyDisp(item.salePrice)} */}
+                                </Text>
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      </TouchableOpacity_>
                     </View>
-                  </TouchableOpacity_>
-                </View>
-              );
-            }}
-          />
+                  </React.Fragment>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
         {sModalItem && (
           <InventoryItemModalScreen

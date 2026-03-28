@@ -61,7 +61,7 @@ import {
   StatusPickerModal,
 } from "../../../../components";
 import { cloneDeep, set, debounce } from "lodash";
-import { Children, useEffect, useRef, useState } from "react";
+import React, { Children, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
@@ -907,7 +907,6 @@ export function Dashboard_Admin({}) {
                     // 4. Strip all payment/sale fields from workorder
                     wo.paymentComplete = false;
                     wo.amountPaid = 0;
-                    wo.amountPaidNonDeposit = 0;
                     wo.activeSaleID = "";
                     wo.saleID = "";
                     wo.endedOnMillis = "";
@@ -1514,6 +1513,9 @@ function UserQuickCard({ userObj, isClockedIn }) {
             btn2Text: "CANCEL",
             handleBtn1Press: () => {
               useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), option);
+              if (option === "out") {
+                useLoginStore.getState().setCurrentUser(null);
+              }
             },
             handleBtn2Press: () => null,
             showAlert: true,
@@ -1552,6 +1554,8 @@ const AppUserListComponent = ({
   const [sLockHours, _setLockHours] = useState(zSettingsObj?.idleLoginTimeoutHours ? String(Math.round(zSettingsObj.idleLoginTimeoutHours)) : "");
   const [sPinLength, _setPinLength] = useState(zSettingsObj?.userPinStrength || "");
   const zPunchClock = useLoginStore((state) => state.punchClock);
+  const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
+  const canEditUsers = zCurrentUserLevel >= PERMISSION_LEVELS.superUser.level;
 
   const userListItemRefs = useRef([]);
 
@@ -1793,11 +1797,12 @@ const AppUserListComponent = ({
                   >
                     <TouchableOpacity
                       onPress={() => {
+                        if (!canEditUsers) return;
                         _setEditUserIndex(sEditUserIndex != null ? null : idx);
                         _setShowPinIndex(null);
                         _setShowWageIndex(null);
                       }}
-                      style={{ marginLeft: 10 }}
+                      style={{ marginLeft: 10, opacity: canEditUsers ? 1 : 0.3 }}
                     >
                       <Image_ icon={editable ? ICONS.close1 : ICONS.editPencil} size={20} />
                     </TouchableOpacity>
@@ -4552,6 +4557,31 @@ const QuickItemButtonsComponent = ({
     handleSettingsFieldChange("quickItemButtons", updated);
   }
 
+  function handleToggleDivider(itemID) {
+    if (!sCurrentParentID) return;
+    let updated = allButtons.map((b) => {
+      if (b.id !== sCurrentParentID) return b;
+      let dividers = [...(b.dividers || [])];
+      let idx = dividers.findIndex((d) => d.itemID === itemID);
+      if (idx >= 0) dividers.splice(idx, 1);
+      else dividers.push({ itemID, label: "" });
+      return { ...b, dividers };
+    });
+    handleSettingsFieldChange("quickItemButtons", updated);
+  }
+
+  function handleDividerLabelChange(itemID, label) {
+    if (!sCurrentParentID) return;
+    let updated = allButtons.map((b) => {
+      if (b.id !== sCurrentParentID) return b;
+      let dividers = (b.dividers || []).map((d) =>
+        d.itemID === itemID ? { ...d, label } : d
+      );
+      return { ...b, dividers };
+    });
+    handleSettingsFieldChange("quickItemButtons", updated);
+  }
+
   let allButtons = zSettingsObj?.quickItemButtons || [];
   let topLevelButtons = allButtons.filter((b) => !b.parentID);
   let currentChildren = allButtons.filter(
@@ -4749,8 +4779,8 @@ const QuickItemButtonsComponent = ({
         <BoxContainerInnerComponent
           style={{ width: "100%", alignItems: "center", borderWidth: 0, flex: 1 }}
         >
-          <View style={{ width: "100%", alignItems: "center", flexDirection: "row", marginBottom: 10 }}>
-            <Tooltip text="Add quick-item buttonsss" position="right">
+          <View style={{ width: "100%", alignItems: "center", flexDirection: "column", marginBottom: 10 }}>
+            <Tooltip text="Add quick-item button" position="right">
               <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={40} />
             </Tooltip>
           </View>
@@ -4907,58 +4937,85 @@ const QuickItemButtonsComponent = ({
               <Text style={{ fontSize: 12, fontWeight: "bold", color: gray(0.5), marginBottom: 6 }}>
                 ITEMS ({parentItems.length})
               </Text>
-              {parentItems.map((inv, i) => (
-                <div
-                  key={inv.id}
-                  draggable
-                  onDragStart={() => _setItemDragIdx(i)}
-                  onDragOver={(e) => { e.preventDefault(); _setItemDragOverIdx(i); }}
-                  onDragEnd={() => { _setItemDragIdx(null); _setItemDragOverIdx(null); }}
-                  onDrop={(e) => { e.preventDefault(); reorderItems(sItemDragIdx, i); _setItemDragIdx(null); _setItemDragOverIdx(null); }}
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingTop: 6,
-                    paddingBottom: 6,
-                    paddingLeft: 8,
-                    paddingRight: 8,
-                    borderRadius: 6,
-                    borderWidth: sItemDragOverIdx === i && sItemDragIdx !== null && sItemDragIdx !== i ? 2 : 1,
-                    borderStyle: "solid",
-                    borderColor: sItemDragOverIdx === i && sItemDragIdx !== null && sItemDragIdx !== i ? C.blue : C.buttonLightGreenOutline,
-                    backgroundColor: i % 2 === 0 ? C.backgroundListWhite : C.listItemWhite,
-                    marginBottom: 2,
-                    cursor: "grab",
-                    opacity: sItemDragIdx === i ? 0.5 : 1,
-                  }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, color: C.text }} numberOfLines={1}>
-                      {inv.informalName || inv.formalName}
-                    </Text>
-                    {!!inv.informalName && (
-                      <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
-                        {inv.formalName}
-                      </Text>
+              {parentItems.map((inv, i) => {
+                let dividerObj = (parentButton?.dividers || []).find((d) => d.itemID === inv.id);
+                let hasDivider = !!dividerObj && i > 0;
+                let isFirstItem = i === 0;
+                return (
+                  <React.Fragment key={inv.id}>
+                    {hasDivider && (
+                      <View style={{ marginTop: 10, marginBottom: 4 }}>
+                        <View style={{ height: 4, backgroundColor: C.buttonLightGreenOutline, borderRadius: 2 }} />
+                        <TextInput_
+                          placeholder="Divider label (optional)"
+                          defaultValue={dividerObj?.label || ""}
+                          onChangeText={(val) => handleDividerLabelChange(inv.id, val)}
+                          debounceMs={500}
+                          style={{
+                            fontSize: 12,
+                            color: gray(0.5),
+                            paddingVertical: 3,
+                            paddingHorizontal: 6,
+                            outlineWidth: 0,
+                            backgroundColor: "transparent",
+                          }}
+                        />
+                      </View>
                     )}
-                  </View>
-                  <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
-                    {"$" + formatCurrencyDisp(inv.price)}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      let updated = allButtons.map((b) => {
-                        if (b.id !== sCurrentParentID) return b;
-                        return { ...b, items: (b.items || []).filter((id) => id !== inv.id) };
-                      });
-                      handleSettingsFieldChange("quickItemButtons", updated);
-                    }}
-                  >
-                    <Image_ icon={ICONS.close1} size={14} />
-                  </TouchableOpacity>
-                </div>
-              ))}
+                    <div
+                      draggable
+                      onDragStart={() => _setItemDragIdx(i)}
+                      onDragOver={(e) => { e.preventDefault(); _setItemDragOverIdx(i); }}
+                      onDragEnd={() => { _setItemDragIdx(null); _setItemDragOverIdx(null); }}
+                      onDrop={(e) => { e.preventDefault(); reorderItems(sItemDragIdx, i); _setItemDragIdx(null); _setItemDragOverIdx(null); }}
+                      onContextMenu={isFirstItem ? undefined : (e) => { e.preventDefault(); handleToggleDivider(inv.id); }}
+                      title={isFirstItem ? "" : hasDivider ? "Right click to remove divider" : "Right click to add divider above"}
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingTop: 6,
+                        paddingBottom: 6,
+                        paddingLeft: 8,
+                        paddingRight: 8,
+                        borderRadius: 6,
+                        borderWidth: sItemDragOverIdx === i && sItemDragIdx !== null && sItemDragIdx !== i ? 2 : 1,
+                        borderStyle: "solid",
+                        borderColor: sItemDragOverIdx === i && sItemDragIdx !== null && sItemDragIdx !== i ? C.blue : C.buttonLightGreenOutline,
+                        backgroundColor: i % 2 === 0 ? C.backgroundListWhite : C.listItemWhite,
+                        marginBottom: 2,
+                        cursor: "grab",
+                        opacity: sItemDragIdx === i ? 0.5 : 1,
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, color: C.text }} numberOfLines={1}>
+                          {inv.informalName || inv.formalName}
+                        </Text>
+                        {!!inv.informalName && (
+                          <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
+                            {inv.formalName}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
+                        {"$" + formatCurrencyDisp(inv.price)}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          let updated = allButtons.map((b) => {
+                            if (b.id !== sCurrentParentID) return b;
+                            return { ...b, items: (b.items || []).filter((id) => id !== inv.id) };
+                          });
+                          handleSettingsFieldChange("quickItemButtons", updated);
+                        }}
+                      >
+                        <Image_ icon={ICONS.close1} size={14} />
+                      </TouchableOpacity>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
             </View>
           )}
         </View>
@@ -7601,6 +7658,12 @@ const ARCHIVE_COLLECTION_NAMES = [
   "completed-sales",
   "customers",
   "sales-index",
+  "open-workorders",
+  "inventory",
+  "settings",
+  "active-sales",
+  "punch_clock",
+  "punches",
 ];
 
 const MILLIS_IN_WEEK = 7 * 24 * 60 * 60 * 1000;

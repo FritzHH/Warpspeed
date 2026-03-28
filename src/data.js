@@ -808,6 +808,7 @@ export const SETTINGS_OBJ = {
     { id: "34trhrg", name: "Diagnostics", parentID: null, items: [], removable: true },
     { id: "labor", name: "$Labor", parentID: null, items: [], removable: false },
     { id: "part", name: "$Part", parentID: null, items: [], removable: false },
+    { id: "common", name: "Common", parentID: null, items: [], removable: false },
   ],
   // colors:
   bikeBrands: ["Trek", "Specialized", "Sun", "Marin", "Cannondale", "Jamis"],

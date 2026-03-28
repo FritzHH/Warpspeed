@@ -149,7 +149,7 @@ export const CashRefund = memo(function CashRefund({
         text="PROCESS CASH REFUND"
         onPress={handleProcessRefund}
         enabled={isEnabled && sRefundAmount > 0}
-        colorGradientArr={COLOR_GRADIENTS.red}
+        colorGradientArr={COLOR_GRADIENTS.yellow}
         textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
         buttonStyle={{
           paddingVertical: 8,

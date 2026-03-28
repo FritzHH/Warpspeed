@@ -38,6 +38,7 @@ import {
   updateSaleWithTotals,
   calculateSaleTotals,
   sendSaleReceipt,
+  recomputeSaleAmounts,
 } from "./newCheckoutUtils";
 import { translateSalesReceipt } from "../../../../shared/receiptTranslator";
 import { generateSaleReceiptPDF } from "../../../../pdfGenerator";
@@ -333,7 +334,8 @@ export function NewCheckoutModalScreen() {
         let existingDepositIds = new Set((existingSale.payments || []).filter((p) => p.isDeposit).map((p) => p.depositId));
         let unappliedDeposits = cloneDeep(freshCust?.deposits || []).filter((d) => d.amountCents > 0 && !existingDepositIds.has(d.id));
         for (let deposit of unappliedDeposits) {
-          let amountNeeded = (existingSale.total || 0) - (existingSale.amountCaptured || 0);
+          let currentCaptured = (existingSale.payments || []).reduce((s, p) => s + (p.amountCaptured || 0), 0);
+          let amountNeeded = (existingSale.total || 0) - currentCaptured;
           if (amountNeeded <= 0) break;
           let appliedAmount = Math.min(deposit.amountCents, amountNeeded);
           let payment = {
@@ -355,8 +357,8 @@ export function NewCheckoutModalScreen() {
           };
           payment.saleID = existingSale.id;
           existingSale.payments = [...existingSale.payments, payment];
-          existingSale.amountCaptured = existingSale.amountCaptured + appliedAmount;
         }
+        recomputeSaleAmounts(existingSale);
 
         _setSale(existingSale);
         broadcastSaleToDisplay(existingSale, combined, existingSale.addedItems || [], custFirst, custLast);
@@ -392,7 +394,8 @@ export function NewCheckoutModalScreen() {
     let freshCust2 = useCurrentCustomerStore.getState().getCustomer();
     let customerDeposits = cloneDeep(freshCust2?.deposits || []).filter((d) => d.amountCents > 0);
     for (let deposit of customerDeposits) {
-      let amountNeeded = (sale.total || 0) - (sale.amountCaptured || 0);
+      let currentCaptured = (sale.payments || []).reduce((s, p) => s + (p.amountCaptured || 0), 0);
+      let amountNeeded = (sale.total || 0) - currentCaptured;
       if (amountNeeded <= 0) break;
       let appliedAmount = Math.min(deposit.amountCents, amountNeeded);
       let payment = {
@@ -414,8 +417,8 @@ export function NewCheckoutModalScreen() {
       };
       payment.saleID = sale.id;
       sale.payments = [...sale.payments, payment];
-      sale.amountCaptured = sale.amountCaptured + appliedAmount;
     }
+    recomputeSaleAmounts(sale);
 
     _setSale(sale);
     broadcastSaleToDisplay(sale, zOpenWorkorder ? [cloneDeep(zOpenWorkorder)] : [], [], custFirst, custLast);
@@ -673,7 +676,7 @@ export function NewCheckoutModalScreen() {
     // Remove deposit payment from sale
     let sale = cloneDeep(sSale);
     sale.payments = sale.payments.filter((p) => p.id !== payment.id);
-    sale.amountCaptured = sale.amountCaptured - payment.amountCaptured;
+    recomputeSaleAmounts(sale);
     _setSale(sale);
     newCheckoutSaveActiveSale(sale);
 
@@ -704,7 +707,7 @@ export function NewCheckoutModalScreen() {
       amountCaptured: newAmountCents,
       amountTendered: newAmountCents,
     };
-    sale.amountCaptured = sale.amountCaptured - difference;
+    recomputeSaleAmounts(sale);
     _setSale(sale);
     newCheckoutSaveActiveSale(sale);
 
@@ -775,22 +778,18 @@ export function NewCheckoutModalScreen() {
     let sale = cloneDeep(sSale);
     payment.saleID = sale.id;
     sale.payments = [...sale.payments, payment];
-    sale.amountCaptured = sale.amountCaptured + payment.amountCaptured;
     sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);
 
     // Store added items on the sale so they can be restored on resume
     sale.addedItems = cloneDeep(sAddedItems);
 
-    // Check if fully paid
-    if (sale.amountCaptured >= sale.total) {
-      sale.paymentComplete = true;
-      sale.status = "complete";
+    recomputeSaleAmounts(sale);
+
+    if (sale.paymentComplete) {
       _setShowCelebration(true);
       setTimeout(() => _setShowCelebration(false), 1700);
       handleSaleComplete(sale);
     } else {
-      sale.status = "partial";
-      // Update all combined workorders with partial payment info
       updateWorkordersWithPaymentStatus(sale);
     }
 
@@ -817,10 +816,7 @@ export function NewCheckoutModalScreen() {
 
       updated.activeSaleID = sale.id;
       updated.saleID = sale.id;
-      updated.amountPaid = sale.amountCaptured;
-      updated.amountPaidNonDeposit = (sale.payments || [])
-        .filter((p) => !p.isDeposit)
-        .reduce((sum, p) => sum + (p.amountCaptured || 0), 0);
+      updated.amountPaid = (sale.payments || []).filter((p) => !p.isDeposit).reduce((sum, p) => sum + (p.amountCaptured || 0), 0);
       // updated.status = "sale_in_progress";
 
       let entries = [];
@@ -858,6 +854,10 @@ export function NewCheckoutModalScreen() {
     };
     let updatedCustomer = cloneDeep(zCustomer) || {};
     updatedCustomer.deposits = [...(updatedCustomer.deposits || []), newDeposit];
+    let customerSales = updatedCustomer.sales || [];
+    if (!customerSales.includes(sale.id)) {
+      updatedCustomer.sales = [...customerSales, sale.id];
+    }
     useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
     dbSaveCustomer(updatedCustomer);
 
@@ -873,17 +873,66 @@ export function NewCheckoutModalScreen() {
     };
     saveSaleIndex(sale, customerInfo, [], false);
 
-    // Print receipt
+    // Receipt actions based on settings
     let settings = useSettingsStore.getState().getSettings();
     let printerID = settings?.selectedPrinterID || "";
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let emptyWO = { workorderLines: [], taxFree: false, status: "" };
     let saleReceipt = printBuilder.sale(sale, sale.payments || [], customerInfo, emptyWO, 0, _ctx);
-    if (settings?.autoPrintSalesReceipt && printerID) {
-      dbSavePrintObj(saleReceipt, printerID);
-    }
-    if (saleReceipt.popCashRegister && !settings?.autoPrintSalesReceipt && printerID) {
+
+    if (saleReceipt.popCashRegister && !settings?.autoPrintSalesReceipt) {
       dbSavePrintObj({ popCashRegister: true }, printerID);
+    }
+
+    // Translate receipt if non-English language is set
+    let translatedReceipt = null;
+    let translatedPdfLabels = null;
+    let langCode = getTranslateCode(sReceiptLanguage);
+    if (langCode) {
+      try {
+        let translated = await translateSalesReceipt(saleReceipt, langCode);
+        translatedReceipt = translated.translatedReceipt;
+        translatedPdfLabels = translated.pdfLabels;
+      } catch (e) {
+        log("Receipt translation failed, falling back to English:", e);
+      }
+    }
+
+    // Print sale receipt
+    if (settings?.autoPrintSalesReceipt && printerID) {
+      let toPrint = translatedReceipt || saleReceipt;
+      dbSavePrintObj(toPrint, printerID);
+    }
+
+    // SMS/Email — template-driven
+    const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
+    const emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+    const smsContent = smsTemplate?.content || smsTemplate?.message || "";
+    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    let emptyParts = [];
+    if (settings?.autoSMSSalesReceipt && customerInfo.phone && !smsContent.trim()) emptyParts.push("SMS");
+    if (settings?.autoEmailSalesReceipt && (zCustomer?.email) && !emailContent.trim()) emptyParts.push("email");
+    if (emptyParts.length > 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "Empty Template",
+        message: "The sale receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ", or uncheck the auto " + emptyParts.join("/") + " option in Dashboard > Printing.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    }
+
+    const customerForReceipt = {
+      first: zCustomer?.first || "",
+      last: zCustomer?.last || "",
+      customerCell: zCustomer?.customerCell || "",
+      email: zCustomer?.email || "",
+      id: zCustomer?.id || "",
+    };
+    const canSMS = customerForReceipt.customerCell && smsContent.trim();
+    const canEmail = customerForReceipt.email && emailContent.trim();
+    if (canSMS || canEmail) {
+      sendSaleReceipt(sale, customerForReceipt, emptyWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode);
     }
   }
 
@@ -925,7 +974,7 @@ export function NewCheckoutModalScreen() {
 
       woToComplete.paymentComplete = true;
       woToComplete.activeSaleID = "";
-      woToComplete.amountPaid = sale.total;
+      woToComplete.amountPaid = (sale.payments || []).filter((p) => !p.isDeposit).reduce((sum, p) => sum + (p.amountCaptured || 0), 0);
       woToComplete.saleID = sale.id;
       woToComplete.status = "finished_and_paid";
 
@@ -956,11 +1005,18 @@ export function NewCheckoutModalScreen() {
     // Save completed sale to Cloud Storage
     await newCheckoutCompleteSale(sale);
 
-    // Persist deposit removal now that sale is finalized
-    let depositPayments = (sale.payments || []).filter((p) => p.isDeposit);
-    if (depositPayments.length > 0) {
-      let currentCustomer = cloneDeep(useCurrentCustomerStore.getState().getCustomer());
-      if (currentCustomer) {
+    // Add sale ID to customer and persist deposit removal
+    let currentCustomer = cloneDeep(useCurrentCustomerStore.getState().getCustomer());
+    if (currentCustomer) {
+      // Add sale ID to customer's sales array
+      let customerSales = currentCustomer.sales || [];
+      if (!customerSales.includes(sale.id)) {
+        currentCustomer.sales = [...customerSales, sale.id];
+      }
+
+      // Persist deposit removal now that sale is finalized
+      let depositPayments = (sale.payments || []).filter((p) => p.isDeposit);
+      if (depositPayments.length > 0) {
         let deposits = currentCustomer.deposits || [];
         for (let dp of depositPayments) {
           let idx = deposits.findIndex((d) => d.id === dp.depositId);
@@ -974,8 +1030,9 @@ export function NewCheckoutModalScreen() {
           }
         }
         currentCustomer.deposits = deposits;
-        useCurrentCustomerStore.getState().setCustomer(currentCustomer, true);
       }
+
+      useCurrentCustomerStore.getState().setCustomer(currentCustomer, true);
     }
 
     // Write sale index for reporting
@@ -1159,10 +1216,12 @@ export function NewCheckoutModalScreen() {
       btn2Text: "Print Receipts",
       handleBtn2Press: () => {
         handlePrintReceipts();
+        resetAndClose();
       },
       btn3Text: "Print Paper Only",
       handleBtn3Press: () => {
         handlePrintPaperOnly();
+        resetAndClose();
       },
       useCancelButton: true,
     });
@@ -1240,7 +1299,7 @@ export function NewCheckoutModalScreen() {
       sSale,
       sSale.payments,
       customer,
-      primaryWO,
+      primaryWO || { workorderLines: [], taxFree: false },
       zSettings?.salesTaxPercent,
       _ctx
     );

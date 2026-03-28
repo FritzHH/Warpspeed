@@ -3429,7 +3429,7 @@ export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) =
   );
 };
 
-export const DepositsList = ({ deposits }) => {
+export const DepositsList = ({ deposits, onPress }) => {
   let activeDeposits = (deposits || []).filter((d) => d.amountCents > 0);
   return (
     <View style={{ marginTop: 10, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 10, padding: 10, backgroundColor: C.listItemWhite }}>
@@ -3444,8 +3444,10 @@ export const DepositsList = ({ deposits }) => {
         </Text>
       )}
       {activeDeposits.map((deposit) => (
-        <View
+        <TouchableOpacity_
           key={deposit.id}
+          onPress={() => onPress && onPress(deposit)}
+          hoverOpacity={onPress ? 0.7 : 1}
           style={{
             marginBottom: 4,
             borderRadius: 7,
@@ -3490,14 +3492,14 @@ export const DepositsList = ({ deposits }) => {
                 </Text>
               )}
             </View>
-            <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 2 }}>
+            <Text style={{ fontSize: 12, color: gray(0.4), marginTop: 2 }}>
               {formatMillisForDisplay(deposit.millis)}
             </Text>
           </View>
           <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
             {"$" + formatCurrencyDisp(deposit.amountCents)}
           </Text>
-        </View>
+        </TouchableOpacity_>
       ))}
     </View>
   );

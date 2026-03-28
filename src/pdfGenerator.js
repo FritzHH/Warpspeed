@@ -391,6 +391,123 @@ export function generateSaleReceiptPDF(data, labels) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Refund Receipt PDF
+////////////////////////////////////////////////////////////////////////////////
+
+export function generateRefundReceiptPDF(data) {
+  let pageWidth = 226;
+  let margin = 10;
+  let contentWidth = pageWidth - margin * 2;
+  let centerX = pageWidth / 2;
+  let leftX = margin;
+  let rightX = pageWidth - margin;
+
+  let doc = new jsPDF({ unit: "pt", format: [pageWidth, 800] });
+  let y = margin + 10;
+
+  // Shop header
+  y = addShopHeader(doc, y, data, centerX);
+  y = addDivider(doc, y, leftX, rightX);
+
+  // Title
+  y += 10;
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("REFUND RECEIPT", centerX, y, { align: "center" });
+  y += 14;
+
+  // Date/time
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  if (data.millis || data.startedOnMillis) {
+    let d = new Date(Number(data.millis || data.startedOnMillis));
+    let dateStr = d.toLocaleDateString() + "  " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    doc.text(dateStr, centerX, y, { align: "center" });
+    y += 10;
+  }
+  y += 6;
+
+  // Customer info
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  let custName = [(data.customerFirstName || ""), (data.customerLastName || "")].filter(Boolean).join(" ");
+  if (custName) {
+    doc.text("Customer: " + custName, leftX, y);
+    y += 11;
+  }
+  if (data.customerContact) {
+    doc.text("Contact: " + data.customerContact, leftX, y);
+    y += 11;
+  }
+  if (data.startedBy) {
+    doc.text("Processed by: " + data.startedBy, leftX, y);
+    y += 11;
+  }
+
+  y += 4;
+  y = addDivider(doc, y, leftX, rightX);
+
+  // Refund type badge
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  let typeLabel = (data.refundType || "").toUpperCase() || "REFUND";
+  doc.text(typeLabel + " REFUND", leftX, y);
+  y += 14;
+
+  // Line items (item-based refund)
+  if (data.workorderLines && data.workorderLines.length > 0) {
+    y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, false, DEFAULT_SALE_LABELS);
+    y = addDivider(doc, y, leftX, rightX);
+    y = addTotals(doc, y, data, leftX, rightX, DEFAULT_SALE_LABELS);
+    y += 4;
+    y = addDivider(doc, y, leftX, rightX);
+  }
+
+  // Refund amount (bold, prominent)
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Refund Amount: $" + formatCents(data.refundAmount || data.total || 0), leftX, y);
+  y += 16;
+
+  // Refund notes
+  if (data.refundNotes) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    let noteLines = doc.splitTextToSize("Notes: " + data.refundNotes, contentWidth);
+    noteLines.forEach(function (nl) {
+      doc.text(nl, leftX, y);
+      y += 10;
+    });
+    y += 4;
+  }
+
+  y = addDivider(doc, y, leftX, rightX);
+
+  // Thank you blurb
+  if (data.thankYouBlurb) {
+    y = checkPageBreak(doc, y, 40, margin);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    let thankLines = doc.splitTextToSize(data.thankYouBlurb, contentWidth);
+    thankLines.forEach(function (line) {
+      doc.text(line, centerX, y, { align: "center" });
+      y += 9;
+    });
+    y += 6;
+  }
+
+  // Barcode
+  if (data.barcode) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.barcode, centerX, y, { align: "center" });
+    y += 10;
+  }
+
+  return doc.output("datauristring").split(",")[1];
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Workorder Ticket PDF
 ////////////////////////////////////////////////////////////////////////////////
 

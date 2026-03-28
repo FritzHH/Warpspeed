@@ -69,6 +69,7 @@ export const COLOR_GRADIENTS = {
   blue: [lightenRGBByPercent(C.blue, 15), lightenRGBByPercent(C.blue, 0)],
   lightBlue: [lightenRGBByPercent(C.blue, 60), lightenRGBByPercent(C.blue, 45)],
   grey: [gray(0.35), gray(0.45)],
+  yellow: [lightenRGBByPercent(C.orange, 35), lightenRGBByPercent(C.orange, 15)],
 };
 
 const ASSETS_PATH = "./assets/";

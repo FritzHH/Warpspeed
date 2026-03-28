@@ -91,8 +91,14 @@ export async function newCheckoutSaveActiveSale(sale) {
       log("newCheckoutSaveActiveSale: missing tenantID/storeID");
       return { success: false };
     }
-    const path = buildActiveSalePath(tenantID, storeID, sale.id);
-    await firestoreWrite(path, sale);
+    // Strip deposit/credit payments before persisting — they are session-only
+    // and get re-applied from the customer's deposits on resume
+    let saleToSave = cloneDeep(sale);
+    let realPayments = (saleToSave.payments || []).filter((p) => !p.isDeposit);
+    saleToSave.payments = realPayments;
+    saleToSave.amountCaptured = realPayments.reduce((sum, p) => sum + (p.amountCaptured || 0), 0);
+    const path = buildActiveSalePath(tenantID, storeID, saleToSave.id);
+    await firestoreWrite(path, saleToSave);
     return { success: true };
   } catch (error) {
     log("newCheckoutSaveActiveSale error:", error);
@@ -500,6 +506,50 @@ export async function querySalesIndex(startMillis, endMillis) {
   }
 }
 
+// ─── Deposit Void (Remove from Customer) ────────────────────────────
+
+export async function voidCustomerDeposit(saleID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !saleID) {
+      log("voidCustomerDeposit: missing tenantID/storeID/saleID");
+      return { success: false };
+    }
+
+    // Read the sale index to get the customerID
+    const indexPath = buildSalesIndexPath(tenantID, storeID, saleID);
+    const indexDoc = await firestoreRead(indexPath);
+    const customerID = indexDoc?.customerID;
+    if (!customerID) {
+      log("voidCustomerDeposit: no customerID found in sale index for", saleID);
+      return { success: false };
+    }
+
+    // Fetch the customer
+    const customerPath = `tenants/${tenantID}/stores/${storeID}/customers/${customerID}`;
+    const customer = await firestoreRead(customerPath);
+    if (!customer) {
+      log("voidCustomerDeposit: customer not found", customerID);
+      return { success: false };
+    }
+
+    // Remove the deposit entry matching this saleID
+    const deposits = customer.deposits || [];
+    const filtered = deposits.filter((d) => d.saleID !== saleID);
+    if (filtered.length === deposits.length) {
+      log("voidCustomerDeposit: no matching deposit found for saleID", saleID);
+      return { success: true }; // nothing to remove
+    }
+
+    customer.deposits = filtered;
+    await firestoreWrite(customerPath, customer);
+    return { success: true };
+  } catch (error) {
+    log("voidCustomerDeposit error:", error);
+    return { success: false, error };
+  }
+}
+
 // ─── Item Sales Tracking ─────────────────────────────────────────────
 
 export async function saveItemSales(sale, workorderLines) {
@@ -562,7 +612,7 @@ export async function markItemSalesRefunded(saleID, refundedLines) {
     if (!docs || docs.length === 0) return { success: true };
 
     const refundedItemIDs = new Set(
-      (refundedLines || []).map((l) => l.id).filter(Boolean)
+      (refundedLines || []).map((l) => l._originalLineId || l.id).filter(Boolean)
     );
     const toUpdate = docs.filter((d) => !d.refunded && refundedItemIDs.has(d.itemID));
     if (toUpdate.length === 0) return { success: true };

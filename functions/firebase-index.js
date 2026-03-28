@@ -6072,6 +6072,12 @@ const ARCHIVE_COLLECTIONS = [
   "completed-sales",
   "customers",
   "sales-index",
+  "open-workorders",
+  "inventory",
+  "settings",
+  "active-sales",
+  "punch_clock",
+  "punches",
 ];
 
 /**
@@ -6876,6 +6882,26 @@ async function completeSaleServerSide({
     .collection("stores").doc(storeID)
     .collection("active-sales").doc(saleID)
     .delete();
+
+  // ── Add sale ID to customer's sales array ──
+  const custID = customerID || sale.customerID;
+  if (custID) {
+    try {
+      const custRef = db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("customers").doc(custID);
+      const custSnap = await custRef.get();
+      if (custSnap.exists) {
+        const custData = custSnap.data();
+        const custSales = custData.sales || [];
+        if (!custSales.includes(saleID)) {
+          await custRef.update({ sales: [...custSales, saleID] });
+        }
+      }
+    } catch (e) {
+      log(`completeSaleServerSide[${logPrefix}]: failed to update customer sales array`, e);
+    }
+  }
 
   // ── Save sales index ──
   let allLines = [];

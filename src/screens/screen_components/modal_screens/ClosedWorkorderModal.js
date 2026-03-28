@@ -207,17 +207,31 @@ const NoteItem = ({ note, color }) => {
 
 // ─── Change Log Entry ───────────────────────────────────────────
 
-const ChangeLogEntry = ({ entry }) => {
+function formatShortDate(millis) {
+  const d = new Date(millis);
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const day = d.getDate();
+  const suffix = day === 1 || day === 21 || day === 31 ? "st" : day === 2 || day === 22 ? "nd" : day === 3 || day === 23 ? "rd" : "th";
+  let hours = d.getHours();
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  const mins = d.getMinutes().toString().padStart(2, "0");
+  return days[d.getDay()] + ", " + months[d.getMonth()] + " " + day + suffix + ", '" + String(d.getFullYear()).slice(2) + " -- " + hours + ":" + mins + " " + ampm;
+}
+
+const ChangeLogEntry = ({ entry, index }) => {
   if (!entry) return null;
   const message = entry.message || entry.text || JSON.stringify(entry);
   const millis = entry.millis || entry.timestamp || null;
   const user = entry.user || entry.userName || "";
+  const isAlt = index % 2 === 1;
   return (
-    <View style={{ marginBottom: 4, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: gray(0.15) }}>
-      <Text style={{ fontSize: 10, color: gray(0.5) }}>{message}</Text>
+    <View style={{ marginBottom: 4, paddingLeft: 8, paddingVertical: 4, paddingRight: 6, borderLeftWidth: 2, borderLeftColor: gray(0.15), backgroundColor: isAlt ? gray(0.06) : "transparent", borderRadius: isAlt ? 4 : 0 }}>
+      <Text style={{ fontSize: 10, color: isAlt ? gray(0.45) : gray(0.5) }}>{message}</Text>
       {(!!millis || !!user) && (
-        <Text style={{ fontSize: 9, color: gray(0.35), marginTop: 1 }}>
-          {[user, millis ? formatMillisForDisplay(millis) : ""].filter(Boolean).join(" - ")}
+        <Text style={{ fontSize: 9, color: isAlt ? gray(0.3) : gray(0.35), marginTop: 1 }}>
+          {[user, millis ? formatShortDate(millis) : ""].filter(Boolean).join(" - ")}
         </Text>
       )}
     </View>
@@ -251,6 +265,7 @@ export const ClosedWorkorderModal = () => {
 
   if (!workorder) return null;
 
+  const isClosed = !!workorder.paymentComplete;
   const rs = resolveStatus(workorder.status, statuses);
   const totals = calculateRunningTotals(workorder, taxPercent, [], false, !!workorder.taxFree);
   const lines = workorder.workorderLines || [];
@@ -362,12 +377,46 @@ export const ClosedWorkorderModal = () => {
             </View>
             <Button_
               text="Close"
-              icon={ICONS.close1}
-              iconSize={14}
+              colorGradientArr={COLOR_GRADIENTS.red}
               onPress={handleClose}
               buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-              textStyle={{ color: gray(0.5), fontSize: 12 }}
+              textStyle={{ color: C.textWhite, fontSize: 12 }}
             />
+          </View>
+
+          {/* ── Active / Closed Banner ── */}
+          <View
+            style={{
+              backgroundColor: isClosed ? lightenRGBByPercent(C.lightred, 55) : lightenRGBByPercent(C.green, 55),
+              paddingVertical: 8,
+              paddingHorizontal: 20,
+              flexDirection: "row",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: rs.backgroundColor,
+                paddingHorizontal: 14,
+                paddingVertical: 5,
+                borderRadius: 8,
+                marginRight: 12,
+              }}
+            >
+              <Text style={{ color: rs.textColor, fontSize: 13, fontWeight: "600" }}>
+                {rs.label}
+              </Text>
+            </View>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "700",
+                color: isClosed ? C.lightred : C.green,
+                letterSpacing: 1,
+              }}
+            >
+              {isClosed ? "CLOSED WORKORDER" : "ACTIVE WORKORDER"}
+            </Text>
           </View>
 
           {/* ── Body: two columns ── */}
@@ -555,7 +604,7 @@ export const ClosedWorkorderModal = () => {
                     </Text>
                   </TouchableOpacity>
                   {sShowChangeLog && changeLog.map((entry, idx) => (
-                    <ChangeLogEntry key={idx} entry={entry} />
+                    <ChangeLogEntry key={idx} entry={entry} index={idx} />
                   ))}
                 </View>
               )}

@@ -394,14 +394,16 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
             <Image_ icon={ICONS.thoughtBubble} size={22} />
           </TouchableOpacity>
         </Tooltip>
-        <Tooltip text="Send translated text to customer display" position="bottom">
-          <TouchableOpacity
-            onPress={onTranslatePress}
-            style={{ paddingHorizontal: 10, justifyContent: "center" }}
-          >
-            <Image_ icon={ICONS.paperPlane} size={22} />
-          </TouchableOpacity>
-        </Tooltip>
+        {localStorage.getItem("warpspeed_has_secondary_display") === "true" && (
+          <Tooltip text="Send translated text to customer display" position="bottom">
+            <TouchableOpacity
+              onPress={onTranslatePress}
+              style={{ paddingHorizontal: 10, justifyContent: "center" }}
+            >
+              <Image_ icon={ICONS.paperPlane} size={22} />
+            </TouchableOpacity>
+          </Tooltip>
+        )}
         {!!zOpenWorkorderID && !zIsStandaloneSale && localStorage.getItem("warpspeed_has_secondary_display") === "true" && (
           <Tooltip text="Show workorder on customer display" position="bottom">
             <TouchableOpacity

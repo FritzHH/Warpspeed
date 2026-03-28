@@ -37,6 +37,7 @@ import {
   dbSaveSettings,
   dbSaveSettingsField,
   dbSendSMS,
+  dbGetCustomer,
 } from "./db_calls_wrapper";
 
 // IndexedDB storage adapter for Zustand persist (used by inventory — too large for localStorage)
@@ -765,11 +766,13 @@ export const useCurrentCustomerStore = create(
   persist(
     (set, get) => ({
       customer: { ...CUSTOMER_PROTO },
+      customerRefreshed: false,
       sales: [],
       workorders: [],
       salesLoading: false,
       workordersLoading: false,
       getCustomer: () => get().customer,
+      getCustomerRefreshed: () => get().customerRefreshed,
       getWorkorders: () => get().workorders,
       getSales: () => get().sales,
       getSalesLoading: () => get().salesLoading,
@@ -781,7 +784,7 @@ export const useCurrentCustomerStore = create(
         if (saveToDB) dbSaveCustomer({ ...get().customer, [fieldName]: value });
       },
       setCustomer: (customer, sendToDB = true) => {
-        set({ customer });
+        set({ customer, customerRefreshed: true });
         // log(get().customer, customer)
         if (sendToDB) dbSaveCustomer(customer);
       },
@@ -830,6 +833,23 @@ export const useCurrentCustomerStore = create(
     {
       name: "warpspeed_customer",
       partialize: (s) => ({ customer: s.customer }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error || !state) return;
+        const cachedCustomer = state.customer;
+        if (cachedCustomer?.id) {
+          dbGetCustomer(cachedCustomer.id).then((freshCustomer) => {
+            if (freshCustomer) {
+              useCurrentCustomerStore.setState({ customer: freshCustomer, customerRefreshed: true });
+            } else {
+              useCurrentCustomerStore.setState({ customerRefreshed: true });
+            }
+          }).catch(() => {
+            useCurrentCustomerStore.setState({ customerRefreshed: true });
+          });
+        } else {
+          useCurrentCustomerStore.setState({ customerRefreshed: true });
+        }
+      },
     }
   )
 );
@@ -1145,6 +1165,7 @@ export const useOpenWorkordersStore = create(
       workorderPreviewID: null,
       lockedWorkorderID: null,
       closedWorkorderModalObj: null,
+      saleModalObj: null,
 
       getOpenWorkorder: () => {
         let id = get().openWorkorderID;
@@ -1161,7 +1182,9 @@ export const useOpenWorkordersStore = create(
       getLockedWorkorderID: () => get().lockedWorkorderID,
       setLockedWorkorderID: (lockedWorkorderID) => set({ lockedWorkorderID }),
       getClosedWorkorderModalObj: () => get().closedWorkorderModalObj,
-      setClosedWorkorderModalObj: (closedWorkorderModalObj) => set({ closedWorkorderModalObj }),
+      setClosedWorkorderModalObj: (closedWorkorderModalObj) => set({ closedWorkorderModalObj: closedWorkorderModalObj ? { ...closedWorkorderModalObj } : null }),
+      getSaleModalObj: () => get().saleModalObj,
+      setSaleModalObj: (saleModalObj) => set({ saleModalObj }),
       setOpenWorkorderID: (openWorkorderID) => {
         set({ openWorkorderID, workorderPreviewID: null });
         if (openWorkorderID) {
@@ -1215,6 +1238,7 @@ export const useOpenWorkordersStore = create(
       },
 
       removeWorkorder: (workorderID, saveToDB = true, batch = true) => {
+        let workorder = get().workorders.find((o) => o.id === workorderID);
         let workorders = get().workorders.filter((o) => o.id !== workorderID);
         set({ workorders });
 
@@ -1224,6 +1248,15 @@ export const useOpenWorkordersStore = create(
 
         if (saveToDB && !workorderID.isStandaloneSale) {
           dbDeleteWorkorder(workorderID);
+
+          // Remove workorder ID from customer's workorders array
+          if (workorder?.customerID) {
+            let customer = useCurrentCustomerStore.getState().getCustomer();
+            if (customer?.id === workorder.customerID && customer.workorders) {
+              let updated = { ...customer, workorders: customer.workorders.filter((id) => id !== workorderID) };
+              useCurrentCustomerStore.getState().setCustomer(updated, true);
+            }
+          }
         }
       },
     }),

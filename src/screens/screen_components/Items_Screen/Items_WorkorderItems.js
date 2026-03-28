@@ -601,9 +601,9 @@ export const Items_WorkorderItemsTab = ({}) => {
         />
 
         {(() => {
-          let paidNonDeposit = zOpenWorkorder?.amountPaidNonDeposit || zOpenWorkorder?.amountPaid || 0;
-          let hasPayments = paidNonDeposit > 0;
-          let remaining = hasPayments ? Math.max(0, sTotals.finalTotal - paidNonDeposit) : 0;
+          let paid = zOpenWorkorder?.amountPaid || 0;
+          let hasPayments = paid > 0;
+          let remaining = hasPayments ? Math.max(0, sTotals.finalTotal - paid) : 0;
           return (
             <View
               style={{

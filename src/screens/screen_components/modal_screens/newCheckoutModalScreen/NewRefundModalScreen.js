@@ -28,6 +28,7 @@ import {
   getPreviouslyRefundedLineIDs,
   splitWorkorderLinesToSingleQty,
   sendRefundReceipt,
+  recomputeSaleAmounts,
 } from "./newCheckoutUtils";
 import {
   newCheckoutFetchCompletedSale,
@@ -289,7 +290,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     );
 
     sale.refunds = [...(sale.refunds || []), refund];
-    sale.amountRefunded = (sale.amountRefunded || 0) + amount;
+    recomputeSaleAmounts(sale);
 
     // Update per-payment amountRefunded
     if (type === "card" && cardDetails?.paymentId) {
@@ -651,7 +652,6 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
               <View
                 style={{
                   width: "29%",
-                  alignSelf: "stretch",
                   borderRightWidth: 1,
                   borderRightColor: gray(0.1),
                 }}
@@ -853,6 +853,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     previouslyRefundedIDs={previouslyRefundedIDs}
                     disabledItemIDs={disabledItemIDs}
                     hasPaymentSelection={hasPaymentSelection}
+                    isDepositSale={!!sOriginalSale?.isDepositSale}
+                    isActiveSale={sIsActiveSale}
                   />
                 )}
               </View>

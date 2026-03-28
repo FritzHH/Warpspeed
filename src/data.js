@@ -359,9 +359,9 @@ export const SALE_PROTO = {
   tax: 0,
   salesTaxPercent: 0,
   total: 0,
-  amountCaptured: 0,
-  amountRefunded: 0,
-  paymentComplete: false,
+  amountCaptured: 0, // Computed from payments[] — use recomputeSaleAmounts()
+  amountRefunded: 0, // Computed from refunds[] — use recomputeSaleAmounts()
+  paymentComplete: false, // Computed — true when amountCaptured >= total
   workorderIDs: [],
   payments: [],
   refunds: [],

@@ -107,6 +107,8 @@ export const RefundItemSelector = memo(function RefundItemSelector({
   previouslyRefundedIDs = [],
   disabledItemIDs = new Set(),
   hasPaymentSelection = false,
+  isDepositSale = false,
+  isActiveSale = false,
 }) {
   function isItemSelected(line) {
     return selectedItems.some((s) => s.id === line.id);
@@ -115,6 +117,69 @@ export const RefundItemSelector = memo(function RefundItemSelector({
   function isItemRefunded(line) {
     return previouslyRefundedIDs.includes(line.id) ||
       previouslyRefundedIDs.includes(line._originalLineId);
+  }
+
+  // Active/partial sales — restrict to payment-level refunds only
+  if (isActiveSale) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <View
+          style={{
+            backgroundColor: "rgb(252, 243, 225)",
+            borderRadius: 10,
+            padding: 20,
+            maxWidth: 340,
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 22, marginBottom: 10 }}>
+            {"\u26A0"}
+          </Text>
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.orange,
+              textAlign: "center",
+              marginBottom: 10,
+            }}
+          >
+            PARTIAL SALE
+          </Text>
+          <Text
+            style={{
+              fontSize: 12,
+              color: C.text,
+              textAlign: "center",
+              lineHeight: 18,
+              marginBottom: 12,
+            }}
+          >
+            Item-level refunds are not available for sales that are still in progress. Select a payment on the left to refund by amount.
+          </Text>
+          <View
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: "rgb(230, 215, 185)",
+              paddingTop: 10,
+              width: "100%",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                color: C.lightText,
+                textAlign: "center",
+                fontStyle: "italic",
+                lineHeight: 16,
+              }}
+            >
+              Complete the sale first, then reopen this screen to refund individual items.
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -131,18 +196,19 @@ export const RefundItemSelector = memo(function RefundItemSelector({
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.text,
-            }}
-          >
-            SELECT ITEMS TO REFUND
-          </Text>
-          {hasPaymentSelection && (
+          {hasPaymentSelection ? (
             <Text style={{ fontSize: 11, color: C.orange, fontWeight: Fonts.weight.textHeavy }}>
               UNCHECK ALL PAYMENTS TO SELECT ITEMS
+            </Text>
+          ) : (
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: Fonts.weight.textHeavy,
+                color: C.text,
+              }}
+            >
+              SELECT ITEMS TO REFUND
             </Text>
           )}
         </View>

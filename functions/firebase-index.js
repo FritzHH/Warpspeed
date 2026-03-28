@@ -6814,6 +6814,16 @@ function findHighestItem(workorderLines) {
 //   channel        — "sms" | "email" | "both" | undefined
 //
 // Returns: { completed: bool, partial: bool }
+function recomputeSaleAmounts(sale) {
+  sale.amountCaptured = (sale.payments || []).reduce((sum, p) => sum + (p.amountCaptured || 0), 0);
+  sale.amountRefunded = (sale.refunds || []).reduce((sum, r) => sum + (r.amountRefunded || 0), 0);
+  let fullyPaid = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
+  sale.paymentComplete = fullyPaid;
+  if (fullyPaid) sale.status = "complete";
+  else if (sale.amountCaptured > 0) sale.status = "partial";
+  return sale;
+}
+
 async function completeSaleServerSide({
   db, sale, saleID, tenantID, storeID, customerID,
   workorderIDs, addedItems, payment, charge, settings, customer,
@@ -6822,12 +6832,11 @@ async function completeSaleServerSide({
 }) {
   // Add payment to sale
   sale.payments = [...(sale.payments || []), payment];
-  sale.amountCaptured = (sale.amountCaptured || 0) + payment.amountCaptured;
+  recomputeSaleAmounts(sale);
 
   // Check if fully paid
-  if (sale.amountCaptured < sale.total) {
+  if (!sale.paymentComplete) {
     // Partial payment — update active sale
-    sale.status = "partial";
     await db.collection("tenants").doc(tenantID)
       .collection("stores").doc(storeID)
       .collection("active-sales").doc(saleID)
@@ -6839,8 +6848,6 @@ async function completeSaleServerSide({
   }
 
   // ── Sale is fully paid ──
-  sale.paymentComplete = true;
-  sale.status = "complete";
   log(`completeSaleServerSide[${logPrefix}]: sale fully paid, completing`, { saleID });
 
   // ── Complete workorders ──

@@ -12,6 +12,7 @@ import { log } from "../../../../utils";
 import { SALE_INDEX_PROTO, ITEM_SALE_PROTO } from "../../../../data";
 import { generateRandomID } from "../../../../utils";
 import { cloneDeep } from "lodash";
+import { recomputeSaleAmounts } from "./newCheckoutUtils";
 
 // ─── Callable Function References ─────────────────────────────
 // These are lazily initialized to avoid import-order issues with
@@ -94,9 +95,8 @@ export async function newCheckoutSaveActiveSale(sale) {
     // Strip deposit/credit payments before persisting — they are session-only
     // and get re-applied from the customer's deposits on resume
     let saleToSave = cloneDeep(sale);
-    let realPayments = (saleToSave.payments || []).filter((p) => !p.isDeposit);
-    saleToSave.payments = realPayments;
-    saleToSave.amountCaptured = realPayments.reduce((sum, p) => sum + (p.amountCaptured || 0), 0);
+    saleToSave.payments = (saleToSave.payments || []).filter((p) => !p.isDeposit);
+    recomputeSaleAmounts(saleToSave);
     const path = buildActiveSalePath(tenantID, storeID, saleToSave.id);
     await firestoreWrite(path, saleToSave);
     return { success: true };

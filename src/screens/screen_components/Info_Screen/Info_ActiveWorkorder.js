@@ -85,7 +85,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
   const zCustomerRefreshed = useCurrentCustomerStore((state) => state.customerRefreshed);
   const zCustomerLanguage = useCurrentCustomerStore((state) => state.customer?.language || "");
-  const zCustomerDeposits = useCurrentCustomerStore((state) => state.customer?.deposits || []);
+  const zCustomerDeposits = useCurrentCustomerStore((state) => state.customer?.deposits) || [];
   const zCustomer = {
     first: zOpenWorkorder?.customerFirst || "",
     last: zOpenWorkorder?.customerLast || "",
@@ -258,6 +258,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
   function handleStartStandaloneSalePress() {
     useLoginStore.getState().requireLogin(() => {
+      useCurrentCustomerStore.getState().setCustomer(null, false);
       let store = useOpenWorkordersStore.getState();
       store.setWorkorderPreviewID(null);
       let existing = store.workorders.find((o) => o.isStandaloneSale);

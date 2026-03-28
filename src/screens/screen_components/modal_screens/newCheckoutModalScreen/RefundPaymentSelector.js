@@ -62,7 +62,9 @@ const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, o
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <View
             style={{
-              backgroundColor: isDeposit ? C.purple : (isCash || isCheck ? C.green : C.blue),
+              backgroundColor: isDeposit
+                ? (payment.depositType === "credit" ? C.blue : C.orange)
+                : (isCash || isCheck ? C.green : C.blue),
               borderRadius: 3,
               paddingHorizontal: 5,
               paddingVertical: 1,
@@ -185,7 +187,7 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
         Select payments to refund
       </Text>
 
-      <ScrollView style={{ maxHeight: 200 }}>
+      <ScrollView>
         {payments.map((payment, idx) => {
           let isSelected = selectedPayments.some((p) => p.id === payment.id);
           let paymentIsCash = payment.cash || payment.check || payment.isDeposit;

@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
-import { TAB_NAMES, RECEIPT_TYPES } from "../../../data";
+import { TAB_NAMES, RECEIPT_TYPES, WORKORDER_PROTO } from "../../../data";
+import { cloneDeep } from "lodash";
 import {
   useOpenWorkordersStore,
   useTabNamesStore,
@@ -10,6 +11,7 @@ import {
   useWorkorderPreviewStore,
   useTicketSearchStore,
   useSettingsStore,
+  useLoginStore,
 } from "../../../stores";
 
 import {
@@ -258,6 +260,30 @@ export const StandaloneSaleComponent = ({}) => {
       >
         <Text style={{ fontSize: 72, color: gray(0.08) }}>{"SALE"}</Text>
       </View>
+      <Button_
+        text="CLEAR SALE"
+        onPress={() => {
+          let store = useOpenWorkordersStore.getState();
+          let oldWo = store.getOpenWorkorder();
+          if (!oldWo) return;
+          store.removeWorkorder(oldWo.id);
+          let wo = cloneDeep(WORKORDER_PROTO);
+          wo.isStandaloneSale = true;
+          wo.id = generateEAN13Barcode();
+          wo.startedBy = useLoginStore.getState().currentUser?.id;
+          wo.startedOnMillis = Date.now();
+          store.setWorkorder(wo);
+          store.setOpenWorkorderID(wo.id);
+        }}
+        colorGradientArr={COLOR_GRADIENTS.red}
+        buttonStyle={{
+          borderRadius: 5,
+          paddingHorizontal: 30,
+          paddingVertical: 10,
+          marginBottom: 30,
+        }}
+        textStyle={{ color: C.textWhite, fontSize: 14, fontWeight: "600" }}
+      />
       <View
         style={{
           flexDirection: "row",

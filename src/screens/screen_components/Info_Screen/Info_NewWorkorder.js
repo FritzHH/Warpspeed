@@ -369,6 +369,7 @@ export function NewWorkorderComponent({}) {
 
   function handleStartStandaloneSalePress() {
     useLoginStore.getState().requireLogin(() => {
+      useCurrentCustomerStore.getState().setCustomer(null, false);
       let store = useOpenWorkordersStore.getState();
       store.setWorkorderPreviewID(null);
       let existing = store.workorders.find((o) => o.isStandaloneSale);

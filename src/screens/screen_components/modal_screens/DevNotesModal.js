@@ -6,7 +6,7 @@ import { C, ICONS, Fonts, COLOR_GRADIENTS } from "../../../styles";
 import { Button_, TextInput_, Image_ } from "../../../components";
 import { useLoginStore, useAlertScreenStore } from "../../../stores";
 import { PRIVILEDGE_LEVELS } from "../../../data";
-import { generateEAN13Barcode, formatMillisForDisplay, gray } from "../../../utils";
+import { formatMillisForDisplay, gray } from "../../../utils";
 import {
   firestoreWrite,
   firestoreDelete,
@@ -39,7 +39,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
   async function handlePost() {
     let text = sNewNoteText.trim();
     if (!text) return;
-    let id = generateEAN13Barcode();
+    let id = crypto.randomUUID();
     let now = Date.now();
     await firestoreWrite("dev_notes/" + id, {
       id,

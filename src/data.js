@@ -370,6 +370,7 @@ export const SALE_PROTO = {
   receiptURL: "",
   isDepositSale: false,
   voidedByRefund: false,
+  standaloneSale: false
 };
 
 export const SALE_INDEX_PROTO = {

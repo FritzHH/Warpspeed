@@ -14,7 +14,6 @@ import {
   formatPhoneWithDashes,
   formatDateTimeForReceipt,
   capitalizeFirstLetterOfString,
-  generateRandomID,
   gray,
   log,
 } from "../../utils";
@@ -78,7 +77,7 @@ export function MobileMessagesScreen() {
       msg.canRespond = null;
       msg.millis = new Date().getTime();
       msg.customerID = customerID;
-      msg.id = generateRandomID();
+      msg.id = crypto.randomUUID();
       msg.type = "outgoing";
       msg.senderUserObj = currentUser;
       _setNewMessage("");

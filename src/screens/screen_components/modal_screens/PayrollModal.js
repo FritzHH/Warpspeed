@@ -18,7 +18,6 @@ import {
   trimToTwoDecimals,
   gray,
   log,
-  generateRandomID,
   lightenRGBByPercent,
   deepEqual,
 } from "../../../utils";
@@ -448,7 +447,7 @@ export const PayrollModal = ({ handleExit }) => {
 
     let punchObj = { ...TIME_PUNCH_PROTO };
     punchObj.userID = sSelectedUser.id;
-    punchObj.id = generateRandomID();
+    punchObj.id = crypto.randomUUID();
     punchObj.millis = newMillis;
     punchObj.option = option;
 
@@ -468,7 +467,7 @@ export const PayrollModal = ({ handleExit }) => {
 
     let punchObj = { ...TIME_PUNCH_PROTO };
     punchObj.userID = sSelectedUser.id;
-    punchObj.id = generateRandomID();
+    punchObj.id = crypto.randomUUID();
     punchObj.millis = usePrevious
       ? prevPunchObj.millis + MILLIS_IN_HOUR
       : new Date().getTime();

@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { generateRandomID, log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage, localStorageWrapper } from "./utils";
+import { log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage, localStorageWrapper } from "./utils";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
@@ -32,6 +32,7 @@ import {
   storageDelete,
   uploadPDFAndSendSMS,
   rehydrateFromArchiveCallable,
+  manualArchiveAndCleanupCallable,
   createTextToPayInvoiceCallable,
   firestoreBatchWrite,
 } from "./db_calls";
@@ -1228,7 +1229,7 @@ export async function dbSavePrintObj(printObj, printerID) {
       };
     }
 
-    printObj.id = generateRandomID();
+    printObj.id = crypto.randomUUID();
     printObj.timestamp = Date.now();
     const path = buildPrintObjectPath(
       tenantID,
@@ -1239,6 +1240,7 @@ export async function dbSavePrintObj(printObj, printerID) {
     let cleanedPrintObj = removeEmptyFields(printObj);
 
     let stringifiedPrintObj = stringifyAllObjectFields(cleanedPrintObj);
+    log("dbSavePrintObj:", JSON.stringify(stringifiedPrintObj, null, 2));
 
     const result = await firestoreWrite(path, stringifiedPrintObj);
 
@@ -3055,7 +3057,7 @@ export async function dbUploadWorkorderMedia(workorderID, file, extraMeta = {}) 
     }
 
     const mediaItem = {
-      id: generateRandomID(),
+      id: crypto.randomUUID(),
       url: result.downloadURL,
       storagePath: result.path,
       thumbnailUrl,
@@ -3142,5 +3144,16 @@ export async function dbRehydrateFromArchive(collections) {
   } catch (error) {
     log("Error in dbRehydrateFromArchive:", error);
     return { success: false, error: error.message || "Rehydration failed" };
+  }
+}
+
+export async function dbManualArchiveAndCleanup() {
+  const { tenantID, storeID } = getTenantAndStore();
+  try {
+    const result = await manualArchiveAndCleanupCallable({ tenantID, storeID });
+    return result.data;
+  } catch (error) {
+    log("Error in dbManualArchiveAndCleanup:", error);
+    return { success: false, error: error.message || "Manual archive failed" };
   }
 }

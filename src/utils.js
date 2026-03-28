@@ -1207,11 +1207,6 @@ export function lightenRGBByPercent(rgb, percent) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-export function generateRandomID(collectionPath) {
-  let ref = getNewCollectionRef(collectionPath || "CUSTOMERS");
-  return ref.id;
-}
-
 /**
  * Compute EAN-13 check digit from first 12 digits.
  * @param {string} first12 - 12-digit string
@@ -1224,58 +1219,22 @@ export function ean13CheckDigit(first12) {
 }
 
 /**
- * Create a 13-digit EAN-13 barcode for a specific type.
- * Prefix: 1 = workorder, 3 = sale, 4 = customer.
- * Prefix 2 is reserved for Lightspeed legacy barcodes.
- * @param {'workorder'|'sale'|'customer'} barcodeType
+ * Generate a valid 13-digit EAN-13 barcode.
+ * Used for workorder IDs (prefix "1") and sale IDs (prefix "3").
+ * Format: prefix + 8-digit timestamp + 3-digit random + check digit.
+ * Regenerates if check digit is 0.
+ * @param {string} prefix - "1" for workorder, "3" for sale
  * @returns {string} 13-digit EAN-13 barcode
  */
-export function generateEAN13Barcode(barcodeType) {
-  let begins = "0";
-  switch (barcodeType) {
-    case "workorder": begins = "1"; break;
-    case "sale": begins = "3"; break;
-    case "customer": begins = "4"; break;
+export function generateEAN13Barcode(prefix) {
+  while (true) {
+    const millis = Date.now().toString();
+    const timePart = millis.slice(-8);
+    const randomPart = Math.floor(100 + Math.random() * 900).toString();
+    const data = prefix + timePart + randomPart;
+    const check = ean13CheckDigit(data);
+    if (check !== 0) return data + check;
   }
-  const millis = Date.now().toString();
-  const timePart = millis.slice(-8);
-  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-  let data = (begins + timePart + randomPart).slice(0, 12);
-  return data + ean13CheckDigit(data);
-}
-
-/**
- * Get the next sequential EAN-13 barcode for workorders or sales.
- * Reads the counter from settings, increments it, and persists back.
- * @param {"workorder"|"sale"} type
- * @returns {string} 13-digit EAN-13 barcode
- */
-export function getNextID(type) {
-  const settings = useSettingsStore.getState().settings || {};
-  let counterField, prefix;
-  switch (type) {
-    case "workorder":
-      counterField = "nextWorkorderCounter";
-      prefix = "1";
-      break;
-    case "sale":
-      counterField = "nextSaleCounter";
-      prefix = "3";
-      break;
-    default:
-      return generateEAN13Barcode(type);
-  }
-  const counter = settings[counterField] || 1;
-  const padded = String(counter).padStart(11, "0");
-  const data = prefix + padded;
-  const barcode = data + ean13CheckDigit(data);
-
-  // Increment counter locally + persist to DB
-  const next = counter + 1;
-  useSettingsStore.getState().setField(counterField, next, false);
-  import("./db_calls_wrapper.js").then(m => m.dbSaveSettingsNode(counterField, next));
-
-  return barcode;
 }
 
 /**
@@ -1967,7 +1926,7 @@ export function createNewWorkorder({
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
   wo.isStandaloneSale = isStandaloneSale || false;
-  wo.id = getNextID("workorder");
+  wo.id = generateEAN13Barcode("1");
   wo.workorderNumber = generateWorkorderNumber(wo.id);
   wo.status = status || SETTINGS_OBJ.statuses[0]?.id || "";
   wo.customerFirst = customerFirst || "";
@@ -2001,12 +1960,11 @@ export function findTemplateByType(templates, type) {
 // Re-export calculateWaitEstimateLabel so existing imports keep working
 export const calculateWaitEstimateLabel = _shared.calculateWaitEstimateLabel;
 
-// Re-export printBuilder with a test() override that uses Firebase-based generateRandomID
 export const printBuilder = {
   ..._shared.printBuilder,
   test: () => ({
     ...RECEIPT_PROTO,
-    id: generateRandomID(),
+    id: crypto.randomUUID(),
     receiptType: RECEIPT_TYPES.test,
   }),
 };
@@ -2276,7 +2234,7 @@ async function executeAutoText(msg) {
         message: msg.smsMessage,
         phoneNumber: msg.customerCell,
         customerID: msg.customerID || "",
-        id: generateRandomID(),
+        id: crypto.randomUUID(),
       });
     }
     if (msg.emailSubject && msg.emailBody && msg.customerEmail) {
@@ -2313,7 +2271,7 @@ export function scheduleAutoText(rule, workorder, settings) {
   let delayMs = ((rule.delayMinutes || 0) * 60 + (rule.delaySeconds || 0)) * 1000;
   let sendAtMillis = Date.now() + delayMs;
   let pendingMsg = {
-    id: generateRandomID(),
+    id: crypto.randomUUID(),
     workorderID: workorder?.id || "",
     customerCell: cell,
     customerEmail: email,

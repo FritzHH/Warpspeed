@@ -33,7 +33,6 @@ import {
 import { FaceDetectionClientComponent } from "../faceDetection";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
-import { ClosedWorkorderModal } from "./screen_components/modal_screens/ClosedWorkorderModal";
 import { SaleModal } from "./screen_components/modal_screens/SaleModal";
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode } from "../utils";
@@ -303,7 +302,6 @@ export function BaseScreen() {
           50% { opacity: 0.3; }
         }
       `}</style>
-      <ClosedWorkorderModal />
       <SaleModal />
       <NewCheckoutModalScreen />
       <NewRefundModalScreen

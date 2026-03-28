@@ -19,7 +19,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   convertMillisToHoursMins,
   formatMillisForDisplay,
-  generateRandomID,
   getPreviousMondayDayJS,
   log,
   gray,
@@ -249,7 +248,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
 
       let punchObj = { ...TIME_PUNCH_PROTO };
       punchObj.userID = sUserObj.id;
-      punchObj.id = generateRandomID();
+      punchObj.id = crypto.randomUUID();
       punchObj.millis = usePrevious
         ? prevPunchObj.millis + MILLIS_IN_HOUR
         : new Date().getTime();

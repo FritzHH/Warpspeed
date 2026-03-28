@@ -5,7 +5,6 @@ import { View, Text, FlatList } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
   formatPhoneForDisplay,
-  generateEAN13Barcode,
   gray,
   log,
   createNewWorkorder

@@ -4,7 +4,6 @@ import { View, TextInput, Button } from "react-native-web";
 import {
   formatPhoneWithDashes,
   createNewWorkorder,
-  generateEAN13Barcode,
   log,
   removeDashesFromPhone,
   stringIsNumeric,
@@ -415,7 +414,7 @@ export function NewWorkorderComponent({}) {
     useLoginStore.getState().requireLogin(() => {
       // first create new customer — use the modal's updated state, not the stale local copy
       let newCustomer = cloneDeep(customerInfoFromModal || sCustomerInfo);
-      newCustomer.id = generateEAN13Barcode();
+      newCustomer.id = crypto.randomUUID();
       newCustomer.millisCreated = new Date().getTime();
 
       // next create new empty workorder for automatic population of next screen

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { View, Text, ScrollView } from "react-native-web";
+import { View, Text, ScrollView, FlatList } from "react-native-web";
 import { TouchableOpacity } from "react-native";
 import { useState, memo } from "react";
 import { cloneDeep } from "lodash";
@@ -7,7 +7,6 @@ import { TextInput_, Button_, DropdownMenu, Tooltip } from "../../../../componen
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   formatCurrencyDisp,
-  generateRandomID,
   gray,
 } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
@@ -150,6 +149,7 @@ export const InventorySearch = memo(function InventorySearch({
   inventory = [],
   discounts = [],
   onOpenNewItemModal,
+  isStandaloneSale = false,
 }) {
   const [sSearchString, _setSearchString] = useState("");
   const [sSearchResults, _setSearchResults] = useState([]);
@@ -192,7 +192,7 @@ export const InventorySearch = memo(function InventorySearch({
 
   function handleCreateNewItem() {
     let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-    newItem.id = generateRandomID();
+    newItem.id = crypto.randomUUID();
     newItem.upc = sNotFoundBarcode;
     if (onOpenNewItemModal) onOpenNewItemModal(newItem);
     _setNotFoundBarcode("");
@@ -301,20 +301,36 @@ export const InventorySearch = memo(function InventorySearch({
               marginBottom: 4,
             }}
           >
-            ADDED ITEMS ({addedItems.length})
+            {isStandaloneSale ? `SALE ITEMS (${addedItems.length})` : `ADDED ITEMS (${addedItems.length})`}
           </Text>
-          <ScrollView style={{ maxHeight: 120 }}>
-            {addedItems.map((item, idx) => (
-              <AddedItemRow
-                key={item.id || idx}
-                item={item}
-                onRemove={onRemoveItem}
-                onQtyChange={onQtyChange}
-                onDiscountChange={onDiscountChange}
-                discounts={discounts}
-              />
-            ))}
-          </ScrollView>
+          {isStandaloneSale ? (
+            <FlatList
+              data={addedItems}
+              keyExtractor={(item, idx) => item.id || String(idx)}
+              renderItem={({ item }) => (
+                <AddedItemRow
+                  item={item}
+                  onRemove={onRemoveItem}
+                  onQtyChange={onQtyChange}
+                  onDiscountChange={onDiscountChange}
+                  discounts={discounts}
+                />
+              )}
+            />
+          ) : (
+            <ScrollView style={{ maxHeight: 120 }}>
+              {addedItems.map((item, idx) => (
+                <AddedItemRow
+                  key={item.id || idx}
+                  item={item}
+                  onRemove={onRemoveItem}
+                  onQtyChange={onQtyChange}
+                  onDiscountChange={onDiscountChange}
+                  discounts={discounts}
+                />
+              ))}
+            </ScrollView>
+          )}
         </View>
       )}
 

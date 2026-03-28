@@ -34,7 +34,10 @@
       "Bash(grep -n \"runBackgroundRecognition.*true\\\\|setRunBackgroundRecognition\" src/**/*.js)",
       "Bash(xargs grep -l \"loadFromUri\\\\|loadFromWeightMap\")",
       "Bash(ESLINT_NO_DEV_ERRORS=true npx react-scripts build)",
-      "Bash(node -e \"const pkg = require\\(''./node_modules/react-scripts/package.json''\\); console.log\\(''react-scripts:'', pkg.version\\); const wp = require\\(''./node_modules/webpack/package.json''\\); console.log\\(''webpack:'', wp.version\\);\")"
+      "Bash(node -e \"const pkg = require\\(''./node_modules/react-scripts/package.json''\\); console.log\\(''react-scripts:'', pkg.version\\); const wp = require\\(''./node_modules/webpack/package.json''\\); console.log\\(''webpack:'', wp.version\\);\")",
+      "Bash(for commit in a9d66ed 85d3d7e aa40acb 1bb8fef a7fcddf 55d452a c773e51 9836504 3970793 53c0b49)",
+      "Bash(do echo \"=== $commit ===\")",
+      "Bash(done)"
     ]
   }
 }

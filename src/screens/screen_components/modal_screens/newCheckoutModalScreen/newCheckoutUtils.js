@@ -1,8 +1,6 @@
 import { cloneDeep } from "lodash";
 import {
   generateEAN13Barcode,
-  getNextID,
-  generateRandomID,
   calculateRunningTotals,
   formatCurrencyDisp,
   log,
@@ -21,10 +19,6 @@ import {
 // Sale IDs are 13-digit EAN-13 barcodes starting with "3".
 // Prefix "2" is reserved for Lightspeed legacy barcodes (sales + workorders).
 
-export function generateSaleID() {
-  return getNextID("sale"); // 13 digits starting with "3"
-}
-
 export function isSaleID(id) {
   return typeof id === "string" && id.length === 13 && /^\d{13}$/.test(id) && id.startsWith("3");
 }
@@ -38,7 +32,7 @@ export function isLightspeedID(id) {
 
 export function createNewSale(settings, createdBy = "") {
   let sale = cloneDeep(SALE_PROTO);
-  sale.id = generateSaleID();
+  sale.id = generateEAN13Barcode("3");
   sale.millis = Date.now();
   sale.salesTaxPercent = settings?.salesTaxPercent || 0;
   sale.status = "active";
@@ -179,7 +173,7 @@ export function recomputeSaleAmounts(sale) {
 
 export function buildCashPayment(amountCaptured, amountTendered, isCheck) {
   let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
-  payment.id = generateEAN13Barcode();
+  payment.id = crypto.randomUUID();
   payment.amountCaptured = amountCaptured;
   payment.amountTendered = amountTendered;
   payment.cash = !isCheck;
@@ -193,7 +187,7 @@ export function buildCardPayment(stripeChargeData) {
   let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
   let card = stripeChargeData?.payment_method_details?.card_present;
 
-  payment.id = generateEAN13Barcode();
+  payment.id = crypto.randomUUID();
   payment.amountCaptured = stripeChargeData.amount_captured || 0;
   payment.cardIssuer = card?.receipt?.application_preferred_name || "Unknown";
   payment.cardType = card?.description || "";
@@ -217,7 +211,7 @@ export function buildManualCardPayment(chargeData) {
   let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
   let card = chargeData?.payment_method_details?.card;
 
-  payment.id = generateEAN13Barcode();
+  payment.id = crypto.randomUUID();
   payment.amountCaptured = chargeData.amount_captured || 0;
   payment.cardIssuer = card?.brand || "Unknown";
   payment.cardType = card?.brand || "";
@@ -305,7 +299,7 @@ export function validateCardRefundAmount(requestedAmount, payment) {
 
 export function buildRefundObject(amountRefunded, selectedLines, cardRefundID, notes, type) {
   let refund = cloneDeep(REFUND_PROTO);
-  refund.id = generateEAN13Barcode();
+  refund.id = crypto.randomUUID();
   refund.type = type || "";
   refund.amountRefunded = amountRefunded;
   refund.workorderLines = selectedLines || [];
@@ -407,7 +401,7 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
         message: msg,
         phoneNumber: customer.customerCell,
         customerID: customer.id || "",
-        messageID: generateRandomID(),
+        messageID: crypto.randomUUID(),
       });
       if (result?.data?.url) receiptURL = result.data.url;
       log("Sent sale receipt SMS to", customer.customerCell);
@@ -474,7 +468,7 @@ export async function sendRefundReceipt(refundReceiptData, customer, settings, s
         message: msg,
         phoneNumber: customer.customerCell,
         customerID: customer.id || "",
-        messageID: generateRandomID(),
+        messageID: crypto.randomUUID(),
       });
       if (result?.data?.url) receiptURL = result.data.url;
       log("Sent refund receipt SMS to", customer.customerCell);

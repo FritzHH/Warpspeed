@@ -6,8 +6,6 @@ import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
 import {
   formatCurrencyDisp,
-  generateRandomID,
-  generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
   log,
@@ -79,15 +77,6 @@ export function InventoryComponent({}) {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    let arr = [];
-    if (sSearchResults.length > 20) return;
-    for (let i = 0; i <= 10; i++) {
-      if (zInventoryArr[i]) arr.push(zInventoryArr[i]);
-    }
-    _setSearchResults(arr);
-  }, [zInventoryArr]);
-
   // Auto-fire "common" button on mount once data is loaded
   const hasAutoFiredRef = useRef(false);
   useEffect(() => {
@@ -126,7 +115,7 @@ export function InventoryComponent({}) {
       if (/^\d{12,13}$/.test(searchTerm) && results.length === 0) {
         barcodeModalTimerRef.current = setTimeout(() => {
           let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-          newItem.id = generateRandomID();
+          newItem.id = crypto.randomUUID();
           if (searchTerm.length === 12) newItem.upc = searchTerm;
           else newItem.ean = searchTerm;
           _setModalItem(newItem);
@@ -274,7 +263,7 @@ export function InventoryComponent({}) {
       } else {
         let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
         lineItem.inventoryItem = item;
-        lineItem.id = generateEAN13Barcode();
+        lineItem.id = crypto.randomUUID();
         workorderLines = [...workorderLines, lineItem];
       }
       useOpenWorkordersStore
@@ -298,7 +287,7 @@ export function InventoryComponent({}) {
               name: userName,
               userID: currentUser?.id || "",
               value: autoNote.text,
-              id: generateRandomID(),
+              id: crypto.randomUUID(),
               autoNoteItemID: item.id,
             },
           ];
@@ -422,7 +411,7 @@ export function InventoryComponent({}) {
             useColorGradient={false}
             onPress={() => {
               let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-              newItem.id = generateRandomID();
+              newItem.id = crypto.randomUUID();
               _setModalItem(newItem);
             }}
           />
@@ -619,10 +608,10 @@ export function InventoryComponent({}) {
                 return (
                   <React.Fragment key={item.id}>
                     {hasDivider && (
-                      <View>
+                      <View style={{ marginTop: 3 }}>
                         <View style={{ height: 4, backgroundColor: C.buttonLightGreenOutline, borderRadius: 2 }} />
                         {!!dividerObj?.label && (
-                          <Text style={{ fontSize: 16, color: gray(0.5), paddingVertical: 2, paddingHorizontal: 6, textAlign: "center", fontWeight: "600" }}>
+                          <Text style={{ fontSize: 16, color: C.blue, paddingVertical: 2, paddingHorizontal: 6, textAlign: "center", fontWeight: "600" }}>
                             {dividerObj.label}
                           </Text>
                         )}

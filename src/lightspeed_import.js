@@ -1,4 +1,4 @@
-import { generateRandomID, buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex } from "./utils";
+import { buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex } from "./utils";
 import { COLORS, NONREMOVABLE_STATUSES } from "./data";
 
 // ============================================================================
@@ -256,7 +256,7 @@ function buildDiscountObj(saleLine, priceCents) {
   }
 
   return {
-    id: generateRandomID(),
+    id: crypto.randomUUID(),
     discountName: pct > 0 ? `${Math.round(pct * 100)}% Off` : `$${amt} Off`,
     discountValue,
     discountType,
@@ -423,7 +423,7 @@ export function mapWorkorders(
     const customerNotes = [];
     if (wo.note && wo.note.trim()) {
       customerNotes.push({
-        id: generateRandomID(),
+        id: crypto.randomUUID(),
         name: noteName,
         userID: "",
         value: sanitize(wo.note.trim()),
@@ -433,7 +433,7 @@ export function mapWorkorders(
     const internalNotes = [];
     if (wo.internalNote && wo.internalNote.trim()) {
       internalNotes.push({
-        id: generateRandomID(),
+        id: crypto.randomUUID(),
         name: noteName,
         userID: "",
         value: sanitize(wo.internalNote.trim()),
@@ -446,7 +446,7 @@ export function mapWorkorders(
       const item = itemMap[wi.itemID] || null;
 
       const inventoryItem = {
-        id: item ? item.itemID : generateRandomID(),
+        id: item ? item.itemID : crypto.randomUUID(),
         formalName: item ? (item.description || "Unknown Item") : "Unknown Item",
         informalName: "",
         brand: "",
@@ -463,7 +463,7 @@ export function mapWorkorders(
       const discountObj = buildDiscountObj(wiSaleLine, inventoryItem.price);
 
       return {
-        id: generateRandomID(),
+        id: crypto.randomUUID(),
         qty: parseInt(wi.unitQuantity) || 1,
         intakeNotes: sanitize((wi.note || "").trim()),
         receiptNotes: "",
@@ -495,12 +495,12 @@ export function mapWorkorders(
       const wlDiscountObj = buildDiscountObj(wlSaleLine, price);
 
       workorderLines.push({
-        id: generateRandomID(),
+        id: crypto.randomUUID(),
         qty: parseInt(wl.unitQuantity) || 1,
         intakeNotes: "",
         receiptNotes: "",
         inventoryItem: {
-          id: generateRandomID(),
+          id: crypto.randomUUID(),
           formalName: sanitize((wl.note || "").trim()) || (isLabor ? "Custom Labor" : "Custom Part"),
           informalName: "",
           brand: "",
@@ -681,7 +681,7 @@ export function mapSales(
       }
 
       return {
-        id: sp.salePaymentID || generateRandomID(),
+        id: sp.salePaymentID || crypto.randomUUID(),
         saleID,
         amountCaptured: amount,
         amountTendered: isCash ? amount : "",

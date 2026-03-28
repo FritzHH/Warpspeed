@@ -17,10 +17,8 @@ import {
   formatCurrencyDisp,
   formatMillisForDisplay,
   // searchInventory moved to Web Worker
-  generateRandomID,
   generateTimesForListDisplay,
   generateEAN13Barcode,
-  getNextID,
   getDayOfWeekFrom0To7Input,
   log,
   gray,
@@ -72,7 +70,7 @@ import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
 import { PayrollModal } from "../../modal_screens/PayrollModal";
-import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection } from "../../../../db_calls_wrapper";
+import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, extractStatusesFromWorkorders, parseCSV } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
 import { DB_NODES } from "../../../../constants";
@@ -624,7 +622,7 @@ export function Dashboard_Admin({}) {
             <TouchableOpacity
               onPress={() => {
                 let printObj = {
-                  id: generateRandomID(),
+                  id: crypto.randomUUID(),
                   receiptType: "Workorder",
                   barcode: "100000000001",
                   workorderNumber: "WO-10001",
@@ -716,14 +714,14 @@ export function Dashboard_Admin({}) {
                     allPunches.push({
                       ...TIME_PUNCH_PROTO,
                       userID,
-                      id: generateRandomID(),
+                      id: crypto.randomUUID(),
                       millis: inMillis,
                       option: "in",
                     });
                     allPunches.push({
                       ...TIME_PUNCH_PROTO,
                       userID,
-                      id: generateRandomID(),
+                      id: crypto.randomUUID(),
                       millis: outMillis,
                       option: "out",
                     });
@@ -775,7 +773,7 @@ export function Dashboard_Admin({}) {
 
                   const totals = calculateRunningTotals(workorder, settings?.salesTaxPercent, [], false, !!workorder.taxFree);
                   const fakeSale = {
-                    id: getNextID("sale"),
+                    id: generateEAN13Barcode("3"),
                     millis: Date.now(),
                     subtotal: totals.runningSubtotal,
                     discount: totals.runningDiscount,
@@ -1561,7 +1559,7 @@ const AppUserListComponent = ({
 
   function handleNewUserPress() {
     let userObj = cloneDeep(APP_USER);
-    userObj.id = generateEAN13Barcode();
+    userObj.id = crypto.randomUUID();
     let role = PERMISSION_LEVELS.user;
     userObj.permissions = role;
     commitUserInfoChange(userObj, true);
@@ -2560,7 +2558,7 @@ const DiscountsComponent = ({
                 discount.name = "";
                 discount.type = "Percent";
                 discount.value = "20";
-                discount.id = generateRandomID();
+                discount.id = crypto.randomUUID();
                 discountsArr.push(discount);
                 discountsArr.push(discount);
                 handleSettingsFieldChange("discounts", discountsArr);
@@ -2697,7 +2695,7 @@ const WaitTimesComponent = ({
                 let waitTime = {};
                 waitTime.label = "New wait time...";
                 waitTime.maxWaitTimeDays = 0;
-                waitTime.id = generateRandomID();
+                waitTime.id = crypto.randomUUID();
                 waitTimesArr.push(waitTime);
                 handleSettingsFieldChange("waitTimes", waitTimesArr);
               }}
@@ -3715,7 +3713,7 @@ const WorkorderStatusesComponent = ({
                   proto[key] = "";
                 });
                 proto.label = "New Status";
-                proto.id = generateRandomID();
+                proto.id = crypto.randomUUID();
                 proto.backgroundColor = gray(0.3);
                 proto.textColor = C.text;
                 proto.removable = true;
@@ -4078,7 +4076,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
   }
 
   function addRule() {
-    let newRule = { ...STATUS_AUTO_TEXT_PROTO, id: generateRandomID() };
+    let newRule = { ...STATUS_AUTO_TEXT_PROTO, id: crypto.randomUUID() };
     handleSettingsFieldChange("statusAutoText", [...rules, newRule]);
   }
 
@@ -4311,7 +4309,7 @@ const QuickItemButtonsComponent = ({
   }
 
   function handleAdd() {
-    let newID = generateRandomID();
+    let newID = crypto.randomUUID();
     let quickButtonsArr = [...(zSettingsObj?.quickItemButtons || [])];
     quickButtonsArr.push({
       id: newID,
@@ -4948,7 +4946,7 @@ const QuickItemButtonsComponent = ({
                         <View style={{ height: 4, backgroundColor: C.buttonLightGreenOutline, borderRadius: 2 }} />
                         <TextInput_
                           placeholder="Divider label (optional)"
-                          defaultValue={dividerObj?.label || ""}
+                          value={dividerObj?.label || ""}
                           onChangeText={(val) => handleDividerLabelChange(inv.id, val)}
                           debounceMs={500}
                           style={{
@@ -5037,7 +5035,7 @@ const IntakeButtonsComponent = ({ zSettingsObj, handleSettingsFieldChange, _setI
   function handleAdd() {
     let newBtn = {
       ...cloneDeep(INTAKE_BUTTON_PROTO),
-      id: generateRandomID(),
+      id: crypto.randomUUID(),
       label: "",
       itemsToAdd: [],
     };
@@ -6048,7 +6046,7 @@ const ImportComponent = () => {
         const isLabor = descLower.includes("labor") || descLower.includes("install");
         const upc = (item["UPC"] || "").trim();
         const systemId = (item["System ID"] || "").trim();
-        const id = upc || systemId || generateRandomID();
+        const id = upc || systemId || crypto.randomUUID();
         const isTube = desc.includes("TUBE ");
         const tubeCost = dollarsToCents(stripDollar(item["Default Cost"]));
         const price = isTube ? (tubeCost > 600 ? 1878 : 939) : dollarsToCents(stripDollar(item["Price"]));
@@ -6210,7 +6208,7 @@ const ImportComponent = () => {
       const mappedItems = activeItems.map(item => {
         const isLabor = (item.description || "").toLowerCase().includes("labor");
         return {
-          id: item.itemID || generateRandomID(),
+          id: item.itemID || crypto.randomUUID(),
           formalName: item.description || "",
           informalName: "",
           brand: "",
@@ -6353,7 +6351,7 @@ const ImportComponent = () => {
       const mappedItems = activeItems.map(item => {
         const isLabor = (item.description || "").toLowerCase().includes("labor");
         return {
-          id: item.itemID || generateRandomID(),
+          id: item.itemID || crypto.randomUUID(),
           formalName: item.description || "",
           informalName: "",
           brand: "",
@@ -6892,7 +6890,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
 
   function handleAddTemplate() {
     let newTemplate = {
-      id: generateRandomID(),
+      id: crypto.randomUUID(),
       label: "",
       content: "",
       type: "",
@@ -7234,7 +7232,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
 
   function handleAddTemplate() {
     let newTemplate = {
-      id: generateRandomID(),
+      id: crypto.randomUUID(),
       label: "",
       subject: "",
       content: "",
@@ -7678,6 +7676,8 @@ function BackupRecoveryComponent() {
   const [sConfirmStep, _setConfirmStep] = useState(0); // 0=idle, 1=first confirm, 2=second confirm
   const [sRehydrateResult, _setRehydrateResult] = useState(null);
   const [sWeeksLoaded, _setWeeksLoaded] = useState(1);
+  const [sArchiving, _setArchiving] = useState(false);
+  const [sArchiveResult, _setArchiveResult] = useState(null);
 
   async function loadLogs(weeksBack) {
     if (!tenantID || !storeID) return;
@@ -7725,8 +7725,100 @@ function BackupRecoveryComponent() {
     _setConfirmStep(0);
   }
 
+  async function handleManualArchive() {
+    _setArchiving(true);
+    _setArchiveResult(null);
+    try {
+      const result = await dbManualArchiveAndCleanup();
+      _setArchiveResult(result);
+    } catch (err) {
+      _setArchiveResult({ success: false, error: err.message });
+    }
+    _setArchiving(false);
+  }
+
   return (
     <BoxContainerOuterComponent>
+      {/*** MANUAL BACKUP SECTION ***/}
+      <BoxContainerInnerComponent style={{ alignItems: "center" }}>
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: "700",
+            color: C.text,
+            marginBottom: 10,
+            alignSelf: "flex-start",
+          }}
+        >
+          RUN BACKUP NOW
+        </Text>
+        <Text
+          style={{
+            fontSize: 12,
+            color: gray(0.5),
+            marginBottom: 15,
+            alignSelf: "flex-start",
+          }}
+        >
+          Manually runs the full nightly archive process: backs up all collections
+          to Cloud Storage, cleans up old media, and cleans up standalone active sales.
+        </Text>
+        <Button_
+          text={sArchiving ? "Archiving..." : "Run Full Backup"}
+          onPress={handleManualArchive}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+          disabled={sArchiving}
+          loading={sArchiving}
+        />
+        {!!sArchiveResult && (
+          <View
+            style={{
+              marginTop: 15,
+              padding: 10,
+              borderRadius: 8,
+              backgroundColor: sArchiveResult.success
+                ? "rgba(0,180,0,0.08)"
+                : "rgba(220,0,0,0.08)",
+              width: "100%",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: sArchiveResult.success ? C.green : C.red,
+                marginBottom: 5,
+              }}
+            >
+              {sArchiveResult.success ? "Backup Complete" : "Backup Failed"}
+            </Text>
+            {sArchiveResult.success &&
+              sArchiveResult.archive &&
+              Object.entries(sArchiveResult.archive).map(([name, r]) => (
+                <Text
+                  key={name}
+                  style={{ fontSize: 12, color: C.text, marginBottom: 2 }}
+                >
+                  {name}: {r.success ? r.docCount + " docs archived" : "FAILED — " + r.error}
+                </Text>
+              ))}
+            {sArchiveResult.success && sArchiveResult.mediaCleanup && (
+              <Text style={{ fontSize: 12, color: C.text, marginTop: 2 }}>
+                Media cleanup: {sArchiveResult.mediaCleanup.workordersProcessed} workorders,{" "}
+                {sArchiveResult.mediaCleanup.mediaFilesDeleted} files deleted
+              </Text>
+            )}
+            {!sArchiveResult.success && sArchiveResult.error && (
+              <Text style={{ fontSize: 12, color: C.red }}>
+                {sArchiveResult.error}
+              </Text>
+            )}
+          </View>
+        )}
+      </BoxContainerInnerComponent>
+
+      <View style={{ height: 20 }} />
       <BoxContainerInnerComponent style={{ alignItems: "center" }}>
         {/*** REHYDRATE SECTION ***/}
         <Text
@@ -8352,7 +8444,7 @@ const StandButtonsEditorComponent = ({
                     onPress={() => {
                       let newBtn = {
                         ...cloneDeep(INTAKE_QUICK_BUTTON_PROTO),
-                        id: generateRandomID(),
+                        id: crypto.randomUUID(),
                       };
                       let updated = rows.map((r) => [...r]);
                       updated[rowIdx].push(newBtn);

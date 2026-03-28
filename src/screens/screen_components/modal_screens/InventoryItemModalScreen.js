@@ -27,7 +27,6 @@ import { C, ICONS } from "../../../styles";
 import {
   formatCurrencyDisp,
   usdTypeMask,
-  generateRandomID,
   gray,
   log,
   showAlert,

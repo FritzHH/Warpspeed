@@ -18,8 +18,6 @@ import {
 import {
   lightenRGBByPercent,
   formatCurrencyDisp,
-  generateEAN13Barcode,
-  generateRandomID,
   log,
   printBuilder,
   gray,
@@ -30,8 +28,9 @@ import {
   applyDiscountToWorkorderItem,
   resolveStatus,
   usdTypeMask,
+  generateEAN13Barcode,
 } from "../../../../utils";
-import { WORKORDER_ITEM_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, PAYMENT_OBJECT_PROTO, CUSTOMER_DEPOST_TYPES, TAB_NAMES } from "../../../../data";
+import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, PAYMENT_OBJECT_PROTO, CUSTOMER_DEPOST_TYPES, TAB_NAMES } from "../../../../data";
 import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer } from "../../../../db_calls_wrapper";
 import {
   createNewSale,
@@ -261,14 +260,14 @@ export function NewCheckoutModalScreen() {
   const [sSplitDepositPayment, _setSplitDepositPayment] = useState(null);
   // ─── Derived Values ───────────────────────────────────────
   let isDepositMode = !!zDepositInfo;
-  let isStandalone = !zOpenWorkorder;
+  let isStandalone = !zOpenWorkorder || zOpenWorkorder?.isStandaloneSale;
   let saleComplete = sSale?.paymentComplete || false;
   let amountLeftToPay = Math.round((sSale?.total || 0) - (sSale?.amountCaptured || 0));
   if (amountLeftToPay < 0) amountLeftToPay = 0;
   let cashAmountLeftToPay = amountLeftToPay - sCardProcessingAmount;
   if (cashAmountLeftToPay < 0) cashAmountLeftToPay = 0;
-  let custFirst = zOpenWorkorder?.customerFirst || "";
-  let custLast = zOpenWorkorder?.customerLast || "";
+  let custFirst = zOpenWorkorder?.customerFirst || zCustomer?.first || "";
+  let custLast = zOpenWorkorder?.customerLast || zCustomer?.last || "";
   let hasRealPayments = (sSale?.payments || []).some((p) => !p.isDeposit);
 
   // ─── Initialization ──────────────────────────────────────
@@ -311,6 +310,7 @@ export function NewCheckoutModalScreen() {
     if (zOpenWorkorder?.activeSaleID) {
       let existingSale = await newCheckoutGetActiveSale(zOpenWorkorder.activeSaleID);
       if (existingSale && !existingSale.voidedByRefund) {
+        existingSale.standaloneSale = existingSale.standaloneSale || zOpenWorkorder?.isStandaloneSale || false;
         log("Resuming existing sale:", existingSale.id);
 
         // Rebuild combined workorders from the sale's workorderIDs
@@ -340,7 +340,7 @@ export function NewCheckoutModalScreen() {
           let appliedAmount = Math.min(deposit.amountCents, amountNeeded);
           let payment = {
             ...cloneDeep(PAYMENT_OBJECT_PROTO),
-            id: generateRandomID(),
+            id: crypto.randomUUID(),
             amountCaptured: appliedAmount,
             amountTendered: appliedAmount,
             isDeposit: true,
@@ -379,15 +379,24 @@ export function NewCheckoutModalScreen() {
     if (zOpenWorkorder) {
       // Checkout with workorder
       sale.customerID = zOpenWorkorder.customerID || "";
+      if (zOpenWorkorder.isStandaloneSale) sale.standaloneSale = true;
       let combined = [cloneDeep(zOpenWorkorder)];
       _setCombinedWorkorders(combined);
 
-      // Calculate initial totals
-      sale = updateSaleWithTotals(sale, combined, [], zSettings);
+      // Standalone sale: move workorderLines into addedItems
+      if (zOpenWorkorder.isStandaloneSale && (zOpenWorkorder.workorderLines || []).length > 0) {
+        let initialItems = cloneDeep(zOpenWorkorder.workorderLines);
+        _setAddedItems(initialItems);
+        sale.addedItems = initialItems;
+        sale = updateSaleWithTotals(sale, combined, initialItems, zSettings);
+      } else {
+        sale = updateSaleWithTotals(sale, combined, [], zSettings);
+      }
       sale.workorderIDs = [zOpenWorkorder.id];
     } else {
       // Standalone sale
       sale.status = "active";
+      sale.standaloneSale = true;
     }
 
     // Auto-apply customer deposits/credits (use fresh store data)
@@ -400,7 +409,7 @@ export function NewCheckoutModalScreen() {
       let appliedAmount = Math.min(deposit.amountCents, amountNeeded);
       let payment = {
         ...cloneDeep(PAYMENT_OBJECT_PROTO),
-        id: generateRandomID(),
+        id: crypto.randomUUID(),
         amountCaptured: appliedAmount,
         amountTendered: appliedAmount,
         isDeposit: true,
@@ -562,7 +571,7 @@ export function NewCheckoutModalScreen() {
       qty: 1,
       inventoryItem: cloneDeep(invItem),
       discountObj: null,
-      id: generateEAN13Barcode(),
+      id: crypto.randomUUID(),
       useSalePrice: false,
       warranty: false,
     };
@@ -577,6 +586,7 @@ export function NewCheckoutModalScreen() {
       newAddedItems,
       zSettings
     );
+    updated.addedItems = cloneDeep(newAddedItems);
     _setSale(updated);
     broadcastSaleToDisplay(updated, sCombinedWorkorders, newAddedItems, custFirst, custLast);
     newCheckoutSaveActiveSale(updated);
@@ -595,6 +605,7 @@ export function NewCheckoutModalScreen() {
       newAddedItems,
       zSettings
     );
+    updated.addedItems = cloneDeep(newAddedItems);
     _setSale(updated);
     broadcastSaleToDisplay(updated, sCombinedWorkorders, newAddedItems, custFirst, custLast);
     newCheckoutSaveActiveSale(updated);
@@ -617,6 +628,7 @@ export function NewCheckoutModalScreen() {
       newAddedItems,
       zSettings
     );
+    updated.addedItems = cloneDeep(newAddedItems);
     _setSale(updated);
     broadcastSaleToDisplay(updated, sCombinedWorkorders, newAddedItems, custFirst, custLast);
     newCheckoutSaveActiveSale(updated);
@@ -632,6 +644,7 @@ export function NewCheckoutModalScreen() {
       newAddedItems,
       zSettings
     );
+    updated.addedItems = cloneDeep(newAddedItems);
     _setSale(updated);
     broadcastSaleToDisplay(updated, sCombinedWorkorders, newAddedItems, custFirst, custLast);
     newCheckoutSaveActiveSale(updated);
@@ -649,7 +662,7 @@ export function NewCheckoutModalScreen() {
     // Create a payment object for this deposit
     let payment = {
       ...cloneDeep(PAYMENT_OBJECT_PROTO),
-      id: generateRandomID(),
+      id: crypto.randomUUID(),
       amountCaptured: appliedAmount,
       amountTendered: appliedAmount,
       isDeposit: true,
@@ -742,9 +755,11 @@ export function NewCheckoutModalScreen() {
         }
       }
     }
-    let updatedCustomer = { ...zCustomer, deposits: customerDeposits };
-    useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
-    dbSaveCustomer(updatedCustomer);
+    if (zCustomer?.id) {
+      let updatedCustomer = { ...zCustomer, deposits: customerDeposits };
+      useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+      dbSaveCustomer(updatedCustomer);
+    }
 
     _setSplitDepositPayment(null);
   }
@@ -770,6 +785,7 @@ export function NewCheckoutModalScreen() {
 
   // ─── Payment Handling ─────────────────────────────────────
   function handlePaymentCapture(payment) {
+    log("handlePaymentCapture called:", JSON.stringify(payment));
     // Guard: if sale is already marked complete locally, skip
     if (sSale?.paymentComplete) {
       log("handlePaymentCapture: sale already complete, skipping");
@@ -785,19 +801,37 @@ export function NewCheckoutModalScreen() {
 
     recomputeSaleAmounts(sale);
 
+    // Persist before completion so handleSaleComplete can find the active sale
+    if (!sDevSkip) newCheckoutSaveActiveSale(sale);
+
     if (sale.paymentComplete) {
       _setShowCelebration(true);
       setTimeout(() => _setShowCelebration(false), 1700);
       handleSaleComplete(sale);
     } else {
       updateWorkordersWithPaymentStatus(sale);
+
+      // Print receipt after partial cash payment (includes popCashRegister if change is due)
+      if (payment.cash) {
+        let settings = useSettingsStore.getState().getSettings();
+        let printerID = settings?.selectedPrinterID || "";
+        if (printerID) {
+          let primaryWO = sCombinedWorkorders[0];
+          let _isStandalone = primaryWO?.isStandaloneSale || !primaryWO;
+          let customer = (_isStandalone)
+            ? { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" }
+            : { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" };
+          let wo = _isStandalone ? { workorderLines: [], taxFree: false, status: "" } : primaryWO;
+          let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+          let receipt = printBuilder.sale(sale, [payment], customer, wo, settings?.salesTaxPercent, _ctx);
+          receipt.transactionOnly = true;
+          dbSavePrintObj(receipt, printerID);
+        }
+      }
     }
 
     _setSale(sale);
     broadcastSaleToDisplay(sale, sCombinedWorkorders, sAddedItems, custFirst, custLast);
-
-    // Persist immediately — network-failure-proof
-    if (!sDevSkip) newCheckoutSaveActiveSale(sale);
   }
 
   // Update workorders to track that a sale is in progress
@@ -841,7 +875,7 @@ export function NewCheckoutModalScreen() {
     // Create the deposit and add to customer
     let primaryPayment = (sale.payments || [])[0];
     let newDeposit = {
-      id: generateRandomID(),
+      id: crypto.randomUUID(),
       type: depositInfo.type,
       amountCents: depositInfo.amountCents,
       millis: Date.now(),
@@ -852,14 +886,16 @@ export function NewCheckoutModalScreen() {
       cardType: primaryPayment?.cardType || "",
       cardIssuer: primaryPayment?.cardIssuer || "",
     };
-    let updatedCustomer = cloneDeep(zCustomer) || {};
-    updatedCustomer.deposits = [...(updatedCustomer.deposits || []), newDeposit];
-    let customerSales = updatedCustomer.sales || [];
-    if (!customerSales.includes(sale.id)) {
-      updatedCustomer.sales = [...customerSales, sale.id];
+    if (zCustomer?.id) {
+      let updatedCustomer = cloneDeep(zCustomer);
+      updatedCustomer.deposits = [...(updatedCustomer.deposits || []), newDeposit];
+      let customerSales = updatedCustomer.sales || [];
+      if (!customerSales.includes(sale.id)) {
+        updatedCustomer.sales = [...customerSales, sale.id];
+      }
+      useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+      dbSaveCustomer(updatedCustomer);
     }
-    useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
-    dbSaveCustomer(updatedCustomer);
 
     // Complete the sale
     await newCheckoutCompleteSale(sale);
@@ -879,10 +915,7 @@ export function NewCheckoutModalScreen() {
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let emptyWO = { workorderLines: [], taxFree: false, status: "" };
     let saleReceipt = printBuilder.sale(sale, sale.payments || [], customerInfo, emptyWO, 0, _ctx);
-
-    if (saleReceipt.popCashRegister && !settings?.autoPrintSalesReceipt) {
-      dbSavePrintObj({ popCashRegister: true }, printerID);
-    }
+    // log("Receipt object (deposit sale):", JSON.stringify(saleReceipt, null, 2));
 
     // Translate receipt if non-English language is set
     let translatedReceipt = null;
@@ -898,8 +931,8 @@ export function NewCheckoutModalScreen() {
       }
     }
 
-    // Print sale receipt
-    if (settings?.autoPrintSalesReceipt && printerID) {
+    // Print sale receipt (popCashRegister flag is already on the receipt if change is due)
+    if (printerID) {
       let toPrint = translatedReceipt || saleReceipt;
       dbSavePrintObj(toPrint, printerID);
     }
@@ -968,6 +1001,7 @@ export function NewCheckoutModalScreen() {
     let timestamp = Date.now();
 
     for (let wo of sCombinedWorkorders) {
+      if (wo.isStandaloneSale) continue;
       let woToComplete = cloneDeep(wo);
       let oldStatusLabel = resolveStatus(wo.status, statuses)?.label || wo.status || "";
       let newStatusLabel = resolveStatus("finished_and_paid", statuses)?.label || "Finished & Paid";
@@ -1037,40 +1071,32 @@ export function NewCheckoutModalScreen() {
 
     // Write sale index for reporting
     const primaryWO = sCombinedWorkorders[0];
-    const customerInfo = {
-      first: primaryWO?.customerFirst || "",
-      last: primaryWO?.customerLast || "",
-      phone: primaryWO?.customerCell || "",
-      id: primaryWO?.customerID || "",
-    };
-    const allLines = sCombinedWorkorders.flatMap((wo) =>
+    const isStandaloneSale = primaryWO?.isStandaloneSale || !primaryWO;
+    const customerInfo = (!isStandaloneSale && primaryWO)
+      ? { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", phone: primaryWO.customerCell || "", id: primaryWO.customerID || "" }
+      : { first: zCustomer?.first || "", last: zCustomer?.last || "", phone: zCustomer?.customerCell || "", id: zCustomer?.id || "" };
+    let allLines = sCombinedWorkorders.flatMap((wo) =>
       (wo.workorderLines || []).map((line) => ({ ...line, _workorderID: wo.id }))
     );
-    const isStandalone = primaryWO?.isStandaloneSale || false;
-    saveSaleIndex(sale, customerInfo, allLines, isStandalone);
+    if (isStandaloneSale && sAddedItems.length > 0) {
+      sAddedItems.forEach((item) => allLines.push({ ...item, _workorderID: "" }));
+    }
+    saveSaleIndex(sale, customerInfo, allLines, isStandaloneSale);
     saveItemSales(sale, allLines);
 
     // Receipt actions based on settings
-    const customerForReceipt = {
-      first: primaryWO?.customerFirst || "",
-      last: primaryWO?.customerLast || "",
-      customerCell: primaryWO?.customerCell || "",
-      email: primaryWO?.customerEmail || "",
-      id: primaryWO?.customerID || "",
-    };
+    const customerForReceipt = (!isStandaloneSale && primaryWO)
+      ? { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" }
+      : { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" };
     const printerID = settings?.selectedPrinterID || "";
 
     // Build receipt context
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
 
     // Build the sale receipt — it computes popCashRegister and cashChangeGiven
-    let saleReceipt = printBuilder.sale(sale, sale.payments || [], customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
-
-    // Pop cash register if receipt says change is needed and auto-print is off
-    // (auto-printed receipt already carries the popCashRegister flag)
-    if (saleReceipt.popCashRegister && !settings?.autoPrintSalesReceipt) {
-      dbSavePrintObj({ popCashRegister: true }, printerID);
-    }
+    let woForReceipt = primaryWO || { workorderLines: [], taxFree: false, status: "" };
+    let saleReceipt = printBuilder.sale(sale, sale.payments || [], customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx);
+    log("Receipt object (sale complete):", JSON.stringify(saleReceipt, null, 2));
 
     // Translate receipt if non-English language is set
     let translatedReceipt = null;
@@ -1086,8 +1112,8 @@ export function NewCheckoutModalScreen() {
       }
     }
 
-    // Print sale receipt
-    if (settings?.autoPrintSalesReceipt) {
+    // Print sale receipt (popCashRegister flag is already on the receipt if change is due)
+    if (printerID) {
       let toPrint = translatedReceipt || saleReceipt;
       dbSavePrintObj(toPrint, printerID);
     }
@@ -1114,7 +1140,7 @@ export function NewCheckoutModalScreen() {
     const canSMS = customerForReceipt.customerCell && smsContent.trim();
     const canEmail = customerForReceipt.email && emailContent.trim();
     if (canSMS || canEmail) {
-      sendSaleReceipt(sale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode);
+      sendSaleReceipt(sale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode);
     }
   }
 
@@ -1127,26 +1153,21 @@ export function NewCheckoutModalScreen() {
 
     function buildPartialReceipt() {
       const primaryWO = sCombinedWorkorders[0];
-      const customerForReceipt = {
-        first: primaryWO?.customerFirst || "",
-        last: primaryWO?.customerLast || "",
-        customerCell: primaryWO?.customerCell || "",
-        email: primaryWO?.customerEmail || "",
-        id: primaryWO?.customerID || "",
-      };
+      const _isStandalone = primaryWO?.isStandaloneSale || !primaryWO;
+      const customerForReceipt = (!_isStandalone && primaryWO)
+        ? { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" }
+        : { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" };
       const settings = useSettingsStore.getState().getSettings();
       const printerID = settings?.selectedPrinterID || "";
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      let saleReceipt = printBuilder.sale(sSale, sSale.payments, customerForReceipt, primaryWO, settings?.salesTaxPercent, _ctx);
+      let woForReceipt = primaryWO || { workorderLines: [], taxFree: false, status: "" };
+      let saleReceipt = printBuilder.sale(sSale, sSale.payments, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx);
+      // log("Receipt object (partial/reprint):", JSON.stringify(saleReceipt, null, 2));
       return { saleReceipt, customerForReceipt, primaryWO, settings, printerID };
     }
 
     async function handlePrintReceipts() {
       let { saleReceipt, customerForReceipt, primaryWO, settings, printerID } = buildPartialReceipt();
-
-      if (saleReceipt.popCashRegister && !settings?.autoPrintSalesReceipt) {
-        dbSavePrintObj({ popCashRegister: true }, printerID);
-      }
 
       let translatedReceipt = null;
       let translatedPdfLabels = null;
@@ -1161,8 +1182,9 @@ export function NewCheckoutModalScreen() {
         }
       }
 
-      if (settings?.autoPrintSalesReceipt) {
+      if (printerID) {
         let toPrint = translatedReceipt || saleReceipt;
+        toPrint.popCashRegister = false;
         dbSavePrintObj(toPrint, printerID);
       }
 
@@ -1194,9 +1216,7 @@ export function NewCheckoutModalScreen() {
 
     function handlePrintPaperOnly() {
       let { saleReceipt, settings, printerID } = buildPartialReceipt();
-      if (saleReceipt.popCashRegister) {
-        dbSavePrintObj({ popCashRegister: true }, printerID);
-      }
+      saleReceipt.popCashRegister = false;
       dbSavePrintObj(saleReceipt, printerID);
     }
 
@@ -1212,16 +1232,19 @@ export function NewCheckoutModalScreen() {
       btn1Text: "Exit",
       handleBtn1Press: () => {
         resetAndClose();
+        if (isStandalone) resetStandaloneWorkorder();
       },
       btn2Text: "Print Receipts",
       handleBtn2Press: () => {
         handlePrintReceipts();
         resetAndClose();
+        if (isStandalone) resetStandaloneWorkorder();
       },
       btn3Text: "Print Paper Only",
       handleBtn3Press: () => {
         handlePrintPaperOnly();
         resetAndClose();
+        if (isStandalone) resetStandaloneWorkorder();
       },
       useCancelButton: true,
     });
@@ -1252,6 +1275,7 @@ export function NewCheckoutModalScreen() {
       return;
     }
     resetAndClose();
+    if (isStandalone) resetStandaloneWorkorder();
   }
 
   function resetAndClose() {
@@ -1284,22 +1308,32 @@ export function NewCheckoutModalScreen() {
     useCheckoutStore.getState().setIsCheckingOut(false);
   }
 
+  function resetStandaloneWorkorder() {
+    let store = useOpenWorkordersStore.getState();
+    let oldWo = store.getOpenWorkorder();
+    if (oldWo) store.removeWorkorder(oldWo.id);
+    let wo = cloneDeep(WORKORDER_PROTO);
+    wo.isStandaloneSale = true;
+    wo.id = generateEAN13Barcode("1");
+    wo.startedBy = useLoginStore.getState().currentUser?.id;
+    wo.startedOnMillis = Date.now();
+    store.setWorkorder(wo);
+    store.setOpenWorkorderID(wo.id);
+  }
+
   async function handleReprint() {
     if (!sSale) return;
     const primaryWO = sCombinedWorkorders[0];
-    const customer = {
-      first: primaryWO?.customerFirst || "",
-      last: primaryWO?.customerLast || "",
-      customerCell: primaryWO?.customerCell || "",
-      email: primaryWO?.customerEmail || "",
-      id: primaryWO?.customerID || "",
-    };
+    const _isStandalone = primaryWO?.isStandaloneSale || !primaryWO;
+    const customer = (!_isStandalone && primaryWO)
+      ? { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" }
+      : { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" };
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
     let toPrint = printBuilder.sale(
       sSale,
       sSale.payments,
       customer,
-      primaryWO || { workorderLines: [], taxFree: false },
+      primaryWO || { workorderLines: [], taxFree: false, status: "" },
       zSettings?.salesTaxPercent,
       _ctx
     );
@@ -1315,27 +1349,36 @@ export function NewCheckoutModalScreen() {
     }
 
     const printerID = zSettings?.selectedPrinterID || "";
+    toPrint.popCashRegister = false;
     dbSavePrintObj(toPrint, printerID);
   }
 
-  function handlePrintReceipt() {
+  function handlePrintReceipt(payment) {
     if (!sSale) return;
     let settings = useSettingsStore.getState().getSettings();
     let isDeposit = sSale.isDepositSale;
     let primaryWO = isDeposit ? null : sCombinedWorkorders[0];
-    let customer = isDeposit
+    let _isStandalone = primaryWO?.isStandaloneSale || !primaryWO;
+    let customer = (isDeposit || _isStandalone)
       ? { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" }
-      : { first: primaryWO?.customerFirst || "", last: primaryWO?.customerLast || "", customerCell: primaryWO?.customerCell || "", email: primaryWO?.customerEmail || "", id: primaryWO?.customerID || "" };
+      : { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" };
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-    let wo = isDeposit ? { workorderLines: [], taxFree: false, status: "" } : primaryWO;
-    let receipt = printBuilder.sale(sSale, sSale.payments || [], customer, wo, settings?.salesTaxPercent, _ctx);
+    let wo = (isDeposit || _isStandalone) ? { workorderLines: [], taxFree: false, status: "" } : primaryWO;
+    let paymentsForReceipt = payment ? [payment] : (sSale.payments || []);
+    let receipt = printBuilder.sale(sSale, paymentsForReceipt, customer, wo, settings?.salesTaxPercent, _ctx);
+    if (payment) {
+      receipt.transactionOnly = true;
+      receipt.popCashRegister = false;
+    }
+    log("handlePrintReceipt receipt:", JSON.stringify(receipt));
     let printerID = settings?.selectedPrinterID || "";
     if (printerID) dbSavePrintObj(receipt, printerID);
   }
 
   function handlePopRegister() {
     let settings = useSettingsStore.getState().getSettings();
-    let printObj = { id: generateEAN13Barcode(), receiptType: RECEIPT_TYPES.register };
+    let printObj = { id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register };
+    log("handlePopRegister printObj:", JSON.stringify(printObj));
     dbSavePrintObj(printObj, settings?.selectedPrinterID || "");
     _setShowPopConfirm(true);
     setTimeout(() => _setShowPopConfirm(false), 1000);
@@ -1906,6 +1949,7 @@ export function NewCheckoutModalScreen() {
                     inventory={zInventory}
                     discounts={zSettings?.discounts || EMPTY_ARR}
                     onOpenNewItemModal={(item) => _setNewItemModal(item)}
+                    isStandaloneSale={isStandalone}
                   />
                 )}
 

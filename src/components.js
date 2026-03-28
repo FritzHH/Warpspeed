@@ -19,7 +19,7 @@ import React, {
   useCallback,
 } from "react";
 import { Image } from "react-native-web";
-import { formatCurrencyDisp, formatMillisForDisplay, generateRandomID, gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log, usdTypeMask, deepEqual } from "./utils";
+import { formatCurrencyDisp, formatMillisForDisplay, gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log, usdTypeMask, deepEqual } from "./utils";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
 import { SETTINGS_OBJ, PRIVILEDGE_LEVELS, CUSTOMER_DEPOST_TYPES } from "./data";
 import { cloneDeep } from "lodash";

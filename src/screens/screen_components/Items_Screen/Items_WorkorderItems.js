@@ -5,7 +5,6 @@ import {
   calculateRunningTotals,
   deepEqual,
   formatCurrencyDisp,
-  generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
   log,
@@ -270,7 +269,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       for (let i = 0; i <= num - 1; i++) {
         let newLine = cloneDeep(workorderLine);
         newLine.qty = 1;
-        newLine.id = generateEAN13Barcode();
+        newLine.id = crypto.randomUUID();
         newLine.discountObj = null;
         if (i === 0) {
           workorderLines[index] = newLine;

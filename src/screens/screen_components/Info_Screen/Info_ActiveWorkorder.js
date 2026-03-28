@@ -8,7 +8,6 @@ import {
   formatMillisForDisplay,
   formatPhoneWithDashes,
   createNewWorkorder,
-  generateRandomID,
   generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
@@ -280,7 +279,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
       let wo = cloneDeep(WORKORDER_PROTO);
       wo.isStandaloneSale = true;
-      wo.id = generateEAN13Barcode();
+      wo.id = generateEAN13Barcode("1");
       wo.startedBy = useLoginStore.getState().currentUser?.id;
       wo.startedOnMillis = new Date().getTime();
 
@@ -473,7 +472,7 @@ export const ActiveWorkorderComponent = ({}) => {
           message: msg,
           phoneNumber: customer.customerCell,
           customerID: workorder?.customerID || "",
-          messageID: generateRandomID(),
+          messageID: crypto.randomUUID(),
         });
         if (result?.data?.url) receiptURL = result.data.url;
         log("Sent intake receipt SMS to", customer.customerCell);

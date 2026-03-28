@@ -56,9 +56,7 @@ function initFirebase() {
   db = admin.firestore();
 }
 
-function generateRandomID() {
-  return db.collection("_").doc().id;
-}
+// Removed — using crypto.randomUUID() instead
 
 // ============================================================================
 // Status Logger
@@ -94,18 +92,15 @@ function ean13CheckDigit(first12) {
   return (10 - (sum % 10)) % 10;
 }
 
-function generateEAN13Barcode(barcodeType) {
-  let begins = "0";
-  switch (barcodeType) {
-    case "workorder": begins = "1"; break;
-    case "sale": begins = "3"; break;
-    case "customer": begins = "4"; break;
+function generateEAN13Barcode(prefix) {
+  while (true) {
+    const millis = Date.now().toString();
+    const timePart = millis.slice(-8);
+    const randomPart = Math.floor(100 + Math.random() * 900).toString();
+    const data = prefix + timePart + randomPart;
+    const check = ean13CheckDigit(data);
+    if (check !== 0) return data + check;
   }
-  const millis = Date.now().toString();
-  const timePart = millis.slice(-8);
-  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-  let data = (begins + timePart + randomPart).slice(0, 12);
-  return data + ean13CheckDigit(data);
 }
 
 function buildLightspeedEAN13(prefix2digit, lsID) {
@@ -330,7 +325,7 @@ function buildDiscountObj(saleLine, priceCents) {
   }
 
   return {
-    id: generateRandomID(),
+    id: crypto.randomUUID(),
     discountName: pct > 0 ? `${Math.round(pct * 100)}% Off` : `$${amt} Off`,
     discountValue,
     discountType,
@@ -495,11 +490,11 @@ function mapWorkorders(
     const noteName = employeeMap[wo.employeeID] || "Lightspeed Import";
     const customerNotes = [];
     if (wo.note && wo.note.trim()) {
-      customerNotes.push({ id: generateRandomID(), name: noteName, userID: "", value: sanitize(wo.note.trim()) });
+      customerNotes.push({ id: crypto.randomUUID(), name: noteName, userID: "", value: sanitize(wo.note.trim()) });
     }
     const internalNotes = [];
     if (wo.internalNote && wo.internalNote.trim()) {
-      internalNotes.push({ id: generateRandomID(), name: noteName, userID: "", value: sanitize(wo.internalNote.trim()) });
+      internalNotes.push({ id: crypto.randomUUID(), name: noteName, userID: "", value: sanitize(wo.internalNote.trim()) });
     }
 
     // Catalog items
@@ -507,7 +502,7 @@ function mapWorkorders(
     const workorderLines = woItems.map(wi => {
       const item = itemMap[wi.itemID] || null;
       const inventoryItem = {
-        id: item ? item.itemID : generateRandomID(),
+        id: item ? item.itemID : crypto.randomUUID(),
         formalName: item ? (item.description || "Unknown Item") : "Unknown Item",
         informalName: "",
         brand: "",
@@ -521,7 +516,7 @@ function mapWorkorders(
       };
       const wiSaleLine = wi.saleLineID ? saleLineMap[wi.saleLineID] : null;
       return {
-        id: generateRandomID(),
+        id: crypto.randomUUID(),
         qty: parseInt(wi.unitQuantity) || 1,
         intakeNotes: sanitize((wi.note || "").trim()),
         receiptNotes: "",
@@ -546,12 +541,12 @@ function mapWorkorders(
       const price = wlSaleLine ? dollarsToCents(wlSaleLine.unitPrice) : dollarsToCents(wl.unitPriceOverride);
 
       workorderLines.push({
-        id: generateRandomID(),
+        id: crypto.randomUUID(),
         qty: parseInt(wl.unitQuantity) || 1,
         intakeNotes: "",
         receiptNotes: "",
         inventoryItem: {
-          id: generateRandomID(),
+          id: crypto.randomUUID(),
           formalName: sanitize((wl.note || "").trim()) || (isLabor ? "Custom Labor" : "Custom Part"),
           informalName: "",
           brand: "",
@@ -704,7 +699,7 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
       }
 
       return {
-        id: sp.salePaymentID || generateRandomID(),
+        id: sp.salePaymentID || crypto.randomUUID(),
         saleID,
         amountCaptured: amount,
         amountTendered: isCash ? amount : "",

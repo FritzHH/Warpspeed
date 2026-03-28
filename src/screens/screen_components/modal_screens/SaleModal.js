@@ -1,5 +1,6 @@
 /*eslint-disable*/
 import { View, Text, ScrollView, Modal, TouchableOpacity } from "react-native-web";
+import { useState } from "react";
 import {
   formatCurrencyDisp,
   formatMillisForDisplay,
@@ -11,6 +12,7 @@ import {
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useCheckoutStore, useOpenWorkordersStore, useSettingsStore } from "../../../stores";
 import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
+import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
 
 // ─── Helper components ──────────────────────────────────
 
@@ -42,6 +44,7 @@ const SectionHeader = ({ text }) => (
 export const SaleModal = () => {
   const sale = useOpenWorkordersStore((s) => s.saleModalObj);
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
+  const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
 
   const payments = sale?.payments || [];
   const refunds = sale?.refunds || [];
@@ -59,6 +62,7 @@ export const SaleModal = () => {
   }
 
   return (
+  <>
     <Modal visible={!!sale} transparent={true} animationType="fade">
       {sale && <View
         style={{
@@ -291,10 +295,7 @@ export const SaleModal = () => {
                     return (
                       <TouchableOpacity
                         key={wo.id}
-                        onPress={() => {
-                          handleClose();
-                          useOpenWorkordersStore.getState().setClosedWorkorderModalObj(wo);
-                        }}
+                        onPress={() => _sSetClosedWorkorder(wo)}
                         style={{
                           marginBottom: 4,
                           borderRadius: 6,
@@ -416,5 +417,10 @@ export const SaleModal = () => {
         </View>
       </View>}
     </Modal>
+    <ClosedWorkorderModal
+      workorder={sClosedWorkorder}
+      onClose={() => _sSetClosedWorkorder(null)}
+    />
+  </>
   );
 };

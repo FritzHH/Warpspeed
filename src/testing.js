@@ -19,6 +19,7 @@ import {
   randomWordGenerator,
   roundToTwoDecimals,
 } from "./utils";
+
 import { MILLIS_IN_DAY, MILLIS_IN_MINUTE } from "./constants";
 import { dbSaveInventoryItem, dbSaveSettings } from "./db_calls_wrapper";
 
@@ -32,7 +33,7 @@ export function sendTestMessage() {
   message.phoneNumber = "2393369177";
   message.message = "Here is the last message sent number 18";
   message.customerID = "testid";
-  message.id = generateEAN13Barcode();
+  message.id = crypto.randomUUID();
   message.canRespond = false;
 
   // sendSMS(message);
@@ -48,7 +49,7 @@ export async function fillInventory() {
     lastDigit = lastDigit.slice(lastDigit.length - 1);
     if (lastDigit == 0) lastDigit = 2;
     if (lastDigit == 9) lastDigit = 8;
-    let inv = { ...INVENTORY_ITEM_PROTO, id: generateEAN13Barcode() };
+    let inv = { ...INVENTORY_ITEM_PROTO, id: crypto.randomUUID() };
     inv.formalName =
       (await randomWordGenerator()) +
       " " +
@@ -80,7 +81,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
   let arr = [];
   for (let i = 1; i <= 1; i++) {
     let wo = cloneDeep(WORKORDER_PROTO);
-    wo.id = generateEAN13Barcode();
+    wo.id = generateEAN13Barcode("1");
     wo.brand = SETTINGS_OBJ.bikeBrands[Math.floor(Math.random() * 4)];
     wo.color1 = COLORS[Math.floor(Math.random() * 6)];
     wo.color2 = COLORS[Math.floor(Math.random() * 6)];
@@ -101,7 +102,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
     for (let i = 1; i <= 5; i++) {
       let val = Math.round(Math.random() * 8);
       let line = cloneDeep(WORKORDER_ITEM_PROTO);
-      line.id = generateEAN13Barcode();
+      line.id = crypto.randomUUID();
       line.inventoryItem = zInventoryArr[val];
       line.qty = Math.ceil(i / 2);
       wo.workorderLines.push(line);
@@ -114,7 +115,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
 export function fillCustomers() {
   for (let i = 5; i <= 8; i++) {
     let cust = { ...CUSTOMER_PROTO };
-    cust.id = generateEAN13Barcode();
+    cust.id = crypto.randomUUID();
     cust.first = "test first" + i;
     cust.last = "test last " + i;
     cust.customerCell = "111111111" + i;
@@ -148,7 +149,7 @@ export function fillPunchHistory() {
     let obj = {
       userID,
       millis: running,
-      id: generateEAN13Barcode(),
+      id: crypto.randomUUID(),
       option: option ? "in" : "out",
     };
     // log(formatMillisForDisplay(obj.millis));

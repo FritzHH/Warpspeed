@@ -10,7 +10,6 @@ import {
   useLoginStore,
 } from "../stores";
 import {
-  generateEAN13Barcode,
   resolveStatus,
   formatCurrencyDisp,
   gray,
@@ -139,7 +138,7 @@ export function BikeStandScreen() {
     let lines = [...(wo.workorderLines || [])];
     let line = cloneDeep(WORKORDER_ITEM_PROTO);
     line.inventoryItem = invItem;
-    line.id = generateEAN13Barcode();
+    line.id = crypto.randomUUID();
     lines.push(line);
 
     useOpenWorkordersStore.getState().setField("workorderLines", lines, wo.id, true);

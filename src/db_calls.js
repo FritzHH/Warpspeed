@@ -18,6 +18,7 @@ import {
   serverTimestamp,
   onSnapshot,
   writeBatch as firestoreWriteBatch,
+  getCountFromServer,
 } from "firebase/firestore";
 import {
   getDatabase,
@@ -170,6 +171,13 @@ export async function firestoreQuery(
 
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function firestoreCount(collectionPath, field, operator, value) {
+  const collectionRef = collection(DB, ...collectionPath.split("/"));
+  const q = query(collectionRef, where(field, operator, value));
+  const snapshot = await getCountFromServer(q);
+  return snapshot.data().count;
 }
 
 /**
@@ -604,6 +612,10 @@ export const lightspeedImportDataCallable = httpsCallable(
 export const rehydrateFromArchiveCallable = httpsCallable(
   functions,
   "rehydrateFromArchive"
+);
+export const manualArchiveAndCleanupCallable = httpsCallable(
+  functions,
+  "manualArchiveAndCleanup"
 );
 export const createTextToPayInvoiceCallable = httpsCallable(
   functions,

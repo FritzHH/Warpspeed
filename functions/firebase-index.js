@@ -555,7 +555,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
                 // Build payment from charge (mirrors buildCardPayment)
                 const card = charge?.payment_method_details?.card_present;
                 const payment = {
-                  id: generateUPCBarcode("sale"),
+                  id: crypto.randomUUID(),
                   amountCaptured: charge.amount_captured || 0,
                   amountTendered: 0,
                   last4: card?.last4 || "",
@@ -2930,25 +2930,21 @@ exports.createTenant = onRequest({ cors: true }, async (req, res) => {
   }
 });
 
-function generateUPCBarcode(barcodeType) {
-  // Get current millis since epoch
-  let begins = "0";
-  switch (barcodeType) {
-    case "workorder":
-      begins = "1";
-      break;
-    case "sale":
-      begins = "2";
-      break;
-    case "customer":
-      begins = "3";
+function ean13CheckDigit(first12) {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += parseInt(first12[i]) * (i % 2 === 0 ? 1 : 3);
+  return (10 - (sum % 10)) % 10;
+}
+
+function generateEAN13Barcode(prefix) {
+  while (true) {
+    const millis = Date.now().toString();
+    const timePart = millis.slice(-8);
+    const randomPart = Math.floor(100 + Math.random() * 900).toString();
+    const data = prefix + timePart + randomPart;
+    const check = ean13CheckDigit(data);
+    if (check !== 0) return data + check;
   }
-  const millis = Date.now().toString();
-  const timePart = millis.slice(-8);
-  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
-  let upc = timePart + randomPart;
-  upc = upc.replace(/^./, begins);
-  return upc;
 }
 
 // ============================================================================
@@ -6213,6 +6209,29 @@ async function cleanupOldMedia(db, bucket, tenantID, storeID) {
   }
 }
 
+async function cleanupStandaloneActiveSales(db, tenantID, storeID) {
+  try {
+    const snapshot = await db
+      .collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("active-sales")
+      .where("standaloneSale", "==", true)
+      .get();
+
+    if (snapshot.empty) return { deleted: 0 };
+
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+
+    log("nightlyArchive: Cleaned up standalone active sales", { tenantID, storeID, deleted: snapshot.size });
+    return { deleted: snapshot.size };
+  } catch (err) {
+    log("nightlyArchive: Error cleaning standalone active sales for " + tenantID + "/" + storeID, err.message);
+    return { deleted: 0, error: err.message };
+  }
+}
+
 // ============================================================================
 // Customer-Facing Workorder Screen
 // ============================================================================
@@ -6439,7 +6458,7 @@ exports.customerUploadWorkorderMedia = onRequest(
       // Upload to Cloud Storage
       const bucket = admin.storage().bucket();
       const timestamp = Date.now();
-      const mediaID = "cm_" + generateUPCBarcode("customer") + "_" + timestamp;
+      const mediaID = "cm_" + crypto.randomUUID() + "_" + timestamp;
       const storagePath = `${tenantID}/${storeID}/workorders/${workorderID}/attachments/media/${timestamp}_${fileName}`;
       const file = bucket.file(storagePath);
 
@@ -6537,6 +6556,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
         try {
           const archiveResults = await archiveTenantStore(db, bucket, tenantID, storeID);
           const mediaResults = await cleanupOldMedia(db, bucket, tenantID, storeID);
+          const standaloneCleanup = await cleanupStandaloneActiveSales(db, tenantID, storeID);
 
           // Write audit log
           const now = Date.now();
@@ -6554,11 +6574,13 @@ exports.nightlyArchiveAndCleanup = onSchedule(
               type: "nightly-archive",
               archive: archiveResults,
               mediaCleanup: mediaResults,
+              standaloneCleanup,
             });
 
           log("nightlyArchive: Completed " + tenantID + "/" + storeID, {
             archive: archiveResults,
             mediaCleanup: mediaResults,
+            standaloneCleanup,
           });
         } catch (err) {
           log(
@@ -6570,6 +6592,61 @@ exports.nightlyArchiveAndCleanup = onSchedule(
     }
 
     log("nightlyArchiveAndCleanup: Nightly archive run complete");
+  }
+);
+
+/**
+ * Manual trigger for the nightly archive process.
+ * Runs the same archive + cleanup as the scheduled function.
+ */
+exports.manualArchiveAndCleanup = onCall(
+  {
+    secrets: [firebaseServiceAccountKey],
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async (request) => {
+    log("manualArchiveAndCleanup: Manual archive triggered");
+
+    const { tenantID, storeID } = request.data || {};
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "tenantID and storeID are required");
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const bucket = admin
+      .storage()
+      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+
+    try {
+      const archiveResults = await archiveTenantStore(db, bucket, tenantID, storeID);
+      const mediaResults = await cleanupOldMedia(db, bucket, tenantID, storeID);
+      const standaloneCleanup = await cleanupStandaloneActiveSales(db, tenantID, storeID);
+
+      const now = Date.now();
+      const dateStr = new Date(now).toISOString().split("T")[0];
+      await db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("archive-logs")
+        .doc(String(now))
+        .set({
+          millis: now,
+          date: dateStr,
+          type: "manual-archive",
+          archive: archiveResults,
+          mediaCleanup: mediaResults,
+          standaloneCleanup,
+        });
+
+      log("manualArchiveAndCleanup: Completed", { archive: archiveResults, mediaCleanup: mediaResults, standaloneCleanup });
+      return { success: true, archive: archiveResults, mediaCleanup: mediaResults, standaloneCleanup };
+    } catch (err) {
+      log("manualArchiveAndCleanup: Error", err.message);
+      throw new HttpsError("internal", err.message);
+    }
   }
 );
 
@@ -6719,9 +6796,8 @@ exports.rehydrateFromArchive = onCall(
 // TEXT-TO-PAY / EMAIL-TO-PAY
 // ============================================================================
 
-// Helper: generate sale ID (mirrors client-side generateSaleID in newCheckoutUtils.js)
 function generateSaleID() {
-  return generateUPCBarcode("sale"); // 12 digits starting with "2"
+  return generateEAN13Barcode("3");
 }
 
 // Helper: calculate workorder totals server-side
@@ -6924,6 +7000,10 @@ async function completeSaleServerSide({
       allLines = [...allLines, ...(wo.workorderLines || [])];
     }
   }
+  // Standalone sales store items in sale.addedItems, not workorder lines
+  if ((sale.addedItems || []).length > 0) {
+    allLines = [...allLines, ...sale.addedItems];
+  }
 
   const { highestName, highestPrice } = findHighestItem(allLines);
   const payments = sale.payments || [];
@@ -6955,7 +7035,7 @@ async function completeSaleServerSide({
       itemCount: allLines.length,
       highestItemName: highestName,
       highestItemPrice: highestPrice,
-      isStandaloneSale: primaryWO?.isStandaloneSale || false,
+      isStandaloneSale: sale.standaloneSale || primaryWO?.isStandaloneSale || false,
       workorderIDs: workorderIDs,
       paymentType: paymentType,
     });
@@ -6973,7 +7053,7 @@ async function completeSaleServerSide({
         email: customer?.email || primaryWO?.customerEmail || "",
       };
       const printObj = sharedPrintBuilder.sale(sale, sale.payments, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext);
-      printObj.id = generateUPCBarcode("sale");
+      printObj.id = crypto.randomUUID();
       printObj.timestamp = Date.now();
 
       // Remove undefined/null values (Firestore rejects undefined)
@@ -7001,7 +7081,7 @@ async function completeSaleServerSide({
         (p) => p.cash && p.amountTendered > p.amountCaptured
       );
       if (hasCashChange) {
-        const registerObj = { id: generateUPCBarcode("sale"), popCashRegister: true, timestamp: Date.now() };
+        const registerObj = { id: crypto.randomUUID(), popCashRegister: true, timestamp: Date.now() };
         await db.collection("tenants").doc(tenantID)
           .collection("stores").doc(storeID)
           .collection("printers").doc(printerID)
@@ -7051,7 +7131,7 @@ async function completeSaleServerSide({
         to: `+1${cleanPhone}`,
         from: "+12393171234",
       });
-      const receiptMsgID = generateUPCBarcode("customer");
+      const receiptMsgID = crypto.randomUUID();
       await db.collection("customer_phone").doc(cleanPhone)
         .collection("messages").doc(receiptMsgID)
         .set({
@@ -7297,7 +7377,7 @@ exports.createTextToPayInvoice = onCall(
         });
 
         // Store in customer message queue
-        const messageID = generateUPCBarcode("customer");
+        const messageID = crypto.randomUUID();
         await db
           .collection("customer_phone").doc(cleanPhone)
           .collection("messages").doc(messageID)
@@ -7475,7 +7555,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
 
         // ── Build payment object (mirrors PAYMENT_OBJECT_PROTO) ──
         const payment = {
-          id: generateUPCBarcode("sale"),
+          id: crypto.randomUUID(),
           amountCaptured: charge.amount_captured,
           amountTendered: 0,
           last4: charge.payment_method_details?.card?.last4 || "",
@@ -7570,7 +7650,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
               const storeName = (settingsSnap.exists ? settingsSnap.data() : {})?.storeInfo?.displayName || "Our store";
 
               const expMsg = `Your payment link from ${storeName} has expired. Please contact us if you'd like a new one.`;
-              const expMsgID = generateUPCBarcode("customer");
+              const expMsgID = crypto.randomUUID();
               await db
                 .collection("customer_phone").doc(cleanPhone)
                 .collection("messages").doc(expMsgID)

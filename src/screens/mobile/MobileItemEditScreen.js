@@ -12,7 +12,6 @@ import { cloneDeep } from "lodash";
 import { TextInput_, Button_, DropdownMenu, Image_ } from "../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import {
-  generateEAN13Barcode,
   formatCurrencyDisp,
   calculateRunningTotals,
   applyDiscountToWorkorderItem,
@@ -99,7 +98,7 @@ export function MobileItemEditScreen() {
       let workorderLines = zWorkorder.workorderLines || [];
       let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
       lineItem.inventoryItem = item;
-      lineItem.id = generateEAN13Barcode();
+      lineItem.id = crypto.randomUUID();
       workorderLines = [...workorderLines, lineItem];
       useOpenWorkordersStore
         .getState()
@@ -161,7 +160,7 @@ export function MobileItemEditScreen() {
       for (let i = 0; i <= num - 1; i++) {
         let newLine = cloneDeep(workorderLine);
         newLine.qty = 1;
-        newLine.id = generateEAN13Barcode();
+        newLine.id = crypto.randomUUID();
         newLine.discountObj = null;
         if (i === 0) {
           workorderLines[index] = newLine;

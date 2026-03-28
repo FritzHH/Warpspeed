@@ -5,7 +5,7 @@ import {
   TextInput,
   FlatList,
 } from "react-native-web";
-import { generateRandomID, gray, resolveStatus } from "../../../utils";
+import { gray, resolveStatus } from "../../../utils";
 import { Image_, TouchableOpacity_, TextInput_, Tooltip } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
@@ -93,7 +93,7 @@ export function Notes_MainComponent() {
         fieldName = "internalNotes";
       }
 
-      const newId = generateRandomID();
+      const newId = crypto.randomUUID();
       notesArr.unshift({
         name: formatUserShowName(),
         userID: zCurrentUser.id,

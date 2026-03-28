@@ -13,6 +13,7 @@ const RECEIPT_TYPES = {
   register: "pop-register",
   test: "Test",
   refund: "Refund",
+  transaction: "Transaction",
 };
 
 const RECEIPT_PROTO = {
@@ -511,6 +512,9 @@ var printBuilder = {
     receipt.depositType = sale.depositType || "";
     receipt.depositNote = sale.depositNote || "";
     receipt.depositAmountCents = sale.isDepositSale ? (sale.subtotal || 0) : 0;
+
+    // Transaction-only flag — when true, receipt covers a single payment only
+    receipt.transactionOnly = false;
 
     return receipt;
   },

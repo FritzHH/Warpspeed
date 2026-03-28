@@ -12,7 +12,7 @@ import {
   resolveStatus,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { useCheckoutStore, useOpenWorkordersStore, useSettingsStore } from "../../../stores";
+import { useCheckoutStore, useSettingsStore } from "../../../stores";
 import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
 import { dbGetCompletedSale } from "../../../db_calls_wrapper";
 
@@ -240,8 +240,7 @@ const ChangeLogEntry = ({ entry, index }) => {
 
 // ─── Main Modal ─────────────────────────────────────────────────
 
-export const ClosedWorkorderModal = () => {
-  const workorder = useOpenWorkordersStore((s) => s.closedWorkorderModalObj);
+export const ClosedWorkorderModal = ({ workorder, onClose }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
 
@@ -281,7 +280,7 @@ export const ClosedWorkorderModal = () => {
   ).trim();
 
   function handleClose() {
-    useOpenWorkordersStore.getState().setClosedWorkorderModalObj(null);
+    onClose && onClose();
   }
 
   function handleRefund(saleID) {

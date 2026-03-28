@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { Button_, Image_, CheckBox_, Tooltip } from "../../../components";
-import { gray, generateRandomID, log } from "../../../utils";
+import { gray, log } from "../../../utils";
 import {
   useOpenWorkordersStore,
   useAlertScreenStore,
@@ -103,7 +103,7 @@ export const WorkorderMediaModal = ({
       msg.canRespond = new Date().getTime();
       msg.millis = new Date().getTime();
       msg.customerID = zWorkorder.customerID || "";
-      msg.id = generateRandomID();
+      msg.id = crypto.randomUUID();
       msg.type = "outgoing";
       msg.senderUserObj = useLoginStore.getState().currentUser || "";
       smsService.send(msg).then((result) => {

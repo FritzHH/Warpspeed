@@ -9,6 +9,7 @@ import {
   useLoginStore,
   useOpenWorkordersStore,
   useAlertScreenStore,
+  useCurrentCustomerStore,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
@@ -169,6 +170,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
         sale.workorderIDs || []
       );
       let splitWOs = splitWorkorderLinesToSingleQty(workorders);
+      if (splitWOs.length === 0 && (sale.addedItems || []).length > 0) {
+        splitWOs = splitWorkorderLinesToSingleQty([{ id: "standalone", workorderLines: cloneDeep(sale.addedItems) }]);
+      }
       _setWorkordersInSale(splitWOs);
       if (initialPayment) _setSelectedPayments([initialPayment]);
       _setLoading(false);
@@ -201,6 +205,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
       // Split to single qty for refund selection
       let splitWOs = splitWorkorderLinesToSingleQty(workorders);
+      if (splitWOs.length === 0 && (sale.addedItems || []).length > 0) {
+        splitWOs = splitWorkorderLinesToSingleQty([{ id: "standalone", workorderLines: cloneDeep(sale.addedItems) }]);
+      }
       _setWorkordersInSale(splitWOs);
 
       _setLoading(false);
@@ -325,13 +332,15 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
     // Write refund index for reporting
     const primaryWO = sWorkordersInSale[0];
-    const customerInfo = {
-      first: primaryWO?.customerFirst || "",
-      last: primaryWO?.customerLast || "",
-      phone: primaryWO?.customerCell || "",
-      id: primaryWO?.customerID || "",
-    };
-    saveRefundIndex(sale, refund, customerInfo);
+    let customerInfo;
+    if (primaryWO && primaryWO.id !== "standalone") {
+      customerInfo = { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", phone: primaryWO.customerCell || "", id: primaryWO.customerID || "" };
+    } else {
+      let cust = useCurrentCustomerStore.getState().getCustomer();
+      customerInfo = { first: cust?.first || "", last: cust?.last || "", phone: cust?.customerCell || "", id: cust?.id || sale.customerID || "" };
+    }
+    let isStandaloneSale = sale.standaloneSale || (sale.workorderIDs || []).length === 0;
+    saveRefundIndex(sale, refund, customerInfo, isStandaloneSale);
     if (refund.workorderLines && refund.workorderLines.length > 0) {
       markItemSalesRefunded(sale.id, refund.workorderLines);
     }
@@ -359,8 +368,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     const customerForReceipt = {
       first: customerInfo.first,
       last: customerInfo.last,
-      customerCell: primaryWO?.customerCell || "",
-      email: primaryWO?.customerEmail || "",
+      customerCell: (primaryWO && primaryWO.id !== "standalone") ? (primaryWO.customerCell || "") : customerInfo.phone,
+      email: (primaryWO && primaryWO.id !== "standalone") ? (primaryWO.customerEmail || "") : (useCurrentCustomerStore.getState().getCustomer()?.email || ""),
       id: customerInfo.id,
     };
     const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");

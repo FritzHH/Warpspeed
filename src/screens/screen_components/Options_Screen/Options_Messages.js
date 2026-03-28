@@ -16,7 +16,6 @@ import {
   dim,
   formatDateTimeForReceipt,
   formatStoreHours,
-  generateRandomID,
   gray,
   log,
   printBuilder,
@@ -206,7 +205,7 @@ export function MessagesComponent({}) {
       msg.canRespond = sCanRespond ? new Date().getTime() : null;
       msg.millis = new Date().getTime();
       msg.customerID = zCustomer.id;
-      msg.id = generateRandomID();
+      msg.id = crypto.randomUUID();
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
       _setNewMessage("");
@@ -278,7 +277,7 @@ export function MessagesComponent({}) {
       let storagePath = build_db_path.cloudStorage.workorderTicketPDF(zWorkorderObj.id, tenantID, storeID);
       let messageTemplate = zSettings?.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
       let message = resolveTemplate(messageTemplate);
-      let messageID = generateRandomID();
+      let messageID = crypto.randomUUID();
       let result = await dbUploadPDFAndSendSMS({
         base64,
         storagePath,

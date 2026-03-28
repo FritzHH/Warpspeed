@@ -1,6 +1,7 @@
 /* eslint-disable */
 
 import { View, Text, FlatList } from "react-native-web";
+import { useState } from "react";
 import { formatCurrencyDisp, formatMillisForDisplay, gray, log } from "../../../utils";
 import {
   SmallLoadingIndicator,
@@ -14,12 +15,19 @@ import {
 } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { C } from "../../../styles";
+import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 
 export function Items_TicketSearchResults({}) {
   const zResults = useTicketSearchStore((state) => state.getResults());
   const zIsSearching = useTicketSearchStore((state) => state.getIsSearching());
+  const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
 
   function handleWorkorderPress(wo, isCompleted) {
+    if (isCompleted) {
+      _sSetClosedWorkorder(wo);
+      return;
+    }
+
     // add to open workorders store if not already there
     let existing = useOpenWorkordersStore.getState().getWorkorders() || [];
     let found = existing.find((w) => w.id === wo.id);
@@ -190,6 +198,10 @@ export function Items_TicketSearchResults({}) {
           )
         }
         contentContainerStyle={{ paddingBottom: 20 }}
+      />
+      <ClosedWorkorderModal
+        workorder={sClosedWorkorder}
+        onClose={() => _sSetClosedWorkorder(null)}
       />
     </View>
   );

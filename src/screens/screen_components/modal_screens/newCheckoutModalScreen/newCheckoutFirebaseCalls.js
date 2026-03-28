@@ -6,11 +6,11 @@ import {
   firestoreSubscribe,
   firestoreQuery,
   firestoreBatchWrite,
+  firestoreCount,
 } from "../../../../db_calls";
 import { useSettingsStore, useOpenWorkordersStore } from "../../../../stores";
 import { log } from "../../../../utils";
 import { SALE_INDEX_PROTO, ITEM_SALE_PROTO } from "../../../../data";
-import { generateRandomID } from "../../../../utils";
 import { cloneDeep } from "lodash";
 import { recomputeSaleAmounts } from "./newCheckoutUtils";
 
@@ -129,6 +129,31 @@ export async function newCheckoutDeleteActiveSale(saleID) {
     await firestoreDelete(path);
   } catch (error) {
     log("newCheckoutDeleteActiveSale error:", error);
+  }
+}
+
+export async function fetchStandaloneActiveSales() {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+    const basePath = `tenants/${tenantID}/stores/${storeID}/active-sales`;
+    const results = await firestoreQuery(basePath, [{ field: "standaloneSale", operator: "==", value: true }]);
+    return results || [];
+  } catch (error) {
+    log("fetchStandaloneActiveSales error:", error);
+    return [];
+  }
+}
+
+export async function countStandaloneActiveSales() {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return 0;
+    const basePath = `tenants/${tenantID}/stores/${storeID}/active-sales`;
+    return await firestoreCount(basePath, "standaloneSale", "==", true);
+  } catch (error) {
+    log("countStandaloneActiveSales error:", error);
+    return 0;
   }
 }
 
@@ -443,7 +468,7 @@ export async function saveSaleIndex(sale, customerInfo, workorderLines, isStanda
   }
 }
 
-export async function saveRefundIndex(sale, refund, customerInfo) {
+export async function saveRefundIndex(sale, refund, customerInfo, isStandaloneSale = false) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !refund?.id) {
@@ -471,7 +496,7 @@ export async function saveRefundIndex(sale, refund, customerInfo) {
     indexDoc.itemCount = (refund.workorderLines || []).length;
     indexDoc.highestItemName = highestName;
     indexDoc.highestItemPrice = highestPrice;
-    indexDoc.isStandaloneSale = false;
+    indexDoc.isStandaloneSale = !!isStandaloneSale;
     indexDoc.workorderIDs = sale.workorderIDs || [];
     indexDoc.paymentType = "Refund";
 
@@ -564,7 +589,7 @@ export async function saveItemSales(sale, workorderLines) {
     for (const line of (workorderLines || [])) {
       const inv = line.inventoryItem || {};
       const qty = Number(line.qty) || 1;
-      const docID = generateRandomID();
+      const docID = crypto.randomUUID();
 
       let entry = cloneDeep(ITEM_SALE_PROTO);
       entry.id = docID;

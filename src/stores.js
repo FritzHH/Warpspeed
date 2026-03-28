@@ -14,7 +14,6 @@ import {
   addOrRemoveFromArr,
   arrHasItem,
   checkArr,
-  generateEAN13Barcode,
   log,
   removeFieldFromObj,
   replaceOrAddToArr,
@@ -584,7 +583,7 @@ export const useLoginStore = create(
   // create new punch obj, log user in locally and send punch obj to DB
   setCreateUserClock: (userID, millis, option) => {
     let punch = { ...TIME_PUNCH_PROTO };
-    punch.id = generateEAN13Barcode();
+    punch.id = crypto.randomUUID();
     punch.userID = userID;
     punch.option = option;
     punch.millis = millis;
@@ -1164,7 +1163,6 @@ export const useOpenWorkordersStore = create(
       openWorkorderID: null,
       workorderPreviewID: null,
       lockedWorkorderID: null,
-      closedWorkorderModalObj: null,
       saleModalObj: null,
 
       getOpenWorkorder: () => {
@@ -1181,8 +1179,6 @@ export const useOpenWorkordersStore = create(
       setWorkorderPreviewID: (workorderPreviewID) => set({ workorderPreviewID }),
       getLockedWorkorderID: () => get().lockedWorkorderID,
       setLockedWorkorderID: (lockedWorkorderID) => set({ lockedWorkorderID }),
-      getClosedWorkorderModalObj: () => get().closedWorkorderModalObj,
-      setClosedWorkorderModalObj: (closedWorkorderModalObj) => set({ closedWorkorderModalObj: closedWorkorderModalObj ? { ...closedWorkorderModalObj } : null }),
       getSaleModalObj: () => get().saleModalObj,
       setSaleModalObj: (saleModalObj) => set({ saleModalObj }),
       setOpenWorkorderID: (openWorkorderID) => {

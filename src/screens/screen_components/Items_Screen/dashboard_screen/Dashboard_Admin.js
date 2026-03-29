@@ -18,7 +18,7 @@ import {
   formatMillisForDisplay,
   // searchInventory moved to Web Worker
   generateTimesForListDisplay,
-  generateEAN13Barcode,
+  generate12DigitBarcode,
   getDayOfWeekFrom0To7Input,
   log,
   gray,
@@ -773,7 +773,7 @@ export function Dashboard_Admin({}) {
 
                   const totals = calculateRunningTotals(workorder, settings?.salesTaxPercent, [], false, !!workorder.taxFree);
                   const fakeSale = {
-                    id: generateEAN13Barcode("3"),
+                    id: generate12DigitBarcode(),
                     millis: Date.now(),
                     subtotal: totals.runningSubtotal,
                     discount: totals.runningDiscount,
@@ -4452,7 +4452,7 @@ const QuickItemButtonsComponent = ({
               onPress={handleMultiSelect}
               enabled={sSelectedIDs.size > 0}
               colorGradientArr={COLOR_GRADIENTS.green}
-              buttonStyle={{ borderRadius: 6, paddingVertical: 8, opacity: sSelectedIDs.size > 0 ? 1 : 0.4 }}
+              buttonStyle={{ borderRadius: 5, paddingVertical: 8, opacity: sSelectedIDs.size > 0 ? 1 : 0.4 }}
               textStyle={{ fontSize: 13, color: C.textWhite }}
             />
           </View>
@@ -6037,7 +6037,7 @@ const ImportComponent = () => {
         const isLabor = descLower.includes("labor") || descLower.includes("install");
         const upc = (item["UPC"] || "").trim();
         const systemId = (item["System ID"] || "").trim();
-        const id = upc || systemId || generateEAN13Barcode("6");
+        const id = upc || systemId || generate12DigitBarcode();
         const isTube = desc.includes("TUBE ");
         const tubeCost = dollarsToCents(stripDollar(item["Default Cost"]));
         const price = isTube ? (tubeCost > 600 ? 1878 : 939) : dollarsToCents(stripDollar(item["Price"]));
@@ -6151,18 +6151,20 @@ const ImportComponent = () => {
     _setMigrationStep("Loading & mapping CSVs...");
     _setMigrationProgress({ done: 0, total: 0 });
     _setLsResult("");
+    const migrationStart = Date.now();
 
     try {
-      // Fire-and-forget: clear existing collections in background
-      console.log("[Migration] Clearing collections in background...");
-      Promise.all([
+      // Clear existing collections before writing
+      _setMigrationStep("Clearing collections...");
+      console.log("[Migration] Clearing collections...");
+      await Promise.all([
         dbClearCollection("open-workorders"),
         dbClearCollection("completed-workorders"),
         dbClearCollection("customers"),
         dbClearCollection("completed-sales"),
         dbClearCollection("active-sales"),
-      ]).then(() => console.log("[Migration] Collections cleared."))
-        .catch(e => console.error("[Migration] Clear error:", e));
+      ]);
+      console.log("[Migration] Collections cleared.");
 
       // Load & map all CSV data
       _setMigrationStep("Loading & mapping CSVs...");
@@ -6244,21 +6246,31 @@ const ImportComponent = () => {
       });
       console.log("[Migration] Workorders done.");
 
-      // Route & save sales
+      // Route & save sales — completed go to completed-sales, incomplete only if linked to a workorder go to active-sales
       _setMigrationStep("Saving sales...");
       const completedSales = freshData.sales.filter(s => s.paymentComplete);
-      console.log("[Migration] Saving " + completedSales.length + " completed sales (skipping " + (freshData.sales.length - completedSales.length) + " incomplete)...");
-      _setMigrationProgress({ done: 0, total: completedSales.length });
-      await dbBatchWrite(completedSales, "completed-sales", (done, total) => {
-        _setMigrationProgress({ done, total });
+      const linkedIncompleteSales = freshData.sales.filter(s => !s.paymentComplete && s.workorderIDs && s.workorderIDs.length > 0);
+      const skippedCount = freshData.sales.length - completedSales.length - linkedIncompleteSales.length;
+      console.log("[Migration] Saving " + completedSales.length + " completed sales + " + linkedIncompleteSales.length + " linked incomplete sales (skipping " + skippedCount + " unlinked incomplete)...");
+      _setMigrationProgress({ done: 0, total: completedSales.length + linkedIncompleteSales.length });
+      let salesDone = 0;
+      await dbBatchWrite(completedSales, "completed-sales", (done) => {
+        salesDone = done;
+        _setMigrationProgress({ done: salesDone, total: completedSales.length + linkedIncompleteSales.length });
       });
+      if (linkedIncompleteSales.length > 0) {
+        await dbBatchWrite(linkedIncompleteSales, "active-sales", (done) => {
+          _setMigrationProgress({ done: salesDone + done, total: completedSales.length + linkedIncompleteSales.length });
+        });
+      }
       console.log("[Migration] Sales done.");
 
       // Update local store with open workorders
       useOpenWorkordersStore.getState().setOpenWorkorders(openWorkorders);
 
       // Summary
-      const summary = "Full Migration Complete: " +
+      const elapsed = ((Date.now() - migrationStart) / 1000).toFixed(1);
+      const summary = "Full Migration Complete in " + elapsed + "s: " +
         freshData.customers.length + " customers, " +
         mappedItems.length + " inventory, " +
         openWorkorders.length + " open WOs, " +

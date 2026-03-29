@@ -767,6 +767,59 @@ export async function dbGetStandaloneActiveSales() {
   }
 }
 
+/**
+ * Get all store IDs under the current tenant, excluding the current store.
+ * @returns {Promise<string[]>} Array of other store IDs
+ */
+export async function dbGetTenantStoreIDs() {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID) return [];
+    const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}`;
+    const stores = await firestoreQuery(path);
+    return stores.map((s) => s.id).filter((id) => id !== storeID);
+  } catch (error) {
+    log("Error fetching tenant store IDs:", error);
+    return [];
+  }
+}
+
+/**
+ * Cross-store search by ID. Fan out to all other stores under the tenant.
+ * Searches completed-workorders, completed-sales, open-workorders, and active-sales.
+ * @param {string} id - 12-digit barcode ID
+ * @returns {Promise<{ type: 'workorder'|'sale', data: Object, storeID: string, isCompleted: boolean }|null>}
+ */
+export async function dbCrossStoreSearchByID(id) {
+  try {
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID || !id) return null;
+    const otherStoreIDs = await dbGetTenantStoreIDs();
+    if (!otherStoreIDs.length) return null;
+
+    const results = await Promise.all(
+      otherStoreIDs.map(async (sid) => {
+        const base = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${sid}`;
+        const [completedWo, completedSale, openWo, activeSale] = await Promise.all([
+          firestoreRead(`${base}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}/${id}`),
+          firestoreRead(`${base}/${DB_NODES.FIRESTORE.COMPLETED_SALES}/${id}`),
+          firestoreRead(`${base}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${id}`),
+          firestoreRead(`${base}/active-sales/${id}`),
+        ]);
+        if (completedWo) return { type: "workorder", data: { id, ...completedWo }, storeID: sid, isCompleted: true };
+        if (openWo) return { type: "workorder", data: { id, ...openWo }, storeID: sid, isCompleted: false };
+        if (completedSale) return { type: "sale", data: { id, ...completedSale }, storeID: sid, isCompleted: true };
+        if (activeSale) return { type: "sale", data: { id, ...activeSale }, storeID: sid, isCompleted: false };
+        return null;
+      })
+    );
+    return results.find((r) => r !== null) || null;
+  } catch (error) {
+    log("Error in cross-store search:", error);
+    return null;
+  }
+}
+
 export async function dbSaveCompletedWorkorder(workorder) {
   try {
     const { tenantID, storeID } = getTenantAndStore();

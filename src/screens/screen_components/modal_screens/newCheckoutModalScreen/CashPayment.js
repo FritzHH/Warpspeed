@@ -1,8 +1,8 @@
 /* eslint-disable */
-import { View, Text, TextInput } from "react-native-web";
+import { View, Text, TextInput, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
 import { Button_, CheckBox_, SHADOW_RADIUS_PROTO } from "../../../../components";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   usdTypeMask,
   formatCurrencyDisp,
@@ -18,6 +18,7 @@ export const CashPayment = memo(function CashPayment({
   onCashChange,
   hasReaders = false,
   isVisible = false,
+  lockAmount = false,
 }) {
   const [sPayAmount, _setPayAmount] = useState("");
   const [sPayAmountDisp, _setPayAmountDisp] = useState("");
@@ -26,6 +27,8 @@ export const CashPayment = memo(function CashPayment({
   const [sIsCheck, _setIsCheck] = useState(false);
   const [sFocused, _setFocused] = useState("");
   const [sStatusMessage, _setStatusMessage] = useState("");
+  const [sDone, _setDone] = useState(false);
+  const [sSuccessMsg, _setSuccessMsg] = useState("");
 
   const tenderInputRef = useRef(null);
   const autoLoadedRef = useRef(false);
@@ -101,6 +104,10 @@ export const CashPayment = memo(function CashPayment({
 
     if (onPaymentCapture) onPaymentCapture(payment);
 
+    // Show celebration
+    _setSuccessMsg(`Payment of $${formatCurrencyDisp(payment.amountCaptured)} approved`);
+    _setDone(true);
+
     // Reset inputs
     _setPayAmount("");
     _setPayAmountDisp("");
@@ -108,9 +115,48 @@ export const CashPayment = memo(function CashPayment({
     _setTenderAmountDisp("");
     _setStatusMessage("");
     _setIsCheck(false);
+
+    // If partial payment, reset back to form after brief celebration
+    let newRemaining = amountLeftToPay - payment.amountCaptured;
+    if (newRemaining > 0) {
+      setTimeout(() => {
+        _setDone(false);
+        _setSuccessMsg("");
+      }, 3000);
+    }
   }
 
   let isEnabled = !saleComplete && amountLeftToPay > 0;
+
+  // ── Success celebration ──
+  let celebrationGif = saleComplete ? ICONS.guyCelebrating : ICONS.popperCelebration;
+
+  if (sDone) {
+    return (
+      <View
+        style={{
+          alignItems: "center",
+          width: "100%",
+          height: "48%",
+          borderRadius: 15,
+          ...SHADOW_RADIUS_PROTO,
+          justifyContent: "center",
+          paddingHorizontal: 15,
+        }}
+      >
+        <View style={{ alignItems: "center" }}>
+          <Image
+            source={celebrationGif}
+            style={{ width: 100, height: 100, marginBottom: 14, backgroundColor: "transparent" }}
+            resizeMode="contain"
+          />
+          <Text style={{ fontSize: 15, color: C.green, fontWeight: "600", textAlign: "center" }}>
+            {saleComplete ? "Full payment complete!" : sSuccessMsg}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -216,16 +262,16 @@ export const CashPayment = memo(function CashPayment({
             >
               <TextInput
                 onFocus={() => {
+                  if (lockAmount) return;
                   _setFocused("pay");
                   _setPayAmountDisp("");
                   _setPayAmount(0);
-
                 }}
                 style={{
                   fontSize: 20,
                   outlineWidth: 0,
                   outlineStyle: "none",
-                  color: C.text,
+                  color: lockAmount ? gray(0.5) : C.text,
                   paddingRight: 2,
                   textAlign: "right",
                 }}
@@ -233,7 +279,7 @@ export const CashPayment = memo(function CashPayment({
                 placeholderTextColor={gray(0.3)}
                 value={sPayAmountDisp}
                 onChangeText={handlePayAmountChange}
-                editable={isEnabled}
+                editable={isEnabled && !lockAmount}
               />
             </View>
           </View>

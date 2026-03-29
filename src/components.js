@@ -3413,14 +3413,15 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
             text="Cancel"
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 13 }}
-            buttonStyle={{ width: 90, height: 34, borderRadius: 6, marginRight: 10 }}
+            buttonStyle={{ width: 90, height: 34, borderRadius: 5, marginRight: 10 }}
             onPress={resetAndClose}
           />
           <Button_
           text={isCredit ? "Apply Credit" : "Pay Amount"}
           colorGradientArr={isCredit ? COLOR_GRADIENTS.blue : COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 13 }}
-          buttonStyle={{ width: 110, height: 34, borderRadius: 6, opacity: isCredit ? (creditReady ? 1 : 0.4) : (depositReady ? 1 : 0.4) }}
+          enabled={isCredit ? creditReady : depositReady}
+          buttonStyle={{ width: 110, height: 34, borderRadius: 5, opacity: isCredit ? (creditReady ? 1 : 0.4) : (depositReady ? 1 : 0.4) }}
             onPress={() => {
               if (isCredit) {
                 if (!creditReady) return;
@@ -3487,7 +3488,7 @@ export const DepositsList = ({ deposits, credits, onPress, onRemoveCredit }) => 
       )}
       {allItems.map((item) => {
         let isCredit = item._type === "credit";
-        let badgeColor = isCredit ? C.blue : (item.method === "cash" ? C.orange : C.green);
+        let badgeColor = isCredit ? C.blue : C.green;
         let noteText = item.note || item.text || "";
         let isConfirming = sConfirmId === item.id;
         return (

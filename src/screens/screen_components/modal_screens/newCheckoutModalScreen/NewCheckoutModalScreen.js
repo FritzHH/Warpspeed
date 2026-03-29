@@ -27,7 +27,7 @@ import {
   findTemplateByType,
   resolveStatus,
   usdTypeMask,
-  generateEAN13Barcode,
+  generate12DigitBarcode,
   createNewWorkorder,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, TAX_FREE_RECEIPT_NOTE, CUSTOMER_PROTO } from "../../../../data";
@@ -77,7 +77,7 @@ function getTranslateCode(langKey) {
   return LANG_TO_ISO[langKey] || langKey;
 }
 
-function broadcastSaleToDisplay(sale, combinedWOs, customerFirst, customerLast) {
+function broadcastSaleToDisplay(sale, combinedWOs, customerFirst, customerLast, customerLanguage) {
   if (!sale) return;
   let mapLine = (line) => ({
     id: line.id,
@@ -93,6 +93,7 @@ function broadcastSaleToDisplay(sale, combinedWOs, customerFirst, customerLast) 
   broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
     customerFirst: customerFirst || "",
     customerLast: customerLast || "",
+    customerLanguage: customerLanguage || "",
     combinedWorkorders: (combinedWOs || []).map((wo) => ({
       brand: wo.brand || "",
       model: wo.model || "",
@@ -201,7 +202,7 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
             text="Remove From Sale"
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 12 }}
-            buttonStyle={{ height: 32, borderRadius: 6, paddingHorizontal: 10 }}
+            buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10 }}
             onPress={onRemove}
           />
           <View style={{ flexDirection: "row" }}>
@@ -209,14 +210,14 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
               text="Cancel"
               colorGradientArr={COLOR_GRADIENTS.grey}
               textStyle={{ color: C.textWhite, fontSize: 12 }}
-              buttonStyle={{ height: 32, borderRadius: 6, paddingHorizontal: 10, marginRight: 8 }}
+              buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10, marginRight: 8 }}
               onPress={onClose}
             />
             <Button_
               text={isUnchanged ? "No Change" : "Apply"}
               colorGradientArr={isValid && !isUnchanged ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
               textStyle={{ color: C.textWhite, fontSize: 12 }}
-              buttonStyle={{ height: 32, borderRadius: 6, paddingHorizontal: 10, opacity: isValid && !isUnchanged ? 1 : 0.5 }}
+              buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10, opacity: isValid && !isUnchanged ? 1 : 0.5 }}
               onPress={() => { if (isValid && !isUnchanged) onConfirm(sAmountCents); }}
             />
           </View>
@@ -253,8 +254,9 @@ export function NewCheckoutModalScreen() {
   const [sDevSkip, _setDevSkip] = useState(_devSkipCompletion);
   const [sShowRefundModal, _setShowRefundModal] = useState(false);
   const [sRefundPayment, _setRefundPayment] = useState(null);
-  const [sShowCelebration, _setShowCelebration] = useState(false);
   const [sSplitDepositPayment, _setSplitDepositPayment] = useState(null);
+  const [sExpandedCreditIds, _setExpandedCreditIds] = useState([]);
+  const salePersistedRef = useRef(false);
   // ─── Derived Values ───────────────────────────────────────
   let isDepositMode = !!zDepositInfo;
   let isStandalone = !zOpenWorkorder?.customerID;
@@ -265,6 +267,7 @@ export function NewCheckoutModalScreen() {
   if (cashAmountLeftToPay < 0) cashAmountLeftToPay = 0;
   let custFirst = zOpenWorkorder?.customerFirst || zCustomer?.first || "";
   let custLast = zOpenWorkorder?.customerLast || zCustomer?.last || "";
+  let custLanguage = zOpenWorkorder?.customerLanguage || zCustomer?.language || "";
   let hasRealPayments = (sSale?.transactions || []).some((t) => !t.depositType);
 
   // ─── Initialization ──────────────────────────────────────
@@ -329,57 +332,11 @@ export function NewCheckoutModalScreen() {
         // (items may have been added/removed on the main screen since last checkout)
         existingSale = updateSaleWithTotals(existingSale, combined, zSettings);
 
-        // Auto-apply any customer deposits/credits not already on this sale and consume immediately
-        let freshCust = useCurrentCustomerStore.getState().getCustomer();
-        let existingDepositIds = new Set((existingSale.transactions || []).filter((t) => t.depositType).map((t) => t.depositId));
-        let rCustDeposits = cloneDeep(freshCust?.deposits || []);
-        let rCustCredits = cloneDeep(freshCust?.credits || []);
-        let unappliedItems = [
-          ...rCustDeposits.filter((d) => d.amountCents > 0 && !existingDepositIds.has(d.id)).map((d) => ({ ...d, _type: "deposit" })),
-          ...rCustCredits.filter((d) => d.amountCents > 0 && !existingDepositIds.has(d.id)).map((d) => ({ ...d, _type: "credit" })),
-        ];
-        let rDepositConsumed = false;
-        for (let item of unappliedItems) {
-          let currentCaptured = (existingSale.transactions || []).reduce((s, t) => s + (t.amountCaptured || 0), 0);
-          let amountNeeded = (existingSale.total || 0) - currentCaptured;
-          if (amountNeeded <= 0) break;
-          let isCredit = item._type === "credit";
-          let appliedAmount = Math.min(item.amountCents, amountNeeded);
-          let payment = {
-            ...cloneDeep(TRANSACTION_PROTO),
-            id: generateEAN13Barcode("4"),
-            amountCaptured: appliedAmount,
-            amountTendered: appliedAmount,
-            type: "payment",
-            method: isCredit ? "credit" : (item.method || "cash"),
-            depositId: item.id,
-            depositType: isCredit ? "credit" : "deposit",
-            depositOriginalAmount: item.amountCents,
-            paymentIntentID: item.paymentIntentID || "",
-            last4: item.last4 || "",
-            millis: Date.now(),
-          };
-          payment.saleID = existingSale.id;
-          existingSale.transactions = [...existingSale.transactions, payment];
-          // Consume from customer arrays
-          let arr = isCredit ? rCustCredits : rCustDeposits;
-          let idx = arr.findIndex((d) => d.id === item.id);
-          if (idx >= 0) {
-            let remainder = arr[idx].amountCents - appliedAmount;
-            if (remainder > 0) { arr[idx] = { ...arr[idx], amountCents: remainder }; }
-            else { arr.splice(idx, 1); }
-            rDepositConsumed = true;
-          }
-        }
-        if (rDepositConsumed && freshCust?.id) {
-          let updatedCust = { ...freshCust, deposits: rCustDeposits, credits: rCustCredits };
-          useCurrentCustomerStore.getState().setCustomer(updatedCust);
-          dbSaveCustomer(updatedCust);
-        }
         recomputeSaleAmounts(existingSale);
+        salePersistedRef.current = true;
 
         _setSale(existingSale);
-        broadcastSaleToDisplay(existingSale, combined, custFirst, custLast);
+        broadcastSaleToDisplay(existingSale, combined, custFirst, custLast, custLanguage);
         fetchReaders();
         return;
       }
@@ -405,59 +362,8 @@ export function NewCheckoutModalScreen() {
       // No workorder — should not normally happen
     }
 
-    // Auto-apply customer deposits/credits (use fresh store data) and consume immediately
-    let freshCust2 = useCurrentCustomerStore.getState().getCustomer();
-    let custDeposits = cloneDeep(freshCust2?.deposits || []);
-    let custCredits = cloneDeep(freshCust2?.credits || []);
-    let customerItems = [
-      ...custDeposits.filter((d) => d.amountCents > 0).map((d) => ({ ...d, _type: "deposit" })),
-      ...custCredits.filter((d) => d.amountCents > 0).map((d) => ({ ...d, _type: "credit" })),
-    ];
-    let depositConsumed = false;
-    for (let item of customerItems) {
-      let currentCaptured = (sale.transactions || []).reduce((s, t) => s + (t.amountCaptured || 0), 0);
-      let amountNeeded = (sale.total || 0) - currentCaptured;
-      if (amountNeeded <= 0) break;
-      let isCredit = item._type === "credit";
-      let appliedAmount = Math.min(item.amountCents, amountNeeded);
-      let payment = {
-        ...cloneDeep(TRANSACTION_PROTO),
-        id: generateEAN13Barcode("4"),
-        amountCaptured: appliedAmount,
-        amountTendered: appliedAmount,
-        type: "payment",
-        method: isCredit ? "credit" : (item.method || "cash"),
-        depositId: item.id,
-        depositType: isCredit ? "credit" : "deposit",
-        depositOriginalAmount: item.amountCents,
-        paymentIntentID: item.paymentIntentID || "",
-        last4: item.last4 || "",
-        millis: Date.now(),
-      };
-      payment.saleID = sale.id;
-      sale.transactions = [...sale.transactions, payment];
-      // Consume from customer arrays
-      let arr = isCredit ? custCredits : custDeposits;
-      let idx = arr.findIndex((d) => d.id === item.id);
-      if (idx >= 0) {
-        let remainder = arr[idx].amountCents - appliedAmount;
-        if (remainder > 0) { arr[idx] = { ...arr[idx], amountCents: remainder }; }
-        else { arr.splice(idx, 1); }
-        depositConsumed = true;
-      }
-    }
-    if (depositConsumed && freshCust2?.id) {
-      let updatedCust = { ...freshCust2, deposits: custDeposits, credits: custCredits };
-      useCurrentCustomerStore.getState().setCustomer(updatedCust);
-      dbSaveCustomer(updatedCust);
-    }
-    recomputeSaleAmounts(sale);
-
     _setSale(sale);
-    broadcastSaleToDisplay(sale, zOpenWorkorder ? [cloneDeep(zOpenWorkorder)] : [], custFirst, custLast);
-
-    // Persist immediately for network resilience
-    newCheckoutSaveActiveSale(sale);
+    broadcastSaleToDisplay(sale, zOpenWorkorder ? [cloneDeep(zOpenWorkorder)] : [], custFirst, custLast, custLanguage);
 
     // Fetch card readers
     fetchReaders();
@@ -484,7 +390,6 @@ export function NewCheckoutModalScreen() {
     sale.customerID = zCustomer?.id || "";
     _setCombinedWorkorders([]);
     _setSale(sale);
-    newCheckoutSaveActiveSale(sale);
     fetchReaders();
   }
 
@@ -528,6 +433,11 @@ export function NewCheckoutModalScreen() {
   // Poll for card readers every 5s when none are detected
   let onlineReaders = zStripeReaders.filter((r) => r.status === "online");
   const readerPollRef = useRef(null);
+
+  function persistSale(sale) {
+    newCheckoutSaveActiveSale(sale);
+    salePersistedRef.current = true;
+  }
   useEffect(() => {
     if (onlineReaders.length === 0 && sInitialized) {
       readerPollRef.current = setInterval(fetchReaders, 5000);
@@ -557,8 +467,7 @@ export function NewCheckoutModalScreen() {
     let updated = updateSaleWithTotals(sSale, newArr, zSettings);
     updated.workorderIDs = newArr.map((o) => o.id);
     _setSale(updated);
-    broadcastSaleToDisplay(updated, newArr, custFirst, custLast);
-    newCheckoutSaveActiveSale(updated);
+    broadcastSaleToDisplay(updated, newArr, custFirst, custLast, custLanguage);
   }
 
   function handleWorkorderLineChange(woId, newLines) {
@@ -572,8 +481,8 @@ export function NewCheckoutModalScreen() {
 
     let updated = updateSaleWithTotals(sSale, newArr, zSettings);
     _setSale(updated);
-    broadcastSaleToDisplay(updated, newArr, custFirst, custLast);
-    newCheckoutSaveActiveSale(updated);
+    broadcastSaleToDisplay(updated, newArr, custFirst, custLast, custLanguage);
+    persistSale(updated);
   }
 
   // Other open workorders for the same customer
@@ -613,7 +522,7 @@ export function NewCheckoutModalScreen() {
     // Create a payment object for this deposit/credit
     let payment = {
       ...cloneDeep(TRANSACTION_PROTO),
-      id: generateEAN13Barcode("4"),
+      id: generate12DigitBarcode(),
       amountCaptured: appliedAmount,
       amountTendered: appliedAmount,
       type: "payment",
@@ -621,6 +530,8 @@ export function NewCheckoutModalScreen() {
       depositId: deposit.id,
       depositType: isCredit ? "credit" : "deposit",
       depositOriginalAmount: deposit.amountCents,
+      depositOriginalMillis: deposit.millis || 0,
+      depositOriginalText: isCredit ? (deposit.text || "") : "",
       paymentIntentID: deposit.paymentIntentID || "",
       last4: deposit.last4 || "",
       millis: Date.now(),
@@ -658,9 +569,9 @@ export function NewCheckoutModalScreen() {
     if (existing) {
       existing.amountCents = existing.amountCents + payment.amountCaptured;
     } else if (isCredit) {
-      customerArr.push({ id: payment.depositId, text: "", amountCents: payment.amountCaptured, millis: payment.millis });
+      customerArr.push({ id: payment.depositId, text: "", amountCents: payment.amountCaptured, millis: payment.depositOriginalMillis || payment.millis });
     } else {
-      customerArr.push({ id: payment.depositId, amountCents: payment.amountCaptured, millis: payment.millis, method: payment.method || "cash", note: "", last4: payment.last4 || "", paymentIntentID: payment.paymentIntentID || "" });
+      customerArr.push({ id: payment.depositId, amountCents: payment.amountCaptured, millis: payment.depositOriginalMillis || payment.millis, method: payment.method || "cash", note: "", last4: payment.last4 || "", paymentIntentID: payment.paymentIntentID || "" });
     }
     let updatedCustomer = { ...zCustomer, [arrKey]: customerArr };
     useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
@@ -671,7 +582,25 @@ export function NewCheckoutModalScreen() {
     sale.transactions = sale.transactions.filter((t) => t.id !== payment.id);
     recomputeSaleAmounts(sale);
     _setSale(sale);
-    newCheckoutSaveActiveSale(sale);
+    persistSale(sale);
+
+    // Log removal to workorder changelogs
+    let user = useLoginStore.getState().currentUser?.first || "System";
+    let timestamp = Date.now();
+    let label = isCredit ? "Credit" : "Deposit";
+    let entry = { timestamp, user, field: "payment", action: "recorded", from: "", to: label + " removed " + formatCurrencyDisp(payment.amountCaptured, true) };
+    let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
+    let amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
+    if (amountPaid < 0) amountPaid = 0;
+    let updatedWorkorders = [];
+    for (let wo of sCombinedWorkorders) {
+      let updated = cloneDeep(wo);
+      updated.changeLog = [...(updated.changeLog || []), entry];
+      updated.amountPaid = amountPaid;
+      if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
+      updatedWorkorders.push(updated);
+    }
+    _setCombinedWorkorders(updatedWorkorders);
   }
 
   function handleSplitDeposit(payment, newAmountCents) {
@@ -689,6 +618,7 @@ export function NewCheckoutModalScreen() {
     }
 
     let difference = payment.amountCaptured - newAmountCents; // positive = decrease, negative = increase
+    log("handleSplitDeposit: payment.amountCaptured=", payment.amountCaptured, "newAmountCents=", newAmountCents, "difference=", difference, "depositId=", payment.depositId, "zCustomer?.id=", zCustomer?.id, "sCombinedWorkorders.length=", sCombinedWorkorders.length);
 
     // Update the payment in the sale
     let sale = cloneDeep(sSale);
@@ -698,10 +628,11 @@ export function NewCheckoutModalScreen() {
       ...sale.transactions[paymentIdx],
       amountCaptured: newAmountCents,
       amountTendered: newAmountCents,
+      salesTax: sale.total > 0 ? Math.round(sale.salesTax * (newAmountCents / sale.total)) : 0,
     };
     recomputeSaleAmounts(sale);
     _setSale(sale);
-    newCheckoutSaveActiveSale(sale);
+    persistSale(sale);
 
     // Update customer deposits/credits: positive difference = restore, negative = consume more
     let isCredit = payment.depositType === "credit";
@@ -715,22 +646,19 @@ export function NewCheckoutModalScreen() {
       } else if (isCredit) {
         customerArr.push({
           id: payment.depositId,
-          text: payment.depositNote || "",
+          text: payment.depositOriginalText || "",
           amountCents: difference,
-          millis: payment.millis,
+          millis: payment.depositOriginalMillis || payment.millis,
         });
       } else {
         customerArr.push({
           id: payment.depositId,
-          type: payment.depositType,
           amountCents: difference,
-          millis: payment.millis,
-          note: payment.depositNote || "",
-          saleID: payment.depositSaleID || "",
-          cash: payment.method === "cash",
+          millis: payment.depositOriginalMillis || payment.millis,
+          method: payment.method || "cash",
+          note: "",
           last4: payment.last4 || "",
-          cardType: payment.cardType || "",
-          cardIssuer: payment.cardIssuer || "",
+          paymentIntentID: payment.paymentIntentID || "",
         });
       }
     } else if (difference < 0) {
@@ -743,11 +671,32 @@ export function NewCheckoutModalScreen() {
         }
       }
     }
+    log("handleSplitDeposit: existing deposit found=", !!existing, "customerArr after=", JSON.stringify(customerArr), "zCustomer?.id=", zCustomer?.id);
     if (zCustomer?.id) {
       let updatedCustomer = { ...zCustomer, [arrKey]: customerArr };
+      log("handleSplitDeposit: saving customer, deposit amountCents=", updatedCustomer[arrKey]?.find((d) => d.id === payment.depositId)?.amountCents);
       useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
       dbSaveCustomer(updatedCustomer);
     }
+
+    // Log split to workorder changelogs
+    let user = useLoginStore.getState().currentUser?.first || "System";
+    let timestamp = Date.now();
+    let label = isCredit ? "Credit" : "Deposit";
+    let action = difference > 0 ? "reduced to" : "increased to";
+    let entry = { timestamp, user, field: "payment", action: "recorded", from: "", to: label + " " + action + " " + formatCurrencyDisp(newAmountCents, true) };
+    let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
+    let amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
+    if (amountPaid < 0) amountPaid = 0;
+    let updatedWorkorders = [];
+    for (let wo of sCombinedWorkorders) {
+      let updated = cloneDeep(wo);
+      updated.changeLog = [...(updated.changeLog || []), entry];
+      updated.amountPaid = amountPaid;
+      if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
+      updatedWorkorders.push(updated);
+    }
+    _setCombinedWorkorders(updatedWorkorders);
 
     _setSplitDepositPayment(null);
   }
@@ -795,8 +744,6 @@ export function NewCheckoutModalScreen() {
     recomputeSaleAmounts(sale);
 
     if (sale.paymentComplete) {
-      _setShowCelebration(true);
-      setTimeout(() => _setShowCelebration(false), 1700);
       handleSaleComplete(sale);
     } else {
       updateWorkordersWithPaymentStatus(sale);
@@ -821,10 +768,10 @@ export function NewCheckoutModalScreen() {
     }
 
     _setSale(sale);
-    broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast);
+    broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast, custLanguage);
 
     // Persist immediately (skip if complete — handleSaleComplete handles deletion)
-    if (!sDevSkip && !sale.paymentComplete) newCheckoutSaveActiveSale(sale);
+    if (!sDevSkip && !sale.paymentComplete) persistSale(sale);
   }
 
   // Update workorders to track that a sale is in progress
@@ -844,7 +791,9 @@ export function NewCheckoutModalScreen() {
 
       updated.activeSaleID = sale.id;
       updated.saleID = sale.id;
-      updated.amountPaid = (sale.transactions || []).filter((t) => !t.depositType).reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
+      let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
+      updated.amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
+      if (updated.amountPaid < 0) updated.amountPaid = 0;
       // updated.status = "sale_in_progress";
 
       let entries = [];
@@ -991,8 +940,11 @@ export function NewCheckoutModalScreen() {
       let newStatusLabel = resolveStatus("finished_and_paid", statuses)?.label || "Finished & Paid";
 
       woToComplete.paymentComplete = true;
+      woToComplete.paidOnMillis = Date.now();
       woToComplete.activeSaleID = "";
-      woToComplete.amountPaid = (sale.transactions || []).filter((t) => !t.depositType).reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
+      let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
+      woToComplete.amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
+      if (woToComplete.amountPaid < 0) woToComplete.amountPaid = 0;
       woToComplete.saleID = sale.id;
       woToComplete.status = "finished_and_paid";
 
@@ -1274,10 +1226,13 @@ export function NewCheckoutModalScreen() {
   }
 
   function resetAndClose() {
-    // Clean up orphaned active-sale if no payments were made
-    if (sSale?.id && !(sSale?.amountCaptured > 0)) {
+    // If sale has transactions, it's already fully persisted — just close the modal.
+    // Only delete empty sales (no transactions) to clean up the active-sale document.
+    let hasTransactions = (sSale?.transactions || []).length > 0;
+    if (sSale?.id && !hasTransactions && salePersistedRef.current) {
       newCheckoutDeleteActiveSale(sSale.id);
     }
+    salePersistedRef.current = false;
     broadcastClear();
     _setSale(null);
     _setCombinedWorkorders([]);
@@ -1395,8 +1350,8 @@ export function NewCheckoutModalScreen() {
     // Recalculate sale totals
     let updated = updateSaleWithTotals(sSale, newCombined, zSettings);
     _setSale(updated);
-    broadcastSaleToDisplay(updated, newCombined, custFirst, custLast);
-    newCheckoutSaveActiveSale(updated);
+    broadcastSaleToDisplay(updated, newCombined, custFirst, custLast, custLanguage);
+    persistSale(updated);
   }
 
   function handleTaxFreeToggle() {
@@ -1448,28 +1403,6 @@ export function NewCheckoutModalScreen() {
               <LoadingIndicator />
             </View>
           )}
-          {/* Celebration overlay */}
-          {sShowCelebration && (
-            <View
-              pointerEvents="none"
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                justifyContent: "center",
-                alignItems: "center",
-                zIndex: 999,
-              }}
-            >
-              <Image
-                source={ICONS.guyCelebrating}
-                style={{ width: "66%", height: "66%", backgroundColor: "transparent" }}
-                resizeMode="contain"
-              />
-            </View>
-          )}
           {/* DEV TOGGLE */}
           <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", paddingVertical: 4 }}>
             <CheckBox_
@@ -1503,6 +1436,7 @@ export function NewCheckoutModalScreen() {
                 onCashChange={handleCashChange}
                 hasReaders={onlineReaders.length > 0}
                 isVisible={zIsCheckingOut}
+                lockAmount={isDepositMode}
               />
               {sCardMode === "manual" ? (
                 <CardPayment
@@ -1515,6 +1449,7 @@ export function NewCheckoutModalScreen() {
                   onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
                   onCardProcessingEnd={() => _setCardProcessingAmount(0)}
                   onSwitchToReader={() => _setCardMode("reader")}
+                  lockAmount={isDepositMode}
                 />
               ) : (
                 <CardReaderPayment
@@ -1530,6 +1465,7 @@ export function NewCheckoutModalScreen() {
                     onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
                     onCardProcessingEnd={() => _setCardProcessingAmount(0)}
                     onSwitchToManual={() => _setCardMode("manual")}
+                    lockAmount={isDepositMode}
                   />
               )}
             </View>
@@ -1585,6 +1521,29 @@ export function NewCheckoutModalScreen() {
                   )}
                 </View>
 
+                {/* Deposit info banner */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: C.backgroundListWhite,
+                    borderWidth: 1,
+                    borderColor: C.orange,
+                    borderRadius: 6,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    marginTop: 8,
+                  }}
+                >
+                  <Image_
+                    source={ICONS.info}
+                    style={{ width: 18, height: 18, marginRight: 8, tintColor: C.orange }}
+                  />
+                  <Text style={{ fontSize: 13, color: C.orange, fontWeight: "500" }}>
+                    Deposit requires full payment — partial payments are not allowed.
+                  </Text>
+                </View>
+
                 <SaleTotals
                   sale={sSale}
                   cashChangeNeeded={sCashChangeNeeded}
@@ -1621,7 +1580,7 @@ export function NewCheckoutModalScreen() {
                     text={saleComplete ? "CLOSE" : isStandalone ? "CANCEL SALE" : "CANCEL"}
                     onPress={closeModal}
                     textStyle={{ color: C.textWhite, fontSize: 13 }}
-                    buttonStyle={{ width: 80, height: 30, borderRadius: 6, marginRight: 10 }}
+                    buttonStyle={{ width: 80, height: 30, borderRadius: 5, marginRight: 10 }}
                   />
                   {saleComplete && (
                     <Button_
@@ -1629,7 +1588,7 @@ export function NewCheckoutModalScreen() {
                       text="REPRINT"
                       onPress={handleReprint}
                       textStyle={{ color: C.textWhite }}
-                      buttonStyle={{ width: 100, borderRadius: 6, marginRight: 10 }}
+                      buttonStyle={{ width: 100, borderRadius: 5, marginRight: 10 }}
                     />
                   )}
                   <Tooltip text="Pop register" position="top">
@@ -1725,69 +1684,90 @@ export function NewCheckoutModalScreen() {
                 let saleComplete = sSale?.paymentComplete;
                       if (allAvailable.length === 0 || saleComplete) return null;
                 return (
-                  <ScrollView
+                  <View
                     style={{
-                      maxHeight: 60,
                       borderWidth: 1,
                       borderColor: C.buttonLightGreenOutline,
                       borderRadius: 6,
-                      backgroundColor: C.backgroundListWhite,
+                      backgroundColor: "#FFFACD",
                       marginTop: 5,
-                      paddingHorizontal: 6,
-                      paddingVertical: 3,
+                      paddingHorizontal: 8,
+                      paddingVertical: 5,
                     }}
                   >
+                    <View style={{ borderRadius: 4, paddingVertical: 4, paddingHorizontal: 8, marginBottom: 5 }}>
+                      <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }}>DEPOSITS & CREDITS</Text>
+                    </View>
                     {allAvailable.map((item) => {
                       let isCredit = item._type === "credit";
                       let badgeColor = isCredit ? C.blue : C.green;
                       let noteText = item.note || item.text || "";
+                      let isExpanded = sExpandedCreditIds.includes(item.id);
                       return (
-                        <View
-                          key={item.id}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            paddingVertical: 2,
-                          }}
-                        >
-                          <CheckBox_
-                            text=""
-                            isChecked={false}
-                            onCheck={() => handleApplyDeposit(item)}
-                            buttonStyle={{ marginRight: 4 }}
-                            iconSize={16}
-                          />
+                        <View key={item.id} style={{ paddingVertical: 4 }}>
                           <View
                             style={{
-                              backgroundColor: lightenRGBByPercent(badgeColor, 70),
-                              paddingHorizontal: 5,
-                              paddingVertical: 1,
-                              borderRadius: 6,
-                              marginRight: 6,
+                              flexDirection: "row",
+                              alignItems: "center",
                             }}
                           >
-                            <Text
+                            <CheckBox_
+                              text=""
+                              isChecked={false}
+                              onCheck={() => handleApplyDeposit(item)}
+                              buttonStyle={{ marginRight: 6 }}
+                              iconSize={20}
+                            />
+                            <View
                               style={{
-                                fontSize: 9,
-                                fontWeight: "600",
-                                color: badgeColor,
+                                backgroundColor: lightenRGBByPercent(badgeColor, 70),
+                                paddingHorizontal: 7,
+                                paddingVertical: 2,
+                                borderRadius: 6,
+                                marginRight: 8,
                               }}
                             >
-                              {isCredit ? "Credit" : "Deposit"}
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: "600",
+                                  color: badgeColor,
+                                }}
+                              >
+                                {isCredit ? "Credit" : "Deposit"}
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginRight: 8 }}>
+                              {"$" + formatCurrencyDisp(item.amountCents)}
                             </Text>
+                            {!isCredit && !!noteText && (
+                              <Text numberOfLines={1} style={{ fontSize: 13, color: gray(0.5), flex: 1 }}>
+                                {noteText}
+                              </Text>
+                            )}
+                            {isCredit && !!noteText && (
+                              <Text
+                                onPress={() => {
+                                  _setExpandedCreditIds(isExpanded
+                                    ? sExpandedCreditIds.filter((id) => id !== item.id)
+                                    : [...sExpandedCreditIds, item.id]
+                                  );
+                                }}
+                                style={{ fontSize: 12, color: C.blue, fontWeight: "600" }}
+                              >
+                                {"Reason " + (isExpanded ? "▾" : "▸")}
+                              </Text>
+                            )}
                           </View>
-                          <Text style={{ fontSize: 12, fontWeight: "600", color: C.text, marginRight: 6 }}>
-                            {"$" + formatCurrencyDisp(item.amountCents)}
-                          </Text>
-                          {!!noteText && (
-                            <Text numberOfLines={1} style={{ fontSize: 10, color: gray(0.5), flex: 1 }}>
+                          {isCredit && isExpanded && !!noteText && (
+                            <Text style={{ fontSize: 13, color: gray(0.5), marginLeft: 34, marginTop: 2 }}>
                               {noteText}
                             </Text>
                           )}
                         </View>
                       );
                     })}
-                  </ScrollView>
+                  </View>
                 );
               })()}
 
@@ -1815,7 +1795,9 @@ export function NewCheckoutModalScreen() {
                 </ScrollView>
 
                       {!!sSplitDepositPayment && (() => {
-                        let customerRemaining = (zCustomer?.deposits || [])
+                        let isCredit = sSplitDepositPayment.depositType === "credit";
+                        let customerArr = isCredit ? (zCustomer?.credits || []) : (zCustomer?.deposits || []);
+                        let customerRemaining = customerArr
                           .filter((d) => d.id === sSplitDepositPayment.depositId)
                           .reduce((sum, d) => sum + (d.amountCents || 0), 0);
                         let totalDeposit = customerRemaining + sSplitDepositPayment.amountCaptured;
@@ -1852,8 +1834,8 @@ export function NewCheckoutModalScreen() {
                   borderWidth: 1,
                   borderColor: C.buttonLightGreenOutline,
                   backgroundColor: C.backgroundListWhite,
-                  borderRadius: 6,
-                  paddingVertical: 2,
+                        borderRadius: 5,
+                        paddingVertical: 4,
                   paddingHorizontal: 3,
                   marginTop: 5
                 }}
@@ -1902,7 +1884,7 @@ export function NewCheckoutModalScreen() {
                           text={saleComplete ? "CLOSE" : isStandalone ? "CANCEL SALE" : "CANCEL"}
                           onPress={closeModal}
                           textStyle={{ color: C.textWhite, fontSize: 13 }}
-                          buttonStyle={{ height: 30, borderRadius: 6 }}
+                          buttonStyle={{ height: 30, borderRadius: 5 }}
                         />
                       )}
                 {saleComplete && (
@@ -1911,7 +1893,7 @@ export function NewCheckoutModalScreen() {
                     text="REPRINT"
                     onPress={handleReprint}
                     textStyle={{ color: C.textWhite }}
-                    buttonStyle={{ width: 100, borderRadius: 6 }}
+                          buttonStyle={{ width: 100, borderRadius: 5 }}
                   />
                 )}
                 <Tooltip text="Pop register" position="top">

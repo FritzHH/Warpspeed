@@ -1218,16 +1218,20 @@ export function ean13CheckDigit(first12) {
 }
 
 /**
- * Generate a 12-digit barcode ID.
- * Format: prefix + 8-digit timestamp + 3-digit random = 12 digits.
- * @param {string} prefix - "1" for workorder, "3" for sale, "4" for transaction, "5" for credit, "6" for inventory
- * @returns {string} 12-digit barcode
+ * Generate a 12-digit crypto-random numeric ID.
+ * @returns {string} 12-digit numeric string
  */
-export function generateEAN13Barcode(prefix) {
-  const millis = Date.now().toString();
-  const timePart = millis.slice(-8);
-  const randomPart = Math.floor(100 + Math.random() * 900).toString();
-  return prefix + timePart + randomPart;
+export function generate12DigitBarcode() {
+  const arr = crypto.getRandomValues(new Uint8Array(12));
+  return Array.from(arr, b => (b % 10).toString()).join('');
+}
+
+/**
+ * Generate a 36-character UUID (32 hex digits + 4 hyphens).
+ * @returns {string} UUID string (e.g. "550e8400-e29b-41d4-a716-446655440000")
+ */
+export function generate36CharUUID() {
+  return crypto.randomUUID();
 }
 
 /**
@@ -1911,12 +1915,13 @@ export function createNewWorkorder({
   customerLandline,
   customerEmail,
   customerContactRestriction,
+  customerLanguage,
   startedByFirst,
   startedByLast,
   status,
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
-  wo.id = generateEAN13Barcode("1");
+  wo.id = generate12DigitBarcode();
   wo.workorderNumber = generateWorkorderNumber(wo.id);
   wo.status = status || SETTINGS_OBJ.statuses[0]?.id || "";
   wo.customerFirst = customerFirst || "";
@@ -1925,6 +1930,7 @@ export function createNewWorkorder({
   wo.customerLandline = customerLandline || "";
   wo.customerEmail = customerEmail || "";
   wo.customerContactRestriction = customerContactRestriction || "";
+  wo.customerLanguage = customerLanguage || "";
   wo.customerID = customerID || "";
   wo.startedBy = (startedByFirst || "") + " " + (startedByLast || "");
   wo.changeLog.push("Started by: " + (startedByFirst || "") + " " + (startedByLast || ""));

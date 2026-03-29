@@ -15,7 +15,7 @@ import {
   WORKORDER_PROTO,
 } from "./data";
 import {
-  generateEAN13Barcode,
+  generate12DigitBarcode,
   randomWordGenerator,
   roundToTwoDecimals,
 } from "./utils";
@@ -49,7 +49,7 @@ export async function fillInventory() {
     lastDigit = lastDigit.slice(lastDigit.length - 1);
     if (lastDigit == 0) lastDigit = 2;
     if (lastDigit == 9) lastDigit = 8;
-    let inv = { ...INVENTORY_ITEM_PROTO, id: generateEAN13Barcode("6") };
+    let inv = { ...INVENTORY_ITEM_PROTO, id: generate12DigitBarcode() };
     inv.formalName =
       (await randomWordGenerator()) +
       " " +
@@ -81,7 +81,7 @@ export async function fillOpenWorkorders(zInventoryArr) {
   let arr = [];
   for (let i = 1; i <= 1; i++) {
     let wo = cloneDeep(WORKORDER_PROTO);
-    wo.id = generateEAN13Barcode("1");
+    wo.id = generate12DigitBarcode();
     wo.brand = SETTINGS_OBJ.bikeBrands[Math.floor(Math.random() * 4)];
     wo.color1 = COLORS[Math.floor(Math.random() * 6)];
     wo.color2 = COLORS[Math.floor(Math.random() * 6)];

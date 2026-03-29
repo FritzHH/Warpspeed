@@ -14,7 +14,7 @@ import {
   formatCurrencyDisp,
   formatMillisForDisplay,
   formatPhoneWithDashes,
-  generateEAN13Barcode,
+  generate12DigitBarcode,
   gray,
   lightenRGBByPercent,
   removeDashesFromPhone,
@@ -127,6 +127,8 @@ export const CustomerInfoScreenModalComponent = ({
           }
         })
       );
+      console.log("WO IDs from customer:", woIDs);
+      console.log("WO results (before filter):", results.map((r, i) => ({ id: woIDs[i], found: !!r, source: r ? (openWOs.some((o) => o.id === r.id) ? "local" : "completed") : "null" })));
       let loaded = results.filter(Boolean);
       if (mountedRef.current) _sSetWorkorders(loaded);
       return loaded;
@@ -251,6 +253,7 @@ export const CustomerInfoScreenModalComponent = ({
     customerLandline: "customerLandline",
     email: "customerEmail",
     contactRestriction: "customerContactRestriction",
+    language: "customerLanguage",
   };
 
   function saveField(fieldName, val) {
@@ -607,7 +610,7 @@ export const CustomerInfoScreenModalComponent = ({
           }}
           onCredit={({ amountCents, text }) => {
             let credit = { ...CUSTOMER_CREDIT_PROTO };
-            credit.id = generateEAN13Barcode("5");
+            credit.id = generate12DigitBarcode();
             credit.text = text;
             credit.amountCents = amountCents;
             credit.millis = Date.now();

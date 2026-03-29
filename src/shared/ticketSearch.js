@@ -17,6 +17,7 @@ import {
   dbSearchCompletedWorkorders,
   dbSearchWorkordersByIdPrefix,
   dbSearchSalesByIdPrefix,
+  dbCrossStoreSearchByID,
 } from "../db_calls_wrapper";
 import { newCheckoutGetActiveSale } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
@@ -80,34 +81,33 @@ export async function executeTicketSearch(searchText, onComplete, options) {
     const isWoNumber = /^\d{5}$/.test(trimmed);
     const isFirst4 = /^\d{4}$/.test(trimmed);
 
-    // Full 12-digit barcode — auto search
+    // Full 12-digit barcode — search all collections (no prefix routing)
     if (isFullBarcode) {
-      const prefix = trimmed[0];
-      if (prefix === "1") {
-        let found = openWOs.find((w) => w.id === trimmed);
-        if (found) { if (onWorkorderFound) onWorkorderFound(found); else openWorkorder(found, false); if (onComplete) onComplete(); return; }
-        let completed = await dbGetCompletedWorkorder(trimmed);
-        if (completed) { if (onWorkorderFound) onWorkorderFound(completed); else openWorkorder(completed, true); if (onComplete) onComplete(); return; }
-        showTicketAlert("Workorder not found");
-      } else if (prefix === "3") {
-        let sale = await newCheckoutGetActiveSale(trimmed);
-        if (sale) { openSale(sale, false); if (onComplete) onComplete(); return; }
-        sale = await dbGetCompletedSale(trimmed);
-        if (sale) { openSale(sale, true); if (onComplete) onComplete(); return; }
-        showTicketAlert("Sale not found");
-      } else if (prefix === "2") {
-        let found = openWOs.find((w) => w.id === trimmed);
-        if (found) { if (onWorkorderFound) onWorkorderFound(found); else openWorkorder(found, false); if (onComplete) onComplete(); return; }
-        let completedWo = await dbGetCompletedWorkorder(trimmed);
-        if (completedWo) { if (onWorkorderFound) onWorkorderFound(completedWo); else openWorkorder(completedWo, true); if (onComplete) onComplete(); return; }
-        let sale = await newCheckoutGetActiveSale(trimmed);
-        if (sale) { openSale(sale, false); if (onComplete) onComplete(); return; }
-        sale = await dbGetCompletedSale(trimmed);
-        if (sale) { openSale(sale, true); if (onComplete) onComplete(); return; }
-        showTicketAlert("Ticket not found");
-      } else {
-        showTicketAlert("Unrecognized barcode prefix");
+      // 1. Local open workorders
+      let found = openWOs.find((w) => w.id === trimmed);
+      if (found) { if (onWorkorderFound) onWorkorderFound(found); else openWorkorder(found, false); if (onComplete) onComplete(); return; }
+      // 2. Completed workorders
+      let completedWo = await dbGetCompletedWorkorder(trimmed);
+      if (completedWo) { if (onWorkorderFound) onWorkorderFound(completedWo); else openWorkorder(completedWo, true); if (onComplete) onComplete(); return; }
+      // 3. Active sales
+      let activeSale = await newCheckoutGetActiveSale(trimmed);
+      if (activeSale) { openSale(activeSale, false); if (onComplete) onComplete(); return; }
+      // 4. Completed sales
+      let completedSale = await dbGetCompletedSale(trimmed);
+      if (completedSale) { openSale(completedSale, true); if (onComplete) onComplete(); return; }
+      // 5. Cross-store fallback
+      let crossResult = await dbCrossStoreSearchByID(trimmed);
+      if (crossResult) {
+        if (crossResult.type === "workorder") {
+          if (onWorkorderFound) onWorkorderFound(crossResult.data);
+          else openWorkorder(crossResult.data, crossResult.isCompleted);
+        } else {
+          openSale(crossResult.data, crossResult.isCompleted);
+        }
+        if (onComplete) onComplete();
+        return;
       }
+      showTicketAlert("Ticket not found");
       return;
     }
 
@@ -121,28 +121,17 @@ export async function executeTicketSearch(searchText, onComplete, options) {
       return;
     }
 
-    // 4-digit prefix search
+    // 4-digit prefix search — search all collections
     if (isFirst4) {
-      const prefix = trimmed[0];
       useTicketSearchStore.getState().setIsSearching(true);
       useTicketSearchStore.getState().setResults([]);
       useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.ticketSearchResults);
 
-      if (prefix === "1") {
-        let results = await dbSearchWorkordersByIdPrefix(trimmed);
-        useTicketSearchStore.getState().setResults(results);
-      } else if (prefix === "3") {
-        let results = await dbSearchSalesByIdPrefix(trimmed);
-        useTicketSearchStore.getState().setResults(results);
-      } else if (prefix === "2") {
-        let [woResults, saleResults] = await Promise.all([
-          dbSearchWorkordersByIdPrefix(trimmed),
-          dbSearchSalesByIdPrefix(trimmed),
-        ]);
-        useTicketSearchStore.getState().setResults([...woResults, ...saleResults]);
-      } else {
-        showTicketAlert("First digit must be 1 (workorder), 2 (legacy), or 3 (sale)");
-      }
+      let [woResults, saleResults] = await Promise.all([
+        dbSearchWorkordersByIdPrefix(trimmed),
+        dbSearchSalesByIdPrefix(trimmed),
+      ]);
+      useTicketSearchStore.getState().setResults([...woResults, ...saleResults]);
       useTicketSearchStore.getState().setIsSearching(false);
       if (onComplete) onComplete();
       return;

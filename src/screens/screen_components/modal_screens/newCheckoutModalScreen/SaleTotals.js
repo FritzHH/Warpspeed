@@ -229,7 +229,7 @@ export const SaleTotals = memo(function SaleTotals({
             borderColor: C.buttonLightGreenOutline,
             borderRadius: 10,
             borderWidth: 2,
-            backgroundColor: C.listItemWhite,
+            backgroundColor: C.green,
             paddingVertical: 10,
             paddingHorizontal: 10,
             flexDirection: "column",
@@ -241,19 +241,19 @@ export const SaleTotals = memo(function SaleTotals({
           <Text
             style={{
               fontSize: 11,
-              color: gray(0.3),
+              color: gray(0.5),
               width: "100%",
               textAlign: "left",
               paddingBottom: 3,
             }}
           >
-            CHANGE
+            CHANGE NEEDED
           </Text>
           <Text
             style={{
               textAlign: "right",
               fontSize: 25,
-              color: C.green,
+              color: C.textWhite,
             }}
           >
             <Text

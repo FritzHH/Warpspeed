@@ -367,15 +367,24 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
 
     // Update workorder payment fields to reflect refund
-    let netPaid = Math.max(0, sale.amountCaptured - sale.amountRefunded);
+    let nonDepositCaptured = (sale.transactions || [])
+      .filter(t => t.type === "payment" && !t.depositType)
+      .reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
+    let netPaid = Math.max(0, nonDepositCaptured - sale.amountRefunded);
     let woIDs = sale.workorderIDs || [];
     if (woIDs.length > 0) {
+      let allOpenWorkorders = useOpenWorkordersStore.getState().getWorkorders();
       let freshWorkorders = await newCheckoutFetchWorkordersForSale(woIDs);
       for (let wo of freshWorkorders) {
         if (!wo || wo.id === "standalone") continue;
         let updatedWO = cloneDeep(wo);
         updatedWO.amountPaid = netPaid;
-        newCheckoutUpdateCompletedWorkorder(updatedWO);
+        let isOpen = allOpenWorkorders.some((w) => w.id === wo.id);
+        if (isOpen) {
+          useOpenWorkordersStore.getState().setWorkorder(updatedWO, true);
+        } else {
+          newCheckoutUpdateCompletedWorkorder(updatedWO);
+        }
       }
     }
 
@@ -456,10 +465,10 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
         let _user = useLoginStore.getState().currentUser?.first || "System";
         let _ts = Date.now();
         let finishedLabel = resolveStatus("finished", statuses)?.label || "Finished";
-        let allWorkorders = useOpenWorkordersStore.getState().getWorkorders();
+        let allOpenWorkorders = useOpenWorkordersStore.getState().getWorkorders();
 
-        for (let woID of (sale.workorderIDs || [])) {
-          let wo = allWorkorders.find((w) => w.id === woID);
+        let fetchedWorkorders = await newCheckoutFetchWorkordersForSale(sale.workorderIDs || []);
+        for (let wo of fetchedWorkorders) {
           if (!wo) continue;
           let updated = cloneDeep(wo);
           let oldStatusLabel = resolveStatus(wo.status, statuses)?.label || wo.status || "";
@@ -474,7 +483,14 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
             { timestamp: _ts, user: _user, field: "payment", action: "voided", from: "", to: "Sale fully refunded — workorder restored" },
           ];
           updated.changeLog = [...(updated.changeLog || []), ...entries];
-          useOpenWorkordersStore.getState().setWorkorder(updated, true);
+
+          // Update via store if open, otherwise write directly to completed-workorders
+          let isOpen = allOpenWorkorders.some((w) => w.id === wo.id);
+          if (isOpen) {
+            useOpenWorkordersStore.getState().setWorkorder(updated, true);
+          } else {
+            newCheckoutUpdateCompletedWorkorder(updated);
+          }
         }
       } else {
         // Completed sale fully refunded — just flag it

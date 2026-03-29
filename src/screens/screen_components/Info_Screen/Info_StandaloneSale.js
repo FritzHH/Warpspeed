@@ -17,7 +17,7 @@ import {
   Tooltip,
 } from "../../../components";
 import {
-  generateEAN13Barcode,
+  generate12DigitBarcode,
   gray,
   formatCurrencyDisp,
   formatMillisForDisplay,
@@ -274,7 +274,7 @@ export const StandaloneSaleComponent = ({}) => {
           if (!oldWo) return;
           store.removeWorkorder(oldWo.id);
           let wo = cloneDeep(WORKORDER_PROTO);
-          wo.id = generateEAN13Barcode("1");
+          wo.id = generate12DigitBarcode();
           wo.startedBy = useLoginStore.getState().currentUser?.id;
           wo.startedOnMillis = Date.now();
           store.setWorkorder(wo);

@@ -35,6 +35,7 @@ function CardPaymentForm({
   onCardProcessingStart,
   onCardProcessingEnd,
   onSwitchToReader,
+  lockAmount = false,
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -66,10 +67,6 @@ function CardPaymentForm({
   const prevAmountRef = useRef(amountLeftToPay);
   const zipRef = useRef(null);
   const startBtnRef = useRef(null);
-
-  const successScale = useRef(new Animated.Value(0)).current;
-  const successOpacity = useRef(new Animated.Value(0)).current;
-  const successAnimStarted = useRef(false);
 
   // ── Focus chain: Amount → Card → Zip → Exp → CVC → Start button ──
   function focusCardNumber() {
@@ -173,6 +170,15 @@ function CardPaymentForm({
         _setProcessing(false);
         if (onPaymentCapture) onPaymentCapture(payment);
         if (onCardProcessingEnd) onCardProcessingEnd();
+
+        // If partial payment, reset back to form after a brief celebration
+        let newRemaining = amountLeftToPay - payment.amountCaptured;
+        if (newRemaining > 0) {
+          setTimeout(() => {
+            _setDone(false);
+            _setSuccess("");
+          }, 3000);
+        }
       } else {
         _setError(result?.message || "Payment failed");
         _setProcessing(false);
@@ -206,14 +212,6 @@ function CardPaymentForm({
   }
 
   // ── Success animation ──
-  if (sDone && !successAnimStarted.current) {
-    successAnimStarted.current = true;
-    Animated.parallel([
-      Animated.spring(successScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: false }),
-      Animated.timing(successOpacity, { toValue: 1, duration: 350, useNativeDriver: false }),
-    ]).start();
-  }
-
   // ── Derived ──
   let formLocked = sProcessing || sDone || saleComplete;
   let chargeEnabled = !formLocked && sRequestedAmount >= 50 && sCardReady && sCardComplete && sExpComplete && sCvcComplete && sZip.length >= 5 && !!stripe;
@@ -265,22 +263,16 @@ function CardPaymentForm({
           paddingHorizontal: 15,
         }}
       >
-        <Animated.View
-          style={{
-            alignItems: "center",
-            opacity: successOpacity,
-            transform: [{ scale: successScale }],
-          }}
-        >
+        <View style={{ alignItems: "center" }}>
           <Image
             source={celebrationGif}
             style={{ width: 100, height: 100, marginBottom: 14, backgroundColor: "transparent" }}
             resizeMode="contain"
           />
           <Text style={{ fontSize: 15, color: C.green, fontWeight: "600", textAlign: "center" }}>
-            {sSuccess}
+            {saleComplete ? "Full payment complete!" : sSuccess}
           </Text>
-        </Animated.View>
+        </View>
       </View>
     );
   }
@@ -351,6 +343,7 @@ function CardPaymentForm({
         <View style={{ width: 100, alignItems: "flex-end", paddingRight: 5 }}>
           <TextInput
             onFocus={() => {
+              if (lockAmount) return;
               _setRequestedAmountDisp("");
               _setRequestedAmount(0);
             }}
@@ -358,7 +351,7 @@ function CardPaymentForm({
               fontSize: 18,
               outlineWidth: 0,
               outlineStyle: "none",
-              color: C.text,
+              color: lockAmount ? gray(0.5) : C.text,
               paddingRight: 2,
               textAlign: "right",
             }}
@@ -366,7 +359,7 @@ function CardPaymentForm({
             placeholderTextColor={gray(0.3)}
             value={sRequestedAmountDisp}
             onChangeText={handleAmountChange}
-            editable={!formLocked}
+            editable={!formLocked && !lockAmount}
             onSubmitEditing={focusCardNumber}
           />
         </View>

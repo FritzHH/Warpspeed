@@ -542,7 +542,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
                 // Build payment from charge (mirrors buildCardPayment)
                 const card = charge?.payment_method_details?.card_present;
                 const payment = {
-                  id: generateEAN13Barcode("4"),
+                  id: generate12DigitBarcode(),
                   type: "payment",
                   method: "card",
                   amountCaptured: charge.amount_captured || 0,
@@ -2921,11 +2921,9 @@ function ean13CheckDigit(first12) {
   return (10 - (sum % 10)) % 10;
 }
 
-function generateEAN13Barcode(prefix) {
-  const millis = Date.now().toString();
-  const timePart = millis.slice(-8);
-  const randomPart = Math.floor(100 + Math.random() * 900).toString();
-  return prefix + timePart + randomPart;
+function generate12DigitBarcode() {
+  const arr = require('crypto').randomBytes(12);
+  return Array.from(arr, b => (b % 10).toString()).join('');
 }
 
 // ============================================================================
@@ -6226,7 +6224,7 @@ async function cleanupOldMedia(db, bucket, tenantID, storeID) {
 // Customer-Facing Workorder Screen
 // ============================================================================
 
-const LANGUAGE_MAP = { English: "en", Spanish: "es", French: "fr" };
+const LANGUAGE_MAP = { English: "en", Spanish: "es", French: "fr", Creole: "ht" };
 
 const CUSTOMER_WO_UI_LABELS = {
   yourWorkorder: "Your Workorder",
@@ -6787,7 +6785,7 @@ exports.rehydrateFromArchive = onCall(
 // ============================================================================
 
 function generateSaleID() {
-  return generateEAN13Barcode("3");
+  return generate12DigitBarcode();
 }
 
 // Helper: calculate workorder totals server-side
@@ -7532,7 +7530,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
 
         // ── Build payment object (mirrors PAYMENT_OBJECT_PROTO) ──
         const payment = {
-          id: generateEAN13Barcode("4"),
+          id: generate12DigitBarcode(),
           type: "payment",
           method: "card",
           amountCaptured: charge.amount_captured,

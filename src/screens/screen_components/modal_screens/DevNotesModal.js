@@ -249,14 +249,14 @@ export const DevNotesModal = ({ visible, onClose }) => {
                         text="Cancel"
                         colorGradientArr={COLOR_GRADIENTS.grey}
                         textStyle={{ color: C.textWhite, fontSize: 12 }}
-                        buttonStyle={{ width: 70, height: 30, borderRadius: 6, marginRight: 8 }}
+                        buttonStyle={{ width: 70, height: 30, borderRadius: 5, marginRight: 8 }}
                         onPress={handleCancelEdit}
                       />
                       <Button_
                         text="Save"
                         colorGradientArr={COLOR_GRADIENTS.green}
                         textStyle={{ color: C.textWhite, fontSize: 12 }}
-                        buttonStyle={{ width: 70, height: 30, borderRadius: 6 }}
+                        buttonStyle={{ width: 70, height: 30, borderRadius: 5 }}
                         onPress={() => handleSaveEdit(note)}
                       />
                     </View>

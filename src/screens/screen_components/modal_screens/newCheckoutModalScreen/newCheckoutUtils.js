@@ -1,6 +1,6 @@
 import { cloneDeep } from "lodash";
 import {
-  generateEAN13Barcode,
+  generate12DigitBarcode,
   calculateRunningTotals,
   formatCurrencyDisp,
   log,
@@ -32,7 +32,7 @@ export function isLightspeedID(id) {
 
 export function createNewSale(settings, createdBy = "") {
   let sale = cloneDeep(SALE_PROTO);
-  sale.id = generateEAN13Barcode("3");
+  sale.id = generate12DigitBarcode();
   sale.millis = Date.now();
   sale.salesTaxPercent = settings?.salesTaxPercent || 0;
   sale.cardFee = 0;
@@ -151,7 +151,7 @@ export function recomputeSaleAmounts(sale) {
 
 export function buildCashTransaction(amountCaptured, amountTendered, isCheck) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
-  transaction.id = generateEAN13Barcode("4");
+  transaction.id = generate12DigitBarcode();
   transaction.type = "payment";
   transaction.method = isCheck ? "check" : "cash";
   transaction.amountCaptured = amountCaptured;
@@ -165,7 +165,7 @@ export function buildCardTransaction(stripeChargeData) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = stripeChargeData?.payment_method_details?.card_present;
 
-  transaction.id = generateEAN13Barcode("4");
+  transaction.id = generate12DigitBarcode();
   transaction.type = "payment";
   transaction.method = "card";
   transaction.amountCaptured = stripeChargeData.amount_captured || 0;
@@ -190,7 +190,7 @@ export function buildManualCardTransaction(chargeData) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = chargeData?.payment_method_details?.card;
 
-  transaction.id = generateEAN13Barcode("4");
+  transaction.id = generate12DigitBarcode();
   transaction.type = "payment";
   transaction.method = "card";
   transaction.amountCaptured = chargeData.amount_captured || 0;
@@ -278,7 +278,7 @@ export function validateCardRefundAmount(requestedAmount, payment) {
 
 export function buildRefundObject(amountRefunded, selectedLines, cardRefundID, notes, type) {
   let refund = cloneDeep(REFUND_PROTO);
-  refund.id = generateEAN13Barcode("4");
+  refund.id = generate12DigitBarcode();
   refund.type = type || "";
   refund.amountRefunded = amountRefunded;
   refund.workorderLines = selectedLines || [];

@@ -18,6 +18,96 @@ const logo = require("../resources/bblogo_trans_high.png");
 const DEV_SHOW_OVERLAY = false;
 
 ////////////////////////////////////////////////////////////////////////////////
+// Translation dictionary
+////////////////////////////////////////////////////////////////////////////////
+const TRANSLATIONS = {
+  English: {
+    greeting: "Hi",
+    inProgress: "In Progress",
+    checkedIn: "Checked in",
+    items: "Items",
+    subtotal: "Subtotal",
+    discounts: "Discounts",
+    tax: "Tax",
+    total: "Total",
+    paid: "Paid",
+    balanceDue: "Balance Due",
+    paidBadge: "PAID",
+    checkout: "Checkout",
+    totalDiscounts: "Total Discounts",
+    salesTax: "Sales Tax",
+    cardFee: "Card Fee",
+    totalColon: "Total:",
+    remaining: "Remaining",
+    fullScreen: "Full-Screen",
+  },
+  Spanish: {
+    greeting: "Hola",
+    inProgress: "En Progreso",
+    checkedIn: "Registrado",
+    items: "Artículos",
+    subtotal: "Subtotal",
+    discounts: "Descuentos",
+    tax: "Impuesto",
+    total: "Total",
+    paid: "Pagado",
+    balanceDue: "Saldo Pendiente",
+    paidBadge: "PAGADO",
+    checkout: "Pago",
+    totalDiscounts: "Descuentos Totales",
+    salesTax: "Impuesto de Venta",
+    cardFee: "Cargo por Tarjeta",
+    totalColon: "Total:",
+    remaining: "Restante",
+    fullScreen: "Pantalla Completa",
+  },
+  French: {
+    greeting: "Bonjour",
+    inProgress: "En Cours",
+    checkedIn: "Enregistré",
+    items: "Articles",
+    subtotal: "Sous-total",
+    discounts: "Remises",
+    tax: "Taxe",
+    total: "Total",
+    paid: "Payé",
+    balanceDue: "Solde Dû",
+    paidBadge: "PAYÉ",
+    checkout: "Paiement",
+    totalDiscounts: "Remises Totales",
+    salesTax: "Taxe de Vente",
+    cardFee: "Frais de Carte",
+    totalColon: "Total :",
+    remaining: "Restant",
+    fullScreen: "Plein Écran",
+  },
+  Creole: {
+    greeting: "Bonjou",
+    inProgress: "An Pwogre",
+    checkedIn: "Anrejistre",
+    items: "Atik",
+    subtotal: "Sou-total",
+    discounts: "Rabè",
+    tax: "Taks",
+    total: "Total",
+    paid: "Peye",
+    balanceDue: "Balans Dwe",
+    paidBadge: "PEYE",
+    checkout: "Peman",
+    totalDiscounts: "Total Rabè",
+    salesTax: "Taks sou Lavant",
+    cardFee: "Frè Kat",
+    totalColon: "Total:",
+    remaining: "Rès",
+    fullScreen: "Plen Ekran",
+  },
+};
+
+function t(lang, key) {
+  return (TRANSLATIONS[lang] || TRANSLATIONS.English)[key] || TRANSLATIONS.English[key];
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Shared sub-components
 ////////////////////////////////////////////////////////////////////////////////
 const textColor = gray(0.7);
@@ -252,7 +342,7 @@ function formatDateShort(millis) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function WorkorderOverlay({ data, isTall }) {
+function WorkorderOverlay({ data, isTall, lang }) {
   let lines = data?.workorderLines || [];
   let totals = data?.totals || {};
   let status = data?.status || {};
@@ -269,7 +359,7 @@ function WorkorderOverlay({ data, isTall }) {
       {!!customerFirst && (
         <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
           <Text style={{ fontSize: isTall ? 28 : 24, fontWeight: "700", color: C.text }}>
-            {"Hi " + customerFirst + "!"}
+            {t(lang, "greeting") + " " + customerFirst + "!"}
           </Text>
         </View>
       )}
@@ -287,7 +377,7 @@ function WorkorderOverlay({ data, isTall }) {
       }}>
         <Image source={ICONS.workorder} style={{ width: 22, height: 22, marginRight: 10, tintColor: status.textColor || "#000" }} />
         <Text style={{ fontSize: 18, fontWeight: "700", color: status.textColor || "#000" }}>
-          {status.label || "In Progress"}
+          {status.label || t(lang, "inProgress")}
         </Text>
       </View>
 
@@ -328,7 +418,7 @@ function WorkorderOverlay({ data, isTall }) {
             <View style={{ flex: isTall ? 1 : undefined }}>
               <IconRow icon={ICONS.workorder} iconSize={18}>
                 <Text style={{ fontSize: 14, color: gray(0.5) }}>
-                  {"Checked in " + formatDateShort(data.startedOnMillis)}
+                  {t(lang, "checkedIn") + " " + formatDateShort(data.startedOnMillis)}
                 </Text>
               </IconRow>
             </View>
@@ -342,7 +432,7 @@ function WorkorderOverlay({ data, isTall }) {
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 4 }}>
         <Image source={ICONS.tools1} style={{ width: 20, height: 20, marginRight: 8, opacity: 0.7 }} />
         <Text style={{ fontSize: 16, fontWeight: "700", color: C.green }}>
-          Items
+          {t(lang, "items")}
         </Text>
         <Text style={{ fontSize: 14, color: gray(0.4), marginLeft: 8 }}>
           {"(" + (totals.runningQty || lines.length) + ")"}
@@ -361,26 +451,26 @@ function WorkorderOverlay({ data, isTall }) {
       {/* Totals section */}
       {lines.length > 0 && (
         <View style={{ paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.buttonLightGreenOutline }}>
-          <OverlayTotalRow label="Subtotal" value={totals.runningSubtotal || 0} />
+          <OverlayTotalRow label={t(lang, "subtotal")} value={totals.runningSubtotal || 0} />
           {(totals.runningDiscount || 0) > 0 && (
             <OverlayTotalRow
-              label="Discounts"
+              label={t(lang, "discounts")}
               value={"-$" + formatCurrencyDisp(totals.runningDiscount)}
               color={discountTextColor}
             />
           )}
           <OverlayTotalRow
-            label={"Tax (" + (totals.salesTaxPercent || 0) + "%)"}
+            label={t(lang, "tax") + " (" + (totals.salesTaxPercent || 0) + "%)"}
             value={totals.runningTax || 0}
           />
           <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.12)", marginHorizontal: 20, marginVertical: 6 }} />
-          <OverlayTotalRow label="Total" value={totals.runningTotal || 0} bold />
+          <OverlayTotalRow label={t(lang, "total")} value={totals.runningTotal || 0} bold />
 
           {/* Amount paid / Balance due */}
           {amountPaid > 0 && !paymentComplete && (
             <>
-              <OverlayTotalRow label="Paid" value={amountPaid} color={C.green} />
-              <OverlayTotalRow label="Balance Due" value={(totals.runningTotal || 0) - amountPaid} bold />
+              <OverlayTotalRow label={t(lang, "paid")} value={amountPaid} color={C.green} />
+              <OverlayTotalRow label={t(lang, "balanceDue")} value={(totals.runningTotal || 0) - amountPaid} bold />
             </>
           )}
 
@@ -395,7 +485,7 @@ function WorkorderOverlay({ data, isTall }) {
               alignItems: "center",
             }}>
               <Text style={{ fontSize: 22, fontWeight: "800", color: "#fff", letterSpacing: 2 }}>
-                PAID
+                {t(lang, "paidBadge")}
               </Text>
             </View>
           )}
@@ -409,7 +499,7 @@ function WorkorderOverlay({ data, isTall }) {
 // Sale display (overlay)
 ////////////////////////////////////////////////////////////////////////////////
 
-function SaleOverlay({ data }) {
+function SaleOverlay({ data, lang }) {
   let sale = data?.sale || {};
   let allLines = [];
 
@@ -425,7 +515,7 @@ function SaleOverlay({ data }) {
   if (amountRemaining < 0) amountRemaining = 0;
 
   return (
-    <OverlayPanel header="Checkout">
+    <OverlayPanel header={t(lang, "checkout")}>
       <ScrollView style={{ flex: 1 }}>
         {allLines.map((line, i) => (
           <OverlayLineItemRow key={line.id || i} item={line} />
@@ -434,37 +524,37 @@ function SaleOverlay({ data }) {
 
       <View style={{ paddingVertical: 12 }}>
         <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.12)", marginHorizontal: 20, marginBottom: 12 }} />
-        <OverlayTotalRow label="Subtotal" value={sale.subtotal || 0} />
+        <OverlayTotalRow label={t(lang, "subtotal")} value={sale.subtotal || 0} />
 
         {hasDiscount && (
           <OverlayTotalRow
-            label="Total Discounts"
+            label={t(lang, "totalDiscounts")}
             value={`-$${formatCurrencyDisp(sale.discount)}`}
             color={discountTextColor}
           />
         )}
 
-        <OverlayTotalRow label={`Sales Tax (${sale.taxRate || ""}%)`} value={sale.salesTax || sale.tax || 0} />
+        <OverlayTotalRow label={t(lang, "salesTax") + " (" + (sale.taxRate || "") + "%)"} value={sale.salesTax || sale.tax || 0} />
 
         {hasCardFee && (
           <OverlayTotalRow
-            label={`Card Fee (${sale.cardFeePercent || 0}%)`}
+            label={t(lang, "cardFee") + " (" + (sale.cardFeePercent || 0) + "%)"}
             value={sale.cardFee}
           />
         )}
 
         <View style={{ height: 8, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.12)", marginHorizontal: 20 }} />
         <View style={{ height: 8 }} />
-        <OverlayTotalRow label="Total:" value={sale.total || 0} bold />
+        <OverlayTotalRow label={t(lang, "totalColon")} value={sale.total || 0} bold />
 
         {sale.amountCaptured > 0 && !sale.paymentComplete && (
           <View style={{ marginTop: 8, paddingHorizontal: 20 }}>
             <OverlayTotalRow
-              label="Paid"
+              label={t(lang, "paid")}
               value={sale.amountCaptured}
             />
             <OverlayTotalRow
-              label="Remaining"
+              label={t(lang, "remaining")}
               value={amountRemaining}
             />
           </View>
@@ -482,7 +572,7 @@ function SaleOverlay({ data }) {
             }}
           >
             <Text style={{ fontSize: 24, fontWeight: "600", color: "white" }}>
-              PAID
+              {t(lang, "paidBadge")}
             </Text>
           </View>
         )}
@@ -530,6 +620,7 @@ function TranslateDisplay({ text }) {
 ////////////////////////////////////////////////////////////////////////////////
 
 export function CustomerDisplayScreen() {
+  document.title = "Customer Screen";
   const [sDisplayData, _setDisplayData] = useState(null);
   const [sType, _setType] = useState(null);
   const [sTranslateText, _setTranslateText] = useState("");
@@ -646,11 +737,13 @@ export function CustomerDisplayScreen() {
     }
   }, [shouldShowOverlay, sOverlayPhase]);
 
+  let lang = sDisplayData?.customerLanguage || "English";
+
   let overlayContent = null;
   if (sType === DISPLAY_MSG_TYPES.SALE) {
-    overlayContent = <SaleOverlay data={sDisplayData} />;
+    overlayContent = <SaleOverlay data={sDisplayData} lang={lang} />;
   } else if (sType === DISPLAY_MSG_TYPES.WORKORDER) {
-    overlayContent = <WorkorderOverlay data={sDisplayData} isTall={sIsTall} />;
+    overlayContent = <WorkorderOverlay data={sDisplayData} isTall={sIsTall} lang={lang} />;
   }
 
   return (
@@ -723,7 +816,7 @@ export function CustomerDisplayScreen() {
           }}
         >
           <Text style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: 12 }}>
-            Full-Screen
+            {t(lang, "fullScreen")}
           </Text>
         </TouchableOpacity>
       )}

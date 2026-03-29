@@ -43,6 +43,7 @@ export function NewWorkorderComponent({}) {
   const [sTicketSearching, _setTicketSearching] = React.useState(false);
   const searchTimerRef = useRef(null);
   const containerRef = useRef(null);
+  const phoneInputRef = useRef(null);
 
   async function handleExecuteTicketSearch() {
     _setTicketSearching(true);
@@ -160,7 +161,7 @@ export function NewWorkorderComponent({}) {
         searchStr = rawText;
         _setTextInput(formatPhoneWithDashes(searchStr));
       }
-      if (rawText.length >= 7) searchFun([searchStr], ["phone"]);
+      if (rawText.length >= 5) searchFun([searchStr], ["phone"]);
       return;
     } else if (
       isNumeric &&
@@ -173,13 +174,13 @@ export function NewWorkorderComponent({}) {
         searchStr = rawText.substring(0, 5);
       }
       _setTextInput(formatPhoneWithDashes(searchStr));
-      if (rawText.length >= 7) searchFun([searchStr], ["phone"]);
+      if (rawText.length >= 5) searchFun([searchStr], ["phone"]);
       return;
     } else if (isNumeric && rawText.length > 10) {
       return;
     } else if (isNumeric) {
       _setTextInput(formatPhoneWithDashes(rawText));
-      if (rawText.length >= 7) searchFun([rawText], ["phone"]);
+      if (rawText.length >= 5) searchFun([rawText], ["phone"]);
       return;
     }
 
@@ -263,17 +264,18 @@ export function NewWorkorderComponent({}) {
         customerLandline: newCustomer.customerLandline,
         customerEmail: newCustomer.email,
         customerContactRestriction: newCustomer.contactRestriction,
+        customerLanguage: newCustomer.language,
         startedByFirst: useLoginStore.getState().getCurrentUser().first,
         startedByLast: useLoginStore.getState().getCurrentUser().last,
         status: SETTINGS_OBJ.statuses[0]?.id || "",
       });
 
-      // add in the newly created workorder to the customer's file
-      newCustomer.workorders.push(newWorkorder.id);
       _setCustomerInfo(newCustomer);
       useCurrentCustomerStore.getState().setCustomer(newCustomer);
-      useOpenWorkordersStore.getState().setWorkorder(newWorkorder, false)
-      useOpenWorkordersStore.getState().setOpenWorkorderID(newWorkorder.id)
+      let store = useOpenWorkordersStore.getState();
+      store.setWorkorder(newWorkorder, false);
+      store.setOpenWorkorderID(newWorkorder.id);
+      store.addPendingCustomerLink(newWorkorder.id, newCustomer.id);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,
@@ -289,7 +291,7 @@ export function NewWorkorderComponent({}) {
     <View
       ref={containerRef}
       onClick={() => {
-        let input = containerRef.current?.querySelector("input");
+        let input = phoneInputRef.current?.querySelector("input");
         if (input) input.focus();
       }}
       style={{
@@ -363,6 +365,7 @@ export function NewWorkorderComponent({}) {
       </View>
 
       <View
+        ref={phoneInputRef}
         style={{
           alignItems: "flex-end",
           width: "100%",

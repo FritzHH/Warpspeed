@@ -21,7 +21,7 @@ import {
   gray,
   usdTypeMask,
   dollarsToCents,
-  generateEAN13Barcode,
+  generate12DigitBarcode,
 } from "../../../../utils";
 import { useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
@@ -148,7 +148,7 @@ export const CashSaleComponent = ({
   function handleProcessRefundPress() {
     let refund = cloneDeep(REFUND_PROTO);
     refund.amountRefunded = sRequestedAmount;
-    refund.id = generateEAN13Barcode("4");
+    refund.id = generate12DigitBarcode();
     refund.millis = new Date().getTime();
     handleRefundCapture(refund);
   }
@@ -161,7 +161,7 @@ export const CashSaleComponent = ({
     payment.type = "payment";
     payment.method = sIsCheck ? "check" : "cash";
     payment.millis = new Date().getTime();
-    payment.id = generateEAN13Barcode("4");
+    payment.id = generate12DigitBarcode();
     handlePaymentCapture(payment);
 
     let diff = sTenderAmount - sRequestedAmount;

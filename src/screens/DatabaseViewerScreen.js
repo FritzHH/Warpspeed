@@ -74,11 +74,31 @@ export function DatabaseViewerScreen() {
             let output = COLLECTIONS.map((col) => {
               return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
             }).join("\n\n");
-            navigator.clipboard.writeText(output);
+            navigator.clipboard.writeText("Examine the objects from the database after the transaction. summarize what happened, cross-check fields for errors, and make sure that any fields that were supposed to move or delete or change did so: " + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.blue, marginRight: 8 }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Copy All</Text>
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Summarize</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            let output = COLLECTIONS.map((col) => {
+              return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
+            }).join("\n\n");
+            navigator.clipboard.writeText("Examine the db contents. Cross-check for errors in math and field updates. summarize the action you saw take place. then cross-check with the previous object to find an errors from one db state to the next for the transaction. " + output);
+          }}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.purple, marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600", backgroundColor: 'green' }}>Compare</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            let output = COLLECTIONS.map((col) => `=== ${col.label} ===\n${JSON.stringify(sData[col.key], null, 2)}`).join("\n\n");
+            navigator.clipboard.writeText(output);
+          }}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.green, marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Contents Only</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleClearAll}

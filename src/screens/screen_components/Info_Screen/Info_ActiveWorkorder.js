@@ -8,7 +8,7 @@ import {
   formatMillisForDisplay,
   formatPhoneWithDashes,
   createNewWorkorder,
-  generateEAN13Barcode,
+  generate12DigitBarcode,
   gray,
   lightenRGBByPercent,
   log,
@@ -304,17 +304,15 @@ export const ActiveWorkorderComponent = ({}) => {
         customerLandline: customer.customerLandline,
         customerEmail: customer.email,
         customerContactRestriction: customer.contactRestriction,
+        customerLanguage: customer.language,
         startedByFirst: _currentUser?.first,
         startedByLast: _currentUser?.last,
         status: SETTINGS_OBJ.statuses[0]?.id || "",
       });
-      // Add workorder ID to customer's workorders array (use fresh store data to avoid stale overwrites)
-      let freshWorkorders = useCurrentCustomerStore.getState().getCustomer()?.workorders || [];
-      let updatedCustomer = { ...customer, workorders: [...freshWorkorders, wo.id] };
-      useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
-
-      useOpenWorkordersStore.getState().setWorkorder(wo, false);
-      useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+      let store = useOpenWorkordersStore.getState();
+      store.setWorkorder(wo, false);
+      store.setOpenWorkorderID(wo.id);
+      store.addPendingCustomerLink(wo.id, customer.id);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,

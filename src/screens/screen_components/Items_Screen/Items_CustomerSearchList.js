@@ -1,7 +1,7 @@
 /* eslint-disable */
 
-import { useMemo, useState } from "react";
-import { View, Text, FlatList } from "react-native-web";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, View, Text, FlatList } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
   formatPhoneForDisplay,
@@ -75,6 +75,7 @@ export function CustomerSearchListComponent({}) {
         customerLandline: customer.customerLandline,
         customerEmail: customer.email,
         customerContactRestriction: customer.contactRestriction,
+        customerLanguage: customer.language,
         startedByFirst: useLoginStore.getState().currentUser?.first,
         startedByLast: useLoginStore.getState().currentUser?.last,
         status: SETTINGS_OBJ.statuses[0]?.id || "",
@@ -84,6 +85,7 @@ export function CustomerSearchListComponent({}) {
       store.setWorkorderPreviewID(null);
       store.setWorkorder(wo, false);
       store.setOpenWorkorderID(wo.id);
+      store.addPendingCustomerLink(wo.id, customer.id);
       useCurrentCustomerStore.getState().setCustomer(customer);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,
@@ -95,6 +97,32 @@ export function CustomerSearchListComponent({}) {
     });
   }
 
+  // Spinning logo animation ///////////////////////////////////////////////////////////
+  const spinValue = useRef(new Animated.Value(0)).current;
+  const spinAnim = useRef(null);
+
+  useEffect(() => {
+    if (zIsSearching) {
+      spinValue.setValue(0);
+      spinAnim.current = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 5000,
+          useNativeDriver: false,
+        })
+      );
+      spinAnim.current.start();
+    } else {
+      if (spinAnim.current) spinAnim.current.stop();
+    }
+  }, [zIsSearching]);
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+  ///////////////////////////////////////////////////////////////////////////////////////
+
   return (
     <View
       style={{
@@ -104,9 +132,17 @@ export function CustomerSearchListComponent({}) {
         paddingHorizontal: 10,
       }}
     >
-      <Image_
-        icon={require('../../../resources/bblogo_trans_high.png')}
-        style={{ opacity: 0.1, width: "90%", height: "90%", position: "absolute", alignSelf: "center" }}
+      <Animated.Image
+        source={require('../../../resources/bblogo_trans_high.png')}
+        style={{
+          opacity: 0.1,
+          width: "90%",
+          height: "90%",
+          position: "absolute",
+          alignSelf: "center",
+          resizeMode: "contain",
+          transform: [{ rotate: spin }],
+        }}
       />
       <FlatList
         style={{
@@ -123,9 +159,7 @@ export function CustomerSearchListComponent({}) {
         data={filteredResults}
         ListEmptyComponent={() => (
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>
-            {zIsSearching ? (
-              <SmallLoadingIndicator message="Searching customers...." size={40} textStyle={{ fontSize: 16 }} />
-            ) : (
+            {!zIsSearching && (
               <Text style={{ color: gray(0.4), fontSize: 14 }}>No customers found</Text>
             )}
           </View>

@@ -941,6 +941,7 @@ export function broadcastWorkorderToDisplay(wo) {
     broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
       customerFirst: wo.customerFirst || "",
       customerLast: wo.customerLast || "",
+      customerLanguage: wo.customerLanguage || "",
       combinedWorkorders: [{ workorderLines: lines }],
       sale: {
         subtotal: totals.runningSubtotal,
@@ -963,6 +964,7 @@ export function broadcastWorkorderToDisplay(wo) {
   broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
     customerFirst: wo.customerFirst || "",
     customerLast: wo.customerLast || "",
+    customerLanguage: wo.customerLanguage || "",
     brand: wo.brand || "",
     model: wo.model || "",
     description: wo.description || "",
@@ -1012,6 +1014,7 @@ export function broadcastFullWorkorderToDisplay(wo) {
   broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
     customerFirst: wo.customerFirst || "",
     customerLast: wo.customerLast || "",
+    customerLanguage: wo.customerLanguage || "",
     brand: wo.brand || "",
     model: wo.model || "",
     description: wo.description || "",
@@ -1185,6 +1188,7 @@ export const useOpenWorkordersStore = create(
       workorderPreviewID: null,
       lockedWorkorderID: null,
       saleModalObj: null,
+      _pendingCustomerLinks: {},
 
       getOpenWorkorder: () => {
         let id = get().openWorkorderID;
@@ -1202,6 +1206,21 @@ export const useOpenWorkordersStore = create(
       setLockedWorkorderID: (lockedWorkorderID) => set({ lockedWorkorderID }),
       getSaleModalObj: () => get().saleModalObj,
       setSaleModalObj: (saleModalObj) => set({ saleModalObj }),
+      addPendingCustomerLink: (workorderID, customerID) => {
+        set({ _pendingCustomerLinks: { ...get()._pendingCustomerLinks, [workorderID]: customerID } });
+      },
+      _flushPendingCustomerLink: (workorderID) => {
+        let links = get()._pendingCustomerLinks;
+        let customerID = links[workorderID];
+        if (!customerID) return;
+        let { [workorderID]: _, ...rest } = links;
+        set({ _pendingCustomerLinks: rest });
+        let customer = useCurrentCustomerStore.getState().getCustomer();
+        if (customer?.id === customerID) {
+          let updatedCustomer = { ...customer, workorders: [...(customer.workorders || []), workorderID] };
+          useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+        }
+      },
       setOpenWorkorderID: (openWorkorderID) => {
         set({ openWorkorderID, workorderPreviewID: null });
         if (openWorkorderID) {
@@ -1236,6 +1255,7 @@ export const useOpenWorkordersStore = create(
         // No-customer workorders stay local — saved explicitly by checkout or intake
         if (saveToDB && workorder.customerID) {
           debouncedSaveWorkorder(workorder);
+          get()._flushPendingCustomerLink(workorderID);
         }
         if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
       },

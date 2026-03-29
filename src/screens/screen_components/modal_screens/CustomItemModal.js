@@ -8,7 +8,7 @@ import {
   usdTypeMask,
   applyDiscountToWorkorderItem,
   gray,
-  generateEAN13Barcode,
+  generate12DigitBarcode,
 } from "../../../utils";
 import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
 import { DISCOUNT_TYPES } from "../../../constants";
@@ -121,7 +121,7 @@ export const CustomItemModal = ({
     invItem.minutes = isLabor ? Number(sMinutes) || 0 : 0;
     invItem.id = isEditing
       ? existingLine.inventoryItem.id
-      : generateEAN13Barcode("6");
+      : generate12DigitBarcode();
 
     // Build the workorder line
     let line = isEditing ? cloneDeep(existingLine) : cloneDeep(WORKORDER_ITEM_PROTO);

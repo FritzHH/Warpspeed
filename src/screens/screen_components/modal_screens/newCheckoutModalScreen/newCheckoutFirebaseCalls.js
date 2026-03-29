@@ -12,7 +12,6 @@ import { useSettingsStore, useOpenWorkordersStore } from "../../../../stores";
 import { log } from "../../../../utils";
 import { ITEM_SALE_PROTO } from "../../../../data";
 import { cloneDeep } from "lodash";
-import { recomputeSaleAmounts } from "./newCheckoutUtils";
 
 // ─── Callable Function References ─────────────────────────────
 // These are lazily initialized to avoid import-order issues with
@@ -92,13 +91,8 @@ export async function newCheckoutSaveActiveSale(sale) {
       log("newCheckoutSaveActiveSale: missing tenantID/storeID");
       return { success: false };
     }
-    // Strip deposit/credit transactions before persisting — they are session-only
-    // and get re-applied from the customer's deposits on resume
-    let saleToSave = cloneDeep(sale);
-    saleToSave.transactions = (saleToSave.transactions || []).filter((t) => !t.depositType);
-    recomputeSaleAmounts(saleToSave);
-    const path = buildActiveSalePath(tenantID, storeID, saleToSave.id);
-    await firestoreWrite(path, saleToSave);
+    const path = buildActiveSalePath(tenantID, storeID, sale.id);
+    await firestoreWrite(path, sale);
     return { success: true };
   } catch (error) {
     log("newCheckoutSaveActiveSale error:", error);

@@ -37,12 +37,13 @@ import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheck
 import { SaleModal } from "./screen_components/modal_screens/SaleModal";
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode } from "../utils";
-import { newCheckoutGetStripeReaders } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { newCheckoutGetStripeReaders, newCheckoutGetActiveSale } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import {
   dbListenToSettings,
   dbListenToOpenWorkorders,
   dbListenToCurrentPunchClock,
   dbListenToInventory,
+  dbGetCompletedSale,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
 import { clog, log, recoverPendingAutoTexts } from "../utils";
@@ -50,6 +51,7 @@ import { cloneDeep, throttle } from "lodash";
 import { ROUTES } from "../routes";
 
 export function BaseScreen() {
+  document.title = "Workorders";
   // store getters /////////////////////////////////////////////////////////////////
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
   const zLoginModalVisible = useLoginStore((state) => state.modalVisible);
@@ -126,18 +128,32 @@ export function BaseScreen() {
 
   const zReceiptScan = useCheckoutStore((state) => state.receiptScan);
 
-  // Detect sale-ID scans to open refund modal (prefix 3 = Warpspeed sale, prefix 22 = LS sale)
+  // Detect sale-ID scans to open refund modal
   useEffect(() => {
     if (!zReceiptScan || sRefundModalVisible) return;
-    let isSale = isSaleID(zReceiptScan);
-    if (!isSale && isLightspeedID(zReceiptScan)) {
+    // Fast path for old prefixed IDs
+    let knownSale = isSaleID(zReceiptScan);
+    if (!knownSale && isLightspeedID(zReceiptScan)) {
       let decoded = decodeLightspeedBarcode(zReceiptScan);
-      isSale = decoded?.type === "sale";
+      knownSale = decoded?.type === "sale";
     }
-    if (isSale) {
+    if (knownSale) {
       _setRefundSaleID(zReceiptScan);
       _setRefundModalVisible(true);
       useCheckoutStore.getState().setStringOnly("");
+      return;
+    }
+    // Async lookup for new random IDs — check if it's a sale
+    if (/^\d{12}$/.test(zReceiptScan)) {
+      (async () => {
+        let sale = await newCheckoutGetActiveSale(zReceiptScan);
+        if (!sale) sale = await dbGetCompletedSale(zReceiptScan);
+        if (sale) {
+          _setRefundSaleID(zReceiptScan);
+          _setRefundModalVisible(true);
+          useCheckoutStore.getState().setStringOnly("");
+        }
+      })();
     }
   }, [zReceiptScan]);
 

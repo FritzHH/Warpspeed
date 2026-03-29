@@ -409,6 +409,7 @@ export const WORKORDER_PROTO = {
   amountPaid: 0,
   activeSaleID: "",
   endedOnMillis: "",
+  paidOnMillis: "",
   saleID: "",
   id: "",
   customerID: "",
@@ -418,6 +419,7 @@ export const WORKORDER_PROTO = {
   customerLandline: "",
   customerEmail: "",
   customerContactRestriction: "",
+  customerLanguage: "",
   model: "",
   brand: "",
   description: "",
@@ -477,7 +479,8 @@ export const CUSTOMER_PREVIOUS_BIKE_PROTO = {
 export const CUSTOMER_LANGUAGES = {
   spanish: "Spanish",
   english: "English",
-  french: "French"
+  french: "French",
+  creole: "Creole"
 }
 
 export const CUSTOMER_CREDIT_PROTO = {
@@ -536,7 +539,6 @@ export const INVENTORY_ITEM_PROTO = {
   minutes: 0,
   customPart: false,
   customLabor: false,
-  minutes: 0,
 };
 
 

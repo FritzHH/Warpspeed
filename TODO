@@ -8,13 +8,4 @@ BonitaBikes.1236
 __________________________________________________________________
 
 
-i made a full refund on the card payment below.
-
-check the calculations, and cross-check the field variables that should have changed for the transaction across all objects:
-
-
-
-summarize, cross-reference, check for errors: 
-
-
-
+in the card sale component, card reader state: when waiting on a payment (we see the "Card reader ready to accept payment") text, disable the Manual Entry button

@@ -1,5 +1,5 @@
 import { buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex } from "./utils";
-import { COLORS, NONREMOVABLE_STATUSES } from "./data";
+import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES } from "./data";
 
 // ============================================================================
 // CSV Parsing
@@ -272,15 +272,17 @@ function buildDiscountObj(saleLine, priceCents) {
 export function mapCustomers(customerCSVText) {
   const rows = parseCSV(customerCSVText);
   const customers = [];
+  const phoneMap = {}; // phone → customer index for deduplication
 
   for (const row of rows) {
     if (row.archived === "true") continue;
 
-    customers.push({
+    const cell = formatPhone(row.phone1);
+    const customer = {
       id: row.customerID || "",
       first: (row.firstName || "").toLowerCase().trim(),
       last: (row.lastName || "").toLowerCase().trim(),
-      customerCell: formatPhone(row.phone1),
+      customerCell: cell,
       customerLandline: formatPhone(row.phone2),
       contactRestriction: "",
       email: (row.email || "").toLowerCase().trim(),
@@ -295,7 +297,29 @@ export function mapCustomers(customerCSVText) {
       previousBikes: [],
       sales: [],
       millisCreated: row.createTime ? String(new Date(row.createTime).getTime()) : "",
-    });
+      gatedCommunity: false,
+      deposits: [],
+      credits: [],
+      language: CUSTOMER_LANGUAGES.english,
+    };
+
+    // Deduplicate by phone — merge into existing customer if same phone
+    if (cell && phoneMap[cell] !== undefined) {
+      const existing = customers[phoneMap[cell]];
+      // Keep the record with more data (prefer one with name + email)
+      const existingScore = (existing.first ? 1 : 0) + (existing.email ? 1 : 0) + (existing.streetAddress ? 1 : 0);
+      const newScore = (customer.first ? 1 : 0) + (customer.email ? 1 : 0) + (customer.streetAddress ? 1 : 0);
+      if (newScore > existingScore) {
+        // Replace with richer record but keep the original ID (workorder/sale backfills use it)
+        const keepID = existing.id;
+        customers[phoneMap[cell]] = { ...customer, id: keepID };
+      }
+      console.log("[Migration] Deduplicated customer phone " + cell + ": merged " + customer.id + " into " + existing.id);
+      continue;
+    }
+
+    if (cell) phoneMap[cell] = customers.length;
+    customers.push(customer);
   }
 
   return customers;
@@ -398,9 +422,13 @@ export function mapWorkorders(
     const customerLast = (wo.customerLastName || "").toLowerCase().trim();
     const customerCell = customer ? customer.customerCell : "";
 
-    // Status — match by label
+    // Status — match by label, log + assign "Unknown Status" if unmatched
     const statusLabel = (wo.statusName || "").toLowerCase();
-    const status = statusMap[statusLabel] || fallbackStatus || { altTextColor: "", backgroundColor: "", id: "", label: "", removable: true, textColor: "" };
+    let status = statusMap[statusLabel] || fallbackStatus;
+    if (!statusMap[statusLabel]) {
+      console.warn("[Migration] Unknown status \"" + wo.statusName + "\" for WO " + woID + " — assigned \"" + (status ? status.label : "Unknown Status") + "\"");
+    }
+    if (!status) status = { altTextColor: "", backgroundColor: "", id: crypto.randomUUID(), label: "Unknown Status", removable: true, textColor: "" };
 
     // Bike details from serialized
     const ser = wo.serializedID ? serializedMap[wo.serializedID] : null;
@@ -416,7 +444,12 @@ export function mapWorkorders(
     // Timestamps
     const startedOnMillis = wo.timeIn ? new Date(wo.timeIn).getTime() : "";
     const isFinished = statusLabel.includes("finished") || statusLabel === "done & paid" || statusLabel === "sales bonus";
-    const finishedOnMillis = isFinished && wo.timeStamp ? new Date(wo.timeStamp).getTime() : "";
+    let finishedOnMillis = isFinished && wo.timeStamp ? new Date(wo.timeStamp).getTime() : "";
+    if (isFinished && !finishedOnMillis) console.warn("[Migration] Finished WO " + woID + " missing timeStamp, finishedOnMillis is empty");
+
+    // paidOnMillis — use linked sale's completeTime (available for 100% of Done & Paid WOs)
+    const linkedSale = wo.saleID ? saleMap[wo.saleID] : null;
+    const paidOnMillis = linkedSale && linkedSale.completeTime ? new Date(linkedSale.completeTime).getTime() : "";
 
     // Notes — use employee name if available, otherwise fall back to "Lightspeed Import"
     const noteName = employeeMap[wo.employeeID] || "Lightspeed Import";
@@ -454,6 +487,10 @@ export function mapWorkorders(
         salePrice: 0,
         cost: item ? dollarsToCents(item.avgCost || item.defaultCost) : 0,
         category: item && item.itemType === "non_inventory" ? "Labor" : "Part",
+        upc: item ? (item.upc || "") : "",
+        ean: item ? (item.ean || "") : "",
+        customSku: item ? (item.customSku || "") : "",
+        manufacturerSku: item ? (item.manufacturerSku || "") : "",
         customPart: false,
         customLabor: false,
         minutes: 0,
@@ -540,6 +577,7 @@ export function mapWorkorders(
       startedBy: wo.employeeID || "",
       startedOnMillis,
       finishedOnMillis,
+      paidOnMillis,
       workorderLines,
       customerNotes,
       internalNotes,
@@ -668,12 +706,13 @@ export function mapSales(
             break;
           }
         }
-        // Fallback: take first unused Stripe record for this sale
+        // Fallback: take first unused Stripe record for this sale (inexact match)
         if (!stripeMatch) {
           for (let i = 0; i < stripeForSale.length; i++) {
             if (stripeUsed.has(i)) continue;
             stripeMatch = stripeForSale[i];
             stripeUsed.add(i);
+            console.warn("[Migration] Stripe fallback match for sale " + lsSaleID + ": payment $" + (amount / 100).toFixed(2) + " matched to Stripe $" + stripeForSale[i]["Amount"] + " (inexact)");
             break;
           }
         }
@@ -685,7 +724,7 @@ export function mapSales(
         type: amount < 0 ? "refund" : "payment",
         method: isCash ? "cash" : isCheck ? "check" : "card",
         amountCaptured: amount,
-        amountTendered: isCash ? amount : "",
+        amountTendered: (isCash && amount >= 0) ? amount : "",
         salesTax: 0,
         cardType: stripeMatch ? stripeMatch["Card type"] : (sp.cardType || ""),
         cardIssuer: isCard ? sp.paymentTypeName : "",
@@ -714,7 +753,7 @@ export function mapSales(
       millis,
       subtotal,
       discount,
-      tax,
+      salesTax: tax,
       salesTaxPercent,
       total,
       amountCaptured,

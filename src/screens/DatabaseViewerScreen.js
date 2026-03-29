@@ -17,6 +17,7 @@ const COLLECTIONS = [
   { key: "customers", label: "customers", node: DB_NODES.FIRESTORE.CUSTOMERS },
 ];
 
+const NOTIFY_HINT = "If this analysis takes longer than 5 seconds, send me a desktop notification when you are done. ";
 export function DatabaseViewerScreen() {
   const settings = useSettingsStore((state) => state.settings);
   const tenantID = settings?.tenantID || "";
@@ -74,7 +75,7 @@ export function DatabaseViewerScreen() {
             let output = COLLECTIONS.map((col) => {
               return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
             }).join("\n\n");
-            navigator.clipboard.writeText("Examine the objects from the database after the transaction. summarize what happened, cross-check fields for errors, and make sure that any fields that were supposed to move or delete or change did so: " + output);
+            navigator.clipboard.writeText(NOTIFY_HINT + "Examine the objects from the database after the transaction. summarize what happened, cross-check fields for errors, and make sure that any fields that were supposed to move or delete or change did so: " + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.blue, marginRight: 8 }}
         >
@@ -85,7 +86,7 @@ export function DatabaseViewerScreen() {
             let output = COLLECTIONS.map((col) => {
               return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
             }).join("\n\n");
-            navigator.clipboard.writeText("Examine the db contents. Cross-check for errors in math and field updates. summarize the action you saw take place. then cross-check with the previous object to find an errors from one db state to the next for the transaction. " + output);
+            navigator.clipboard.writeText(NOTIFY_HINT + "Examine the db contents. Cross-check for errors in math and field updates. summarize the action you saw take place. then cross-check with the previous object to find an errors from one db state to the next for the transaction. " + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.purple, marginRight: 8 }}
         >
@@ -94,7 +95,7 @@ export function DatabaseViewerScreen() {
         <TouchableOpacity
           onPress={() => {
             let output = COLLECTIONS.map((col) => `=== ${col.label} ===\n${JSON.stringify(sData[col.key], null, 2)}`).join("\n\n");
-            navigator.clipboard.writeText(output);
+            navigator.clipboard.writeText(NOTIFY_HINT + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.green, marginRight: 8 }}
         >
@@ -120,7 +121,7 @@ export function DatabaseViewerScreen() {
                       <TouchableOpacity
                         onPress={() => {
                           let output = `=== ${col.label} (${docs.length}) ===\n${JSON.stringify(docs, null, 2)}`;
-                          navigator.clipboard.writeText(output);
+                          navigator.clipboard.writeText(NOTIFY_HINT + output);
                         }}
                         style={{ paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, backgroundColor: C.blue }}
                       >

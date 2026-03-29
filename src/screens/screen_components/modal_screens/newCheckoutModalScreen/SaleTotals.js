@@ -95,7 +95,7 @@ export const PaymentStatus = memo(function PaymentStatus({ sale, amountRemaining
       }}
     >
       {/* Amount Paid */}
-      {sale.amountCaptured > 0 && !sale.paymentComplete && (
+      {(sale.amountCaptured || 0) - (sale.amountRefunded || 0) > 0 && !sale.paymentComplete && (
         <Text
           style={{
             fontSize: 18,
@@ -103,7 +103,7 @@ export const PaymentStatus = memo(function PaymentStatus({ sale, amountRemaining
             color: gray(0.6),
           }}
         >
-          {"AMOUNT PAID:   $" + formatCurrencyDisp(sale.amountCaptured)}
+          {"AMOUNT PAID:   $" + formatCurrencyDisp((sale.amountCaptured || 0) - (sale.amountRefunded || 0))}
         </Text>
       )}
 
@@ -157,7 +157,7 @@ export const SaleTotals = memo(function SaleTotals({
 
   let hasDiscount = (sale.discount || 0) > 0;
   let hasCardFee = (sale.cardFee || 0) > 0;
-  let amountRemaining = (sale.total || 0) - (sale.amountCaptured || 0);
+  let amountRemaining = (sale.total || 0) - (sale.amountCaptured || 0) + (sale.amountRefunded || 0);
   if (amountRemaining < 0) amountRemaining = 0;
 
   return (

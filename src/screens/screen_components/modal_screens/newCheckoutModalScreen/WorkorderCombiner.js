@@ -128,19 +128,6 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                     >
                       {wo.brand || ""}
                     </Text>
-                    {wo.model ? (
-                      <Text
-                        style={{
-                          color: gray(0.6),
-                          fontSize: 16,
-                          fontWeight: "500",
-                          fontStyle: "italic",
-                          marginRight: 10,
-                        }}
-                      >
-                        {"     " + wo.model}
-                      </Text>
-                    ) : null}
                     {wo.description ? (
                       <Text
                         style={{

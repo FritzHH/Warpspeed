@@ -82,8 +82,188 @@ function buildPaymentCompletionsPath(tenantID, storeID, readerID, paymentIntentI
   return `tenants/${tenantID}/stores/${storeID}/payment-processing/${readerID}/payments/${paymentIntentID}/completions/current`;
 }
 
-// ─── Active Sale (In-Progress, Firestore) ─────────────────────
+function buildTransactionPath(tenantID, storeID, txnID) {
+  return `tenants/${tenantID}/stores/${storeID}/transactions/${txnID}`;
+}
 
+function buildCompletedSalePath(tenantID, storeID, saleID) {
+  return `tenants/${tenantID}/stores/${storeID}/completed-sales/${saleID}`;
+}
+
+// ─── Transactions (Firestore) ────────────────────────────────
+
+export async function writeTransaction(transaction) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !transaction?.id) {
+      log("writeTransaction: missing tenantID/storeID/transaction.id");
+      return { success: false };
+    }
+    const path = buildTransactionPath(tenantID, storeID, transaction.id);
+    await firestoreWrite(path, transaction);
+    return { success: true };
+  } catch (error) {
+    log("writeTransaction error:", error);
+    return { success: false, error };
+  }
+}
+
+export async function readTransaction(txnID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !txnID) {
+      log("readTransaction: missing tenantID/storeID/txnID");
+      return null;
+    }
+    const path = buildTransactionPath(tenantID, storeID, txnID);
+    return await firestoreRead(path);
+  } catch (error) {
+    log("readTransaction error:", error);
+    return null;
+  }
+}
+
+export async function readTransactions(txnIDs) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !txnIDs?.length) return [];
+    const results = await Promise.all(
+      txnIDs.map((txnID) => {
+        const path = buildTransactionPath(tenantID, storeID, txnID);
+        return firestoreRead(path);
+      })
+    );
+    return results.filter(Boolean);
+  } catch (error) {
+    log("readTransactions error:", error);
+    return [];
+  }
+}
+
+export async function deleteTransaction(txnID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !txnID) {
+      log("deleteTransaction: missing tenantID/storeID/txnID");
+      return { success: false };
+    }
+    const path = buildTransactionPath(tenantID, storeID, txnID);
+    await firestoreDelete(path);
+    return { success: true };
+  } catch (error) {
+    log("deleteTransaction error:", error);
+    return { success: false, error };
+  }
+}
+
+// ─── Thin Sale (Firestore) ───────────────────────────────────
+
+export async function writeActiveSale(sale) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !sale?.id) {
+      log("writeActiveSale: missing tenantID/storeID/sale.id");
+      return { success: false };
+    }
+    const path = buildActiveSalePath(tenantID, storeID, sale.id);
+    await firestoreWrite(path, sale);
+    return { success: true };
+  } catch (error) {
+    log("writeActiveSale error:", error);
+    return { success: false, error };
+  }
+}
+
+export async function readActiveSale(saleID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !saleID) {
+      log("readActiveSale: missing tenantID/storeID/saleID");
+      return null;
+    }
+    const path = buildActiveSalePath(tenantID, storeID, saleID);
+    return await firestoreRead(path);
+  } catch (error) {
+    log("readActiveSale error:", error);
+    return null;
+  }
+}
+
+export async function deleteActiveSale(saleID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !saleID) {
+      log("deleteActiveSale: missing tenantID/storeID/saleID");
+      return { success: false };
+    }
+    const path = buildActiveSalePath(tenantID, storeID, saleID);
+    await firestoreDelete(path);
+    return { success: true };
+  } catch (error) {
+    log("deleteActiveSale error:", error);
+    return { success: false, error };
+  }
+}
+
+export async function writeCompletedSale(sale) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !sale?.id) {
+      log("writeCompletedSale: missing tenantID/storeID/sale.id");
+      return { success: false };
+    }
+    const path = buildCompletedSalePath(tenantID, storeID, sale.id);
+    await firestoreWrite(path, sale);
+    return { success: true };
+  } catch (error) {
+    log("writeCompletedSale error:", error);
+    return { success: false, error };
+  }
+}
+
+export async function readCompletedSale(saleID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !saleID) {
+      log("readCompletedSale: missing tenantID/storeID/saleID");
+      return null;
+    }
+    const path = buildCompletedSalePath(tenantID, storeID, saleID);
+    return await firestoreRead(path);
+  } catch (error) {
+    log("readCompletedSale error:", error);
+    return null;
+  }
+}
+
+// ─── Cash Refund (Firestore) ─────────────────────────────────
+
+export async function writeCashRefund(transactionID, refundObj) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !transactionID || !refundObj) {
+      log("writeCashRefund: missing tenantID/storeID/transactionID/refundObj");
+      return { success: false };
+    }
+    const path = buildTransactionPath(tenantID, storeID, transactionID);
+    const transaction = await firestoreRead(path);
+    if (!transaction) {
+      log("writeCashRefund: transaction not found");
+      return { success: false };
+    }
+    const refunds = transaction.refunds || [];
+    refunds.push(refundObj);
+    await firestoreWrite(path, { ...transaction, refunds });
+    return { success: true };
+  } catch (error) {
+    log("writeCashRefund error:", error);
+    return { success: false, error };
+  }
+}
+
+// ─── DEPRECATED — use new thin sale functions above ──────────
+
+// DEPRECATED — use writeActiveSale
 export async function newCheckoutSaveActiveSale(sale) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
@@ -91,6 +271,7 @@ export async function newCheckoutSaveActiveSale(sale) {
       log("newCheckoutSaveActiveSale: missing tenantID/storeID");
       return { success: false };
     }
+
     const path = buildActiveSalePath(tenantID, storeID, sale.id);
     await firestoreWrite(path, sale);
     return { success: true };
@@ -100,6 +281,7 @@ export async function newCheckoutSaveActiveSale(sale) {
   }
 }
 
+// DEPRECATED — use readActiveSale
 export async function newCheckoutGetActiveSale(saleID) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
@@ -115,6 +297,7 @@ export async function newCheckoutGetActiveSale(saleID) {
   }
 }
 
+// DEPRECATED — use deleteActiveSale
 export async function newCheckoutDeleteActiveSale(saleID) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
@@ -128,6 +311,7 @@ export async function newCheckoutDeleteActiveSale(saleID) {
 
 // ─── Completed Sale (Firestore) ───────────────────────────────
 
+// DEPRECATED — use writeCompletedSale + deleteActiveSale
 export async function newCheckoutCompleteSale(sale) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
@@ -148,6 +332,7 @@ export async function newCheckoutCompleteSale(sale) {
   }
 }
 
+// DEPRECATED — use writeCompletedSale
 export async function newCheckoutUpdateCompletedSale(sale) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
@@ -164,6 +349,7 @@ export async function newCheckoutUpdateCompletedSale(sale) {
   }
 }
 
+// DEPRECATED — use readCompletedSale
 export async function newCheckoutFetchCompletedSale(saleID) {
   try {
     const { tenantID, storeID } = getTenantAndStore();

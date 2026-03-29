@@ -474,6 +474,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
       const storeID = paymentIntent.metadata?.storeID;
       const saleID = paymentIntent.metadata?.saleID;
       const customerID = paymentIntent.metadata?.customerID;
+      const transactionID = paymentIntent.metadata?.transactionID;
 
       if (!tenantID || !storeID) {
         throw new Error(
@@ -562,6 +563,39 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
                   networkTransactionID: card?.network_transaction_id || "",
                   amountRefunded: 0,
                 };
+
+                // Write transaction to transactions collection (new architecture)
+                if (transactionID) {
+                  try {
+                    const txnDoc = {
+                      id: transactionID,
+                      method: "card",
+                      millis: Date.now(),
+                      amountCaptured: charge.amount_captured || 0,
+                      amountTendered: 0,
+                      salesTax: 0,
+                      last4: card?.last4 || "",
+                      expMonth: card?.exp_month || "",
+                      expYear: card?.exp_year || "",
+                      cardType: card?.description || "",
+                      cardIssuer: card?.receipt?.application_preferred_name || "Unknown",
+                      paymentProcessor: "stripe",
+                      paymentIntentID: paymentIntentComplete.id || "",
+                      chargeID: charge.id || "",
+                      authorizationCode: card?.receipt?.authorization_code || "",
+                      networkTransactionID: card?.network_transaction_id || "",
+                      receiptURL: charge.receipt_url || "",
+                      refunds: [],
+                    };
+                    await db.collection("tenants").doc(tenantID)
+                      .collection("stores").doc(storeID)
+                      .collection("transactions").doc(transactionID)
+                      .set(txnDoc);
+                    log("stripeCheckoutWebhook_Terminal: transaction written", { transactionID });
+                  } catch (txnError) {
+                    log("stripeCheckoutWebhook_Terminal: transaction write error (non-fatal)", txnError.message);
+                  }
+                }
 
                 // Fetch customer and settings for sale completion
                 let customer = {};
@@ -4235,15 +4269,17 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
 
 /**
  * newCheckoutProcessRefundCallable
- * Processes a refund for a given PaymentIntent.
- * Input: { paymentIntentID, amount (cents, optional for partial) }
+ * Processes a refund for a given charge.
+ * Input: { chargeID, amount (cents, optional for partial) }
+ * Optional (new architecture): { transactionID, tenantID, storeID, refundId, method, salesTax, workorderLines, notes }
+ * If transactionID is provided, writes the refund object to the payment transaction in Firestore.
  */
 exports.newCheckoutProcessRefundCallable = onCall(
-  { secrets: [stripeSecretKey] },
+  { secrets: [stripeSecretKey, firebaseServiceAccountKey] },
   async (request) => {
     log("newCheckout: process refund request", request.data);
 
-    const { chargeID, amount } = request.data;
+    const { chargeID, amount, transactionID, tenantID, storeID, refundId, method, salesTax, workorderLines, notes } = request.data;
 
     if (!chargeID || typeof chargeID !== "string") {
       throw new HttpsError(
@@ -4268,6 +4304,41 @@ exports.newCheckoutProcessRefundCallable = onCall(
         ...(amount ? { amount } : {}),
       });
 
+      // If transactionID provided, write refund to the transaction document
+      let refundObj = null;
+      if (transactionID && tenantID && storeID) {
+        try {
+          const db = await getDB(firebaseServiceAccountKey);
+          const txnRef = db.collection("tenants").doc(tenantID)
+            .collection("stores").doc(storeID)
+            .collection("transactions").doc(transactionID);
+
+          const txnSnap = await txnRef.get();
+          if (txnSnap.exists) {
+            const txnData = txnSnap.data();
+            refundObj = {
+              id: refundId || "",
+              transactionID,
+              amount: amount || refund.amount,
+              method: method || "card",
+              millis: Date.now(),
+              salesTax: salesTax || 0,
+              stripeRefundID: refund.id,
+              workorderLines: workorderLines || [],
+              notes: notes || "",
+            };
+            const refunds = txnData.refunds || [];
+            refunds.push(refundObj);
+            await txnRef.update({ refunds });
+          } else {
+            log("newCheckout: transaction not found for refund write:", transactionID);
+          }
+        } catch (txnError) {
+          log("newCheckout: error writing refund to transaction:", txnError);
+          // Don't throw — Stripe refund already succeeded
+        }
+      }
+
       return {
         success: true,
         message: `Refund ${
@@ -4276,6 +4347,7 @@ exports.newCheckoutProcessRefundCallable = onCall(
         data: {
           refundId: refund.id,
           status: refund.status,
+          refundObj,
         },
       };
     } catch (error) {
@@ -4554,6 +4626,8 @@ async function lightspeedGetAll(accessToken, accountID, endpoint, params = {}) {
     allItems = allItems.concat(arr);
 
     const attrs = data["@attributes"];
+    const total = attrs?.count || "?";
+    log("[" + key + "] Fetched " + allItems.length + " / " + total + " records");
     if (!attrs || allItems.length >= parseInt(attrs.count)) break;
 
     // Use cursor-based "next" URL for pagination
@@ -5678,6 +5752,22 @@ exports.lightspeedImportData = onCall(
       const url = await uploadCSVToStorage(csv, path);
       await lsLog(JSON.stringify({ csvType: "employees", url, filename: "lightspeed_employees.csv", rowCount: rows.length }), "csv-download");
       await lsLog("Employees CSV exported: " + rows.length + " rows", "success");
+    }
+
+    if (importType === "csv-employeehours") {
+      await lsLog("Fetching employee hours (punch history) from Lightspeed API...");
+      const data = await lightspeedGetAll(accessToken, accountID, "EmployeeHours", {});
+      await lsLog("Fetched " + data.length + " punch records. Building CSV...");
+      const headers = ["employeeHoursID", "employeeID", "checkIn", "checkOut", "shopID"];
+      const rows = data.map(h => [
+        h.employeeHoursID, h.employeeID, h.checkIn || "", h.checkOut || "", h.shopID || "",
+      ]);
+      const csv = buildCSV(headers, rows);
+      await lsLog("CSV built: " + rows.length + " rows. Uploading to Cloud Storage...");
+      const path = `${tenantID}/${storeID}/lightspeed-exports/${Date.now()}_employeehours.csv`;
+      const url = await uploadCSVToStorage(csv, path);
+      await lsLog(JSON.stringify({ csvType: "employeehours", url, filename: "lightspeed_employeehours.csv", rowCount: rows.length }), "csv-download");
+      await lsLog("Employee Hours CSV exported: " + rows.length + " rows", "success");
     }
 
     if (importType === "csv-cccharges") {
@@ -7463,7 +7553,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
 
       const db = await getDB(firebaseServiceAccountKey);
       const session = event.data.object;
-      const { tenantID, storeID, saleID, workorderID, customerID, channel } =
+      const { tenantID, storeID, saleID, workorderID, customerID, channel, transactionID } =
         session.metadata || {};
 
       if (!tenantID || !storeID || !saleID || !workorderID) {
@@ -7551,6 +7641,40 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
           amountRefunded: 0,
           textToPay: true,
         };
+
+        // Write transaction to transactions collection (new architecture)
+        if (transactionID) {
+          try {
+            const card = charge.payment_method_details?.card;
+            const txnDoc = {
+              id: transactionID,
+              method: "card",
+              millis: Date.now(),
+              amountCaptured: charge.amount_captured || 0,
+              amountTendered: 0,
+              salesTax: 0,
+              last4: card?.last4 || "",
+              expMonth: card?.exp_month || "",
+              expYear: card?.exp_year || "",
+              cardType: card?.brand || "",
+              cardIssuer: card?.brand || "",
+              paymentProcessor: "stripe",
+              paymentIntentID: paymentIntent.id || "",
+              chargeID: charge.id || "",
+              authorizationCode: "",
+              networkTransactionID: card?.network_transaction_id || "",
+              receiptURL: charge.receipt_url || "",
+              refunds: [],
+            };
+            await db.collection("tenants").doc(tenantID)
+              .collection("stores").doc(storeID)
+              .collection("transactions").doc(transactionID)
+              .set(txnDoc);
+            log("stripeCheckoutWebhook_LinkToPay: transaction written", { transactionID });
+          } catch (txnError) {
+            log("stripeCheckoutWebhook_LinkToPay: transaction write error (non-fatal)", txnError.message);
+          }
+        }
 
         await completeSaleServerSide({
           db, sale, saleID, tenantID, storeID, customerID,

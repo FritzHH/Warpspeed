@@ -1,5 +1,12 @@
 import { buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex } from "./utils";
-import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES } from "./data";
+import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES, TAX_FREE_RECEIPT_NOTE, APP_USER, TIME_PUNCH_PROTO } from "./data";
+
+// ============================================================================
+// Status Aliases — map common Lightspeed labels to existing nonremovable labels
+// ============================================================================
+const STATUS_ALIASES = {
+  "done & paid": "finished & paid",
+};
 
 // ============================================================================
 // CSV Parsing
@@ -49,7 +56,7 @@ function splitCSVRows(text) {
 }
 
 function sanitize(str) {
-  return str.replace(/'\//g, "'");
+  return str.replace(/\\'/g, "'");
 }
 
 export function parseCSV(text) {
@@ -112,6 +119,8 @@ export function extractStatusesFromWorkorders(workorderCSVText) {
   const nonremovableLabels = new Set(
     NONREMOVABLE_STATUSES.map(s => s.label.toLowerCase())
   );
+  // Also exclude aliased names (e.g. "Done & Paid" → "Finished & Paid")
+  for (const alias of Object.keys(STATUS_ALIASES)) nonremovableLabels.add(alias);
   const csvStatuses = extracted
     .filter(name => !nonremovableLabels.has(name.toLowerCase()))
     .map(name => {
@@ -133,7 +142,7 @@ export function extractStatusesFromWorkorders(workorderCSVText) {
 // ============================================================================
 
 // Build color lookup from COLORS array in data.js
-// Keys: lowercase label → { textColor, backgroundColor, label, altTextColor }
+// Keys: lowercase label → { textColor, backgroundColor, label }
 const COLOR_MAP = {};
 for (const c of COLORS) {
   const key = c.label.toLowerCase();
@@ -141,17 +150,16 @@ for (const c of COLORS) {
     textColor: c.textColor || "",
     backgroundColor: c.backgroundColor || "",
     label: c.label || "",
-    altTextColor: c.altTextColor || "dimgray",
   };
 }
 // Add aliases
-COLOR_MAP["grey"] = COLOR_MAP["gray"] || { textColor: "white", backgroundColor: "darkgray", label: "Gray", altTextColor: "dimgray" };
+COLOR_MAP["grey"] = COLOR_MAP["gray"] || { textColor: "white", backgroundColor: "darkgray", label: "Gray" };
 COLOR_MAP["light blue"] = COLOR_MAP["light-blue"];
 COLOR_MAP["lightblue"] = COLOR_MAP["light-blue"];
 COLOR_MAP["light gray"] = COLOR_MAP["light-gray"];
 COLOR_MAP["lightgray"] = COLOR_MAP["light-gray"];
 
-const EMPTY_COLOR = { textColor: "", backgroundColor: "", label: "", altTextColor: "" };
+const EMPTY_COLOR = { textColor: "", backgroundColor: "", label: "" };
 
 function mapColor(colorName) {
   if (!colorName) return { ...EMPTY_COLOR };
@@ -273,13 +281,14 @@ export function mapCustomers(customerCSVText) {
   const rows = parseCSV(customerCSVText);
   const customers = [];
   const phoneMap = {}; // phone → customer index for deduplication
+  const customerRedirectMap = {}; // discardedLsID → survivingLsID
 
   for (const row of rows) {
     if (row.archived === "true") continue;
 
     const cell = formatPhone(row.phone1);
     const customer = {
-      id: row.customerID || "",
+      id: row.customerID ? buildLightspeedEAN13("20", row.customerID) : "",
       first: (row.firstName || "").toLowerCase().trim(),
       last: (row.lastName || "").toLowerCase().trim(),
       customerCell: cell,
@@ -301,6 +310,8 @@ export function mapCustomers(customerCSVText) {
       deposits: [],
       credits: [],
       language: CUSTOMER_LANGUAGES.english,
+      _importSource: "lightspeed",
+      lightspeed_id: row.customerID || "",
     };
 
     // Deduplicate by phone — merge into existing customer if same phone
@@ -309,12 +320,14 @@ export function mapCustomers(customerCSVText) {
       // Keep the record with more data (prefer one with name + email)
       const existingScore = (existing.first ? 1 : 0) + (existing.email ? 1 : 0) + (existing.streetAddress ? 1 : 0);
       const newScore = (customer.first ? 1 : 0) + (customer.email ? 1 : 0) + (customer.streetAddress ? 1 : 0);
+      const keepID = existing.id;
       if (newScore > existingScore) {
         // Replace with richer record but keep the original ID (workorder/sale backfills use it)
-        const keepID = existing.id;
         customers[phoneMap[cell]] = { ...customer, id: keepID };
       }
-      console.log("[Migration] Deduplicated customer phone " + cell + ": merged " + customer.id + " into " + existing.id);
+      // Redirect the discarded LS customer ID to the surviving one
+      customerRedirectMap[customer.id] = keepID;
+      console.log("[Migration] Deduplicated customer phone " + cell + ": merged " + customer.id + " -> " + keepID);
       continue;
     }
 
@@ -322,7 +335,7 @@ export function mapCustomers(customerCSVText) {
     customers.push(customer);
   }
 
-  return customers;
+  return { customers, customerRedirectMap };
 }
 
 // ============================================================================
@@ -335,10 +348,11 @@ export function mapWorkorders(
   serializedCSVText,
   itemsCSVText,
   salesLinesCSVText,
-  customerMap,       // { lsCustomerID → customer object } (from mapCustomers output)
-  warpspeedStatuses, // array of status objects from settings
-  employeesCSVText,  // optional — employees.csv text for note author names
-  salesCSVText       // optional — sales.csv text for taxFree detection
+  customerMap,            // { lsCustomerID → customer object } (from mapCustomers output)
+  warpspeedStatuses,      // array of status objects from settings
+  employeesCSVText,       // optional — employees.csv text for note author names
+  salesCSVText,           // optional — sales.csv text for taxFree detection
+  customerRedirectMap = {} // { discardedLsID → survivingLsID } (from mapCustomers)
 ) {
   const woRows = parseCSV(workorderCSVText);
   const wiRows = parseCSV(workorderItemsCSVText);
@@ -416,19 +430,22 @@ export function mapWorkorders(
     // Skip archived
     if (wo.archived === "true") continue;
 
-    // Customer lookup
-    const customer = customerMap[wo.customerID] || null;
+    // Customer lookup (apply redirect for deduplicated customers)
+    const woCustomerEAN = wo.customerID ? buildLightspeedEAN13("20", wo.customerID) : "";
+    const resolvedCustomerID = customerRedirectMap[woCustomerEAN] || woCustomerEAN;
+    const customer = customerMap[resolvedCustomerID] || null;
     const customerFirst = (wo.customerFirstName || "").toLowerCase().trim();
     const customerLast = (wo.customerLastName || "").toLowerCase().trim();
     const customerCell = customer ? customer.customerCell : "";
 
-    // Status — match by label, log + assign "Unknown Status" if unmatched
-    const statusLabel = (wo.statusName || "").toLowerCase();
+    // Status — match by label (resolve aliases first), log + assign "Unknown Status" if unmatched
+    const rawLabel = (wo.statusName || "").toLowerCase();
+    const statusLabel = STATUS_ALIASES[rawLabel] || rawLabel;
     let status = statusMap[statusLabel] || fallbackStatus;
     if (!statusMap[statusLabel]) {
       console.warn("[Migration] Unknown status \"" + wo.statusName + "\" for WO " + woID + " — assigned \"" + (status ? status.label : "Unknown Status") + "\"");
     }
-    if (!status) status = { altTextColor: "", backgroundColor: "", id: crypto.randomUUID(), label: "Unknown Status", removable: true, textColor: "" };
+    if (!status) status = { backgroundColor: "", id: crypto.randomUUID(), label: "Unknown Status", removable: true, textColor: "" };
 
     // Bike details from serialized
     const ser = wo.serializedID ? serializedMap[wo.serializedID] : null;
@@ -560,11 +577,15 @@ export function mapWorkorders(
       workorderNumber: generateWorkorderNumber(ean13),
       id: ean13,
       lightspeed_id: woID,
-      customerID: wo.customerID || "",
+      customerID: resolvedCustomerID || "",
       customerFirst,
       customerLast,
       customerCell,
-      model: "",
+      customerLandline: customer ? (customer.customerLandline || "") : "",
+      customerEmail: customer ? (customer.email || "") : "",
+      customerContactRestriction: "",
+      customerLanguage: "",
+      customerPin: "",
       brand,
       description,
       color1,
@@ -573,6 +594,9 @@ export function mapWorkorders(
       taxFree: wo.saleID && saleMap[wo.saleID]
         ? (parseFloat(saleMap[wo.saleID].calcTax1 || "0") + parseFloat(saleMap[wo.saleID].calcTax2 || "0")) === 0
         : false,
+      taxFreeReceiptNote: (wo.saleID && saleMap[wo.saleID]
+        && (parseFloat(saleMap[wo.saleID].calcTax1 || "0") + parseFloat(saleMap[wo.saleID].calcTax2 || "0")) === 0)
+        ? TAX_FREE_RECEIPT_NOTE : "",
       archived: wo.archived === "true",
       startedBy: wo.employeeID || "",
       startedOnMillis,
@@ -582,13 +606,17 @@ export function mapWorkorders(
       customerNotes,
       internalNotes,
       changeLog: [],
+      hasNewSMS: false,
       waitTime: "",
+      waitTimeEstimateLabel: "",
       partOrdered: "",
       partSource: "",
+      partToBeOrdered: false,
+      partOrderEstimateMillis: "",
+      partOrderedMillis: "",
       paymentComplete: false,
       amountPaid: 0,
       activeSaleID: "",
-      sales: [],
       endedOnMillis: "",
       saleID: "",
       media: [],
@@ -615,8 +643,9 @@ export function mapSales(
   salesCSVText,
   salesPaymentsCSVText,
   stripePaymentsCSVText,
-  workorderMap,   // { lsSaleID → mapped workorder object(s) }
-  customerMap     // { lsCustomerID → customer object }
+  workorderMap,            // { lsSaleID → mapped workorder object(s) }
+  customerMap,             // { lsCustomerID → customer object }
+  customerRedirectMap = {} // { discardedLsID → survivingLsID } (from mapCustomers)
 ) {
   const saleRows = parseCSV(salesCSVText);
   const spRows = parseCSV(salesPaymentsCSVText);
@@ -656,7 +685,6 @@ export function mapSales(
     const total = dollarsToCents(row.calcTotal);
     const tax = dollarsToCents(row.calcTax1) + dollarsToCents(row.calcTax2);
     const discount = dollarsToCents(row.calcDiscount);
-    const amountCaptured = dollarsToCents(row.calcPayments);
 
     // Tax percent: derive from subtotal if possible
     const taxableAmount = subtotal - discount;
@@ -673,10 +701,14 @@ export function mapSales(
     const linkedWorkorders = workorderMap[lsSaleID] || [];
     const workorderIDs = linkedWorkorders.map(wo => wo.id);
 
-    // Customer linkage
-    const customer = row.customerID && row.customerID !== "0"
-      ? customerMap[row.customerID] || null
-      : null;
+    // Customer linkage (apply redirect for deduplicated customers)
+    const saleCustEAN = row.customerID && row.customerID !== "0"
+      ? buildLightspeedEAN13("20", row.customerID)
+      : "";
+    const resolvedCustID = saleCustEAN
+      ? (customerRedirectMap[saleCustEAN] || saleCustEAN)
+      : "";
+    const customer = resolvedCustID ? customerMap[resolvedCustID] || null : null;
 
     // Map payments
     const paymentRows = paymentsMap[lsSaleID] || [];
@@ -724,14 +756,14 @@ export function mapSales(
         type: amount < 0 ? "refund" : "payment",
         method: isCash ? "cash" : isCheck ? "check" : "card",
         amountCaptured: amount,
-        amountTendered: (isCash && amount >= 0) ? amount : "",
+        amountTendered: (isCash && amount >= 0) ? amount : 0,
         salesTax: 0,
         cardType: stripeMatch ? stripeMatch["Card type"] : (sp.cardType || ""),
         cardIssuer: isCard ? sp.paymentTypeName : "",
         last4: stripeMatch ? stripeMatch["Card last 4"] : (sp.cardLast4 || ""),
         authorizationCode: sp.authCode || "",
-        millis: sp.createTime ? new Date(sp.createTime).getTime() : "",
-        paymentProcessor: "Stripe",
+        millis: sp.createTime ? new Date(sp.createTime).getTime() : 0,
+        paymentProcessor: isCard ? "Stripe" : "",
         chargeID: stripeMatch ? stripeMatch["ID"] : (sp.ccChargeID && sp.ccChargeID !== "0" ? sp.ccChargeID : ""),
         paymentIntentID: stripeMatch ? (stripeMatch["Payment ID"] || "") : "",
         receiptURL: "",
@@ -747,6 +779,10 @@ export function mapSales(
       };
     });
 
+    // Compute amountCaptured/amountRefunded from transactions (consistent with recomputeSaleAmounts)
+    const computedAmountCaptured = payments.reduce((sum, p) => p.type === "payment" ? sum + p.amountCaptured : sum, 0);
+    const computedAmountRefunded = payments.reduce((sum, p) => p.type === "refund" ? sum + Math.abs(p.amountCaptured) : sum, 0);
+
     const mappedSale = {
       id: saleID,
       lightspeed_id: lsSaleID,
@@ -756,12 +792,16 @@ export function mapSales(
       salesTax: tax,
       salesTaxPercent,
       total,
-      amountCaptured,
-      amountRefunded: 0,
+      amountCaptured: computedAmountCaptured,
+      amountRefunded: computedAmountRefunded,
       paymentComplete: completed,
       workorderIDs,
       transactions: payments,
       refunds: [],
+      textToPay: false,
+      checkoutSessionID: "",
+      depositType: "",
+      voidedByRefund: false,
       _importSource: "lightspeed",
     };
 
@@ -772,7 +812,7 @@ export function mapSales(
       wo.saleID = saleID;
       if (completed) {
         wo.paymentComplete = true;
-        wo.amountPaid = amountCaptured;
+        wo.amountPaid = computedAmountCaptured;
       }
     }
 
@@ -783,4 +823,94 @@ export function mapSales(
   }
 
   return sales;
+}
+
+// ============================================================================
+// Employee Mapping
+// ============================================================================
+
+const SKIP_EMPLOYEE_IDS = ["1"]; // Fritz - already in system
+const SKIP_EMPLOYEE_NAMES = ["support user", "office user"]; // system accounts
+
+/**
+ * Map Lightspeed employees CSV to APP_USER objects.
+ * Returns { users: APP_USER[], employeeIDMap: { lsEmployeeID → appUserID } }
+ */
+export function mapEmployees(employeesCSVText) {
+  const rows = parseCSV(employeesCSVText);
+  const users = [];
+  const employeeIDMap = {};
+
+  for (const row of rows) {
+    const lsID = (row.employeeID || "").trim();
+    if (!lsID) continue;
+    if (SKIP_EMPLOYEE_IDS.includes(lsID)) continue;
+
+    const first = (row.firstName || "").trim();
+    const last = (row.lastName || "").trim();
+    const fullName = (first + " " + last).trim().toLowerCase();
+    if (SKIP_EMPLOYEE_NAMES.includes(fullName)) continue;
+
+    const appUserID = crypto.randomUUID();
+    employeeIDMap[lsID] = appUserID;
+
+    users.push({
+      ...APP_USER,
+      first,
+      last,
+      id: appUserID,
+      permissions: { name: "User", level: 1 },
+      _importSource: "lightspeed",
+      lightspeed_id: lsID,
+    });
+  }
+
+  return { users, employeeIDMap };
+}
+
+// ============================================================================
+// Punch History Mapping
+// ============================================================================
+
+/**
+ * Map Lightspeed employeeHours CSV to TIME_PUNCH_PROTO objects.
+ * Each row with a valid checkIn/checkOut becomes 2 punch objects ("in" + "out").
+ * Skips rows where employeeID is not in employeeIDMap.
+ */
+export function mapPunchHistory(employeeHoursCSVText, employeeIDMap) {
+  const rows = parseCSV(employeeHoursCSVText);
+  const punches = [];
+
+  for (const row of rows) {
+    const lsEmployeeID = (row.employeeID || "").trim();
+    const appUserID = employeeIDMap[lsEmployeeID];
+    if (!appUserID) continue;
+
+    const checkIn = (row.checkIn || "").trim();
+    const checkOut = (row.checkOut || "").trim();
+
+    if (checkIn) {
+      punches.push({
+        ...TIME_PUNCH_PROTO,
+        id: crypto.randomUUID(),
+        userID: appUserID,
+        millis: new Date(checkIn).getTime(),
+        option: "in",
+        _importSource: "lightspeed",
+      });
+    }
+
+    if (checkOut) {
+      punches.push({
+        ...TIME_PUNCH_PROTO,
+        id: crypto.randomUUID(),
+        userID: appUserID,
+        millis: new Date(checkOut).getTime(),
+        option: "out",
+        _importSource: "lightspeed",
+      });
+    }
+  }
+
+  return punches;
 }

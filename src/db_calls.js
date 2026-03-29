@@ -107,6 +107,28 @@ export async function firestoreBatchWrite(items) {
 }
 
 /**
+ * Delete multiple documents in Firestore batches (max 500 per batch).
+ * @param {string} collectionPath - Full collection path
+ * @param {Array<{id: string}>} docs - Array of doc objects with id field
+ * @returns {Promise<{success: boolean, count: number}>}
+ */
+export async function firestoreBatchDelete(collectionPath, docs) {
+  const BATCH_LIMIT = 500;
+  let deleted = 0;
+  for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
+    const chunk = docs.slice(i, i + BATCH_LIMIT);
+    const batch = firestoreWriteBatch(DB);
+    for (const d of chunk) {
+      const docRef = doc(DB, ...`${collectionPath}/${d.id}`.split("/"));
+      batch.delete(docRef);
+    }
+    await batch.commit();
+    deleted += chunk.length;
+  }
+  return { success: true, count: deleted };
+}
+
+/**
  * Read a document from Firestore
  * @param {string} path - Document path
  * @returns {Promise<Object|null>} Document data or null if not found

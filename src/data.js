@@ -189,6 +189,7 @@ export const WAIT_TIME_INCREMENTS = {
 export const CUSTOMER_DEPOST_TYPES = {
   deposit: 'deposit',
   credit: 'credit',
+  giftcard: 'giftcard',
 }
 export const CUSTOMER_DEPOSIT_PROTO = {
   id: "",              // sale ID (EAN-13 prefix "3") — IS the completed-sales doc ID
@@ -196,8 +197,8 @@ export const CUSTOMER_DEPOSIT_PROTO = {
   millis: 0,           // creation timestamp
   method: "",          // "cash" | "card" | "check"
   note: "",            // user-entered note
-  paymentIntentID: "", // Stripe PaymentIntent ID (card deposits only, for refunds)
   last4: "",           // card last 4 digits (card deposits only, for display)
+  type: "",            // "" = regular deposit, "giftcard" = gift card
 }
 
 
@@ -319,14 +320,12 @@ export const DISCOUNT_OBJ_PROTO = {
 };
 
 export const TRANSACTION_PROTO = {
-  id: "",                       // EAN-13 barcode (prefix "4")
-  type: "",                     // "payment" | "refund"
-  method: "",                   // "cash" | "card" | "check"
-  millis: 0,                    // timestamp
-  amountCaptured: 0,            // cents moved in this transaction
-  amountTendered: 0,            // cents tendered (cash only, for change calc)
-  salesTax: 0,                  // tax portion of this transaction (cents)
-  saleID: "",                   // parent sale ID
+  id: "",
+  method: "",                   // "cash" | "card"
+  millis: 0,
+  amountCaptured: 0,
+  amountTendered: 0,
+  salesTax: 0,
 
   // Card-specific
   last4: "",
@@ -340,21 +339,19 @@ export const TRANSACTION_PROTO = {
   authorizationCode: "",
   networkTransactionID: "",
   receiptURL: "",
-  amountRefunded: 0,            // running total refunded against this charge
 
-  // Deposit/credit
-  depositType: "",              // "deposit" | "credit" (empty = normal payment)
-  depositId: "",                // consumed deposit ID (for remove-deposit flow)
-  depositOriginalAmount: 0,     // original deposit amount (for partial display)
+  refunds: [],
 };
 
 export const REFUND_PROTO = {
   id: "",
-  type: "",
+  transactionID: "",
+  amount: 0,
+  method: "",
+  millis: 0,
+  salesTax: 0,
+  stripeRefundID: "",
   workorderLines: [],
-  amountRefunded: 0,
-  millis: "",
-  cardRefundID: "",
   notes: "",
 };
 
@@ -366,21 +363,22 @@ export const THIN_DEPOSIT_PROTO = {
 export const SALE_PROTO = {
   id: "",
   millis: "",
+  workorderIDs: [],
+  transactionIDs: [],
+  amountCaptured: 0,
+  creditsApplied: [],
   subtotal: 0,
   discount: 0,
   salesTax: 0,
   salesTaxPercent: 0,
   total: 0,
-  amountCaptured: 0, // Computed from payments[] — use recomputeSaleAmounts()
-  amountRefunded: 0, // Computed from refunds[] — use recomputeSaleAmounts()
-  paymentComplete: false, // Computed — true when amountCaptured >= total
-  workorderIDs: [],
-  transactions: [],
-  refunds: [],
-  textToPay: false,
-  checkoutSessionID: "",
-  depositType: "", // "deposit" | "credit" (empty = normal sale)
-  voidedByRefund: false,
+};
+
+export const CREDIT_APPLIED_PROTO = {
+  creditId: "",
+  transactionId: "",
+  amount: 0,
+  type: "",           // "deposit" | "giftcard" | "credit"
 };
 
 export const ITEM_SALE_PROTO = {
@@ -420,7 +418,6 @@ export const WORKORDER_PROTO = {
   customerEmail: "",
   customerContactRestriction: "",
   customerLanguage: "",
-  model: "",
   brand: "",
   description: "",
   color1: {
@@ -455,7 +452,7 @@ export const WORKORDER_PROTO = {
   taxFreeReceiptNote: "",
 };
 
-export const TAX_FREE_RECEIPT_NOTE = "No items on this workorder were taxable. All items must be labor-only, and no shop parts or material left the shop with the customer."
+export const TAX_FREE_RECEIPT_NOTE = "No items on this workorder were taxable under Florida law. All items are, be labor-only, and no shop parts or material left the shop with the customer."
 
 export const WORKORDER_ITEM_PROTO = {
   qty: 1,
@@ -470,7 +467,6 @@ export const WORKORDER_ITEM_PROTO = {
 
 export const CUSTOMER_PREVIOUS_BIKE_PROTO = {
   brand: "",
-  model: "",
   description: "",
   color1: "",
   color2: "",
@@ -1202,7 +1198,6 @@ export const RECEIPT_PROTO = {
   partSource: "",
   partOrdered: "",
   waitTime: "",
-  model: "",
   amountPaid: "",
   startedOnDate: "",
   finishedOnDate: "",

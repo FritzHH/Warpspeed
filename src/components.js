@@ -3290,8 +3290,10 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
   const [sDepositNote, _sSetDepositNote] = useState("");
 
   let isCredit = sDepositType === CUSTOMER_DEPOST_TYPES.credit;
+  let isGiftCard = sDepositType === CUSTOMER_DEPOST_TYPES.giftcard;
   let creditReady = isCredit && sDepositAmountCents >= 100 && sDepositNote.trim().length > 3;
-  let depositReady = !isCredit && sDepositAmountCents > 0;
+  let depositReady = (!isCredit && !isGiftCard) && sDepositAmountCents > 0;
+  let giftCardReady = isGiftCard && sDepositAmountCents > 0;
 
   function resetAndClose() {
     _sSetDepositAmount("");
@@ -3326,7 +3328,7 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
         }}
       >
         <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 14 }}>
-          Add Deposit / Credit
+          Add Deposit / Credit / Gift Card
         </Text>
         <View style={{ flexDirection: "row", marginBottom: 14 }}>
           <CheckBox_
@@ -3340,6 +3342,13 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
             text="Credit"
             isChecked={sDepositType === CUSTOMER_DEPOST_TYPES.credit}
             onCheck={() => _sSetDepositType(CUSTOMER_DEPOST_TYPES.credit)}
+            textStyle={{ fontSize: 14 }}
+            buttonStyle={{ marginRight: 20 }}
+          />
+          <CheckBox_
+            text="Gift Card"
+            isChecked={sDepositType === CUSTOMER_DEPOST_TYPES.giftcard}
+            onCheck={() => _sSetDepositType(CUSTOMER_DEPOST_TYPES.giftcard)}
             textStyle={{ fontSize: 14 }}
           />
         </View>
@@ -3418,14 +3427,22 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
           />
           <Button_
           text={isCredit ? "Apply Credit" : "Pay Amount"}
-          colorGradientArr={isCredit ? COLOR_GRADIENTS.blue : COLOR_GRADIENTS.green}
+          colorGradientArr={isCredit ? COLOR_GRADIENTS.blue : isGiftCard ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 13 }}
-          enabled={isCredit ? creditReady : depositReady}
-          buttonStyle={{ width: 110, height: 34, borderRadius: 5, opacity: isCredit ? (creditReady ? 1 : 0.4) : (depositReady ? 1 : 0.4) }}
+          enabled={isCredit ? creditReady : isGiftCard ? giftCardReady : depositReady}
+          buttonStyle={{ width: 110, height: 34, borderRadius: 5, opacity: (isCredit ? creditReady : isGiftCard ? giftCardReady : depositReady) ? 1 : 0.4 }}
             onPress={() => {
               if (isCredit) {
                 if (!creditReady) return;
                 handleCreditConfirm();
+              } else if (isGiftCard) {
+                if (!giftCardReady) return;
+                onPay({
+                  type: sDepositType,
+                  amountCents: sDepositAmountCents,
+                  note: sDepositNote,
+                });
+                resetAndClose();
               } else {
                 if (!depositReady) return;
                 onPay({
@@ -3479,16 +3496,17 @@ export const DepositsList = ({ deposits, credits, onPress, onRemoveCredit }) => 
   return (
     <View style={{ marginTop: 10, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 10, padding: 10, backgroundColor: C.listItemWhite }}>
       <Text style={{ fontSize: 15, fontWeight: "600", marginBottom: 6, color: C.green }}>
-        Deposits / Credits
+        Deposits / Credits / Gift Cards
       </Text>
       {allItems.length === 0 && (
         <Text style={{ color: gray(0.4), fontSize: 12, textAlign: "center", marginTop: 4 }}>
-          No deposits or credits on file
+          No deposits, credits, or gift cards on file
         </Text>
       )}
       {allItems.map((item) => {
         let isCredit = item._type === "credit";
-        let badgeColor = isCredit ? C.blue : C.green;
+        let isGiftCard = item.type === "giftcard";
+        let badgeColor = isGiftCard ? C.orange : isCredit ? C.blue : C.green;
         let noteText = item.note || item.text || "";
         let isConfirming = sConfirmId === item.id;
         return (
@@ -3539,7 +3557,7 @@ export const DepositsList = ({ deposits, credits, onPress, onRemoveCredit }) => 
                     }}
                   >
                     <Text style={{ fontSize: 10, fontWeight: "600", color: badgeColor }}>
-                      {isCredit ? "Credit" : "Deposit"}
+                      {isGiftCard ? "Gift Card" : isCredit ? "Credit" : "Deposit"}
                     </Text>
                   </View>
                   {!!noteText && (

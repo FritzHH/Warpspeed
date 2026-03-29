@@ -441,7 +441,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
               {/* Bike */}
               <SectionHeader text="BIKE" />
               <DetailRow label="Brand" value={workorder.brand} labelSize={13} valueSize={14} />
-              <DetailRow label="Model" value={workorder.description || workorder.model} labelSize={13} valueSize={14} />
+              <DetailRow label="Description" value={workorder.description} labelSize={13} valueSize={14} />
 
               {/* Colors */}
               {(!!workorder.color1?.label || !!workorder.color2?.label) && (

@@ -532,7 +532,7 @@ const WorkorderCard = ({ workorder, statuses, salesTaxPercent }) => {
       {/* Header: brand/description + status badge */}
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <Text style={{ fontSize: 13, color: C.text, fontWeight: "600", flex: 1 }} numberOfLines={1}>
-          {(wo.brand || "") + (wo.description ? " — " + wo.description : wo.model ? " — " + wo.model : "")}
+          {(wo.brand || "") + (wo.description ? " — " + wo.description : "")}
         </Text>
         <View
           style={{

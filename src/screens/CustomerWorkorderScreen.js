@@ -388,12 +388,6 @@ export function CustomerWorkorderScreen() {
             <Text style={S.value}>{d.brand}</Text>
           </View>
         )}
-        {!!d.model && (
-          <View style={S.row}>
-            <Text style={S.label}>{t(tr, "model", "Model")}</Text>
-            <Text style={S.value}>{d.model}</Text>
-          </View>
-        )}
         {!!d.description && (
           <View style={S.row}>
             <Text style={S.label}>{t(tr, "description", "Description")}</Text>

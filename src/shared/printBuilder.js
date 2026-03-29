@@ -38,7 +38,6 @@ const RECEIPT_PROTO = {
   partSource: "",
   partOrdered: "",
   waitTime: "",
-  model: "",
   amountPaid: "",
   startedOnDate: "",
   finishedOnDate: "",

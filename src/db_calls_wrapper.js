@@ -35,6 +35,7 @@ import {
   manualArchiveAndCleanupCallable,
   createTextToPayInvoiceCallable,
   firestoreBatchWrite,
+  firestoreBatchDelete,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
 import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores } from "./stores";
@@ -354,6 +355,7 @@ export async function dbClearCollection(collectionName) {
       "completed-workorders": DB_NODES.FIRESTORE.COMPLETED_WORKORDERS,
       "completed-sales": DB_NODES.FIRESTORE.COMPLETED_SALES,
       "active-sales": DB_NODES.FIRESTORE.ACTIVE_SALES,
+      "punches": DB_NODES.FIRESTORE.PUNCHES,
     };
     const node = collectionMap[collectionName];
     if (!node) {
@@ -361,8 +363,8 @@ export async function dbClearCollection(collectionName) {
     }
     const collectionPath = `${base}/${node}`;
     let docs = await firestoreQuery(collectionPath);
-    for (let doc of docs) {
-      await firestoreDelete(collectionPath + "/" + doc.id);
+    if (docs.length > 0) {
+      await firestoreBatchDelete(collectionPath, docs);
     }
     return { success: true, deletedCount: docs.length };
   } catch (error) {

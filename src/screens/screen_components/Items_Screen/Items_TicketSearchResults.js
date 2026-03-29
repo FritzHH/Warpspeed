@@ -76,7 +76,7 @@ export function Items_TicketSearchResults({}) {
             WO #{wo.workorderNumber || wo.id}
           </Text>
           <Text style={{ fontSize: 13, color: gray(0.45), marginTop: 2 }}>
-            {[wo.brand, wo.model].filter(Boolean).join(" / ") || "No vehicle info"}
+            {[wo.brand, wo.description].filter(Boolean).join(" / ") || "No vehicle info"}
           </Text>
           {wo.customerFirst ? (
             <Text style={{ fontSize: 12, color: gray(0.55), marginTop: 2 }}>

@@ -8,4 +8,4 @@ BonitaBikes.1236
 __________________________________________________________________
 
 
-in the card sale component, card reader state: when waiting on a payment (we see the "Card reader ready to accept payment") text, disable the Manual Entry button
+using the constennts 

@@ -966,7 +966,6 @@ export function broadcastWorkorderToDisplay(wo) {
     customerLast: wo.customerLast || "",
     customerLanguage: wo.customerLanguage || "",
     brand: wo.brand || "",
-    model: wo.model || "",
     description: wo.description || "",
     workorderLines: lines,
     customer: {
@@ -1016,7 +1015,6 @@ export function broadcastFullWorkorderToDisplay(wo) {
     customerLast: wo.customerLast || "",
     customerLanguage: wo.customerLanguage || "",
     brand: wo.brand || "",
-    model: wo.model || "",
     description: wo.description || "",
     workorderLines: lines,
     customer: {
@@ -1054,7 +1052,7 @@ const CHANGELOG_DISCRETE_FIELDS = ["status", "color1", "color2", "waitTime", "wo
 const CHANGELOG_TRACKED_FIELDS = [...CHANGELOG_TEXT_FIELDS, ...CHANGELOG_DISCRETE_FIELDS];
 const changeLogDebounceMap = {};
 
-function getChangeLogUser() {
+export function getChangeLogUser() {
   return useLoginStore.getState().currentUser?.first || "System";
 }
 
@@ -1062,7 +1060,7 @@ function getItemName(item) {
   return item?.formalName || item?.informalName || "item";
 }
 
-function diffWorkorderLines(oldLines, newLines) {
+export function diffWorkorderLines(oldLines, newLines) {
   let entries = [];
   let oldMap = {};
   let newMap = {};

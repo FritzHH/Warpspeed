@@ -41,7 +41,11 @@
       "Bash(grep -n \"customer\\\\.deposits\\\\|applyDeposit\" \"/c/Users/hiebf/OneDrive/Desktop/warpspeed/src/screens/screen_components/modal_screens/newCheckoutModalScreen/\"*.js)",
       "Bash(xargs grep -l \"dbListenToCustomerMessages\\\\|setIncomingMessages\")",
       "Bash(python3:*)",
-      "Bash(xargs grep -l \"barcode\\\\|Barcode\")"
+      "Bash(xargs grep -l \"barcode\\\\|Barcode\")",
+      "Bash(node __inv_match.js)",
+      "Bash(wc -l /c/Users/hiebf/OneDrive/Desktop/warpspeed/lightspeed/*.csv /c/Users/hiebf/OneDrive/Desktop/warpspeed/src/assets/import_data/*.csv)",
+      "mcp__claude-terminal__notification_send",
+      "WebFetch(domain:docs.stripe.com)"
     ]
   }
 }

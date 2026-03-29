@@ -16,6 +16,7 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
   function getPaymentLabel() {
     if (isDeposit) {
       if (payment.depositType === "credit") return "ACCOUNT CREDIT";
+      if (payment.depositType === "giftcard") return "GIFT CARD";
       if (depositPaidByCash) return "DEPOSIT";
       if (payment.last4) return "CARD DEPOSIT";
       return "DEPOSIT";
@@ -50,10 +51,15 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
           alignItems: "center",
         }}
       >
-        <Text style={{ color: isDeposit ? (depositPaidByCash ? C.orange : C.blue) : C.green }}>
+        <Text style={{ color: isDeposit ? (payment.depositType === "giftcard" ? C.orange : depositPaidByCash ? C.orange : C.blue) : C.green }}>
           {getPaymentLabel()}
         </Text>
-        {onRefund && !payment.depositType && (
+        {!payment.depositType && payment.amountRefunded > 0 && payment.amountCaptured <= (payment.amountRefunded || 0) && (
+          <View style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 2, paddingHorizontal: 8 }}>
+            <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>Fully Refunded</Text>
+          </View>
+        )}
+        {onRefund && !payment.depositType && payment.amountCaptured > (payment.amountRefunded || 0) && (
           <Tooltip text="Refund this payment" position="top">
             <TouchableOpacity
               onPress={(e) => { e.stopPropagation(); onRefund(); }}
@@ -184,7 +190,11 @@ export const PaymentsList = memo(function PaymentsList({ payments = [], onRefund
       }}
     >
       <View style={{ width: "100%" }}>
-        {payments.map((payment, idx) => (
+        {payments.filter((p) => p.type !== "refund").sort((a, b) => {
+          let aRefunded = !a.depositType && a.amountCaptured <= (a.amountRefunded || 0) ? 1 : 0;
+          let bRefunded = !b.depositType && b.amountCaptured <= (b.amountRefunded || 0) ? 1 : 0;
+          return aRefunded - bRefunded;
+        }).map((payment, idx) => (
           <PaymentRow
             key={payment.id || idx}
             payment={payment}

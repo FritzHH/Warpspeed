@@ -350,7 +350,7 @@ function WorkorderOverlay({ data, isTall, lang }) {
   let amountPaid = data?.amountPaid || 0;
   let paymentComplete = data?.paymentComplete || false;
   let hasColors = (data?.color1 && data.color1.label) || (data?.color2 && data.color2.label);
-  let bikeDesc = [data?.brand, data?.model, data?.description].filter(Boolean).join(" — ");
+  let bikeDesc = [data?.brand, data?.description].filter(Boolean).join(" — ");
 
   return (
     <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.92)", justifyContent: "space-between" }}>

@@ -343,7 +343,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     } else if (type === "cash") {
       let remaining = amount;
       sale.transactions = sale.transactions.map((p) => {
-        if (remaining <= 0 || (p.method === "card" && !p.depositType)) return p;
+        if (remaining <= 0 || p.type !== "payment" || !!p.depositType || (p.method === "card")) return p;
         let available = p.amountCaptured - (p.amountRefunded || 0);
         let deduct = Math.min(remaining, available);
         remaining -= deduct;
@@ -375,10 +375,15 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     if (woIDs.length > 0) {
       let allOpenWorkorders = useOpenWorkordersStore.getState().getWorkorders();
       let freshWorkorders = await newCheckoutFetchWorkordersForSale(woIDs);
+      let _user = useLoginStore.getState().currentUser?.first || "System";
+      let _ts = Date.now();
+      let refundLabel = type === "card" ? "Card" : "Cash";
+      let entry = { timestamp: _ts, user: _user, field: "payment", action: "refunded", from: "", to: refundLabel + " refund " + formatCurrencyDisp(amount, true) };
       for (let wo of freshWorkorders) {
         if (!wo || wo.id === "standalone") continue;
         let updatedWO = cloneDeep(wo);
         updatedWO.amountPaid = netPaid;
+        updatedWO.changeLog = [...(updatedWO.changeLog || []), entry];
         let isOpen = allOpenWorkorders.some((w) => w.id === wo.id);
         if (isOpen) {
           useOpenWorkordersStore.getState().setWorkorder(updatedWO, true);
@@ -587,7 +592,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 transform: [{ translateX: "-50%" }],
               }}
             >
-              {sOriginalSale && !sRefundComplete ? (
+              {sOriginalSale && !sRefundComplete && !sIsActiveSale ? (
                 <Button_
                   text={sIsCustomAmount ? "EXIT CUSTOM REFUND" : "CUSTOM REFUND AMOUNT"}
                   onPress={toggleCustomAmount}

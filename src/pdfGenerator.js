@@ -561,7 +561,7 @@ export function generateWorkorderTicketPDF(data) {
   y += 4;
 
   // Bike info
-  let bikeInfo = [data.brand, data.model].filter(Boolean).join(" ");
+  let bikeInfo = [data.brand, data.description].filter(Boolean).join(" ");
   if (bikeInfo) {
     doc.setFont("helvetica", "bold");
     doc.text("Bike: ", leftX, y);

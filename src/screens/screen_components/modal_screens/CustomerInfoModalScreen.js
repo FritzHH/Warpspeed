@@ -483,7 +483,7 @@ export const CustomerInfoScreenModalComponent = ({
                 }}
                 iconSize={16}
                 textStyle={{ color: C.textWhite, fontSize: 13 }}
-                text={"Add Deposit / Credit"}
+                text={"Deposits / Credits / Gift Cards"}
               />
             )}
           </View>

@@ -92,7 +92,7 @@ const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, o
   let isCheck = payment.method === "check";
   let isDeposit = !!payment.depositType;
   let typeLabel = isDeposit
-    ? (payment.depositType === "credit" ? "CREDIT" : "DEPOSIT")
+    ? (payment.depositType === "credit" ? "CREDIT" : payment.depositType === "giftcard" ? "GIFT CARD" : "DEPOSIT")
     : isCheck ? "CHECK" : isCash ? "CASH" : "CARD";
   let available = payment.amountCaptured - (payment.amountRefunded || 0);
   let fullyRefunded = available <= 0;

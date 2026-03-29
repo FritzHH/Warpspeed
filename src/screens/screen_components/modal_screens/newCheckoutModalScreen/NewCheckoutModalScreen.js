@@ -14,6 +14,8 @@ import {
   useCurrentCustomerStore,
   useStripePaymentStore,
   useTabNamesStore,
+  getChangeLogUser,
+  diffWorkorderLines,
 } from "../../../../stores";
 import {
   lightenRGBByPercent,
@@ -96,7 +98,6 @@ function broadcastSaleToDisplay(sale, combinedWOs, customerFirst, customerLast, 
     customerLanguage: customerLanguage || "",
     combinedWorkorders: (combinedWOs || []).map((wo) => ({
       brand: wo.brand || "",
-      model: wo.model || "",
       description: wo.description || "",
       workorderLines: (wo.workorderLines || []).map(mapLine),
     })),
@@ -261,14 +262,14 @@ export function NewCheckoutModalScreen() {
   let isDepositMode = !!zDepositInfo;
   let isStandalone = !zOpenWorkorder?.customerID;
   let saleComplete = sSale?.paymentComplete || false;
-  let amountLeftToPay = Math.round((sSale?.total || 0) - (sSale?.amountCaptured || 0));
+  let amountLeftToPay = Math.round((sSale?.total || 0) - (sSale?.amountCaptured || 0) + (sSale?.amountRefunded || 0));
   if (amountLeftToPay < 0) amountLeftToPay = 0;
   let cashAmountLeftToPay = amountLeftToPay - sCardProcessingAmount;
   if (cashAmountLeftToPay < 0) cashAmountLeftToPay = 0;
   let custFirst = zOpenWorkorder?.customerFirst || zCustomer?.first || "";
   let custLast = zOpenWorkorder?.customerLast || zCustomer?.last || "";
   let custLanguage = zOpenWorkorder?.customerLanguage || zCustomer?.language || "";
-  let hasRealPayments = (sSale?.transactions || []).some((t) => !t.depositType);
+  let hasRealPayments = (sSale?.transactions || []).some((t) => !t.depositType && t.type === "payment" && (t.amountCaptured || 0) > (t.amountRefunded || 0));
 
   // ─── Initialization ──────────────────────────────────────
   // Called once when the modal opens. We use a flag to avoid
@@ -457,9 +458,23 @@ export function NewCheckoutModalScreen() {
 
     let newArr;
     if (sCombinedWorkorders.find((o) => o.id === wo.id)) {
+      // Removing WO from combined sale — clean up its sale references
       newArr = sCombinedWorkorders.filter((o) => o.id !== wo.id);
+      let cleaned = cloneDeep(wo);
+      cleaned.activeSaleID = "";
+      cleaned.amountPaid = 0;
+      let _user = useLoginStore.getState().currentUser?.first || "System";
+      cleaned.changeLog = [...(cleaned.changeLog || []), { timestamp: Date.now(), user: _user, field: "payment", action: "recorded", from: "", to: "Removed from combined sale" }];
+      useOpenWorkordersStore.getState().setWorkorder(cleaned, true);
     } else {
-      newArr = [...sCombinedWorkorders, cloneDeep(wo)];
+      let linked = cloneDeep(wo);
+      if (sSale?.id) {
+        linked.activeSaleID = sSale.id;
+        let _user = useLoginStore.getState().currentUser?.first || "System";
+        linked.changeLog = [...(linked.changeLog || []), { timestamp: Date.now(), user: _user, field: "payment", action: "recorded", from: "", to: "Added to combined sale" }];
+        useOpenWorkordersStore.getState().setWorkorder(linked, true);
+      }
+      newArr = [...sCombinedWorkorders, linked];
     }
     _setCombinedWorkorders(newArr);
 
@@ -467,6 +482,7 @@ export function NewCheckoutModalScreen() {
     let updated = updateSaleWithTotals(sSale, newArr, zSettings);
     updated.workorderIDs = newArr.map((o) => o.id);
     _setSale(updated);
+    persistSale(updated);
     broadcastSaleToDisplay(updated, newArr, custFirst, custLast, custLanguage);
   }
 
@@ -477,7 +493,16 @@ export function NewCheckoutModalScreen() {
     _setCombinedWorkorders(newArr);
     let woStore = useOpenWorkordersStore.getState();
     let fullWO = newArr.find((wo) => wo.id === woId);
-    if (fullWO) woStore.setWorkorder(fullWO, true);
+    if (fullWO) {
+      let storeWO = woStore.workorders.find((o) => o.id === woId);
+      let entries = diffWorkorderLines(storeWO?.workorderLines || [], newLines);
+      if (entries.length > 0) {
+        let user = getChangeLogUser();
+        let timestamp = Date.now();
+        fullWO = { ...fullWO, changeLog: [...(fullWO.changeLog || []), ...entries.map((e) => ({ ...e, timestamp, user }))] };
+      }
+      woStore.setWorkorder(fullWO, true);
+    }
 
     let updated = updateSaleWithTotals(sSale, newArr, zSettings);
     _setSale(updated);
@@ -528,11 +553,10 @@ export function NewCheckoutModalScreen() {
       type: "payment",
       method: isCredit ? "credit" : (deposit.method || "cash"),
       depositId: deposit.id,
-      depositType: isCredit ? "credit" : "deposit",
+      depositType: isCredit ? "credit" : deposit._type === "giftcard" ? "giftcard" : "deposit",
       depositOriginalAmount: deposit.amountCents,
       depositOriginalMillis: deposit.millis || 0,
       depositOriginalText: isCredit ? (deposit.text || "") : "",
-      paymentIntentID: deposit.paymentIntentID || "",
       last4: deposit.last4 || "",
       millis: Date.now(),
     };
@@ -569,9 +593,9 @@ export function NewCheckoutModalScreen() {
     if (existing) {
       existing.amountCents = existing.amountCents + payment.amountCaptured;
     } else if (isCredit) {
-      customerArr.push({ id: payment.depositId, text: "", amountCents: payment.amountCaptured, millis: payment.depositOriginalMillis || payment.millis });
+      customerArr.push({ id: payment.depositId, text: payment.depositOriginalText || "", amountCents: payment.amountCaptured, millis: payment.depositOriginalMillis || payment.millis });
     } else {
-      customerArr.push({ id: payment.depositId, amountCents: payment.amountCaptured, millis: payment.depositOriginalMillis || payment.millis, method: payment.method || "cash", note: "", last4: payment.last4 || "", paymentIntentID: payment.paymentIntentID || "" });
+      customerArr.push({ id: payment.depositId, amountCents: payment.amountCaptured, millis: payment.depositOriginalMillis || payment.millis, method: payment.method || "cash", note: "", last4: payment.last4 || "", type: payment.depositType === "giftcard" ? "giftcard" : "" });
     }
     let updatedCustomer = { ...zCustomer, [arrKey]: customerArr };
     useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
@@ -658,7 +682,7 @@ export function NewCheckoutModalScreen() {
           method: payment.method || "cash",
           note: "",
           last4: payment.last4 || "",
-          paymentIntentID: payment.paymentIntentID || "",
+          type: payment.depositType === "giftcard" ? "giftcard" : "",
         });
       }
     } else if (difference < 0) {
@@ -790,7 +814,6 @@ export function NewCheckoutModalScreen() {
       // let newStatusLabel = resolveStatus("sale_in_progress", statuses)?.label || "Sale In Progress";
 
       updated.activeSaleID = sale.id;
-      updated.saleID = sale.id;
       let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
       updated.amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
       if (updated.amountPaid < 0) updated.amountPaid = 0;
@@ -825,8 +848,8 @@ export function NewCheckoutModalScreen() {
     newDeposit.millis = Date.now();
     newDeposit.method = primaryPayment?.method || "cash";
     newDeposit.note = depositInfo.note || "";
-    newDeposit.paymentIntentID = primaryPayment?.paymentIntentID || "";
     newDeposit.last4 = primaryPayment?.last4 || "";
+    newDeposit.type = sale.depositType === "giftcard" ? "giftcard" : "";
     if (zCustomer?.id) {
       let updatedCustomer = cloneDeep(zCustomer);
       updatedCustomer.deposits = [...(updatedCustomer.deposits || []), newDeposit];
@@ -1678,7 +1701,7 @@ export function NewCheckoutModalScreen() {
               {/* Customer Deposits / Credits */}
               {(() => {
                       let appliedDepositIds = new Set((sSale?.transactions || []).filter((t) => t.depositType).map((t) => t.depositId));
-                      let availableDeposits = (zCustomer?.deposits || []).filter((d) => d.amountCents > 0 && !appliedDepositIds.has(d.id)).map((d) => ({ ...d, _type: "deposit" }));
+                      let availableDeposits = (zCustomer?.deposits || []).filter((d) => d.amountCents > 0 && !appliedDepositIds.has(d.id)).map((d) => ({ ...d, _type: d.type === "giftcard" ? "giftcard" : "deposit" }));
                       let availableCredits = (zCustomer?.credits || []).filter((d) => d.amountCents > 0 && !appliedDepositIds.has(d.id)).map((d) => ({ ...d, _type: "credit" }));
                       let allAvailable = [...availableDeposits, ...availableCredits];
                 let saleComplete = sSale?.paymentComplete;
@@ -1696,11 +1719,12 @@ export function NewCheckoutModalScreen() {
                     }}
                   >
                     <View style={{ borderRadius: 4, paddingVertical: 4, paddingHorizontal: 8, marginBottom: 5 }}>
-                      <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }}>DEPOSITS & CREDITS</Text>
+                      <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }}>DEPOSITS, CREDITS & GIFT CARDS</Text>
                     </View>
                     {allAvailable.map((item) => {
                       let isCredit = item._type === "credit";
-                      let badgeColor = isCredit ? C.blue : C.green;
+                      let isGiftCard = item._type === "giftcard";
+                      let badgeColor = isGiftCard ? C.orange : isCredit ? C.blue : C.green;
                       let noteText = item.note || item.text || "";
                       let isExpanded = sExpandedCreditIds.includes(item.id);
                       return (
@@ -1734,13 +1758,13 @@ export function NewCheckoutModalScreen() {
                                   color: badgeColor,
                                 }}
                               >
-                                {isCredit ? "Credit" : "Deposit"}
+                                {isGiftCard ? "Gift Card" : isCredit ? "Credit" : "Deposit"}
                               </Text>
                             </View>
                             <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginRight: 8 }}>
                               {"$" + formatCurrencyDisp(item.amountCents)}
                             </Text>
-                            {!isCredit && !!noteText && (
+                            {!isCredit && !isGiftCard && !!noteText && (
                               <Text numberOfLines={1} style={{ fontSize: 13, color: gray(0.5), flex: 1 }}>
                                 {noteText}
                               </Text>
@@ -1817,7 +1841,7 @@ export function NewCheckoutModalScreen() {
 
                       <PaymentStatus
                         sale={sSale}
-                        amountRemaining={Math.max(0, (sSale?.total || 0) - (sSale?.amountCaptured || 0))}
+                        amountRemaining={Math.max(0, (sSale?.total || 0) - (sSale?.amountCaptured || 0) + (sSale?.amountRefunded || 0))}
                       />
 
               </View>
@@ -1869,7 +1893,7 @@ export function NewCheckoutModalScreen() {
                     openUpward={true}
                   />
                 </View>
-                      {!saleComplete && sSale?.transactions?.length > 0 && (
+                      {!saleComplete && hasRealPayments && (
                   <Button_
                           colorGradientArr={COLOR_GRADIENTS.red}
                           text="EXIT PARTIAL PAYMENT"
@@ -1878,10 +1902,10 @@ export function NewCheckoutModalScreen() {
                           buttonStyle={{ height: 35, borderRadius: 5 }}
                   />
                 )}
-                      {(saleComplete || !(sSale?.transactions?.length > 0)) && (
+                      {(saleComplete || !hasRealPayments) && (
                         <Button_
                           colorGradientArr={COLOR_GRADIENTS.red}
-                          text={saleComplete ? "CLOSE" : isStandalone ? "CANCEL SALE" : "CANCEL"}
+                          text={saleComplete ? "CLOSE" : isStandalone ? "CANCEL SALE" : "CLOSE CHECKOUT"}
                           onPress={closeModal}
                           textStyle={{ color: C.textWhite, fontSize: 13 }}
                           buttonStyle={{ height: 30, borderRadius: 5 }}

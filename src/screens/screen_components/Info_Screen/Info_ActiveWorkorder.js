@@ -424,7 +424,7 @@ export const ActiveWorkorderComponent = ({}) => {
     const firstName = customer?.first || "Customer";
     const storeName = settings?.storeInfo?.displayName || "our store";
     const brand = workorder?.brand || "";
-    const description = workorder?.model || workorder?.description || "";
+    const description = workorder?.description || "";
     const workorderLink = workorder?.customerPin ? (window.location.origin + "/wo/" + workorder.customerPin) : "";
 
     function applyVars(template, v) {

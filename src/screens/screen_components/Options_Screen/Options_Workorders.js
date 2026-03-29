@@ -211,8 +211,6 @@ export function WorkordersComponent({}) {
   }
 
   function sortWorkorders(inputArr) {
-    // first remove any standalone sales
-    inputArr = inputArr.filter((o) => !o.isStandaloneSale);
     let finalArr = [];
     let nowMillis = new Date().getTime();
     const statuses = useSettingsStore.getState().settings?.statuses || [];
@@ -321,12 +319,6 @@ export function WorkordersComponent({}) {
           });
         } else {
           let activeWO = store.workorders.find((o) => o.id === activeID);
-          if (activeWO?.isStandaloneSale) {
-            useTabNamesStore.getState().setItems({
-              infoTabName: TAB_NAMES.infoTab.checkout,
-              itemsTabName: TAB_NAMES.itemsTab.workorderItems
-            });
-          }
         }
       }
       useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
@@ -400,7 +392,7 @@ export function WorkordersComponent({}) {
           height: "96%",
           backgroundColor: null,
         }}
-        data={filterWorkorders(sortWorkorders(zOpenWorkorders))}
+        data={filterWorkorders(sortWorkorders(zOpenWorkorders.filter((wo) => !!wo.customerID)))}
         keyExtractor={(item, index) => index}
         ListEmptyComponent={() => (
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>

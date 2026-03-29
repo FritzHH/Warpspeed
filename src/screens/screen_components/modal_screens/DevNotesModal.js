@@ -184,7 +184,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
             buttonStyle={{
               width: 70,
               height: 38,
-              borderRadius: 8,
+              borderRadius: 5,
               marginTop: 2,
             }}
             onPress={handlePost}

@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput, ScrollView } from "react-native-web";
-import { PAYMENT_OBJECT_PROTO, REFUND_PROTO } from "../../../../data";
+import { TRANSACTION_PROTO, REFUND_PROTO } from "../../../../data";
 import {
   useCheckoutStore,
   useCurrentCustomerStore,
@@ -21,6 +21,7 @@ import {
   gray,
   usdTypeMask,
   dollarsToCents,
+  generateEAN13Barcode,
 } from "../../../../utils";
 import { useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
@@ -147,20 +148,20 @@ export const CashSaleComponent = ({
   function handleProcessRefundPress() {
     let refund = cloneDeep(REFUND_PROTO);
     refund.amountRefunded = sRequestedAmount;
-    refund.id = crypto.randomUUID();
+    refund.id = generateEAN13Barcode("4");
     refund.millis = new Date().getTime();
     handleRefundCapture(refund);
   }
 
   function handleProcessPaymentPress() {
     // log("process payment pressed");
-    let payment = { ...PAYMENT_OBJECT_PROTO };
+    let payment = { ...TRANSACTION_PROTO };
     payment.amountTendered = sTenderAmount;
     payment.amountCaptured = sRequestedAmount;
-    payment.cash = !sIsCheck;
-    payment.check = sIsCheck;
+    payment.type = "payment";
+    payment.method = sIsCheck ? "check" : "cash";
     payment.millis = new Date().getTime();
-    payment.id = crypto.randomUUID();
+    payment.id = generateEAN13Barcode("4");
     handlePaymentCapture(payment);
 
     let diff = sTenderAmount - sRequestedAmount;
@@ -220,7 +221,7 @@ export const CashSaleComponent = ({
         >
           {!sIsRefund && (
             <CheckBox_
-              enabled={!sSale?.payments.length > 0}
+              enabled={!sSale?.transactions.length > 0}
               textStyle={{ fontSize: 12 }}
               text={"Paper Check"}
               onCheck={() => {
@@ -349,7 +350,7 @@ export const CashSaleComponent = ({
       </View>
 
       <CheckBox_
-        enabled={sSale?.payments.length === 0}
+        enabled={sSale?.transactions.length === 0}
         buttonStyle={{ marginTop: 7 }}
         textStyle={{ color: gray(0.6), fontWeight: 500, fontSize: 14 }}
         text={"DEPOSIT TO ACCOUNT"}

@@ -178,13 +178,13 @@ exports.initiateRefund = onRequest(
     res.set("Access-Control-Allow-Origin", "http://localhost:3000");
     log("Incoming refund", req.body);
 
-    const paymentIntentId = req.body.paymentIntentId;
+    const chargeID = req.body.chargeID;
     const amount = req.body.amount; // Optional: refund a specific amount (in cents)
 
-    if (!paymentIntentId || typeof paymentIntentId !== "string") {
+    if (!chargeID || typeof chargeID !== "string") {
       return res.status(400).json({
         success: false,
-        message: "PaymentIntent ID must be provided and must be a string.",
+        message: "Charge ID must be provided and must be a string.",
       });
     }
 
@@ -196,22 +196,9 @@ exports.initiateRefund = onRequest(
     }
 
     try {
-      // Step 1: Retrieve the PaymentIntent to get its latest charge
-      const paymentIntent = await stripe.paymentIntents.retrieve(
-        paymentIntentId
-      );
-
-      const chargeId = paymentIntent.charges?.data?.[0]?.id;
-      if (!chargeId) {
-        return res.status(400).json({
-          success: false,
-          message: "No charge found for the given PaymentIntent.",
-        });
-      }
-
-      // Step 2: Create the refund
+      // Create the refund directly with the charge ID
       const refund = await stripe.refunds.create({
-        charge: chargeId,
+        charge: chargeID,
         ...(amount ? { amount } : {}), // Optional partial refund
       });
 
@@ -555,7 +542,9 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
                 // Build payment from charge (mirrors buildCardPayment)
                 const card = charge?.payment_method_details?.card_present;
                 const payment = {
-                  id: crypto.randomUUID(),
+                  id: generateEAN13Barcode("4"),
+                  type: "payment",
+                  method: "card",
                   amountCaptured: charge.amount_captured || 0,
                   amountTendered: 0,
                   last4: card?.last4 || "",
@@ -563,9 +552,6 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
                   cardIssuer: card?.receipt?.application_preferred_name || "Unknown",
                   millis: Date.now(),
                   saleID: saleID,
-                  cash: false,
-                  check: false,
-                  isRefund: false,
                   paymentProcessor: "stripe",
                   chargeID: charge.id || "",
                   authorizationCode: card?.receipt?.authorization_code || "",
@@ -593,7 +579,6 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
                 await completeSaleServerSide({
                   db, sale, saleID, tenantID, storeID, customerID,
                   workorderIDs: sale.workorderIDs || [],
-                  addedItems: sale.addedItems || [],
                   payment, charge, settings, customer,
                   logPrefix: "Terminal",
                   twilioClientRef: twilioClient,
@@ -2937,14 +2922,10 @@ function ean13CheckDigit(first12) {
 }
 
 function generateEAN13Barcode(prefix) {
-  while (true) {
-    const millis = Date.now().toString();
-    const timePart = millis.slice(-8);
-    const randomPart = Math.floor(100 + Math.random() * 900).toString();
-    const data = prefix + timePart + randomPart;
-    const check = ean13CheckDigit(data);
-    if (check !== 0) return data + check;
-  }
+  const millis = Date.now().toString();
+  const timePart = millis.slice(-8);
+  const randomPart = Math.floor(100 + Math.random() * 900).toString();
+  return prefix + timePart + randomPart;
 }
 
 // ============================================================================
@@ -2983,12 +2964,12 @@ exports.initiateRefundCallable = onCall(
   async (request) => {
     log("Incoming refund callable request", request.data);
 
-    const { paymentIntentId, amount } = request.data;
+    const { chargeID, amount } = request.data;
 
-    if (!paymentIntentId || typeof paymentIntentId !== "string") {
+    if (!chargeID || typeof chargeID !== "string") {
       throw new HttpsError(
         "invalid-argument",
-        "PaymentIntent ID must be provided and must be a string."
+        "Charge ID must be provided and must be a string."
       );
     }
 
@@ -3000,22 +2981,9 @@ exports.initiateRefundCallable = onCall(
     }
 
     try {
-      // Step 1: Retrieve the PaymentIntent to get its latest charge
-      const paymentIntent = await stripe.paymentIntents.retrieve(
-        paymentIntentId
-      );
-
-      const chargeId = paymentIntent.charges?.data?.[0]?.id;
-      if (!chargeId) {
-        throw new HttpsError(
-          "invalid-argument",
-          "No charge found for the given PaymentIntent."
-        );
-      }
-
-      // Step 2: Create the refund
+      // Create the refund directly with the charge ID
       const refund = await stripe.refunds.create({
-        charge: chargeId,
+        charge: chargeID,
         ...(amount ? { amount } : {}), // Optional partial refund
       });
 
@@ -4277,12 +4245,12 @@ exports.newCheckoutProcessRefundCallable = onCall(
   async (request) => {
     log("newCheckout: process refund request", request.data);
 
-    const { paymentIntentID, amount } = request.data;
+    const { chargeID, amount } = request.data;
 
-    if (!paymentIntentID || typeof paymentIntentID !== "string") {
+    if (!chargeID || typeof chargeID !== "string") {
       throw new HttpsError(
         "invalid-argument",
-        "PaymentIntent ID must be provided."
+        "Charge ID must be provided."
       );
     }
 
@@ -4296,22 +4264,9 @@ exports.newCheckoutProcessRefundCallable = onCall(
     try {
       const stripeClient = Stripe(stripeSecretKey.value());
 
-      // Retrieve the PaymentIntent to get the charge
-      const paymentIntent = await stripeClient.paymentIntents.retrieve(
-        paymentIntentID
-      );
-
-      const chargeId = paymentIntent.charges?.data?.[0]?.id;
-      if (!chargeId) {
-        throw new HttpsError(
-          "invalid-argument",
-          "No charge found for the given PaymentIntent."
-        );
-      }
-
-      // Create the refund
+      // Create the refund directly with the charge ID
       const refund = await stripeClient.refunds.create({
-        charge: chargeId,
+        charge: chargeID,
         ...(amount ? { amount } : {}),
       });
 
@@ -5336,7 +5291,6 @@ exports.lightspeedImportData = onCall(
           sales: [],
           endedOnMillis: "",
           saleID: "",
-          isStandaloneSale: false,
           id,
           customerID,
           customerFirst,
@@ -6063,11 +6017,69 @@ exports.translateTextCallable = onCall(
 // NIGHTLY ARCHIVE & CLEANUP
 // ============================================================================
 
+/**
+ * Clean up abandoned active sales and their associated workorders.
+ * - Deletes all active-sales documents (abandoned checkout sessions)
+ * - For workorders with no customerID: deletes from open-workorders
+ * - For workorders with a customerID: clears activeSaleID and amountPaid
+ */
+async function cleanupActiveSales(db, tenantID, storeID) {
+  const basePath = `tenants/${tenantID}/stores/${storeID}`;
+  let salesDeleted = 0;
+  let standaloneWosDeleted = 0;
+  let customerWosCleaned = 0;
+
+  try {
+    const salesSnap = await db.collection(`${basePath}/active-sales`).get();
+    if (salesSnap.empty) return { salesDeleted: 0, standaloneWosDeleted: 0, customerWosCleaned: 0 };
+
+    for (const saleDoc of salesSnap.docs) {
+      const sale = saleDoc.data();
+      const workorderIDs = sale.workorderIDs || [];
+
+      // Clean up associated workorders
+      for (const woID of workorderIDs) {
+        try {
+          const woRef = db.collection(`${basePath}/open-workorders`).doc(woID);
+          const woSnap = await woRef.get();
+          if (!woSnap.exists) continue;
+          const wo = woSnap.data();
+          if (!wo.customerID) {
+            // Standalone workorder — delete it
+            await woRef.delete();
+            standaloneWosDeleted++;
+          } else {
+            // Customer workorder — clear payment tracking fields
+            await woRef.update({ activeSaleID: "", amountPaid: 0 });
+            customerWosCleaned++;
+          }
+        } catch (woErr) {
+          log("cleanupActiveSales: Error processing workorder " + woID, woErr.message);
+        }
+      }
+
+      // Delete the active sale
+      await saleDoc.ref.delete();
+      salesDeleted++;
+    }
+  } catch (err) {
+    log("cleanupActiveSales: Error for " + tenantID + "/" + storeID, err.message);
+    return { success: false, error: err.message };
+  }
+
+  if (salesDeleted > 0) {
+    log("cleanupActiveSales: Cleaned up " + tenantID + "/" + storeID, {
+      salesDeleted, standaloneWosDeleted, customerWosCleaned,
+    });
+  }
+
+  return { success: true, salesDeleted, standaloneWosDeleted, customerWosCleaned };
+}
+
 const ARCHIVE_COLLECTIONS = [
   "completed-workorders",
   "completed-sales",
   "customers",
-  "sales-index",
   "open-workorders",
   "inventory",
   "settings",
@@ -6209,28 +6221,6 @@ async function cleanupOldMedia(db, bucket, tenantID, storeID) {
   }
 }
 
-async function cleanupStandaloneActiveSales(db, tenantID, storeID) {
-  try {
-    const snapshot = await db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("active-sales")
-      .where("standaloneSale", "==", true)
-      .get();
-
-    if (snapshot.empty) return { deleted: 0 };
-
-    const batch = db.batch();
-    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-
-    log("nightlyArchive: Cleaned up standalone active sales", { tenantID, storeID, deleted: snapshot.size });
-    return { deleted: snapshot.size };
-  } catch (err) {
-    log("nightlyArchive: Error cleaning standalone active sales for " + tenantID + "/" + storeID, err.message);
-    return { deleted: 0, error: err.message };
-  }
-}
 
 // ============================================================================
 // Customer-Facing Workorder Screen
@@ -6556,7 +6546,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
         try {
           const archiveResults = await archiveTenantStore(db, bucket, tenantID, storeID);
           const mediaResults = await cleanupOldMedia(db, bucket, tenantID, storeID);
-          const standaloneCleanup = await cleanupStandaloneActiveSales(db, tenantID, storeID);
+          const activeSaleResults = await cleanupActiveSales(db, tenantID, storeID);
 
           // Write audit log
           const now = Date.now();
@@ -6574,13 +6564,13 @@ exports.nightlyArchiveAndCleanup = onSchedule(
               type: "nightly-archive",
               archive: archiveResults,
               mediaCleanup: mediaResults,
-              standaloneCleanup,
+              activeSaleCleanup: activeSaleResults,
             });
 
           log("nightlyArchive: Completed " + tenantID + "/" + storeID, {
             archive: archiveResults,
             mediaCleanup: mediaResults,
-            standaloneCleanup,
+            activeSaleCleanup: activeSaleResults,
           });
         } catch (err) {
           log(
@@ -6621,7 +6611,7 @@ exports.manualArchiveAndCleanup = onCall(
     try {
       const archiveResults = await archiveTenantStore(db, bucket, tenantID, storeID);
       const mediaResults = await cleanupOldMedia(db, bucket, tenantID, storeID);
-      const standaloneCleanup = await cleanupStandaloneActiveSales(db, tenantID, storeID);
+      const activeSaleResults = await cleanupActiveSales(db, tenantID, storeID);
 
       const now = Date.now();
       const dateStr = new Date(now).toISOString().split("T")[0];
@@ -6638,11 +6628,11 @@ exports.manualArchiveAndCleanup = onCall(
           type: "manual-archive",
           archive: archiveResults,
           mediaCleanup: mediaResults,
-          standaloneCleanup,
+          activeSaleCleanup: activeSaleResults,
         });
 
-      log("manualArchiveAndCleanup: Completed", { archive: archiveResults, mediaCleanup: mediaResults, standaloneCleanup });
-      return { success: true, archive: archiveResults, mediaCleanup: mediaResults, standaloneCleanup };
+      log("manualArchiveAndCleanup: Completed", { archive: archiveResults, mediaCleanup: mediaResults, activeSaleCleanup: activeSaleResults });
+      return { success: true, archive: archiveResults, mediaCleanup: mediaResults, activeSaleCleanup: activeSaleResults };
     } catch (err) {
       log("manualArchiveAndCleanup: Error", err.message);
       throw new HttpsError("internal", err.message);
@@ -6877,7 +6867,6 @@ function findHighestItem(workorderLines) {
 //   storeID        — store ID
 //   customerID     — customer ID (may be "")
 //   workorderIDs   — array of workorder IDs to complete
-//   addedItems     — items added at checkout (merged into primary WO)
 //   payment        — payment object to add to sale
 //   charge         — Stripe charge object (for receipt URL)
 //   settings       — store settings (fetched before calling)
@@ -6891,23 +6880,30 @@ function findHighestItem(workorderLines) {
 //
 // Returns: { completed: bool, partial: bool }
 function recomputeSaleAmounts(sale) {
-  sale.amountCaptured = (sale.payments || []).reduce((sum, p) => sum + (p.amountCaptured || 0), 0);
+  sale.amountCaptured = (sale.transactions || [])
+    .filter(t => t.type === "payment")
+    .reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
   sale.amountRefunded = (sale.refunds || []).reduce((sum, r) => sum + (r.amountRefunded || 0), 0);
   let fullyPaid = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
   sale.paymentComplete = fullyPaid;
-  if (fullyPaid) sale.status = "complete";
-  else if (sale.amountCaptured > 0) sale.status = "partial";
   return sale;
 }
 
 async function completeSaleServerSide({
   db, sale, saleID, tenantID, storeID, customerID,
-  workorderIDs, addedItems, payment, charge, settings, customer,
+  workorderIDs, payment, charge, settings, customer,
   logPrefix, twilioClientRef, twilioSecretAccountNumber, twilioSecretKey,
   gmailAppPassword, channel,
 }) {
+  // Compute proportional salesTax for this payment (sale.total/salesTax already set from active sale)
+  if (sale.total > 0 && sale.salesTax > 0) {
+    payment.salesTax = Math.round(sale.salesTax * (payment.amountCaptured / sale.total));
+  } else {
+    payment.salesTax = 0;
+  }
+
   // Add payment to sale
-  sale.payments = [...(sale.payments || []), payment];
+  sale.transactions = [...(sale.transactions || []), payment];
   recomputeSaleAmounts(sale);
 
   // Check if fully paid
@@ -6927,6 +6923,12 @@ async function completeSaleServerSide({
   log(`completeSaleServerSide[${logPrefix}]: sale fully paid, completing`, { saleID });
 
   // ── Complete workorders ──
+  const statuses = settings?.statuses || [];
+  const _resolveLabel = (statusId) => {
+    if (!statusId || !statuses.length) return "Unknown";
+    let match = statuses.find((s) => s.id === statusId);
+    return match ? match.label : "Unknown";
+  };
   for (let i = 0; i < workorderIDs.length; i++) {
     const woID = workorderIDs[i];
     const woRef = db.collection("tenants").doc(tenantID)
@@ -6935,19 +6937,25 @@ async function completeSaleServerSide({
     const woSnap = await woRef.get();
     if (woSnap.exists) {
       const wo = woSnap.data();
+      const timestamp = Date.now();
+      const oldStatus = wo.status || "";
+      const oldStatusLabel = _resolveLabel(oldStatus);
+      const newStatusLabel = _resolveLabel("finished_and_paid");
+
       wo.paymentComplete = true;
       wo.activeSaleID = "";
       wo.amountPaid = sale.total;
       wo.saleID = sale.id;
-      const existingSales = wo.sales || [];
-      if (!existingSales.includes(sale.id)) {
-        wo.sales = [...existingSales, sale.id];
+      wo.endedOnMillis = timestamp;
+
+      let entries = [];
+      if (oldStatus !== "finished_and_paid") {
+        entries.push({ timestamp, user: "System", field: "status", action: "changed", from: oldStatusLabel, to: newStatusLabel });
       }
-      wo.endedOnMillis = Date.now();
-      // Merge added items into primary workorder only
-      if (i === 0 && addedItems && addedItems.length > 0) {
-        wo.workorderLines = [...(wo.workorderLines || []), ...addedItems];
-      }
+      entries.push({ timestamp, user: "System", field: "payment", action: "completed", from: "", to: "Sale completed — $" + (sale.total / 100).toFixed(2) });
+      wo.changeLog = [...(wo.changeLog || []), ...entries];
+      wo.status = "finished_and_paid";
+
       await db.collection("tenants").doc(tenantID)
         .collection("stores").doc(storeID)
         .collection("completed-workorders").doc(woID)
@@ -7000,45 +7008,14 @@ async function completeSaleServerSide({
       allLines = [...allLines, ...(wo.workorderLines || [])];
     }
   }
-  // Standalone sales store items in sale.addedItems, not workorder lines
-  if ((sale.addedItems || []).length > 0) {
-    allLines = [...allLines, ...sale.addedItems];
-  }
-
   const { highestName, highestPrice } = findHighestItem(allLines);
-  const payments = sale.payments || [];
-  const hasCash = payments.some((p) => p.cash && !p.isRefund);
-  const hasCard = payments.some((p) => !p.cash && !p.isRefund);
+  const transactions = sale.transactions || [];
+  const hasCash = transactions.some((t) => t.method === "cash" && t.type === "payment");
+  const hasCard = transactions.some((t) => t.method === "card" && t.type === "payment");
   let paymentType = "";
   if (hasCash && hasCard) paymentType = "Split";
   else if (hasCash) paymentType = "Cash";
   else if (hasCard) paymentType = "Card";
-
-  await db.collection("tenants").doc(tenantID)
-    .collection("stores").doc(storeID)
-    .collection("sales-index").doc(saleID)
-    .set({
-      id: saleID,
-      type: "sale",
-      saleID,
-      millis: Number(sale.millis) || Date.now(),
-      customerFirst: primaryWO?.customerFirst || "",
-      customerLast: primaryWO?.customerLast || "",
-      customerCell: primaryWO?.customerCell || "",
-      customerID: customerID || sale.customerID || "",
-      total: sale.total || 0,
-      subtotal: sale.subtotal || 0,
-      tax: sale.tax || 0,
-      salesTaxPercent: sale.salesTaxPercent || 0,
-      discount: sale.discount || 0,
-      amountRefunded: 0,
-      itemCount: allLines.length,
-      highestItemName: highestName,
-      highestItemPrice: highestPrice,
-      isStandaloneSale: sale.standaloneSale || primaryWO?.isStandaloneSale || false,
-      workorderIDs: workorderIDs,
-      paymentType: paymentType,
-    });
 
   // ── Print receipt (if enabled in settings and sale is complete) ──
   const printerID = settings?.printerCloudId || "";
@@ -7052,7 +7029,7 @@ async function completeSaleServerSide({
         customerLandline: customer?.customerLandline || "",
         email: customer?.email || primaryWO?.customerEmail || "",
       };
-      const printObj = sharedPrintBuilder.sale(sale, sale.payments, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext);
+      const printObj = sharedPrintBuilder.sale(sale, sale.transactions, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext);
       printObj.id = crypto.randomUUID();
       printObj.timestamp = Date.now();
 
@@ -7077,8 +7054,8 @@ async function completeSaleServerSide({
       }, 5000);
 
       // Pop cash register if cash change needed
-      const hasCashChange = (sale.payments || []).some(
-        (p) => p.cash && p.amountTendered > p.amountCaptured
+      const hasCashChange = (sale.transactions || []).some(
+        (t) => t.method === "cash" && t.amountTendered > t.amountCaptured
       );
       if (hasCashChange) {
         const registerObj = { id: crypto.randomUUID(), popCashRegister: true, timestamp: Date.now() };
@@ -7288,7 +7265,7 @@ exports.createTextToPayInvoice = onCall(
         millis: Date.now(),
         subtotal: totals.subtotal,
         discount: totals.discount > 0 ? totals.discount : null,
-        tax: totals.tax,
+        salesTax: totals.tax,
         cardFee: totals.cardFee,
         cardFeePercent: totals.cardFeePercent,
         salesTaxPercent: totals.salesTaxPercent,
@@ -7555,7 +7532,9 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
 
         // ── Build payment object (mirrors PAYMENT_OBJECT_PROTO) ──
         const payment = {
-          id: crypto.randomUUID(),
+          id: generateEAN13Barcode("4"),
+          type: "payment",
+          method: "card",
           amountCaptured: charge.amount_captured,
           amountTendered: 0,
           last4: charge.payment_method_details?.card?.last4 || "",
@@ -7563,9 +7542,6 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
           cardIssuer: charge.payment_method_details?.card?.brand || "",
           millis: Date.now(),
           saleID: saleID,
-          cash: false,
-          check: false,
-          isRefund: false,
           paymentProcessor: "stripe",
           chargeID: charge.id,
           authorizationCode: "",
@@ -7575,14 +7551,12 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
           expYear: charge.payment_method_details?.card?.exp_year || "",
           networkTransactionID: charge.payment_method_details?.card?.network_transaction_id || "",
           amountRefunded: 0,
-          isDeposit: false,
           textToPay: true,
         };
 
         await completeSaleServerSide({
           db, sale, saleID, tenantID, storeID, customerID,
           workorderIDs: [workorderID],
-          addedItems: [],
           payment, charge, settings, customer,
           logPrefix: "LinkToPay",
           twilioClientRef: twilioClient,

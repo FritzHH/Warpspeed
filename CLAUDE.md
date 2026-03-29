@@ -28,6 +28,8 @@ Follow these steps before acting on any user request:
 
 **No CSS — flexbox only.** Do not use CSS classes, stylesheets, or CSS-in-JS. All layout must use flexbox properties inline. No exceptions unless otherwise stated by the user.
 
+**Standalone / solo sale = no customerID.** When the user refers to a "standalone sale" or "solo sale", that means a workorder with no `customerID` (`!workorder.customerID`). There are no special flags or fields — the absence of `customerID` is the sole indicator. Do not use or reference `isStandaloneSale` or any other flag.
+
 Then execute the user's prompt according to these guidelines.
 
 ---

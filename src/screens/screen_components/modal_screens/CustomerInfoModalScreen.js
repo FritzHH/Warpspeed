@@ -14,6 +14,7 @@ import {
   formatCurrencyDisp,
   formatMillisForDisplay,
   formatPhoneWithDashes,
+  generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
   removeDashesFromPhone,
@@ -30,7 +31,7 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
 } from "../../../stores";
-import { CONTACT_RESTRICTIONS, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, TAB_NAMES } from "../../../data";
+import { CONTACT_RESTRICTIONS, CUSTOMER_CREDIT_PROTO, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, TAB_NAMES } from "../../../data";
 import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, SmallLoadingIndicator, TextInput_, TouchableOpacity_ } from "../../../components";
 import {
   dbSaveCustomer,
@@ -579,10 +580,18 @@ export const CustomerInfoScreenModalComponent = ({
             {/* Deposits section — directly below sales, pushes down until bottom */}
             <DepositsList
               deposits={sCustomerInfo.deposits || []}
+              credits={sCustomerInfo.credits || []}
               onPress={async (deposit) => {
-                if (!deposit.saleID) return;
-                let sale = await dbGetCompletedSale(deposit.saleID);
+                if (!deposit.id) return;
+                let sale = await dbGetCompletedSale(deposit.id);
                 if (sale) useOpenWorkordersStore.getState().setSaleModalObj(sale);
+              }}
+              onRemoveCredit={(credit) => {
+                let updatedCredits = (sCustomerInfo.credits || []).filter((c) => c.id !== credit.id);
+                let updated = { ...sCustomerInfo, credits: updatedCredits };
+                _setCustomerInfo(updated);
+                useCurrentCustomerStore.getState().setCustomer(updated);
+                dbSaveCustomer(updated);
               }}
             />
           </View>
@@ -595,6 +604,17 @@ export const CustomerInfoScreenModalComponent = ({
             if (handleButton2Press) handleButton2Press();
             useCheckoutStore.getState().setDepositInfo(depositInfo);
             useCheckoutStore.getState().setIsCheckingOut(true);
+          }}
+          onCredit={({ amountCents, text }) => {
+            let credit = { ...CUSTOMER_CREDIT_PROTO };
+            credit.id = generateEAN13Barcode("5");
+            credit.text = text;
+            credit.amountCents = amountCents;
+            credit.millis = Date.now();
+            let updated = { ...sCustomerInfo, credits: [...(sCustomerInfo.credits || []), credit] };
+            _setCustomerInfo(updated);
+            useCurrentCustomerStore.getState().setCustomer(updated);
+            dbSaveCustomer(updated);
           }}
         />
         <ClosedWorkorderModal
@@ -903,7 +923,7 @@ const SalesList = ({ sales, onSelect }) => {
                   )}
                   <Text style={{ fontSize: 11, color: gray(0.5), marginLeft: 8 }}>{"Tax: "}</Text>
                   <Text style={{ fontSize: 12, color: C.text }}>
-                    {"$" + formatCurrencyDisp(sale.tax)}
+                    {"$" + formatCurrencyDisp(sale.salesTax || sale.tax || 0)}
                   </Text>
                 </View>
               )}
@@ -914,7 +934,7 @@ const SalesList = ({ sales, onSelect }) => {
 
             {/* Row 3: Payment method(s) */}
             <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}>
-              {(sale.payments || []).map((p, idx) => (
+              {(sale.transactions || []).map((p, idx) => (
                 <View
                   key={p.id || idx}
                   style={{
@@ -931,9 +951,9 @@ const SalesList = ({ sales, onSelect }) => {
                   }}
                 >
                   <Text style={{ fontSize: 11, color: C.text }}>
-                    {p.cash
+                    {p.method === "cash"
                       ? "Cash"
-                      : p.check
+                      : p.method === "check"
                         ? "Check"
                         : (p.cardType || "Card") + (p.last4 ? " ..." + p.last4 : "")}
                   </Text>

@@ -155,7 +155,7 @@ export const TabBar = ({
           borderWidth: 1,
           borderColor: C.buttonLightGreenOutline,
           backgroundColor: C.buttonLightGreen,
-          borderRadius: 15,
+          borderRadius: 5,
         }}
       />
     );

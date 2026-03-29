@@ -72,7 +72,6 @@
 | `status` | `""` |
 | `labor` | `""` |
 | `parts` | `""` |
-| `isStandaloneSale` | `false` |
 | `popCashRegister` | `false` |
 | `persistFlag` | `false` |
 | `intakeBlurb` | `""` |

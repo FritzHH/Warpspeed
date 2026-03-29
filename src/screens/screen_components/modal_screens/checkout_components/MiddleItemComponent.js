@@ -195,12 +195,12 @@ export const MiddleItemComponent = ({
                 borderWidth: 1,
                 outlineWidth: 0,
                 backgroundColor: C.backgroundListWhite,
-                color: sSale?.payments.length > 0 ? gray(0.3) : C.text,
+                color: sSale?.transactions.length > 0 ? gray(0.3) : C.text,
               }}
             >
               <TextInput
                 disabled={
-                  sSale?.payments.length > 0 ||
+                  sSale?.transactions.length > 0 ||
                   sRefund.cashRefundRequested ||
                   sRefund.cardRefundRequested
                 }
@@ -412,7 +412,7 @@ export const MiddleItemComponent = ({
                     gray(0.5)
                 }}
               >
-                {formatCurrencyDisp(sSale?.tax)}
+                {formatCurrencyDisp(sSale?.salesTax || sSale?.tax || 0)}
               </Text>
             </View>
           </View>
@@ -482,7 +482,7 @@ export const MiddleItemComponent = ({
                 }}
               >
                 {formatCurrencyDisp(
-                  sSale?.subtotal + sSale?.tax - sSale?.discount
+                  sSale?.subtotal + (sSale?.salesTax || sSale?.tax || 0) - sSale?.discount
                 )}
               </Text>
             </View>
@@ -723,7 +723,7 @@ export const MiddleItemComponent = ({
           )}
         </View>
 
-        {!!sSale?.payments.length > 0 && (
+        {!!sSale?.transactions.length > 0 && (
           <View
             style={{
               marginTop: sIsRefund ? 7 : 15,
@@ -737,7 +737,7 @@ export const MiddleItemComponent = ({
         )}
         <View style={{ maxHeight: "18%", width: "100%" }}>
           <ScrollView contentContainerStyle={{ alignItems: "center" }}>
-            {sSale?.payments.map((payment) => {
+            {sSale?.transactions.map((payment) => {
               return (
                 <View
                   key={payment.id}
@@ -756,7 +756,7 @@ export const MiddleItemComponent = ({
                       justifyContent: "space-between",
                     }}
                   >
-                    {!!sIsRefund && !payment.cash && (
+                    {!!sIsRefund && payment.method !== "cash" && (
                       <CheckBox_
                         enabled={payment.amountRefunded}
                         buttonStyle={{
@@ -824,7 +824,7 @@ export const MiddleItemComponent = ({
                           </Text>
                         </View>
                       )}
-                      {!!payment.cash && (
+                      {payment.method === "cash" && (
                         <View
                           style={{
                             flexDirection: "row",
@@ -923,7 +923,7 @@ export const MiddleItemComponent = ({
         >
           <ScrollView style={{}}>
             {sSale?.refunds?.map((refund) => {
-              let cardDetails = sSale.payments.find(
+              let cardDetails = sSale.transactions.find(
                 (o) => o.id === refund.cardPaymentID
               );
               return (
@@ -997,7 +997,7 @@ export const MiddleItemComponent = ({
                   </Text>
                 </View>
               ) : null} */}
-                  {!!refund.isRefund && <Text>{"REFUND"}</Text>}
+                  {refund.type === "refund" && <Text>{"REFUND"}</Text>}
                 </View>
               );
             })}
@@ -1074,7 +1074,7 @@ export const MiddleItemComponent = ({
             </Text>
           </View>
         )}
-        {sSale?.payments?.length > 0 && sSale?.paymentComplete ? (
+        {sSale?.transactions?.length > 0 && sSale?.paymentComplete ? (
           <Button_
             buttonStyle={{ width: 150, color: C.textWhite }}
             colorGradientArr={COLOR_GRADIENTS.greenblue}

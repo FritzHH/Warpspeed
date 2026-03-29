@@ -15,6 +15,7 @@ import {
   calculateRunningTotals,
   dim,
   formatDateTimeForReceipt,
+  formatPhoneWithDashes,
   formatStoreHours,
   gray,
   log,
@@ -27,6 +28,7 @@ import {
   Button_,
   DropdownMenu,
   Image_,
+  PhoneNumberInput,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
 import { useTranslation } from "../../../useTranslation";
@@ -52,7 +54,7 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice } from "../../../db_calls_wrapper";
+import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToCustomerMessages } from "../../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { sendSaleReceipt } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 
@@ -96,6 +98,9 @@ export function MessagesComponent({}) {
   const [sInputHeight, _setInputHeight] = useState(36);
   const [sTranslateActive, _setTranslateActive] = useState(false);
   const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
+  const [sCustomPhoneMode, _setCustomPhoneMode] = useState(false);
+  const [sCustomPhone, _setCustomPhone] = useState("");
+  const [sCustomPhoneMessages, _setCustomPhoneMessages] = useState([]);
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
@@ -146,6 +151,22 @@ export function MessagesComponent({}) {
     };
   }, []);
 
+  // Custom phone mode: listen to message thread for the entered phone number
+  useEffect(() => {
+    if (!sCustomPhoneMode || sCustomPhone.length !== 10) {
+      _setCustomPhoneMessages([]);
+      return;
+    }
+    const unsubscribe = dbListenToCustomerMessages(sCustomPhone, (messages) => {
+      if (messages) {
+        _setCustomPhoneMessages(messages);
+      }
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [sCustomPhoneMode, sCustomPhone]);
+
   // log("res", sCanRespond);
   useEffect(() => {
     try {
@@ -167,6 +188,17 @@ export function MessagesComponent({}) {
       }
     } catch (e) {}
   }, [zIncomingMessagesArr, zOutgoingMessagesArr]);
+
+  // Auto-scroll custom phone messages to bottom
+  useEffect(() => {
+    try {
+      if (!sCustomPhoneMode || sCustomPhoneMessages.length < 2) return;
+      messageListRef.current?.scrollToIndex({
+        index: sCustomPhoneMessages.length - 1,
+        animated: true,
+      });
+    } catch (e) {}
+  }, [sCustomPhoneMessages]);
 
   function handleInsertVariable(variableStr) {
     let cursorPos = cursorPositionRef.current ?? sNewMessage.length;
@@ -194,26 +226,40 @@ export function MessagesComponent({}) {
 
   async function sendMessage(text, imageUrl = "") {
     if ((!text || !text.trim()) && !imageUrl) return;
+    let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer.customerCell;
+    if (!sendPhone || sendPhone.length !== 10) return;
     useLoginStore.getState().requireLogin(async () => {
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let msg = { ...SMS_PROTO };
       msg.message = text || "";
       msg.imageUrl = imageUrl;
-      msg.phoneNumber = zCustomer.customerCell;
-      msg.firstName = zCustomer.first;
-      msg.lastName = zCustomer.last;
+      msg.phoneNumber = sendPhone;
+      msg.firstName = sCustomPhoneMode ? "" : zCustomer.first;
+      msg.lastName = sCustomPhoneMode ? "" : zCustomer.last;
       msg.canRespond = sCanRespond ? new Date().getTime() : null;
       msg.millis = new Date().getTime();
-      msg.customerID = zCustomer.id;
+      msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
       msg.id = crypto.randomUUID();
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
       _setNewMessage("");
       _setInputHeight(36);
-      _setCanRespond(false);
+      if (!sCustomPhoneMode) _setCanRespond(false);
       clearTranslation();
+      // Optimistically add message to local list in custom phone mode
+      if (sCustomPhoneMode) {
+        _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
+      }
       let result = await smsService.send(msg);
-      if (result.success) {
+      // Update status in local list for custom phone mode
+      if (sCustomPhoneMode) {
+        _setCustomPhoneMessages(prev => prev.map(m =>
+          m.id === msg.id
+            ? { ...m, status: result.success ? "sent" : "failed", errorMessage: result.success ? "" : (result.error || "") }
+            : m
+        ));
+      }
+      if (result.success && !sCustomPhoneMode) {
         // Flag all customer workorders so the sender's list prioritizes them
         let allWOs = useOpenWorkordersStore.getState().workorders;
         allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
@@ -396,10 +442,40 @@ export function MessagesComponent({}) {
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
 
-  let messagesArr = combine2ArraysOrderByMillis(
-    zIncomingMessagesArr,
-    zOutgoingMessagesArr
-  );
+  // Determine active phone and message source based on mode
+  const hasCustomer = !!zCustomer?.id && !!zCustomer?.customerCell;
+  const activePhone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
+  const isCustomPhoneReady = sCustomPhoneMode && sCustomPhone.length === 10;
+
+  let messagesArr;
+  if (sCustomPhoneMode) {
+    messagesArr = sCustomPhoneMessages;
+  } else {
+    messagesArr = combine2ArraysOrderByMillis(
+      zIncomingMessagesArr,
+      zOutgoingMessagesArr
+    );
+  }
+
+  function handleEnterCustomPhoneMode() {
+    _setCustomPhoneMode(true);
+    _setCustomPhone("");
+    _setCustomPhoneMessages([]);
+    _setCanRespond(true);
+    _setNewMessage("");
+    clearTranslation();
+  }
+
+  function handleExitCustomPhoneMode() {
+    _setCustomPhoneMode(false);
+    _setCustomPhone("");
+    _setCustomPhoneMessages([]);
+    _setNewMessage("");
+    clearTranslation();
+  }
+
+  // Whether the compose area should show
+  const hasActivePhone = sCustomPhoneMode ? sCustomPhone.length === 10 : !!zCustomer?.customerCell;
 
   return (
     <View
@@ -429,11 +505,15 @@ export function MessagesComponent({}) {
             <Text
               style={{ textAlign: "center", fontSize: 18, color: gray(0.25) }}
             >
-              {!zCustomer?.id
-                ? "Select a customer to message"
-                : zCustomer?.customerCell
-                ? "No messages to/from this cell phone #"
-                : "No cell phone on account\n\nText messaging deactivated"}
+              {sCustomPhoneMode
+                ? (sCustomPhone.length < 10
+                  ? "Enter a phone number to message"
+                  : "No messages to/from this phone number")
+                : !zCustomer?.id
+                  ? "Enter the phone number to message"
+                  : zCustomer?.customerCell
+                    ? "No messages to/from this cell phone #"
+                    : "No cell phone on account\n\nText messaging deactivated"}
             </Text>
           </View>
         )}
@@ -460,8 +540,37 @@ export function MessagesComponent({}) {
           />
         )}
       </View>
-      {!zCustomer?.customerCell ? (
-        <View style={{ width: "100%", height: '100%' }}></View>
+      {!hasActivePhone ? (
+        <View style={{ width: "100%", paddingVertical: 10, paddingHorizontal: 10 }}>
+          {(sCustomPhoneMode || !hasCustomer) ? (
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+              <PhoneNumberInput
+                value={sCustomPhone}
+                onChangeText={(val) => {
+                  let cleaned = val.replace(/\D/g, "").slice(0, 10);
+                  _setCustomPhone(cleaned);
+                  if (!sCustomPhoneMode) {
+                    _setCustomPhoneMode(true);
+                    _setCanRespond(true);
+                  }
+                }}
+                autoFocus={true}
+                maxLength={10}
+                height={36}
+                fontSize={16}
+                style={{ width: "auto" }}
+              />
+              {hasCustomer && (
+                <TouchableOpacity
+                  onPress={handleExitCustomPhoneMode}
+                  style={{ marginLeft: 12, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, borderWidth: 1, borderColor: C.blue }}
+                >
+                  <Text style={{ fontSize: 13, color: C.blue }}>Back to customer</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
+        </View>
       ) : (
         <View
           style={{
@@ -582,7 +691,7 @@ export function MessagesComponent({}) {
                   )}
                 </View>
               </View>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <Button_
                   onPress={handleSendWorkorderTicket}
                   text={"Send Workorder"}
@@ -604,6 +713,30 @@ export function MessagesComponent({}) {
                   colorGradientArr={COLOR_GRADIENTS.blue}
                   buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
                 />
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                {hasCustomer && !sCustomPhoneMode ? (
+                  <TouchableOpacity
+                    onPress={handleEnterCustomPhoneMode}
+                    style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, borderWidth: 1, borderColor: gray(0.3) }}
+                    title="Enter a phone number"
+                  >
+                    <Text style={{ fontSize: 13, color: gray(0.4) }}>Clear customer</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {sCustomPhoneMode ? (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>{formatPhoneWithDashes(sCustomPhone)}</Text>
+                    {hasCustomer && (
+                      <TouchableOpacity
+                        onPress={handleExitCustomPhoneMode}
+                        style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, borderWidth: 1, borderColor: C.blue }}
+                      >
+                        <Text style={{ fontSize: 13, color: C.blue }}>Back to customer</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : null}
               </View>
             </View>
         </View>
@@ -701,19 +834,23 @@ const OutgoingMessageComponent = memo(({ msgObj }) => {
           width: "100%",
           flexDirection: "row",
           justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
         <Text style={{ ...INFO_TEXT_STYLE }}>
           {dateObj.dayOfWeek + ", " + dateObj.time}
         </Text>
+        {msgObj.status === "sending" && (
+          <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic" }}>Sending...</Text>
+        )}
+        {msgObj.status === "sent" && (
+          <Text style={{ fontSize: 10, color: C.green }}>Sent</Text>
+        )}
+        {msgObj.status === "failed" && (
+          <Text style={{ fontSize: 10, color: C.red }}>Failed{msgObj.errorMessage ? ": " + msgObj.errorMessage : ""}</Text>
+        )}
         <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>
       </View>
-      {msgObj.status === "sending" && (
-        <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic", alignSelf: "flex-end" }}>Sending...</Text>
-      )}
-      {msgObj.status === "failed" && (
-        <Text style={{ fontSize: 10, color: C.red, alignSelf: "flex-end" }}>Failed to send{msgObj.errorMessage ? ": " + msgObj.errorMessage : ""}</Text>
-      )}
     </View>
   );
 });

@@ -293,6 +293,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   const [sShowQBPicker, _setShowQBPicker] = useState(false);
   const [sShowQBSection, _setShowQBSection] = useState(true);
   const [sShowAutoNote, _setShowAutoNote] = useState(true);
+  const [sDirty, _setDirty] = useState(false);
 
   // debounced inventory save
   const debouncedInvSaveRef = useRef(
@@ -324,6 +325,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   function handleFieldChange(fieldName, value) {
     let updated = { ...sItem, [fieldName]: value };
     _setItem(updated);
+    _setDirty(true);
     if (!isNew) {
       useInventoryStore.getState().setItem(updated, false);
       debouncedInvSaveRef.current(updated);
@@ -385,6 +387,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
 
   function handleAutoNoteChange(text) {
     _setAutoNoteText(text);
+    _setDirty(true);
     if (isNew) return; // save handled by handleSaveNewItem
     let updatedArr = [...zAutoNoteTexts];
     if (!text || text.trim() === "") {
@@ -411,6 +414,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
       if (b.id !== buttonID) return b;
       return { ...b, items: (b.items || []).filter((id) => id !== sItem.id) };
     });
+    _setDirty(true);
     useSettingsStore.getState().setField("quickItemButtons", updated, false);
     debouncedSettingsSaveRef.current(updated);
   }
@@ -427,6 +431,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
         return { ...b, items: [...(b.items || []), sItem.id] };
       }
     });
+    _setDirty(true);
     useSettingsStore.getState().setField("quickItemButtons", updated, false);
     debouncedSettingsSaveRef.current(updated);
   }
@@ -718,7 +723,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
               onPress={handleExit}
               style={{ padding: 6, borderRadius: 6 }}
             >
-              <Image_ icon={ICONS.close1} size={36} />
+              <Image_ icon={sDirty ? ICONS.check1 : ICONS.close1} size={36} />
             </TouchableOpacity>
           </View>
         </View>

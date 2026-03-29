@@ -322,7 +322,7 @@ export function MobileItemEditScreen() {
             onPress={() => _setShowSearch(true)}
             buttonStyle={{
               paddingVertical: 12,
-              borderRadius: 8,
+              borderRadius: 5,
             }}
             textStyle={{ fontSize: 16, fontWeight: "500" }}
           />

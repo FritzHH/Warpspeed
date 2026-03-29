@@ -4,7 +4,6 @@ import { View, TextInput, Button } from "react-native-web";
 import {
   formatPhoneWithDashes,
   createNewWorkorder,
-  log,
   removeDashesFromPhone,
   stringIsNumeric,
   gray,
@@ -22,24 +21,14 @@ import {
   useTabNamesStore,
   useOpenWorkordersStore,
   useLoginStore,
-  useWorkorderPreviewStore,
-  useAlertScreenStore,
-  useTicketSearchStore,
-  useCheckoutStore,
 } from "../../../stores";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
   dbSearchCustomersByEmail,
   dbSearchCustomersByName,
   dbSearchCustomersByPhone,
-  dbGetCompletedWorkorder,
-  dbSearchCompletedWorkorders,
-  dbGetCustomer,
-  dbSearchWorkordersByIdPrefix,
-  dbSearchSalesByIdPrefix,
-  dbGetCompletedSale,
 } from "../../../db_calls_wrapper";
-import { newCheckoutGetActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { executeTicketSearch } from "../../../shared/ticketSearch";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 export function NewWorkorderComponent({}) {
   // store getters ///////////////////////////////////////////////////////////////
@@ -55,152 +44,10 @@ export function NewWorkorderComponent({}) {
   const searchTimerRef = useRef(null);
   const containerRef = useRef(null);
 
-  function openWorkorder(wo, isCompleted) {
-    const store = useOpenWorkordersStore.getState();
-    store.setWorkorderPreviewID(null);
-    if (isCompleted) {
-      store.setWorkorder(wo, false);
-      store.setLockedWorkorderID(wo.id);
-      store.setOpenWorkorderID(wo.id);
-    } else {
-      // lock if payment is complete even on open workorders
-      if (wo.paymentComplete) {
-        store.setLockedWorkorderID(wo.id);
-      } else {
-        store.setLockedWorkorderID(null);
-      }
-      store.setOpenWorkorderID(wo.id);
-    }
-    useTabNamesStore.getState().setItems({
-      infoTabName: TAB_NAMES.infoTab.workorder,
-      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-      optionsTabName: TAB_NAMES.optionsTab.inventory,
-    });
-    useWorkorderPreviewStore.getState().setPreviewObj(null);
-    if (wo.customerID) {
-      dbGetCustomer(wo.customerID).then((customer) => {
-        if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
-      });
-    }
-    _setTicketSearch("");
-  }
-
-  function openSale(sale, isCompleted) {
-    if (isCompleted) {
-      // completed sale → open refund screen via receiptScan trigger in BaseScreen
-      useCheckoutStore.getState().setStringOnly(sale.id);
-    } else {
-      // partial/active sale → open checkout screen
-      useCheckoutStore.getState().setViewOnlySale(sale);
-      useCheckoutStore.getState().setIsCheckingOut(true);
-    }
-    _setTicketSearch("");
-  }
-
-  async function handleTicketSearch(input) {
-    _setTicketSearch(input);
-  }
-
-  function showTicketAlert(message) {
-    useAlertScreenStore.getState().setValues({
-      title: "Ticket Search",
-      message,
-      btn1Text: "OK",
-      handleBtn1Press: () => {},
-      showAlert: true,
-      canExitOnOuterClick: true,
-    });
-  }
-
-  async function executeTicketSearch() {
-    let trimmed = sTicketSearch.trim();
-    if (!trimmed) return;
+  async function handleExecuteTicketSearch() {
     _setTicketSearching(true);
-
     try {
-      const store = useOpenWorkordersStore.getState();
-      const openWOs = store.getWorkorders();
-      const isFullBarcode = /^\d{13}$/.test(trimmed);
-      const isWoNumber = /^\d{5}$/.test(trimmed);
-      const isFirst4 = /^\d{4}$/.test(trimmed);
-
-      // Full 13-digit EAN-13 barcode — auto search
-      if (isFullBarcode) {
-        const prefix = trimmed[0];
-        if (prefix === "1") {
-          // Warpspeed workorder barcode — check local first
-          let found = openWOs.find((w) => w.id === trimmed);
-          if (found) { openWorkorder(found, false); return; }
-          let completed = await dbGetCompletedWorkorder(trimmed);
-          if (completed) { openWorkorder(completed, true); return; }
-          showTicketAlert("Workorder not found");
-        } else if (prefix === "3") {
-          // Warpspeed sale barcode — search by ID
-          let sale = await newCheckoutGetActiveSale(trimmed);
-          if (sale) { openSale(sale, false); return; }
-          sale = await dbGetCompletedSale(trimmed);
-          if (sale) { openSale(sale, true); return; }
-          showTicketAlert("Sale not found");
-        } else if (prefix === "2") {
-          // Lightspeed legacy barcode — could be sale (22) or workorder (25)
-          // Check workorders first (local then Firestore)
-          let found = openWOs.find((w) => w.id === trimmed);
-          if (found) { openWorkorder(found, false); return; }
-          let completedWo = await dbGetCompletedWorkorder(trimmed);
-          if (completedWo) { openWorkorder(completedWo, true); return; }
-          // Check sales
-          let sale = await newCheckoutGetActiveSale(trimmed);
-          if (sale) { openSale(sale, false); return; }
-          sale = await dbGetCompletedSale(trimmed);
-          if (sale) { openSale(sale, true); return; }
-          showTicketAlert("Ticket not found");
-        } else {
-          showTicketAlert("Unrecognized barcode prefix");
-        }
-        return;
-      }
-
-      // 5-digit workorder number
-      if (isWoNumber) {
-        let found = openWOs.find((w) => w.workorderNumber === trimmed);
-        if (found) { openWorkorder(found, false); return; }
-        let results = await dbSearchCompletedWorkorders("workorderNumber", trimmed);
-        if (results.length > 0) { openWorkorder(results[0], true); return; }
-        showTicketAlert("Workorder not found");
-        return;
-      }
-
-      // 4-digit prefix search — button press search
-      if (isFirst4) {
-        const prefix = trimmed[0];
-        useTicketSearchStore.getState().setIsSearching(true);
-        useTicketSearchStore.getState().setResults([]);
-        useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.ticketSearchResults);
-
-        if (prefix === "1") {
-          let results = await dbSearchWorkordersByIdPrefix(trimmed);
-          useTicketSearchStore.getState().setResults(results);
-        } else if (prefix === "3") {
-          let results = await dbSearchSalesByIdPrefix(trimmed);
-          useTicketSearchStore.getState().setResults(results);
-        } else if (prefix === "2") {
-          // Lightspeed legacy — search both workorders and sales
-          let [woResults, saleResults] = await Promise.all([
-            dbSearchWorkordersByIdPrefix(trimmed),
-            dbSearchSalesByIdPrefix(trimmed),
-          ]);
-          useTicketSearchStore.getState().setResults([...woResults, ...saleResults]);
-        } else {
-          showTicketAlert("First digit must be 1 (workorder), 2 (legacy), or 3 (sale)");
-        }
-        useTicketSearchStore.getState().setIsSearching(false);
-        return;
-      }
-
-      showTicketAlert("Enter a 13-digit barcode, 5-digit WO #, or first 4 digits");
-    } catch (err) {
-      log("Ticket search error:", err);
-      showTicketAlert("Search error — please try again");
+      await executeTicketSearch(sTicketSearch, () => _setTicketSearch(""));
     } finally {
       _setTicketSearching(false);
     }
@@ -248,8 +95,6 @@ export function NewWorkorderComponent({}) {
       isEmail = true;
       isNumeric = false;
     }
-    // let searchStr = "";
-
     const searchFun = async (searchStrings, options, displayQuery) => {
       //dev
       let funs = [];
@@ -268,8 +113,6 @@ export function NewWorkorderComponent({}) {
       const primaryType = options.includes("phone") ? "phone" : options.includes("email") ? "email" : "name";
       useCustomerSearchStore.getState().setSearchQuery(displayQuery || searchStrings.join(" "), primaryType);
 
-      // Clear old results immediately so loading indicator shows right away
-      useCustomerSearchStore.getState().setSearchResults([]);
       useCustomerSearchStore.getState().setIsSearching(true);
       // Debounce the actual DB calls (300ms)
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -279,12 +122,24 @@ export function NewWorkorderComponent({}) {
           useCustomerSearchStore.getState().setIsSearching(false);
           return;
         }
+        let allResults = [];
         funs.forEach((fun) => {
           fun().then((res) => {
-            useCustomerSearchStore.getState().addToSearchResults(res);
+            if (res) allResults.push(...res);
           }).finally(() => {
             pending--;
-            if (pending === 0) useCustomerSearchStore.getState().setIsSearching(false);
+            if (pending === 0) {
+              let existing = useCustomerSearchStore.getState().searchResults;
+              let newIds = new Set(allResults.map((r) => r.id));
+              let existingIds = new Set(existing.map((r) => r.id));
+              let toAdd = allResults.filter((r) => !existingIds.has(r.id));
+              let hasRemovals = existing.some((r) => !newIds.has(r.id));
+              if (hasRemovals || toAdd.length > 0) {
+                let kept = existing.filter((r) => newIds.has(r.id));
+                useCustomerSearchStore.getState().setSearchResults([...kept, ...toAdd]);
+              }
+              useCustomerSearchStore.getState().setIsSearching(false);
+            }
           });
         });
       }, 300);
@@ -321,7 +176,6 @@ export function NewWorkorderComponent({}) {
       if (rawText.length >= 7) searchFun([searchStr], ["phone"]);
       return;
     } else if (isNumeric && rawText.length > 10) {
-      // do nothing, search ran on the last round and do not enter the new
       return;
     } else if (isNumeric) {
       _setTextInput(formatPhoneWithDashes(rawText));
@@ -371,31 +225,14 @@ export function NewWorkorderComponent({}) {
       useCurrentCustomerStore.getState().setCustomer(null, false);
       let store = useOpenWorkordersStore.getState();
       store.setWorkorderPreviewID(null);
-      let existing = store.workorders.find((o) => o.isStandaloneSale);
-
-      if (existing) {
-        let elapsed = Date.now() - (existing.lastInteractionMillis || existing.startedOnMillis || 0);
-        if (elapsed > 5 * 60 * 1000) {
-          store.removeWorkorder(existing.id);
-        } else {
-          store.setOpenWorkorderID(existing.id);
-          useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.checkout,
-            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-            optionsTabName: TAB_NAMES.optionsTab.inventory,
-          });
-          return;
-        }
-      }
 
       let wo = createNewWorkorder({
         startedByFirst: useLoginStore.getState().currentUser?.first,
         startedByLast: useLoginStore.getState().currentUser?.last,
-        isStandaloneSale: true,
       });
 
-      useOpenWorkordersStore.getState().setWorkorder(wo);
-      useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+      store.setWorkorder(wo, false);
+      store.setOpenWorkorderID(wo.id);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.checkout,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,
@@ -477,8 +314,15 @@ export function NewWorkorderComponent({}) {
             value={sTicketSearch}
             placeholder={"Scan ticket or enter first 4 of barcode"}
             placeholderTextColor={gray(0.35)}
-            onChangeText={(val) => handleTicketSearch(val)}
-            onSubmitEditing={() => executeTicketSearch()}
+            onChangeText={(val) => {
+              _setTicketSearch(val);
+              let trimmed = val.trim();
+              if (/^\d{12}$/.test(trimmed)) {
+                _setTicketSearch("");
+                executeTicketSearch(trimmed);
+              }
+            }}
+            onSubmitEditing={() => handleExecuteTicketSearch()}
             style={{
               flex: 1,
               caretColor: C.cursorRed,
@@ -503,7 +347,7 @@ export function NewWorkorderComponent({}) {
           <View style={{ width: "100%", paddingHorizontal: 20, alignItems: "flex-end", marginTop: 3 }}>
             <Button_
               text={sTicketSearch.trim()[0] === "3" ? "Search Sales" : sTicketSearch.trim()[0] === "2" ? "Search Legacy" : "Search Workorders"}
-              onPress={() => executeTicketSearch()}
+              onPress={() => handleExecuteTicketSearch()}
               buttonStyle={{
                 width: 150,
                 borderRadius: 5,

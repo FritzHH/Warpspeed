@@ -260,31 +260,14 @@ export const ActiveWorkorderComponent = ({}) => {
       useCurrentCustomerStore.getState().setCustomer(null, false);
       let store = useOpenWorkordersStore.getState();
       store.setWorkorderPreviewID(null);
-      let existing = store.workorders.find((o) => o.isStandaloneSale);
 
-      if (existing) {
-        let elapsed = Date.now() - (existing.lastInteractionMillis || existing.startedOnMillis || 0);
-        if (elapsed > 5 * 60 * 1000) {
-          store.removeWorkorder(existing.id);
-        } else {
-          store.setOpenWorkorderID(existing.id);
-          useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.checkout,
-            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-            optionsTabName: TAB_NAMES.optionsTab.inventory,
-          });
-          return;
-        }
-      }
+      let wo = createNewWorkorder({
+        startedByFirst: useLoginStore.getState().currentUser?.first,
+        startedByLast: useLoginStore.getState().currentUser?.last,
+      });
 
-      let wo = cloneDeep(WORKORDER_PROTO);
-      wo.isStandaloneSale = true;
-      wo.id = generateEAN13Barcode("1");
-      wo.startedBy = useLoginStore.getState().currentUser?.id;
-      wo.startedOnMillis = new Date().getTime();
-
-      useOpenWorkordersStore.getState().setWorkorder(wo);
-      useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+      store.setWorkorder(wo, false);
+      store.setOpenWorkorderID(wo.id);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.checkout,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,
@@ -325,8 +308,9 @@ export const ActiveWorkorderComponent = ({}) => {
         startedByLast: _currentUser?.last,
         status: SETTINGS_OBJ.statuses[0]?.id || "",
       });
-      // Add workorder ID to customer's workorders array and save
-      let updatedCustomer = { ...customer, workorders: [...(customer.workorders || []), wo.id] };
+      // Add workorder ID to customer's workorders array (use fresh store data to avoid stale overwrites)
+      let freshWorkorders = useCurrentCustomerStore.getState().getCustomer()?.workorders || [];
+      let updatedCustomer = { ...customer, workorders: [...freshWorkorders, wo.id] };
       useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
 
       useOpenWorkordersStore.getState().setWorkorder(wo, false);
@@ -1494,14 +1478,14 @@ export const ActiveWorkorderComponent = ({}) => {
                   text="Upload"
                   colorGradientArr={COLOR_GRADIENTS.green}
                   onPress={handleConfirmUpload}
-                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 }}
                   textStyle={{ fontSize: 14 }}
                 />
                 <Button_
                   text="Cancel"
                   colorGradientArr={COLOR_GRADIENTS.grey}
                   onPress={handleCancelUpload}
-                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 }}
                   textStyle={{ fontSize: 14 }}
                 />
               </View>

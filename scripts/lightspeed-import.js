@@ -93,20 +93,15 @@ function ean13CheckDigit(first12) {
 }
 
 function generateEAN13Barcode(prefix) {
-  while (true) {
-    const millis = Date.now().toString();
-    const timePart = millis.slice(-8);
-    const randomPart = Math.floor(100 + Math.random() * 900).toString();
-    const data = prefix + timePart + randomPart;
-    const check = ean13CheckDigit(data);
-    if (check !== 0) return data + check;
-  }
+  const millis = Date.now().toString();
+  const timePart = millis.slice(-8);
+  const randomPart = Math.floor(100 + Math.random() * 900).toString();
+  return prefix + timePart + randomPart;
 }
 
 function buildLightspeedEAN13(prefix2digit, lsID) {
   let padded = String(lsID).padStart(10, "0");
-  let data = prefix2digit + padded;
-  return data + ean13CheckDigit(data);
+  return prefix2digit + padded;
 }
 
 function generateWorkorderNumber(barcodeNumber) {
@@ -574,7 +569,6 @@ function mapWorkorders(
       sales: [],
       endedOnMillis: "",
       saleID: "",
-      isStandaloneSale: false,
       id: ean13,
       lightspeed_id: woID,
       customerID: wo.customerID || "",
@@ -700,17 +694,17 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
 
       return {
         id: sp.salePaymentID || crypto.randomUUID(),
+        type: amount < 0 ? "refund" : "payment",
+        method: isCash ? "cash" : isCheck ? "check" : "card",
         saleID,
         amountCaptured: amount,
         amountTendered: isCash ? amount : "",
-        cash: isCash,
-        check: isCheck,
+        salesTax: 0,
         cardType: stripeMatch ? stripeMatch["Card type"] : (sp.cardType || ""),
         cardIssuer: isCard ? sp.paymentTypeName : "",
         last4: stripeMatch ? stripeMatch["Card last 4"] : (sp.cardLast4 || ""),
         authorizationCode: sp.authCode || "",
         millis: sp.createTime ? new Date(sp.createTime).getTime() : "",
-        isRefund: amount < 0,
         paymentProcessor: "Stripe",
         chargeID: stripeMatch ? stripeMatch["ID"] : (sp.ccChargeID && sp.ccChargeID !== "0" ? sp.ccChargeID : ""),
         paymentIntentID: stripeMatch ? (stripeMatch["Payment ID"] || "") : "",
@@ -719,7 +713,7 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
         expYear: "",
         networkTransactionID: "",
         amountRefunded: stripeMatch ? dollarsToCents(stripeMatch["Refunded amount"]) : 0,
-        isDeposit: false,
+        depositType: "",
         _cardFundingSource: stripeMatch ? (stripeMatch["Card funding source"] || "") : "",
         _entryMode: stripeMatch ? (stripeMatch["Entry mode"] || "") : "",
       };
@@ -738,7 +732,7 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
       amountRefunded: 0,
       paymentComplete: completed,
       workorderIDs,
-      payments,
+      transactions: payments,
       refunds: [],
       _importSource: "lightspeed",
     };

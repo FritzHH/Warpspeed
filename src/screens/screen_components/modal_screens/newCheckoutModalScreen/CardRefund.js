@@ -97,13 +97,15 @@ export const CardRefund = memo(function CardRefund({
     try {
       let result = await newCheckoutProcessStripeRefund(
         sRefundAmount,
-        selectedPayment.paymentIntentID
+        selectedPayment.chargeID
       );
 
       if (result?.success) {
         _setSuccessMessage(
           `Refund of ${formatCurrencyDisp(sRefundAmount)} processed`
         );
+        _setRefundAmount("");
+        _setRefundAmountDisp("");
 
         if (onProcessRefund) {
           onProcessRefund(sRefundAmount, "card", {
@@ -112,9 +114,6 @@ export const CardRefund = memo(function CardRefund({
             paymentIntentID: selectedPayment.paymentIntentID,
           });
         }
-
-        _setRefundAmount("");
-        _setRefundAmountDisp("");
       } else {
         _setErrorMessage(result?.message || "Refund failed");
         _setSuccessMessage("");

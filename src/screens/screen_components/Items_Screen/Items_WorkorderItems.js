@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { View, Text, TextInput, FlatList, Image, TouchableOpacity } from "react-native-web";
+import { View, Text, TextInput, FlatList, Image, TouchableOpacity, Animated } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
@@ -29,6 +29,7 @@ import {
   INVENTORY_ITEM_PROTO,
   SETTINGS_OBJ,
   TAB_NAMES,
+  TAX_FREE_RECEIPT_NOTE,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep, zipObject } from "lodash";
@@ -70,6 +71,20 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
   const isLocked = isDonePaid;
+  const hasActiveSale = !!zOpenWorkorder?.activeSaleID;
+
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!hasActiveSale) { fadeAnim.setValue(1); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(fadeAnim, { toValue: 0.3, duration: 1200, useNativeDriver: false }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 1200, useNativeDriver: false }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [hasActiveSale]);
 
   ///////////////////////////////////////////////////////////////////////////
   const [sTotalDiscount, _setTotalDiscount] = useState("");
@@ -285,8 +300,6 @@ export const Items_WorkorderItemsTab = ({}) => {
   function handleDeleteWorkorder() {
     useLoginStore.getState().requireLogin(() => {
     const deleteFun = () => {
-      const isStandalone = zOpenWorkorder.isStandaloneSale;
-
       useOpenWorkordersStore.getState().removeWorkorder(zOpenWorkorder.id);
 
       useOpenWorkordersStore.getState().setOpenWorkorderID(null);
@@ -299,9 +312,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     };
 
     showAlert({
-      title: zOpenWorkorder.isStandaloneSale
-        ? "Confirm Delete Sale"
-        : "Confirm Delete Workorder",
+      title: "Confirm Delete Workorder",
       btn1Icon: ICONS.trash,
       handleBtn1Press: deleteFun,
     });
@@ -313,6 +324,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       const currentlyTaxFree = !!zOpenWorkorder.taxFree;
       if (currentlyTaxFree) {
         useOpenWorkordersStore.getState().setField("taxFree", false);
+        useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", "");
       } else {
         useAlertScreenStore.getState().setValues({
           showAlert: true,
@@ -323,6 +335,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           handleBtn1Press: () => {
             useAlertScreenStore.getState().setValues({ showAlert: false });
             useOpenWorkordersStore.getState().setField("taxFree", true);
+            useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", TAX_FREE_RECEIPT_NOTE);
           },
           btn2Text: "Cancel",
           handleBtn2Press: () => {
@@ -341,8 +354,7 @@ export const Items_WorkorderItemsTab = ({}) => {
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1, justifyContent: "center" }}>
           <Text style={{ fontSize: 100, color: gray(0.07), textAlign: "center" }}>
-            {"Empty\n" +
-              (zOpenWorkorder?.isStandaloneSale ? "Sale " : "Workorder")}
+            {zOpenWorkorder.customerID ? "Empty\nWorkorder" : "Empty\nSale"}
           </Text>
         </View>
         <View
@@ -365,7 +377,9 @@ export const Items_WorkorderItemsTab = ({}) => {
             <Button_
               icon={ICONS.trash}
               iconSize={22}
+              enabled={!hasActiveSale}
               onPress={handleDeleteWorkorder}
+              buttonStyle={{ opacity: hasActiveSale ? 0.3 : 1 }}
             />
           </Tooltip>
           <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
@@ -450,13 +464,24 @@ export const Items_WorkorderItemsTab = ({}) => {
         />
       )}
 
-      {/* {hasActiveSale && (
-        <StaleBanner
-          text="Sale in Progress — Workorder Locked"
-          style={{ marginHorizontal: 8, marginTop: 3, backgroundColor: "black" }}
-          textStyle={{ color: "#FFD600" }}
-        />
-      )} */}
+      {hasActiveSale && (
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            backgroundColor: "#FFD600",
+            paddingVertical: 5,
+            paddingHorizontal: 12,
+            marginHorizontal: 8,
+            marginTop: 3,
+            borderRadius: 5,
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ color: "black", fontSize: 12, fontWeight: "600" }}>
+            Sale in progress - go to checkout to remove/reduce items
+          </Text>
+        </Animated.View>
+      )}
 
       <FlatList
         style={{ marginTop: 3, marginRight: 5 }}
@@ -482,6 +507,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               zSettingsObj={{ discounts: zDiscounts }}
               onEditCustomItem={_setEditingCustomLine}
               isLocked={isLocked}
+              hasActiveSale={hasActiveSale}
             />
           );
         }}
@@ -506,9 +532,9 @@ export const Items_WorkorderItemsTab = ({}) => {
           <Button_
             icon={ICONS.trash}
             iconSize={22}
-            enabled={!isLocked}
+            enabled={!isLocked && !hasActiveSale}
             onPress={handleDeleteWorkorder}
-            buttonStyle={{ opacity: isLocked ? 0.3 : 1 }}
+            buttonStyle={{ opacity: (isLocked || hasActiveSale) ? 0.3 : 1 }}
           />
         </Tooltip>
         <View
@@ -689,6 +715,7 @@ export const LineItemComponent = ({
   applyDiscount,
   onEditCustomItem,
   isLocked,
+  hasActiveSale,
 }) => {
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
   const effectiveQty = localQty !== undefined ? localQty : workorderLine.qty;
@@ -908,11 +935,12 @@ export const LineItemComponent = ({
               iconSize={23}
             />
             <Button_
-              enabled={!isLocked}
+              enabled={!isLocked && !hasActiveSale}
               onPress={() => __modQtyPressed(workorderLine, "down", index)}
               buttonStyle={{
                 paddingHorizontal: 4,
                 backgroundColor: "transparent",
+                opacity: hasActiveSale ? 0.3 : 1,
               }}
               icon={ICONS.downArrowOrange}
               iconSize={23}
@@ -1023,7 +1051,7 @@ export const LineItemComponent = ({
                   buttonIconSize={22}
                 modalCoordY={25}
                   modalCoordX={-100}
-                enabled={!isLocked}
+                enabled={!isLocked && !hasActiveSale}
                 buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
                 dataArr={[
                   { label: "No Discount" },
@@ -1045,7 +1073,7 @@ export const LineItemComponent = ({
 
             <Tooltip text="Remove" position="top">
               <Button_
-                enabled={!isLocked}
+                enabled={!isLocked && !hasActiveSale}
                 onPress={() => __deleteWorkorderLine(index)}
                 icon={ICONS.trash}
                 iconSize={21}

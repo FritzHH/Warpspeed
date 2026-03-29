@@ -4,7 +4,6 @@ import {
   View,
   Text,
   TextInput,
-  FlatList,
   ScrollView,
   TouchableOpacity,
 } from "react-native-web";
@@ -14,9 +13,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import {
   getPreviousMondayDayJS,
+  capitalizeFirstLetterOfString,
   formatCurrencyDisp,
   formatMillisForDisplay,
-  formatPhoneWithDashes,
   gray,
   lightenRGBByPercent,
   log,
@@ -25,9 +24,11 @@ import dayjs from "dayjs";
 import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
-import { querySalesIndex } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+// TODO: Replace with completed-sales query
+const queryTransactionIndex = async () => [];
+import { FullSaleModal } from "./FullSaleModal";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 50;
 
 const DATE_SHORTCUTS = [
   {
@@ -101,118 +102,7 @@ export const SalesReportsModal = ({ handleExit }) => {
 
   const [sStartDate, _setStartDate] = useState(dayjs().startOf("day"));
   const [sEndDate, _setEndDate] = useState(dayjs().endOf("day"));
-  const [sResults, _setResults] = useState([
-    {
-      id: "s12345678901",
-      type: "sale",
-      saleID: "s12345678901",
-      millis: dayjs().subtract(1, "hour").valueOf(),
-      customerFirst: "John",
-      customerLast: "Davidson",
-      customerCell: "2392919396",
-      customerID: "cust001",
-      total: 15000,
-      subtotal: 13636,
-      tax: 1364,
-      salesTaxPercent: 10,
-      discount: 0,
-      amountRefunded: 0,
-      itemCount: 3,
-      highestItemName: "Continental Tire 700c",
-      highestItemPrice: 8000,
-      isStandaloneSale: false,
-      workorderIDs: ["wo001"],
-      paymentType: "Card",
-    },
-    {
-      id: "s22345678902",
-      type: "sale",
-      saleID: "s22345678902",
-      millis: dayjs().subtract(3, "hour").valueOf(),
-      customerFirst: "Sarah",
-      customerLast: "Mitchell",
-      customerCell: "2395551234",
-      customerID: "cust002",
-      total: 4250,
-      subtotal: 4250,
-      tax: 0,
-      salesTaxPercent: 0,
-      discount: 500,
-      amountRefunded: 0,
-      itemCount: 1,
-      highestItemName: "Brake Cable Set",
-      highestItemPrice: 4250,
-      isStandaloneSale: true,
-      workorderIDs: [],
-      paymentType: "Cash",
-    },
-    {
-      id: "r33345678903",
-      type: "refund",
-      saleID: "s12345678901",
-      millis: dayjs().subtract(30, "minute").valueOf(),
-      customerFirst: "John",
-      customerLast: "Davidson",
-      customerCell: "2392919396",
-      customerID: "cust001",
-      total: 0,
-      subtotal: 0,
-      tax: 0,
-      salesTaxPercent: 0,
-      discount: 0,
-      amountRefunded: 2500,
-      itemCount: 1,
-      highestItemName: "Inner Tube 700c",
-      highestItemPrice: 2500,
-      isStandaloneSale: false,
-      workorderIDs: ["wo001"],
-      paymentType: "Refund",
-    },
-    {
-      id: "s44345678904",
-      type: "sale",
-      saleID: "s44345678904",
-      millis: dayjs().subtract(5, "hour").valueOf(),
-      customerFirst: "Maria",
-      customerLast: "Gonzalez",
-      customerCell: "2398675309",
-      customerID: "cust003",
-      total: 52499,
-      subtotal: 47726,
-      tax: 4773,
-      salesTaxPercent: 10,
-      discount: 2000,
-      amountRefunded: 0,
-      itemCount: 7,
-      highestItemName: "Shimano Ultegra Groupset",
-      highestItemPrice: 32000,
-      isStandaloneSale: false,
-      workorderIDs: ["wo002", "wo003"],
-      paymentType: "Split",
-    },
-    {
-      id: "s55345678905",
-      type: "sale",
-      saleID: "s55345678905",
-      millis: dayjs().subtract(1, "day").valueOf(),
-      customerFirst: "Robert",
-      customerLast: "Chen",
-      customerCell: "2391112222",
-      customerID: "cust004",
-      total: 1299,
-      subtotal: 1299,
-      tax: 0,
-      salesTaxPercent: 0,
-      discount: 0,
-      amountRefunded: 0,
-      itemCount: 2,
-      highestItemName: "Water Bottle",
-      highestItemPrice: 899,
-      isStandaloneSale: true,
-      workorderIDs: [],
-      paymentType: "Card",
-    },
-  ]);
+  const [sResults, _setResults] = useState([]);
   const [sPage, _setPage] = useState(0);
   const [sLoading, _setLoading] = useState(false);
   const [sSaleModalItem, _setSaleModalItem] = useState(null);
@@ -235,7 +125,7 @@ export const SalesReportsModal = ({ handleExit }) => {
     let thisQueryId = ++queryIdRef.current;
     _setLoading(true);
     _setPage(0);
-    querySalesIndex(startMillis, endMillis)
+    queryTransactionIndex(startMillis, endMillis)
       .then((results) => {
         if (thisQueryId !== queryIdRef.current) return;
         _setResults(results || []);
@@ -285,45 +175,63 @@ export const SalesReportsModal = ({ handleExit }) => {
   let displayEnd = sPendingEnd || sEndDate;
   let hasPendingRange = !!sPendingStart && !!sPendingEnd;
 
-  // Search filtering
+  // Search filtering — filter transactions, then group
   let searchQuery = sSearchText.trim().toLowerCase();
   let filteredResults = sResults;
   if (searchQuery) {
-    filteredResults = sResults.filter((r) => {
-      let first = (r.customerFirst || "").toLowerCase();
-      let last = (r.customerLast || "").toLowerCase();
-      let phone = (r.customerCell || "").toLowerCase();
-      let item = (r.highestItemName || "").toLowerCase();
+    filteredResults = sResults.filter((tx) => {
+      let first = (tx.customerFirst || "").toLowerCase();
+      let last = (tx.customerLast || "").toLowerCase();
+      let phone = (tx.customerCell || "").toLowerCase();
       return (
         first.includes(searchQuery) ||
         last.includes(searchQuery) ||
         phone.includes(searchQuery) ||
-        item.includes(searchQuery) ||
         (first + " " + last).includes(searchQuery)
       );
     });
   }
 
-  // Pagination
-  let totalPages = Math.max(1, Math.ceil(filteredResults.length / PAGE_SIZE));
-  let pageData = filteredResults.slice(sPage * PAGE_SIZE, (sPage + 1) * PAGE_SIZE);
+  // Group transactions by saleID
+  let grouped = {};
+  filteredResults.forEach((tx) => {
+    if (!grouped[tx.saleID]) {
+      grouped[tx.saleID] = {
+        saleID: tx.saleID,
+        customerFirst: tx.customerFirst || "",
+        customerLast: tx.customerLast || "",
+        transactions: [],
+      };
+    }
+    grouped[tx.saleID].transactions.push(tx);
+  });
+  let groups = Object.values(grouped);
+  groups.sort((a, b) => {
+    let aMin = Math.min(...a.transactions.map((t) => t.millis));
+    let bMin = Math.min(...b.transactions.map((t) => t.millis));
+    return bMin - aMin;
+  });
 
-  // Summary calculations over filtered results
-  let totalSales = 0;
-  let taxExemptSales = 0;
-  let taxableSales = 0;
+  // Pagination on groups
+  let totalPages = Math.max(1, Math.ceil(groups.length / PAGE_SIZE));
+  let pageGroups = groups.slice(sPage * PAGE_SIZE, (sPage + 1) * PAGE_SIZE);
+
+  // Summary calculations over all filtered transactions
+  let totalPayments = 0;
+  let taxExemptTotal = 0;
+  let taxableTotal = 0;
   let salesTax = 0;
   let refundsTotal = 0;
-  filteredResults.forEach((r) => {
-    if (r.type === "refund") {
-      refundsTotal += r.amountRefunded || 0;
+  filteredResults.forEach((tx) => {
+    if (tx.type === "refund") {
+      refundsTotal += tx.amountCaptured || 0;
     } else {
-      totalSales += r.total || 0;
-      salesTax += r.tax || 0;
-      if (r.tax === 0) {
-        taxExemptSales += r.subtotal || 0;
+      totalPayments += tx.amountCaptured || 0;
+      salesTax += tx.salesTax || 0;
+      if ((tx.salesTax || 0) === 0) {
+        taxExemptTotal += tx.amountCaptured || 0;
       } else {
-        taxableSales += r.subtotal || 0;
+        taxableTotal += tx.amountCaptured || 0;
       }
     }
   });
@@ -349,45 +257,42 @@ export const SalesReportsModal = ({ handleExit }) => {
     range_label: { color: C.text },
   };
 
-  function renderRow({ item, index }) {
-    let isRefund = item.type === "refund";
-    let bgColor =
-      isRefund
-        ? lightenRGBByPercent(C.red, 80)
-        : index % 2 === 0
-        ? C.listItemWhite
-        : gray(0.075);
-
-    let displayAmount = isRefund
-      ? "-" + formatCurrencyDisp(item.amountRefunded, true)
-      : formatCurrencyDisp(item.total, true);
-
-    let typeLabel = isRefund
-      ? "Refund"
-      : item.isStandaloneSale
-      ? "Sale"
-      : "WO";
-
-    let dateStr = formatMillisForDisplay(item.millis) || "";
-
-    let topItemStr = item.highestItemName
-      ? item.highestItemName +
-        " " +
-        formatCurrencyDisp(item.highestItemPrice, true)
-      : "";
-
-    let phoneStr = "";
-    if (item.customerCell) {
-      let digits = item.customerCell.toString().replace(/\D/g, "");
-      if (digits.length === 10) phoneStr = "(" + digits.slice(0, 3) + ") " + digits.slice(3, 6) + "-" + digits.slice(6);
-      else phoneStr = formatPhoneWithDashes(item.customerCell);
+  function renderGroupHeader(group) {
+    let label = "Sale";
+    let customerName = "";
+    if (group.customerFirst || group.customerLast) {
+      customerName = " — " + (group.customerFirst + " " + group.customerLast).trim();
     }
+    return (
+      <View
+        key={"gh-" + group.saleID}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingVertical: 6,
+          paddingHorizontal: 10,
+          backgroundColor: "rgba(0,0,0,0.75)",
+        }}
+      >
+        <Text style={{ fontSize: 13, fontWeight: "700", color: "white" }}>
+          {label}{customerName}
+        </Text>
+      </View>
+    );
+  }
 
-    let paymentLabel = item.paymentType || "";
+  function renderTransactionRow(tx, index) {
+    let isRefund = tx.type === "refund";
+    let bgColor = isRefund
+      ? lightenRGBByPercent(C.red, 85)
+      : index % 2 === 0
+      ? C.listItemWhite
+      : gray(0.075);
 
     return (
       <TouchableOpacity
-        onPress={() => _setSaleModalItem(item)}
+        key={tx.id || tx.saleID + "-" + index}
+        onPress={() => _setSaleModalItem(tx)}
         activeOpacity={0.6}
         style={{
           flexDirection: "row",
@@ -399,75 +304,53 @@ export const SalesReportsModal = ({ handleExit }) => {
           borderBottomColor: gray(0.9),
         }}
       >
-        <View style={{ flex: 1.6, paddingRight: 5 }}>
-          <Text
-            numberOfLines={1}
-            style={{ fontSize: 15, color: C.text, fontWeight: "600" }}
-          >
-            {item.customerFirst} {item.customerLast}
-          </Text>
-          <Text numberOfLines={1} style={{ fontSize: 14, color: gray(0.4) }}>
-            {phoneStr}
-          </Text>
-        </View>
         <Text
           numberOfLines={1}
           style={{
             flex: 1,
-            fontSize: 15,
-            color: isRefund ? C.red : C.text,
+            fontSize: 14,
             fontWeight: "600",
-            textAlign: "right",
+            color: isRefund ? C.red : C.text,
+            paddingLeft: 10,
           }}
         >
-          {displayAmount}
+          {capitalizeFirstLetterOfString(tx.type || "payment")}
         </Text>
         <Text
           numberOfLines={1}
           style={{
-            flex: 0.7,
+            flex: 0.8,
             fontSize: 14,
             color: gray(0.35),
             fontWeight: "600",
             textAlign: "center",
           }}
         >
-          {paymentLabel}
+          {capitalizeFirstLetterOfString(tx.method || "")}
         </Text>
         <Text
           numberOfLines={1}
           style={{
-            flex: 0.5,
+            flex: 1,
             fontSize: 15,
-            color: C.text,
-            textAlign: "center",
+            fontWeight: "600",
+            color: isRefund ? C.red : C.text,
+            textAlign: "right",
           }}
         >
-          {item.itemCount}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{ flex: 1.5, fontSize: 14, color: gray(0.35), paddingLeft: 5 }}
-        >
-          {dateStr}
+          {isRefund ? "-" : ""}{formatCurrencyDisp(tx.amountCaptured || 0, true)}
         </Text>
         <Text
           numberOfLines={1}
           style={{
-            flex: 0.7,
-            fontSize: 14,
-            color: isRefund ? C.red : C.blue,
-            fontWeight: "600",
-            textAlign: "center",
+            flex: 1.5,
+            fontSize: 13,
+            color: gray(0.35),
+            textAlign: "right",
+            paddingRight: 5,
           }}
         >
-          {typeLabel}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{ flex: 2.5, fontSize: 14, color: gray(0.35), paddingLeft: 5 }}
-        >
-          {topItemStr}
+          {formatMillisForDisplay(tx.millis) || ""}
         </Text>
       </TouchableOpacity>
     );
@@ -486,74 +369,17 @@ export const SalesReportsModal = ({ handleExit }) => {
           borderBottomColor: C.buttonLightGreenOutline,
         }}
       >
-        <Text style={{ flex: 1.6, fontSize: 11, fontWeight: "700", color: "white" }}>
-          Customer
-        </Text>
-        <Text
-          style={{
-            flex: 1,
-            fontSize: 11,
-            fontWeight: "700",
-            color: "white",
-            textAlign: "right",
-          }}
-        >
-          Total
-        </Text>
-        <Text
-          style={{
-            flex: 0.7,
-            fontSize: 11,
-            fontWeight: "700",
-            color: "white",
-            textAlign: "center",
-          }}
-        >
-          Payment
-        </Text>
-        <Text
-          style={{
-            flex: 0.5,
-            fontSize: 11,
-            fontWeight: "700",
-            color: "white",
-            textAlign: "center",
-          }}
-        >
-          Qty
-        </Text>
-        <Text
-          style={{
-            flex: 1.5,
-            fontSize: 11,
-            fontWeight: "700",
-            color: "white",
-            paddingLeft: 5,
-          }}
-        >
-          Date
-        </Text>
-        <Text
-          style={{
-            flex: 0.7,
-            fontSize: 11,
-            fontWeight: "700",
-            color: "white",
-            textAlign: "center",
-          }}
-        >
+        <Text style={{ flex: 1, fontSize: 11, fontWeight: "700", color: "white", paddingLeft: 10 }}>
           Type
         </Text>
-        <Text
-          style={{
-            flex: 2.5,
-            fontSize: 11,
-            fontWeight: "700",
-            color: "white",
-            paddingLeft: 5,
-          }}
-        >
-          Top Item
+        <Text style={{ flex: 0.8, fontSize: 11, fontWeight: "700", color: "white", textAlign: "center" }}>
+          Method
+        </Text>
+        <Text style={{ flex: 1, fontSize: 11, fontWeight: "700", color: "white", textAlign: "right" }}>
+          Amount
+        </Text>
+        <Text style={{ flex: 1.5, fontSize: 11, fontWeight: "700", color: "white", textAlign: "right", paddingRight: 5 }}>
+          Date
         </Text>
       </View>
     );
@@ -770,8 +596,8 @@ export const SalesReportsModal = ({ handleExit }) => {
                 {sLoading
                   ? "Loading..."
                   : searchQuery
-                  ? filteredResults.length + " of " + sResults.length + " results"
-                  : sResults.length + " results"}
+                  ? groups.length + " groups (" + filteredResults.length + " transactions) of " + sResults.length
+                  : groups.length + " groups (" + sResults.length + " transactions)"}
               </Text>
               <Text style={{ fontSize: 12, color: gray(0.4) }}>
                 Page {sPage + 1} of {totalPages}
@@ -794,7 +620,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                   _setSearchText(text);
                   _setPage(0);
                 }}
-                placeholder="Search name, phone, keyword"
+                placeholder="Search customer name or phone"
                 placeholderTextColor={gray(0.65)}
                 style={{
                   flex: 1,
@@ -838,13 +664,24 @@ export const SalesReportsModal = ({ handleExit }) => {
             {/* Table Header */}
             {renderHeader()}
 
-            {/* FlatList */}
-            <FlatList
-              style={{ flex: 1 }}
-              data={pageData}
-              keyExtractor={(item, idx) => item.id || String(idx)}
-              renderItem={renderRow}
-            />
+            {/* Grouped Transaction List */}
+            <ScrollView style={{ flex: 1 }}>
+              {pageGroups.map((group) => {
+                return (
+                  <View key={group.saleID}>
+                    {renderGroupHeader(group)}
+                    {group.transactions.map((tx, idx) => renderTransactionRow(tx, idx))}
+                  </View>
+                );
+              })}
+              {pageGroups.length === 0 && !sLoading && (
+                <View style={{ paddingVertical: 30, alignItems: "center" }}>
+                  <Text style={{ fontSize: 14, color: gray(0.5) }}>
+                    {sResults.length === 0 ? "Select a date range to view transactions" : "No matching transactions"}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
 
             {/* Pagination Controls */}
             <View
@@ -916,9 +753,9 @@ export const SalesReportsModal = ({ handleExit }) => {
                 borderTopColor: C.buttonLightGreenOutline,
               }}
             >
-              <SummaryItem label="Total Sales" value={totalSales} />
-              <SummaryItem label="Tax-Exempt" value={taxExemptSales} />
-              <SummaryItem label="Taxable" value={taxableSales} />
+              <SummaryItem label="Total Payments" value={totalPayments} />
+              <SummaryItem label="Tax-Exempt" value={taxExemptTotal} />
+              <SummaryItem label="Taxable" value={taxableTotal} />
               <SummaryItem label="Sales Tax" value={salesTax} />
               <SummaryItem
                 label="Refunds"
@@ -939,11 +776,11 @@ export const SalesReportsModal = ({ handleExit }) => {
           <Component />
         </View>
       </TouchableWithoutFeedback>
-      {/* Sale TODO Modal */}
+      {/* Full Sale Modal */}
       {!!sSaleModalItem && (
-        <SaleTodoModal
+        <FullSaleModal
           item={sSaleModalItem}
-          handleClose={() => _setSaleModalItem(null)}
+          onClose={() => _setSaleModalItem(null)}
         />
       )}
       {/* Loading Overlay */}
@@ -1016,62 +853,3 @@ const SummaryItem = ({ label, value, isNegative }) => (
   </View>
 );
 
-const SaleTodoModal = ({ item, handleClose }) => {
-  let TodoComponent = useCallback(() => {
-    return (
-      <TouchableWithoutFeedback>
-        <View
-          style={{
-            width: 400,
-            backgroundColor: C.backgroundWhite,
-            borderRadius: 15,
-            padding: 25,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ fontSize: 16, fontWeight: "700", color: C.text, marginBottom: 10 }}>
-            {item.type === "refund" ? "Refund" : "Sale"}: {item.saleID || item.id}
-          </Text>
-          <Text style={{ fontSize: 13, color: gray(0.4), marginBottom: 5 }}>
-            {item.customerFirst} {item.customerLast}
-          </Text>
-          <Text style={{ fontSize: 13, color: gray(0.4), marginBottom: 15 }}>
-            {formatMillisForDisplay(item.millis)}
-          </Text>
-          <View
-            style={{
-              backgroundColor: lightenRGBByPercent(C.blue, 85),
-              borderRadius: 10,
-              padding: 15,
-              width: "100%",
-              alignItems: "center",
-              marginBottom: 20,
-            }}
-          >
-            <Text style={{ fontSize: 14, color: C.blue, fontWeight: "600" }}>
-              TODO: Full sale viewer coming soon
-            </Text>
-          </View>
-          <Button_
-            text="Close"
-            colorGradientArr={COLOR_GRADIENTS.grey}
-            onPress={handleClose}
-            buttonStyle={{ paddingHorizontal: 30, paddingVertical: 8 }}
-            textStyle={{ fontSize: 13 }}
-          />
-        </View>
-      </TouchableWithoutFeedback>
-    );
-  }, [item]);
-
-  return ReactDOM.createPortal(
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1001 }}>
-      <TouchableWithoutFeedback onPress={handleClose}>
-        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
-          <TodoComponent />
-        </View>
-      </TouchableWithoutFeedback>
-    </View>,
-    document.body
-  );
-};

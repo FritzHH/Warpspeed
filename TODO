@@ -5,14 +5,16 @@ curl -X POST https://api.stripe.com/v1/test_helpers/terminal/readers/tmr_GcDlgAz
 PASSWORD:
 
 BonitaBikes.1236
-
-- more information on credit card receipt, look at lightspeed
--
+__________________________________________________________________
 
 
+i made a full refund on the card payment below.
+
+check the calculations, and cross-check the field variables that should have changed for the transaction across all objects:
 
 
 
+summarize, cross-reference, check for errors: 
 
 
 

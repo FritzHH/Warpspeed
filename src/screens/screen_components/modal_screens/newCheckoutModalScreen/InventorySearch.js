@@ -1,110 +1,17 @@
 /* eslint-disable */
-import { View, Text, ScrollView, FlatList } from "react-native-web";
+import { View, Text, ScrollView } from "react-native-web";
 import { TouchableOpacity } from "react-native";
 import { useState, memo } from "react";
 import { cloneDeep } from "lodash";
-import { TextInput_, Button_, DropdownMenu, Tooltip } from "../../../../components";
-import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import { TextInput_, Button_ } from "../../../../components";
+import { C, COLOR_GRADIENTS } from "../../../../styles";
 import {
   formatCurrencyDisp,
   gray,
+  generateEAN13Barcode,
 } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import { INVENTORY_ITEM_PROTO } from "../../../../data";
-
-function AddedItemRow({ item, onRemove, onQtyChange, onDiscountChange, discounts }) {
-  let name =
-    item.inventoryItem?.formalName ||
-    item.inventoryItem?.informalName ||
-    "Unknown Item";
-  let price = item.inventoryItem?.price || 0;
-  let qty = item.qty || 1;
-  let hasDiscount = !!(item.discountObj?.name || item.discountObj?.discountName);
-
-  return (
-    <View
-      style={{
-        paddingVertical: 5,
-        paddingHorizontal: 8,
-        marginBottom: 3,
-        backgroundColor: "rgb(230, 240, 252)",
-        borderRadius: 4,
-        borderLeftWidth: 3,
-        borderLeftColor: C.blue,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 12, color: C.text }}>{name}</Text>
-          <Text style={{ fontSize: 11, color: C.lightText }}>
-            Qty: {qty} | {formatCurrencyDisp(price)}
-            {qty > 1 ? " | Total: " + formatCurrencyDisp(price * qty) : ""}
-          </Text>
-        </View>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Button_
-            onPress={() => onQtyChange(item, qty + 1)}
-            buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3 }}
-            icon={ICONS.upArrowOrange}
-            iconSize={18}
-          />
-          <Button_
-            onPress={() => { if (qty > 1) onQtyChange(item, qty - 1); }}
-            buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3, opacity: qty <= 1 ? 0.25 : 1 }}
-            icon={ICONS.downArrowOrange}
-            iconSize={18}
-            enabled={qty > 1}
-          />
-          <Tooltip text="Discounts" position="top">
-            <DropdownMenu
-              buttonIcon={ICONS.dollarYellow}
-              buttonIconSize={18}
-              modalCoordY={25}
-              modalCoordX={-100}
-              buttonStyle={{ borderWidth: 0, backgroundColor: "transparent", paddingHorizontal: 3 }}
-              dataArr={[
-                { label: "No Discount" },
-                ...(discounts || []).map((o) => ({ label: o.name })),
-              ]}
-              onSelect={(selected) => {
-                if (selected.label === "No Discount") {
-                  onDiscountChange(item, null);
-                } else {
-                  let disc = (discounts || []).find((o) => o.name === selected.label);
-                  onDiscountChange(item, disc || null);
-                }
-              }}
-            />
-          </Tooltip>
-          <Button_
-            onPress={() => onRemove(item)}
-            buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3 }}
-            icon={ICONS.close1}
-            iconSize={14}
-          />
-        </View>
-      </View>
-      {hasDiscount && (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
-          <Text style={{ color: C.green, fontSize: 11 }}>
-            {item.discountObj.name || item.discountObj.discountName}
-          </Text>
-          {!!item.discountObj?.savings && (
-            <Text style={{ color: C.green, fontSize: 11 }}>
-              {"-$" + formatCurrencyDisp(item.discountObj.savings)}
-            </Text>
-          )}
-        </View>
-      )}
-    </View>
-  );
-}
 
 function SearchResultRow({ item, onAdd }) {
   let name = item.formalName || item.informalName || "Unknown";
@@ -141,15 +48,9 @@ function SearchResultRow({ item, onAdd }) {
 }
 
 export const InventorySearch = memo(function InventorySearch({
-  addedItems = [],
   onAddItem,
-  onRemoveItem,
-  onQtyChange,
-  onDiscountChange,
   inventory = [],
-  discounts = [],
   onOpenNewItemModal,
-  isStandaloneSale = false,
 }) {
   const [sSearchString, _setSearchString] = useState("");
   const [sSearchResults, _setSearchResults] = useState([]);
@@ -192,7 +93,7 @@ export const InventorySearch = memo(function InventorySearch({
 
   function handleCreateNewItem() {
     let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-    newItem.id = crypto.randomUUID();
+    newItem.id = generateEAN13Barcode("6");
     newItem.upc = sNotFoundBarcode;
     if (onOpenNewItemModal) onOpenNewItemModal(newItem);
     _setNotFoundBarcode("");
@@ -289,51 +190,6 @@ export const InventorySearch = memo(function InventorySearch({
           ))}
         </ScrollView>
       )}
-
-      {/* Added Items List */}
-      {addedItems.length > 0 && (
-        <View style={{ marginTop: 8, paddingHorizontal: 6 }}>
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.blue,
-              marginBottom: 4,
-            }}
-          >
-            {isStandaloneSale ? `SALE ITEMS (${addedItems.length})` : `ADDED ITEMS (${addedItems.length})`}
-          </Text>
-          {isStandaloneSale ? (
-            <FlatList
-              data={addedItems}
-              keyExtractor={(item, idx) => item.id || String(idx)}
-              renderItem={({ item }) => (
-                <AddedItemRow
-                  item={item}
-                  onRemove={onRemoveItem}
-                  onQtyChange={onQtyChange}
-                  onDiscountChange={onDiscountChange}
-                  discounts={discounts}
-                />
-              )}
-            />
-          ) : (
-            <ScrollView style={{ maxHeight: 120 }}>
-              {addedItems.map((item, idx) => (
-                <AddedItemRow
-                  key={item.id || idx}
-                  item={item}
-                  onRemove={onRemoveItem}
-                  onQtyChange={onQtyChange}
-                  onDiscountChange={onDiscountChange}
-                  discounts={discounts}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      )}
-
     </View>
   );
 });

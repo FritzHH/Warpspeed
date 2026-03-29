@@ -54,7 +54,6 @@ const RECEIPT_PROTO = {
   shopContactBlurb: "",
   thankYouBlurb: "",
   taxFree: false,
-  isStandaloneSale: false,
   popCashRegister: false,
   persistFlag: false,
   intakeBlurb: "",
@@ -398,7 +397,7 @@ var printBuilder = {
 
     var receipt = Object.assign({}, RECEIPT_PROTO);
     receipt.receiptType = RECEIPT_TYPES.refund;
-    receipt.barcode = refund.id;
+    receipt.barcode = sale?.id || refund.id;
     receipt.id = refund.id;
     receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
     receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
@@ -462,6 +461,9 @@ var printBuilder = {
       receipt.total = refund.amountRefunded || 0;
     }
 
+    // Pop cash register for cash/check refunds
+    receipt.popCashRegister = refund.type === "cash" || refund.type === "check";
+
     // Transaction timestamp
     var txDate = refund.millis ? new Date(Number(refund.millis)) : new Date();
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -471,19 +473,20 @@ var printBuilder = {
   sale: function (sale, payments, customer, workorder, salesTaxPercent, context) {
     var receipt = createPrintBase(workorder, customer, salesTaxPercent, context);
     receipt = Object.assign({}, receipt, sale);
+    receipt.tax = sale.salesTax != null ? sale.salesTax : (receipt.tax || 0);
     receipt.barcode = sale.id;
     receipt.receiptType = RECEIPT_TYPES.sales;
     receipt.payments = (payments || []).map(function (p) {
-      var type = p.cash ? "Cash" : p.check ? "Check" : p.isDeposit ? "Deposit" : "Card";
+      var type = p.depositType ? (p.depositType === "credit" ? "Credit" : "Deposit") : p.method === "cash" ? "Cash" : p.method === "check" ? "Check" : "Card";
       return Object.assign({}, p, { paymentType: type });
     });
     receipt.paymentMethod = (function () {
       var types = [];
       var hasCard = false, hasCash = false, hasCheck = false, hasDeposit = false;
       (payments || []).forEach(function (p) {
-        if (p.cash) hasCash = true;
-        else if (p.check) hasCheck = true;
-        else if (p.isDeposit) hasDeposit = true;
+        if (p.method === "cash") hasCash = true;
+        else if (p.method === "check") hasCheck = true;
+        else if (p.depositType) hasDeposit = true;
         else hasCard = true;
       });
       if (hasCash) types.push("Cash");
@@ -493,17 +496,17 @@ var printBuilder = {
       return types.join(" / ") || "None";
     })();
     receipt.popCashRegister = (payments || []).some(function (p) {
-      return p.cash && p.amountTendered > p.amountCaptured;
+      return p.method === "cash" && p.amountTendered > p.amountCaptured;
     });
     var cashChange = 0;
     (payments || []).forEach(function (p) {
-      if (p.cash && p.amountTendered > p.amountCaptured) {
+      if (p.method === "cash" && p.amountTendered > p.amountCaptured) {
         cashChange += p.amountTendered - p.amountCaptured;
       }
     });
     receipt.cashChangeGiven = cashChange;
     receipt.cashChangeGivenDisplay = cashChange ? "$" + (cashChange / 100).toFixed(2) : "";
-    receipt.depositsApplied = (payments || []).filter(function (p) { return p.isDeposit; });
+    receipt.depositsApplied = (payments || []).filter(function (p) { return !!p.depositType; });
     var txDate = workorder?.finishedOnMillis ? new Date(Number(workorder.finishedOnMillis)) : new Date();
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 

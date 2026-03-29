@@ -199,7 +199,7 @@ export const SaleTotals = memo(function SaleTotals({
         {/* Sales Tax */}
         <TotalRow
           label="SALES TAX"
-          value={sale.tax || 0}
+          value={sale.salesTax || 0}
         />
 
         {/* Card Fee */}

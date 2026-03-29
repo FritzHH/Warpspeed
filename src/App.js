@@ -15,6 +15,7 @@ import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
 import { BikeStandScreen } from "./screens/BikeStandScreen";
 import { HomeScreen } from "./screens/HomeScreen";
+import { DatabaseViewerScreen } from "./screens/DatabaseViewerScreen";
 import { CustomerWorkorderScreen } from "./screens/CustomerWorkorderScreen";
 import {
   onAuthStateChange,
@@ -192,6 +193,9 @@ function App() {
 
         {/* Public route - Home (auto-redirects by device type) */}
         <Route path={ROUTES.home} element={<DeviceAwareHome user={user} />} />
+
+        {/* Database Viewer */}
+        <Route path={ROUTES.dbViewer} element={<DatabaseViewerScreen />} />
 
         {/* Public route - Customer Display */}
         <Route path={ROUTES.display} element={<CustomerDisplayScreen />} />

@@ -8,7 +8,7 @@ import {
   formatCurrencyDisp,
   gray,
 } from "../../../../utils";
-import { buildCashPayment } from "./newCheckoutUtils";
+import { buildCashTransaction } from "./newCheckoutUtils";
 
 export const CashPayment = memo(function CashPayment({
   amountLeftToPay = 0,
@@ -91,7 +91,7 @@ export const CashPayment = memo(function CashPayment({
       return;
     }
 
-    let payment = buildCashPayment(sPayAmount, tenderCents, sIsCheck);
+    let payment = buildCashTransaction(sPayAmount, tenderCents, sIsCheck);
 
     // Calculate change
     let change = tenderCents - sPayAmount;

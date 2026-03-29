@@ -77,12 +77,10 @@ export function IntakeScreen() {
 
   function updateField(fieldName, value) {
     if (!selectedWorkorder) return;
-    let isUnsaved = selectedWorkorder._unsaved;
     useOpenWorkordersStore.getState().setField(
       fieldName,
       value,
-      selectedWorkorder.id,
-      !isUnsaved // saveToDB = false if unsaved
+      selectedWorkorder.id
     );
   }
 
@@ -115,7 +113,6 @@ export function IntakeScreen() {
       customerCell: "",
       startedByFirst: zCurrentUser?.first || "",
       startedByLast: zCurrentUser?.last || "",
-      isStandaloneSale: false,
       status: ON_THE_STAND_STATUS_ID,
     });
     // Add to store locally — do NOT save to DB
@@ -130,16 +127,9 @@ export function IntakeScreen() {
   async function handleIntakeButtonPress(btn) {
     if (!selectedWorkorder) return;
 
-    // First save: if workorder has never been saved, persist it now
+    // Persist workorder to Firestore before adding items
     let wo = selectedWorkorder;
-    if (wo._unsaved) {
-      let cleaned = { ...wo };
-      delete cleaned._unsaved;
-      await dbSaveOpenWorkorder(cleaned);
-      // Update local store without the _unsaved flag
-      useOpenWorkordersStore.getState().setWorkorder(cleaned, false);
-      wo = cleaned;
-    }
+    await dbSaveOpenWorkorder(wo);
 
     // Resolve inventory items from IDs and add as workorder lines
     let lines = [...(wo.workorderLines || [])];

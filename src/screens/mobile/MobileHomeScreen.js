@@ -10,7 +10,7 @@ import { ROUTES } from "../../routes";
 export function MobileHomeScreen() {
   const navigate = useNavigate();
   const zWorkorderCount = useOpenWorkordersStore(
-    (state) => state.workorders.filter((o) => !o.isStandaloneSale).length
+    (state) => state.workorders.length
   );
 
   return (
@@ -33,7 +33,7 @@ export function MobileHomeScreen() {
         buttonStyle={{
           width: "100%",
           paddingVertical: 24,
-          borderRadius: 12,
+          borderRadius: 5,
           marginBottom: 16,
         }}
         textStyle={{
@@ -51,7 +51,7 @@ export function MobileHomeScreen() {
         buttonStyle={{
           width: "100%",
           paddingVertical: 18,
-          borderRadius: 12,
+          borderRadius: 5,
           marginBottom: 16,
         }}
         textStyle={{

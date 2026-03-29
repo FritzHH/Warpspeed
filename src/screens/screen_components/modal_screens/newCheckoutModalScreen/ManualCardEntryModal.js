@@ -5,7 +5,7 @@ import { Button_, SmallLoadingIndicator } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { formatCurrencyDisp, log, gray } from "../../../../utils";
 import { newCheckoutProcessManualCardPayment } from "./newCheckoutFirebaseCalls";
-import { buildManualCardPayment } from "./newCheckoutUtils";
+import { buildManualCardTransaction } from "./newCheckoutUtils";
 
 function formatCardNumber(raw) {
   let digits = raw.replace(/\D/g, "").slice(0, 16);
@@ -103,7 +103,7 @@ export function ManualCardEntryModal({
       );
 
       if (result?.success) {
-        let payment = buildManualCardPayment(result.data.charge);
+        let payment = buildManualCardTransaction(result.data.charge);
         _setSuccess(`Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`);
         _setDone(true);
         _setProcessing(false);

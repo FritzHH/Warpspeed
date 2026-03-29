@@ -22,6 +22,8 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
   primaryWorkorderID,
   saleHasPayments = false,
   salesTaxPercent = 0,
+  saleTotal = 0,
+  amountCaptured = 0,
 }) {
   let discounts = useSettingsStore((s) => s.settings?.discounts) || [];
 
@@ -116,25 +118,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                   marginBottom: 10,
                 }}
               >
-                {wo.isStandaloneSale ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
-                    <Image_
-                      source={ICONS.shoppingCart}
-                      style={{ width: 22, height: 22, marginRight: 8, opacity: 0.7, tintColor: C.green }}
-                    />
-                    <Text
-                      style={{
-                        color: C.green,
-                        fontSize: 17,
-                        fontWeight: "600",
-                        letterSpacing: 1,
-                      }}
-                    >
-                      {"STANDALONE SALE"}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={{ flexDirection: "row" }}>
+                <View style={{ flexDirection: "row" }}>
                     <Text
                       style={{
                         color: C.text,
@@ -169,9 +153,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                       </Text>
                     ) : null}
                   </View>
-                )}
-                {!wo.isStandaloneSale && (
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
                     {wo.color1?.backgroundColor ? (
                       <Text
                         style={{
@@ -201,7 +183,6 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                       </Text>
                     ) : null}
                   </View>
-                )}
               </View>
 
               {/* WO Line Items */}
@@ -212,6 +193,16 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                   "Item";
                 let price = line.inventoryItem?.price || 0;
                 let discount = line.discountObj?.savings || 0;
+
+                let canEdit = isCombined;
+                let hasPayments = amountCaptured > 0;
+                let buffer = saleTotal - amountCaptured;
+                let lineSubtotal = line.discountObj?.newPrice != null ? Number(line.discountObj.newPrice) : price * (line.qty || 1);
+                let lineWithTax = lineSubtotal + Math.round(lineSubtotal * effectiveTaxPercent / 100);
+                let oneUnitWithTax = price + Math.round(price * effectiveTaxPercent / 100);
+                let canDelete = !hasPayments || lineWithTax <= buffer;
+                let canQtyDown = (line.qty > 1) && (!hasPayments || oneUnitWithTax <= buffer);
+                let canDiscount = !hasPayments;
 
                 return (
                   <View
@@ -229,14 +220,15 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                       borderRadius: 5,
                     }}
                   >
-                    <View style={{ width: "65%", flexDirection: "row", alignItems: "center" }}>
-                      <View>
+                    <View style={{ width: "65%", flexDirection: "row", alignItems: "center", overflow: "hidden" }}>
+                      <View style={{ flex: 1 }}>
                         {discount > 0 && (
                           <Text style={{ color: C.lightred, fontSize: 12 }}>
                             {line.discountObj?.name}
                           </Text>
                         )}
                         <Text
+                          numberOfLines={1}
                           style={{
                             fontSize: 14,
                             color: C.text,
@@ -266,7 +258,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                         alignItems: "center",
                       }}
                     >
-                      {wo.isStandaloneSale ? (
+                      {canEdit ? (
                         <>
                           <View style={{ flexDirection: "row", alignItems: "center" }}>
                             <Button_
@@ -276,8 +268,9 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                               iconSize={23}
                             />
                             <Button_
+                              enabled={canQtyDown}
                               onPress={() => modifyQty(wo, lineIdx, "down")}
-                              buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3, marginRight: 5 }}
+                              buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3, marginRight: 5, opacity: canQtyDown ? 1 : 0.25 }}
                               icon={ICONS.downArrowOrange}
                               iconSize={23}
                             />
@@ -324,6 +317,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                             </Text>
                           </View>
                           <View style={{ flexDirection: "row", alignItems: "center" }}>
+                            {canDiscount && (
                             <DropdownMenu
                               buttonIcon={ICONS.dollarYellow}
                               buttonIconSize={25}
@@ -342,11 +336,13 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                 }
                               }}
                             />
+                            )}
                             <Button_
+                              enabled={canDelete}
                               onPress={() => deleteLine(wo, lineIdx)}
                               icon={ICONS.trash}
                               iconSize={21}
-                              buttonStyle={{ paddingRight: 2, marginLeft: -8 }}
+                              buttonStyle={{ paddingRight: 2, marginLeft: canDiscount ? -8 : 0, opacity: canDelete ? 1 : 0.25 }}
                             />
                           </View>
                         </>

@@ -343,7 +343,7 @@ export const WorkorderMediaModal = ({
                 onPress={() => !sUploading && fileInputRef.current?.click()}
                 buttonStyle={{
                   paddingVertical: 14,
-                  borderRadius: 8,
+                  borderRadius: 5,
                   opacity: sUploading ? 0.6 : 1,
                 }}
                 textStyle={{ fontSize: 16, fontWeight: "500" }}
@@ -539,7 +539,7 @@ export const WorkorderMediaModal = ({
                 buttonStyle={{
                   paddingHorizontal: 20,
                   paddingVertical: 10,
-                  borderRadius: 8,
+                  borderRadius: 5,
                   opacity: !sDeleting && !sSending ? 1 : 0.4,
                 }}
                 textStyle={{ fontSize: 14, fontWeight: "500" }}
@@ -556,7 +556,7 @@ export const WorkorderMediaModal = ({
                 buttonStyle={{
                   paddingHorizontal: 20,
                   paddingVertical: 10,
-                  borderRadius: 8,
+                  borderRadius: 5,
                   opacity: selectedCount > 0 && !sSending ? 1 : 0.4,
                 }}
                 textStyle={{ fontSize: 14, fontWeight: "500" }}

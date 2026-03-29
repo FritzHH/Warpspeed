@@ -274,7 +274,7 @@ export function MobileWorkorderDetailScreen() {
           onPress={() => !sUploading && fileInputRef.current?.click()}
           buttonStyle={{
             paddingVertical: 14,
-            borderRadius: 8,
+            borderRadius: 5,
             marginBottom: 8,
             opacity: sUploading ? 0.6 : 1,
           }}
@@ -289,7 +289,7 @@ export function MobileWorkorderDetailScreen() {
             onPress={() => _setShowMediaModal("view")}
             buttonStyle={{
               paddingVertical: 12,
-              borderRadius: 8,
+              borderRadius: 5,
             }}
             textStyle={{ fontSize: 15, fontWeight: "500" }}
           />
@@ -305,7 +305,7 @@ export function MobileWorkorderDetailScreen() {
             backgroundColor: C.buttonLightGreen,
             borderColor: C.buttonLightGreenOutline,
             borderWidth: 1,
-            borderRadius: 10,
+            borderRadius: 5,
             paddingVertical: 14,
             alignItems: "center",
             marginRight: 8,
@@ -331,7 +331,7 @@ export function MobileWorkorderDetailScreen() {
             backgroundColor: C.buttonLightGreen,
             borderColor: C.buttonLightGreenOutline,
             borderWidth: 1,
-            borderRadius: 10,
+            borderRadius: 5,
             paddingVertical: 14,
             alignItems: "center",
           }}
@@ -372,7 +372,7 @@ export function MobileWorkorderDetailScreen() {
                 width: "100%",
                 backgroundColor: rs.backgroundColor,
                 paddingVertical: 14,
-                borderRadius: 8,
+                borderRadius: 5,
               }}
               buttonTextStyle={{
                 color: rs.textColor,

@@ -11,7 +11,7 @@ import {
   localStorageWrapper,
 } from "../../../../utils";
 import { useStripePaymentStore } from "../../../../stores";
-import { buildCardPayment } from "./newCheckoutUtils";
+import { buildCardTransaction } from "./newCheckoutUtils";
 import {
   newCheckoutProcessStripePayment,
   newCheckoutCancelStripePayment,
@@ -126,7 +126,6 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   const [sFocused, _setFocused] = useState("");
 
   const autoLoadedRef = useRef(false);
-  const prevAmountRef = useRef(amountLeftToPay);
 
   const callbacksRef = useRef({ onPaymentCapture, onCardProcessingEnd, onCardProcessingStart });
   callbacksRef.current = { onPaymentCapture, onCardProcessingEnd, onCardProcessingStart };
@@ -166,7 +165,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
         if (data.status === "succeeded" && (data.payment_intent || data.amount_captured)) {
           if (s._cardTimeout) { clearTimeout(s._cardTimeout); s._cardTimeout = null; }
-          let payment = buildCardPayment(data);
+          let payment = buildCardTransaction(data);
           s.setCardMessage("");
           s.setCardError("");
           s.setCardStatus("idle");
@@ -380,7 +379,6 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
   if (hasOnlineReaders && amountLeftToPay > 0 && !autoLoadedRef.current) {
     autoLoadedRef.current = true;
-    prevAmountRef.current = amountLeftToPay;
     _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
     _setRequestedAmount(amountLeftToPay);
   }
@@ -578,7 +576,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               enabled={zCardStatus !== "clearing"}
               colorGradientArr={COLOR_GRADIENTS.red}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, borderRadius: 6 }}
+              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, borderRadius: 3 }}
             />
           </Tooltip>
         </View>
@@ -589,7 +587,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             enabled={!startDisabled}
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
-            buttonStyle={{ cursor: startDisabled ? "default" : "inherit", borderRadius: 6 }}
+            buttonStyle={{ cursor: startDisabled ? "default" : "inherit", borderRadius: 5 }}
           />
         </View>
         <View style={{ width: "33%", alignItems: "flex-end", paddingRight: 7 }}>
@@ -600,7 +598,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               enabled={!isProcessing}
               colorGradientArr={COLOR_GRADIENTS.blue}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, cursor: isProcessing ? "default" : "inherit", borderRadius: 6 }}
+              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, cursor: isProcessing ? "default" : "inherit", borderRadius: 3 }}
             />
           )}
         </View>

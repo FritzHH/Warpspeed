@@ -208,7 +208,7 @@ export const RefundTotals = memo(function RefundTotals({
         label="TOTAL REFUND"
         value={grandTotalRefund}
         bold
-        color={exceedsLimit ? C.lightred : C.text}
+        color={refundComplete ? C.lightText : exceedsLimit ? C.lightred : C.text}
         fontSize={16}
       />
 

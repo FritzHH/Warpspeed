@@ -150,6 +150,28 @@ export const useTabNamesStore = create(
         itemsTabName: s.itemsTabName,
         optionsTabName: s.optionsTabName,
       }),
+      merge: (persisted, current) => {
+        let merged = { ...current, ...persisted };
+        try {
+          let raw = JSON.parse(localStorage.getItem("warpspeed_workorders") || "{}");
+          let woState = raw.state || {};
+          let wo = (woState.workorders || []).find((o) => o.id === woState.openWorkorderID);
+          if (wo && wo.customerID) {
+            merged.infoTabName = TAB_NAMES.infoTab.workorder;
+            merged.itemsTabName = TAB_NAMES.itemsTab.workorderItems;
+            merged.optionsTabName = TAB_NAMES.optionsTab.inventory;
+          } else if (wo && !wo.customerID && wo.workorderLines?.length > 0) {
+            merged.infoTabName = TAB_NAMES.infoTab.checkout;
+            merged.itemsTabName = TAB_NAMES.itemsTab.workorderItems;
+            merged.optionsTabName = TAB_NAMES.optionsTab.inventory;
+          } else {
+            merged.infoTabName = TAB_NAMES.infoTab.customer;
+            merged.itemsTabName = TAB_NAMES.itemsTab.empty;
+            merged.optionsTabName = TAB_NAMES.optionsTab.workorders;
+          }
+        } catch (e) {}
+        return merged;
+      },
     }
   )
 );
@@ -913,14 +935,13 @@ export function broadcastWorkorderToDisplay(wo) {
 
   let salesTaxPercent = useSettingsStore.getState().getSettings()?.salesTaxPercent || 0;
 
-  // Standalone sales broadcast as SALE/Checkout type
-  if (wo.isStandaloneSale) {
+  // Quick sales (no customer) broadcast as SALE/Checkout type
+  if (!wo.customerID) {
     let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
     broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
       customerFirst: wo.customerFirst || "",
       customerLast: wo.customerLast || "",
-      combinedWorkorders: [],
-      addedItems: lines,
+      combinedWorkorders: [{ workorderLines: lines }],
       sale: {
         subtotal: totals.runningSubtotal,
         discount: totals.runningDiscount,
@@ -1191,17 +1212,11 @@ export const useOpenWorkordersStore = create(
         }
       },
       setOpenWorkorders: (workorders) => {
-        let incomingIDs = new Set(workorders.map((wo) => wo.id));
-        // Keep local-only workorders that haven't made it to DB yet
-        let localOnly = get().workorders.filter(
-          (wo) => (wo.isStandaloneSale || wo._unsaved) && !incomingIDs.has(wo.id)
-        );
-        set({ workorders: [...workorders, ...localOnly], workordersLoaded: true });
+        set({ workorders, workordersLoaded: true });
       },
       setWorkorder: (wo, saveToDB = true, batch = true) => {
-        if (wo.isStandaloneSale) wo = { ...wo, lastInteractionMillis: Date.now() };
         set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
-        if (saveToDB && !wo.isStandaloneSale) dbSaveOpenWorkorder(wo);
+        if (saveToDB) dbSaveOpenWorkorder(wo);
         if (wo.id === get().openWorkorderID) broadcastWorkorderToDisplay(wo);
       },
       setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
@@ -1216,19 +1231,11 @@ export const useOpenWorkordersStore = create(
         if (logEntries && logEntries.length > 0) {
           workorder.changeLog = [...(workorder.changeLog || []), ...logEntries];
         }
-        if (workorder.isStandaloneSale) workorder.lastInteractionMillis = Date.now();
-        let wasUnsaved = workorder._unsaved;
-        if (workorder._unsaved) delete workorder._unsaved;
 
         set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
-        if (saveToDB && !workorder.isStandaloneSale) {
-          if (wasUnsaved) {
-            // First save — write immediately so Firestore listener includes it
-            // before the debounce window allows setOpenWorkorders to wipe it
-            dbSaveOpenWorkorder(workorder, null, true);
-          } else {
-            debouncedSaveWorkorder(workorder);
-          }
+        // No-customer workorders stay local — saved explicitly by checkout or intake
+        if (saveToDB && workorder.customerID) {
+          debouncedSaveWorkorder(workorder);
         }
         if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
       },
@@ -1242,7 +1249,7 @@ export const useOpenWorkordersStore = create(
           set({ openWorkorderID: null });
         }
 
-        if (saveToDB && !workorderID.isStandaloneSale) {
+        if (saveToDB) {
           dbDeleteWorkorder(workorderID);
 
           // Remove workorder ID from customer's workorders array
@@ -1262,6 +1269,15 @@ export const useOpenWorkordersStore = create(
         workorders: s.workorders,
         openWorkorderID: s.openWorkorderID,
       }),
+      merge: (persisted, current) => {
+        let merged = { ...current, ...persisted };
+        let wo = (merged.workorders || []).find((o) => o.id === merged.openWorkorderID);
+        if (wo && !wo.customerID && !(wo.workorderLines?.length > 0)) {
+          merged.openWorkorderID = null;
+          merged.workorders = (merged.workorders || []).filter((o) => o.id !== wo.id);
+        }
+        return merged;
+      },
     }
   )
 );

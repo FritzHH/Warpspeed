@@ -10,7 +10,7 @@ import {
 } from "../../../../db_calls";
 import { useSettingsStore, useOpenWorkordersStore } from "../../../../stores";
 import { log } from "../../../../utils";
-import { SALE_INDEX_PROTO, ITEM_SALE_PROTO } from "../../../../data";
+import { ITEM_SALE_PROTO } from "../../../../data";
 import { cloneDeep } from "lodash";
 import { recomputeSaleAmounts } from "./newCheckoutUtils";
 
@@ -92,10 +92,10 @@ export async function newCheckoutSaveActiveSale(sale) {
       log("newCheckoutSaveActiveSale: missing tenantID/storeID");
       return { success: false };
     }
-    // Strip deposit/credit payments before persisting — they are session-only
+    // Strip deposit/credit transactions before persisting — they are session-only
     // and get re-applied from the customer's deposits on resume
     let saleToSave = cloneDeep(sale);
-    saleToSave.payments = (saleToSave.payments || []).filter((p) => !p.isDeposit);
+    saleToSave.transactions = (saleToSave.transactions || []).filter((t) => !t.depositType);
     recomputeSaleAmounts(saleToSave);
     const path = buildActiveSalePath(tenantID, storeID, saleToSave.id);
     await firestoreWrite(path, saleToSave);
@@ -129,31 +129,6 @@ export async function newCheckoutDeleteActiveSale(saleID) {
     await firestoreDelete(path);
   } catch (error) {
     log("newCheckoutDeleteActiveSale error:", error);
-  }
-}
-
-export async function fetchStandaloneActiveSales() {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) return [];
-    const basePath = `tenants/${tenantID}/stores/${storeID}/active-sales`;
-    const results = await firestoreQuery(basePath, [{ field: "standaloneSale", operator: "==", value: true }]);
-    return results || [];
-  } catch (error) {
-    log("fetchStandaloneActiveSales error:", error);
-    return [];
-  }
-}
-
-export async function countStandaloneActiveSales() {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) return 0;
-    const basePath = `tenants/${tenantID}/stores/${storeID}/active-sales`;
-    return await firestoreCount(basePath, "standaloneSale", "==", true);
-  } catch (error) {
-    log("countStandaloneActiveSales error:", error);
-    return 0;
   }
 }
 
@@ -247,6 +222,22 @@ export async function newCheckoutCompleteWorkorder(workorder) {
     return { success: true };
   } catch (error) {
     log("newCheckoutCompleteWorkorder error:", error);
+    return { success: false, error };
+  }
+}
+
+export async function newCheckoutUpdateCompletedWorkorder(workorder) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !workorder?.id) {
+      log("newCheckoutUpdateCompletedWorkorder: missing tenantID/storeID/workorder.id");
+      return { success: false };
+    }
+    const path = buildCompletedWorkorderPath(tenantID, storeID, workorder.id);
+    await firestoreWrite(path, workorder);
+    return { success: true };
+  } catch (error) {
+    log("newCheckoutUpdateCompletedWorkorder error:", error);
     return { success: false, error };
   }
 }
@@ -351,12 +342,12 @@ export async function newCheckoutCancelStripePayment(readerID) {
   }
 }
 
-export async function newCheckoutProcessStripeRefund(amount, paymentIntentID) {
+export async function newCheckoutProcessStripeRefund(amount, chargeID) {
   try {
     const callables = await getCallables();
     const result = await callables.processRefund({
       amount: Number(amount),
-      paymentIntentID,
+      chargeID,
     });
     log("newCheckout refund processed:", result.data);
     return result.data;
@@ -399,154 +390,13 @@ export async function newCheckoutProcessManualCardPayment(amount, paymentMethodI
   }
 }
 
-// ─── Sales Index (Firestore) ──────────────────────────────────
-
-function buildSalesIndexPath(tenantID, storeID, docID) {
-  return `tenants/${tenantID}/stores/${storeID}/sales-index/${docID}`;
-}
-
-function findHighestItem(workorderLines) {
-  let highestName = "";
-  let highestPrice = 0;
-  (workorderLines || []).forEach((line) => {
-    const qty = Number(line.qty) || 1;
-    const price = Number(line.inventoryItem?.price) || 0;
-    const lineTotal = qty * price;
-    if (lineTotal > highestPrice) {
-      highestPrice = lineTotal;
-      highestName = line.inventoryItem?.formalName || line.inventoryItem?.informalName || "";
-    }
-  });
-  return { highestName, highestPrice };
-}
-
-export async function saveSaleIndex(sale, customerInfo, workorderLines, isStandaloneSale) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID || !sale?.id) {
-      log("saveSaleIndex: missing tenantID/storeID/sale.id");
-      return { success: false };
-    }
-
-    const { highestName, highestPrice } = findHighestItem(workorderLines);
-
-    let indexDoc = cloneDeep(SALE_INDEX_PROTO);
-    indexDoc.id = sale.id;
-    indexDoc.type = "sale";
-    indexDoc.saleID = sale.id;
-    indexDoc.millis = Number(sale.millis) || Date.now();
-    indexDoc.customerFirst = customerInfo?.first || "";
-    indexDoc.customerLast = customerInfo?.last || "";
-    indexDoc.customerCell = customerInfo?.phone || "";
-    indexDoc.customerID = customerInfo?.id || "";
-    indexDoc.total = sale.total || 0;
-    indexDoc.subtotal = sale.subtotal || 0;
-    indexDoc.tax = sale.tax || 0;
-    indexDoc.salesTaxPercent = sale.salesTaxPercent || 0;
-    indexDoc.discount = sale.discount || 0;
-    indexDoc.amountRefunded = sale.amountRefunded || 0;
-    indexDoc.itemCount = (workorderLines || []).length;
-    indexDoc.highestItemName = highestName;
-    indexDoc.highestItemPrice = highestPrice;
-    indexDoc.isStandaloneSale = !!isStandaloneSale;
-    indexDoc.workorderIDs = sale.workorderIDs || [];
-
-    let payments = sale.payments || [];
-    let hasCash = payments.some((p) => p.cash && !p.isRefund);
-    let hasCard = payments.some((p) => !p.cash && !p.isRefund);
-    if (hasCash && hasCard) indexDoc.paymentType = "Split";
-    else if (hasCash) indexDoc.paymentType = "Cash";
-    else if (hasCard) indexDoc.paymentType = "Card";
-    else indexDoc.paymentType = "";
-
-    const path = buildSalesIndexPath(tenantID, storeID, sale.id);
-    await firestoreWrite(path, indexDoc);
-    return { success: true };
-  } catch (error) {
-    log("saveSaleIndex error:", error);
-    return { success: false, error };
-  }
-}
-
-export async function saveRefundIndex(sale, refund, customerInfo, isStandaloneSale = false) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID || !refund?.id) {
-      log("saveRefundIndex: missing tenantID/storeID/refund.id");
-      return { success: false };
-    }
-
-    const { highestName, highestPrice } = findHighestItem(refund.workorderLines);
-
-    let indexDoc = cloneDeep(SALE_INDEX_PROTO);
-    indexDoc.id = refund.id;
-    indexDoc.type = "refund";
-    indexDoc.saleID = sale.id;
-    indexDoc.millis = Number(refund.millis) || Date.now();
-    indexDoc.customerFirst = customerInfo?.first || "";
-    indexDoc.customerLast = customerInfo?.last || "";
-    indexDoc.customerCell = customerInfo?.phone || "";
-    indexDoc.customerID = customerInfo?.id || "";
-    indexDoc.total = 0;
-    indexDoc.subtotal = 0;
-    indexDoc.tax = 0;
-    indexDoc.salesTaxPercent = sale.salesTaxPercent || 0;
-    indexDoc.discount = 0;
-    indexDoc.amountRefunded = refund.amountRefunded || 0;
-    indexDoc.itemCount = (refund.workorderLines || []).length;
-    indexDoc.highestItemName = highestName;
-    indexDoc.highestItemPrice = highestPrice;
-    indexDoc.isStandaloneSale = !!isStandaloneSale;
-    indexDoc.workorderIDs = sale.workorderIDs || [];
-    indexDoc.paymentType = "Refund";
-
-    const path = buildSalesIndexPath(tenantID, storeID, refund.id);
-    await firestoreWrite(path, indexDoc);
-    return { success: true };
-  } catch (error) {
-    log("saveRefundIndex error:", error);
-    return { success: false, error };
-  }
-}
-
-export async function querySalesIndex(startMillis, endMillis) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) {
-      log("querySalesIndex: missing tenantID/storeID");
-      return [];
-    }
-    const collectionPath = `tenants/${tenantID}/stores/${storeID}/sales-index`;
-    return await firestoreQuery(
-      collectionPath,
-      [
-        { field: "millis", operator: ">=", value: startMillis },
-        { field: "millis", operator: "<=", value: endMillis },
-      ],
-      { orderBy: { field: "millis", direction: "desc" } }
-    );
-  } catch (error) {
-    log("querySalesIndex error:", error);
-    return [];
-  }
-}
-
 // ─── Deposit Void (Remove from Customer) ────────────────────────────
 
-export async function voidCustomerDeposit(saleID) {
+export async function voidCustomerDeposit(saleID, customerID) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID || !saleID) {
-      log("voidCustomerDeposit: missing tenantID/storeID/saleID");
-      return { success: false };
-    }
-
-    // Read the sale index to get the customerID
-    const indexPath = buildSalesIndexPath(tenantID, storeID, saleID);
-    const indexDoc = await firestoreRead(indexPath);
-    const customerID = indexDoc?.customerID;
-    if (!customerID) {
-      log("voidCustomerDeposit: no customerID found in sale index for", saleID);
+    if (!tenantID || !storeID || !saleID || !customerID) {
+      log("voidCustomerDeposit: missing tenantID/storeID/saleID/customerID");
       return { success: false };
     }
 
@@ -560,7 +410,7 @@ export async function voidCustomerDeposit(saleID) {
 
     // Remove the deposit entry matching this saleID
     const deposits = customer.deposits || [];
-    const filtered = deposits.filter((d) => d.saleID !== saleID);
+    const filtered = deposits.filter((d) => d.id !== saleID);
     if (filtered.length === deposits.length) {
       log("voidCustomerDeposit: no matching deposit found for saleID", saleID);
       return { success: true }; // nothing to remove

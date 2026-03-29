@@ -244,7 +244,7 @@ export function generateSaleReceiptPDF(data, labels) {
   y = addDivider(doc, y, leftX, rightX);
 
   // Payments
-  let payments = data.payments || [];
+  let payments = data.transactions || [];
   if (payments.length > 0) {
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
@@ -255,18 +255,18 @@ export function generateSaleReceiptPDF(data, labels) {
     doc.setFontSize(8);
     payments.forEach((p) => {
       y = checkPageBreak(doc, y, 20, margin);
-      let type = p.cash ? L.cash : p.cardType || L.card;
+      let type = p.method === "cash" ? L.cash : p.method === "check" ? "Check" : p.cardType || L.card;
       let amount = "$" + formatCents(p.amountCaptured || 0);
       let detail = p.last4 ? " (..." + p.last4 + ")" : "";
       doc.text(type + detail + "  " + amount, leftX + 4, y);
       y += 11;
 
-      if (!p.cash && p.authorizationCode) {
+      if (p.method === "card" && p.authorizationCode) {
         doc.text("  " + L.auth + ": " + p.authorizationCode, leftX + 4, y);
         y += 11;
       }
 
-      if (p.cash && p.amountTendered > p.amountCaptured) {
+      if (p.method === "cash" && p.amountTendered > p.amountCaptured) {
         let change = p.amountTendered - p.amountCaptured;
         doc.text("  " + L.tendered + ": $" + formatCents(p.amountTendered) + "  " + L.change + ": $" + formatCents(change), leftX + 4, y);
         y += 11;

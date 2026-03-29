@@ -419,10 +419,6 @@ function SaleOverlay({ data }) {
     });
   });
 
-  (data?.addedItems || []).forEach((item) => {
-    allLines.push(item);
-  });
-
   let hasDiscount = (sale.discount || 0) > 0;
   let hasCardFee = (sale.cardFee || 0) > 0;
   let amountRemaining = (sale.total || 0) - (sale.amountCaptured || 0);
@@ -448,7 +444,7 @@ function SaleOverlay({ data }) {
           />
         )}
 
-        <OverlayTotalRow label={`Sales Tax (${sale.taxRate || ""}%)`} value={sale.tax || 0} />
+        <OverlayTotalRow label={`Sales Tax (${sale.taxRate || ""}%)`} value={sale.salesTax || sale.tax || 0} />
 
         {hasCardFee && (
           <OverlayTotalRow

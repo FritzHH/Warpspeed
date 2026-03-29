@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
-import { PAYMENT_OBJECT_PROTO } from "../../../../data";
+import { TRANSACTION_PROTO } from "../../../../data";
 import {
   useCheckoutStore,
   useCurrentCustomerStore,
@@ -23,6 +23,7 @@ import {
   usdTypeMask,
   dollarsToCents,
   extractStripeErrorMessage,
+  generateEAN13Barcode,
 } from "../../../../utils";
 import { useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
@@ -387,7 +388,9 @@ export const StripeCreditCardComponent = ({
           }
 
           let paymentMethodDetails = val.payment_method_details.card_present;
-          let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
+          let payment = cloneDeep(TRANSACTION_PROTO);
+          payment.type = "payment";
+          payment.method = "card";
 
           // Safely extract payment details with fallbacks
           payment.amountCaptured = val.amount_captured || 0;
@@ -396,8 +399,8 @@ export const StripeCreditCardComponent = ({
             "Unknown";
           payment.cardType =
             paymentMethodDetails?.description || "Unknown Card";
-          payment.id = crypto.randomUUID();
-          payment.isRefund = sIsRefund;
+          payment.id = generateEAN13Barcode("4");
+          payment.type = sIsRefund ? "refund" : "payment";
           payment.millis = new Date().getTime();
           payment.authorizationCode =
             paymentMethodDetails?.receipt?.authorization_code || "";
@@ -720,7 +723,7 @@ export const StripeCreditCardComponent = ({
         </View>
       </View>
       <CheckBox_
-        enabled={!sSale?.payments.length > 0}
+        enabled={!sSale?.transactions.length > 0}
         buttonStyle={{ marginTop: 10 }}
         textStyle={{ color: gray(0.6), fontWeight: 500 }}
         text={"DEPOSIT TO ACCOUNT"}

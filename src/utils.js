@@ -143,12 +143,11 @@ export function calculateRunningTotals(
         return;
       let qty = line.qty;
       // clog("line", line.discountObj);
-      let discountPrice = line.discountObj?.newPrice;
-      let discountSavings = line.discountObj?.savings;
       runningSubtotal = runningSubtotal + line.inventoryItem.price * qty;
-      if (discountPrice) {
-        runningTotal = runningTotal + Number(discountPrice);
-        runningDiscount = runningDiscount + Number(discountSavings);
+      if (line.discountObj?.value) {
+        let recalc = applyDiscountToWorkorderItem(line, true);
+        runningTotal = runningTotal + Number(recalc.newPrice);
+        runningDiscount = runningDiscount + Number(recalc.savings);
       } else {
         runningTotal = runningTotal + line.inventoryItem.price * qty;
       }
@@ -1175,8 +1174,8 @@ export function applyDiscountToWorkorderItem(
   // log("newprice", newPrice);
   let newDiscountObj = {
     ...discountObj,
-    newPrice: roundToTwoDecimals(newPrice),
-    savings: roundToTwoDecimals(savings),
+    newPrice: Math.round(newPrice),
+    savings: Math.round(savings),
   };
 
   if (returnAsDiscountObj) {
@@ -1219,49 +1218,42 @@ export function ean13CheckDigit(first12) {
 }
 
 /**
- * Generate a valid 13-digit EAN-13 barcode.
- * Used for workorder IDs (prefix "1") and sale IDs (prefix "3").
- * Format: prefix + 8-digit timestamp + 3-digit random + check digit.
- * Regenerates if check digit is 0.
- * @param {string} prefix - "1" for workorder, "3" for sale
- * @returns {string} 13-digit EAN-13 barcode
+ * Generate a 12-digit barcode ID.
+ * Format: prefix + 8-digit timestamp + 3-digit random = 12 digits.
+ * @param {string} prefix - "1" for workorder, "3" for sale, "4" for transaction, "5" for credit, "6" for inventory
+ * @returns {string} 12-digit barcode
  */
 export function generateEAN13Barcode(prefix) {
-  while (true) {
-    const millis = Date.now().toString();
-    const timePart = millis.slice(-8);
-    const randomPart = Math.floor(100 + Math.random() * 900).toString();
-    const data = prefix + timePart + randomPart;
-    const check = ean13CheckDigit(data);
-    if (check !== 0) return data + check;
-  }
+  const millis = Date.now().toString();
+  const timePart = millis.slice(-8);
+  const randomPart = Math.floor(100 + Math.random() * 900).toString();
+  return prefix + timePart + randomPart;
 }
 
 /**
- * Decode a Lightspeed EAN-13 barcode into type and original LS ID.
+ * Decode a Lightspeed barcode into type and original LS ID.
  * LS uses prefix 22 for sales, 25 for workorders.
- * @param {string} barcode13 - 13-digit barcode string
+ * @param {string} barcode - 12-digit barcode string
  * @returns {{ type: 'sale'|'workorder', lsID: string } | null}
  */
-export function decodeLightspeedBarcode(barcode13) {
-  if (!barcode13 || barcode13.length !== 13 || !/^\d{13}$/.test(barcode13)) return null;
-  let prefix = barcode13.slice(0, 2);
+export function decodeLightspeedBarcode(barcode) {
+  if (!barcode || barcode.length !== 12 || !/^\d{12}$/.test(barcode)) return null;
+  let prefix = barcode.slice(0, 2);
   let type = prefix === "22" ? "sale" : prefix === "25" ? "workorder" : null;
   if (!type) return null;
-  let lsID = barcode13.slice(2, 12).replace(/^0+/, "") || "0";
+  let lsID = barcode.slice(2, 12).replace(/^0+/, "") || "0";
   return { type, lsID };
 }
 
 /**
- * Build a Lightspeed-format EAN-13 barcode from a 2-digit prefix and LS ID.
+ * Build a Lightspeed-format 12-digit barcode from a 2-digit prefix and LS ID.
  * @param {string} prefix2digit - "22" for sale, "25" for workorder
  * @param {string|number} lsID - Lightspeed sequential ID
- * @returns {string} 13-digit EAN-13 barcode
+ * @returns {string} 12-digit barcode
  */
 export function buildLightspeedEAN13(prefix2digit, lsID) {
   let padded = String(lsID).padStart(10, "0");
-  let data = prefix2digit + padded;
-  return data + ean13CheckDigit(data);
+  return prefix2digit + padded;
 }
 
 /**
@@ -1921,11 +1913,9 @@ export function createNewWorkorder({
   customerContactRestriction,
   startedByFirst,
   startedByLast,
-  isStandaloneSale,
   status,
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
-  wo.isStandaloneSale = isStandaloneSale || false;
   wo.id = generateEAN13Barcode("1");
   wo.workorderNumber = generateWorkorderNumber(wo.id);
   wo.status = status || SETTINGS_OBJ.statuses[0]?.id || "";
@@ -1940,7 +1930,6 @@ export function createNewWorkorder({
   wo.changeLog.push("Started by: " + (startedByFirst || "") + " " + (startedByLast || ""));
   wo.startedOnMillis = new Date().getTime();
   wo.customerPin = String(Math.floor(100 + Math.random() * 900));
-  wo._unsaved = true;
   return wo;
 }
 

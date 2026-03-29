@@ -302,7 +302,7 @@ export function MobileWorkorderListScreen() {
 
 function groupWorkordersByStatus(workorders, statuses) {
   if (!workorders || !statuses) return [];
-  const filtered = workorders.filter((o) => !o.isStandaloneSale);
+  const filtered = workorders;
   const placed = new Set();
   const groups = [];
   statuses.forEach((status) => {

@@ -32,7 +32,6 @@ import {
 ////////////////////////////////////////////////////////////////////////////////
 
 function sortWorkorders(inputArr, statuses, currentUser) {
-  inputArr = inputArr.filter((o) => !o.isStandaloneSale);
   let finalArr = [];
 
   // Pass 1: group by status order, sort by due date within each group
@@ -126,14 +125,9 @@ export function BikeStandScreen() {
     let invItem = (zInventory || []).find((o) => o.id === btn.inventoryItemID);
     if (!invItem) return;
 
+    // Persist workorder to Firestore before adding items
     let wo = selectedWorkorder;
-    if (wo._unsaved) {
-      let cleaned = { ...wo };
-      delete cleaned._unsaved;
-      await dbSaveOpenWorkorder(cleaned);
-      useOpenWorkordersStore.getState().setWorkorder(cleaned, false);
-      wo = cleaned;
-    }
+    await dbSaveOpenWorkorder(wo);
 
     let lines = [...(wo.workorderLines || [])];
     let line = cloneDeep(WORKORDER_ITEM_PROTO);

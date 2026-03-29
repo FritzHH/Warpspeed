@@ -7,7 +7,7 @@ import { usdTypeMask, formatCurrencyDisp, log, gray } from "../../../../utils";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "../../../../private_user_constants";
-import { buildManualCardPayment } from "./newCheckoutUtils";
+import { buildManualCardTransaction } from "./newCheckoutUtils";
 import { newCheckoutProcessManualCardPayment } from "./newCheckoutFirebaseCalls";
 
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
@@ -167,7 +167,7 @@ function CardPaymentForm({
       );
 
       if (result?.success) {
-        let payment = buildManualCardPayment(result.data.charge);
+        let payment = buildManualCardTransaction(result.data.charge);
         _setSuccess(`Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`);
         _setDone(true);
         _setProcessing(false);

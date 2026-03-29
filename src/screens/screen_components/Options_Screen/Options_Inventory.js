@@ -10,6 +10,7 @@ import {
   lightenRGBByPercent,
   log,
   resolveStatus,
+  generateEAN13Barcode,
 } from "../../../utils";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
@@ -115,7 +116,7 @@ export function InventoryComponent({}) {
       if (/^\d{12,13}$/.test(searchTerm) && results.length === 0) {
         barcodeModalTimerRef.current = setTimeout(() => {
           let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-          newItem.id = crypto.randomUUID();
+          newItem.id = generateEAN13Barcode("6");
           if (searchTerm.length === 12) newItem.upc = searchTerm;
           else newItem.ean = searchTerm;
           _setModalItem(newItem);
@@ -411,7 +412,7 @@ export function InventoryComponent({}) {
             useColorGradient={false}
             onPress={() => {
               let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-              newItem.id = crypto.randomUUID();
+              newItem.id = generateEAN13Barcode("6");
               _setModalItem(newItem);
             }}
           />
@@ -604,7 +605,7 @@ export function InventoryComponent({}) {
               {sSearchResults.map((item, index) => {
                 let activeBtn = sSelectedButtonID ? (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID) : null;
                 let dividerObj = (activeBtn?.dividers || []).find((d) => d.itemID === item.id);
-                let hasDivider = !!dividerObj && index > 0;
+                let hasDivider = !!dividerObj;
                 return (
                   <React.Fragment key={item.id}>
                     {hasDivider && (
@@ -628,7 +629,7 @@ export function InventoryComponent({}) {
                         alignItems: "center",
                         backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
                         paddingRight: 3,
-                        paddingVertical: 1,
+                        paddingVertical: 2,
                         marginTop: index === 0 ? 0 : 5,
                         marginBottom: 5,
                       }}
@@ -670,7 +671,7 @@ export function InventoryComponent({}) {
                             }}
                           >
                             {item.informalName || item.formalName}
-                            {!!item.informalName && (
+                            {!!item.informalName && !sSelectedButtonID && (
                               <Text style={{ fontSize: 12, color: "gray" }}>
                                 {"\n" + item.formalName}
                               </Text>

@@ -132,7 +132,7 @@ export const NONREMOVABLE_STATUSES = [
     systemOwned: true
   },
   {
-    id: "finshied_and_paid",
+    id: "finished_and_paid",
     label: "Finished & Paid",
     textColor: "white",
     backgroundColor: "green",
@@ -191,11 +191,13 @@ export const CUSTOMER_DEPOST_TYPES = {
   credit: 'credit',
 }
 export const CUSTOMER_DEPOSIT_PROTO = {
-  id: "",
-  type: "", //CUSTOMER_DEPOST_TYPES.deposit or CUSTOMER_DEPOST_TYPES.credit
-  amountCents: 0,
-  millis: "",
-  note: "",
+  id: "",              // sale ID (EAN-13 prefix "3") — IS the completed-sales doc ID
+  amountCents: 0,      // current remaining balance (decremented on partial use)
+  millis: 0,           // creation timestamp
+  method: "",          // "cash" | "card" | "check"
+  note: "",            // user-entered note
+  paymentIntentID: "", // Stripe PaymentIntent ID (card deposits only, for refunds)
+  last4: "",           // card last 4 digits (card deposits only, for display)
 }
 
 
@@ -316,29 +318,34 @@ export const DISCOUNT_OBJ_PROTO = {
   savings: 0,
 };
 
-export const PAYMENT_OBJECT_PROTO = {
-  amountCaptured: 0,
-  amountTendered: 0,
+export const TRANSACTION_PROTO = {
+  id: "",                       // EAN-13 barcode (prefix "4")
+  type: "",                     // "payment" | "refund"
+  method: "",                   // "cash" | "card" | "check"
+  millis: 0,                    // timestamp
+  amountCaptured: 0,            // cents moved in this transaction
+  amountTendered: 0,            // cents tendered (cash only, for change calc)
+  salesTax: 0,                  // tax portion of this transaction (cents)
+  saleID: "",                   // parent sale ID
+
+  // Card-specific
   last4: "",
-  saleID: "",
-  cash: false,
-  check: false,
-  cardType: "",
-  cardIssuer: "",
-  millis: "",
-  id: "",
-  saleID: "",
-  isRefund: false,
-  paymentProcessor: "",
-  chargeID: "",
-  authorizationCode: "",
-  paymentIntentID: "",
-  receiptURL: "",
   expMonth: "",
   expYear: "",
+  cardType: "",
+  cardIssuer: "",
+  paymentProcessor: "",
+  paymentIntentID: "",
+  chargeID: "",
+  authorizationCode: "",
   networkTransactionID: "",
-  amountRefunded: 0,
-  isDeposit: false,
+  receiptURL: "",
+  amountRefunded: 0,            // running total refunded against this charge
+
+  // Deposit/credit
+  depositType: "",              // "deposit" | "credit" (empty = normal payment)
+  depositId: "",                // consumed deposit ID (for remove-deposit flow)
+  depositOriginalAmount: 0,     // original deposit amount (for partial display)
 };
 
 export const REFUND_PROTO = {
@@ -351,49 +358,29 @@ export const REFUND_PROTO = {
   notes: "",
 };
 
+export const THIN_DEPOSIT_PROTO = {
+  id: "",
+  amountCents: 0,
+}
+
 export const SALE_PROTO = {
   id: "",
   millis: "",
   subtotal: 0,
   discount: 0,
-  tax: 0,
+  salesTax: 0,
   salesTaxPercent: 0,
   total: 0,
   amountCaptured: 0, // Computed from payments[] — use recomputeSaleAmounts()
   amountRefunded: 0, // Computed from refunds[] — use recomputeSaleAmounts()
   paymentComplete: false, // Computed — true when amountCaptured >= total
   workorderIDs: [],
-  payments: [],
+  transactions: [],
   refunds: [],
   textToPay: false,
   checkoutSessionID: "",
-  receiptURL: "",
-  isDepositSale: false,
+  depositType: "", // "deposit" | "credit" (empty = normal sale)
   voidedByRefund: false,
-  standaloneSale: false
-};
-
-export const SALE_INDEX_PROTO = {
-  id: "",
-  type: "sale",
-  saleID: "",
-  millis: 0,
-  customerFirst: "",
-  customerLast: "",
-  customerCell: "",
-  customerID: "",
-  total: 0,
-  subtotal: 0,
-  tax: 0,
-  salesTaxPercent: 0,
-  discount: 0,
-  amountRefunded: 0,
-  itemCount: 0,
-  highestItemName: "",
-  highestItemPrice: 0,
-  isStandaloneSale: false,
-  workorderIDs: [],
-  paymentType: "",
 };
 
 export const ITEM_SALE_PROTO = {
@@ -423,7 +410,6 @@ export const WORKORDER_PROTO = {
   activeSaleID: "",
   endedOnMillis: "",
   saleID: "",
-  isStandaloneSale: false,
   id: "",
   customerID: "",
   customerFirst: "",
@@ -464,8 +450,10 @@ export const WORKORDER_PROTO = {
   archived: false,
   media: [],
   customerPin: "",
-  taxFreeReceiptNote: "No items on this workorder were taxable. All items must be labor-only, and no shop parts or material left the shop with the customer.",
+  taxFreeReceiptNote: "",
 };
+
+export const TAX_FREE_RECEIPT_NOTE = "No items on this workorder were taxable. All items must be labor-only, and no shop parts or material left the shop with the customer."
 
 export const WORKORDER_ITEM_PROTO = {
   qty: 1,
@@ -492,6 +480,13 @@ export const CUSTOMER_LANGUAGES = {
   french: "French"
 }
 
+export const CUSTOMER_CREDIT_PROTO = {
+  id: "",
+  text: "",
+  amountCents: 0,
+  millis: "",
+}
+
 export const CUSTOMER_PROTO = {
   first: "",
   last: "",
@@ -513,6 +508,7 @@ export const CUSTOMER_PROTO = {
   sales: [],
   millisCreated: "",
   deposits: [],
+  credits: [],
   language: CUSTOMER_LANGUAGES.english
 };
 
@@ -1017,7 +1013,7 @@ export const SETTINGS_OBJ = {
   smsConversationLockTimeout: 2, //days
   smsBlockedNumbers: [], // array of 10-digit phone strings
   activeLoginTimeoutSeconds: 7,
-  userInactivityTimeout: 60,
+  userInactivityTimeout: 120,
   idleLoginTimeoutHours: 24,
   salesTaxPercent: 6.5,
   acceptChecks: true,
@@ -1220,7 +1216,6 @@ export const RECEIPT_PROTO = {
   shopContactBlurb: "",
   thankYouBlurb: "",
   taxFree: false,
-  isStandaloneSale: false,
   popCashRegister: false,
   persistFlag: false,
   intakeBlurb: "",

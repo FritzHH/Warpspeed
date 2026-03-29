@@ -23,6 +23,7 @@ import {
   useAlertScreenStore,
   useTabNamesStore,
   useStripePaymentStore,
+  useCurrentCustomerStore,
   broadcastWorkorderToDisplay,
 } from "../stores";
 import {
@@ -43,7 +44,7 @@ import {
   dbListenToCurrentPunchClock,
   dbListenToInventory,
 } from "../db_calls_wrapper";
-import { SETTINGS_OBJ, TAB_NAMES } from "../data";
+import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
 import { clog, log, recoverPendingAutoTexts } from "../utils";
 import { cloneDeep, throttle } from "lodash";
 import { ROUTES } from "../routes";
@@ -276,6 +277,29 @@ export function BaseScreen() {
 
     // Recover any pending auto-text messages from localStorage (crash recovery)
     recoverPendingAutoTexts();
+  }, []);
+
+  // Inactivity timer — clear active workorder/customer after timeout
+  useEffect(() => {
+    const DEFAULT_TIMEOUT_SECONDS = 120;
+    const interval = setInterval(() => {
+      const lastAction = useLoginStore.getState().getLastActionMillis();
+      const openWorkorderID = useOpenWorkordersStore.getState().openWorkorderID;
+      if (!openWorkorderID) return; // nothing to clear
+      const timeoutSeconds =
+        useSettingsStore.getState().settings?.userInactivityTimeout || DEFAULT_TIMEOUT_SECONDS;
+      const elapsedSeconds = (Date.now() - lastAction) / 1000;
+      if (elapsedSeconds >= timeoutSeconds) {
+        useOpenWorkordersStore.getState().setOpenWorkorderID(null);
+        useCurrentCustomerStore.getState().setCustomer({ ...CUSTOMER_PROTO }, false);
+        useTabNamesStore.getState().setItems({
+          infoTabName: TAB_NAMES.infoTab.customer,
+          itemsTabName: TAB_NAMES.itemsTab.empty,
+          optionsTabName: TAB_NAMES.optionsTab.workorders,
+        });
+      }
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
 

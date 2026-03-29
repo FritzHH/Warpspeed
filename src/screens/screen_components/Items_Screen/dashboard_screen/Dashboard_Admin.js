@@ -780,7 +780,7 @@ export function Dashboard_Admin({}) {
                     tax: totals.runningTax,
                     total: totals.finalTotal,
                     amountCaptured: totals.finalTotal,
-                    payments: [],
+                    transactions: [],
                     refunds: [],
                     workorderID: workorder.id,
                   };
@@ -789,7 +789,8 @@ export function Dashboard_Admin({}) {
                   const fakeCardPayment = {
                     amountCaptured: cardAmount,
                     amountTendered: cardAmount,
-                    cash: false,
+                    type: "payment",
+                    method: "card",
                     last4: "4242",
                     cardType: "Visa",
                     brand: "visa",
@@ -799,7 +800,8 @@ export function Dashboard_Admin({}) {
                   const fakeCashPayment = {
                     amountCaptured: cashAmount,
                     amountTendered: cashAmount + 500,
-                    cash: true,
+                    type: "payment",
+                    method: "cash",
                   };
 
                   const receiptData = printBuilder.sale(fakeSale, [fakeCardPayment, fakeCashPayment], customer, workorder, settings?.salesTaxPercent, _ctx);
@@ -884,22 +886,10 @@ export function Dashboard_Admin({}) {
                     let saleIDs = [wo.activeSaleID, wo.saleID].filter(Boolean);
                     let uniqueSaleIDs = [...new Set(saleIDs)];
 
-                    // 3. For each sale, delete the sale + its index + any refund indexes
+                    // 3. For each sale, delete the sale from active + completed
                     for (let sid of uniqueSaleIDs) {
-                      // Read the sale to find refund IDs
-                      let sale = await firestoreRead(`${basePath}/active-sales/${sid}`).catch(() => null);
-                      if (!sale) sale = await firestoreRead(`${basePath}/completed-sales/${sid}`).catch(() => null);
-                      if (sale) {
-                        // Delete refund index entries
-                        for (let refund of (sale.refunds || [])) {
-                          if (refund.id) await firestoreDelete(`${basePath}/sales-index/${refund.id}`).catch(() => {});
-                        }
-                      }
-                      // Delete sale from active + completed
                       await firestoreDelete(`${basePath}/active-sales/${sid}`).catch(() => {});
                       await firestoreDelete(`${basePath}/completed-sales/${sid}`).catch(() => {});
-                      // Delete sale index entry
-                      await firestoreDelete(`${basePath}/sales-index/${sid}`).catch(() => {});
                     }
 
                     // 4. Strip all payment/sale fields from workorder
@@ -4570,10 +4560,11 @@ const QuickItemButtonsComponent = ({
 
   function handleDividerLabelChange(itemID, label) {
     if (!sCurrentParentID) return;
+    let capitalized = label.replace(/(?:^|\s)\S/g, (ch) => ch.toUpperCase());
     let updated = allButtons.map((b) => {
       if (b.id !== sCurrentParentID) return b;
       let dividers = (b.dividers || []).map((d) =>
-        d.itemID === itemID ? { ...d, label } : d
+        d.itemID === itemID ? { ...d, label: capitalized } : d
       );
       return { ...b, dividers };
     });
@@ -6046,7 +6037,7 @@ const ImportComponent = () => {
         const isLabor = descLower.includes("labor") || descLower.includes("install");
         const upc = (item["UPC"] || "").trim();
         const systemId = (item["System ID"] || "").trim();
-        const id = upc || systemId || crypto.randomUUID();
+        const id = upc || systemId || generateEAN13Barcode("6");
         const isTube = desc.includes("TUBE ");
         const tubeCost = dollarsToCents(stripDollar(item["Default Cost"]));
         const price = isTube ? (tubeCost > 600 ? 1878 : 939) : dollarsToCents(stripDollar(item["Price"]));
@@ -6064,8 +6055,8 @@ const ImportComponent = () => {
           customSku: (item["Custom SKU"] || "").trim(),
           manufacturerSku: (item["Manufact. SKU"] || "").trim(),
           minutes: 0,
-          customPart: !isLabor,
-          customLabor: isLabor,
+          customPart: false,
+          customLabor: false,
         };
         if (price > 0) {
           toImport.push(mapped);
@@ -7655,7 +7646,6 @@ const ARCHIVE_COLLECTION_NAMES = [
   "completed-workorders",
   "completed-sales",
   "customers",
-  "sales-index",
   "open-workorders",
   "inventory",
   "settings",
@@ -8098,8 +8088,177 @@ function BackupRecoveryComponent() {
           />
         )}
       </BoxContainerInnerComponent>
+
+      {/*** SETTINGS CSV EXPORT / IMPORT ***/}
+      <View style={{ height: 20 }} />
+      <SettingsCSVComponent />
     </BoxContainerOuterComponent>
   );
+}
+
+function SettingsCSVComponent() {
+  const zSettingsObj = useSettingsStore((state) => state.settings);
+  const [sUploading, _setUploading] = useState(false);
+  const [sUploadResult, _setUploadResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  function handleDownloadCSV() {
+    if (!zSettingsObj) return;
+    const rows = [["field", "value"]];
+    Object.keys(zSettingsObj).forEach((key) => {
+      const val = zSettingsObj[key];
+      const serialized =
+        typeof val === "string" ? val : JSON.stringify(val);
+      // Escape double-quotes for CSV
+      const escaped = serialized.replace(/"/g, '""');
+      rows.push([key, '"' + escaped + '"']);
+    });
+    const csvContent = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "settings.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleRehydrateCSV(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    _setUploading(true);
+    _setUploadResult(null);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target.result;
+        const parsed = parseSettingsCSV(text);
+        // Write each field back to settings
+        for (const [key, rawVal] of Object.entries(parsed)) {
+          let val;
+          try {
+            val = JSON.parse(rawVal);
+          } catch {
+            val = rawVal; // plain string
+          }
+          useSettingsStore.getState().setField(key, val);
+        }
+        _setUploadResult({ success: true, fieldCount: Object.keys(parsed).length });
+      } catch (err) {
+        _setUploadResult({ success: false, error: err.message });
+      }
+      _setUploading(false);
+    };
+    reader.onerror = () => {
+      _setUploadResult({ success: false, error: "Failed to read file" });
+      _setUploading(false);
+    };
+    reader.readAsText(file);
+    // Reset so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  return (
+    <BoxContainerInnerComponent style={{ alignItems: "center" }}>
+      <Text
+        style={{
+          fontSize: 15,
+          fontWeight: "700",
+          color: C.text,
+          marginBottom: 10,
+          alignSelf: "flex-start",
+        }}
+      >
+        SETTINGS CSV
+      </Text>
+      <Text
+        style={{
+          fontSize: 12,
+          color: gray(0.5),
+          marginBottom: 15,
+          alignSelf: "flex-start",
+        }}
+      >
+        Download the current settings as a CSV file, or restore settings from a
+        previously downloaded CSV.
+      </Text>
+
+      <View style={{ flexDirection: "row", gap: 12 }}>
+        <Button_
+          text="Download Settings CSV"
+          onPress={handleDownloadCSV}
+          colorGradientArr={COLOR_GRADIENTS.blue}
+          buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+        />
+        <Button_
+          text={sUploading ? "Importing..." : "Rehydrate from CSV"}
+          onPress={() => fileInputRef.current?.click()}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+          disabled={sUploading}
+          loading={sUploading}
+        />
+      </View>
+
+      {/* Hidden file input for CSV upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: "none" }}
+        onChange={handleRehydrateCSV}
+      />
+
+      {!!sUploadResult && (
+        <View
+          style={{
+            marginTop: 15,
+            padding: 10,
+            borderRadius: 8,
+            backgroundColor: sUploadResult.success
+              ? "rgba(0,180,0,0.08)"
+              : "rgba(220,0,0,0.08)",
+            width: "100%",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: "700",
+              color: sUploadResult.success ? C.green : C.red,
+            }}
+          >
+            {sUploadResult.success
+              ? "Settings restored — " + sUploadResult.fieldCount + " fields updated"
+              : "Import Failed — " + sUploadResult.error}
+          </Text>
+        </View>
+      )}
+    </BoxContainerInnerComponent>
+  );
+}
+
+/**
+ * Parse a settings CSV (field,value) back into an object.
+ * Handles quoted values with embedded commas and double-quote escaping.
+ */
+function parseSettingsCSV(text) {
+  const lines = text.split("\n");
+  const result = {};
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const commaIdx = line.indexOf(",");
+    if (commaIdx === -1) continue;
+    const key = line.substring(0, commaIdx);
+    let val = line.substring(commaIdx + 1);
+    // Strip surrounding quotes and unescape doubled quotes
+    if (val.startsWith('"') && val.endsWith('"')) {
+      val = val.slice(1, -1).replace(/""/g, '"');
+    }
+    result[key] = val;
+  }
+  return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -8257,7 +8416,6 @@ const SPOOF_WORKORDER = {
   customerContactRestriction: "",
   customerEmail: "hieb.fritz@gmail.com",
   waitTimeEstimateLabel: "First half Tuesday",
-  isStandaloneSale: false,
   brand: "Sun",
   workorderNumber: "82860",
   customerLast: "Hieb",

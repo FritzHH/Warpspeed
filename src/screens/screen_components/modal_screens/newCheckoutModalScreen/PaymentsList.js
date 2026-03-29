@@ -6,19 +6,19 @@ import { Tooltip, Pressable_ } from "../../../../components";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
 const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemoveDeposit }) {
-  let isCash = payment.cash;
-  let isCheck = payment.check;
-  let isDeposit = payment.isDeposit;
+  let isCash = payment.method === "cash";
+  let isCheck = payment.method === "check";
+  let isDeposit = !!payment.depositType;
   let isCard = !isCash && !isCheck && !isDeposit;
-  let depositPaidByCash = isDeposit && payment.depositCash;
-  let depositPaidByCard = isDeposit && !payment.depositCash;
+  let depositPaidByCash = isDeposit && payment.method === "cash";
+  let depositPaidByCard = isDeposit && payment.method !== "cash";
 
   function getPaymentLabel() {
     if (isDeposit) {
-      let typeLabel = payment.depositType === "credit" ? "CREDIT" : "DEPOSIT";
-      if (depositPaidByCash) return "CASH " + typeLabel;
-      if (payment.last4) return "CARD " + typeLabel;
-      return typeLabel + " APPLIED";
+      if (payment.depositType === "credit") return "ACCOUNT CREDIT";
+      if (depositPaidByCash) return "DEPOSIT";
+      if (payment.last4) return "CARD DEPOSIT";
+      return "DEPOSIT";
     }
     if (isCheck) return "CHECK SALE";
     if (isCash) return "CASH SALE";
@@ -53,7 +53,7 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
         <Text style={{ color: isDeposit ? (depositPaidByCash ? C.orange : C.blue) : C.green }}>
           {getPaymentLabel()}
         </Text>
-        {onRefund && (
+        {onRefund && !payment.depositType && (
           <Tooltip text="Refund this payment" position="top">
             <TouchableOpacity
               onPress={(e) => { e.stopPropagation(); onRefund(); }}

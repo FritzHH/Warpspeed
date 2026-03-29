@@ -480,7 +480,7 @@ export function CustomerWorkorderScreen() {
           )}
           <View style={S.row}>
             <Text style={S.label}>{t(tr, "tax", "Tax")}</Text>
-            <Text style={S.value}>{d.tax}</Text>
+            <Text style={S.value}>{d.salesTax || d.tax}</Text>
           </View>
           <View style={S.divider} />
           <View style={S.row}>

@@ -42,6 +42,7 @@ export function HomeScreen() {
       { label: "Login", path: ROUTES.login, icon: ICONS.userControl, gradient: COLOR_GRADIENTS.blue },
       { label: "Customer Display", path: ROUTES.display, icon: ICONS.eyeballs, gradient: COLOR_GRADIENTS.blue, popup: true },
       { label: "Translate", path: ROUTES.translate, icon: ICONS.letterI, gradient: COLOR_GRADIENTS.blue },
+      { label: "Database Viewer", path: ROUTES.dbViewer, icon: ICONS.gears1, gradient: COLOR_GRADIENTS.purple },
     ];
   }
 
@@ -121,7 +122,7 @@ export function HomeScreen() {
             iconSize={isMobileOrTablet ? 24 : 20}
             colorGradientArr={item.gradient}
             buttonStyle={{
-              borderRadius: 10,
+              borderRadius: 5,
               paddingVertical: isMobileOrTablet ? 16 : 12,
               paddingHorizontal: 20,
               marginBottom: isMobileOrTablet ? 10 : 12,

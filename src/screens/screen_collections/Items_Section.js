@@ -327,9 +327,6 @@ const TranslateModal = ({ visible, onClose }) => {
 const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
-  const zIsStandaloneSale = useOpenWorkordersStore(
-    (s) => s.workorders.find((o) => o.id === s.openWorkorderID)?.isStandaloneSale
-  );
   // log("Items_Section TabBar render");
   return (
     <View
@@ -355,11 +352,7 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
               onPress={() =>
                 useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems)
               }
-              text={
-                zIsStandaloneSale
-                  ? "Sale Items"
-                  : TAB_NAMES.itemsTab.workorderItems
-              }
+              text={TAB_NAMES.itemsTab.workorderItems}
               isSelected={
                 zItemsTabName === TAB_NAMES.itemsTab.workorderItems
                   ? true
@@ -369,7 +362,7 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
             {/* <View style={{ width: 20 }} /> */}
           </View>
         )}
-        {zOpenWorkorderID && !zIsStandaloneSale && (
+        {!!zOpenWorkorderID && (
           <TabMenuButton
             onPress={() => useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}
@@ -404,7 +397,7 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
             </TouchableOpacity>
           </Tooltip>
         )}
-        {!!zOpenWorkorderID && !zIsStandaloneSale && localStorage.getItem("warpspeed_has_secondary_display") === "true" && (
+        {!!zOpenWorkorderID && localStorage.getItem("warpspeed_has_secondary_display") === "true" && (
           <Tooltip text="Show workorder on customer display" position="bottom">
             <TouchableOpacity
               onPress={() => {

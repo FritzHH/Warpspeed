@@ -46,7 +46,7 @@ export const SaleModal = () => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
 
-  const payments = sale?.payments || [];
+  const payments = sale?.transactions || [];
   const refunds = sale?.refunds || [];
   const linkedWOs = sale?._workorders || [];
   const hasRefunds = (sale?.amountRefunded || 0) > 0;
@@ -224,7 +224,7 @@ export const SaleModal = () => {
               >
                 <TotalRow label="Subtotal" value={sale.subtotal} />
                 {(sale.discount || 0) > 0 && <TotalRow label="Discount" value={sale.discount} isNegative />}
-                <TotalRow label="Tax" value={sale.tax} />
+                <TotalRow label="Tax" value={sale.salesTax || sale.tax || 0} />
                 {(sale.cardFee || 0) > 0 && <TotalRow label="Card Fee" value={sale.cardFee} />}
                 <View style={{ height: 1, backgroundColor: gray(0.15), marginVertical: 6 }} />
                 <TotalRow label="Total" value={sale.total} bold />
@@ -362,7 +362,7 @@ export const SaleModal = () => {
                   {/* Type + Amount */}
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
-                      {p.cash ? "CASH" : p.check ? "CHECK" : "CARD"}
+                      {(p.method || "card").toUpperCase()}
                     </Text>
                     <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>
                       {"$" + formatCurrencyDisp(p.amountCaptured)}
@@ -370,7 +370,7 @@ export const SaleModal = () => {
                   </View>
 
                   {/* Card details */}
-                  {!p.cash && !p.check && (
+                  {p.method === "card" && (
                     <View style={{ marginTop: 4 }}>
                       {(!!p.cardType || !!p.last4) && (
                         <Text style={{ fontSize: 11, color: gray(0.4) }}>
@@ -392,7 +392,7 @@ export const SaleModal = () => {
                   )}
 
                   {/* Cash tendered */}
-                  {p.cash && !!p.amountTendered && (
+                  {p.method === "cash" && !!p.amountTendered && (
                     <Text style={{ fontSize: 11, color: gray(0.4), marginTop: 2 }}>
                       {"Tendered: $" + formatCurrencyDisp(p.amountTendered)}
                     </Text>

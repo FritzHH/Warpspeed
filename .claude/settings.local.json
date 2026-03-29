@@ -37,7 +37,11 @@
       "Bash(node -e \"const pkg = require\\(''./node_modules/react-scripts/package.json''\\); console.log\\(''react-scripts:'', pkg.version\\); const wp = require\\(''./node_modules/webpack/package.json''\\); console.log\\(''webpack:'', wp.version\\);\")",
       "Bash(for commit in a9d66ed 85d3d7e aa40acb 1bb8fef a7fcddf 55d452a c773e51 9836504 3970793 53c0b49)",
       "Bash(do echo \"=== $commit ===\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(grep -n \"customer\\\\.deposits\\\\|applyDeposit\" \"/c/Users/hiebf/OneDrive/Desktop/warpspeed/src/screens/screen_components/modal_screens/newCheckoutModalScreen/\"*.js)",
+      "Bash(xargs grep -l \"dbListenToCustomerMessages\\\\|setIncomingMessages\")",
+      "Bash(python3:*)",
+      "Bash(xargs grep -l \"barcode\\\\|Barcode\")"
     ]
   }
 }

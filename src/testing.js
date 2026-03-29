@@ -49,7 +49,7 @@ export async function fillInventory() {
     lastDigit = lastDigit.slice(lastDigit.length - 1);
     if (lastDigit == 0) lastDigit = 2;
     if (lastDigit == 9) lastDigit = 8;
-    let inv = { ...INVENTORY_ITEM_PROTO, id: crypto.randomUUID() };
+    let inv = { ...INVENTORY_ITEM_PROTO, id: generateEAN13Barcode("6") };
     inv.formalName =
       (await randomWordGenerator()) +
       " " +

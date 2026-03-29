@@ -11,20 +11,20 @@ import { useLoginStore, useSettingsStore } from "../../../../stores";
 import { printBuilder } from "../../../../utils";
 import {
   SALE_PROTO,
-  PAYMENT_OBJECT_PROTO,
+  TRANSACTION_PROTO,
   REFUND_PROTO,
 } from "../../../../data";
 
 // ─── Sale ID ──────────────────────────────────────────────────
-// Sale IDs are 13-digit EAN-13 barcodes starting with "3".
+// Sale IDs are 12-digit barcodes starting with "3".
 // Prefix "2" is reserved for Lightspeed legacy barcodes (sales + workorders).
 
 export function isSaleID(id) {
-  return typeof id === "string" && id.length === 13 && /^\d{13}$/.test(id) && id.startsWith("3");
+  return typeof id === "string" && id.length === 12 && /^\d{12}$/.test(id) && id.startsWith("3");
 }
 
 export function isLightspeedID(id) {
-  return typeof id === "string" && id.length === 13 && /^\d{13}$/.test(id) && id.startsWith("2");
+  return typeof id === "string" && id.length === 12 && /^\d{12}$/.test(id) && id.startsWith("2");
 }
 
 // ─── New Sale Object ──────────────────────────────────────────
@@ -35,10 +35,8 @@ export function createNewSale(settings, createdBy = "") {
   sale.id = generateEAN13Barcode("3");
   sale.millis = Date.now();
   sale.salesTaxPercent = settings?.salesTaxPercent || 0;
-  sale.status = "active";
   sale.cardFee = 0;
   sale.cardFeePercent = settings?.useCardFee ? settings.cardFeePercent || 0 : 0;
-  sale.addedItems = [];
   sale.customerID = "";
   sale.createdBy = createdBy;
   return sale;
@@ -46,25 +44,10 @@ export function createNewSale(settings, createdBy = "") {
 
 // ─── Totals Calculation ───────────────────────────────────────
 // Calculates subtotal, discount, tax, card fee, and grand total
-// for an array of combined workorders + separately-added items.
+// for an array of combined workorders.
 
-export function calculateSaleTotals(combinedWorkorders, addedItems, settings) {
+export function calculateSaleTotals(combinedWorkorders, settings) {
   let allWorkorders = cloneDeep(combinedWorkorders || []);
-
-  // Build a temporary workorder-like object for added items so we
-  // can feed them through the same calculateRunningTotals pipeline.
-  if (addedItems && addedItems.length > 0) {
-    let addedItemsWO = {
-      workorderLines: addedItems.map((item) => ({
-        qty: item.qty || 1,
-        inventoryItem: item.inventoryItem || item,
-        discountObj: item.discountObj || null,
-        id: item.id,
-      })),
-      taxFree: false,
-    };
-    allWorkorders = [...allWorkorders, addedItemsWO];
-  }
 
   if (allWorkorders.length === 0) {
     return {
@@ -120,7 +103,7 @@ export function calculateSaleTotals(combinedWorkorders, addedItems, settings) {
     subtotal: Math.round(totalSubtotal),
     discount: Math.round(totalDiscount),
     discountedTotal: Math.round(discountedTotal),
-    tax,
+    salesTax: tax,
     cardFee,
     cardFeePercent: settings?.useCardFee ? settings.cardFeePercent : 0,
     salesTaxPercent,
@@ -132,13 +115,13 @@ export function calculateSaleTotals(combinedWorkorders, addedItems, settings) {
 // ─── Update Sale With Totals ──────────────────────────────────
 // Takes a sale object and recalculates all total fields in-place.
 
-export function updateSaleWithTotals(sale, combinedWorkorders, addedItems, settings) {
+export function updateSaleWithTotals(sale, combinedWorkorders, settings) {
   let updated = cloneDeep(sale);
-  let totals = calculateSaleTotals(combinedWorkorders, addedItems, settings);
+  let totals = calculateSaleTotals(combinedWorkorders, settings);
 
   updated.subtotal = totals.subtotal;
   updated.discount = totals.discount > 0 ? totals.discount : null;
-  updated.tax = totals.tax;
+  updated.salesTax = totals.salesTax;
   updated.cardFee = totals.cardFee;
   updated.cardFeePercent = totals.cardFeePercent;
   updated.salesTaxPercent = totals.salesTaxPercent;
@@ -148,85 +131,82 @@ export function updateSaleWithTotals(sale, combinedWorkorders, addedItems, setti
 }
 
 // ─── Recompute Sale Amounts ──────────────────────────────────
-// Call after any mutation to sale.payments or sale.refunds.
-// Derives amountCaptured, amountRefunded, paymentComplete, and status
+// Call after any mutation to sale.transactions or sale.refunds.
+// Derives amountCaptured, amountRefunded, and paymentComplete
 // from the arrays — single source of truth.
 
 export function recomputeSaleAmounts(sale) {
-  sale.amountCaptured = (sale.payments || []).reduce(
-    (sum, p) => sum + (p.amountCaptured || 0), 0
-  );
+  sale.amountCaptured = (sale.transactions || [])
+    .filter((t) => t.type === "payment")
+    .reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
   sale.amountRefunded = (sale.refunds || []).reduce(
     (sum, r) => sum + (r.amountRefunded || 0), 0
   );
   let fullyPaid = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
   sale.paymentComplete = fullyPaid;
-  if (fullyPaid) {
-    sale.status = "complete";
-  } else if (sale.amountCaptured > 0) {
-    sale.status = "partial";
-  }
   return sale;
 }
 
 // ─── Build Payment Object ─────────────────────────────────────
 
-export function buildCashPayment(amountCaptured, amountTendered, isCheck) {
-  let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
-  payment.id = crypto.randomUUID();
-  payment.amountCaptured = amountCaptured;
-  payment.amountTendered = amountTendered;
-  payment.cash = !isCheck;
-  payment.check = isCheck;
-  payment.millis = Date.now();
-  payment.paymentProcessor = isCheck ? "check" : "cash";
-  return payment;
+export function buildCashTransaction(amountCaptured, amountTendered, isCheck) {
+  let transaction = cloneDeep(TRANSACTION_PROTO);
+  transaction.id = generateEAN13Barcode("4");
+  transaction.type = "payment";
+  transaction.method = isCheck ? "check" : "cash";
+  transaction.amountCaptured = amountCaptured;
+  transaction.amountTendered = amountTendered;
+  transaction.millis = Date.now();
+  transaction.paymentProcessor = isCheck ? "check" : "cash";
+  return transaction;
 }
 
-export function buildCardPayment(stripeChargeData) {
-  let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
+export function buildCardTransaction(stripeChargeData) {
+  let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = stripeChargeData?.payment_method_details?.card_present;
 
-  payment.id = crypto.randomUUID();
-  payment.amountCaptured = stripeChargeData.amount_captured || 0;
-  payment.cardIssuer = card?.receipt?.application_preferred_name || "Unknown";
-  payment.cardType = card?.description || "";
-  payment.millis = Date.now();
-  payment.authorizationCode = card?.receipt?.authorization_code || "";
-  payment.paymentIntentID = stripeChargeData.payment_intent || "";
-  payment.chargeID = stripeChargeData.id || "";
-  payment.paymentProcessor = "stripe";
-  payment.receiptURL = stripeChargeData.receipt_url || "";
-  payment.last4 = card?.last4 || "";
-  payment.expMonth = card?.exp_month || "";
-  payment.expYear = card?.exp_year || "";
-  payment.networkTransactionID = card?.network_transaction_id || "";
-  payment.amountRefunded = stripeChargeData.amount_refunded || 0;
-  payment.cash = false;
+  transaction.id = generateEAN13Barcode("4");
+  transaction.type = "payment";
+  transaction.method = "card";
+  transaction.amountCaptured = stripeChargeData.amount_captured || 0;
+  transaction.cardIssuer = card?.receipt?.application_preferred_name || "Unknown";
+  transaction.cardType = card?.description || "";
+  transaction.millis = Date.now();
+  transaction.authorizationCode = card?.receipt?.authorization_code || "";
+  transaction.paymentIntentID = stripeChargeData.payment_intent || "";
+  transaction.chargeID = stripeChargeData.id || "";
+  transaction.paymentProcessor = "stripe";
+  transaction.receiptURL = stripeChargeData.receipt_url || "";
+  transaction.last4 = card?.last4 || "";
+  transaction.expMonth = card?.exp_month || "";
+  transaction.expYear = card?.exp_year || "";
+  transaction.networkTransactionID = card?.network_transaction_id || "";
+  transaction.amountRefunded = stripeChargeData.amount_refunded || 0;
 
-  return payment;
+  return transaction;
 }
 
-export function buildManualCardPayment(chargeData) {
-  let payment = cloneDeep(PAYMENT_OBJECT_PROTO);
+export function buildManualCardTransaction(chargeData) {
+  let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = chargeData?.payment_method_details?.card;
 
-  payment.id = crypto.randomUUID();
-  payment.amountCaptured = chargeData.amount_captured || 0;
-  payment.cardIssuer = card?.brand || "Unknown";
-  payment.cardType = card?.brand || "";
-  payment.millis = Date.now();
-  payment.paymentIntentID = chargeData.payment_intent || "";
-  payment.chargeID = chargeData.id || "";
-  payment.paymentProcessor = "stripe";
-  payment.receiptURL = chargeData.receipt_url || "";
-  payment.last4 = card?.last4 || "";
-  payment.expMonth = card?.exp_month || "";
-  payment.expYear = card?.exp_year || "";
-  payment.amountRefunded = chargeData.amount_refunded || 0;
-  payment.cash = false;
+  transaction.id = generateEAN13Barcode("4");
+  transaction.type = "payment";
+  transaction.method = "card";
+  transaction.amountCaptured = chargeData.amount_captured || 0;
+  transaction.cardIssuer = card?.brand || "Unknown";
+  transaction.cardType = card?.brand || "";
+  transaction.millis = Date.now();
+  transaction.paymentIntentID = chargeData.payment_intent || "";
+  transaction.chargeID = chargeData.id || "";
+  transaction.paymentProcessor = "stripe";
+  transaction.receiptURL = chargeData.receipt_url || "";
+  transaction.last4 = card?.last4 || "";
+  transaction.expMonth = card?.exp_month || "";
+  transaction.expYear = card?.exp_year || "";
+  transaction.amountRefunded = chargeData.amount_refunded || 0;
 
-  return payment;
+  return transaction;
 }
 
 // ─── Refund Validation ────────────────────────────────────────
@@ -242,10 +222,9 @@ export function calculateRefundLimits(originalSale, settings) {
     );
   }
 
-  let totalCaptured = (originalSale.payments || []).reduce(
-    (sum, p) => sum + (p.amountCaptured || 0),
-    0
-  );
+  let totalCaptured = (originalSale.transactions || [])
+    .filter((t) => t.type === "payment")
+    .reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
   let maxRefund = totalCaptured - totalPreviouslyRefunded;
   if (maxRefund < 0) maxRefund = 0;
 
@@ -299,7 +278,7 @@ export function validateCardRefundAmount(requestedAmount, payment) {
 
 export function buildRefundObject(amountRefunded, selectedLines, cardRefundID, notes, type) {
   let refund = cloneDeep(REFUND_PROTO);
-  refund.id = crypto.randomUUID();
+  refund.id = generateEAN13Barcode("4");
   refund.type = type || "";
   refund.amountRefunded = amountRefunded;
   refund.workorderLines = selectedLines || [];
@@ -375,7 +354,7 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
       base64 = generateSaleReceiptPDF(translatedReceipt, translatedPdfLabels);
     } else {
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      const receiptData = printBuilder.sale(sale, sale.payments || [], customer, workorder, settings?.salesTaxPercent, _ctx);
+      const receiptData = printBuilder.sale(sale, sale.transactions || [], customer, workorder, settings?.salesTaxPercent, _ctx);
       const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
       base64 = generateSaleReceiptPDF(receiptData);
     }

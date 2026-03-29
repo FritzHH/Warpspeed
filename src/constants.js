@@ -213,8 +213,6 @@ export const DB_NODES = {
     PUNCH_CLOCK: "punch_clock",
     PRINTERS: "printers",
     PAYMENT_PROCESSING: "payment-processing",
-    OUTGOING_MESSAGES: "outgoing-messages", // LEGACY — messages now at customer_phone/{phone}/messages
-    INCOMING_MESSAGES: "incoming-messages", // LEGACY — messages now at customer_phone/{phone}/messages
     COMPLETED_WORKORDERS: "completed-workorders",
     COMPLETED_SALES: "completed-sales",
     ACTIVE_SALES: "active-sales",

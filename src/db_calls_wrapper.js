@@ -227,18 +227,6 @@ function buildPaymentCompletionPath(
 }
 
 /**
- * Build Firestore path for outgoing message
- * @param {string} tenantID - Tenant ID
- * @param {string} storeID - Store ID
- * @param {string} customerID - Customer ID
- * @param {string} messageID - Message ID
- * @returns {string} Full Firestore path for outgoing message
- */
-// LEGACY — unused. All messages now stored at customer_phone/{phone}/messages via Cloud Functions.
-// function buildOutgoingMessagePath(tenantID, storeID, customerID, messageID) {}
-// function buildIncomingMessagePath(tenantID, storeID, customerID, messageID) {}
-
-/**
  * Build Firestore collection path for customers
  * @param {string} tenantID - Tenant ID
  * @param {string} storeID - Store ID
@@ -760,6 +748,21 @@ export async function dbSearchSalesByIdPrefix(prefix) {
     return [...activeMatches, ...completedMatches];
   } catch (error) {
     log("Error searching sales by ID prefix:", error);
+    return [];
+  }
+}
+
+export async function dbGetStandaloneActiveSales() {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+    const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/active-sales`;
+    const results = await firestoreQuery(path, [
+      { field: "customerID", operator: "==", value: "" },
+    ]);
+    return results.filter((s) => !s.paymentComplete);
+  } catch (error) {
+    log("Error fetching standalone active sales:", error);
     return [];
   }
 }

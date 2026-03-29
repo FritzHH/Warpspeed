@@ -54,7 +54,7 @@ const SectionHeader = ({ text }) => (
 // ─── Sale Card ──────────────────────────────────────────────────
 
 const SaleCard = ({ sale, onRefund }) => {
-  const payments = sale.payments || [];
+  const payments = sale.transactions || [];
   const refunds = sale.refunds || [];
   const hasRefunds = (sale.amountRefunded || 0) > 0;
 
@@ -129,10 +129,10 @@ const SaleCard = ({ sale, onRefund }) => {
             <Text style={{ fontSize: 13, color: C.lightred }}>{"-$" + formatCurrencyDisp(sale.discount)}</Text>
           </View>
         )}
-        {(sale.tax || 0) > 0 && (
+        {(sale.salesTax || sale.tax || 0) > 0 && (
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
             <Text style={{ fontSize: 13, color: gray(0.45) }}>Tax</Text>
-            <Text style={{ fontSize: 13, color: C.text }}>{"$" + formatCurrencyDisp(sale.tax)}</Text>
+            <Text style={{ fontSize: 13, color: C.text }}>{"$" + formatCurrencyDisp(sale.salesTax || sale.tax)}</Text>
           </View>
         )}
         <View style={{ height: 1, backgroundColor: gray(0.1), marginVertical: 3 }} />
@@ -149,7 +149,7 @@ const SaleCard = ({ sale, onRefund }) => {
           {payments.map((p, idx) => (
             <View key={p.id || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
               <Text style={{ fontSize: 13, color: gray(0.5) }}>
-                {p.cash ? "Cash" : p.check ? "Check" : (p.cardType || "Card") + (p.last4 ? " ..." + p.last4 : "")}
+                {p.method === "cash" ? "Cash" : p.method === "check" ? "Check" : (p.cardType || "Card") + (p.last4 ? " ..." + p.last4 : "")}
               </Text>
               <Text style={{ fontSize: 13, color: C.text }}>{"$" + formatCurrencyDisp(p.amountCaptured)}</Text>
             </View>
@@ -172,7 +172,7 @@ const SaleCard = ({ sale, onRefund }) => {
               <Text style={{ fontSize: 13, color: C.lightred }}>
                 {r.notes ? r.notes : "Refund #" + (idx + 1)}
               </Text>
-              <Text style={{ fontSize: 13, color: C.lightred }}>{"-$" + formatCurrencyDisp(r.amount)}</Text>
+              <Text style={{ fontSize: 13, color: C.lightred }}>{"-$" + formatCurrencyDisp(r.amountRefunded || r.amount)}</Text>
             </View>
           ))}
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>

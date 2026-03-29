@@ -554,7 +554,7 @@ export const ScreenModal = ({
       }}
     >
       <View style={{}}>
-        {buttonVisible && ButtonComponent && <ButtonComponent />}
+        {buttonVisible && ButtonComponent && ButtonComponent()}
         {buttonVisible && !ButtonComponent && (
           <Button_
             enabled={enabled}
@@ -615,7 +615,7 @@ export const ScreenModal = ({
               left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
             }}
           >
-            <Component />
+            {Component()}
           </View>
         </Modal>
       </View>
@@ -2239,7 +2239,7 @@ export const Button_ = ({
             alignItems: "center",
             justifyContent: "center",
             flexDirection: "row",
-            borderRadius: 15,
+            borderRadius: 5,
             paddingVertical: 5,
             paddingHorizontal: 15,
             paddingLeft: icon ? 10 : null,
@@ -3283,11 +3283,15 @@ export const StatusPickerModal = ({
   );
 };
 
-export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) => {
+export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inlineStyle }) => {
   const [sDepositType, _sSetDepositType] = useState(CUSTOMER_DEPOST_TYPES.deposit);
   const [sDepositAmount, _sSetDepositAmount] = useState("");
   const [sDepositAmountCents, _sSetDepositAmountCents] = useState(0);
   const [sDepositNote, _sSetDepositNote] = useState("");
+
+  let isCredit = sDepositType === CUSTOMER_DEPOST_TYPES.credit;
+  let creditReady = isCredit && sDepositAmountCents >= 100 && sDepositNote.trim().length > 3;
+  let depositReady = !isCredit && sDepositAmountCents > 0;
 
   function resetAndClose() {
     _sSetDepositAmount("");
@@ -3295,6 +3299,16 @@ export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) =
     _sSetDepositNote("");
     _sSetDepositType(CUSTOMER_DEPOST_TYPES.deposit);
     onClose();
+  }
+
+  function handleCreditConfirm() {
+    if (onCredit) {
+      onCredit({
+        amountCents: sDepositAmountCents,
+        text: sDepositNote.trim(),
+      });
+    }
+    resetAndClose();
   }
 
   if (!visible) return null;
@@ -3329,6 +3343,25 @@ export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) =
             textStyle={{ fontSize: 14 }}
           />
         </View>
+
+      {isCredit && (
+        <View style={{
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: "rgb(255,248,230)",
+          borderWidth: 1,
+          borderColor: "rgb(230,190,80)",
+          borderRadius: 7,
+          padding: 10,
+          marginBottom: 12,
+        }}>
+          <Text style={{ fontSize: 18, marginRight: 8 }}>!</Text>
+          <Text style={{ fontSize: 12, color: "rgb(140,100,20)", flex: 1, lineHeight: 17 }}>
+            Applying a credit will give a customer future free money
+          </Text>
+        </View>
+      )}
+
         <View style={{ flexDirection: "row", alignItems: "center", borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderRadius: 7, backgroundColor: C.listItemWhite, marginBottom: 10, paddingHorizontal: 10, height: 40 }}>
           <Text style={{ fontSize: 16, color: gray(0.4), marginRight: 4 }}>$</Text>
           <TextInput_
@@ -3354,7 +3387,7 @@ export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) =
           />
         </View>
         <TextInput_
-          placeholder="Note (optional)"
+        placeholder={isCredit ? "Reason (required)" : "Note (optional)"}
           placeholderTextColor={gray(0.35)}
           value={sDepositNote}
           onChangeText={(val) => _sSetDepositNote(val)}
@@ -3363,7 +3396,7 @@ export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) =
           numberOfLines={5}
           blurOnSubmit={false}
           style={{
-            borderColor: gray(0.08),
+            borderColor: isCredit && sDepositNote.trim().length === 0 ? C.orange : gray(0.08),
             borderWidth: 1,
             borderRadius: 7,
             paddingHorizontal: 10,
@@ -3384,18 +3417,23 @@ export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) =
             onPress={resetAndClose}
           />
           <Button_
-            text="Pay Amount"
-            colorGradientArr={COLOR_GRADIENTS.green}
+          text={isCredit ? "Apply Credit" : "Pay Amount"}
+          colorGradientArr={isCredit ? COLOR_GRADIENTS.blue : COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 13 }}
-            buttonStyle={{ width: 110, height: 34, borderRadius: 6 }}
+          buttonStyle={{ width: 110, height: 34, borderRadius: 6, opacity: isCredit ? (creditReady ? 1 : 0.4) : (depositReady ? 1 : 0.4) }}
             onPress={() => {
-              if (sDepositAmountCents <= 0) return;
-              onPay({
-                type: sDepositType,
-                amountCents: sDepositAmountCents,
-                note: sDepositNote,
-              });
-              resetAndClose();
+              if (isCredit) {
+                if (!creditReady) return;
+                handleCreditConfirm();
+              } else {
+                if (!depositReady) return;
+                onPay({
+                  type: sDepositType,
+                  amountCents: sDepositAmountCents,
+                  note: sDepositNote,
+                });
+                resetAndClose();
+              }
             }}
           />
         </View>
@@ -3429,78 +3467,105 @@ export const DepositModal = ({ visible, onClose, onPay, inline, inlineStyle }) =
   );
 };
 
-export const DepositsList = ({ deposits, onPress }) => {
+export const DepositsList = ({ deposits, credits, onPress, onRemoveCredit }) => {
+  let [sConfirmId, _sSetConfirmId] = useState(null);
   let activeDeposits = (deposits || []).filter((d) => d.amountCents > 0);
+  let activeCredits = (credits || []).filter((d) => d.amountCents > 0);
+  let allItems = [
+    ...activeDeposits.map((d) => ({ ...d, _type: "deposit" })),
+    ...activeCredits.map((d) => ({ ...d, _type: "credit" })),
+  ];
   return (
     <View style={{ marginTop: 10, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 10, padding: 10, backgroundColor: C.listItemWhite }}>
-      <Text style={{ fontSize: 15, fontWeight: "600", marginBottom: 6 }}>
-        <Text style={{ color: C.green }}>Deposits</Text>
-        <Text style={{ color: gray(0.4) }}> / </Text>
-        <Text style={{ color: C.blue }}>Credits</Text>
+      <Text style={{ fontSize: 15, fontWeight: "600", marginBottom: 6, color: C.green }}>
+        Deposits / Credits
       </Text>
-      {activeDeposits.length === 0 && (
+      {allItems.length === 0 && (
         <Text style={{ color: gray(0.4), fontSize: 12, textAlign: "center", marginTop: 4 }}>
-          No deposits on file
+          No deposits or credits on file
         </Text>
       )}
-      {activeDeposits.map((deposit) => (
-        <TouchableOpacity_
-          key={deposit.id}
-          onPress={() => onPress && onPress(deposit)}
-          hoverOpacity={onPress ? 0.7 : 1}
-          style={{
-            marginBottom: 4,
-            borderRadius: 7,
-            borderLeftWidth: 4,
-            borderLeftColor: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : (deposit.cash ? C.orange : C.green),
-            borderColor: C.buttonLightGreenOutline,
-            borderWidth: 1,
-            backgroundColor: C.listItemWhite,
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View
-                style={{
-                  backgroundColor: deposit.type === CUSTOMER_DEPOST_TYPES.credit
-                    ? lightenRGBByPercent(C.blue, 70)
-                    : (deposit.cash ? lightenRGBByPercent(C.orange, 70) : lightenRGBByPercent(C.green, 70)),
-                  paddingHorizontal: 6,
-                  paddingVertical: 1,
-                  borderRadius: 8,
-                  marginRight: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    fontWeight: "600",
-                    color: deposit.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : (deposit.cash ? C.orange : C.green),
-                  }}
+      {allItems.map((item) => {
+        let isCredit = item._type === "credit";
+        let badgeColor = isCredit ? C.blue : (item.method === "cash" ? C.orange : C.green);
+        let noteText = item.note || item.text || "";
+        let isConfirming = sConfirmId === item.id;
+        return (
+          <View key={item.id}>
+            {isConfirming && (
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 4, gap: 6 }}>
+                <TouchableOpacity
+                  onPress={() => { _sSetConfirmId(null); if (onRemoveCredit) onRemoveCredit(item); }}
+                  style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 4, paddingHorizontal: 10 }}
                 >
-                  {deposit.type === CUSTOMER_DEPOST_TYPES.credit ? "Credit" : "Deposit"}
+                  <Text style={{ color: C.textWhite, fontSize: 11, fontWeight: "600" }}>Confirm Remove</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => _sSetConfirmId(null)}
+                  style={{ backgroundColor: gray(0.6), borderRadius: 5, paddingVertical: 4, paddingHorizontal: 10 }}
+                >
+                  <Text style={{ color: C.textWhite, fontSize: 11, fontWeight: "600" }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <TouchableOpacity_
+              onPress={() => onPress && onPress(item)}
+              hoverOpacity={onPress ? 0.7 : 1}
+              style={{
+                marginBottom: 4,
+                borderRadius: 7,
+                borderLeftWidth: 4,
+                borderLeftColor: badgeColor,
+                borderColor: C.buttonLightGreenOutline,
+                borderWidth: 1,
+                backgroundColor: C.listItemWhite,
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
+                    style={{
+                      backgroundColor: lightenRGBByPercent(badgeColor, 70),
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      borderRadius: 8,
+                      marginRight: 6,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: "600", color: badgeColor }}>
+                      {isCredit ? "Credit" : "Deposit"}
+                    </Text>
+                  </View>
+                  {!!noteText && (
+                    <Text numberOfLines={1} style={{ fontSize: 11, color: gray(0.5), flex: 1 }}>
+                      {noteText}
+                    </Text>
+                  )}
+                </View>
+                <Text style={{ fontSize: 12, color: gray(0.4), marginTop: 2 }}>
+                  {formatMillisForDisplay(item.millis)}
                 </Text>
               </View>
-              {!!deposit.note && (
-                <Text numberOfLines={1} style={{ fontSize: 11, color: gray(0.5), flex: 1 }}>
-                  {deposit.note}
-                </Text>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text, marginRight: isCredit && onRemoveCredit ? 8 : 0 }}>
+                {"$" + formatCurrencyDisp(item.amountCents)}
+              </Text>
+              {isCredit && onRemoveCredit && (
+                <TouchableOpacity
+                  onPress={(e) => { e.stopPropagation(); _sSetConfirmId(item.id); }}
+                  style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 3, paddingHorizontal: 8 }}
+                >
+                  <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>Remove</Text>
+                </TouchableOpacity>
               )}
-            </View>
-            <Text style={{ fontSize: 12, color: gray(0.4), marginTop: 2 }}>
-              {formatMillisForDisplay(deposit.millis)}
-            </Text>
+            </TouchableOpacity_>
           </View>
-          <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
-            {"$" + formatCurrencyDisp(deposit.amountCents)}
-          </Text>
-        </TouchableOpacity_>
-      ))}
+        );
+      })}
     </View>
   );
 };

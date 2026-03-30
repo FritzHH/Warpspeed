@@ -67,8 +67,30 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
   // Build the full display list: combined first, then uncombined
   let allWOs = [...combinedWorkorders, ...uncombinedWOs];
 
+  let hasUncombined = uncombinedWOs.length > 0;
+
   return (
     <View>
+      {saleHasPayments && hasUncombined && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: lightenRGBByPercent(C.orange, 85),
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: lightenRGBByPercent(C.orange, 50),
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            marginBottom: 8,
+          }}
+        >
+          <Image_ source={ICONS.info} style={{ width: 18, height: 18, marginRight: 8 }} />
+          <Text style={{ color: C.text, fontSize: 13, flex: 1 }}>
+            {"Remove all payments and credits to combine workorders"}
+          </Text>
+        </View>
+      )}
       {allWOs.map((wo, idx) => {
         let isCombined = !!combinedWorkorders.find((c) => c.id === wo.id);
         let isPrimary = wo.id === primaryWorkorderID;
@@ -78,22 +100,6 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
 
         return (
           <View key={wo.id}>
-            {/* Combine checkbox — only for non-primary workorders */}
-            {!isPrimary && (
-              <CheckBox_
-                enabled={!saleHasPayments}
-                buttonStyle={{
-                  alignSelf: "flex-start",
-                  marginTop: 5,
-                  marginBottom: 5,
-                }}
-                isChecked={isCombined}
-                textStyle={{ color: C.text }}
-                text={"ADD TO SALE"}
-                onCheck={() => onToggle(wo)}
-              />
-            )}
-
             {/* Workorder card */}
             <View
               style={{
@@ -106,13 +112,39 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                 backgroundColor: lightenRGBByPercent(C.backgroundWhite, 60),
               }}
             >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 0,
+                }}
+              >
+                <Text style={{ color: C.blue, fontSize: 14, fontWeight: "500", marginRight: 8 }}>
+                  {"Workorder #" + wo.workorderNumber}
+                </Text>
+                {!isPrimary && (
+                  <CheckBox_
+                    enabled={!saleHasPayments}
+                    buttonStyle={{
+                      marginTop: 0,
+                      marginBottom: 0,
+                    }}
+                    isChecked={isCombined}
+                    textStyle={{ color: C.text }}
+                    text={"ADD TO SALE"}
+                    onCheck={() => onToggle(wo)}
+                  />
+                )}
+              </View>
               {/* WO Header */}
               <View
                 style={{
                   flexDirection: "row",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  padding: 10,
+                  paddingHorizontal: 10,
+                  paddingBottom: 10,
+                  paddingTop: 1,
                   borderBottomWidth: 1,
                   borderBottomColor: gray(0.1),
                   marginBottom: 10,
@@ -218,6 +250,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                           width: "60%",
                           justifyContent: "center",
                           flexDirection: "column",
+                          overflow: "hidden",
                         }}
                       >
                         <View style={{ width: "100%" }}>

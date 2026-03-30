@@ -584,3 +584,130 @@ export async function markItemSalesRefunded(saleID, refundedLines) {
     return { success: false, error };
   }
 }
+
+// ─── Sales Report Query ─────────────────────────────────────────
+
+async function readCustomersBatch(customerIDs) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID || !customerIDs?.length) return {};
+  let map = {};
+  for (let i = 0; i < customerIDs.length; i += 50) {
+    let chunk = customerIDs.slice(i, i + 50);
+    let results = await Promise.all(
+      chunk.map((id) => {
+        let path = `tenants/${tenantID}/stores/${storeID}/customers/${id}`;
+        return firestoreRead(path).catch(() => null);
+      })
+    );
+    results.forEach((cust, idx) => {
+      if (cust) map[chunk[idx]] = cust;
+    });
+  }
+  return map;
+}
+
+export async function queryCompletedSalesReport(startMillis, endMillis) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("queryCompletedSalesReport: missing tenantID/storeID");
+      return [];
+    }
+
+    // Phase 1: Query completed-sales by millis range
+    const salesPath = `tenants/${tenantID}/stores/${storeID}/completed-sales`;
+    const sales = await firestoreQuery(salesPath, [
+      { field: "millis", operator: ">=", value: startMillis },
+      { field: "millis", operator: "<=", value: endMillis },
+    ], {
+      orderBy: { field: "millis", direction: "desc" },
+      limit: 2000,
+    });
+
+    if (!sales || sales.length === 0) return [];
+
+    // Collect unique transaction IDs and customer IDs
+    let allTxnIDs = [];
+    let txnIDSet = new Set();
+    let uniqueCustomerIDs = [];
+    let custIDSet = new Set();
+
+    sales.forEach((sale) => {
+      (sale.transactionIDs || []).forEach((id) => {
+        if (!txnIDSet.has(id)) { txnIDSet.add(id); allTxnIDs.push(id); }
+      });
+      if (sale.customerID && !custIDSet.has(sale.customerID)) {
+        custIDSet.add(sale.customerID);
+        uniqueCustomerIDs.push(sale.customerID);
+      }
+    });
+
+    // Phase 2 + 3: Fetch transactions and customers in parallel
+    let txnMapPromise = (async () => {
+      let map = {};
+      for (let i = 0; i < allTxnIDs.length; i += 50) {
+        let chunk = allTxnIDs.slice(i, i + 50);
+        let results = await readTransactions(chunk);
+        results.forEach((txn) => { map[txn.id] = txn; });
+      }
+      return map;
+    })();
+
+    let [txnMap, customerMap] = await Promise.all([
+      txnMapPromise,
+      readCustomersBatch(uniqueCustomerIDs),
+    ]);
+
+    // Phase 4: Flatten into report rows
+    let flatRows = [];
+    for (let sale of sales) {
+      let customer = customerMap[sale.customerID] || {};
+      let custFirst = customer.first || "";
+      let custLast = customer.last || "";
+      let custCell = customer.customerCell || "";
+      let custEmail = customer.email || "";
+
+      for (let txnID of (sale.transactionIDs || [])) {
+        let txn = txnMap[txnID];
+        if (!txn) continue;
+
+        // Payment row
+        flatRows.push({
+          saleID: sale.id,
+          customerFirst: custFirst,
+          customerLast: custLast,
+          customerCell: custCell,
+          customerEmail: custEmail,
+          type: "payment",
+          method: txn.method || "",
+          amountCaptured: txn.amountCaptured || 0,
+          salesTax: txn.salesTax || 0,
+          millis: txn.millis || sale.millis,
+          id: txn.id,
+        });
+
+        // Refund rows from this transaction
+        (txn.refunds || []).forEach((refund) => {
+          flatRows.push({
+            saleID: sale.id,
+            customerFirst: custFirst,
+            customerLast: custLast,
+            customerCell: custCell,
+            customerEmail: custEmail,
+            type: "refund",
+            method: refund.method || txn.method || "",
+            amountCaptured: refund.amount || 0,
+            salesTax: refund.salesTax || 0,
+            millis: refund.millis || txn.millis,
+            id: refund.id || (txn.id + "-refund"),
+          });
+        });
+      }
+    }
+
+    return flatRows;
+  } catch (error) {
+    log("queryCompletedSalesReport error:", error);
+    return [];
+  }
+}

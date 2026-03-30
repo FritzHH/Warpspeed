@@ -5904,8 +5904,8 @@ const ImportComponent = () => {
         workorderMap[lsSaleID].push(wo);
       }
     }
-    const sales = mapSales(salesText, spText, stripeText, workorderMap, customerMap, customerRedirectMap);
-    _lsCsvData = { customers, customerMap, customerRedirectMap, workorders, sales, itemsText };
+    const { sales, transactions } = mapSales(salesText, spText, stripeText, workorderMap, customerMap, customerRedirectMap);
+    _lsCsvData = { customers, customerMap, customerRedirectMap, workorders, sales, transactions, itemsText };
     return _lsCsvData;
   }
 
@@ -6178,6 +6178,7 @@ const ImportComponent = () => {
         dbClearCollection("active-sales"),
         dbClearCollection("inventory"),
         dbClearCollection("punches"),
+        dbClearCollection("transactions"),
       ]);
       console.log("[Migration] Collections cleared.");
 
@@ -6288,6 +6289,15 @@ const ImportComponent = () => {
       }
       console.log("[Migration] Sales done.");
 
+      // Save transactions
+      _setMigrationStep("Saving transactions...");
+      console.log("[Migration] Saving " + freshData.transactions.length + " transactions...");
+      _setMigrationProgress({ done: 0, total: freshData.transactions.length });
+      await dbBatchWrite(freshData.transactions, "transactions", (done) => {
+        _setMigrationProgress({ done, total: freshData.transactions.length });
+      });
+      console.log("[Migration] Transactions done.");
+
       // Map & save employees and punch history
       _setMigrationStep("Mapping employees...");
       const empCsvText = await fetch("/lightspeed/employees.csv").then(r => r.ok ? r.text() : "").catch(() => "");
@@ -6336,6 +6346,7 @@ const ImportComponent = () => {
         completedWorkorders.length + " completed WOs, " +
         completedSales.length + " completed sales, " +
         linkedIncompleteSales.length + " active sales, " +
+        freshData.transactions.length + " transactions, " +
         employeeCount + " employees, " +
         punchCount + " punches";
       console.log("[Migration] " + summary);
@@ -6398,7 +6409,7 @@ const ImportComponent = () => {
       const empHoursCsvText = await fetch("/lightspeed/employeeHours.csv").then(r => r.ok ? r.text() : "").catch(() => "");
       const { users: allEmployees, employeeIDMap } = empCsvText ? mapEmployees(empCsvText) : { users: [], employeeIDMap: {} };
       const allPunches = empHoursCsvText ? mapPunchHistory(empHoursCsvText, employeeIDMap) : [];
-      console.log("[Dev Export] Full mapping complete: " + freshData.workorders.length + " WOs, " + freshData.customers.length + " customers, " + freshData.sales.length + " sales, " + allEmployees.length + " employees, " + allPunches.length + " punches.");
+      console.log("[Dev Export] Full mapping complete: " + freshData.workorders.length + " WOs, " + freshData.customers.length + " customers, " + freshData.sales.length + " sales, " + freshData.transactions.length + " transactions, " + allEmployees.length + " employees, " + allPunches.length + " punches.");
 
       // 2. Pick 50 most recent workorders
       _setMigrationStep("Filtering to 50 most recent WOs...");
@@ -6430,6 +6441,8 @@ const ImportComponent = () => {
       // Filter each collection to only referenced items
       const filteredCustomers = freshData.customers.filter(c => customerIDSet.has(c.id));
       const filteredSales = freshData.sales.filter(s => saleIDSet.has(s.id) || saleIDSet.has(s.lightspeed_id));
+      const filteredSaleIDSet = new Set(filteredSales.map(s => s.id));
+      const filteredTransactions = freshData.transactions.filter(t => filteredSaleIDSet.has(t.saleID));
       const filteredEmployees = allEmployees.filter(u => employeeUserIDSet.has(u.id));
       const filteredPunches = allPunches.filter(p => employeeUserIDSet.has(p.userID));
 
@@ -6470,7 +6483,7 @@ const ImportComponent = () => {
       // Workorder lines use inline custom items, not inventory IDs - include full inventory for dev
       const filteredInventory = allMappedItems;
 
-      console.log("[Dev Export] Filtered: " + selectedWOs.length + " WOs, " + filteredCustomers.length + " customers, " + filteredSales.length + " sales, " + filteredInventory.length + " inventory, " + filteredEmployees.length + " employees, " + filteredPunches.length + " punches.");
+      console.log("[Dev Export] Filtered: " + selectedWOs.length + " WOs, " + filteredCustomers.length + " customers, " + filteredSales.length + " sales, " + filteredTransactions.length + " transactions, " + filteredInventory.length + " inventory, " + filteredEmployees.length + " employees, " + filteredPunches.length + " punches.");
 
       // 4. Write 7 CSV files to selected folder
       _setMigrationStep("Writing CSVs to folder...");
@@ -6491,9 +6504,14 @@ const ImportComponent = () => {
       await writeCsvToDir(dirHandle, "_import_workorders.csv", buildCsvString(woHeaders, woRows));
 
       // _import_sales.csv
-      const saleHeaders = ["id", "lightspeed_id", "millis", "subtotal", "discount", "salesTax", "salesTaxPercent", "total", "amountCaptured", "amountRefunded", "paymentComplete", "workorderIDs", "transactions", "_importSource"];
-      const saleRows = filteredSales.map(s => [s.id, s.lightspeed_id, s.millis, s.subtotal, s.discount, s.salesTax, s.salesTaxPercent, s.total, s.amountCaptured, s.amountRefunded, s.paymentComplete, JSON.stringify(s.workorderIDs), JSON.stringify(s.transactions), s._importSource]);
+      const saleHeaders = ["id", "lightspeed_id", "millis", "subtotal", "discount", "salesTax", "salesTaxPercent", "total", "amountCaptured", "amountRefunded", "paymentComplete", "workorderIDs", "transactionIDs", "pendingTransactionIDs", "pendingRefundIDs", "creditsApplied", "customerID", "_importSource"];
+      const saleRows = filteredSales.map(s => [s.id, s.lightspeed_id, s.millis, s.subtotal, s.discount, s.salesTax, s.salesTaxPercent, s.total, s.amountCaptured, s.amountRefunded, s.paymentComplete, JSON.stringify(s.workorderIDs), JSON.stringify(s.transactionIDs), JSON.stringify(s.pendingTransactionIDs), JSON.stringify(s.pendingRefundIDs), JSON.stringify(s.creditsApplied), s.customerID, s._importSource]);
       await writeCsvToDir(dirHandle, "_import_sales.csv", buildCsvString(saleHeaders, saleRows));
+
+      // _import_transactions.csv
+      const txnHeaders = ["id", "saleID", "type", "method", "amountCaptured", "amountTendered", "salesTax", "cardType", "cardIssuer", "last4", "authorizationCode", "millis", "paymentProcessor", "chargeID", "paymentIntentID", "receiptURL", "expMonth", "expYear", "networkTransactionID", "amountRefunded", "refunds", "_cardFundingSource", "_entryMode"];
+      const txnRows = filteredTransactions.map(t => [t.id, t.saleID, t.type, t.method, t.amountCaptured, t.amountTendered, t.salesTax, t.cardType, t.cardIssuer, t.last4, t.authorizationCode, t.millis, t.paymentProcessor, t.chargeID, t.paymentIntentID, t.receiptURL, t.expMonth, t.expYear, t.networkTransactionID, t.amountRefunded, JSON.stringify(t.refunds), t._cardFundingSource, t._entryMode]);
+      await writeCsvToDir(dirHandle, "_import_transactions.csv", buildCsvString(txnHeaders, txnRows));
 
       // _import_inventory.csv
       const invHeaders = ["id", "formalName", "informalName", "brand", "price", "salePrice", "cost", "category", "upc", "ean", "customSku", "manufacturerSku", "minutes", "customPart", "customLabor"];
@@ -6514,10 +6532,11 @@ const ImportComponent = () => {
         selectedWOs.length + "/" + freshData.workorders.length + " workorders, " +
         filteredCustomers.length + " customers, " +
         filteredSales.length + " sales, " +
+        filteredTransactions.length + " transactions, " +
         filteredInventory.length + " inventory, " +
         filteredEmployees.length + " employees, " +
         filteredPunches.length + " punches, " +
-        mergedStatuses.length + " statuses. 7 CSVs downloaded.";
+        mergedStatuses.length + " statuses. 8 CSVs downloaded.";
       console.log("[Dev Export] " + summary);
       _setMigrationStep("Complete!");
       _setMigrationProgress({ done: 0, total: 0 });
@@ -6541,7 +6560,7 @@ const ImportComponent = () => {
     try {
       const dirHandle = await window.showDirectoryPicker({ mode: "read" });
 
-      // --- Read all 7 CSV files ---
+      // --- Read all 8 CSV files ---
       _setMigrationStep("Reading CSV files...");
       const readFile = async (name) => {
         try {
@@ -6553,11 +6572,12 @@ const ImportComponent = () => {
         }
       };
 
-      const [statusesTxt, customersTxt, workordersTxt, salesTxt, inventoryTxt, employeesTxt, punchesTxt] = await Promise.all([
+      const [statusesTxt, customersTxt, workordersTxt, salesTxt, transactionsTxt, inventoryTxt, employeesTxt, punchesTxt] = await Promise.all([
         readFile("_import_statuses.csv"),
         readFile("_import_customers.csv"),
         readFile("_import_workorders.csv"),
         readFile("_import_sales.csv"),
+        readFile("_import_transactions.csv"),
         readFile("_import_inventory.csv"),
         readFile("_import_employees.csv"),
         readFile("_import_punches.csv"),
@@ -6568,6 +6588,7 @@ const ImportComponent = () => {
       if (!customersTxt) missing.push("_import_customers.csv");
       if (!workordersTxt) missing.push("_import_workorders.csv");
       if (!salesTxt) missing.push("_import_sales.csv");
+      if (!transactionsTxt) missing.push("_import_transactions.csv");
       if (!inventoryTxt) missing.push("_import_inventory.csv");
       if (!employeesTxt) missing.push("_import_employees.csv");
       if (!punchesTxt) missing.push("_import_punches.csv");
@@ -6581,17 +6602,19 @@ const ImportComponent = () => {
       const customers = customersTxt ? parseCSV(customersTxt) : [];
       const workorders = workordersTxt ? parseCSV(workordersTxt) : [];
       const sales = salesTxt ? parseCSV(salesTxt) : [];
+      const transactions = transactionsTxt ? parseCSV(transactionsTxt) : [];
       const inventory = inventoryTxt ? parseCSV(inventoryTxt) : [];
       const employees = employeesTxt ? parseCSV(employeesTxt) : [];
       const punches = punchesTxt ? parseCSV(punchesTxt) : [];
 
-      info.push("Parsed: " + statuses.length + " statuses, " + customers.length + " customers, " + workorders.length + " workorders, " + sales.length + " sales, " + inventory.length + " inventory, " + employees.length + " employees, " + punches.length + " punches");
+      info.push("Parsed: " + statuses.length + " statuses, " + customers.length + " customers, " + workorders.length + " workorders, " + sales.length + " sales, " + transactions.length + " transactions, " + inventory.length + " inventory, " + employees.length + " employees, " + punches.length + " punches");
 
       // --- Build ID sets for lookups ---
       const statusIDSet = new Set(statuses.map(s => s.id));
       const customerIDSet = new Set(customers.map(c => c.id));
       const saleIDSet = new Set(sales.map(s => s.id));
       const saleLsIDSet = new Set(sales.map(s => s.lightspeed_id).filter(Boolean));
+      const transactionIDSet = new Set(transactions.map(t => t.id));
       const inventoryIDSet = new Set(inventory.map(i => i.id));
       const employeeIDSet = new Set(employees.map(e => e.id));
       const workorderIDSet = new Set(workorders.map(w => w.id));
@@ -6614,6 +6637,7 @@ const ImportComponent = () => {
       checkDuplicates(customers, "Customers");
       checkDuplicates(workorders, "Workorders");
       checkDuplicates(sales, "Sales");
+      checkDuplicates(transactions, "Transactions");
       checkDuplicates(inventory, "Inventory");
       checkDuplicates(employees, "Employees");
       checkDuplicates(punches, "Punches");
@@ -6824,13 +6848,39 @@ const ImportComponent = () => {
           warnings.push("Sale " + sale.id + ": marked complete but captured(" + captured + ") < total(" + total + ")");
         }
 
-        // Validate transactionIDs array
-        if (sale.transactionIDs && !Array.isArray(sale.transactionIDs)) {
-          errors.push("Sale " + sale.id + ": transactionIDs is not an array");
-        }
       }
       if (saleFinancialIssues === 0) info.push("Sale financials: all " + sales.length + " sales check out");
       else if (saleFinancialIssues > 6) warnings.push("...and " + (saleFinancialIssues - 6) + " more sale financial issues");
+
+      // ================================================================
+      // 12b. SALE → TRANSACTION (transactionIDs reference check)
+      // ================================================================
+      _setMigrationStep("Validating sale → transaction...");
+      let saleTxnMissing = 0;
+      let saleTxnLinks = 0;
+      for (const sale of sales) {
+        let txnIDs = [];
+        try { txnIDs = JSON.parse(sale.transactionIDs || "[]"); } catch (e) { errors.push("Sale " + sale.id + ": invalid transactionIDs JSON"); continue; }
+        if (!Array.isArray(txnIDs)) { errors.push("Sale " + sale.id + ": transactionIDs is not an array"); continue; }
+        for (const txnID of txnIDs) {
+          saleTxnLinks++;
+          if (!transactionIDSet.has(txnID)) saleTxnMissing++;
+        }
+      }
+      if (saleTxnMissing > 0) errors.push("Sale → Transaction: " + saleTxnMissing + "/" + saleTxnLinks + " transactionIDs reference missing transactions");
+      else info.push("Sale → Transaction: all " + saleTxnLinks + " links OK");
+
+      // ================================================================
+      // 12c. TRANSACTION → SALE (saleID back-reference check)
+      // ================================================================
+      _setMigrationStep("Validating transaction → sale...");
+      let txnSaleMissing = 0;
+      for (const txn of transactions) {
+        if (!txn.saleID) { errors.push("Transaction " + txn.id + ": empty saleID"); continue; }
+        if (!saleIDSet.has(txn.saleID)) txnSaleMissing++;
+      }
+      if (txnSaleMissing > 0) warnings.push("Transaction → Sale: " + txnSaleMissing + "/" + transactions.length + " transactions reference sales not in export (may be outside 50-WO window)");
+      else info.push("Transaction → Sale: all " + transactions.length + " OK");
 
       // ================================================================
       // 13. WORKORDER TIMESTAMP SANITY
@@ -6948,6 +6998,235 @@ const ImportComponent = () => {
         _setMigrationStep("Error");
         _setLsResult("Validation error: " + e.message);
       }
+    }
+    _setDevMigrating(false);
+  }
+
+  async function handleDevUploadMigration() {
+    if (!window.confirm("This will CLEAR all collections and upload 20 most recent workorders + all associated data to the database. Continue?")) return;
+    _setDevMigrating(true);
+    _setMigrationStep("Loading & mapping CSVs...");
+    _setMigrationProgress({ done: 0, total: 0 });
+    _setLsResult("");
+    const migrationStart = Date.now();
+
+    try {
+      // Invalidate cached CSV data so fresh files are always used
+      _lsCsvData = null;
+
+      // Clear existing collections before writing
+      _setMigrationStep("Clearing collections...");
+      console.log("[Dev Upload] Clearing collections...");
+      await Promise.all([
+        dbClearCollection("open-workorders"),
+        dbClearCollection("completed-workorders"),
+        dbClearCollection("customers"),
+        dbClearCollection("completed-sales"),
+        dbClearCollection("active-sales"),
+        dbClearCollection("inventory"),
+        dbClearCollection("punches"),
+        dbClearCollection("transactions"),
+      ]);
+      console.log("[Dev Upload] Collections cleared.");
+
+      // Extract statuses first so the mapping resolves status IDs correctly
+      const settings = cloneDeep(useSettingsStore.getState().settings || {});
+      _setMigrationStep("Extracting statuses...");
+      console.log("[Dev Upload] Extracting statuses...");
+      const statusesText = await fetch("/import_data/statuses.csv").then(r => r.text());
+      const mergedStatuses = mapStatuses(statusesText);
+      settings.statuses = mergedStatuses;
+      await dbSaveSettings(settings);
+      useSettingsStore.getState().setSettings(settings);
+
+      // Load & map all CSV data with correct statuses
+      _setMigrationStep("Loading & mapping CSVs...");
+      console.log("[Dev Upload] Loading & mapping CSVs...");
+      _lsCsvData = null;
+      const freshData = await loadAndCacheLightspeedData();
+
+      // Pick 20 most recent workorders
+      const sorted = [...freshData.workorders]
+        .filter(wo => wo.startedOnMillis)
+        .sort((a, b) => b.startedOnMillis - a.startedOnMillis);
+      const selectedWOs = sorted.slice(0, 20);
+      console.log("[Dev Upload] Selected " + selectedWOs.length + " most recent workorders.");
+
+      // Collect referenced IDs from those 20 workorders
+      const customerIDSet = new Set();
+      const saleIDSet = new Set();
+      for (const wo of selectedWOs) {
+        if (wo.customerID) customerIDSet.add(wo.customerID);
+        if (wo.saleID) saleIDSet.add(wo.saleID);
+      }
+
+      // Filter associated data
+      const filteredCustomers = freshData.customers.filter(c => customerIDSet.has(c.id));
+      const filteredSales = freshData.sales.filter(s => saleIDSet.has(s.id));
+      const filteredSaleIDSet = new Set(filteredSales.map(s => s.id));
+      const filteredTransactions = freshData.transactions.filter(t => filteredSaleIDSet.has(t.saleID));
+
+      // Build inventory (same as full migration)
+      const invCsvText = await fetch("/lightspeed/inventory.csv").then(r => r.text());
+      const invPriceMap = {};
+      const stripDollar = (val) => (val || "").replace(/[$,]/g, "");
+      for (const invRow of parseCSV(invCsvText)) {
+        const desc = (invRow["Description"] || "").toLowerCase().trim();
+        if (desc) invPriceMap[desc] = stripDollar(invRow["Price"]);
+      }
+      const itemRows = parseCSV(freshData.itemsText);
+      const activeItems = itemRows.filter(row => row.archived !== "true" && row.description);
+      const mappedItems = activeItems.map(item => {
+        const isLabor = (item.description || "").toLowerCase().includes("labor");
+        const descKey = (item.description || "").toLowerCase().trim();
+        const retailPrice = invPriceMap[descKey];
+        return {
+          id: item.itemID || crypto.randomUUID(),
+          formalName: item.description || "",
+          informalName: "",
+          brand: "",
+          price: retailPrice ? dollarsToCents(retailPrice) : dollarsToCents(item.defaultCost),
+          salePrice: 0,
+          cost: dollarsToCents(item.avgCost || item.defaultCost),
+          category: isLabor ? "Labor" : "Part",
+          upc: item.upc || "",
+          ean: item.ean || "",
+          customSku: item.customSku || "",
+          manufacturerSku: item.manufacturerSku || "",
+          minutes: 0,
+          customPart: false,
+          customLabor: false,
+        };
+      });
+      const pricedItems = mappedItems.filter(item => item.price > 0);
+
+      // Map employees
+      const empCsvText = await fetch("/lightspeed/employees.csv").then(r => r.ok ? r.text() : "").catch(() => "");
+      const empHoursCsvText = await fetch("/lightspeed/employeeHours.csv").then(r => r.ok ? r.text() : "").catch(() => "");
+      let employeeCount = 0;
+      let punchCount = 0;
+
+      console.log("[Dev Upload] Filtered: " + selectedWOs.length + " WOs, " + filteredCustomers.length + " customers, " + filteredSales.length + " sales, " + filteredTransactions.length + " transactions, " + pricedItems.length + " inventory.");
+
+      // Save customers
+      _setMigrationStep("Saving customers...");
+      console.log("[Dev Upload] Saving " + filteredCustomers.length + " customers...");
+      _setMigrationProgress({ done: 0, total: filteredCustomers.length });
+      await dbBatchWrite(filteredCustomers, "customers", (done) => {
+        _setMigrationProgress({ done, total: filteredCustomers.length });
+      });
+      console.log("[Dev Upload] Customers done.");
+
+      // Save inventory
+      _setMigrationStep("Saving inventory...");
+      console.log("[Dev Upload] Saving " + pricedItems.length + " inventory items...");
+      _setMigrationProgress({ done: 0, total: pricedItems.length });
+      await dbBatchWrite(pricedItems, "inventory", (done) => {
+        _setMigrationProgress({ done, total: pricedItems.length });
+      });
+      console.log("[Dev Upload] Inventory done.");
+
+      // Route & save workorders (same logic as full migration)
+      _setMigrationStep("Saving workorders...");
+      const statusByLabel = {};
+      for (const s of (settings.statuses || [])) statusByLabel[s.label.toLowerCase()] = s;
+      const doneAndPaidID = statusByLabel["finished & paid"]?.id;
+
+      const openWorkorders = selectedWOs.filter(wo => wo.status !== doneAndPaidID);
+      const completedWorkorders = selectedWOs.filter(wo => wo.status === doneAndPaidID);
+      const allWOs = [...openWorkorders, ...completedWorkorders];
+      console.log("[Dev Upload] Saving " + openWorkorders.length + " open WOs + " + completedWorkorders.length + " completed WOs...");
+      _setMigrationProgress({ done: 0, total: allWOs.length });
+      let woDone = 0;
+      await dbBatchWrite(openWorkorders, "open-workorders", (done) => {
+        woDone = done;
+        _setMigrationProgress({ done: woDone, total: allWOs.length });
+      });
+      await dbBatchWrite(completedWorkorders, "completed-workorders", (done) => {
+        _setMigrationProgress({ done: woDone + done, total: allWOs.length });
+      });
+      console.log("[Dev Upload] Workorders done.");
+
+      // Route & save sales (same logic as full migration)
+      _setMigrationStep("Saving sales...");
+      const completedSales = filteredSales.filter(s => s.paymentComplete);
+      const linkedIncompleteSales = filteredSales.filter(s => !s.paymentComplete && s.workorderIDs && s.workorderIDs.length > 0);
+      console.log("[Dev Upload] Saving " + completedSales.length + " completed sales + " + linkedIncompleteSales.length + " linked incomplete sales...");
+      _setMigrationProgress({ done: 0, total: completedSales.length + linkedIncompleteSales.length });
+      let salesDone = 0;
+      await dbBatchWrite(completedSales, "completed-sales", (done) => {
+        salesDone = done;
+        _setMigrationProgress({ done: salesDone, total: completedSales.length + linkedIncompleteSales.length });
+      });
+      if (linkedIncompleteSales.length > 0) {
+        await dbBatchWrite(linkedIncompleteSales, "active-sales", (done) => {
+          _setMigrationProgress({ done: salesDone + done, total: completedSales.length + linkedIncompleteSales.length });
+        });
+      }
+      console.log("[Dev Upload] Sales done.");
+
+      // Save transactions
+      _setMigrationStep("Saving transactions...");
+      console.log("[Dev Upload] Saving " + filteredTransactions.length + " transactions...");
+      _setMigrationProgress({ done: 0, total: filteredTransactions.length });
+      await dbBatchWrite(filteredTransactions, "transactions", (done) => {
+        _setMigrationProgress({ done, total: filteredTransactions.length });
+      });
+      console.log("[Dev Upload] Transactions done.");
+
+      // Map & save employees and punch history
+      if (empCsvText) {
+        _setMigrationStep("Mapping employees...");
+        const { users: newUsers, employeeIDMap } = mapEmployees(empCsvText);
+        employeeCount = newUsers.length;
+        console.log("[Dev Upload] Mapped " + newUsers.length + " employees.");
+
+        const updatedSettings = cloneDeep(useSettingsStore.getState().settings || {});
+        if (!updatedSettings.users) updatedSettings.users = [];
+        const existingIDs = new Set(updatedSettings.users.map(u => u.id));
+        for (const u of newUsers) {
+          if (!existingIDs.has(u.id)) updatedSettings.users.push(u);
+        }
+        await dbSaveSettings(updatedSettings);
+        useSettingsStore.getState().setSettings(updatedSettings);
+        console.log("[Dev Upload] Users saved to settings (" + updatedSettings.users.length + " total).");
+
+        if (empHoursCsvText) {
+          _setMigrationStep("Saving punch history...");
+          const punches = mapPunchHistory(empHoursCsvText, employeeIDMap);
+          punchCount = punches.length;
+          console.log("[Dev Upload] Saving " + punches.length + " punch records...");
+          _setMigrationProgress({ done: 0, total: punches.length });
+          await dbBatchWrite(punches, "punches", (done, total) => {
+            _setMigrationProgress({ done, total });
+          });
+          console.log("[Dev Upload] Punch history done.");
+        }
+      }
+
+      // Update local store with open workorders
+      useOpenWorkordersStore.getState().setOpenWorkorders(openWorkorders);
+
+      // Summary
+      const elapsed = ((Date.now() - migrationStart) / 1000).toFixed(1);
+      const summary = "Dev Upload Complete in " + elapsed + "s: " +
+        filteredCustomers.length + " customers, " +
+        pricedItems.length + " inventory, " +
+        openWorkorders.length + " open WOs, " +
+        completedWorkorders.length + " completed WOs, " +
+        completedSales.length + " completed sales, " +
+        linkedIncompleteSales.length + " active sales, " +
+        filteredTransactions.length + " transactions, " +
+        employeeCount + " employees, " +
+        punchCount + " punches";
+      console.log("[Dev Upload] " + summary);
+      _setMigrationStep("Complete!");
+      _setMigrationProgress({ done: 0, total: 0 });
+      _setLsResult(summary);
+    } catch (e) {
+      console.error("[Dev Upload] Error:", e);
+      _setMigrationStep("Error");
+      _setLsResult("Dev Upload Error: " + e.message);
     }
     _setDevMigrating(false);
   }
@@ -7073,6 +7352,30 @@ const ImportComponent = () => {
           </Text>
           <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 3 }}>
             Cross-check all 7 _import_ files
+          </Text>
+        </TouchableOpacity>
+        {/* --- Dev Upload Migration --- */}
+        <TouchableOpacity
+          onPress={handleDevUploadMigration}
+          disabled={sLookupLoading || sMigrating || sDevMigrating}
+          style={{
+            width: 300,
+            paddingVertical: 14,
+            borderRadius: 10,
+            borderWidth: 2,
+            borderColor: "rgb(115, 83, 173)",
+            backgroundColor: sDevMigrating ? gray(0.85) : C.listItemWhite,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 10,
+            opacity: sLookupLoading || sMigrating || sDevMigrating ? 0.5 : 1,
+          }}
+        >
+          <Text style={{ fontSize: 15, color: "rgb(115, 83, 173)", fontWeight: "700" }}>
+            {sDevMigrating ? "Uploading..." : "Dev Upload Migration"}
+          </Text>
+          <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 3 }}>
+            Clear DB + upload 20 most recent WOs + all dependencies
           </Text>
         </TouchableOpacity>
         <View style={{ width: "100%", height: 1, backgroundColor: C.buttonLightGreenOutline, marginBottom: 10 }} />

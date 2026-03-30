@@ -279,7 +279,7 @@ export function NewCheckoutModalScreen() {
   let hasRealPayments = sTransactions.some((t) => {
     let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
     return (t.amountCaptured || 0) > refunded;
-  });
+  }) || sCredits.length > 0;
 
   // ─── Initialization ──────────────────────────────────────
   // Called once when the modal opens. We use a flag to avoid
@@ -501,23 +501,31 @@ export function NewCheckoutModalScreen() {
   let onlineReaders = zStripeReaders.filter((r) => r.status === "online");
   const readerPollRef = useRef(null);
 
-  function persistSale(sale, txns, creds) {
-    // Persist thin sale with creditsApplied (strip display-only fields)
+  // Shared: build a thin sale object and write all transaction docs
+  function prepareSaleForPersist(sale, txns, creds) {
     let saleToPersist = { ...sale };
-    saleToPersist.creditsApplied = (creds || sCredits).map((c) => ({
-      creditId: c.creditId, transactionId: c.transactionId || "", amount: c.amount, type: c.type,
-    }));
-    // Append-only: merge any new transaction IDs into the existing array
+    saleToPersist.creditsApplied = (creds || sCredits).map((c) => {
+      let entry = { creditId: c.creditId, amount: c.amount, type: c.type };
+      if (c.type !== "credit") entry.transactionId = c.transactionId || "";
+      return entry;
+    });
     let existingIDs = saleToPersist.transactionIDs || [];
     let currentIDs = (txns || sTransactions).map((t) => t.id);
     saleToPersist.transactionIDs = [...new Set([...existingIDs, ...currentIDs])];
-    // Stamp only when transaction activity changes (payments started or confirmed)
     if (saleToPersist.transactionIDs.length > 0 || saleToPersist.pendingTransactionIDs?.length > 0) {
       saleToPersist.lastTransactionStamp = Date.now();
     }
-    // Write sale + all transactions in parallel (card reader txns are also written by webhook, but this ensures manual card entries are persisted)
+    return saleToPersist;
+  }
+
+  function writeAllTransactions(txns) {
     let allTxns = txns || sTransactions;
-    Promise.all([writeActiveSale(saleToPersist), ...allTxns.map((t) => writeTransaction(t))]);
+    return Promise.all(allTxns.map((t) => writeTransaction(t)));
+  }
+
+  function persistSale(sale, txns, creds) {
+    let saleToPersist = prepareSaleForPersist(sale, txns, creds);
+    Promise.all([writeActiveSale(saleToPersist), ...((txns || sTransactions).map((t) => writeTransaction(t)))]);
     salePersistedRef.current = true;
   }
   useEffect(() => {
@@ -629,7 +637,7 @@ export function NewCheckoutModalScreen() {
     // Create a credit entry (not a transaction)
     let credit = {
       creditId: deposit.id,
-      transactionId: isCredit ? "" : (deposit.transactionId || deposit.id || ""),
+      ...(isCredit ? {} : { transactionId: deposit.transactionId || deposit.id || "" }),
       amount: appliedAmount,
       type: isCredit ? "credit" : deposit._type === "giftcard" ? "giftcard" : "deposit",
       // Display-only fields (stripped on persist)
@@ -909,10 +917,8 @@ export function NewCheckoutModalScreen() {
       dbSaveCustomer(updatedCustomer);
     }
 
-    // Persist transactions only (no completed-sale for deposits/gift cards)
-    for (let txn of localTxns) {
-      if (txn.method !== "card") await writeTransaction(txn);
-    }
+    // Persist all transactions (no completed-sale for deposits/gift cards)
+    await writeAllTransactions(localTxns);
     await deleteActiveSale(sale.id);
 
     // Receipt actions based on settings
@@ -1021,15 +1027,10 @@ export function NewCheckoutModalScreen() {
     useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
     useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
 
-    // Save cash transactions to collection — card transactions are written by the webhook
-    for (let txn of localTxns) {
-      if (txn.method !== "card") await writeTransaction(txn);
-    }
-    let saleToPersist = { ...sale };
-    saleToPersist.creditsApplied = localCreds.map((c) => ({ creditId: c.creditId, transactionId: c.transactionId || "", amount: c.amount, type: c.type }));
-    saleToPersist.transactionIDs = localTxns.map((t) => t.id);
+    // Write all transaction docs + completed sale
+    let saleToPersist = prepareSaleForPersist(sale, localTxns, localCreds);
     delete saleToPersist.pendingTransactionIDs;
-    await writeCompletedSale(saleToPersist);
+    await Promise.all([writeAllTransactions(localTxns), writeCompletedSale(saleToPersist)]);
     await deleteActiveSale(sale.id);
 
     // Add sale ID to customer and persist deposit removal
@@ -1842,6 +1843,11 @@ export function NewCheckoutModalScreen() {
                             <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginRight: 8 }}>
                               {"$" + formatCurrencyDisp(item.amountCents)}
                             </Text>
+                            {(item.reservedCents || 0) > 0 && (
+                              <Text style={{ fontSize: 11, color: C.orange, fontWeight: "600", marginRight: 8 }}>
+                                {"$" + formatCurrencyDisp(item.reservedCents) + "/$" + formatCurrencyDisp(item.amountCents + item.reservedCents) + (item.amountCents <= 0 ? " Used" : " In use")}
+                              </Text>
+                            )}
                             {!isCredit && !isGiftCard && !!noteText && (
                               <Text numberOfLines={1} style={{ fontSize: 13, color: gray(0.5), flex: 1 }}>
                                 {noteText}
@@ -2182,7 +2188,7 @@ export function NewCheckoutModalScreen() {
     {sShowRefundModal && (
       <NewRefundModalScreen
         visible={true}
-        sale={sSale}
+        sale={prepareSaleForPersist(sSale)}
         transactions={sTransactions}
         initialPayment={sRefundPayment}
         onClose={() => { _setShowRefundModal(false); _setRefundPayment(null); }}

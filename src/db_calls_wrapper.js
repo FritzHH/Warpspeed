@@ -356,6 +356,7 @@ export async function dbClearCollection(collectionName) {
       "completed-sales": DB_NODES.FIRESTORE.COMPLETED_SALES,
       "active-sales": DB_NODES.FIRESTORE.ACTIVE_SALES,
       "punches": DB_NODES.FIRESTORE.PUNCHES,
+      "transactions": DB_NODES.FIRESTORE.TRANSACTIONS,
     };
     const node = collectionMap[collectionName];
     if (!node) {

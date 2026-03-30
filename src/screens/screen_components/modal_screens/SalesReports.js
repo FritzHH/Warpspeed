@@ -24,8 +24,7 @@ import dayjs from "dayjs";
 import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
-// TODO: Replace with completed-sales query
-const queryTransactionIndex = async () => [];
+import { queryCompletedSalesReport } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { FullSaleModal } from "./FullSaleModal";
 
 const PAGE_SIZE = 50;
@@ -125,7 +124,7 @@ export const SalesReportsModal = ({ handleExit }) => {
     let thisQueryId = ++queryIdRef.current;
     _setLoading(true);
     _setPage(0);
-    queryTransactionIndex(startMillis, endMillis)
+    queryCompletedSalesReport(startMillis, endMillis)
       .then((results) => {
         if (thisQueryId !== queryIdRef.current) return;
         _setResults(results || []);

@@ -674,6 +674,7 @@ export function mapSales(
 
   // --- Map sales ---
   const sales = [];
+  const allTransactions = [];
 
   for (const row of saleRows) {
     const lsSaleID = row.saleID;
@@ -778,6 +779,7 @@ export function mapSales(
         depositOriginalAmount: 0,
         _cardFundingSource: stripeMatch ? (stripeMatch["Card funding source"] || "") : "",
         _entryMode: stripeMatch ? (stripeMatch["Entry mode"] || "") : "",
+        refunds: [],
       };
     });
 
@@ -798,7 +800,11 @@ export function mapSales(
       amountRefunded: computedAmountRefunded,
       paymentComplete: completed,
       workorderIDs,
-      transactions: payments,
+      transactionIDs: payments.map(p => p.id),
+      pendingTransactionIDs: [],
+      pendingRefundIDs: [],
+      creditsApplied: [],
+      customerID: resolvedCustID,
       refunds: [],
       textToPay: false,
       checkoutSessionID: "",
@@ -808,6 +814,7 @@ export function mapSales(
     };
 
     sales.push(mappedSale);
+    allTransactions.push(...payments);
 
     // Backfill workorder saleID
     for (const wo of linkedWorkorders) {
@@ -824,7 +831,7 @@ export function mapSales(
     }
   }
 
-  return sales;
+  return { sales, transactions: allTransactions };
 }
 
 // ============================================================================

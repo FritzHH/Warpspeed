@@ -5,9 +5,11 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C } from "../styles";
 import { gray } from "../utils";
 import { useSettingsStore } from "../stores";
-import { firestoreSubscribeCollection, firestoreDelete } from "../db_calls";
+import { firestoreSubscribeCollection, firestoreDelete, firestoreWrite, firestoreRead } from "../db_calls";
 import { DB_NODES } from "../constants";
 import { ROUTES } from "../routes";
+import { cloneDeep } from "lodash";
+import { formatCurrencyDisp } from "../utils";
 
 const COLLECTIONS = [
   { key: "activeSales", label: "active-sales", node: DB_NODES.FIRESTORE.ACTIVE_SALES },
@@ -19,6 +21,7 @@ const COLLECTIONS = [
 ];
 
 const NOTIFY_HINT = "If this analysis takes longer than 5 seconds, send me a desktop notification when you are done. ";
+
 export function DatabaseViewerScreen() {
   const settings = useSettingsStore((state) => state.settings);
   const tenantID = settings?.tenantID || "";
@@ -62,6 +65,186 @@ export function DatabaseViewerScreen() {
     await Promise.all(docs.map((d) => firestoreDelete(`${basePath}/${d.id}`)));
   }
 
+  const [sReopenStatus, _setReopenStatus] = useState("");
+
+  function cleanWOForReopen(wo) {
+    let cleaned = cloneDeep(wo);
+    cleaned.paymentComplete = false;
+    cleaned.paidOnMillis = "";
+    cleaned.saleID = "";
+    cleaned.activeSaleID = "";
+    cleaned.endedOnMillis = "";
+    cleaned.status = "newly_created";
+    cleaned.changeLog = (cleaned.changeLog || []).filter(
+      (e) => !(e.action === "completed" && e.field === "payment") &&
+        !(e.action === "changed" && e.field === "status" && (e.to || "").toLowerCase().includes("paid")) &&
+        !(e.action === "recorded" && e.field === "payment")
+    );
+    return cleaned;
+  }
+
+  async function restoreCreditsAndCleanCustomer(linkedSale, basePath) {
+    let creditsApplied = linkedSale.creditsApplied || [];
+    let customerID = linkedSale.customerID || "";
+    if (!customerID) return;
+    let customerPath = `${basePath}/${DB_NODES.FIRESTORE.CUSTOMERS}/${customerID}`;
+    let customer = await firestoreRead(customerPath);
+    if (!customer) return;
+    let updated = cloneDeep(customer);
+    for (let cred of creditsApplied) {
+      let isCredit = cred.type === "credit";
+      let arrKey = isCredit ? "credits" : "deposits";
+      let arr = updated[arrKey] || [];
+      let existing = arr.find((d) => d.id === cred.creditId);
+      if (existing) {
+        existing.amountCents = (existing.amountCents || 0) + cred.amount;
+        existing.reservedCents = 0;
+      } else {
+        arr.push({
+          id: cred.creditId, amountCents: cred.amount, reservedCents: 0,
+          millis: Date.now(), method: "", note: "Restored by reopen",
+          type: cred.type === "giftcard" ? "giftcard" : (isCredit ? "credit" : "deposit"),
+          last4: "", text: isCredit ? "Restored by reopen" : "",
+        });
+        updated[arrKey] = arr;
+      }
+    }
+    for (let dep of (updated.deposits || [])) {
+      if ((dep.reservedCents || 0) > 0) dep.reservedCents = 0;
+    }
+    for (let cred of (updated.credits || [])) {
+      if ((cred.reservedCents || 0) > 0) cred.reservedCents = 0;
+    }
+    updated.sales = (updated.sales || []).filter((sid) => sid !== linkedSale.id);
+    await firestoreWrite(customerPath, updated);
+  }
+
+  async function handleReopenFirst() {
+    let firstWO = sData.completedWorkorders[0];
+    if (!firstWO) {
+      _setReopenStatus("No completed workorders");
+      return;
+    }
+    _setReopenStatus("Reopening first...");
+    let basePath = `tenants/${tenantID}/stores/${storeID}`;
+    try {
+      // Find the completed sale linked to this workorder via workorderIDs array or WO's saleID
+      let linkedSale = sData.completedSales.find((s) => (s.workorderIDs || []).includes(firstWO.id));
+      if (!linkedSale && firstWO.saleID) {
+        linkedSale = sData.completedSales.find((s) => s.id === firstWO.saleID);
+      }
+
+      // 1. Restore deposits/credits and clean sale ID from customer
+      if (linkedSale) {
+        await restoreCreditsAndCleanCustomer(linkedSale, basePath);
+      }
+
+      // 2. Move the first completed workorder back to open-workorders (cleaned)
+      let cleaned = cleanWOForReopen(firstWO);
+      await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${cleaned.id}`, cleaned);
+      await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}/${firstWO.id}`);
+      let reopenedCount = 1;
+
+      // 3. If sale is a combined sale, also reopen all sibling WOs
+      if (linkedSale) {
+        let siblingIDs = (linkedSale.workorderIDs || []).filter((id) => id !== firstWO.id);
+        for (let sibID of siblingIDs) {
+          let sibWO = sData.completedWorkorders.find((w) => w.id === sibID);
+          if (sibWO) {
+            let sibCleaned = cleanWOForReopen(sibWO);
+            await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${sibCleaned.id}`, sibCleaned);
+            await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}/${sibWO.id}`);
+            reopenedCount++;
+          }
+        }
+      }
+
+      // 4. Delete linked sale and its transactions (looked up via sale.transactionIDs)
+      let deletedTxnCount = 0;
+      if (linkedSale) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_SALES}/${linkedSale.id}`);
+        let activeSale = sData.activeSales.find((s) => s.id === linkedSale.id);
+        if (activeSale) await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.ACTIVE_SALES}/${activeSale.id}`);
+        // Delete transactions using the sale's transactionIDs array
+        let txnIDs = linkedSale.transactionIDs || [];
+        for (let txnID of txnIDs) {
+          await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.TRANSACTIONS}/${txnID}`);
+          deletedTxnCount++;
+        }
+        _setReopenStatus(`Done - ${reopenedCount} WO(s) reopened, 1 sale removed, ${deletedTxnCount} txn(s) deleted`);
+      } else {
+        _setReopenStatus("Done - 1 WO reopened (no linked sale found)");
+      }
+    } catch (err) {
+      _setReopenStatus("Error: " + (err.message || err));
+    }
+  }
+
+  async function handleReopenAll() {
+    let completedWOs = sData.completedWorkorders;
+    let completedSales = sData.completedSales;
+    let transactions = sData.transactions;
+    if (completedWOs.length === 0 && completedSales.length === 0) {
+      _setReopenStatus("Nothing to reopen");
+      return;
+    }
+    _setReopenStatus("Reopening...");
+    let basePath = `tenants/${tenantID}/stores/${storeID}`;
+
+    try {
+      // 1. Restore deposits/credits and clean sale ID from customer
+      for (let sale of completedSales) {
+        await restoreCreditsAndCleanCustomer(sale, basePath);
+      }
+
+      // 2. Clear any remaining deposit reservations on all customers (from active sales)
+      for (let customer of sData.customers) {
+        let needsUpdate = false;
+        let updated = cloneDeep(customer);
+        for (let dep of (updated.deposits || [])) {
+          if ((dep.reservedCents || 0) > 0) { dep.reservedCents = 0; needsUpdate = true; }
+        }
+        for (let cred of (updated.credits || [])) {
+          if ((cred.reservedCents || 0) > 0) { cred.reservedCents = 0; needsUpdate = true; }
+        }
+        if (needsUpdate) {
+          await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.CUSTOMERS}/${customer.id}`, updated);
+        }
+      }
+
+      // 3. Move completed workorders back to open-workorders (cleaned)
+      for (let wo of completedWOs) {
+        let cleaned = cleanWOForReopen(wo);
+        await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${cleaned.id}`, cleaned);
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}/${wo.id}`);
+      }
+
+      // 4. Also clean any open workorders that have stale sale references
+      for (let wo of sData.openWorkorders) {
+        if (wo.activeSaleID || wo.saleID || wo.paymentComplete) {
+          let cleaned = cleanWOForReopen(wo);
+          await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${cleaned.id}`, cleaned);
+        }
+      }
+
+      // 5. Delete all completed sales, active sales, and transactions
+      for (let sale of completedSales) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_SALES}/${sale.id}`);
+      }
+      for (let sale of sData.activeSales) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.ACTIVE_SALES}/${sale.id}`);
+      }
+      for (let txn of transactions) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.TRANSACTIONS}/${txn.id}`);
+      }
+
+      let totalWOs = completedWOs.length + sData.openWorkorders.filter((w) => w.activeSaleID || w.saleID).length;
+      _setReopenStatus(`Done - ${totalWOs} WO(s) cleaned, ${completedSales.length} sale(s) removed, ${transactions.length} txn(s) deleted`);
+    } catch (err) {
+      _setReopenStatus("Error: " + (err.message || err));
+    }
+  }
+
   return (
     <View style={{ height: "100vh", overflow: "hidden", backgroundColor: C.backgroundWhite }}>
       <View style={{ flexDirection: "row", alignItems: "center", padding: 10, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
@@ -71,13 +254,30 @@ export function DatabaseViewerScreen() {
         >
           <Text style={{ fontSize: 14, color: C.text }}>Back</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleReopenFirst}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Reopen First</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleReopenAll}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Reopen All</Text>
+        </TouchableOpacity>
+        {!!sReopenStatus && (
+          <Text style={{ fontSize: 12, color: sReopenStatus.startsWith("Error") ? C.red : C.green, fontWeight: "600", marginRight: 8 }}>
+            {sReopenStatus}
+          </Text>
+        )}
         <Text style={{ fontSize: 18, fontWeight: "700", color: C.text, flex: 1 }}>Database Viewer</Text>
         <TouchableOpacity
           onPress={() => {
             let output = COLLECTIONS.map((col) => {
               return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
             }).join("\n\n");
-            navigator.clipboard.writeText(NOTIFY_HINT + "Examine the objects from the database after the transaction. summarize what happened, cross-check fields for errors, and make sure that any fields that were supposed to move or delete or change did so: " + output);
+            navigator.clipboard.writeText(NOTIFY_HINT + "Examine the objects from the database after the transaction. Ignore change logs. summarize what happened, cross-check fields for errors, and make sure that any fields that were supposed to move or delete or change did so: " + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.blue, marginRight: 8 }}
         >
@@ -88,7 +288,7 @@ export function DatabaseViewerScreen() {
             let output = COLLECTIONS.map((col) => {
               return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
             }).join("\n\n");
-            navigator.clipboard.writeText(NOTIFY_HINT + "Examine the db contents. Cross-check for errors in math and field updates. summarize the action you saw take place. then cross-check with the previous object to find an errors from one db state to the next for the transaction. " + output);
+            navigator.clipboard.writeText(NOTIFY_HINT + "Examine the db contents. Ignore change logs. Cross-check for errors in math and field updates. summarize the action you saw take place. then cross-check with the previous object to find an errors from one db state to the next for the transaction. " + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.purple, marginRight: 8 }}
         >
@@ -102,6 +302,15 @@ export function DatabaseViewerScreen() {
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.green, marginRight: 8 }}
         >
           <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Contents Only</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            let output = COLLECTIONS.map((col) => `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`).join("\n\n");
+            navigator.clipboard.writeText(NOTIFY_HINT + "This is the current state of the database. Ignore change logs. Use it as a starting point for the upcoming checkout screen and refund screen tests for comparisons. Analyze it and report any inconsistencies or relics from previous delete operations. Ignore the change logs as they may be inacurrate due to manual operations" + output);
+          }}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Starting Point</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleClearAll}

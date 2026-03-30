@@ -73,6 +73,7 @@ export async function executeTicketSearch(searchText, onComplete, options) {
   let trimmed = (searchText || "").trim();
   if (!trimmed) return;
   const onWorkorderFound = options?.onWorkorderFound;
+  const onCompletedWorkorderFound = options?.onCompletedWorkorderFound;
 
   try {
     const store = useOpenWorkordersStore.getState();
@@ -88,7 +89,7 @@ export async function executeTicketSearch(searchText, onComplete, options) {
       if (found) { if (onWorkorderFound) onWorkorderFound(found); else openWorkorder(found, false); if (onComplete) onComplete(); return; }
       // 2. Completed workorders
       let completedWo = await dbGetCompletedWorkorder(trimmed);
-      if (completedWo) { if (onWorkorderFound) onWorkorderFound(completedWo); else openWorkorder(completedWo, true); if (onComplete) onComplete(); return; }
+      if (completedWo) { if (onCompletedWorkorderFound) onCompletedWorkorderFound(completedWo); else if (onWorkorderFound) onWorkorderFound(completedWo); else openWorkorder(completedWo, true); if (onComplete) onComplete(); return; }
       // 3. Active sales
       let activeSale = await readActiveSale(trimmed);
       if (activeSale) { openSale(activeSale, false); if (onComplete) onComplete(); return; }
@@ -99,7 +100,8 @@ export async function executeTicketSearch(searchText, onComplete, options) {
       let crossResult = await dbCrossStoreSearchByID(trimmed);
       if (crossResult) {
         if (crossResult.type === "workorder") {
-          if (onWorkorderFound) onWorkorderFound(crossResult.data);
+          if (crossResult.isCompleted && onCompletedWorkorderFound) onCompletedWorkorderFound(crossResult.data);
+          else if (onWorkorderFound) onWorkorderFound(crossResult.data);
           else openWorkorder(crossResult.data, crossResult.isCompleted);
         } else {
           openSale(crossResult.data, crossResult.isCompleted);
@@ -116,7 +118,7 @@ export async function executeTicketSearch(searchText, onComplete, options) {
       let found = openWOs.find((w) => w.workorderNumber === trimmed);
       if (found) { if (onWorkorderFound) onWorkorderFound(found); else openWorkorder(found, false); if (onComplete) onComplete(); return; }
       let results = await dbSearchCompletedWorkorders("workorderNumber", trimmed);
-      if (results.length > 0) { if (onWorkorderFound) onWorkorderFound(results[0]); else openWorkorder(results[0], true); if (onComplete) onComplete(); return; }
+      if (results.length > 0) { if (onCompletedWorkorderFound) onCompletedWorkorderFound(results[0]); else if (onWorkorderFound) onWorkorderFound(results[0]); else openWorkorder(results[0], true); if (onComplete) onComplete(); return; }
       showTicketAlert("Workorder not found");
       return;
     }

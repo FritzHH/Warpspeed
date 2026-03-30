@@ -29,6 +29,7 @@ import {
   dbSearchCustomersByPhone,
 } from "../../../db_calls_wrapper";
 import { executeTicketSearch } from "../../../shared/ticketSearch";
+import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 export function NewWorkorderComponent({}) {
   // store getters ///////////////////////////////////////////////////////////////
@@ -41,6 +42,7 @@ export function NewWorkorderComponent({}) {
   const [buttonVisible, setButtonVisible] = React.useState(false);
   const [sTicketSearch, _setTicketSearch] = React.useState("");
   const [sTicketSearching, _setTicketSearching] = React.useState(false);
+  const [sClosedWorkorder, _sSetClosedWorkorder] = React.useState(null);
   const searchTimerRef = useRef(null);
   const containerRef = useRef(null);
   const phoneInputRef = useRef(null);
@@ -48,7 +50,9 @@ export function NewWorkorderComponent({}) {
   async function handleExecuteTicketSearch() {
     _setTicketSearching(true);
     try {
-      await executeTicketSearch(sTicketSearch, () => _setTicketSearch(""));
+      await executeTicketSearch(sTicketSearch, () => _setTicketSearch(""), {
+        onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
+      });
     } finally {
       _setTicketSearching(false);
     }
@@ -321,7 +325,9 @@ export function NewWorkorderComponent({}) {
               let trimmed = val.trim();
               if (/^\d{12}$/.test(trimmed)) {
                 _setTicketSearch("");
-                executeTicketSearch(trimmed);
+                executeTicketSearch(trimmed, null, {
+                  onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
+                });
               }
             }}
             onSubmitEditing={() => handleExecuteTicketSearch()}
@@ -483,7 +489,10 @@ export function NewWorkorderComponent({}) {
         </Tooltip>
       </View>
 
-      {/** customer info modal */}
+      <ClosedWorkorderModal
+        workorder={sClosedWorkorder}
+        onClose={() => _sSetClosedWorkorder(null)}
+      />
     </View>
   );
 }

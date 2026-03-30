@@ -241,7 +241,7 @@ export const SaleTotals = memo(function SaleTotals({
           <Text
             style={{
               fontSize: 11,
-              color: gray(0.5),
+              color: gray(0.3),
               width: "100%",
               textAlign: "left",
               paddingBottom: 3,

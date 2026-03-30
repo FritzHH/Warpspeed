@@ -20,7 +20,7 @@ const COLLECTIONS = [
   { key: "transactions", label: "transactions", node: DB_NODES.FIRESTORE.TRANSACTIONS },
 ];
 
-const NOTIFY_HINT = "If this analysis takes longer than 5 seconds, send me a desktop notification when you are done. ";
+const NOTIFY_HINT = " ";
 
 export function DatabaseViewerScreen() {
   const settings = useSettingsStore((state) => state.settings);

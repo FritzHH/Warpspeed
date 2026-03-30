@@ -12,9 +12,10 @@ import {
   resolveStatus,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { useCheckoutStore, useSettingsStore } from "../../../stores";
+import { useCheckoutStore, useSettingsStore, useLoginStore } from "../../../stores";
 import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
-import { dbGetCompletedSale } from "../../../db_calls_wrapper";
+import { dbGetCompletedSale, dbSavePrintObj } from "../../../db_calls_wrapper";
+import { printBuilder } from "../../../utils";
 import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 // ─── Helper display components ──────────────────────────────────
@@ -319,6 +320,33 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
     useCheckoutStore.getState().setStringOnly(saleID);
   }
 
+  function _getCustomerFromWorkorder() {
+    return {
+      customerCell: workorder.customerCell || "",
+      customerLandline: workorder.customerLandline || "",
+      email: workorder.customerEmail || "",
+      first: workorder.customerFirst || "",
+      last: workorder.customerLast || "",
+    };
+  }
+
+  function handlePrintWorkorder() {
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    let toPrint = printBuilder.workorder(workorder, _getCustomerFromWorkorder(), _settings?.salesTaxPercent, _ctx);
+    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
+  }
+
+  function handlePrintSale() {
+    if (sSales.length === 0) return;
+    const sale = sSales[0];
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const transactions = sTransactionsMap[sale.id] || [];
+    let toPrint = printBuilder.sale(sale, transactions, _getCustomerFromWorkorder(), workorder, _settings?.salesTaxPercent, _ctx, sale.creditsApplied || []);
+    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
+  }
+
   return (
     <Modal visible={true} transparent={true} animationType="fade">
       <View
@@ -405,13 +433,33 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
                 </View>
               )}
             </View>
-            <Button_
-              text="Close"
-              colorGradientArr={COLOR_GRADIENTS.red}
-              onPress={handleClose}
-              buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-              textStyle={{ color: C.textWhite, fontSize: 12 }}
-            />
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Button_
+                text="Print Workorder"
+                icon={ICONS.receipt}
+                iconSize={16}
+                onPress={handlePrintWorkorder}
+                buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
+                textStyle={{ fontSize: 12, color: C.text }}
+              />
+              {sSales.length > 0 && (
+                <Button_
+                  text="Print Sale"
+                  icon={ICONS.receipt}
+                  iconSize={16}
+                  onPress={handlePrintSale}
+                  buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
+                  textStyle={{ fontSize: 12, color: C.text }}
+                />
+              )}
+              <Button_
+                text="Close"
+                colorGradientArr={COLOR_GRADIENTS.red}
+                onPress={handleClose}
+                buttonStyle={{ paddingHorizontal: 16, height: 32 }}
+                textStyle={{ color: C.textWhite, fontSize: 12 }}
+              />
+            </View>
           </View>
 
           {/* ── Active / Closed Banner ── */}

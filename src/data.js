@@ -376,6 +376,7 @@ export const SALE_PROTO = {
   salesTax: 0,
   salesTaxPercent: 0,
   total: 0,
+
 };
 
 export const CREDIT_APPLIED_PROTO = {
@@ -438,7 +439,6 @@ export const WORKORDER_PROTO = {
   changeLog: [],
   startedBy: "",
   startedOnMillis: "",
-  finishedOnMillis: "",
   partOrdered: "",
   partSource: "",
   partToBeOrdered: false,

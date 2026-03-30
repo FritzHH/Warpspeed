@@ -15,6 +15,7 @@ const COLLECTIONS = [
   { key: "openWorkorders", label: "open-workorders", node: DB_NODES.FIRESTORE.OPEN_WORKORDERS },
   { key: "completedWorkorders", label: "completed-workorders", node: DB_NODES.FIRESTORE.COMPLETED_WORKORDERS },
   { key: "customers", label: "customers", node: DB_NODES.FIRESTORE.CUSTOMERS },
+  { key: "transactions", label: "transactions", node: DB_NODES.FIRESTORE.TRANSACTIONS },
 ];
 
 const NOTIFY_HINT = "If this analysis takes longer than 5 seconds, send me a desktop notification when you are done. ";
@@ -29,6 +30,7 @@ export function DatabaseViewerScreen() {
     openWorkorders: [],
     completedWorkorders: [],
     customers: [],
+    transactions: [],
   });
 
   useEffect(() => {

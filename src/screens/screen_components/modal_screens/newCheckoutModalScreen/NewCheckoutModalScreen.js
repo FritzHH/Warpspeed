@@ -32,7 +32,7 @@ import {
   generate12DigitBarcode,
   createNewWorkorder,
 } from "../../../../utils";
-import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, TAX_FREE_RECEIPT_NOTE, CUSTOMER_PROTO } from "../../../../data";
+import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, TAX_FREE_RECEIPT_NOTE, CUSTOMER_PROTO } from "../../../../data";
 import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder } from "../../../../db_calls_wrapper";
 import {
   createNewSale,
@@ -44,14 +44,17 @@ import {
 import { translateSalesReceipt } from "../../../../shared/receiptTranslator";
 import { generateSaleReceiptPDF } from "../../../../pdfGenerator";
 import {
-  newCheckoutSaveActiveSale,
-  newCheckoutGetActiveSale,
-  newCheckoutCompleteSale,
   newCheckoutSaveWorkorder,
   newCheckoutCompleteWorkorder,
   newCheckoutGetStripeReaders,
-  newCheckoutDeleteActiveSale,
   saveItemSales,
+  writeTransaction,
+  readTransactions,
+  deleteTransaction,
+  writeActiveSale,
+  readActiveSale,
+  deleteActiveSale,
+  writeCompletedSale,
 } from "./newCheckoutFirebaseCalls";
 
 import { SaleHeader } from "./SaleHeader";
@@ -119,10 +122,10 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
   const [sAmount, _sSetAmount] = useState("");
   const [sAmountCents, _sSetAmountCents] = useState(0);
 
-  let maxAmount = maxAvailable || payment.amountCaptured;
+  let maxAmount = maxAvailable || payment.amount;
   let isValid = sAmountCents > 0 && sAmountCents <= maxAmount;
-  let isUnchanged = sAmountCents === payment.amountCaptured;
-  let typeLabel = payment.depositType === "credit" ? "Credit" : "Deposit";
+  let isUnchanged = sAmountCents === payment.amount;
+  let typeLabel = payment.type === "credit" ? "Credit" : "Deposit";
 
   return (
     <View
@@ -151,10 +154,10 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
 
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
           <Text style={{ fontSize: 12, color: C.green }}>Currently applied</Text>
-          <Text style={{ fontSize: 12, color: C.green }}>{formatCurrencyDisp(payment.amountCaptured, true)}</Text>
+          <Text style={{ fontSize: 12, color: C.green }}>{formatCurrencyDisp(payment.amount, true)}</Text>
         </View>
 
-        {maxAmount !== payment.amountCaptured && (
+        {maxAmount !== payment.amount && (
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
             <Text style={{ fontSize: 12, color: gray(0.4) }}>Full amount available</Text>
             <Text style={{ fontSize: 12, color: gray(0.4) }}>{formatCurrencyDisp(maxAmount, true)}</Text>
@@ -257,6 +260,8 @@ export function NewCheckoutModalScreen() {
   const [sRefundPayment, _setRefundPayment] = useState(null);
   const [sSplitDepositPayment, _setSplitDepositPayment] = useState(null);
   const [sExpandedCreditIds, _setExpandedCreditIds] = useState([]);
+  const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
+  const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
   const salePersistedRef = useRef(false);
   // ─── Derived Values ───────────────────────────────────────
   let isDepositMode = !!zDepositInfo;
@@ -269,7 +274,10 @@ export function NewCheckoutModalScreen() {
   let custFirst = zOpenWorkorder?.customerFirst || zCustomer?.first || "";
   let custLast = zOpenWorkorder?.customerLast || zCustomer?.last || "";
   let custLanguage = zOpenWorkorder?.customerLanguage || zCustomer?.language || "";
-  let hasRealPayments = (sSale?.transactions || []).some((t) => !t.depositType && t.type === "payment" && (t.amountCaptured || 0) > (t.amountRefunded || 0));
+  let hasRealPayments = sTransactions.some((t) => {
+    let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+    return (t.amountCaptured || 0) > refunded;
+  });
 
   // ─── Initialization ──────────────────────────────────────
   // Called once when the modal opens. We use a flag to avoid
@@ -314,7 +322,7 @@ export function NewCheckoutModalScreen() {
 
     // Check if workorder has an existing partial-payment sale to resume
     if (zOpenWorkorder?.activeSaleID) {
-      let existingSale = await newCheckoutGetActiveSale(zOpenWorkorder.activeSaleID);
+      let existingSale = await readActiveSale(zOpenWorkorder.activeSaleID);
       if (existingSale && !existingSale.voidedByRefund) {
         log("Resuming existing sale:", existingSale.id);
 
@@ -333,12 +341,52 @@ export function NewCheckoutModalScreen() {
         // (items may have been added/removed on the main screen since last checkout)
         existingSale = updateSaleWithTotals(existingSale, combined, zSettings);
 
-        recomputeSaleAmounts(existingSale);
+        // Load transactions from collection, credits from sale
+        let loadedTxns = [];
+        if (existingSale.transactionIDs?.length > 0) {
+          loadedTxns = (await readTransactions(existingSale.transactionIDs)).filter(Boolean);
+        }
+        let loadedCredits = existingSale.creditsApplied || [];
+
+        // Reconcile pending transactions (crash recovery)
+        if (existingSale.pendingTransactionIDs?.length > 0) {
+          let pendingResults = await readTransactions(existingSale.pendingTransactionIDs);
+          for (let i = 0; i < existingSale.pendingTransactionIDs.length; i++) {
+            let txn = pendingResults[i];
+            if (txn) {
+              loadedTxns.push(txn);
+              if (!existingSale.transactionIDs.includes(txn.id)) {
+                existingSale.transactionIDs.push(txn.id);
+              }
+            }
+          }
+          existingSale.pendingTransactionIDs = [];
+        }
+
+        // Reconcile pending refunds (crash recovery)
+        // Transaction docs already contain refund arrays written by the Cloud Function.
+        // recomputeSaleAmounts below derives amountRefunded from loaded transactions.
+        if (existingSale.pendingRefundIDs?.length > 0) {
+          existingSale.pendingRefundIDs = [];
+        }
+
+        _setTransactions(loadedTxns);
+        _setCredits(loadedCredits);
+
+        recomputeSaleAmounts(existingSale, loadedTxns, loadedCredits);
         salePersistedRef.current = true;
+
+        // Persist reconciled state (clears pending IDs, updates amounts)
+        persistSale(existingSale, loadedTxns, loadedCredits);
 
         _setSale(existingSale);
         broadcastSaleToDisplay(existingSale, combined, custFirst, custLast, custLanguage);
         fetchReaders();
+
+        // If reconciliation completed the sale, trigger completion
+        if (existingSale.paymentComplete) {
+          handleSaleComplete(existingSale, loadedTxns, loadedCredits);
+        }
         return;
       }
       // Stale or voided activeSaleID — clean up the workorder
@@ -395,8 +443,6 @@ export function NewCheckoutModalScreen() {
   }
 
   async function initializeFromViewOnlySale(sale) {
-    _setSale(sale);
-
     // Rebuild combined workorders from the sale's workorderIDs
     let combined = [];
     let openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
@@ -410,6 +456,18 @@ export function NewCheckoutModalScreen() {
       }
     }
     _setCombinedWorkorders(combined);
+
+    // Load transactions from collection, credits from sale
+    let loadedTxns = [];
+    if (sale.transactionIDs?.length > 0) {
+      loadedTxns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
+    }
+    let loadedCredits = sale.creditsApplied || [];
+    _setTransactions(loadedTxns);
+    _setCredits(loadedCredits);
+
+    recomputeSaleAmounts(sale, loadedTxns, loadedCredits);
+    _setSale(sale);
 
     fetchReaders();
   }
@@ -435,8 +493,16 @@ export function NewCheckoutModalScreen() {
   let onlineReaders = zStripeReaders.filter((r) => r.status === "online");
   const readerPollRef = useRef(null);
 
-  function persistSale(sale) {
-    newCheckoutSaveActiveSale(sale);
+  function persistSale(sale, txns, creds) {
+    // Persist thin sale with creditsApplied (strip display-only fields)
+    let saleToPersist = { ...sale };
+    saleToPersist.creditsApplied = (creds || sCredits).map((c) => ({
+      creditId: c.creditId, transactionId: c.transactionId || "", amount: c.amount, type: c.type,
+    }));
+    saleToPersist.transactionIDs = (txns || sTransactions).map((t) => t.id);
+    writeActiveSale(saleToPersist);
+    // Persist cash transactions only — card transactions are written by the webhook
+    (txns || sTransactions).filter((t) => t.method !== "card").forEach((t) => writeTransaction(t));
     salePersistedRef.current = true;
   }
   useEffect(() => {
@@ -482,7 +548,7 @@ export function NewCheckoutModalScreen() {
     let updated = updateSaleWithTotals(sSale, newArr, zSettings);
     updated.workorderIDs = newArr.map((o) => o.id);
     _setSale(updated);
-    persistSale(updated);
+    if (salePersistedRef.current) persistSale(updated);
     broadcastSaleToDisplay(updated, newArr, custFirst, custLast, custLanguage);
   }
 
@@ -507,7 +573,7 @@ export function NewCheckoutModalScreen() {
     let updated = updateSaleWithTotals(sSale, newArr, zSettings);
     _setSale(updated);
     broadcastSaleToDisplay(updated, newArr, custFirst, custLast, custLanguage);
-    persistSale(updated);
+    if (salePersistedRef.current) persistSale(updated);
   }
 
   // Other open workorders for the same customer
@@ -544,161 +610,138 @@ export function NewCheckoutModalScreen() {
     let isCredit = deposit._type === "credit";
     let appliedAmount = Math.min(deposit.amountCents, amountNeeded);
 
-    // Create a payment object for this deposit/credit
-    let payment = {
-      ...cloneDeep(TRANSACTION_PROTO),
-      id: generate12DigitBarcode(),
-      amountCaptured: appliedAmount,
-      amountTendered: appliedAmount,
-      type: "payment",
-      method: isCredit ? "credit" : (deposit.method || "cash"),
-      depositId: deposit.id,
-      depositType: isCredit ? "credit" : deposit._type === "giftcard" ? "giftcard" : "deposit",
-      depositOriginalAmount: deposit.amountCents,
-      depositOriginalMillis: deposit.millis || 0,
-      depositOriginalText: isCredit ? (deposit.text || "") : "",
-      last4: deposit.last4 || "",
-      millis: Date.now(),
+    // Create a credit entry (not a transaction)
+    let credit = {
+      creditId: deposit.id,
+      transactionId: "",
+      amount: appliedAmount,
+      type: isCredit ? "credit" : deposit._type === "giftcard" ? "giftcard" : "deposit",
+      // Display-only fields (stripped on persist)
+      _originalAmount: deposit.amountCents,
+      _note: isCredit ? (deposit.text || "") : (deposit.note || ""),
+      _last4: deposit.last4 || "",
+      _method: deposit.method || "cash",
+      _millis: deposit.millis || 0,
+      _depositSaleID: deposit.saleID || "",
     };
 
-    // Consume deposit/credit from customer immediately
+    // Reserve deposit/credit on customer (not consumed until sale completes)
     let arrKey = isCredit ? "credits" : "deposits";
     let customerArr = cloneDeep(zCustomer?.[arrKey] || []);
     let idx = customerArr.findIndex((d) => d.id === deposit.id);
     if (idx >= 0) {
-      let remainder = customerArr[idx].amountCents - appliedAmount;
-      if (remainder > 0) {
-        customerArr[idx] = { ...customerArr[idx], amountCents: remainder };
-      } else {
-        customerArr.splice(idx, 1);
-      }
+      customerArr[idx] = { ...customerArr[idx], reservedCents: (customerArr[idx].reservedCents || 0) + appliedAmount };
       let updatedCustomer = { ...zCustomer, [arrKey]: customerArr };
       useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
       dbSaveCustomer(updatedCustomer);
     }
 
-    // Feed into the existing payment capture flow
-    handlePaymentCapture(payment);
+    // Update sale and credits state
+    let newCredits = [...sCredits, credit];
+    _setCredits(newCredits);
+    let sale = cloneDeep(sSale);
+    recomputeSaleAmounts(sale, sTransactions, newCredits);
+
+    if (sale.paymentComplete) {
+      handleSaleComplete(sale, sTransactions, newCredits);
+    } else {
+      updateWorkordersWithPaymentStatus(sale, credit);
+    }
+
+    _setSale(sale);
+    broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast, custLanguage);
+    if (!sDevSkip && !sale.paymentComplete) persistSale(sale, sTransactions, newCredits);
   }
 
-  function handleRemoveDeposit(payment) {
+  function handleRemoveDeposit(credit) {
     if (!sSale || sSale.paymentComplete) return;
-    if (!payment.depositType) return;
+    if (!credit.type) return;
 
-    // Restore deposit/credit to customer
-    let isCredit = payment.depositType === "credit";
+    // Release reservation on deposit/credit (not consumed yet, just reserved)
+    let isCredit = credit.type === "credit";
     let arrKey = isCredit ? "credits" : "deposits";
     let customerArr = cloneDeep(zCustomer?.[arrKey] || []);
-    let existing = customerArr.find((d) => d.id === payment.depositId);
+    let existing = customerArr.find((d) => d.id === credit.creditId);
     if (existing) {
-      existing.amountCents = existing.amountCents + payment.amountCaptured;
-    } else if (isCredit) {
-      customerArr.push({ id: payment.depositId, text: payment.depositOriginalText || "", amountCents: payment.amountCaptured, millis: payment.depositOriginalMillis || payment.millis });
-    } else {
-      customerArr.push({ id: payment.depositId, amountCents: payment.amountCaptured, millis: payment.depositOriginalMillis || payment.millis, method: payment.method || "cash", note: "", last4: payment.last4 || "", type: payment.depositType === "giftcard" ? "giftcard" : "" });
+      existing.reservedCents = Math.max(0, (existing.reservedCents || 0) - credit.amount);
     }
     let updatedCustomer = { ...zCustomer, [arrKey]: customerArr };
     useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
     dbSaveCustomer(updatedCustomer);
 
-    // Remove deposit payment from sale
+    // Remove credit from sCredits
+    let newCredits = sCredits.filter((c) => c.creditId !== credit.creditId);
+    _setCredits(newCredits);
     let sale = cloneDeep(sSale);
-    sale.transactions = sale.transactions.filter((t) => t.id !== payment.id);
-    recomputeSaleAmounts(sale);
+    recomputeSaleAmounts(sale, sTransactions, newCredits);
     _setSale(sale);
-    persistSale(sale);
+    if (sTransactions.length === 0 && newCredits.length === 0 && sale.id) {
+      deleteActiveSale(sale.id);
+      salePersistedRef.current = false;
+    } else {
+      persistSale(sale, sTransactions, newCredits);
+    }
 
     // Log removal to workorder changelogs
     let user = useLoginStore.getState().currentUser?.first || "System";
     let timestamp = Date.now();
     let label = isCredit ? "Credit" : "Deposit";
-    let entry = { timestamp, user, field: "payment", action: "recorded", from: "", to: label + " removed " + formatCurrencyDisp(payment.amountCaptured, true) };
-    let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
-    let amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
+    let entry = { timestamp, user, field: "payment", action: "recorded", from: "", to: label + " removed " + formatCurrencyDisp(credit.amount, true) };
+    let amountPaid = sTransactions.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
     if (amountPaid < 0) amountPaid = 0;
+    let noPaymentsLeft = sTransactions.length === 0 && newCredits.length === 0;
     let updatedWorkorders = [];
     for (let wo of sCombinedWorkorders) {
       let updated = cloneDeep(wo);
       updated.changeLog = [...(updated.changeLog || []), entry];
       updated.amountPaid = amountPaid;
+      if (noPaymentsLeft) updated.activeSaleID = "";
       if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
       updatedWorkorders.push(updated);
     }
     _setCombinedWorkorders(updatedWorkorders);
   }
 
-  function handleSplitDeposit(payment, newAmountCents) {
+  function handleSplitDeposit(credit, newAmountCents) {
     if (!sSale || sSale.paymentComplete) return;
-    if (!payment.depositType) return;
+    if (!credit.type) return;
 
     if (newAmountCents <= 0) {
-      handleRemoveDeposit(payment);
+      handleRemoveDeposit(credit);
       _setSplitDepositPayment(null);
       return;
     }
-    if (newAmountCents === payment.amountCaptured) {
+    if (newAmountCents === credit.amount) {
       _setSplitDepositPayment(null);
       return;
     }
 
-    let difference = payment.amountCaptured - newAmountCents; // positive = decrease, negative = increase
-    log("handleSplitDeposit: payment.amountCaptured=", payment.amountCaptured, "newAmountCents=", newAmountCents, "difference=", difference, "depositId=", payment.depositId, "zCustomer?.id=", zCustomer?.id, "sCombinedWorkorders.length=", sCombinedWorkorders.length);
+    let difference = credit.amount - newAmountCents; // positive = decrease, negative = increase
+    log("handleSplitDeposit: credit.amount=", credit.amount, "newAmountCents=", newAmountCents, "difference=", difference, "creditId=", credit.creditId, "zCustomer?.id=", zCustomer?.id);
 
-    // Update the payment in the sale
+    // Update the credit in sCredits
+    let newCredits = sCredits.map((c) =>
+      c.creditId === credit.creditId ? { ...c, amount: newAmountCents } : c
+    );
+    _setCredits(newCredits);
     let sale = cloneDeep(sSale);
-    let paymentIdx = sale.transactions.findIndex((t) => t.id === payment.id);
-    if (paymentIdx < 0) return;
-    sale.transactions[paymentIdx] = {
-      ...sale.transactions[paymentIdx],
-      amountCaptured: newAmountCents,
-      amountTendered: newAmountCents,
-      salesTax: sale.total > 0 ? Math.round(sale.salesTax * (newAmountCents / sale.total)) : 0,
-    };
-    recomputeSaleAmounts(sale);
+    recomputeSaleAmounts(sale, sTransactions, newCredits);
     _setSale(sale);
-    persistSale(sale);
+    persistSale(sale, sTransactions, newCredits);
 
-    // Update customer deposits/credits: positive difference = restore, negative = consume more
-    let isCredit = payment.depositType === "credit";
+    // Adjust reservation on customer deposits/credits: positive difference = release, negative = reserve more
+    let isCredit = credit.type === "credit";
     let arrKey = isCredit ? "credits" : "deposits";
     let customerArr = cloneDeep(zCustomer?.[arrKey] || []);
-    let existing = customerArr.find((d) => d.id === payment.depositId);
-    if (difference > 0) {
-      // Decreasing applied amount — restore difference to customer
-      if (existing) {
-        existing.amountCents = existing.amountCents + difference;
-      } else if (isCredit) {
-        customerArr.push({
-          id: payment.depositId,
-          text: payment.depositOriginalText || "",
-          amountCents: difference,
-          millis: payment.depositOriginalMillis || payment.millis,
-        });
-      } else {
-        customerArr.push({
-          id: payment.depositId,
-          amountCents: difference,
-          millis: payment.depositOriginalMillis || payment.millis,
-          method: payment.method || "cash",
-          note: "",
-          last4: payment.last4 || "",
-          type: payment.depositType === "giftcard" ? "giftcard" : "",
-        });
-      }
-    } else if (difference < 0) {
-      // Increasing applied amount — consume more from customer deposit/credit
-      let consume = Math.abs(difference);
-      if (existing) {
-        existing.amountCents = Math.max(0, existing.amountCents - consume);
-        if (existing.amountCents <= 0) {
-          customerArr = customerArr.filter((d) => d.id !== payment.depositId);
-        }
-      }
+    let existing = customerArr.find((d) => d.id === credit.creditId);
+    if (existing) {
+      // difference > 0 means user reduced the applied amount (release some reservation)
+      // difference < 0 means user increased the applied amount (reserve more)
+      existing.reservedCents = Math.max(0, (existing.reservedCents || 0) - difference);
     }
-    log("handleSplitDeposit: existing deposit found=", !!existing, "customerArr after=", JSON.stringify(customerArr), "zCustomer?.id=", zCustomer?.id);
+    log("handleSplitDeposit: existing deposit found=", !!existing, "reservedCents=", existing?.reservedCents, "zCustomer?.id=", zCustomer?.id);
     if (zCustomer?.id) {
       let updatedCustomer = { ...zCustomer, [arrKey]: customerArr };
-      log("handleSplitDeposit: saving customer, deposit amountCents=", updatedCustomer[arrKey]?.find((d) => d.id === payment.depositId)?.amountCents);
       useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
       dbSaveCustomer(updatedCustomer);
     }
@@ -709,8 +752,7 @@ export function NewCheckoutModalScreen() {
     let label = isCredit ? "Credit" : "Deposit";
     let action = difference > 0 ? "reduced to" : "increased to";
     let entry = { timestamp, user, field: "payment", action: "recorded", from: "", to: label + " " + action + " " + formatCurrencyDisp(newAmountCents, true) };
-    let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
-    let amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
+    let amountPaid = sTransactions.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
     if (amountPaid < 0) amountPaid = 0;
     let updatedWorkorders = [];
     for (let wo of sCombinedWorkorders) {
@@ -725,9 +767,9 @@ export function NewCheckoutModalScreen() {
     _setSplitDepositPayment(null);
   }
 
-  async function handlePrintDepositReceipt(payment) {
-    if (!payment.depositSaleID) return;
-    let sale = await dbGetCompletedSale(payment.depositSaleID);
+  async function handlePrintDepositReceipt(credit) {
+    if (!credit._depositSaleID) return;
+    let sale = await dbGetCompletedSale(credit._depositSaleID);
     if (!sale) return;
     let settings = useSettingsStore.getState().getSettings();
     let printerID = settings?.selectedPrinterID || "";
@@ -740,11 +782,21 @@ export function NewCheckoutModalScreen() {
       id: zCustomer?.id || "",
     };
     let emptyWO = { workorderLines: [], taxFree: false };
-    let receipt = printBuilder.sale(sale, sale.transactions || [], customerInfo, emptyWO, 0, _ctx);
+    let txns = sale.transactionIDs?.length > 0
+      ? (await readTransactions(sale.transactionIDs)).filter(Boolean)
+      : [];
+    let receipt = printBuilder.sale(sale, txns, customerInfo, emptyWO, 0, _ctx, sale.creditsApplied);
     dbSavePrintObj(receipt, printerID);
   }
 
   // ─── Payment Handling ─────────────────────────────────────
+  function handlePaymentStarted(transactionID) {
+    let sale = cloneDeep(sSale);
+    sale.pendingTransactionIDs = [...(sale.pendingTransactionIDs || []), transactionID];
+    _setSale(sale);
+    if (!sDevSkip) persistSale(sale);
+  }
+
   function handlePaymentCapture(payment) {
     log("handlePaymentCapture called:", JSON.stringify(payment));
     // Guard: if sale is already marked complete locally, skip
@@ -753,7 +805,6 @@ export function NewCheckoutModalScreen() {
       return;
     }
     let sale = cloneDeep(sSale);
-    payment.saleID = sale.id;
 
     // Compute proportional salesTax for this transaction
     if (sale.total > 0 && sale.salesTax > 0) {
@@ -762,15 +813,18 @@ export function NewCheckoutModalScreen() {
       payment.salesTax = 0;
     }
 
-    sale.transactions = [...sale.transactions, payment];
+    let newTransactions = [...sTransactions, payment];
+    _setTransactions(newTransactions);
+    sale.transactionIDs = newTransactions.map((t) => t.id);
+    sale.pendingTransactionIDs = (sale.pendingTransactionIDs || []).filter((id) => id !== payment.id);
     sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);
 
-    recomputeSaleAmounts(sale);
+    recomputeSaleAmounts(sale, newTransactions, sCredits);
 
     if (sale.paymentComplete) {
-      handleSaleComplete(sale);
+      handleSaleComplete(sale, newTransactions, sCredits);
     } else {
-      updateWorkordersWithPaymentStatus(sale);
+      updateWorkordersWithPaymentStatus(sale, payment, newTransactions);
 
       // Print receipt after partial cash payment (includes popCashRegister if change is due)
       if (payment.method === "cash") {
@@ -795,35 +849,27 @@ export function NewCheckoutModalScreen() {
     broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast, custLanguage);
 
     // Persist immediately (skip if complete — handleSaleComplete handles deletion)
-    if (!sDevSkip && !sale.paymentComplete) persistSale(sale);
+    if (!sDevSkip && !sale.paymentComplete) persistSale(sale, newTransactions, sCredits);
   }
 
   // Update workorders to track that a sale is in progress
-  function updateWorkordersWithPaymentStatus(sale) {
-    let settings = useSettingsStore.getState().getSettings();
-    let statuses = settings?.statuses || [];
+  function updateWorkordersWithPaymentStatus(sale, entry, txns) {
     let user = useLoginStore.getState().currentUser?.first || "System";
     let timestamp = Date.now();
-    let payment = sale.transactions[sale.transactions.length - 1];
-    let paymentLabel = payment?.depositType ? "Deposit/credit applied" : payment?.method === "cash" ? "Cash payment" : "Card payment";
+    let isCredit = !!entry.creditId;
+    let paymentLabel = isCredit ? "Deposit/credit applied" : entry.method === "cash" ? "Cash payment" : "Card payment";
+    let entryAmount = isCredit ? entry.amount : entry.amountCaptured;
 
+    let currentTxns = txns || sTransactions;
     let updatedWorkorders = [];
     for (let wo of sCombinedWorkorders) {
       let updated = cloneDeep(wo);
-      // let oldStatusLabel = resolveStatus(wo.status, statuses)?.label || wo.status || "";
-      // let newStatusLabel = resolveStatus("sale_in_progress", statuses)?.label || "Sale In Progress";
-
       updated.activeSaleID = sale.id;
-      let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
-      updated.amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
+      updated.amountPaid = currentTxns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
       if (updated.amountPaid < 0) updated.amountPaid = 0;
-      // updated.status = "sale_in_progress";
 
       let entries = [];
-      // if (wo.status !== "sale_in_progress") {
-      //   entries.push({ timestamp, user, field: "status", action: "changed", from: oldStatusLabel, to: newStatusLabel });
-      // }
-      entries.push({ timestamp, user, field: "payment", action: "recorded", from: "", to: paymentLabel + " " + formatCurrencyDisp(payment?.amountCaptured || 0, true) });
+      entries.push({ timestamp, user, field: "payment", action: "recorded", from: "", to: paymentLabel + " " + formatCurrencyDisp(entryAmount || 0, true) });
 
       updated.changeLog = [...(updated.changeLog || []), ...entries];
       if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
@@ -832,7 +878,9 @@ export function NewCheckoutModalScreen() {
     _setCombinedWorkorders(updatedWorkorders);
   }
 
-  async function handleDepositSaleComplete(sale) {
+  async function handleDepositSaleComplete(sale, txns, creds) {
+    let localTxns = txns || sTransactions;
+    let localCreds = creds || sCredits;
     if (sDevSkip) {
       log("sDevSkip: deposit sale complete locally, skipping DB/print/SMS", sale);
       return;
@@ -841,28 +889,27 @@ export function NewCheckoutModalScreen() {
     if (!depositInfo) return;
 
     // Create the deposit and add to customer
-    let primaryPayment = (sale.transactions || [])[0];
+    let primaryPayment = localTxns[0];
     let newDeposit = { ...CUSTOMER_DEPOSIT_PROTO };
-    newDeposit.id = sale.id;
+    newDeposit.id = primaryPayment?.id || sale.id;
     newDeposit.amountCents = depositInfo.amountCents;
     newDeposit.millis = Date.now();
     newDeposit.method = primaryPayment?.method || "cash";
     newDeposit.note = depositInfo.note || "";
     newDeposit.last4 = primaryPayment?.last4 || "";
-    newDeposit.type = sale.depositType === "giftcard" ? "giftcard" : "";
+    newDeposit.type = sale.depositType === "giftcard" ? "giftcard" : "deposit";
     if (zCustomer?.id) {
       let updatedCustomer = cloneDeep(zCustomer);
       updatedCustomer.deposits = [...(updatedCustomer.deposits || []), newDeposit];
-      let customerSales = updatedCustomer.sales || [];
-      if (!customerSales.includes(sale.id)) {
-        updatedCustomer.sales = [...customerSales, sale.id];
-      }
       useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
       dbSaveCustomer(updatedCustomer);
     }
 
-    // Complete the sale
-    await newCheckoutCompleteSale(sale);
+    // Persist transactions only (no completed-sale for deposits/gift cards)
+    for (let txn of localTxns) {
+      if (txn.method !== "card") await writeTransaction(txn);
+    }
+    await deleteActiveSale(sale.id);
 
     // Receipt actions based on settings
     let settings = useSettingsStore.getState().getSettings();
@@ -870,7 +917,7 @@ export function NewCheckoutModalScreen() {
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let emptyWO = { workorderLines: [], taxFree: false };
     let customerInfo = { first: zCustomer?.first || "", last: zCustomer?.last || "", phone: zCustomer?.customerCell || "", id: zCustomer?.id || "" };
-    let saleReceipt = printBuilder.sale(sale, sale.transactions || [], customerInfo, emptyWO, 0, _ctx);
+    let saleReceipt = printBuilder.sale(sale, localTxns, customerInfo, emptyWO, 0, _ctx, localCreds);
     // log("Receipt object (deposit sale):", JSON.stringify(saleReceipt, null, 2));
 
     // Translate receipt if non-English language is set
@@ -921,15 +968,17 @@ export function NewCheckoutModalScreen() {
     const canSMS = customerForReceipt.customerCell && smsContent.trim();
     const canEmail = customerForReceipt.email && emailContent.trim();
     if (canSMS || canEmail) {
-      sendSaleReceipt(sale, customerForReceipt, emptyWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode);
+      sendSaleReceipt(sale, customerForReceipt, emptyWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode, localTxns, localCreds);
     }
   }
 
-  async function handleSaleComplete(sale) {
+  async function handleSaleComplete(sale, txns, creds) {
+    let localTxns = txns || sTransactions;
+    let localCreds = creds || sCredits;
     log("handleSaleComplete entered, paymentComplete:", sale.paymentComplete, "isDepositSale:", sale.isDepositSale);
     // Deposit sale — separate completion path
     if (sale.isDepositSale) {
-      handleDepositSaleComplete(sale);
+      handleDepositSaleComplete(sale, localTxns, localCreds);
       return;
     }
     // DEV: skip all DB writes, printing, SMS — freeze UI for layout work
@@ -937,20 +986,6 @@ export function NewCheckoutModalScreen() {
       log("sDevSkip: sale complete locally, skipping DB/print/SMS", sale);
       return;
     }
-    // Idempotency: check if webhook already completed this sale
-    let existingActiveSale = await newCheckoutGetActiveSale(sale.id);
-    if (!existingActiveSale) {
-      log("handleSaleComplete: active sale gone (webhook completed it). UI cleanup only.");
-      // Webhook handled DB completion, printing, SMS/email — just clean up local UI
-      for (let wo of sCombinedWorkorders) {
-        useOpenWorkordersStore.getState().removeWorkorder(wo, false);
-      }
-      useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
-      useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
-      return;
-    }
-
-    // Normal flow — webhook hasn't completed it yet
     // Mark all combined workorders as complete
     let settings = useSettingsStore.getState().getSettings();
     let statuses = settings?.statuses || [];
@@ -965,8 +1000,7 @@ export function NewCheckoutModalScreen() {
       woToComplete.paymentComplete = true;
       woToComplete.paidOnMillis = Date.now();
       woToComplete.activeSaleID = "";
-      let nonDepositPayments = (sale.transactions || []).filter((t) => t.type === "payment" && !t.depositType);
-      woToComplete.amountPaid = nonDepositPayments.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
+      woToComplete.amountPaid = localTxns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
       if (woToComplete.amountPaid < 0) woToComplete.amountPaid = 0;
       woToComplete.saleID = sale.id;
       woToComplete.status = "finished_and_paid";
@@ -985,8 +1019,16 @@ export function NewCheckoutModalScreen() {
     useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
     useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
 
-    // Save completed sale to Cloud Storage
-    await newCheckoutCompleteSale(sale);
+    // Save cash transactions to collection — card transactions are written by the webhook
+    for (let txn of localTxns) {
+      if (txn.method !== "card") await writeTransaction(txn);
+    }
+    let saleToPersist = { ...sale };
+    saleToPersist.creditsApplied = localCreds.map((c) => ({ creditId: c.creditId, transactionId: c.transactionId || "", amount: c.amount, type: c.type }));
+    saleToPersist.transactionIDs = localTxns.map((t) => t.id);
+    delete saleToPersist.pendingTransactionIDs;
+    await writeCompletedSale(saleToPersist);
+    await deleteActiveSale(sale.id);
 
     // Add sale ID to customer and persist deposit removal
     let currentCustomer = cloneDeep(useCurrentCustomerStore.getState().getCustomer());
@@ -997,7 +1039,22 @@ export function NewCheckoutModalScreen() {
         currentCustomer.sales = [...customerSales, sale.id];
       }
 
-      // Deposits/credits already consumed at apply-time — no need to consume again here
+      // Consume reserved deposits/credits now that sale is complete
+      for (let cred of localCreds) {
+        let isCredit = cred.type === "credit";
+        let arrKey = isCredit ? "credits" : "deposits";
+        let arr = currentCustomer[arrKey] || [];
+        let idx = arr.findIndex((d) => d.id === cred.creditId);
+        if (idx >= 0) {
+          let dep = arr[idx];
+          dep.amountCents = Math.max(0, (dep.amountCents || 0) - cred.amount);
+          dep.reservedCents = Math.max(0, (dep.reservedCents || 0) - cred.amount);
+          if (dep.amountCents <= 0) {
+            arr.splice(idx, 1);
+          }
+          currentCustomer[arrKey] = arr;
+        }
+      }
 
       useCurrentCustomerStore.getState().setCustomer(currentCustomer, true);
     }
@@ -1023,7 +1080,7 @@ export function NewCheckoutModalScreen() {
 
     // Build the sale receipt — it computes popCashRegister and cashChangeGiven
     let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
-    let saleReceipt = printBuilder.sale(sale, sale.transactions || [], customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx);
+    let saleReceipt = printBuilder.sale(sale, sTransactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
     log("Receipt object (sale complete):", JSON.stringify(saleReceipt, null, 2));
 
     // Translate receipt if non-English language is set
@@ -1068,7 +1125,7 @@ export function NewCheckoutModalScreen() {
     const canSMS = customerForReceipt.customerCell && smsContent.trim();
     const canEmail = customerForReceipt.email && emailContent.trim();
     if (canSMS || canEmail) {
-      sendSaleReceipt(sale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode);
+      sendSaleReceipt(sale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode, sTransactions, sCredits);
     }
   }
 
@@ -1089,7 +1146,7 @@ export function NewCheckoutModalScreen() {
       const printerID = settings?.selectedPrinterID || "";
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
       let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
-      let saleReceipt = printBuilder.sale(sSale, sSale.transactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx);
+      let saleReceipt = printBuilder.sale(sSale, sTransactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
       // log("Receipt object (partial/reprint):", JSON.stringify(saleReceipt, null, 2));
       return { saleReceipt, customerForReceipt, primaryWO, settings, printerID };
     }
@@ -1138,7 +1195,7 @@ export function NewCheckoutModalScreen() {
       const canSMS = customerForReceipt.customerCell && smsContent.trim();
       const canEmail = customerForReceipt.email && emailContent.trim();
       if (canSMS || canEmail) {
-        sendSaleReceipt(sSale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode);
+        sendSaleReceipt(sSale, customerForReceipt, primaryWO, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode, sTransactions, sCredits);
       }
     }
 
@@ -1178,7 +1235,7 @@ export function NewCheckoutModalScreen() {
   // ─── Close Modal ──────────────────────────────────────────
   function closeModal() {
     if (
-      sSale?.transactions?.length > 0 &&
+      (sTransactions.length > 0 || sCredits.length > 0) &&
       !sSale.paymentComplete
     ) {
       // Partial payment — confirm with user
@@ -1249,15 +1306,32 @@ export function NewCheckoutModalScreen() {
   }
 
   function resetAndClose() {
-    // If sale has transactions, it's already fully persisted — just close the modal.
+    // Release any deposit/credit reservations held by this checkout (only if sale not completed)
+    if (sCredits.length > 0 && zCustomer?.id && !sSale?.paymentComplete) {
+      let updatedCustomer = cloneDeep(zCustomer);
+      for (let cred of sCredits) {
+        let isCredit = cred.type === "credit";
+        let arrKey = isCredit ? "credits" : "deposits";
+        let arr = updatedCustomer[arrKey] || [];
+        let dep = arr.find((d) => d.id === cred.creditId);
+        if (dep) {
+          dep.reservedCents = Math.max(0, (dep.reservedCents || 0) - cred.amount);
+        }
+      }
+      useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+      dbSaveCustomer(updatedCustomer);
+    }
+    // If sale has transactions/credits, it's already fully persisted - just close the modal.
     // Only delete empty sales (no transactions) to clean up the active-sale document.
-    let hasTransactions = (sSale?.transactions || []).length > 0;
-    if (sSale?.id && !hasTransactions && salePersistedRef.current) {
-      newCheckoutDeleteActiveSale(sSale.id);
+    let hasPayments = sTransactions.length > 0 || sCredits.length > 0;
+    if (sSale?.id && !hasPayments && salePersistedRef.current) {
+      deleteActiveSale(sSale.id);
     }
     salePersistedRef.current = false;
     broadcastClear();
     _setSale(null);
+    _setTransactions([]);
+    _setCredits([]);
     _setCombinedWorkorders([]);
     _setCashChangeNeeded(0);
     _setCardProcessingAmount(0);
@@ -1302,11 +1376,12 @@ export function NewCheckoutModalScreen() {
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
     let toPrint = printBuilder.sale(
       sSale,
-      sSale.transactions,
+      sTransactions,
       customer,
       primaryWO || { workorderLines: [], taxFree: false },
       zSettings?.salesTaxPercent,
-      _ctx
+      _ctx,
+      sCredits
     );
 
     let langCode = getTranslateCode(sReceiptLanguage);
@@ -1335,8 +1410,9 @@ export function NewCheckoutModalScreen() {
       : { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" };
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let wo = (isDeposit || !primaryWO) ? { workorderLines: [], taxFree: false } : primaryWO;
-    let paymentsForReceipt = payment ? [payment] : (sSale.transactions || []);
-    let receipt = printBuilder.sale(sSale, paymentsForReceipt, customer, wo, settings?.salesTaxPercent, _ctx);
+    let paymentsForReceipt = payment ? [payment] : sTransactions;
+    let creditsForReceipt = payment ? [] : sCredits;
+    let receipt = printBuilder.sale(sSale, paymentsForReceipt, customer, wo, settings?.salesTaxPercent, _ctx, creditsForReceipt);
     if (payment) {
       receipt.transactionOnly = true;
       receipt.popCashRegister = false;
@@ -1374,7 +1450,7 @@ export function NewCheckoutModalScreen() {
     let updated = updateSaleWithTotals(sSale, newCombined, zSettings);
     _setSale(updated);
     broadcastSaleToDisplay(updated, newCombined, custFirst, custLast, custLanguage);
-    persistSale(updated);
+    if (salePersistedRef.current) persistSale(updated);
   }
 
   function handleTaxFreeToggle() {
@@ -1465,6 +1541,7 @@ export function NewCheckoutModalScreen() {
                 <CardPayment
                   amountLeftToPay={amountLeftToPay}
                   onPaymentCapture={handlePaymentCapture}
+                  onPaymentStarted={handlePaymentStarted}
                   saleComplete={saleComplete}
                   saleID={sSale?.id || ""}
                   customerID={sSale?.customerID || zCustomer?.id || ""}
@@ -1478,6 +1555,7 @@ export function NewCheckoutModalScreen() {
                 <CardReaderPayment
                   amountLeftToPay={amountLeftToPay}
                   onPaymentCapture={handlePaymentCapture}
+                  onPaymentStarted={handlePaymentStarted}
                     stripeReaders={zStripeReaders}
                     settings={zSettings}
                     saleComplete={saleComplete}
@@ -1563,7 +1641,7 @@ export function NewCheckoutModalScreen() {
                     style={{ width: 18, height: 18, marginRight: 8, tintColor: C.orange }}
                   />
                   <Text style={{ fontSize: 13, color: C.orange, fontWeight: "500" }}>
-                    Deposit requires full payment — partial payments are not allowed.
+                    {sSale?.depositType === "giftcard" ? "Gift card" : "Deposit"} requires full payment - partial payments are not allowed.
                   </Text>
                 </View>
 
@@ -1575,7 +1653,8 @@ export function NewCheckoutModalScreen() {
 
                 <View style={{ flex: 1, marginTop: 3 }}>
                   <PaymentsList
-                    payments={sSale?.transactions}
+                    payments={sTransactions}
+                    credits={sCredits}
                     onRefund={(payment) => { _setRefundPayment(payment); _setShowRefundModal(true); }}
                     onPrintReceipt={handlePrintReceipt}
                   />
@@ -1598,7 +1677,7 @@ export function NewCheckoutModalScreen() {
                   }}
                 >
                   <Button_
-                    enabled={saleComplete || !(sSale?.transactions?.length > 0)}
+                    enabled={saleComplete || !(sTransactions.length > 0 || sCredits.length > 0)}
                     colorGradientArr={COLOR_GRADIENTS.red}
                     text={saleComplete ? "CLOSE" : isStandalone ? "CANCEL SALE" : "CANCEL"}
                     onPress={closeModal}
@@ -1700,9 +1779,9 @@ export function NewCheckoutModalScreen() {
 
               {/* Customer Deposits / Credits */}
               {(() => {
-                      let appliedDepositIds = new Set((sSale?.transactions || []).filter((t) => t.depositType).map((t) => t.depositId));
-                      let availableDeposits = (zCustomer?.deposits || []).filter((d) => d.amountCents > 0 && !appliedDepositIds.has(d.id)).map((d) => ({ ...d, _type: d.type === "giftcard" ? "giftcard" : "deposit" }));
-                      let availableCredits = (zCustomer?.credits || []).filter((d) => d.amountCents > 0 && !appliedDepositIds.has(d.id)).map((d) => ({ ...d, _type: "credit" }));
+                      let appliedCreditIds = new Set(sCredits.map((c) => c.creditId));
+                      let availableDeposits = (zCustomer?.deposits || []).filter((d) => (d.amountCents - (d.reservedCents || 0)) > 0 && !appliedCreditIds.has(d.id)).map((d) => ({ ...d, amountCents: d.amountCents - (d.reservedCents || 0), _type: d.type === "giftcard" ? "giftcard" : "deposit" }));
+                      let availableCredits = (zCustomer?.credits || []).filter((d) => (d.amountCents - (d.reservedCents || 0)) > 0 && !appliedCreditIds.has(d.id)).map((d) => ({ ...d, amountCents: d.amountCents - (d.reservedCents || 0), _type: "credit" }));
                       let allAvailable = [...availableDeposits, ...availableCredits];
                 let saleComplete = sSale?.paymentComplete;
                       if (allAvailable.length === 0 || saleComplete) return null;
@@ -1810,23 +1889,24 @@ export function NewCheckoutModalScreen() {
               >
                 <ScrollView style={{ flexShrink: 1 }}>
                       <PaymentsList
-                          payments={sSale?.transactions}
+                          payments={sTransactions}
+                          credits={sCredits}
                   onRefund={(payment) => { _setRefundPayment(payment); _setShowRefundModal(true); }}
                   onPrintReceipt={handlePrintReceipt}
                   onPrintDepositReceipt={handlePrintDepositReceipt}
-                  onRemoveDeposit={!saleComplete ? (payment) => _setSplitDepositPayment(payment) : null}
+                  onRemoveDeposit={!saleComplete ? (credit) => _setSplitDepositPayment(credit) : null}
                 />
                 </ScrollView>
 
                       {!!sSplitDepositPayment && (() => {
-                        let isCredit = sSplitDepositPayment.depositType === "credit";
+                        let isCredit = sSplitDepositPayment.type === "credit";
                         let customerArr = isCredit ? (zCustomer?.credits || []) : (zCustomer?.deposits || []);
                         let customerRemaining = customerArr
-                          .filter((d) => d.id === sSplitDepositPayment.depositId)
+                          .filter((d) => d.id === sSplitDepositPayment.creditId)
                           .reduce((sum, d) => sum + (d.amountCents || 0), 0);
-                        let totalDeposit = customerRemaining + sSplitDepositPayment.amountCaptured;
-                        let originalAmount = sSplitDepositPayment.depositOriginalAmount || totalDeposit;
-                        let saleRemaining = (sSale?.total || 0) - (sSale?.amountCaptured || 0) + sSplitDepositPayment.amountCaptured;
+                        let totalDeposit = customerRemaining + sSplitDepositPayment.amount;
+                        let originalAmount = sSplitDepositPayment._originalAmount || totalDeposit;
+                        let saleRemaining = (sSale?.total || 0) - (sSale?.amountCaptured || 0) + sSplitDepositPayment.amount;
                         let maxAvailable = Math.min(totalDeposit, originalAmount, saleRemaining);
                         return (
                           <SplitDepositModal
@@ -1866,7 +1946,7 @@ export function NewCheckoutModalScreen() {
               >
                 {/* Tax-Free & Receipt Language */}
 
-                      {sCombinedWorkorders.length > 0 && !saleComplete && !(sSale?.transactions?.length > 0) && (
+                      {sCombinedWorkorders.length > 0 && !saleComplete && !(sTransactions.length > 0 || sCredits.length > 0) && (
                   <CheckBox_
                     text="Tax-Free"
                     isChecked={!!sCombinedWorkorders[0]?.taxFree}
@@ -2104,9 +2184,29 @@ export function NewCheckoutModalScreen() {
       <NewRefundModalScreen
         visible={true}
         sale={sSale}
+        transactions={sTransactions}
         initialPayment={sRefundPayment}
         onClose={() => { _setShowRefundModal(false); _setRefundPayment(null); }}
-        onSaleUpdated={(updatedSale) => _setSale(updatedSale)}
+        onSaleUpdated={(updatedSale, updatedTransactions) => {
+          if (updatedSale?.voidedByRefund) {
+            // Sale was fully voided - reset to fresh sale from workorders
+            let currentUser = useLoginStore.getState().currentUser;
+            let createdBy = currentUser?.first ? currentUser.first + " " + (currentUser.last || "") : "";
+            let freshSale = createNewSale(zSettings, createdBy);
+            if (sCombinedWorkorders.length > 0) {
+              freshSale.customerID = sCombinedWorkorders[0]?.customerID || "";
+              freshSale = updateSaleWithTotals(freshSale, sCombinedWorkorders, zSettings);
+              freshSale.workorderIDs = sCombinedWorkorders.map((w) => w.id);
+            }
+            _setSale(freshSale);
+            _setTransactions([]);
+            _setCredits([]);
+            salePersistedRef.current = false;
+          } else {
+            _setSale(updatedSale);
+            if (updatedTransactions) _setTransactions(updatedTransactions);
+          }
+        }}
       />
     )}
   </>

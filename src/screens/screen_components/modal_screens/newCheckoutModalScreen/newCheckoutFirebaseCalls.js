@@ -261,110 +261,6 @@ export async function writeCashRefund(transactionID, refundObj) {
   }
 }
 
-// ─── DEPRECATED — use new thin sale functions above ──────────
-
-// DEPRECATED — use writeActiveSale
-export async function newCheckoutSaveActiveSale(sale) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) {
-      log("newCheckoutSaveActiveSale: missing tenantID/storeID");
-      return { success: false };
-    }
-
-    const path = buildActiveSalePath(tenantID, storeID, sale.id);
-    await firestoreWrite(path, sale);
-    return { success: true };
-  } catch (error) {
-    log("newCheckoutSaveActiveSale error:", error);
-    return { success: false, error };
-  }
-}
-
-// DEPRECATED — use readActiveSale
-export async function newCheckoutGetActiveSale(saleID) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) {
-      log("newCheckoutGetActiveSale: missing tenantID/storeID");
-      return null;
-    }
-    const path = buildActiveSalePath(tenantID, storeID, saleID);
-    return await firestoreRead(path);
-  } catch (error) {
-    log("newCheckoutGetActiveSale error:", error);
-    return null;
-  }
-}
-
-// DEPRECATED — use deleteActiveSale
-export async function newCheckoutDeleteActiveSale(saleID) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) return;
-    const path = buildActiveSalePath(tenantID, storeID, saleID);
-    await firestoreDelete(path);
-  } catch (error) {
-    log("newCheckoutDeleteActiveSale error:", error);
-  }
-}
-
-// ─── Completed Sale (Firestore) ───────────────────────────────
-
-// DEPRECATED — use writeCompletedSale + deleteActiveSale
-export async function newCheckoutCompleteSale(sale) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) {
-      log("newCheckoutCompleteSale: missing tenantID/storeID");
-      return { success: false };
-    }
-    const path = `tenants/${tenantID}/stores/${storeID}/completed-sales/${sale.id}`;
-    await firestoreWrite(path, sale);
-
-    // Clean up active-sale from Firestore
-    await newCheckoutDeleteActiveSale(sale.id);
-
-    return { success: true };
-  } catch (error) {
-    log("newCheckoutCompleteSale error:", error);
-    return { success: false, error };
-  }
-}
-
-// DEPRECATED — use writeCompletedSale
-export async function newCheckoutUpdateCompletedSale(sale) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) {
-      log("newCheckoutUpdateCompletedSale: missing tenantID/storeID");
-      return { success: false };
-    }
-    const path = `tenants/${tenantID}/stores/${storeID}/completed-sales/${sale.id}`;
-    await firestoreWrite(path, sale);
-    return { success: true };
-  } catch (error) {
-    log("newCheckoutUpdateCompletedSale error:", error);
-    return { success: false, error };
-  }
-}
-
-// DEPRECATED — use readCompletedSale
-export async function newCheckoutFetchCompletedSale(saleID) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) {
-      log("newCheckoutFetchCompletedSale: missing tenantID/storeID");
-      return null;
-    }
-    const path = `tenants/${tenantID}/stores/${storeID}/completed-sales/${saleID}`;
-    return await firestoreRead(path);
-  } catch (error) {
-    log("newCheckoutFetchCompletedSale error:", error);
-    return null;
-  }
-}
-
 // ─── Workorders ───────────────────────────────────────────────
 
 export async function newCheckoutSaveWorkorder(workorder) {
@@ -488,7 +384,7 @@ export function newCheckoutListenToPaymentUpdates(readerID, paymentIntentID, onU
 
 // ─── Stripe Callable Wrappers ─────────────────────────────────
 
-export async function newCheckoutProcessStripePayment(amount, readerID, paymentIntentID, saleID, customerID, customerEmail) {
+export async function newCheckoutProcessStripePayment(amount, readerID, paymentIntentID, saleID, customerID, customerEmail, transactionID) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     const callables = await getCallables();
@@ -501,6 +397,7 @@ export async function newCheckoutProcessStripePayment(amount, readerID, paymentI
       saleID: saleID || "",
       customerID: customerID || "",
       customerEmail: customerEmail || "",
+      transactionID: transactionID || "",
     });
     log("newCheckout payment initiated:", result.data);
     return result.data;
@@ -522,12 +419,13 @@ export async function newCheckoutCancelStripePayment(readerID) {
   }
 }
 
-export async function newCheckoutProcessStripeRefund(amount, chargeID) {
+export async function newCheckoutProcessStripeRefund(amount, chargeID, transactionFields) {
   try {
     const callables = await getCallables();
     const result = await callables.processRefund({
       amount: Number(amount),
       chargeID,
+      ...(transactionFields || {}),
     });
     log("newCheckout refund processed:", result.data);
     return result.data;
@@ -549,7 +447,7 @@ export async function newCheckoutGetStripeReaders() {
   }
 }
 
-export async function newCheckoutProcessManualCardPayment(amount, paymentMethodID, saleID, customerID, customerEmail) {
+export async function newCheckoutProcessManualCardPayment(amount, paymentMethodID, saleID, customerID, customerEmail, transactionID) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     const callables = await getCallables();
@@ -561,6 +459,7 @@ export async function newCheckoutProcessManualCardPayment(amount, paymentMethodI
       saleID: saleID || "",
       customerID: customerID || "",
       customerEmail: customerEmail || "",
+      transactionID: transactionID || "",
     });
     log("newCheckout manual card payment:", result.data);
     return result.data;

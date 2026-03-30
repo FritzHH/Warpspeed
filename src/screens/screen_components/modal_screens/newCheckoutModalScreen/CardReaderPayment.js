@@ -9,6 +9,7 @@ import {
   log,
   gray,
   localStorageWrapper,
+  generate12DigitBarcode,
 } from "../../../../utils";
 import { useStripePaymentStore } from "../../../../stores";
 import { buildCardTransaction } from "./newCheckoutUtils";
@@ -119,6 +120,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   onCardProcessingStart,
   onCardProcessingEnd,
   onSwitchToManual,
+  onPaymentStarted,
   lockAmount = false,
 }) {
   const [sRequestedAmount, _setRequestedAmount] = useState("");
@@ -130,6 +132,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
   const autoLoadedRef = useRef(false);
   const prevAmountLeftRef = useRef(0);
+  const pendingTransactionIDRef = useRef(null);
   const callbacksRef = useRef({ onPaymentCapture, onCardProcessingEnd, onCardProcessingStart, amountLeftToPay });
   callbacksRef.current = { onPaymentCapture, onCardProcessingEnd, onCardProcessingStart, amountLeftToPay };
 
@@ -182,7 +185,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
         if (data.status === "succeeded" && (data.payment_intent || data.amount_captured)) {
           if (s._cardTimeout) { clearTimeout(s._cardTimeout); s._cardTimeout = null; }
-          let payment = buildCardTransaction(data);
+          let payment = buildCardTransaction(data, pendingTransactionIDRef.current);
+          pendingTransactionIDRef.current = null;
           s.setCardMessage("");
           s.setCardError("");
           s.setCardStatus("idle");
@@ -317,6 +321,13 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
     if (callbacksRef.current.onCardProcessingStart) callbacksRef.current.onCardProcessingStart(sRequestedAmount);
 
+    // Pre-generate transaction ID so webhook can use it as the document ID
+    let transactionID = generate12DigitBarcode();
+    pendingTransactionIDRef.current = transactionID;
+
+    // Notify parent to add pending ID to sale before payment starts
+    if (onPaymentStarted) onPaymentStarted(transactionID);
+
     try {
       let result = await newCheckoutProcessStripePayment(
         sRequestedAmount,
@@ -324,7 +335,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
         zPaymentIntentID || null,
         saleID,
         customerID,
-        customerEmail
+        customerEmail,
+        transactionID
       );
 
       if (!result?.success) {

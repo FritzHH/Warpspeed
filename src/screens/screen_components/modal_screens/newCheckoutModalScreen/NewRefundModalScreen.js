@@ -4,7 +4,6 @@ import { useState, memo, useMemo } from "react";
 import { cloneDeep } from "lodash";
 import { ScreenModal, SHADOW_RADIUS_PROTO, Button_ } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
-import { TRANSACTION_PROTO } from "../../../../data";
 import {
   useSettingsStore,
   useLoginStore,
@@ -18,14 +17,12 @@ import {
   findTemplateByType,
   log,
   gray,
-  deepEqual,
   printBuilder,
   resolveStatus,
 } from "../../../../utils";
 import { dbSavePrintObj } from "../../../../db_calls_wrapper";
 import {
   calculateRefundLimits,
-  validateRefundAmount,
   buildRefundObject,
   getPreviouslyRefundedLineIDs,
   splitWorkorderLinesToSingleQty,
@@ -33,15 +30,16 @@ import {
   recomputeSaleAmounts,
 } from "./newCheckoutUtils";
 import {
-  newCheckoutFetchCompletedSale,
+  readCompletedSale,
   newCheckoutFetchWorkordersForSale,
-  newCheckoutUpdateCompletedSale,
-  newCheckoutSaveActiveSale,
-  newCheckoutCompleteSale,
-  newCheckoutDeleteActiveSale,
+  writeCompletedSale,
+  deleteActiveSale,
   newCheckoutUpdateCompletedWorkorder,
   markItemSalesRefunded,
   voidCustomerDeposit,
+  writeCashRefund,
+  writeActiveSale,
+  readTransactions,
 } from "./newCheckoutFirebaseCalls";
 
 import { CashRefund } from "./CashRefund";
@@ -50,12 +48,13 @@ import { RefundTotals } from "./RefundTotals";
 import { RefundItemSelector } from "./RefundItemSelector";
 import { RefundPaymentSelector } from "./RefundPaymentSelector";
 
-export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible, saleID, sale: saleProp, initialPayment, onClose, onSaleUpdated }) {
+export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible, saleID, sale: saleProp, transactions: transactionsProp, initialPayment, onClose, onSaleUpdated }) {
   const zSalesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent);
   const zCardFeeRefund = useSettingsStore((s) => s.settings?.cardFeeRefund);
 
   // ─── Local State ──────────────────────────────────────────
   const [sOriginalSale, _setOriginalSale] = useState(null);
+  const [sTransactions, _setTransactions] = useState([]);
   const [sWorkordersInSale, _setWorkordersInSale] = useState([]);
   const [sSelectedItems, _setSelectedItems] = useState([]);
   const [sSelectedPayments, _setSelectedPayments] = useState([]);
@@ -69,8 +68,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sCustomCardPayment, _setCustomCardPayment] = useState(null);
 
   // ─── Derived Values ───────────────────────────────────────
-  let refundLimits = calculateRefundLimits(sOriginalSale, { cardFeeRefund: zCardFeeRefund });
-  let previouslyRefundedIDs = useMemo(() => getPreviouslyRefundedLineIDs(sOriginalSale), [sOriginalSale]);
+  let refundLimits = calculateRefundLimits(sOriginalSale, { cardFeeRefund: zCardFeeRefund }, sTransactions);
+  let previouslyRefundedIDs = useMemo(() => getPreviouslyRefundedLineIDs(sOriginalSale, sTransactions), [sOriginalSale, sTransactions]);
 
   // Calculate selected items subtotal
   let selectedItemsTotal = 0;
@@ -81,13 +80,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     selectedItemsTotal += price;
   });
 
-  // Calculate card payments total and cash payments total
-  // Deposit-applied payments are refunded as cash (the deposit was consumed)
+  // Calculate card payments total and cash payments total from transactions
   let cardPaymentsTotal = 0;
   let cashPaymentsTotal = 0;
-  (sOriginalSale?.transactions || []).forEach((p) => {
-    let available = p.amountCaptured - (p.amountRefunded || 0);
-    if (p.method === "cash" || p.method === "check" || (!!p.depositType && p.method !== "card")) {
+  sTransactions.forEach((p) => {
+    let refunded = (p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+    let available = p.amountCaptured - refunded;
+    if (p.method === "cash" || p.method === "check") {
       cashPaymentsTotal += available;
     } else {
       cardPaymentsTotal += available;
@@ -100,7 +99,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   // Total available from selected payments
   let selectedPaymentsTotal = 0;
   sSelectedPayments.forEach((p) => {
-    selectedPaymentsTotal += p.amountCaptured - (p.amountRefunded || 0);
+    let refunded = (p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+    selectedPaymentsTotal += p.amountCaptured - refunded;
   });
 
   // Item-based refund total (subtotal + tax)
@@ -154,18 +154,33 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   if (visible && !sInitialized && (saleID || saleProp)) {
     _setInitialized(true);
     if (saleProp) {
-      loadSaleFromProp(saleProp);
+      loadSaleFromProp(saleProp, transactionsProp || []);
     } else {
       loadSaleData(saleID);
     }
   }
 
-  async function loadSaleFromProp(sale) {
+  async function loadSaleFromProp(sale, txns) {
     _setLoading(true);
     _setLoadMessage("Loading sale...");
     try {
-      _setOriginalSale(cloneDeep(sale));
-      _setIsActiveSale(!sale.paymentComplete);
+      let saleCopy = cloneDeep(sale);
+      let txnsCopy = cloneDeep(txns);
+
+      // Reconcile pending refunds (crash recovery)
+      if (saleCopy.pendingRefundIDs?.length > 0) {
+        recomputeSaleAmounts(saleCopy, txnsCopy, saleCopy.creditsApplied || []);
+        saleCopy.pendingRefundIDs = [];
+        if (!saleCopy.paymentComplete) {
+          writeActiveSale(saleCopy);
+        } else {
+          writeCompletedSale(saleCopy);
+        }
+      }
+
+      _setOriginalSale(saleCopy);
+      _setTransactions(txnsCopy);
+      _setIsActiveSale(!saleCopy.paymentComplete);
       _setLoadMessage("Loading workorders...");
       let workorders = await newCheckoutFetchWorkordersForSale(
         sale.workorderIDs || []
@@ -188,14 +203,29 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _setLoadMessage("Loading sale...");
 
     try {
-      let sale = await newCheckoutFetchCompletedSale(id);
+      let sale = await readCompletedSale(id);
       if (!sale) {
         _setLoadMessage("Sale not found");
         _setLoading(false);
         return;
       }
 
+      // Load transactions from collection
+      let txns = [];
+      if (sale.transactionIDs?.length > 0) {
+        txns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
+      }
+
+      // Reconcile pending refunds (crash recovery)
+      if (sale.pendingRefundIDs?.length > 0) {
+        recomputeSaleAmounts(sale, txns, sale.creditsApplied || []);
+        sale.pendingRefundIDs = [];
+        await writeCompletedSale(sale);
+      }
+
       _setOriginalSale(sale);
+      _setTransactions(txns);
+
       _setLoadMessage("Loading workorders...");
 
       let workorders = await newCheckoutFetchWorkordersForSale(
@@ -231,7 +261,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   }
 
   // ─── Payment Selection ────────────────────────────────────
-  let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check" || !!sSelectedPayments[0].depositType);
+  let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check");
   let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
 
   function handleSelectPayment(payment) {
@@ -240,13 +270,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       _setSelectedPayments(sSelectedPayments.filter((p) => p.id !== payment.id));
       return;
     }
-    // Clear selected items — payment selection takes over
+    // Clear selected items - payment selection takes over
     if (sSelectedItems.length > 0) _setSelectedItems([]);
-    // Block mixed cash/card selection (deposits refund as cash)
-    let incomingIsCash = payment.method === "cash" || payment.method === "check" || !!payment.depositType;
+    // Block mixed cash/card selection
+    let incomingIsCash = payment.method === "cash" || payment.method === "check";
     if (sSelectedPayments.length > 0) {
-      let currentIsCash = sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check" || !!sSelectedPayments[0].depositType;
-      if (incomingIsCash !== currentIsCash) return; // mismatched type — disabled rows handle this visually
+      let currentIsCash = sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check";
+      if (incomingIsCash !== currentIsCash) return;
     }
     _setSelectedPayments([...sSelectedPayments, payment]);
   }
@@ -262,10 +292,12 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     if (entering) {
       _setSelectedItems([]);
       _setSelectedPayments([]);
-      // Auto-select if only one available card payment (exclude deposits)
-      let availableCards = (sOriginalSale?.transactions || []).filter(
-        (p) => p.method === "card" && !p.depositType && (p.amountCaptured - (p.amountRefunded || 0)) > 0
-      );
+      // Auto-select if only one available card payment
+      let availableCards = sTransactions.filter((p) => {
+        if (p.method !== "card") return false;
+        let refunded = (p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+        return (p.amountCaptured - refunded) > 0;
+      });
       _setCustomCardPayment(availableCards.length === 1 ? availableCards[0] : null);
     } else {
       _setCustomCardPayment(null);
@@ -281,77 +313,77 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
   }
 
+  // ─── Pending Refund Tracking (crash recovery) ────────────
+  function handleRefundStarted({ refundId, transactionID, amount }) {
+    let sale = cloneDeep(sOriginalSale);
+    sale.pendingRefundIDs = [...(sale.pendingRefundIDs || []), { refundId, transactionID, amount }];
+    _setOriginalSale(sale);
+    if (sIsActiveSale) {
+      writeActiveSale(sale);
+    } else {
+      writeCompletedSale(sale);
+    }
+  }
+
+  function handleRefundFailed(refundId) {
+    let sale = cloneDeep(sOriginalSale);
+    sale.pendingRefundIDs = (sale.pendingRefundIDs || []).filter((p) => p.refundId !== refundId);
+    _setOriginalSale(sale);
+    if (sIsActiveSale) {
+      writeActiveSale(sale);
+    } else {
+      writeCompletedSale(sale);
+    }
+  }
+
   // ─── Process Refund ───────────────────────────────────────
   async function handleProcessRefund(amount, type, cardDetails) {
     let sale = cloneDeep(sOriginalSale);
+    let updatedTxns = cloneDeep(sTransactions);
 
-    let refund = buildRefundObject(
-      amount,
-      sSelectedItems,
-      cardDetails?.refundId || "",
-      "",
-      type
-    );
-
-    sale.refunds = [...(sale.refunds || []), refund];
-
-    // Add a refund transaction to the transactions array
-    let refundTransaction = cloneDeep(TRANSACTION_PROTO);
-    refundTransaction.id = refund.id;
-    refundTransaction.type = "refund";
-    refundTransaction.method = type; // "cash" | "card"
-    refundTransaction.paymentProcessor = type === "cash" ? "cash" : "";
-    refundTransaction.amountCaptured = amount;
-    refundTransaction.amountRefunded = amount;
-    refundTransaction.saleID = sale.id;
-    refundTransaction.millis = Date.now();
+    // Compute sales tax portion of this refund
+    let refundSalesTax = 0;
     if (sale.total > 0 && sale.salesTax > 0) {
-      refundTransaction.salesTax = Math.round(sale.salesTax * (amount / sale.total));
+      refundSalesTax = Math.round(sale.salesTax * (amount / sale.total));
     }
-    if (type === "card" && cardDetails) {
-      refundTransaction.chargeID = cardDetails.chargeId || "";
-      refundTransaction.paymentIntentID = cardDetails.paymentIntentId || "";
-      // Copy card fields from the original payment
-      let originalPayment = (sale.transactions || []).find((t) => t.id === cardDetails.paymentId);
-      if (originalPayment) {
-        refundTransaction.last4 = originalPayment.last4 || "";
-        refundTransaction.cardType = originalPayment.cardType || "";
-        refundTransaction.cardIssuer = originalPayment.cardIssuer || "";
-        refundTransaction.expMonth = originalPayment.expMonth || "";
-        refundTransaction.expYear = originalPayment.expYear || "";
-        refundTransaction.receiptURL = originalPayment.receiptURL || "";
-        refundTransaction.networkTransactionID = originalPayment.networkTransactionID || "";
-        refundTransaction.authorizationCode = originalPayment.authorizationCode || "";
-        refundTransaction.paymentProcessor = originalPayment.paymentProcessor || "";
+
+    // Build refund objects and attach to the correct transaction(s)
+    let refundObjects = []; // { transactionID, refundObj } pairs for persistence
+
+    if (type === "card" && cardDetails?.paymentId) {
+      // Card refund: attach to the specific card transaction
+      let refund = buildRefundObject(amount, cardDetails.paymentId, "card", sSelectedItems, cardDetails.refundId || "", refundSalesTax, "");
+      let txnIdx = updatedTxns.findIndex((t) => t.id === cardDetails.paymentId);
+      if (txnIdx >= 0) {
+        updatedTxns[txnIdx].refunds = [...(updatedTxns[txnIdx].refunds || []), refund];
+        refundObjects.push({ transactionID: cardDetails.paymentId, refundObj: refund });
+      }
+    } else if (type === "cash") {
+      // Cash refund: distribute across cash/check transactions
+      let remaining = amount;
+      for (let i = 0; i < updatedTxns.length && remaining > 0; i++) {
+        let txn = updatedTxns[i];
+        if (txn.method !== "cash" && txn.method !== "check") continue;
+        let refunded = (txn.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+        let available = txn.amountCaptured - refunded;
+        if (available <= 0) continue;
+        let deduct = Math.min(remaining, available);
+        let refundTax = sale.total > 0 && sale.salesTax > 0 ? Math.round(sale.salesTax * (deduct / sale.total)) : 0;
+        let refund = buildRefundObject(deduct, txn.id, "cash", sSelectedItems, "", refundTax, "");
+        updatedTxns[i].refunds = [...(updatedTxns[i].refunds || []), refund];
+        refundObjects.push({ transactionID: txn.id, refundObj: refund });
+        remaining -= deduct;
       }
     }
-    sale.transactions = [...(sale.transactions || []), refundTransaction];
 
-    recomputeSaleAmounts(sale);
+    // Recompute sale amounts from updated transactions
+    recomputeSaleAmounts(sale, updatedTxns, sale.creditsApplied || []);
 
-    // Update per-payment amountRefunded
-    if (type === "card" && cardDetails?.paymentId) {
-      sale.transactions = sale.transactions.map((p) => {
-        if (p.id === cardDetails.paymentId) {
-          return {
-            ...p,
-            amountRefunded: (p.amountRefunded || 0) + amount,
-          };
-        }
-        return p;
-      });
-    } else if (type === "cash") {
-      let remaining = amount;
-      sale.transactions = sale.transactions.map((p) => {
-        if (remaining <= 0 || p.type !== "payment" || !!p.depositType || (p.method === "card")) return p;
-        let available = p.amountCaptured - (p.amountRefunded || 0);
-        let deduct = Math.min(remaining, available);
-        remaining -= deduct;
-        return { ...p, amountRefunded: (p.amountRefunded || 0) + deduct };
-      });
-    }
+    // Clear pending refund marker (refund completed successfully on client)
+    sale.pendingRefundIDs = [];
 
     _setOriginalSale(sale);
+    _setTransactions(updatedTxns);
     _setRefundComplete(true);
     _setSelectedItems([]);
     _setSelectedPayments([]);
@@ -359,18 +391,24 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _setIsCustomAmount(false);
     _setCustomCardPayment(null);
 
-    // Persist updated sale immediately
+    // Persist refunds to transaction documents
+    for (let { transactionID, refundObj } of refundObjects) {
+      await writeCashRefund(transactionID, refundObj);
+    }
+
+    // Persist updated sale
     if (sIsActiveSale) {
-      await newCheckoutSaveActiveSale(sale);
+      await writeActiveSale(sale);
     } else {
-      await newCheckoutUpdateCompletedSale(sale);
+      await writeCompletedSale(sale);
     }
 
     // Update workorder payment fields to reflect refund
-    let nonDepositCaptured = (sale.transactions || [])
-      .filter(t => t.type === "payment" && !t.depositType)
-      .reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
-    let netPaid = Math.max(0, nonDepositCaptured - sale.amountRefunded);
+    let totalRefunded = updatedTxns.reduce((sum, t) =>
+      sum + (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
+    );
+    let totalCaptured = updatedTxns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
+    let netPaid = Math.max(0, totalCaptured - totalRefunded);
     let woIDs = sale.workorderIDs || [];
     if (woIDs.length > 0) {
       let allOpenWorkorders = useOpenWorkordersStore.getState().getWorkorders();
@@ -393,6 +431,10 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       }
     }
 
+    // Build refund receipt using the first refund object
+    let primaryRefund = refundObjects[0]?.refundObj;
+    if (!primaryRefund) return;
+
     const primaryWO = sWorkordersInSale[0];
     let customerInfo;
     if (primaryWO && primaryWO.id !== "standalone") {
@@ -401,17 +443,18 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       let cust = useCurrentCustomerStore.getState().getCustomer();
       customerInfo = { first: cust?.first || "", last: cust?.last || "", phone: cust?.customerCell || "", id: cust?.id || sale.customerID || "" };
     }
-    if (refund.workorderLines && refund.workorderLines.length > 0) {
-      markItemSalesRefunded(sale.id, refund.workorderLines);
+
+    // Mark item sales as refunded
+    if (primaryRefund.workorderLines && primaryRefund.workorderLines.length > 0) {
+      markItemSalesRefunded(sale.id, primaryRefund.workorderLines);
     }
 
-    // Build refund receipt
     let settings = useSettingsStore.getState().getSettings();
     let printerID = settings?.selectedPrinterID || "";
     let currentUser = useLoginStore.getState().getCurrentUser();
     let _ctx = { currentUser, settings };
     let refundReceipt = printBuilder.refund(
-      refund,
+      primaryRefund,
       sale,
       customerInfo,
       primaryWO || { workorderLines: [], taxFree: false },
@@ -424,7 +467,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       dbSavePrintObj(refundReceipt, printerID);
     }
 
-    // SMS/Email — same templates as sale receipts
+    // SMS/Email
     const customerForReceipt = {
       first: customerInfo.first,
       last: customerInfo.last,
@@ -457,13 +500,14 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
 
     // Check if fully refunded
-    let newLimits = calculateRefundLimits(sale, { cardFeeRefund: zCardFeeRefund });
+    let newLimits = calculateRefundLimits(sale, { cardFeeRefund: zCardFeeRefund }, updatedTxns);
     if (newLimits.maxRefund <= 0) {
       if (sIsActiveSale) {
-        // Partial sale fully refunded — void it and restore workorders
+        // Partial sale fully refunded - delete active sale and restore workorders
+        // No completed-sale needed — the transaction documents are the ledger
         sale.voidedByRefund = true;
         _setOriginalSale(sale);
-        await newCheckoutCompleteSale(sale);
+        await deleteActiveSale(sale.id);
 
         let _settings = useSettingsStore.getState().getSettings();
         let statuses = _settings?.statuses || [];
@@ -485,11 +529,10 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
           let entries = [
             { timestamp: _ts, user: _user, field: "status", action: "changed", from: oldStatusLabel, to: finishedLabel },
-            { timestamp: _ts, user: _user, field: "payment", action: "voided", from: "", to: "Sale fully refunded — workorder restored" },
+            { timestamp: _ts, user: _user, field: "payment", action: "voided", from: "", to: "Sale fully refunded - workorder restored" },
           ];
           updated.changeLog = [...(updated.changeLog || []), ...entries];
 
-          // Update via store if open, otherwise write directly to completed-workorders
           let isOpen = allOpenWorkorders.some((w) => w.id === wo.id);
           if (isOpen) {
             useOpenWorkordersStore.getState().setWorkorder(updated, true);
@@ -498,10 +541,10 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
           }
         }
       } else {
-        // Completed sale fully refunded — just flag it
+        // Completed sale fully refunded - just flag it
         sale.voidedByRefund = true;
         _setOriginalSale(sale);
-        await newCheckoutUpdateCompletedSale(sale);
+        await writeCompletedSale(sale);
       }
 
       // If deposit sale fully refunded, remove deposit from customer
@@ -511,12 +554,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
 
     // Sync parent sale state (checkout modal)
-    if (onSaleUpdated) onSaleUpdated(sale);
+    if (onSaleUpdated) onSaleUpdated(sale, updatedTxns);
   }
 
   // ─── Close Modal ──────────────────────────────────────────
   function handleClose() {
     _setOriginalSale(null);
+    _setTransactions([]);
     _setWorkordersInSale([]);
     _setSelectedItems([]);
     _setSelectedPayments([]);
@@ -530,6 +574,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _setInitialized(false);
     if (onClose) onClose();
   }
+
+  // Helper: check if first transaction is cash/check
+  let firstTxnIsCash = sTransactions.length > 0 && (sTransactions[0].method === "cash" || sTransactions[0].method === "check");
 
   // ─── Render ───────────────────────────────────────────────
   return (
@@ -685,7 +732,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                       : 0
                     }
                     lockedAmount={!sIsCustomAmount}
-                    shouldFocus={sIsCustomAmount && !!((sOriginalSale?.transactions || [])[0]?.method === "cash" || (sOriginalSale?.transactions || [])[0]?.method === "check" || !!(sOriginalSale?.transactions || [])[0]?.depositType)}
+                    shouldFocus={sIsCustomAmount && firstTxnIsCash}
                   />
                 </View>
                 <View
@@ -696,11 +743,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     selectedPayment={
                       sIsCustomAmount ? sCustomCardPayment
                       : hasItemSelection && hasCardPayments
-                        ? (sOriginalSale?.transactions || []).find((p) => p.method === "card" && !p.depositType)
+                        ? sTransactions.find((p) => p.method === "card")
                         : selectedIsCard ? sSelectedPayments[0] : null
                     }
                     maxCardRefund={maxCardRefund}
                     onProcessRefund={handleProcessRefund}
+                    onRefundStarted={handleRefundStarted}
+                    onRefundFailed={handleRefundFailed}
                     salesTaxPercent={zSalesTaxPercent}
                     refundComplete={sRefundComplete}
                     suggestedAmount={
@@ -709,7 +758,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                       : 0
                     }
                     lockedAmount={!sIsCustomAmount}
-                    shouldFocus={sIsCustomAmount && !((sOriginalSale?.transactions || [])[0]?.method === "cash" || (sOriginalSale?.transactions || [])[0]?.method === "check" || !!(sOriginalSale?.transactions || [])[0]?.depositType)}
+                    shouldFocus={sIsCustomAmount && !firstTxnIsCash}
                   />
                 </View>
               </View>
@@ -740,7 +789,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                   />
 
                   <RefundPaymentSelector
-                    payments={sOriginalSale?.transactions || []}
+                    payments={sTransactions}
                     selectedPayments={sSelectedPayments}
                     onSelectPayment={handleSelectPayment}
                     disabled={sRefundComplete || sIsCustomAmount}
@@ -762,10 +811,11 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                       >
                         SELECT CARD FOR REFUND
                       </Text>
-                      {(sOriginalSale?.transactions || [])
-                        .filter((p) => p.method === "card" && !p.depositType)
+                      {sTransactions
+                        .filter((p) => p.method === "card")
                         .map((payment, idx) => {
-                          let available = payment.amountCaptured - (payment.amountRefunded || 0);
+                          let refunded = (payment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+                          let available = payment.amountCaptured - refunded;
                           let fullyRefunded = available <= 0;
                           let isSelected = sCustomCardPayment?.id === payment.id;
                           return (

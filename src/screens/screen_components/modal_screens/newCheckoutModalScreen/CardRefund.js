@@ -8,13 +8,17 @@ import {
   formatCurrencyDisp,
   log,
   gray,
+  generate12DigitBarcode,
 } from "../../../../utils";
+import { useSettingsStore } from "../../../../stores";
 import { newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
 
 export const CardRefund = memo(function CardRefund({
   selectedPayment,
   maxCardRefund = 0,
   onProcessRefund,
+  onRefundStarted,
+  onRefundFailed,
   salesTaxPercent,
   refundComplete = false,
   suggestedAmount = 0,
@@ -53,7 +57,7 @@ export const CardRefund = memo(function CardRefund({
     // Cap to the lesser of max card refund and selected card's available amount
     let maxAllowed = maxCardRefund;
     if (selectedPayment) {
-      let cardAvailable = selectedPayment.amountCaptured - (selectedPayment.amountRefunded || 0);
+      let cardAvailable = selectedPayment.amountCaptured - ((selectedPayment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0));
       maxAllowed = Math.min(maxAllowed, cardAvailable);
     }
     if (result.cents > maxAllowed) {
@@ -76,7 +80,7 @@ export const CardRefund = memo(function CardRefund({
     }
 
     let available =
-      selectedPayment.amountCaptured - (selectedPayment.amountRefunded || 0);
+      selectedPayment.amountCaptured - ((selectedPayment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0));
     if (sRefundAmount > available) {
       _setErrorMessage(
         `Exceeds available on this card (${formatCurrencyDisp(available)})`
@@ -95,9 +99,23 @@ export const CardRefund = memo(function CardRefund({
     _setSuccessMessage("Processing refund...");
 
     try {
+      let { tenantID, storeID } = useSettingsStore.getState().getSettings();
+      let refundId = generate12DigitBarcode();
+
+      // Persist pending refund marker before calling Cloud Function (crash recovery)
+      if (onRefundStarted) onRefundStarted({ refundId, transactionID: selectedPayment.id, amount: sRefundAmount });
+
       let result = await newCheckoutProcessStripeRefund(
         sRefundAmount,
-        selectedPayment.chargeID
+        selectedPayment.chargeID,
+        {
+          transactionID: selectedPayment.id,
+          tenantID,
+          storeID,
+          refundId,
+          method: "card",
+          salesTax: salesTaxPercent > 0 ? Math.round(sRefundAmount * (salesTaxPercent / (100 + salesTaxPercent))) : 0,
+        }
       );
 
       if (result?.success) {
@@ -109,17 +127,22 @@ export const CardRefund = memo(function CardRefund({
 
         if (onProcessRefund) {
           onProcessRefund(sRefundAmount, "card", {
-            refundId: result.data?.refundId,
+            refundId: refundId,
             paymentId: selectedPayment.id,
             paymentIntentID: selectedPayment.paymentIntentID,
           });
         }
       } else {
+        // Cloud Function returned explicit failure — refund did not happen
+        if (onRefundFailed) onRefundFailed(refundId);
         _setErrorMessage(result?.message || "Refund failed");
         _setSuccessMessage("");
       }
     } catch (error) {
       log("Card refund error:", error);
+      // HttpsError has a .code property — means the Cloud Function responded (refund failed server-side)
+      // No .code means network/timeout — refund may have succeeded, keep pending marker for reconciliation
+      if (error?.code && onRefundFailed) onRefundFailed(refundId);
       _setErrorMessage(error?.message || "Refund processing failed");
       _setSuccessMessage("");
     }
@@ -135,7 +158,7 @@ export const CardRefund = memo(function CardRefund({
   let inputEditable = isEnabled && !lockedAmount;
 
   let available = selectedPayment
-    ? selectedPayment.amountCaptured - (selectedPayment.amountRefunded || 0)
+    ? selectedPayment.amountCaptured - ((selectedPayment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0))
     : 0;
 
   return (

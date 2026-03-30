@@ -14,87 +14,12 @@ function formatTransactionDate(millis) {
   return d.format(fmt) + day + suffix + (d.year() !== dayjs().year() ? ", " + d.year() : "");
 }
 
-const RefundRow = memo(function RefundRow({ payment }) {
-  let isCash = payment.method === "cash";
-  let isCheck = payment.method === "check";
-  let methodLabel = isCheck ? "CHECK" : isCash ? "CASH" : "CARD";
-
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 6,
-        paddingHorizontal: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: gray(0.05),
-        backgroundColor: "transparent",
-        borderRadius: 4,
-      }}
-    >
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <View
-            style={{
-              backgroundColor: C.lightred,
-              borderRadius: 3,
-              paddingHorizontal: 5,
-              paddingVertical: 1,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 9,
-                fontWeight: Fonts.weight.textHeavy,
-                color: "white",
-              }}
-            >
-              {methodLabel} REFUND
-            </Text>
-          </View>
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.lightred,
-            }}
-          >
-            -{formatCurrencyDisp(payment.amountCaptured)}
-          </Text>
-        </View>
-
-        {/* Card details */}
-        {!isCash && !isCheck && payment.last4 && (
-          <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
-            {payment.cardIssuer} ****{payment.last4}
-          </Text>
-        )}
-
-        {!!payment.millis && (
-          <Text
-            style={{
-              fontSize: 10,
-              color: C.lightText,
-              fontStyle: "italic",
-              marginTop: 2,
-            }}
-          >
-            {formatTransactionDate(payment.millis)}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-});
-
 const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
   let isCash = payment.method === "cash";
   let isCheck = payment.method === "check";
-  let isDeposit = !!payment.depositType;
-  let typeLabel = isDeposit
-    ? (payment.depositType === "credit" ? "CREDIT" : payment.depositType === "giftcard" ? "GIFT CARD" : "DEPOSIT")
-    : isCheck ? "CHECK" : isCash ? "CASH" : "CARD";
-  let available = payment.amountCaptured - (payment.amountRefunded || 0);
+  let typeLabel = isCheck ? "CHECK" : isCash ? "CASH" : "CARD";
+  let amountRefunded = (payment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+  let available = payment.amountCaptured - amountRefunded;
   let fullyRefunded = available <= 0;
 
   return (
@@ -143,9 +68,7 @@ const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, o
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <View
             style={{
-              backgroundColor: isDeposit
-                ? (payment.depositType === "credit" ? C.blue : C.orange)
-                : (isCash || isCheck ? C.green : C.blue),
+              backgroundColor: isCash || isCheck ? C.green : C.blue,
               borderRadius: 3,
               paddingHorizontal: 5,
               paddingVertical: 1,
@@ -179,17 +102,10 @@ const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, o
           </Text>
         )}
 
-        {/* Deposit details */}
-        {isDeposit && !!payment.depositNote && (
-          <Text numberOfLines={1} style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
-            {payment.depositNote}
-          </Text>
-        )}
-
         {/* Refund history */}
-        {payment.amountRefunded > 0 && (
+        {amountRefunded > 0 && (
           <Text style={{ fontSize: 10, color: C.lightred, marginTop: 2 }}>
-            Previously refunded: {formatCurrencyDisp(payment.amountRefunded)}
+            Previously refunded: {formatCurrencyDisp(amountRefunded)}
           </Text>
         )}
 
@@ -236,9 +152,6 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
   onSelectPayment,
   disabled = false,
 }) {
-  let paymentTransactions = payments.filter((p) => p.type === "payment" && p.depositType !== "credit");
-  let refundTransactions = payments.filter((p) => p.type === "refund");
-
   return (
     <View style={{ padding: 10 }}>
       <Text
@@ -266,14 +179,14 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
       </Text>
 
       <ScrollView>
-        {paymentTransactions.map((payment, idx) => {
+        {payments.map((payment, idx) => {
           let isSelected = selectedPayments.some((p) => p.id === payment.id);
-          let paymentIsCash = payment.method === "cash" || payment.method === "check" || (!!payment.depositType && payment.method !== "card");
+          let paymentIsCash = payment.method === "cash" || payment.method === "check";
 
           // Disable logic
           let rowDisabled = disabled;
           if (!rowDisabled && selectedPayments.length > 0 && !isSelected) {
-            let selIsCash = selectedPayments[0].method === "cash" || selectedPayments[0].method === "check" || (!!selectedPayments[0].depositType && selectedPayments[0].method !== "card");
+            let selIsCash = selectedPayments[0].method === "cash" || selectedPayments[0].method === "check";
             if (paymentIsCash !== selIsCash) {
               // Different type than current selection
               rowDisabled = true;
@@ -294,23 +207,89 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
           );
         })}
 
-        {refundTransactions.length > 0 && (
-          <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: gray(0.1), paddingTop: 6 }}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: Fonts.weight.textHeavy,
-                color: C.lightText,
-                marginBottom: 4,
-              }}
-            >
-              REFUNDS
-            </Text>
-            {refundTransactions.map((payment, idx) => (
-              <RefundRow key={payment.id || "r" + idx} payment={payment} />
-            ))}
-          </View>
-        )}
+        {/* Show previous refunds summary from transaction refunds arrays */}
+        {(() => {
+          let allRefunds = [];
+          payments.forEach((t) => {
+            (t.refunds || []).forEach((r) => {
+              allRefunds.push({ ...r, _parentMethod: t.method, _parentLast4: t.last4, _parentCardIssuer: t.cardIssuer });
+            });
+          });
+          if (allRefunds.length === 0) return null;
+          return (
+            <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: gray(0.1), paddingTop: 6 }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: Fonts.weight.textHeavy,
+                  color: C.lightText,
+                  marginBottom: 4,
+                }}
+              >
+                PREVIOUS REFUNDS
+              </Text>
+              {allRefunds.map((refund, idx) => {
+                let methodLabel = refund.method === "cash" ? "CASH" : refund.method === "check" ? "CHECK" : "CARD";
+                return (
+                  <View
+                    key={refund.id || "r" + idx}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingVertical: 6,
+                      paddingHorizontal: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: gray(0.05),
+                      borderRadius: 4,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View
+                          style={{
+                            backgroundColor: C.lightred,
+                            borderRadius: 3,
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              fontWeight: Fonts.weight.textHeavy,
+                              color: "white",
+                            }}
+                          >
+                            {methodLabel} REFUND
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: Fonts.weight.textHeavy,
+                            color: C.lightred,
+                          }}
+                        >
+                          -{formatCurrencyDisp(refund.amount)}
+                        </Text>
+                      </View>
+                      {refund._parentLast4 && (
+                        <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
+                          {refund._parentCardIssuer} ****{refund._parentLast4}
+                        </Text>
+                      )}
+                      {!!refund.millis && (
+                        <Text style={{ fontSize: 10, color: C.lightText, fontStyle: "italic", marginTop: 2 }}>
+                          {formatTransactionDate(refund.millis)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })()}
       </ScrollView>
     </View>
   );

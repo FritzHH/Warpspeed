@@ -37,7 +37,7 @@ import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheck
 import { SaleModal } from "./screen_components/modal_screens/SaleModal";
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode } from "../utils";
-import { newCheckoutGetStripeReaders, newCheckoutGetActiveSale } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { newCheckoutGetStripeReaders, readActiveSale } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import {
   dbListenToSettings,
   dbListenToOpenWorkorders,
@@ -146,7 +146,7 @@ export function BaseScreen() {
     // Async lookup for new random IDs — check if it's a sale
     if (/^\d{12}$/.test(zReceiptScan)) {
       (async () => {
-        let sale = await newCheckoutGetActiveSale(zReceiptScan);
+        let sale = await readActiveSale(zReceiptScan);
         if (!sale) sale = await dbGetCompletedSale(zReceiptScan);
         if (sale) {
           _setRefundSaleID(zReceiptScan);

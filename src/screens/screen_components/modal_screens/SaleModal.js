@@ -46,10 +46,12 @@ export const SaleModal = () => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
 
-  const payments = sale?.transactions || [];
-  const refunds = sale?.refunds || [];
+  const payments = sale?._transactions || [];
+  const credits = sale?.creditsApplied || [];
   const linkedWOs = sale?._workorders || [];
-  const hasRefunds = (sale?.amountRefunded || 0) > 0;
+  const allRefunds = payments.flatMap((t) => (t.refunds || []).map((r) => ({ ...r, _parentMethod: t.method })));
+  const totalRefunded = allRefunds.reduce((s, r) => s + (r.amount || 0), 0);
+  const hasRefunds = totalRefunded > 0;
   const isVoided = !!sale?.voidedByRefund;
 
   function handleClose() {
@@ -255,10 +257,10 @@ export const SaleModal = () => {
                   <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
                     <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "600" }}>Total Refunded</Text>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: C.lightred }}>
-                      {"-$" + formatCurrencyDisp(sale.amountRefunded)}
+                      {"-$" + formatCurrencyDisp(totalRefunded)}
                     </Text>
                   </View>
-                  {refunds.map((r, idx) => (
+                  {allRefunds.map((r, idx) => (
                     <View
                       key={r.id || idx}
                       style={{
@@ -272,7 +274,7 @@ export const SaleModal = () => {
                     >
                       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                         <Text style={{ fontSize: 12, color: C.lightred }}>
-                          {"Refund #" + (idx + 1)}
+                          {(r.method || "card").toUpperCase() + " Refund"}
                         </Text>
                         <Text style={{ fontSize: 12, color: C.lightred }}>
                           {"-$" + formatCurrencyDisp(r.amount)}
@@ -398,10 +400,10 @@ export const SaleModal = () => {
                     </Text>
                   )}
 
-                  {/* Refund on this payment */}
-                  {(p.amountRefunded || 0) > 0 && (
+                  {/* Refunds on this transaction */}
+                  {(p.refunds || []).length > 0 && (
                     <Text style={{ fontSize: 11, color: C.lightred, marginTop: 2 }}>
-                      {"Refunded: $" + formatCurrencyDisp(p.amountRefunded)}
+                      {"Refunded: $" + formatCurrencyDisp((p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0))}
                     </Text>
                   )}
                 </View>

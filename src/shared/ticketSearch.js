@@ -19,7 +19,7 @@ import {
   dbSearchSalesByIdPrefix,
   dbCrossStoreSearchByID,
 } from "../db_calls_wrapper";
-import { newCheckoutGetActiveSale } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { readActiveSale } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 export function showTicketAlert(message) {
   useAlertScreenStore.getState().setValues({
@@ -90,7 +90,7 @@ export async function executeTicketSearch(searchText, onComplete, options) {
       let completedWo = await dbGetCompletedWorkorder(trimmed);
       if (completedWo) { if (onWorkorderFound) onWorkorderFound(completedWo); else openWorkorder(completedWo, true); if (onComplete) onComplete(); return; }
       // 3. Active sales
-      let activeSale = await newCheckoutGetActiveSale(trimmed);
+      let activeSale = await readActiveSale(trimmed);
       if (activeSale) { openSale(activeSale, false); if (onComplete) onComplete(); return; }
       // 4. Completed sales
       let completedSale = await dbGetCompletedSale(trimmed);

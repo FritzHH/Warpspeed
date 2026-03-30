@@ -131,19 +131,23 @@ export function updateSaleWithTotals(sale, combinedWorkorders, settings) {
 }
 
 // ─── Recompute Sale Amounts ──────────────────────────────────
-// Call after any mutation to sale.transactions or sale.refunds.
-// Derives amountCaptured, amountRefunded, and paymentComplete
-// from the arrays — single source of truth.
+// Call after any mutation to transactions or credits.
+// Derives amountCaptured, amountRefunded, and paymentComplete.
+// transactions = array of real payment objects (cash/card)
+// credits = array of credit application objects (creditsApplied)
 
-export function recomputeSaleAmounts(sale) {
-  sale.amountCaptured = (sale.transactions || [])
-    .filter((t) => t.type === "payment")
-    .reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
-  sale.amountRefunded = (sale.refunds || []).reduce(
-    (sum, r) => sum + (r.amountRefunded || 0), 0
+export function recomputeSaleAmounts(sale, transactions, credits) {
+  let txns = transactions || [];
+  let creds = credits || sale.creditsApplied || [];
+  let txnTotal = txns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
+  let creditTotal = creds.reduce((sum, c) => sum + (c.amount || 0), 0);
+  sale.amountCaptured = txnTotal + creditTotal;
+  let totalRefunded = txns.reduce((sum, t) =>
+    sum + (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
   );
-  let fullyPaid = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
-  sale.paymentComplete = fullyPaid;
+  sale.amountRefunded = totalRefunded;
+  let netPaid = sale.amountCaptured - totalRefunded;
+  sale.paymentComplete = netPaid >= (sale.total || 0) && (sale.total || 0) > 0;
   return sale;
 }
 
@@ -152,7 +156,6 @@ export function recomputeSaleAmounts(sale) {
 export function buildCashTransaction(amountCaptured, amountTendered, isCheck) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   transaction.id = generate12DigitBarcode();
-  transaction.type = "payment";
   transaction.method = isCheck ? "check" : "cash";
   transaction.amountCaptured = amountCaptured;
   transaction.amountTendered = amountTendered;
@@ -161,12 +164,11 @@ export function buildCashTransaction(amountCaptured, amountTendered, isCheck) {
   return transaction;
 }
 
-export function buildCardTransaction(stripeChargeData) {
+export function buildCardTransaction(stripeChargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = stripeChargeData?.payment_method_details?.card_present;
 
-  transaction.id = generate12DigitBarcode();
-  transaction.type = "payment";
+  transaction.id = transactionID || generate12DigitBarcode();
   transaction.method = "card";
   transaction.amountCaptured = stripeChargeData.amount_captured || 0;
   transaction.cardIssuer = card?.receipt?.application_preferred_name || "Unknown";
@@ -181,17 +183,15 @@ export function buildCardTransaction(stripeChargeData) {
   transaction.expMonth = card?.exp_month || "";
   transaction.expYear = card?.exp_year || "";
   transaction.networkTransactionID = card?.network_transaction_id || "";
-  transaction.amountRefunded = stripeChargeData.amount_refunded || 0;
 
   return transaction;
 }
 
-export function buildManualCardTransaction(chargeData) {
+export function buildManualCardTransaction(chargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = chargeData?.payment_method_details?.card;
 
-  transaction.id = generate12DigitBarcode();
-  transaction.type = "payment";
+  transaction.id = transactionID || generate12DigitBarcode();
   transaction.method = "card";
   transaction.amountCaptured = chargeData.amount_captured || 0;
   transaction.cardIssuer = card?.brand || "Unknown";
@@ -204,27 +204,21 @@ export function buildManualCardTransaction(chargeData) {
   transaction.last4 = card?.last4 || "";
   transaction.expMonth = card?.exp_month || "";
   transaction.expYear = card?.exp_year || "";
-  transaction.amountRefunded = chargeData.amount_refunded || 0;
 
   return transaction;
 }
 
 // ─── Refund Validation ────────────────────────────────────────
 
-export function calculateRefundLimits(originalSale, settings) {
+export function calculateRefundLimits(originalSale, settings, transactions) {
   if (!originalSale) return { maxRefund: 0, previouslyRefunded: 0 };
 
-  let totalPreviouslyRefunded = 0;
-  if (originalSale.refunds && originalSale.refunds.length > 0) {
-    totalPreviouslyRefunded = originalSale.refunds.reduce(
-      (sum, r) => sum + (r.amountRefunded || 0),
-      0
-    );
-  }
+  let txns = transactions || [];
+  let totalPreviouslyRefunded = txns.reduce((sum, t) =>
+    sum + (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
+  );
 
-  let totalCaptured = (originalSale.transactions || [])
-    .filter((t) => t.type === "payment")
-    .reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
+  let totalCaptured = txns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
   let maxRefund = totalCaptured - totalPreviouslyRefunded;
   if (maxRefund < 0) maxRefund = 0;
 
@@ -261,7 +255,8 @@ export function validateCardRefundAmount(requestedAmount, payment) {
   if (!payment) {
     return { valid: false, message: "No card payment selected" };
   }
-  let available = payment.amountCaptured - (payment.amountRefunded || 0);
+  let previouslyRefunded = (payment.refunds || []).reduce((sum, r) => sum + (r.amount || 0), 0);
+  let available = payment.amountCaptured - previouslyRefunded;
   if (requestedAmount < 50) {
     return { valid: false, message: "Minimum card refund is $0.50" };
   }
@@ -276,29 +271,33 @@ export function validateCardRefundAmount(requestedAmount, payment) {
 
 // ─── Build Refund Object ──────────────────────────────────────
 
-export function buildRefundObject(amountRefunded, selectedLines, cardRefundID, notes, type) {
+export function buildRefundObject(amount, transactionID, method, selectedLines, stripeRefundID, salesTax, notes) {
   let refund = cloneDeep(REFUND_PROTO);
   refund.id = generate12DigitBarcode();
-  refund.type = type || "";
-  refund.amountRefunded = amountRefunded;
-  refund.workorderLines = selectedLines || [];
+  refund.transactionID = transactionID || "";
+  refund.amount = amount;
+  refund.method = method || "";
   refund.millis = Date.now();
-  refund.cardRefundID = cardRefundID || "";
+  refund.salesTax = salesTax || 0;
+  refund.stripeRefundID = stripeRefundID || "";
+  refund.workorderLines = selectedLines || [];
   refund.notes = notes || "";
   return refund;
 }
 
 // ─── Get Previously Refunded Line IDs ─────────────────────────
 
-export function getPreviouslyRefundedLineIDs(sale) {
-  if (!sale?.refunds) return [];
+export function getPreviouslyRefundedLineIDs(sale, transactions) {
+  let txns = transactions || [];
   let refundedIDs = [];
-  sale.refunds.forEach((refund) => {
-    if (refund.workorderLines) {
-      refund.workorderLines.forEach((line) => {
-        refundedIDs.push(line.id);
-      });
-    }
+  txns.forEach((t) => {
+    (t.refunds || []).forEach((refund) => {
+      if (refund.workorderLines) {
+        refund.workorderLines.forEach((line) => {
+          refundedIDs.push(line.id);
+        });
+      }
+    });
   });
   return refundedIDs;
 }
@@ -336,7 +335,7 @@ function applyVars(template, vars) {
   return result;
 }
 
-export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels, langCode) {
+export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels, langCode, transactions, credits) {
   if (!sale || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
@@ -354,7 +353,7 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
       base64 = generateSaleReceiptPDF(translatedReceipt, translatedPdfLabels);
     } else {
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      const receiptData = printBuilder.sale(sale, sale.transactions || [], customer, workorder, settings?.salesTaxPercent, _ctx);
+      const receiptData = printBuilder.sale(sale, transactions || [], customer, workorder, settings?.salesTaxPercent, _ctx, credits);
       const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
       base64 = generateSaleReceiptPDF(receiptData);
     }

@@ -172,74 +172,6 @@ exports.getAvailableStripeReaders = onRequest(
   }
 );
 
-exports.initiateRefund = onRequest(
-  { cors: true, secrets: [stripeSecretKey] },
-  async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
-    log("Incoming refund", req.body);
-
-    const chargeID = req.body.chargeID;
-    const amount = req.body.amount; // Optional: refund a specific amount (in cents)
-
-    if (!chargeID || typeof chargeID !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "Charge ID must be provided and must be a string.",
-      });
-    }
-
-    if (amount !== undefined && typeof amount !== "number") {
-      return res.status(400).json({
-        success: false,
-        message: "If provided, refund amount must be a valid number in cents.",
-      });
-    }
-
-    try {
-      // Create the refund directly with the charge ID
-      const refund = await stripe.refunds.create({
-        charge: chargeID,
-        ...(amount ? { amount } : {}), // Optional partial refund
-      });
-
-      // Step 3: Return success response
-      return res.status(200).json({
-        success: true,
-        message: `✅ Refund ${
-          amount ? `$${(amount / 100).toFixed(2)}` : "for full amount"
-        } processed successfully.`,
-        refundId: refund.id,
-        status: refund.status,
-      });
-    } catch (error) {
-      let message;
-
-      switch (error.type) {
-        case "StripeInvalidRequestError":
-          message = `⚠️ Invalid request: ${error.message}`;
-          break;
-        case "StripeAPIError":
-          message = `⚠️ Stripe API error: ${error.message}`;
-          break;
-        case "StripeConnectionError":
-          message = `📡 Network error: Could not connect to Stripe.`;
-          break;
-        case "StripeAuthenticationError":
-          message = `🔐 Authentication error: Please check your Stripe credentials.`;
-          break;
-        case "StripePermissionError":
-          message = `🔒 Permission error: Not allowed to issue this refund.`;
-          break;
-        default:
-          message = `❗ Unexpected error: ${error.message}`;
-          break;
-      }
-
-      return res.status(500).json({ success: false, message });
-    }
-  }
-);
-
 exports.initiatePaymentIntent = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
@@ -526,103 +458,37 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
           });
           log("stripeEventWebhook: charge written to updates/current", { chargeID });
 
-          // ── SERVER-SIDE SALE COMPLETION ──
-          if (saleID) {
+          // ── Write transaction document ──
+          if (transactionID) {
             try {
-              const db = await getDB(firebaseServiceAccountKey);
-              const saleRef = db
-                .collection("tenants").doc(tenantID)
+              const card = charge?.payment_method_details?.card_present;
+              const txnDoc = {
+                id: transactionID,
+                method: "card",
+                millis: Date.now(),
+                amountCaptured: charge.amount_captured || 0,
+                amountTendered: 0,
+                salesTax: 0,
+                last4: card?.last4 || "",
+                expMonth: card?.exp_month || "",
+                expYear: card?.exp_year || "",
+                cardType: card?.description || "",
+                cardIssuer: card?.receipt?.application_preferred_name || "Unknown",
+                paymentProcessor: "stripe",
+                paymentIntentID: paymentIntentComplete.id || "",
+                chargeID: charge.id || "",
+                authorizationCode: card?.receipt?.authorization_code || "",
+                networkTransactionID: card?.network_transaction_id || "",
+                receiptURL: charge.receipt_url || "",
+                refunds: [],
+              };
+              await DB.collection("tenants").doc(tenantID)
                 .collection("stores").doc(storeID)
-                .collection("active-sales").doc(saleID);
-
-              const saleSnap = await saleRef.get();
-
-              if (saleSnap.exists) {
-                const sale = saleSnap.data();
-
-                // Build payment from charge (mirrors buildCardPayment)
-                const card = charge?.payment_method_details?.card_present;
-                const payment = {
-                  id: generate12DigitBarcode(),
-                  type: "payment",
-                  method: "card",
-                  amountCaptured: charge.amount_captured || 0,
-                  amountTendered: 0,
-                  last4: card?.last4 || "",
-                  cardType: card?.description || "",
-                  cardIssuer: card?.receipt?.application_preferred_name || "Unknown",
-                  millis: Date.now(),
-                  saleID: saleID,
-                  paymentProcessor: "stripe",
-                  chargeID: charge.id || "",
-                  authorizationCode: card?.receipt?.authorization_code || "",
-                  paymentIntentID: paymentIntentComplete.id || "",
-                  receiptURL: charge.receipt_url || "",
-                  expMonth: card?.exp_month || "",
-                  expYear: card?.exp_year || "",
-                  networkTransactionID: card?.network_transaction_id || "",
-                  amountRefunded: 0,
-                };
-
-                // Write transaction to transactions collection (new architecture)
-                if (transactionID) {
-                  try {
-                    const txnDoc = {
-                      id: transactionID,
-                      method: "card",
-                      millis: Date.now(),
-                      amountCaptured: charge.amount_captured || 0,
-                      amountTendered: 0,
-                      salesTax: 0,
-                      last4: card?.last4 || "",
-                      expMonth: card?.exp_month || "",
-                      expYear: card?.exp_year || "",
-                      cardType: card?.description || "",
-                      cardIssuer: card?.receipt?.application_preferred_name || "Unknown",
-                      paymentProcessor: "stripe",
-                      paymentIntentID: paymentIntentComplete.id || "",
-                      chargeID: charge.id || "",
-                      authorizationCode: card?.receipt?.authorization_code || "",
-                      networkTransactionID: card?.network_transaction_id || "",
-                      receiptURL: charge.receipt_url || "",
-                      refunds: [],
-                    };
-                    await db.collection("tenants").doc(tenantID)
-                      .collection("stores").doc(storeID)
-                      .collection("transactions").doc(transactionID)
-                      .set(txnDoc);
-                    log("stripeCheckoutWebhook_Terminal: transaction written", { transactionID });
-                  } catch (txnError) {
-                    log("stripeCheckoutWebhook_Terminal: transaction write error (non-fatal)", txnError.message);
-                  }
-                }
-
-                // Fetch customer and settings for sale completion
-                let customer = {};
-                if (customerID) {
-                  const custSnap = await db.collection("tenants").doc(tenantID)
-                    .collection("stores").doc(storeID)
-                    .collection("customers").doc(customerID).get();
-                  if (custSnap.exists) customer = custSnap.data();
-                }
-                const settingsSnap = await db.collection("tenants").doc(tenantID)
-                  .collection("stores").doc(storeID)
-                  .collection("settings").doc("settings").get();
-                const settings = settingsSnap.exists ? settingsSnap.data() : {};
-
-                await completeSaleServerSide({
-                  db, sale, saleID, tenantID, storeID, customerID,
-                  workorderIDs: sale.workorderIDs || [],
-                  payment, charge, settings, customer,
-                  logPrefix: "Terminal",
-                  twilioClientRef: twilioClient,
-                  twilioSecretAccountNumber, twilioSecretKey, gmailAppPassword,
-                });
-              } else {
-                log("stripeCheckoutWebhook_Terminal: active sale not found (already completed)", { saleID });
-              }
-            } catch (saleError) {
-              log("stripeCheckoutWebhook_Terminal: sale completion error (non-fatal)", saleError.message);
+                .collection("transactions").doc(transactionID)
+                .set(txnDoc);
+              log("stripeCheckoutWebhook_Terminal: transaction written", { transactionID });
+            } catch (txnError) {
+              log("stripeCheckoutWebhook_Terminal: transaction write error", txnError.message);
             }
           }
         } catch (stripeError) {
@@ -4153,7 +4019,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
   async (request) => {
     log("newCheckout: initiate payment intent request", request.data);
 
-    const { amount, readerID, paymentIntentID, tenantID, storeID, saleID, customerID, customerEmail } = request.data;
+    const { amount, readerID, paymentIntentID, tenantID, storeID, saleID, customerID, customerEmail, transactionID } = request.data;
 
     if (!amount || typeof amount !== "number") {
       throw new HttpsError(
@@ -4216,7 +4082,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
           payment_method_types: ["card_present"],
           capture_method: "automatic",
           currency: "usd",
-          metadata: { tenantID, storeID, saleID: saleID || "", customerID: customerID || "" },
+          metadata: { tenantID, storeID, saleID: saleID || "", customerID: customerID || "", transactionID: transactionID || "" },
         };
         if (customerEmail) piParams.receipt_email = customerEmail;
         paymentIntent = await stripeClient.paymentIntents.create(piParams);
@@ -4424,7 +4290,7 @@ exports.newCheckoutManualCardPaymentCallable = onCall(
       saleID: request.data?.saleID,
     });
 
-    const { amount, paymentMethodID, tenantID, storeID, saleID, customerID, customerEmail } = request.data;
+    const { amount, paymentMethodID, tenantID, storeID, saleID, customerID, customerEmail, transactionID } = request.data;
 
     if (!amount || amount < 50) {
       throw new HttpsError("invalid-argument", "Amount must be at least $0.50 (50 cents).");
@@ -4452,6 +4318,7 @@ exports.newCheckoutManualCardPaymentCallable = onCall(
           storeID,
           saleID: saleID || "",
           customerID: customerID || "",
+          transactionID: transactionID || "",
           entryMethod: "manual",
         },
       };
@@ -6967,11 +6834,12 @@ function findHighestItem(workorderLines) {
 //   channel        — "sms" | "email" | "both" | undefined
 //
 // Returns: { completed: bool, partial: bool }
-function recomputeSaleAmounts(sale) {
-  sale.amountCaptured = (sale.transactions || [])
-    .filter(t => t.type === "payment")
-    .reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
-  sale.amountRefunded = (sale.refunds || []).reduce((sum, r) => sum + (r.amountRefunded || 0), 0);
+function recomputeSaleAmountsServer(sale, transactions, credits) {
+  let txnTotal = (transactions || []).reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
+  let creditTotal = (credits || []).reduce((sum, c) => sum + (c.amount || 0), 0);
+  let refundTotal = (transactions || []).reduce((sum, t) => sum + ((t.refunds || []).reduce((rs, r) => rs + (r.amount || 0), 0)), 0);
+  sale.amountCaptured = txnTotal + creditTotal;
+  sale.amountRefunded = refundTotal;
   let fullyPaid = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
   sale.paymentComplete = fullyPaid;
   return sale;
@@ -6990,17 +6858,54 @@ async function completeSaleServerSide({
     payment.salesTax = 0;
   }
 
-  // Add payment to sale
-  sale.transactions = [...(sale.transactions || []), payment];
-  recomputeSaleAmounts(sale);
+  // Write payment as a transaction document
+  const txnDoc = {
+    id: payment.id,
+    method: payment.method || "card",
+    millis: payment.millis || Date.now(),
+    amountCaptured: payment.amountCaptured || 0,
+    amountTendered: payment.amountTendered || 0,
+    salesTax: payment.salesTax || 0,
+    last4: payment.last4 || "",
+    expMonth: payment.expMonth || "",
+    expYear: payment.expYear || "",
+    cardType: payment.cardType || "",
+    cardIssuer: payment.cardIssuer || "",
+    paymentProcessor: payment.paymentProcessor || "",
+    paymentIntentID: payment.paymentIntentID || "",
+    chargeID: payment.chargeID || "",
+    authorizationCode: payment.authorizationCode || "",
+    networkTransactionID: payment.networkTransactionID || "",
+    receiptURL: payment.receiptURL || "",
+    refunds: [],
+  };
+  await db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("transactions").doc(payment.id)
+    .set(txnDoc);
+
+  // Add transaction ID to sale
+  sale.transactionIDs = [...(sale.transactionIDs || []), payment.id];
+
+  // Load all transactions for recomputation
+  let allTransactions = [];
+  for (const txnID of sale.transactionIDs) {
+    const txnSnap = await db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("transactions").doc(txnID).get();
+    if (txnSnap.exists) allTransactions.push(txnSnap.data());
+  }
+
+  recomputeSaleAmountsServer(sale, allTransactions, sale.creditsApplied || []);
 
   // Check if fully paid
   if (!sale.paymentComplete) {
-    // Partial payment — update active sale
+    // Partial payment — update active sale (no inline transactions)
+    const { transactions, ...saleToPersist } = sale;
     await db.collection("tenants").doc(tenantID)
       .collection("stores").doc(storeID)
       .collection("active-sales").doc(saleID)
-      .set(sale, { merge: true });
+      .set(saleToPersist, { merge: true });
     log(`completeSaleServerSide[${logPrefix}]: partial payment recorded`, {
       saleID, amountCaptured: sale.amountCaptured, total: sale.total,
     });
@@ -7053,10 +6958,12 @@ async function completeSaleServerSide({
   }
 
   // ── Write completed sale, delete active sale ──
+  // Strip legacy inline transactions field if present (transactions are in their own collection now)
+  const { transactions: _legacyTxns, refunds: _legacyRefunds, ...cleanSale } = sale;
   await db.collection("tenants").doc(tenantID)
     .collection("stores").doc(storeID)
     .collection("completed-sales").doc(saleID)
-    .set(sale);
+    .set(cleanSale);
   await db.collection("tenants").doc(tenantID)
     .collection("stores").doc(storeID)
     .collection("active-sales").doc(saleID)
@@ -7097,9 +7004,8 @@ async function completeSaleServerSide({
     }
   }
   const { highestName, highestPrice } = findHighestItem(allLines);
-  const transactions = sale.transactions || [];
-  const hasCash = transactions.some((t) => t.method === "cash" && t.type === "payment");
-  const hasCard = transactions.some((t) => t.method === "card" && t.type === "payment");
+  const hasCash = allTransactions.some((t) => t.method === "cash");
+  const hasCard = allTransactions.some((t) => t.method === "card");
   let paymentType = "";
   if (hasCash && hasCard) paymentType = "Split";
   else if (hasCash) paymentType = "Cash";
@@ -7117,7 +7023,7 @@ async function completeSaleServerSide({
         customerLandline: customer?.customerLandline || "",
         email: customer?.email || primaryWO?.customerEmail || "",
       };
-      const printObj = sharedPrintBuilder.sale(sale, sale.transactions, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext);
+      const printObj = sharedPrintBuilder.sale(sale, allTransactions, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext, sale.creditsApplied);
       printObj.id = crypto.randomUUID();
       printObj.timestamp = Date.now();
 
@@ -7142,7 +7048,7 @@ async function completeSaleServerSide({
       }, 5000);
 
       // Pop cash register if cash change needed
-      const hasCashChange = (sale.transactions || []).some(
+      const hasCashChange = allTransactions.some(
         (t) => t.method === "cash" && t.amountTendered > t.amountCaptured
       );
       if (hasCashChange) {

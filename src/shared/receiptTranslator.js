@@ -153,9 +153,9 @@ export async function translateSalesReceipt(receiptObj, targetLanguage) {
  * @param {object} [context] - { currentUser, settings }
  * @returns {Promise<{ receipt: object, pdfBase64: string }>}
  */
-export async function generateSpanishSalesReceipt(sale, payments, customer, workorder, salesTaxPercent, context) {
+export async function generateSpanishSalesReceipt(sale, payments, customer, workorder, salesTaxPercent, context, credits) {
   // 1. Build English receipt
-  var receipt = printBuilder.sale(sale, payments, customer, workorder, salesTaxPercent, context);
+  var receipt = printBuilder.sale(sale, payments, customer, workorder, salesTaxPercent, context, credits);
 
   // 2. Translate
   var translated = await translateSalesReceipt(receipt, "es");

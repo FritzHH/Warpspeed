@@ -216,6 +216,7 @@ export const DB_NODES = {
     COMPLETED_WORKORDERS: "completed-workorders",
     COMPLETED_SALES: "completed-sales",
     ACTIVE_SALES: "active-sales",
+    TRANSACTIONS: "transactions",
     ARCHIVE_LOGS: "archive-logs",
   },
 

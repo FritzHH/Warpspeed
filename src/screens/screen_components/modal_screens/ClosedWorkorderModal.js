@@ -15,6 +15,7 @@ import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useCheckoutStore, useSettingsStore } from "../../../stores";
 import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
 import { dbGetCompletedSale } from "../../../db_calls_wrapper";
+import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 // ─── Helper display components ──────────────────────────────────
 
@@ -53,10 +54,12 @@ const SectionHeader = ({ text }) => (
 
 // ─── Sale Card ──────────────────────────────────────────────────
 
-const SaleCard = ({ sale, onRefund }) => {
-  const payments = sale.transactions || [];
-  const refunds = sale.refunds || [];
-  const hasRefunds = (sale.amountRefunded || 0) > 0;
+const SaleCard = ({ sale, transactions = [], onRefund }) => {
+  const payments = transactions;
+  const credits = sale.creditsApplied || [];
+  const allRefunds = transactions.flatMap((t) => (t.refunds || []).map((r) => ({ ...r, _parentMethod: t.method })));
+  const totalRefunded = allRefunds.reduce((s, r) => s + (r.amount || 0), 0);
+  const hasRefunds = totalRefunded > 0;
 
   return (
     <View
@@ -163,21 +166,36 @@ const SaleCard = ({ sale, onRefund }) => {
         </View>
       )}
 
+      {/* Credits / Deposits */}
+      {credits.length > 0 && (
+        <View style={{ marginTop: 4 }}>
+          <Text style={{ fontSize: 12, fontWeight: "600", color: C.orange, marginBottom: 3 }}>CREDITS / DEPOSITS</Text>
+          {credits.map((c, idx) => (
+            <View key={c.creditId || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+              <Text style={{ fontSize: 13, color: C.orange }}>
+                {capitalizeFirstLetterOfString(c.type || "deposit")}
+              </Text>
+              <Text style={{ fontSize: 13, color: C.text }}>{"$" + formatCurrencyDisp(c.amount)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Refunds */}
       {hasRefunds && (
         <View style={{ marginTop: 4 }}>
           <Text style={{ fontSize: 12, fontWeight: "600", color: C.lightred, marginBottom: 3 }}>REFUNDS</Text>
-          {refunds.map((r, idx) => (
+          {allRefunds.map((r, idx) => (
             <View key={r.id || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
               <Text style={{ fontSize: 13, color: C.lightred }}>
-                {r.notes ? r.notes : "Refund #" + (idx + 1)}
+                {r.notes ? r.notes : (r.method || "card").toUpperCase() + " Refund"}
               </Text>
-              <Text style={{ fontSize: 13, color: C.lightred }}>{"-$" + formatCurrencyDisp(r.amountRefunded || r.amount)}</Text>
+              <Text style={{ fontSize: 13, color: C.lightred }}>{"-$" + formatCurrencyDisp(r.amount)}</Text>
             </View>
           ))}
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
             <Text style={{ fontSize: 13, fontWeight: "500", color: C.lightred }}>Total Refunded</Text>
-            <Text style={{ fontSize: 13, fontWeight: "500", color: C.lightred }}>{"-$" + formatCurrencyDisp(sale.amountRefunded)}</Text>
+            <Text style={{ fontSize: 13, fontWeight: "500", color: C.lightred }}>{"-$" + formatCurrencyDisp(totalRefunded)}</Text>
           </View>
         </View>
       )}
@@ -245,20 +263,33 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
 
   const [sSales, _sSetSales] = useState([]);
+  const [sTransactionsMap, _sSetTransactionsMap] = useState({});
   const [sLoadingSales, _sSetLoadingSales] = useState(false);
   const [sShowChangeLog, _sSetShowChangeLog] = useState(false);
 
   // Fetch associated sales when workorder opens
   useEffect(() => {
-    if (!workorder) { _sSetSales([]); return; }
+    if (!workorder) { _sSetSales([]); _sSetTransactionsMap({}); return; }
     const saleIDs = [];
     if (workorder.activeSaleID) saleIDs.push(workorder.activeSaleID);
     if (workorder.saleID && !saleIDs.includes(workorder.saleID)) saleIDs.push(workorder.saleID);
-    if (saleIDs.length === 0) { _sSetSales([]); return; }
+    if (saleIDs.length === 0) { _sSetSales([]); _sSetTransactionsMap({}); return; }
 
     _sSetLoadingSales(true);
     Promise.all(saleIDs.map((id) => dbGetCompletedSale(id)))
-      .then((results) => _sSetSales(results.filter(Boolean)))
+      .then(async (results) => {
+        let sales = results.filter(Boolean);
+        _sSetSales(sales);
+        let txnMap = {};
+        await Promise.all(sales.map(async (sale) => {
+          if (sale.transactionIDs?.length > 0) {
+            txnMap[sale.id] = (await readTransactions(sale.transactionIDs)).filter(Boolean);
+          } else {
+            txnMap[sale.id] = [];
+          }
+        }));
+        _sSetTransactionsMap(txnMap);
+      })
       .finally(() => _sSetLoadingSales(false));
   }, [workorder?.id]);
 
@@ -718,7 +749,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
               ) : sSales.length > 0 ? (
                 <ScrollView style={{ flex: 1, maxHeight: 300 }}>
                   {sSales.map((sale) => (
-                    <SaleCard key={sale.id} sale={sale} onRefund={handleRefund} />
+                    <SaleCard key={sale.id} sale={sale} transactions={sTransactionsMap[sale.id] || []} onRefund={handleRefund} />
                   ))}
                 </ScrollView>
               ) : (

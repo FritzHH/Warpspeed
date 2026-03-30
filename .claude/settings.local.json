@@ -45,7 +45,8 @@
       "Bash(node __inv_match.js)",
       "Bash(wc -l /c/Users/hiebf/OneDrive/Desktop/warpspeed/lightspeed/*.csv /c/Users/hiebf/OneDrive/Desktop/warpspeed/src/assets/import_data/*.csv)",
       "mcp__claude-terminal__notification_send",
-      "WebFetch(domain:docs.stripe.com)"
+      "WebFetch(domain:docs.stripe.com)",
+      "mcp__claude-terminal__db_list_connections"
     ]
   }
 }

@@ -244,7 +244,7 @@ export function generateSaleReceiptPDF(data, labels) {
   y = addDivider(doc, y, leftX, rightX);
 
   // Payments
-  let payments = data.transactions || [];
+  let payments = data.payments || [];
   if (payments.length > 0) {
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");

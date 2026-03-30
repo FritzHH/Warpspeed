@@ -3,7 +3,7 @@ import { View, Text, TextInput, Animated, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
 import { Button_, SHADOW_RADIUS_PROTO, SmallLoadingIndicator } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
-import { usdTypeMask, formatCurrencyDisp, log, gray } from "../../../../utils";
+import { usdTypeMask, formatCurrencyDisp, log, gray, generate12DigitBarcode } from "../../../../utils";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "../../../../private_user_constants";
@@ -35,6 +35,7 @@ function CardPaymentForm({
   onCardProcessingStart,
   onCardProcessingEnd,
   onSwitchToReader,
+  onPaymentStarted,
   lockAmount = false,
 }) {
   const stripe = useStripe();
@@ -155,16 +156,22 @@ function CardPaymentForm({
 
       if (onCardProcessingStart) onCardProcessingStart(sRequestedAmount);
 
+      let transactionID = generate12DigitBarcode();
+
+      // Notify parent to add pending ID to sale before payment starts
+      if (onPaymentStarted) onPaymentStarted(transactionID);
+
       let result = await newCheckoutProcessManualCardPayment(
         Math.round(sRequestedAmount),
         paymentMethod.id,
         saleID,
         customerID,
-        customerEmail
+        customerEmail,
+        transactionID
       );
 
       if (result?.success) {
-        let payment = buildManualCardTransaction(result.data.charge);
+        let payment = buildManualCardTransaction(result.data.charge, transactionID);
         _setSuccess(`Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`);
         _setDone(true);
         _setProcessing(false);

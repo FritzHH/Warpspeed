@@ -6360,16 +6360,11 @@ const ImportComponent = () => {
     return headers.map(escape).join(",") + "\n" + rows.map(r => r.map(escape).join(",")).join("\n");
   }
 
-  function downloadCsvFile(filename, csvString) {
-    const blob = new Blob([csvString], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  async function writeCsvToDir(dirHandle, filename, csvString) {
+    const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(csvString);
+    await writable.close();
   }
 
   async function handleDevMigration() {
@@ -6379,6 +6374,10 @@ const ImportComponent = () => {
     _setLsResult("");
 
     try {
+      // Prompt user to select the lightspeed/test folder
+      _setMigrationStep("Select lightspeed/test folder...");
+      const dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+
       // 1. Run full mapping pipeline (identical to full migration)
       _lsCsvData = null;
 
@@ -6474,43 +6473,43 @@ const ImportComponent = () => {
 
       console.log("[Dev Export] Filtered: " + selectedWOs.length + " WOs, " + filteredCustomers.length + " customers, " + filteredSales.length + " sales, " + filteredInventory.length + " inventory, " + filteredEmployees.length + " employees, " + filteredPunches.length + " punches.");
 
-      // 4. Build and download 7 CSV files
-      _setMigrationStep("Building CSVs...");
+      // 4. Write 7 CSV files to selected folder
+      _setMigrationStep("Writing CSVs to folder...");
 
       // _import_statuses.csv
       const statusHeaders = ["id", "label", "textColor", "backgroundColor", "removable"];
       const statusRows = mergedStatuses.map(s => [s.id, s.label, s.textColor, s.backgroundColor, s.removable]);
-      downloadCsvFile("_import_statuses.csv", buildCsvString(statusHeaders, statusRows));
+      await writeCsvToDir(dirHandle, "_import_statuses.csv", buildCsvString(statusHeaders, statusRows));
 
       // _import_customers.csv
       const custHeaders = ["id", "first", "last", "customerCell", "customerLandline", "email", "streetAddress", "unit", "city", "state", "zip", "millisCreated", "workorders", "sales", "_importSource", "lightspeed_id"];
       const custRows = filteredCustomers.map(c => [c.id, c.first, c.last, c.customerCell, c.customerLandline, c.email, c.streetAddress, c.unit, c.city, c.state, c.zip, c.millisCreated, JSON.stringify(c.workorders), JSON.stringify(c.sales), c._importSource, c.lightspeed_id]);
-      downloadCsvFile("_import_customers.csv", buildCsvString(custHeaders, custRows));
+      await writeCsvToDir(dirHandle, "_import_customers.csv", buildCsvString(custHeaders, custRows));
 
       // _import_workorders.csv
       const woHeaders = ["id", "workorderNumber", "lightspeed_id", "customerID", "customerFirst", "customerLast", "customerCell", "brand", "description", "status", "taxFree", "startedBy", "startedOnMillis", "finishedOnMillis", "paidOnMillis", "paymentComplete", "amountPaid", "saleID", "_lsSaleID", "_importSource", "workorderLines", "customerNotes", "internalNotes", "color1"];
       const woRows = selectedWOs.map(wo => [wo.id, wo.workorderNumber, wo.lightspeed_id, wo.customerID, wo.customerFirst, wo.customerLast, wo.customerCell, wo.brand, wo.description, wo.status, wo.taxFree, wo.startedBy, wo.startedOnMillis, wo.finishedOnMillis, wo.paidOnMillis, wo.paymentComplete, wo.amountPaid, wo.saleID, wo._lsSaleID, wo._importSource, JSON.stringify(wo.workorderLines), JSON.stringify(wo.customerNotes), JSON.stringify(wo.internalNotes), JSON.stringify(wo.color1)]);
-      downloadCsvFile("_import_workorders.csv", buildCsvString(woHeaders, woRows));
+      await writeCsvToDir(dirHandle, "_import_workorders.csv", buildCsvString(woHeaders, woRows));
 
       // _import_sales.csv
       const saleHeaders = ["id", "lightspeed_id", "millis", "subtotal", "discount", "salesTax", "salesTaxPercent", "total", "amountCaptured", "amountRefunded", "paymentComplete", "workorderIDs", "transactions", "_importSource"];
       const saleRows = filteredSales.map(s => [s.id, s.lightspeed_id, s.millis, s.subtotal, s.discount, s.salesTax, s.salesTaxPercent, s.total, s.amountCaptured, s.amountRefunded, s.paymentComplete, JSON.stringify(s.workorderIDs), JSON.stringify(s.transactions), s._importSource]);
-      downloadCsvFile("_import_sales.csv", buildCsvString(saleHeaders, saleRows));
+      await writeCsvToDir(dirHandle, "_import_sales.csv", buildCsvString(saleHeaders, saleRows));
 
       // _import_inventory.csv
       const invHeaders = ["id", "formalName", "informalName", "brand", "price", "salePrice", "cost", "category", "upc", "ean", "customSku", "manufacturerSku", "minutes", "customPart", "customLabor"];
       const invRows = filteredInventory.map(i => [i.id, i.formalName, i.informalName, i.brand, i.price, i.salePrice, i.cost, i.category, i.upc, i.ean, i.customSku, i.manufacturerSku, i.minutes, i.customPart, i.customLabor]);
-      downloadCsvFile("_import_inventory.csv", buildCsvString(invHeaders, invRows));
+      await writeCsvToDir(dirHandle, "_import_inventory.csv", buildCsvString(invHeaders, invRows));
 
       // _import_employees.csv
       const empHeaders = ["id", "first", "last", "permissions", "_importSource", "lightspeed_id"];
       const empRows = filteredEmployees.map(e => [e.id, e.first, e.last, JSON.stringify(e.permissions), e._importSource, e.lightspeed_id]);
-      downloadCsvFile("_import_employees.csv", buildCsvString(empHeaders, empRows));
+      await writeCsvToDir(dirHandle, "_import_employees.csv", buildCsvString(empHeaders, empRows));
 
       // _import_punches.csv
       const punchHeaders = ["id", "userID", "millis", "option", "_importSource"];
       const punchRows = filteredPunches.map(p => [p.id, p.userID, p.millis, p.option, p._importSource]);
-      downloadCsvFile("_import_punches.csv", buildCsvString(punchHeaders, punchRows));
+      await writeCsvToDir(dirHandle, "_import_punches.csv", buildCsvString(punchHeaders, punchRows));
 
       const summary = "Dev Export Complete: " +
         selectedWOs.length + "/" + freshData.workorders.length + " workorders, " +
@@ -6528,6 +6527,428 @@ const ImportComponent = () => {
       console.error("[Dev Export] Error:", e);
       _setMigrationStep("Error");
       _setLsResult("Dev Export Error: " + e.message);
+    }
+    _setDevMigrating(false);
+  }
+
+  async function handleValidateExport() {
+    _setDevMigrating(true);
+    _setMigrationStep("Select folder with _import_ CSVs...");
+    _setLsResult("");
+    const errors = [];
+    const warnings = [];
+    const info = [];
+
+    try {
+      const dirHandle = await window.showDirectoryPicker({ mode: "read" });
+
+      // --- Read all 7 CSV files ---
+      _setMigrationStep("Reading CSV files...");
+      const readFile = async (name) => {
+        try {
+          const fh = await dirHandle.getFileHandle(name);
+          const file = await fh.getFile();
+          return await file.text();
+        } catch (e) {
+          return null;
+        }
+      };
+
+      const [statusesTxt, customersTxt, workordersTxt, salesTxt, inventoryTxt, employeesTxt, punchesTxt] = await Promise.all([
+        readFile("_import_statuses.csv"),
+        readFile("_import_customers.csv"),
+        readFile("_import_workorders.csv"),
+        readFile("_import_sales.csv"),
+        readFile("_import_inventory.csv"),
+        readFile("_import_employees.csv"),
+        readFile("_import_punches.csv"),
+      ]);
+
+      const missing = [];
+      if (!statusesTxt) missing.push("_import_statuses.csv");
+      if (!customersTxt) missing.push("_import_customers.csv");
+      if (!workordersTxt) missing.push("_import_workorders.csv");
+      if (!salesTxt) missing.push("_import_sales.csv");
+      if (!inventoryTxt) missing.push("_import_inventory.csv");
+      if (!employeesTxt) missing.push("_import_employees.csv");
+      if (!punchesTxt) missing.push("_import_punches.csv");
+      if (missing.length > 0) {
+        errors.push("MISSING FILES: " + missing.join(", "));
+      }
+
+      // --- Parse CSVs ---
+      _setMigrationStep("Parsing CSVs...");
+      const statuses = statusesTxt ? parseCSV(statusesTxt) : [];
+      const customers = customersTxt ? parseCSV(customersTxt) : [];
+      const workorders = workordersTxt ? parseCSV(workordersTxt) : [];
+      const sales = salesTxt ? parseCSV(salesTxt) : [];
+      const inventory = inventoryTxt ? parseCSV(inventoryTxt) : [];
+      const employees = employeesTxt ? parseCSV(employeesTxt) : [];
+      const punches = punchesTxt ? parseCSV(punchesTxt) : [];
+
+      info.push("Parsed: " + statuses.length + " statuses, " + customers.length + " customers, " + workorders.length + " workorders, " + sales.length + " sales, " + inventory.length + " inventory, " + employees.length + " employees, " + punches.length + " punches");
+
+      // --- Build ID sets for lookups ---
+      const statusIDSet = new Set(statuses.map(s => s.id));
+      const customerIDSet = new Set(customers.map(c => c.id));
+      const saleIDSet = new Set(sales.map(s => s.id));
+      const saleLsIDSet = new Set(sales.map(s => s.lightspeed_id).filter(Boolean));
+      const inventoryIDSet = new Set(inventory.map(i => i.id));
+      const employeeIDSet = new Set(employees.map(e => e.id));
+      const workorderIDSet = new Set(workorders.map(w => w.id));
+
+      // ================================================================
+      // 1. DUPLICATE ID CHECKS
+      // ================================================================
+      _setMigrationStep("Checking for duplicate IDs...");
+      const checkDuplicates = (arr, label) => {
+        const seen = new Set();
+        const dupes = [];
+        for (const item of arr) {
+          if (!item.id) { errors.push(label + ": row with empty ID"); continue; }
+          if (seen.has(item.id)) dupes.push(item.id);
+          seen.add(item.id);
+        }
+        if (dupes.length > 0) errors.push(label + ": " + dupes.length + " duplicate IDs — " + dupes.slice(0, 5).join(", ") + (dupes.length > 5 ? "..." : ""));
+      };
+      checkDuplicates(statuses, "Statuses");
+      checkDuplicates(customers, "Customers");
+      checkDuplicates(workorders, "Workorders");
+      checkDuplicates(sales, "Sales");
+      checkDuplicates(inventory, "Inventory");
+      checkDuplicates(employees, "Employees");
+      checkDuplicates(punches, "Punches");
+
+      // ================================================================
+      // 2. WORKORDER → STATUS
+      // ================================================================
+      _setMigrationStep("Validating workorder → status...");
+      let woMissingStatus = 0;
+      const unknownStatuses = new Set();
+      for (const wo of workorders) {
+        if (!wo.status) { woMissingStatus++; continue; }
+        if (!statusIDSet.has(wo.status)) {
+          unknownStatuses.add(wo.status);
+          woMissingStatus++;
+        }
+      }
+      if (woMissingStatus > 0) errors.push("Workorder → Status: " + woMissingStatus + " workorders reference missing/empty status IDs" + (unknownStatuses.size > 0 ? " — unknown: " + [...unknownStatuses].slice(0, 5).join(", ") : ""));
+      else info.push("Workorder → Status: all " + workorders.length + " OK");
+
+      // ================================================================
+      // 3. WORKORDER → CUSTOMER
+      // ================================================================
+      _setMigrationStep("Validating workorder → customer...");
+      let woMissingCust = 0;
+      let woStandalone = 0;
+      const missingCustIDs = new Set();
+      for (const wo of workorders) {
+        if (!wo.customerID) { woStandalone++; continue; }
+        if (!customerIDSet.has(wo.customerID)) {
+          woMissingCust++;
+          missingCustIDs.add(wo.customerID);
+        }
+      }
+      if (woMissingCust > 0) errors.push("Workorder → Customer: " + woMissingCust + " workorders reference missing customers — " + [...missingCustIDs].slice(0, 5).join(", ") + (missingCustIDs.size > 5 ? "..." : ""));
+      else info.push("Workorder → Customer: all OK (" + woStandalone + " standalone)");
+
+      // ================================================================
+      // 4. WORKORDER → SALE (saleID and _lsSaleID)
+      // ================================================================
+      _setMigrationStep("Validating workorder → sale...");
+      let woMissingSale = 0;
+      let woHasSale = 0;
+      const missingSaleIDs = new Set();
+      for (const wo of workorders) {
+        const hasSaleRef = wo.saleID || wo._lsSaleID;
+        if (!hasSaleRef) continue;
+        woHasSale++;
+        // saleID should match a sale.id; _lsSaleID should match a sale.lightspeed_id
+        const saleFound = (wo.saleID && saleIDSet.has(wo.saleID)) || (wo._lsSaleID && saleLsIDSet.has(wo._lsSaleID));
+        if (!saleFound) {
+          woMissingSale++;
+          missingSaleIDs.add(wo.saleID || wo._lsSaleID);
+        }
+      }
+      if (woMissingSale > 0) errors.push("Workorder → Sale: " + woMissingSale + "/" + woHasSale + " workorders reference missing sales — " + [...missingSaleIDs].slice(0, 5).join(", "));
+      else info.push("Workorder → Sale: all " + woHasSale + " linked WOs OK");
+
+      // ================================================================
+      // 5. SALE → WORKORDER (workorderIDs array)
+      // ================================================================
+      _setMigrationStep("Validating sale → workorder...");
+      let saleMissingWo = 0;
+      let saleWoLinks = 0;
+      for (const sale of sales) {
+        let woIDs = [];
+        try { woIDs = JSON.parse(sale.workorderIDs || "[]"); } catch (e) { errors.push("Sale " + sale.id + ": invalid workorderIDs JSON"); continue; }
+        if (!Array.isArray(woIDs)) { errors.push("Sale " + sale.id + ": workorderIDs is not an array"); continue; }
+        for (const woID of woIDs) {
+          saleWoLinks++;
+          if (!workorderIDSet.has(woID)) saleMissingWo++;
+        }
+      }
+      if (saleMissingWo > 0) warnings.push("Sale → Workorder: " + saleMissingWo + "/" + saleWoLinks + " links reference workorders not in export (may be outside 50-WO window)");
+      else info.push("Sale → Workorder: all " + saleWoLinks + " links OK");
+
+      // ================================================================
+      // 6. CUSTOMER → WORKORDER back-references
+      // ================================================================
+      _setMigrationStep("Validating customer → workorder...");
+      let custWoMissing = 0;
+      let custWoLinks = 0;
+      for (const cust of customers) {
+        let woIDs = [];
+        try { woIDs = JSON.parse(cust.workorders || "[]"); } catch (e) { errors.push("Customer " + cust.id + ": invalid workorders JSON"); continue; }
+        if (!Array.isArray(woIDs)) continue;
+        for (const woID of woIDs) {
+          custWoLinks++;
+          if (!workorderIDSet.has(woID)) custWoMissing++;
+        }
+      }
+      if (custWoMissing > 0) warnings.push("Customer → Workorder: " + custWoMissing + "/" + custWoLinks + " back-references point to workorders not in export (expected for 50-WO filter)");
+      else info.push("Customer → Workorder: all " + custWoLinks + " back-refs OK");
+
+      // ================================================================
+      // 7. CUSTOMER → SALE back-references
+      // ================================================================
+      _setMigrationStep("Validating customer → sale...");
+      let custSaleMissing = 0;
+      let custSaleLinks = 0;
+      for (const cust of customers) {
+        let saleIDs = [];
+        try { saleIDs = JSON.parse(cust.sales || "[]"); } catch (e) { continue; }
+        if (!Array.isArray(saleIDs)) continue;
+        for (const sid of saleIDs) {
+          custSaleLinks++;
+          if (!saleIDSet.has(sid)) custSaleMissing++;
+        }
+      }
+      if (custSaleMissing > 0) warnings.push("Customer → Sale: " + custSaleMissing + "/" + custSaleLinks + " back-references point to sales not in export (expected for 50-WO filter)");
+      else info.push("Customer → Sale: all " + custSaleLinks + " back-refs OK");
+
+      // ================================================================
+      // 8. PUNCH → EMPLOYEE
+      // ================================================================
+      _setMigrationStep("Validating punch → employee...");
+      let punchMissingEmp = 0;
+      const missingEmpIDs = new Set();
+      for (const punch of punches) {
+        if (!punch.userID) { errors.push("Punch " + punch.id + ": empty userID"); continue; }
+        if (!employeeIDSet.has(punch.userID)) {
+          punchMissingEmp++;
+          missingEmpIDs.add(punch.userID);
+        }
+      }
+      if (punchMissingEmp > 0) errors.push("Punch → Employee: " + punchMissingEmp + " punches reference missing employees — " + [...missingEmpIDs].slice(0, 3).join(", "));
+      else info.push("Punch → Employee: all " + punches.length + " OK");
+
+      // ================================================================
+      // 9. PUNCH PAIRING (in/out balance per employee)
+      // ================================================================
+      _setMigrationStep("Checking punch in/out pairing...");
+      const punchByUser = {};
+      for (const p of punches) {
+        if (!punchByUser[p.userID]) punchByUser[p.userID] = { in: 0, out: 0 };
+        if (p.option === "in") punchByUser[p.userID].in++;
+        else if (p.option === "out") punchByUser[p.userID].out++;
+      }
+      let punchImbalance = 0;
+      for (const [uid, counts] of Object.entries(punchByUser)) {
+        const diff = Math.abs(counts.in - counts.out);
+        if (diff > 1) {
+          const emp = employees.find(e => e.id === uid);
+          const name = emp ? (emp.first + " " + emp.last).trim() : uid;
+          warnings.push("Punch pairing: " + name + " has " + counts.in + " ins, " + counts.out + " outs (diff: " + diff + ")");
+          punchImbalance++;
+        }
+      }
+      if (punchImbalance === 0) info.push("Punch pairing: all employees balanced (within 1)");
+
+      // ================================================================
+      // 10. PUNCH TIMESTAMPS
+      // ================================================================
+      let invalidPunchMillis = 0;
+      for (const p of punches) {
+        const ms = Number(p.millis);
+        if (!ms || isNaN(ms) || ms < 0) invalidPunchMillis++;
+      }
+      if (invalidPunchMillis > 0) errors.push("Punch timestamps: " + invalidPunchMillis + " punches with invalid millis");
+      else info.push("Punch timestamps: all " + punches.length + " valid");
+
+      // ================================================================
+      // 11. WORKORDER LINE ITEMS → INVENTORY
+      // ================================================================
+      _setMigrationStep("Validating workorder lines → inventory...");
+      let lineItemCount = 0;
+      let lineItemMissing = 0;
+      let lineItemCustom = 0;
+      for (const wo of workorders) {
+        let lines = [];
+        try { lines = JSON.parse(wo.workorderLines || "[]"); } catch (e) { errors.push("Workorder " + wo.id + ": invalid workorderLines JSON"); continue; }
+        if (!Array.isArray(lines)) continue;
+        for (const line of lines) {
+          lineItemCount++;
+          const invItem = line.inventoryItem;
+          if (!invItem || !invItem.id) { lineItemMissing++; continue; }
+          if (invItem.customPart || invItem.customLabor) { lineItemCustom++; continue; }
+          // Non-custom items: check if ID exists in inventory
+          if (!inventoryIDSet.has(invItem.id)) {
+            // Workorder lines embed the full item inline, so this is info not error
+            lineItemMissing++;
+          }
+        }
+      }
+      info.push("Workorder lines: " + lineItemCount + " total, " + lineItemCustom + " custom, " + lineItemMissing + " not in inventory CSV (inline items, expected)");
+
+      // ================================================================
+      // 12. SALE FINANCIAL INTEGRITY
+      // ================================================================
+      _setMigrationStep("Validating sale financials...");
+      let saleFinancialIssues = 0;
+      for (const sale of sales) {
+        const subtotal = Number(sale.subtotal) || 0;
+        const discount = Number(sale.discount) || 0;
+        const tax = Number(sale.salesTax) || 0;
+        const total = Number(sale.total) || 0;
+        const captured = Number(sale.amountCaptured) || 0;
+
+        // total should ≈ subtotal - discount + tax (allow 2 cent tolerance for rounding)
+        const expectedTotal = subtotal - discount + tax;
+        if (Math.abs(total - expectedTotal) > 2) {
+          saleFinancialIssues++;
+          if (saleFinancialIssues <= 3) warnings.push("Sale " + sale.id + " math: subtotal(" + subtotal + ") - discount(" + discount + ") + tax(" + tax + ") = " + expectedTotal + " but total = " + total);
+        }
+
+        // paymentComplete should match captured ≥ total
+        if (sale.paymentComplete === "true" && captured < total && total > 0) {
+          warnings.push("Sale " + sale.id + ": marked complete but captured(" + captured + ") < total(" + total + ")");
+        }
+
+        // Validate transactionIDs array
+        if (sale.transactionIDs && !Array.isArray(sale.transactionIDs)) {
+          errors.push("Sale " + sale.id + ": transactionIDs is not an array");
+        }
+      }
+      if (saleFinancialIssues === 0) info.push("Sale financials: all " + sales.length + " sales check out");
+      else if (saleFinancialIssues > 6) warnings.push("...and " + (saleFinancialIssues - 6) + " more sale financial issues");
+
+      // ================================================================
+      // 13. WORKORDER TIMESTAMP SANITY
+      // ================================================================
+      _setMigrationStep("Validating workorder timestamps...");
+      let woTimestampIssues = 0;
+      for (const wo of workorders) {
+        const started = Number(wo.startedOnMillis) || 0;
+        const finished = Number(wo.finishedOnMillis) || 0;
+        const paid = Number(wo.paidOnMillis) || 0;
+        if (!started) { woTimestampIssues++; continue; }
+        if (finished && finished < started) {
+          woTimestampIssues++;
+          if (woTimestampIssues <= 3) warnings.push("Workorder " + wo.id + ": finished(" + new Date(finished).toLocaleDateString() + ") before started(" + new Date(started).toLocaleDateString() + ")");
+        }
+        if (paid && started && paid < started) {
+          woTimestampIssues++;
+          if (woTimestampIssues <= 3) warnings.push("Workorder " + wo.id + ": paid before started");
+        }
+      }
+      if (woTimestampIssues === 0) info.push("Workorder timestamps: all " + workorders.length + " valid");
+      else warnings.push("Workorder timestamps: " + woTimestampIssues + " issues total");
+
+      // ================================================================
+      // 14. BIDIRECTIONAL SALE ↔ WORKORDER CONSISTENCY
+      // ================================================================
+      _setMigrationStep("Checking sale ↔ workorder bidirectional links...");
+      let biDirIssues = 0;
+      for (const wo of workorders) {
+        if (!wo.saleID && !wo._lsSaleID) continue;
+        // Find the sale this WO claims to be linked to
+        const linkedSale = sales.find(s => s.id === wo.saleID || s.lightspeed_id === wo._lsSaleID);
+        if (!linkedSale) continue; // Already caught in check 4
+        // Does the sale's workorderIDs include this WO?
+        let saleWoIDs = [];
+        try { saleWoIDs = JSON.parse(linkedSale.workorderIDs || "[]"); } catch (e) { continue; }
+        if (!saleWoIDs.includes(wo.id)) {
+          biDirIssues++;
+          if (biDirIssues <= 3) warnings.push("Bidirectional: WO " + wo.id + " links to sale " + (wo.saleID || wo._lsSaleID) + " but sale doesn't list WO in workorderIDs");
+        }
+      }
+      if (biDirIssues === 0) info.push("Sale ↔ Workorder bidirectional: all consistent");
+      else if (biDirIssues > 3) warnings.push("...and " + (biDirIssues - 3) + " more bidirectional issues");
+
+      // ================================================================
+      // 15. CUSTOMER DATA QUALITY
+      // ================================================================
+      _setMigrationStep("Checking customer data quality...");
+      let custNoName = 0;
+      let custNoContact = 0;
+      for (const c of customers) {
+        if (!c.first && !c.last) custNoName++;
+        if (!c.customerCell && !c.customerLandline && !c.email) custNoContact++;
+      }
+      if (custNoName > 0) warnings.push("Customer quality: " + custNoName + "/" + customers.length + " customers with no name");
+      if (custNoContact > 0) warnings.push("Customer quality: " + custNoContact + "/" + customers.length + " customers with no phone or email");
+      if (custNoName === 0 && custNoContact === 0) info.push("Customer quality: all have name + contact info");
+
+      // ================================================================
+      // 16. EMPLOYEE SKIPPED CHECK (Fritz, Support User, Office User)
+      // ================================================================
+      for (const emp of employees) {
+        const name = ((emp.first || "") + " " + (emp.last || "")).trim().toLowerCase();
+        if (name === "support user" || name === "office user") errors.push("Employee: system account \"" + name + "\" was not filtered out");
+        if (emp.lightspeed_id === "1") errors.push("Employee: Fritz (LS ID 1) was not filtered out");
+      }
+
+      // ================================================================
+      // 17. INVENTORY PRICE SANITY
+      // ================================================================
+      let invZeroPrice = 0;
+      let invNegPrice = 0;
+      for (const item of inventory) {
+        const price = Number(item.price) || 0;
+        if (price === 0) invZeroPrice++;
+        if (price < 0) invNegPrice++;
+      }
+      if (invNegPrice > 0) errors.push("Inventory: " + invNegPrice + " items with negative price");
+      if (invZeroPrice > 0) warnings.push("Inventory: " + invZeroPrice + "/" + inventory.length + " items with zero price");
+      if (invNegPrice === 0 && invZeroPrice === 0) info.push("Inventory prices: all " + inventory.length + " positive");
+
+      // ================================================================
+      // REPORT
+      // ================================================================
+      _setMigrationStep("Validation complete");
+      console.log("\n========================================");
+      console.log("  IMPORT CSV VALIDATION REPORT");
+      console.log("========================================\n");
+
+      if (errors.length > 0) {
+        console.log("ERRORS (" + errors.length + "):");
+        for (const e of errors) console.log("  [ERROR] " + e);
+        console.log("");
+      }
+      if (warnings.length > 0) {
+        console.log("WARNINGS (" + warnings.length + "):");
+        for (const w of warnings) console.log("  [WARN]  " + w);
+        console.log("");
+      }
+      console.log("INFO (" + info.length + "):");
+      for (const i of info) console.log("  [OK]    " + i);
+      console.log("\n========================================");
+      console.log("  " + errors.length + " errors, " + warnings.length + " warnings, " + info.length + " passed");
+      console.log("========================================\n");
+
+      const resultSummary = errors.length + " errors, " + warnings.length + " warnings, " + info.length + " checks passed";
+      _setLsResult((errors.length > 0 ? "FAIL: " : "PASS: ") + resultSummary);
+
+    } catch (e) {
+      if (e.name === "AbortError") {
+        _setMigrationStep("");
+        _setLsResult("Folder selection cancelled");
+      } else {
+        console.error("[Validate] Error:", e);
+        _setMigrationStep("Error");
+        _setLsResult("Validation error: " + e.message);
+      }
     }
     _setDevMigrating(false);
   }
@@ -6631,6 +7052,30 @@ const ImportComponent = () => {
             ) : null}
           </View>
         ) : null}
+        {/* --- Validate Export --- */}
+        <TouchableOpacity
+          onPress={handleValidateExport}
+          disabled={sLookupLoading || sMigrating || sDevMigrating}
+          style={{
+            width: 300,
+            paddingVertical: 14,
+            borderRadius: 10,
+            borderWidth: 2,
+            borderColor: C.blue,
+            backgroundColor: C.listItemWhite,
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 10,
+            opacity: sLookupLoading || sMigrating || sDevMigrating ? 0.5 : 1,
+          }}
+        >
+          <Text style={{ fontSize: 15, color: C.blue, fontWeight: "700" }}>
+            Validate Export CSVs
+          </Text>
+          <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 3 }}>
+            Cross-check all 7 _import_ files
+          </Text>
+        </TouchableOpacity>
         <View style={{ width: "100%", height: 1, backgroundColor: C.buttonLightGreenOutline, marginBottom: 10 }} />
         {/* --- Dev Import --- */}
         <TouchableOpacity

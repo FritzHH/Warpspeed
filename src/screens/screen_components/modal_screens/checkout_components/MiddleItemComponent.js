@@ -1074,7 +1074,7 @@ export const MiddleItemComponent = ({
             </Text>
           </View>
         )}
-        {sSale?.transactions?.length > 0 && sSale?.paymentComplete ? (
+        {sSale?.transactionIDs?.length > 0 && sSale?.paymentComplete ? (
           <Button_
             buttonStyle={{ width: 150, color: C.textWhite }}
             colorGradientArr={COLOR_GRADIENTS.greenblue}

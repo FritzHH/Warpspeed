@@ -23,8 +23,9 @@ import {
   log,
 } from "../../../utils";
 import {
-  newCheckoutGetActiveSale,
-  newCheckoutFetchCompletedSale,
+  readActiveSale,
+  readCompletedSale,
+  readTransactions,
   newCheckoutFetchWorkordersForSale,
 } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
@@ -70,6 +71,7 @@ export const FullSaleModal = ({ item, onClose }) => {
   const salesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
 
   const [sSale, _setSale] = useState(null);
+  const [sTransactions, _setTransactions] = useState([]);
   const [sLoadingSale, _setLoadingSale] = useState(true);
   const [sWorkorders, _setWorkorders] = useState([]);
   const [sLoadingWorkorders, _setLoadingWorkorders] = useState(false);
@@ -88,8 +90,8 @@ export const FullSaleModal = ({ item, onClose }) => {
       _setError("");
       try {
         // Try active-sales first, then completed-sales
-        let sale = await newCheckoutGetActiveSale(item.saleID);
-        if (!sale) sale = await newCheckoutFetchCompletedSale(item.saleID);
+        let sale = await readActiveSale(item.saleID);
+        if (!sale) sale = await readCompletedSale(item.saleID);
         if (cancelled) return;
         if (!sale) {
           _setError("Sale not found");
@@ -97,6 +99,13 @@ export const FullSaleModal = ({ item, onClose }) => {
           return;
         }
         _setSale(sale);
+
+        // Fetch transactions from collection
+        if (sale.transactionIDs?.length > 0) {
+          let txns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
+          if (!cancelled) _setTransactions(txns);
+        }
+
         _setLoadingSale(false);
 
         // Fetch linked workorders if any
@@ -121,9 +130,11 @@ export const FullSaleModal = ({ item, onClose }) => {
   }, [item?.saleID]);
 
   // Derived
-  const payments = sSale?.transactions || [];
-  const refunds = sSale?.refunds || [];
-  const hasRefunds = (sSale?.amountRefunded || 0) > 0;
+  const payments = sTransactions;
+  const credits = sSale?.creditsApplied || [];
+  const allRefunds = sTransactions.flatMap((t) => (t.refunds || []).map((r) => ({ ...r, _parentMethod: t.method, _parentLast4: t.last4 })));
+  const totalRefunded = allRefunds.reduce((s, r) => s + (r.amount || 0), 0);
+  const hasRefunds = totalRefunded > 0;
   const isVoided = !!sSale?.voidedByRefund;
 
   function handleRefund() {
@@ -372,11 +383,11 @@ export const FullSaleModal = ({ item, onClose }) => {
                     >
                       {/* Type + Amount */}
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: p.type === "refund" ? C.lightred : C.text }}>
+                        <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
                           {(p.method || "card").toUpperCase()}
                         </Text>
-                        <Text style={{ fontSize: 15, fontWeight: "600", color: p.type === "refund" ? C.lightred : C.text }}>
-                          {(p.type === "refund" ? "-" : "") + "$" + formatCurrencyDisp(p.amountCaptured)}
+                        <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>
+                          {"$" + formatCurrencyDisp(p.amountCaptured)}
                         </Text>
                       </View>
 
@@ -416,17 +427,10 @@ export const FullSaleModal = ({ item, onClose }) => {
                         </Text>
                       )}
 
-                      {/* Deposit/credit badge */}
-                      {!!p.depositType && (
-                        <Text style={{ fontSize: 11, color: C.orange, marginTop: 2 }}>
-                          {capitalizeFirstLetterOfString(p.depositType)}
-                        </Text>
-                      )}
-
-                      {/* Refund on this payment */}
-                      {(p.amountRefunded || 0) > 0 && (
+                      {/* Refunds on this transaction */}
+                      {(p.refunds || []).length > 0 && (
                         <Text style={{ fontSize: 11, color: C.lightred, marginTop: 2 }}>
-                          {"Refunded: $" + formatCurrencyDisp(p.amountRefunded)}
+                          {"Refunded: $" + formatCurrencyDisp((p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0))}
                         </Text>
                       )}
                     </View>
@@ -438,6 +442,35 @@ export const FullSaleModal = ({ item, onClose }) => {
                     </Text>
                   )}
 
+                  {/* Credits / Deposits */}
+                  {credits.length > 0 && (
+                    <View>
+                      <SectionHeader text={"CREDITS / DEPOSITS (" + credits.length + ")"} />
+                      {credits.map((c, idx) => (
+                        <View
+                          key={c.creditId || idx}
+                          style={{
+                            marginBottom: 4,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: gray(0.1),
+                            backgroundColor: C.listItemWhite,
+                            padding: 8,
+                          }}
+                        >
+                          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                            <Text style={{ fontSize: 12, color: C.orange }}>
+                              {capitalizeFirstLetterOfString(c.type || "deposit")}
+                            </Text>
+                            <Text style={{ fontSize: 12, color: C.text }}>
+                              {"$" + formatCurrencyDisp(c.amount)}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
                   {/* Refund history */}
                   {hasRefunds && (
                     <View>
@@ -445,10 +478,10 @@ export const FullSaleModal = ({ item, onClose }) => {
                       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
                         <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "600" }}>Total Refunded</Text>
                         <Text style={{ fontSize: 14, fontWeight: "600", color: C.lightred }}>
-                          {"-$" + formatCurrencyDisp(sSale.amountRefunded)}
+                          {"-$" + formatCurrencyDisp(totalRefunded)}
                         </Text>
                       </View>
-                      {refunds.map((r, idx) => (
+                      {allRefunds.map((r, idx) => (
                         <View
                           key={r.id || idx}
                           style={{
@@ -462,7 +495,7 @@ export const FullSaleModal = ({ item, onClose }) => {
                         >
                           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                             <Text style={{ fontSize: 12, color: C.lightred }}>
-                              {"Refund #" + (idx + 1)}
+                              {(r.method || "card").toUpperCase() + " Refund"}
                             </Text>
                             <Text style={{ fontSize: 12, color: C.lightred }}>
                               {"-$" + formatCurrencyDisp(r.amount)}

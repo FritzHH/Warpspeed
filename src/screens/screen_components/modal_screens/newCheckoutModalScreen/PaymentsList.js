@@ -5,29 +5,21 @@ import { C, Fonts } from "../../../../styles";
 import { Tooltip, Pressable_ } from "../../../../components";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 
-const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrintDepositReceipt, onRemoveDeposit }) {
+const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
   let isCash = payment.method === "cash";
   let isCheck = payment.method === "check";
-  let isDeposit = !!payment.depositType;
-  let isCard = !isCash && !isCheck && !isDeposit;
-  let depositPaidByCash = isDeposit && payment.method === "cash";
-  let depositPaidByCard = isDeposit && payment.method !== "cash";
+  let isCard = !isCash && !isCheck;
+
+  let amountRefunded = (payment.refunds || []).reduce((sum, r) => sum + (r.amount || 0), 0);
+  let fullyRefunded = amountRefunded > 0 && payment.amountCaptured <= amountRefunded;
 
   function getPaymentLabel() {
-    if (isDeposit) {
-      if (payment.depositType === "credit") return "ACCOUNT CREDIT";
-      if (payment.depositType === "giftcard") return "GIFT CARD";
-      if (depositPaidByCash) return "DEPOSIT";
-      if (payment.last4) return "CARD DEPOSIT";
-      return "DEPOSIT";
-    }
     if (isCheck) return "CHECK SALE";
     if (isCash) return "CASH SALE";
     return "CARD SALE";
   }
 
   function getAmountLabel() {
-    if (isDeposit) return "Amount applied";
     if (isCheck) return "Check received";
     if (isCash) return "Cash received";
     return "Card payment received";
@@ -51,20 +43,20 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
           alignItems: "center",
         }}
       >
-        <Text style={{ color: isDeposit ? (payment.depositType === "giftcard" ? C.orange : depositPaidByCash ? C.orange : C.blue) : C.green }}>
+        <Text style={{ color: C.green }}>
           {getPaymentLabel()}
         </Text>
-        {!payment.depositType && payment.amountRefunded > 0 && payment.amountCaptured <= (payment.amountRefunded || 0) && (
+        {fullyRefunded && (
           <View style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 2, paddingHorizontal: 8 }}>
             <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>Fully Refunded</Text>
           </View>
         )}
-        {onRefund && !payment.depositType && payment.amountCaptured > (payment.amountRefunded || 0) && (
+        {onRefund && !fullyRefunded && (
           <Tooltip text="Refund this payment" position="top">
             <TouchableOpacity
               onPress={(e) => { e.stopPropagation(); onRefund(); }}
               style={{
-                backgroundColor: isDeposit ? (depositPaidByCash ? C.orange : C.blue) : (isCash ? C.green : C.blue),
+                backgroundColor: isCash ? C.green : C.blue,
                 borderRadius: 5,
                 paddingVertical: 2,
                 paddingHorizontal: 8,
@@ -89,18 +81,8 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
         <Text style={{ color: C.text }}>{formatCurrencyDisp(payment.amountCaptured, true)}</Text>
       </View>
 
-      {/* Partial application indicator */}
-      {!!isDeposit && payment.depositOriginalAmount && payment.amountCaptured < payment.depositOriginalAmount && (
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ color: gray(0.4), fontSize: 11 }}>
-            {"of " + formatCurrencyDisp(payment.depositOriginalAmount, true) + " total"}
-          </Text>
-          <Text style={{ color: C.blue, fontSize: 11, fontWeight: "500" }}>PARTIAL</Text>
-        </View>
-      )}
-
-      {/* Card details — for card payments and deposit-applied payments that were paid by card */}
-      {((isCard || depositPaidByCard) && payment.last4) ? (
+      {/* Card details */}
+      {(isCard && payment.last4) ? (
         <View
           style={{
             flexDirection: "row",
@@ -118,15 +100,8 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
         </View>
       ) : null}
 
-      {/* Deposit note */}
-      {!!isDeposit && !!payment.depositNote && (
-        <Text numberOfLines={2} style={{ color: gray(0.4), fontSize: 13 }}>
-          {payment.depositNote}
-        </Text>
-      )}
-
       {/* Previous refunds */}
-      {!!payment.amountRefunded && (
+      {amountRefunded > 0 && (
         <View
           style={{
             flexDirection: "row",
@@ -137,13 +112,13 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
             Previous Refund amount
           </Text>
           <Text style={{ color: C.red, fontSize: 13 }}>
-            {formatCurrencyDisp(payment.amountRefunded, true)}
+            {formatCurrencyDisp(amountRefunded, true)}
           </Text>
         </View>
       )}
 
       {/* Cash tender */}
-      {!!isCash && !isDeposit && (
+      {!!isCash && (
         <View
           style={{
             flexDirection: "row",
@@ -157,20 +132,112 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
     </View>
   );
 
-  // Build tooltip text
-  let tooltipText = isDeposit && onRemoveDeposit
+  return (
+    <Tooltip text="Click to print paper receipt" position="top">
+      <Pressable_
+        onPress={onPress || undefined}
+        activeOpacity={onPress ? 0.6 : 1}
+      >
+        {content}
+      </Pressable_>
+    </Tooltip>
+  );
+});
+
+const CreditRow = memo(function CreditRow({ credit, onPrintDepositReceipt, onRemoveDeposit }) {
+  let isGiftCard = credit.type === "giftcard";
+  let isCredit = credit.type === "credit";
+  let method = credit._method || "cash";
+  let paidByCash = method === "cash";
+  let paidByCard = method !== "cash";
+
+  function getCreditLabel() {
+    if (isCredit) return "ACCOUNT CREDIT";
+    if (isGiftCard) return "GIFT CARD";
+    if (paidByCard && credit._last4) return "CARD DEPOSIT";
+    return "DEPOSIT";
+  }
+
+  let labelColor = isGiftCard ? C.orange : (paidByCash ? C.orange : C.blue);
+
+  let content = (
+    <View
+      style={{
+        padding: 5,
+        backgroundColor: C.listItemWhite,
+        width: "100%",
+        borderRadius: 8,
+        marginBottom: 5,
+      }}
+    >
+      {/* Type label */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: labelColor }}>
+          {getCreditLabel()}
+        </Text>
+      </View>
+
+      {/* Amount line */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text style={{ color: C.text }}>Amount applied</Text>
+        <Text style={{ color: C.text }}>{formatCurrencyDisp(credit.amount, true)}</Text>
+      </View>
+
+      {/* Partial application indicator */}
+      {credit._originalAmount && credit.amount < credit._originalAmount && (
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: gray(0.4), fontSize: 11 }}>
+            {"of " + formatCurrencyDisp(credit._originalAmount, true) + " total"}
+          </Text>
+          <Text style={{ color: C.blue, fontSize: 11, fontWeight: "500" }}>PARTIAL</Text>
+        </View>
+      )}
+
+      {/* Card details for deposits paid by card */}
+      {(paidByCard && credit._last4) ? (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+          }}
+        >
+          <Text style={{ color: gray(0.4), fontSize: 13 }}>
+            {"***" + credit._last4}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Note */}
+      {!!credit._note && (
+        <Text numberOfLines={2} style={{ color: gray(0.4), fontSize: 13 }}>
+          {credit._note}
+        </Text>
+      )}
+    </View>
+  );
+
+  let tooltipText = onRemoveDeposit
     ? "- Click to print paper receipt\n- Right-click to adjust or remove deposit"
     : "Click to print paper receipt";
 
-  let handlePress = isDeposit
-    ? (onPrintDepositReceipt && payment.depositSaleID ? onPrintDepositReceipt : undefined)
-    : onPress || undefined;
+  let handlePress = onPrintDepositReceipt && credit._depositSaleID ? onPrintDepositReceipt : undefined;
 
   return (
     <Tooltip text={tooltipText} position="top">
       <Pressable_
         onPress={handlePress}
-        onRightPress={isDeposit && onRemoveDeposit ? onRemoveDeposit : undefined}
+        onRightPress={onRemoveDeposit || undefined}
         activeOpacity={handlePress ? 0.6 : 1}
       >
         {content}
@@ -179,8 +246,8 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress, onPrin
   );
 });
 
-export const PaymentsList = memo(function PaymentsList({ payments = [], onRefund, onPrintReceipt, onPrintDepositReceipt, onRemoveDeposit }) {
-  if (!payments || payments.length === 0) return null;
+export const PaymentsList = memo(function PaymentsList({ payments = [], credits = [], onRefund, onPrintReceipt, onPrintDepositReceipt, onRemoveDeposit }) {
+  if ((!payments || payments.length === 0) && (!credits || credits.length === 0)) return null;
   return (
     <View
       style={{
@@ -190,22 +257,31 @@ export const PaymentsList = memo(function PaymentsList({ payments = [], onRefund
       }}
     >
       <View style={{ width: "100%" }}>
-        {payments.filter((p) => p.type !== "refund").sort((a, b) => {
-          let aRefunded = !a.depositType && a.amountCaptured <= (a.amountRefunded || 0) ? 1 : 0;
-          let bRefunded = !b.depositType && b.amountCaptured <= (b.amountRefunded || 0) ? 1 : 0;
-          return aRefunded - bRefunded;
+        {/* Credit rows first */}
+        {credits.map((credit, idx) => (
+          <CreditRow
+            key={credit.creditId || idx}
+            credit={credit}
+            onPrintDepositReceipt={onPrintDepositReceipt ? () => onPrintDepositReceipt(credit) : null}
+            onRemoveDeposit={onRemoveDeposit ? () => onRemoveDeposit(credit) : null}
+          />
+        ))}
+        {/* Transaction rows, sorted: fully-refunded last */}
+        {payments.sort((a, b) => {
+          let aRefunded = (a.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+          let bRefunded = (b.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+          let aFull = a.amountCaptured <= aRefunded ? 1 : 0;
+          let bFull = b.amountCaptured <= bRefunded ? 1 : 0;
+          return aFull - bFull;
         }).map((payment, idx) => (
           <PaymentRow
             key={payment.id || idx}
             payment={payment}
             onRefund={onRefund ? () => onRefund(payment) : null}
             onPress={onPrintReceipt ? () => onPrintReceipt(payment) : null}
-            onPrintDepositReceipt={onPrintDepositReceipt ? () => onPrintDepositReceipt(payment) : null}
-            onRemoveDeposit={onRemoveDeposit ? () => onRemoveDeposit(payment) : null}
           />
         ))}
       </View>
     </View>
   );
 });
-

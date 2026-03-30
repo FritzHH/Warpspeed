@@ -192,13 +192,14 @@ export const CUSTOMER_DEPOST_TYPES = {
   giftcard: 'giftcard',
 }
 export const CUSTOMER_DEPOSIT_PROTO = {
-  id: "",              // sale ID (EAN-13 prefix "3") — IS the completed-sales doc ID
-  amountCents: 0,      // current remaining balance (decremented on partial use)
+  id: "",              // transaction ID
+  amountCents: 0,      // current remaining balance (decremented on sale completion)
+  reservedCents: 0,    // amount held by an in-progress checkout (not yet consumed)
   millis: 0,           // creation timestamp
   method: "",          // "cash" | "card" | "check"
   note: "",            // user-entered note
   last4: "",           // card last 4 digits (card deposits only, for display)
-  type: "",            // "" = regular deposit, "giftcard" = gift card
+  type: "",            // "deposit" = regular deposit, "giftcard" = gift card
 }
 
 
@@ -365,6 +366,8 @@ export const SALE_PROTO = {
   millis: "",
   workorderIDs: [],
   transactionIDs: [],
+  pendingTransactionIDs: [],
+  pendingRefundIDs: [],
   amountCaptured: 0,
   creditsApplied: [],
   subtotal: 0,
@@ -483,6 +486,7 @@ export const CUSTOMER_CREDIT_PROTO = {
   id: "",
   text: "",
   amountCents: 0,
+  reservedCents: 0,    // amount held by an in-progress checkout (not yet consumed)
   millis: "",
 }
 
@@ -508,6 +512,7 @@ export const CUSTOMER_PROTO = {
   millisCreated: "",
   deposits: [],
   credits: [],
+  payments: [],
   language: CUSTOMER_LANGUAGES.english
 };
 

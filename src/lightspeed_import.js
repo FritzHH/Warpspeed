@@ -1,4 +1,4 @@
-import { buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex } from "./utils";
+import { buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex, hexToRgb } from "./utils";
 import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES, TAX_FREE_RECEIPT_NOTE, APP_USER, TIME_PUNCH_PROTO } from "./data";
 
 // ============================================================================
@@ -88,13 +88,14 @@ export function mapStatuses(statusesCSVText) {
   const csvStatuses = rows
     .filter(row => row.Status && !nonremovableLabels.has(row.Status.toLowerCase()))
     .map(row => {
-      const bgColor = row.Color || "#B8B8B8";
-      const textColor = bestForegroundHex(bgColor);
+      const bgHex = row.Color || "#B8B8B8";
+      const textColor = bestForegroundHex(bgHex);
+      const { r, g, b } = hexToRgb(bgHex);
       return {
         id: "ls_" + row.Status.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_"),
         label: row.Status.trim(),
         textColor,
-        backgroundColor: bgColor,
+        backgroundColor: "rgb(" + r + "," + g + "," + b + ")",
         removable: true,
       };
     });
@@ -124,13 +125,14 @@ export function extractStatusesFromWorkorders(workorderCSVText) {
   const csvStatuses = extracted
     .filter(name => !nonremovableLabels.has(name.toLowerCase()))
     .map(name => {
-      const bgColor = "#B8B8B8";
-      const textColor = bestForegroundHex(bgColor);
+      const bgHex = "#B8B8B8";
+      const textColor = bestForegroundHex(bgHex);
+      const { r, g, b } = hexToRgb(bgHex);
       return {
         id: "ls_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
         label: name,
         textColor,
-        backgroundColor: bgColor,
+        backgroundColor: "rgb(" + r + "," + g + "," + b + ")",
         removable: true,
       };
     });
@@ -620,7 +622,7 @@ export function mapWorkorders(
       endedOnMillis: "",
       saleID: "",
       media: [],
-      _lsSaleID: wo.saleID || "",
+      _lsSaleID: (wo.saleID && wo.saleID !== "0") ? wo.saleID : "",
       _importSource: "lightspeed",
     };
 

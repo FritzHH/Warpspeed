@@ -39,7 +39,7 @@ import {
   dbGetCompletedWorkorder,
   dbGetCompletedSale,
 } from "../../../db_calls_wrapper";
-import { newCheckoutGetActiveSale } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
 
 export const CustomerInfoScreenModalComponent = ({
@@ -69,6 +69,7 @@ export const CustomerInfoScreenModalComponent = ({
   const [sCustomerLoadError, _setCustomerLoadError] = useState(false);
   const [sWorkorders, _sSetWorkorders] = useState([]);
   const [sSales, _sSetSales] = useState([]);
+  const [sSaleTransactionsMap, _sSetSaleTransactionsMap] = useState({});
   const [sWoLoading, _sSetWoLoading] = useState(false);
   const [sSalesLoading, _sSetSalesLoading] = useState(false);
   const [sShowDepositModal, _sSetShowDepositModal] = useState(false);
@@ -153,7 +154,7 @@ export const CustomerInfoScreenModalComponent = ({
         saleIDs.map(async (id) => {
           try {
             let sale = await dbGetCompletedSale(id);
-            if (!sale) sale = await newCheckoutGetActiveSale(id);
+            if (!sale) sale = await readActiveSale(id);
             return sale;
           } catch (e) {
             return null;
@@ -198,7 +199,23 @@ export const CustomerInfoScreenModalComponent = ({
           .filter(Boolean),
       }));
 
-      if (mountedRef.current) _sSetSales(salesWithWOs);
+      // Load transactions for each sale and attach as _transactions
+      let txnMap = {};
+      await Promise.all(salesWithWOs.map(async (sale) => {
+        if (sale.transactionIDs?.length > 0) {
+          let txns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
+          sale._transactions = txns;
+          txnMap[sale.id] = txns;
+        } else {
+          sale._transactions = [];
+          txnMap[sale.id] = [];
+        }
+      }));
+
+      if (mountedRef.current) {
+        _sSetSales(salesWithWOs);
+        _sSetSaleTransactionsMap(txnMap);
+      }
     } catch (e) {
       console.log("Error loading sales:", e);
       if (mountedRef.current) _sSetSales([]);
@@ -569,6 +586,7 @@ export const CustomerInfoScreenModalComponent = ({
               <ScrollView style={{ flexShrink: 1 }}>
                 <SalesList
                   sales={sSales}
+                  transactionsMap={sSaleTransactionsMap}
                   onSelect={(sale) => useOpenWorkordersStore.getState().setSaleModalObj(sale)}
                 />
               </ScrollView>
@@ -821,11 +839,13 @@ const WorkordersList = ({ workorders, onSelect }) => {
   );
 };
 
-const SalesList = ({ sales, onSelect }) => {
+const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
   return (
     <View style={{ width: "100%" }}>
       {sales.map((sale) => {
-        const hasRefunds = (sale.amountRefunded || 0) > 0;
+        const txns = transactionsMap[sale.id] || [];
+        const totalRefunded = txns.reduce((s, t) => s + (t.refunds || []).reduce((rs, r) => rs + (r.amount || 0), 0), 0);
+        const hasRefunds = totalRefunded > 0;
 
         return (
           <TouchableOpacity_
@@ -937,7 +957,7 @@ const SalesList = ({ sales, onSelect }) => {
 
             {/* Row 3: Payment method(s) */}
             <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}>
-              {(sale.transactions || []).map((p, idx) => (
+              {txns.map((p, idx) => (
                 <View
                   key={p.id || idx}
                   style={{
@@ -967,7 +987,7 @@ const SalesList = ({ sales, onSelect }) => {
               ))}
               {hasRefunds && (
                 <Text style={{ fontSize: 11, color: C.lightred, marginLeft: 4 }}>
-                  {"Refunded: $" + formatCurrencyDisp(sale.amountRefunded)}
+                  {"Refunded: $" + formatCurrencyDisp(totalRefunded)}
                 </Text>
               )}
             </View>

@@ -1040,7 +1040,11 @@ export function broadcastFullWorkorderToDisplay(wo) {
     waitTimeEstimateLabel: wo.waitTimeEstimateLabel || "",
     startedOnMillis: wo.startedOnMillis || "",
     workorderNumber: wo.workorderNumber || "",
-    amountPaid: wo.amountPaid || 0,
+    amountPaid: (() => {
+      if (!wo.activeSaleID) return 0;
+      let sale = useActiveSalesStore.getState().getActiveSale(wo.activeSaleID);
+      return sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
+    })(),
     paymentComplete: wo.paymentComplete || false,
   });
 }
@@ -1343,6 +1347,13 @@ export const useUploadProgressStore = create((set, get) => ({
   progress: null,
   setProgress: (progress) => set({ progress }),
   clearProgress: () => set({ progress: null }),
+}));
+
+export const useActiveSalesStore = create((set, get) => ({
+  activeSales: [],
+  getActiveSales: () => get().activeSales,
+  setActiveSales: (activeSales) => set({ activeSales }),
+  getActiveSale: (saleID) => get().activeSales.find((s) => s.id === saleID) || null,
 }));
 
 export const useListenersStore = create((set, get) => ({

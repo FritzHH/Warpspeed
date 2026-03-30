@@ -132,7 +132,7 @@ export function updateSaleWithTotals(sale, combinedWorkorders, settings) {
 
 // ─── Recompute Sale Amounts ──────────────────────────────────
 // Call after any mutation to transactions or credits.
-// Derives amountCaptured, amountRefunded, and paymentComplete.
+// Derives amountCaptured (true net) and paymentComplete from transactions.
 // transactions = array of real payment objects (cash/card)
 // credits = array of credit application objects (creditsApplied)
 
@@ -141,13 +141,11 @@ export function recomputeSaleAmounts(sale, transactions, credits) {
   let creds = credits || sale.creditsApplied || [];
   let txnTotal = txns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
   let creditTotal = creds.reduce((sum, c) => sum + (c.amount || 0), 0);
-  sale.amountCaptured = txnTotal + creditTotal;
   let totalRefunded = txns.reduce((sum, t) =>
     sum + (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
   );
-  sale.amountRefunded = totalRefunded;
-  let netPaid = sale.amountCaptured - totalRefunded;
-  sale.paymentComplete = netPaid >= (sale.total || 0) && (sale.total || 0) > 0;
+  sale.amountCaptured = txnTotal + creditTotal - totalRefunded;
+  sale.paymentComplete = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
   return sale;
 }
 

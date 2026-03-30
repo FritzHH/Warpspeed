@@ -30,6 +30,7 @@ import {
   useSettingsStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
+  useActiveSalesStore,
 } from "../../../stores";
 import { CONTACT_RESTRICTIONS, CUSTOMER_CREDIT_PROTO, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, TAB_NAMES } from "../../../data";
 import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, SmallLoadingIndicator, TextInput_, TouchableOpacity_ } from "../../../components";
@@ -672,6 +673,7 @@ const LoadingOverlay = ({ text }) => (
 const WorkordersList = ({ workorders, onSelect }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
+  const zActiveSales = useActiveSalesStore((state) => state.activeSales);
 
   return (
     <View style={{ flex: 1, width: "100%" }}>
@@ -821,15 +823,29 @@ const WorkordersList = ({ workorders, onSelect }) => {
                     {"est: " + workorder.waitTime.label}
                   </Text>
                 )}
-                {workorder.paymentComplete ? (
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: C.green }}>
-                    {"$" + formatCurrencyDisp(workorder.amountPaid)}
-                  </Text>
-                ) : (
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>
-                    {"$" + formatCurrencyDisp(totals.finalTotal)}
-                  </Text>
-                )}
+                {(() => {
+                  let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
+                  let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
+                  if (workorder.paymentComplete) {
+                    return (
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: C.green }}>
+                        {"$" + formatCurrencyDisp(totals.finalTotal)}
+                      </Text>
+                    );
+                  }
+                  if (paid > 0) {
+                    return (
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: C.orange }}>
+                        {"$" + formatCurrencyDisp(paid) + " paid"}
+                      </Text>
+                    );
+                  }
+                  return (
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>
+                      {"$" + formatCurrencyDisp(totals.finalTotal)}
+                    </Text>
+                  );
+                })()}
               </View>
             </TouchableOpacity_>
           );

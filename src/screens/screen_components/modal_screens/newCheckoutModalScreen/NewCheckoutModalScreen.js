@@ -31,6 +31,7 @@ import {
   usdTypeMask,
   generate12DigitBarcode,
   createNewWorkorder,
+  localStorageWrapper,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, TAX_FREE_RECEIPT_NOTE, CUSTOMER_PROTO } from "../../../../data";
 import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder } from "../../../../db_calls_wrapper";
@@ -55,6 +56,7 @@ import {
   readActiveSale,
   deleteActiveSale,
   writeCompletedSale,
+  newCheckoutCancelStripePayment,
 } from "./newCheckoutFirebaseCalls";
 
 import { SaleHeader } from "./SaleHeader";
@@ -267,7 +269,7 @@ export function NewCheckoutModalScreen() {
   let isDepositMode = !!zDepositInfo;
   let isStandalone = !zOpenWorkorder?.customerID;
   let saleComplete = sSale?.paymentComplete || false;
-  let amountLeftToPay = Math.round((sSale?.total || 0) - (sSale?.amountCaptured || 0) + (sSale?.amountRefunded || 0));
+  let amountLeftToPay = Math.round((sSale?.total || 0) - (sSale?.amountCaptured || 0));
   if (amountLeftToPay < 0) amountLeftToPay = 0;
   let cashAmountLeftToPay = amountLeftToPay - sCardProcessingAmount;
   if (cashAmountLeftToPay < 0) cashAmountLeftToPay = 0;
@@ -320,7 +322,7 @@ export function NewCheckoutModalScreen() {
       await newCheckoutSaveWorkorder(zOpenWorkorder);
     }
 
-    // Check if workorder has an existing partial-payment sale to resume
+    // Check if workorder has an existing active sale to resume
     if (zOpenWorkorder?.activeSaleID) {
       let existingSale = await readActiveSale(zOpenWorkorder.activeSaleID);
       if (existingSale && !existingSale.voidedByRefund) {
@@ -365,7 +367,7 @@ export function NewCheckoutModalScreen() {
 
         // Reconcile pending refunds (crash recovery)
         // Transaction docs already contain refund arrays written by the Cloud Function.
-        // recomputeSaleAmounts below derives amountRefunded from loaded transactions.
+        // recomputeSaleAmounts below derives amountCaptured (true net) from loaded transactions.
         if (existingSale.pendingRefundIDs?.length > 0) {
           existingSale.pendingRefundIDs = [];
         }
@@ -393,11 +395,10 @@ export function NewCheckoutModalScreen() {
       let cleanedWO = cloneDeep(zOpenWorkorder);
       cleanedWO.activeSaleID = "";
       cleanedWO.saleID = "";
-      cleanedWO.amountPaid = 0;
       useOpenWorkordersStore.getState().setWorkorder(cleanedWO, true);
     }
 
-    // No existing sale — create a new one
+    // No existing sale — create a new one and persist immediately
     let sale = createNewSale(zSettings, createdBy);
 
     if (zOpenWorkorder) {
@@ -407,11 +408,18 @@ export function NewCheckoutModalScreen() {
       _setCombinedWorkorders(combined);
       sale = updateSaleWithTotals(sale, combined, zSettings);
       sale.workorderIDs = [zOpenWorkorder.id];
+
+      // Write activeSaleID to workorder and persist the sale
+      let updatedWO = cloneDeep(zOpenWorkorder);
+      updatedWO.activeSaleID = sale.id;
+      useOpenWorkordersStore.getState().setWorkorder(updatedWO, true);
     } else {
       // No workorder — should not normally happen
     }
 
     _setSale(sale);
+    salePersistedRef.current = true;
+    persistSale(sale, [], []);
     broadcastSaleToDisplay(sale, zOpenWorkorder ? [cloneDeep(zOpenWorkorder)] : [], custFirst, custLast, custLanguage);
 
     // Fetch card readers
@@ -499,10 +507,17 @@ export function NewCheckoutModalScreen() {
     saleToPersist.creditsApplied = (creds || sCredits).map((c) => ({
       creditId: c.creditId, transactionId: c.transactionId || "", amount: c.amount, type: c.type,
     }));
-    saleToPersist.transactionIDs = (txns || sTransactions).map((t) => t.id);
-    writeActiveSale(saleToPersist);
-    // Persist cash transactions only — card transactions are written by the webhook
-    (txns || sTransactions).filter((t) => t.method !== "card").forEach((t) => writeTransaction(t));
+    // Append-only: merge any new transaction IDs into the existing array
+    let existingIDs = saleToPersist.transactionIDs || [];
+    let currentIDs = (txns || sTransactions).map((t) => t.id);
+    saleToPersist.transactionIDs = [...new Set([...existingIDs, ...currentIDs])];
+    // Stamp only when transaction activity changes (payments started or confirmed)
+    if (saleToPersist.transactionIDs.length > 0 || saleToPersist.pendingTransactionIDs?.length > 0) {
+      saleToPersist.lastTransactionStamp = Date.now();
+    }
+    // Write sale + all transactions in parallel (card reader txns are also written by webhook, but this ensures manual card entries are persisted)
+    let allTxns = txns || sTransactions;
+    Promise.all([writeActiveSale(saleToPersist), ...allTxns.map((t) => writeTransaction(t))]);
     salePersistedRef.current = true;
   }
   useEffect(() => {
@@ -524,11 +539,12 @@ export function NewCheckoutModalScreen() {
 
     let newArr;
     if (sCombinedWorkorders.find((o) => o.id === wo.id)) {
+      // Block unlink if payments exist (transactionIDs is not empty)
+      if (sSale?.transactionIDs?.length > 0) return;
       // Removing WO from combined sale — clean up its sale references
       newArr = sCombinedWorkorders.filter((o) => o.id !== wo.id);
       let cleaned = cloneDeep(wo);
       cleaned.activeSaleID = "";
-      cleaned.amountPaid = 0;
       let _user = useLoginStore.getState().currentUser?.first || "System";
       cleaned.changeLog = [...(cleaned.changeLog || []), { timestamp: Date.now(), user: _user, field: "payment", action: "recorded", from: "", to: "Removed from combined sale" }];
       useOpenWorkordersStore.getState().setWorkorder(cleaned, true);
@@ -613,7 +629,7 @@ export function NewCheckoutModalScreen() {
     // Create a credit entry (not a transaction)
     let credit = {
       creditId: deposit.id,
-      transactionId: "",
+      transactionId: isCredit ? "" : (deposit.transactionId || deposit.id || ""),
       amount: appliedAmount,
       type: isCredit ? "credit" : deposit._type === "giftcard" ? "giftcard" : "deposit",
       // Display-only fields (stripped on persist)
@@ -675,27 +691,17 @@ export function NewCheckoutModalScreen() {
     let sale = cloneDeep(sSale);
     recomputeSaleAmounts(sale, sTransactions, newCredits);
     _setSale(sale);
-    if (sTransactions.length === 0 && newCredits.length === 0 && sale.id) {
-      deleteActiveSale(sale.id);
-      salePersistedRef.current = false;
-    } else {
-      persistSale(sale, sTransactions, newCredits);
-    }
+    persistSale(sale, sTransactions, newCredits);
 
     // Log removal to workorder changelogs
     let user = useLoginStore.getState().currentUser?.first || "System";
     let timestamp = Date.now();
     let label = isCredit ? "Credit" : "Deposit";
     let entry = { timestamp, user, field: "payment", action: "recorded", from: "", to: label + " removed " + formatCurrencyDisp(credit.amount, true) };
-    let amountPaid = sTransactions.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
-    if (amountPaid < 0) amountPaid = 0;
-    let noPaymentsLeft = sTransactions.length === 0 && newCredits.length === 0;
     let updatedWorkorders = [];
     for (let wo of sCombinedWorkorders) {
       let updated = cloneDeep(wo);
       updated.changeLog = [...(updated.changeLog || []), entry];
-      updated.amountPaid = amountPaid;
-      if (noPaymentsLeft) updated.activeSaleID = "";
       if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
       updatedWorkorders.push(updated);
     }
@@ -752,13 +758,10 @@ export function NewCheckoutModalScreen() {
     let label = isCredit ? "Credit" : "Deposit";
     let action = difference > 0 ? "reduced to" : "increased to";
     let entry = { timestamp, user, field: "payment", action: "recorded", from: "", to: label + " " + action + " " + formatCurrencyDisp(newAmountCents, true) };
-    let amountPaid = sTransactions.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
-    if (amountPaid < 0) amountPaid = 0;
     let updatedWorkorders = [];
     for (let wo of sCombinedWorkorders) {
       let updated = cloneDeep(wo);
       updated.changeLog = [...(updated.changeLog || []), entry];
-      updated.amountPaid = amountPaid;
       if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
       updatedWorkorders.push(updated);
     }
@@ -794,6 +797,8 @@ export function NewCheckoutModalScreen() {
     let sale = cloneDeep(sSale);
     sale.pendingTransactionIDs = [...(sale.pendingTransactionIDs || []), transactionID];
     _setSale(sale);
+
+    // Persist the pending transaction ID on the sale (already in Firestore)
     if (!sDevSkip) persistSale(sale);
   }
 
@@ -815,7 +820,7 @@ export function NewCheckoutModalScreen() {
 
     let newTransactions = [...sTransactions, payment];
     _setTransactions(newTransactions);
-    sale.transactionIDs = newTransactions.map((t) => t.id);
+    sale.transactionIDs = [...new Set([...(sale.transactionIDs || []), ...newTransactions.map((t) => t.id)])];
     sale.pendingTransactionIDs = (sale.pendingTransactionIDs || []).filter((id) => id !== payment.id);
     sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);
 
@@ -865,8 +870,6 @@ export function NewCheckoutModalScreen() {
     for (let wo of sCombinedWorkorders) {
       let updated = cloneDeep(wo);
       updated.activeSaleID = sale.id;
-      updated.amountPaid = currentTxns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
-      if (updated.amountPaid < 0) updated.amountPaid = 0;
 
       let entries = [];
       entries.push({ timestamp, user, field: "payment", action: "recorded", from: "", to: paymentLabel + " " + formatCurrencyDisp(entryAmount || 0, true) });
@@ -891,7 +894,8 @@ export function NewCheckoutModalScreen() {
     // Create the deposit and add to customer
     let primaryPayment = localTxns[0];
     let newDeposit = { ...CUSTOMER_DEPOSIT_PROTO };
-    newDeposit.id = primaryPayment?.id || sale.id;
+    newDeposit.id = generate12DigitBarcode();
+    newDeposit.transactionId = primaryPayment?.id || "";
     newDeposit.amountCents = depositInfo.amountCents;
     newDeposit.millis = Date.now();
     newDeposit.method = primaryPayment?.method || "cash";
@@ -1000,8 +1004,6 @@ export function NewCheckoutModalScreen() {
       woToComplete.paymentComplete = true;
       woToComplete.paidOnMillis = Date.now();
       woToComplete.activeSaleID = "";
-      woToComplete.amountPaid = localTxns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0) - (sale.amountRefunded || 0);
-      if (woToComplete.amountPaid < 0) woToComplete.amountPaid = 0;
       woToComplete.saleID = sale.id;
       woToComplete.status = "finished_and_paid";
 
@@ -1306,26 +1308,14 @@ export function NewCheckoutModalScreen() {
   }
 
   function resetAndClose() {
-    // Release any deposit/credit reservations held by this checkout (only if sale not completed)
-    if (sCredits.length > 0 && zCustomer?.id && !sSale?.paymentComplete) {
-      let updatedCustomer = cloneDeep(zCustomer);
-      for (let cred of sCredits) {
-        let isCredit = cred.type === "credit";
-        let arrKey = isCredit ? "credits" : "deposits";
-        let arr = updatedCustomer[arrKey] || [];
-        let dep = arr.find((d) => d.id === cred.creditId);
-        if (dep) {
-          dep.reservedCents = Math.max(0, (dep.reservedCents || 0) - cred.amount);
-        }
-      }
-      useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
-      dbSaveCustomer(updatedCustomer);
-    }
-    // If sale has transactions/credits, it's already fully persisted - just close the modal.
-    // Only delete empty sales (no transactions) to clean up the active-sale document.
     let hasPayments = sTransactions.length > 0 || sCredits.length > 0;
     if (sSale?.id && !hasPayments && salePersistedRef.current) {
       deleteActiveSale(sSale.id);
+      for (let wo of sCombinedWorkorders) {
+        let cleaned = cloneDeep(wo);
+        cleaned.activeSaleID = "";
+        useOpenWorkordersStore.getState().setWorkorder(cleaned, true);
+      }
     }
     salePersistedRef.current = false;
     broadcastClear();
@@ -1340,6 +1330,13 @@ export function NewCheckoutModalScreen() {
     _setReceiptLanguage("english");
     // Clean up card payment state + listeners
     let stripeStore = useStripePaymentStore.getState();
+    // If reader is waiting for a card, cancel the payment on the terminal
+    if (stripeStore.cardStatus === "waitingForCard" || stripeStore.cardStatus === "initiating") {
+      let savedReader = localStorageWrapper.getItem("warpspeed_selected_card_reader");
+      if (savedReader?.id) {
+        newCheckoutCancelStripePayment(savedReader.id).catch((err) => log("clearReader on close error:", err));
+      }
+    }
     if (stripeStore._cardListeners) {
       stripeStore._cardListeners.unsubscribe();
       stripeStore._cardListeners = null;
@@ -1563,6 +1560,8 @@ export function NewCheckoutModalScreen() {
                     saleID={sSale?.id || ""}
                     customerID={sSale?.customerID || zCustomer?.id || ""}
                     customerEmail={zCustomer?.email || ""}
+                    saleSalesTax={sSale?.salesTax || 0}
+                    saleTotal={sSale?.total || 0}
                     onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
                     onCardProcessingEnd={() => _setCardProcessingAmount(0)}
                     onSwitchToManual={() => _setCardMode("manual")}
@@ -1921,7 +1920,7 @@ export function NewCheckoutModalScreen() {
 
                       <PaymentStatus
                         sale={sSale}
-                        amountRemaining={Math.max(0, (sSale?.total || 0) - (sSale?.amountCaptured || 0) + (sSale?.amountRefunded || 0))}
+                        amountRemaining={Math.max(0, (sSale?.total || 0) - (sSale?.amountCaptured || 0))}
                       />
 
               </View>

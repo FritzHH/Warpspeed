@@ -2036,6 +2036,35 @@ export function dbListenToOpenWorkorders(onSnapshot) {
   }
 }
 
+export function dbListenToActiveSales(onSnapshot) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbListenToActiveSales");
+      return null;
+    }
+    if (!onSnapshot || typeof onSnapshot !== "function") {
+      log("Error: onSnapshot callback function is required for dbListenToActiveSales");
+      return null;
+    }
+    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.ACTIVE_SALES}`;
+    const unsubscribe = firestoreSubscribeCollection(
+      collectionPath,
+      (salesData, error) => {
+        if (error) {
+          log("Active sales listener error", { tenantID, storeID, error });
+          return;
+        }
+        onSnapshot(salesData);
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    log("Error setting up active sales listener:", error);
+    return null;
+  }
+}
+
 /**
  * Listen to changes on a single workorder document
  * @param {string} workorderID

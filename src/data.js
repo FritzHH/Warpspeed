@@ -192,7 +192,8 @@ export const CUSTOMER_DEPOST_TYPES = {
   giftcard: 'giftcard',
 }
 export const CUSTOMER_DEPOSIT_PROTO = {
-  id: "",              // transaction ID
+  id: "",              // deposit ID
+  transactionId: "",   // ID of the transaction that funded this deposit
   amountCents: 0,      // current remaining balance (decremented on sale completion)
   reservedCents: 0,    // amount held by an in-progress checkout (not yet consumed)
   millis: 0,           // creation timestamp
@@ -407,7 +408,6 @@ export const WORKORDER_PROTO = {
   workorderNumber: "",
   hasNewSMS: false,
   paymentComplete: false,
-  amountPaid: 0,
   activeSaleID: "",
   endedOnMillis: "",
   paidOnMillis: "",

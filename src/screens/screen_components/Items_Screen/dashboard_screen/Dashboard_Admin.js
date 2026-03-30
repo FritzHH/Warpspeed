@@ -893,7 +893,6 @@ export function Dashboard_Admin({}) {
 
                     // 4. Strip all payment/sale fields from workorder
                     wo.paymentComplete = false;
-                    wo.amountPaid = 0;
                     wo.activeSaleID = "";
                     wo.saleID = "";
                     wo.endedOnMillis = "";

@@ -23,6 +23,7 @@ import {
   useSettingsStore,
   useTabNamesStore,
   useWorkorderPreviewStore,
+  useActiveSalesStore,
 } from "../../../stores";
 import { dbGetCustomer } from "../../../db_calls_wrapper";
 
@@ -152,6 +153,7 @@ export function WorkordersComponent({}) {
   const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zUsers = useSettingsStore((state) => state.settings?.users, deepEqual);
+  const zActiveSales = useActiveSalesStore((state) => state.activeSales);
 
   const [sSearchTerm, _setSearchTerm] = useState("");
 
@@ -477,11 +479,15 @@ export function WorkordersComponent({}) {
                         >
                           {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
                         </Text>
-                        {!!workorder.amountPaid && (
-                          <Text style={{ fontSize: 12, color: C.green, marginLeft: 6, fontWeight: "500" }}>
-                            {"Paid $" + formatCurrencyDisp(workorder.amountPaid)}
-                          </Text>
-                        )}
+                        {(() => {
+                          let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
+                          let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
+                          return paid > 0 ? (
+                            <Text style={{ fontSize: 12, color: C.green, marginLeft: 6, fontWeight: "500" }}>
+                              {"Paid $" + formatCurrencyDisp(paid)}
+                            </Text>
+                          ) : null;
+                        })()}
                         {!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID) && (
                           <Text style={{ fontSize: 12, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
                             Linked

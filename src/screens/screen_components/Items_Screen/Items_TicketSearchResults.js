@@ -12,6 +12,7 @@ import {
   useOpenWorkordersStore,
   useTabNamesStore,
   useCheckoutStore,
+  useActiveSalesStore,
 } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { C } from "../../../styles";
@@ -20,6 +21,7 @@ import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 export function Items_TicketSearchResults({}) {
   const zResults = useTicketSearchStore((state) => state.getResults());
   const zIsSearching = useTicketSearchStore((state) => state.getIsSearching());
+  const zActiveSales = useActiveSalesStore((state) => state.activeSales);
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
 
   function handleWorkorderPress(wo, isCompleted) {
@@ -99,11 +101,15 @@ export function Items_TicketSearchResults({}) {
           >
             {isPaid ? "PAID" : item.isCompleted ? "COMPLETED" : "OPEN"}
           </Text>
-          {wo.amountPaid > 0 && !wo.paymentComplete ? (
-            <Text style={{ fontSize: 11, color: C.orange, marginTop: 2 }}>
-              Partial: {formatCurrencyDisp(wo.amountPaid, true)}
-            </Text>
-          ) : null}
+          {(() => {
+            let sale = wo.activeSaleID ? zActiveSales.find((s) => s.id === wo.activeSaleID) : null;
+            let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
+            return paid > 0 && !wo.paymentComplete ? (
+              <Text style={{ fontSize: 11, color: C.orange, marginTop: 2 }}>
+                Partial: {formatCurrencyDisp(paid, true)}
+              </Text>
+            ) : null;
+          })()}
         </View>
       </View>
     );

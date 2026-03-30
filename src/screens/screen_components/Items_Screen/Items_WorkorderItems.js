@@ -42,6 +42,7 @@ import {
   useTabNamesStore,
   useLoginStore,
   useAlertScreenStore,
+  useActiveSalesStore,
 } from "../../../stores";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
@@ -68,6 +69,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   const zStatuses = useSettingsStore((state) => state.settings?.statuses, deepEqual);
 
   const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
+  const zActiveSales = useActiveSalesStore((state) => state.activeSales);
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
   const isLocked = isDonePaid;
@@ -626,7 +628,8 @@ export const Items_WorkorderItemsTab = ({}) => {
         />
 
         {(() => {
-          let paid = zOpenWorkorder?.amountPaid || 0;
+          let activeSale = zOpenWorkorder?.activeSaleID ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID) : null;
+          let paid = activeSale ? (activeSale.amountCaptured || 0) - (activeSale.amountRefunded || 0) : 0;
           let hasPayments = paid > 0;
           let remaining = hasPayments ? Math.max(0, sTotals.finalTotal - paid) : 0;
           return (
@@ -773,11 +776,11 @@ export const LineItemComponent = ({
           <View style={{ width: "100%" }}>
             {!!(workorderLine.discountObj?.name || workorderLine.discountObj?.discountName) && (
               <View style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text style={{ color: C.green, fontSize: 12, marginRight: 5 }}>
+                <Text style={{ color: C.lightred, fontSize: 12, marginRight: 5 }}>
                   {workorderLine.discountObj.name || workorderLine.discountObj.discountName}
                 </Text>
                 {!!workorderLine.discountObj?.savings && (
-                  <Text style={{ color: C.green, fontSize: 12 }}>
+                  <Text style={{ color: C.lightred, fontSize: 12 }}>
                     {"-$" + formatCurrencyDisp(workorderLine.discountObj.savings)}
                   </Text>
                 )}

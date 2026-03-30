@@ -407,6 +407,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
       const saleID = paymentIntent.metadata?.saleID;
       const customerID = paymentIntent.metadata?.customerID;
       const transactionID = paymentIntent.metadata?.transactionID;
+      const metadataSalesTax = parseInt(paymentIntent.metadata?.salesTax || "0", 10) || 0;
 
       if (!tenantID || !storeID) {
         throw new Error(
@@ -468,7 +469,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
                 millis: Date.now(),
                 amountCaptured: charge.amount_captured || 0,
                 amountTendered: 0,
-                salesTax: 0,
+                salesTax: metadataSalesTax,
                 last4: card?.last4 || "",
                 expMonth: card?.exp_month || "",
                 expYear: card?.exp_year || "",
@@ -486,7 +487,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
                 .collection("stores").doc(storeID)
                 .collection("transactions").doc(transactionID)
                 .set(txnDoc);
-              log("stripeCheckoutWebhook_Terminal: transaction written", { transactionID });
+              log("stripeCheckoutWebhook_Terminal: transaction written", { transactionID, salesTax: metadataSalesTax });
             } catch (txnError) {
               log("stripeCheckoutWebhook_Terminal: transaction write error", txnError.message);
             }
@@ -4019,7 +4020,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
   async (request) => {
     log("newCheckout: initiate payment intent request", request.data);
 
-    const { amount, readerID, paymentIntentID, tenantID, storeID, saleID, customerID, customerEmail, transactionID } = request.data;
+    const { amount, readerID, paymentIntentID, tenantID, storeID, saleID, customerID, customerEmail, transactionID, salesTax } = request.data;
 
     if (!amount || typeof amount !== "number") {
       throw new HttpsError(
@@ -4082,7 +4083,7 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
           payment_method_types: ["card_present"],
           capture_method: "automatic",
           currency: "usd",
-          metadata: { tenantID, storeID, saleID: saleID || "", customerID: customerID || "", transactionID: transactionID || "" },
+          metadata: { tenantID, storeID, saleID: saleID || "", customerID: customerID || "", transactionID: transactionID || "", salesTax: String(salesTax || 0) },
         };
         if (customerEmail) piParams.receipt_email = customerEmail;
         paymentIntent = await stripeClient.paymentIntents.create(piParams);
@@ -4173,35 +4174,42 @@ exports.newCheckoutProcessRefundCallable = onCall(
       // If transactionID provided, write refund to the transaction document
       let refundObj = null;
       if (transactionID && tenantID && storeID) {
-        try {
-          const db = await getDB(firebaseServiceAccountKey);
-          const txnRef = db.collection("tenants").doc(tenantID)
-            .collection("stores").doc(storeID)
-            .collection("transactions").doc(transactionID);
+        const db = await getDB(firebaseServiceAccountKey);
+        const txnRef = db.collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("transactions").doc(transactionID);
 
-          const txnSnap = await txnRef.get();
-          if (txnSnap.exists) {
-            const txnData = txnSnap.data();
-            refundObj = {
-              id: refundId || "",
-              transactionID,
-              amount: amount || refund.amount,
-              method: method || "card",
-              millis: Date.now(),
-              salesTax: salesTax || 0,
-              stripeRefundID: refund.id,
-              workorderLines: workorderLines || [],
-              notes: notes || "",
-            };
-            const refunds = txnData.refunds || [];
-            refunds.push(refundObj);
-            await txnRef.update({ refunds });
-          } else {
-            log("newCheckout: transaction not found for refund write:", transactionID);
+        const txnSnap = await txnRef.get();
+        if (txnSnap.exists) {
+          const txnData = txnSnap.data();
+          refundObj = {
+            id: refundId || "",
+            transactionID,
+            amount: amount || refund.amount,
+            method: method || "card",
+            millis: Date.now(),
+            salesTax: salesTax || 0,
+            stripeRefundID: refund.id,
+            workorderLines: workorderLines || [],
+            notes: notes || "",
+          };
+          const refunds = txnData.refunds || [];
+          refunds.push(refundObj);
+
+          // Retry Firestore write up to 3 times
+          let written = false;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              await txnRef.update({ refunds });
+              written = true;
+              break;
+            } catch (writeErr) {
+              log(`newCheckout: refund write attempt ${attempt}/3 failed:`, writeErr.message);
+            }
           }
-        } catch (txnError) {
-          log("newCheckout: error writing refund to transaction:", txnError);
-          // Don't throw — Stripe refund already succeeded
+          if (!written) log("newCheckout: refund write failed after 3 attempts", { transactionID, refundId });
+        } else {
+          log("newCheckout: transaction not found for refund write:", transactionID);
         }
       }
 
@@ -6303,6 +6311,24 @@ exports.getCustomerWorkorder = onRequest(
         filename: m.filename || "",
       }));
 
+      // Derive amountPaid from active sale or completed sale
+      let paidCents = 0;
+      const saleID = workorder.activeSaleID || workorder.saleID || "";
+      if (saleID) {
+        const salePaths = [
+          `tenants/${tenantID}/stores/${storeID}/active-sales/${saleID}`,
+          `tenants/${tenantID}/stores/${storeID}/completed-sales/${saleID}`,
+        ];
+        for (const salePath of salePaths) {
+          const saleSnap = await db.doc(salePath).get();
+          if (saleSnap.exists) {
+            const saleData = saleSnap.data();
+            paidCents = (saleData.amountCaptured || 0) - (saleData.amountRefunded || 0);
+            break;
+          }
+        }
+      }
+
       // Build response
       const payload = {
         storeName: settings?.storeInfo?.displayName || "",
@@ -6330,8 +6356,8 @@ exports.getCustomerWorkorder = onRequest(
         discount: formatCents(totals.discount),
         tax: formatCents(totals.tax),
         total: formatCents(totals.total),
-        amountPaid: formatCents(workorder.amountPaid || 0),
-        balanceDue: formatCents(totals.total - (workorder.amountPaid || 0)),
+        amountPaid: formatCents(paidCents),
+        balanceDue: formatCents(totals.total - paidCents),
         media,
         customerFirst: customer.first || workorder.customerFirst || "",
         customerLanguage: customer.language || "English",

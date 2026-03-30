@@ -572,22 +572,30 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
               )}
 
               {/* Payment status */}
-              {workorder.paymentComplete && (
-                <DetailRow
-                  label="Payment"
-                  value={"Paid - $" + formatCurrencyDisp(workorder.amountPaid)}
-                  valueColor={C.green}
-                  valueStyle={{ fontWeight: "600" }}
-                />
-              )}
-              {!workorder.paymentComplete && (workorder.amountPaid || 0) > 0 && (
-                <DetailRow
-                  label="Partial Paid"
-                  value={"$" + formatCurrencyDisp(workorder.amountPaid)}
-                  valueColor={C.orange}
-                  valueStyle={{ fontWeight: "600" }}
-                />
-              )}
+              {(() => {
+                let salePaid = sSales.reduce((sum, s) => sum + (s.amountCaptured || 0) - (s.amountRefunded || 0), 0);
+                if (workorder.paymentComplete) {
+                  return (
+                    <DetailRow
+                      label="Payment"
+                      value={"Paid - $" + formatCurrencyDisp(salePaid || totals.finalTotal)}
+                      valueColor={C.green}
+                      valueStyle={{ fontWeight: "600" }}
+                    />
+                  );
+                }
+                if (salePaid > 0) {
+                  return (
+                    <DetailRow
+                      label="Partial Paid"
+                      value={"$" + formatCurrencyDisp(salePaid)}
+                      valueColor={C.orange}
+                      valueStyle={{ fontWeight: "600" }}
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               {/* Media */}
               {mediaCount > 0 && (

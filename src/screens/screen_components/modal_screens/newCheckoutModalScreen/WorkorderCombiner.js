@@ -2,7 +2,7 @@
 import { memo } from "react";
 import { View, Text, ScrollView } from "react-native-web";
 import { C, Fonts, ICONS } from "../../../../styles";
-import { CheckBox_, Image_, Button_, DropdownMenu } from "../../../../components";
+import { CheckBox_, Image_, Button_, DropdownMenu, GradientView, Tooltip } from "../../../../components";
 import {
   formatCurrencyDisp,
   calculateRunningTotals,
@@ -194,175 +194,282 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                 return (
                   <View
                     key={line.id || lineIdx}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      backgroundColor: C.listItemWhite,
-                      paddingVertical: 2,
-                      marginBottom: 5,
-                      borderLeftWidth: 2,
-                      borderLeftColor: lightenRGBByPercent(C.green, 60),
-                      paddingLeft: 10,
-                      paddingRight: 10,
-                      borderRadius: 5,
-                    }}
+                    style={{ width: "100%" }}
                   >
-                    <View style={{ width: "65%", flexDirection: "row", alignItems: "center", overflow: "hidden" }}>
-                      <View style={{ flex: 1 }}>
-                        {discount > 0 && (
-                          <Text style={{ color: C.lightred, fontSize: 12 }}>
-                            {line.discountObj?.name}
-                          </Text>
-                        )}
-                        <Text
-                          numberOfLines={1}
-                          style={{
-                            fontSize: 14,
-                            color: C.text,
-                            fontWeight: "400",
-                          }}
-                        >
-                          {name}
-                        </Text>
-                        {line.intakeNotes ? (
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: gray(0.65),
-                              fontWeight: "500",
-                            }}
-                          >
-                            {line.intakeNotes}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
                     <View
                       style={{
-                        width: "35%",
                         flexDirection: "row",
-                        justifyContent: "flex-end",
+                        width: "100%",
                         alignItems: "center",
+                        backgroundColor: line.inventoryItem?.customLabor ? lightenRGBByPercent(C.blue, 80) : line.inventoryItem?.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
+                        paddingVertical: 3,
+                        paddingRight: 5,
+                        paddingLeft: 4,
+                        marginVertical: 3,
+                        borderColor: C.listItemBorder,
+                        borderLeftColor: line.discountObj?.name ? C.lightred : lightenRGBByPercent(C.green, 60),
+                        borderWidth: 1,
+                        borderRadius: 15,
+                        borderLeftWidth: 3,
                       }}
                     >
-                      {canEdit ? (
-                        <>
-                          <View style={{ flexDirection: "row", alignItems: "center" }}>
-                            <Button_
-                              onPress={() => modifyQty(wo, lineIdx, "up")}
-                              buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3 }}
-                              icon={ICONS.upArrowOrange}
-                              iconSize={23}
-                            />
-                            <Button_
-                              enabled={canQtyDown}
-                              onPress={() => modifyQty(wo, lineIdx, "down")}
-                              buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3, marginRight: 5, opacity: canQtyDown ? 1 : 0.25 }}
-                              icon={ICONS.downArrowOrange}
-                              iconSize={23}
-                            />
-                          </View>
-                          <Text
-                            style={{
-                              fontSize: 16,
-                              fontWeight: "500",
-                              color: C.text,
-                              width: 30,
-                              textAlign: "center",
-                              marginRight: 5,
-                            }}
-                          >
-                            {line.qty || 1}
-                          </Text>
-                          <View
-                            style={{
-                              alignItems: "flex-end",
-                              minWidth: 85,
-                              marginRight: 0,
-                              borderWidth: 1,
-                              borderRadius: 7,
-                              borderColor: C.listItemBorder,
-                              paddingRight: 2,
-                              backgroundColor: C.backgroundWhite,
-                              justifyContent: "center",
-                            }}
-                          >
-                            {(line.qty > 1 || line.discountObj?.newPrice) && (
-                              <Text style={{ color: C.text }}>
-                                {"$ " + formatCurrencyDisp(price)}
+                      <View
+                        style={{
+                          width: "60%",
+                          justifyContent: "center",
+                          flexDirection: "column",
+                        }}
+                      >
+                        <View style={{ width: "100%" }}>
+                          {!!(line.discountObj?.name || line.discountObj?.discountName) && (
+                            <View style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 6 }}>
+                              <Text style={{ color: C.lightred, fontSize: 12, marginRight: 5 }}>
+                                {line.discountObj.name || line.discountObj.discountName}
                               </Text>
-                            )}
-                            {discount > 0 && (
-                              <Text style={{ color: C.lightText }}>
-                                {"$ -" + formatCurrencyDisp(discount)}
-                              </Text>
-                            )}
-                            <Text style={{ fontWeight: "500", color: C.text }}>
-                              {line.discountObj?.newPrice
-                                ? "$ " + formatCurrencyDisp(line.discountObj.newPrice)
-                                : "$ " + formatCurrencyDisp(price * (line.qty || 1))}
-                            </Text>
-                          </View>
-                          <View style={{ flexDirection: "row", alignItems: "center" }}>
-                            {canDiscount && (
-                            <DropdownMenu
-                              buttonIcon={ICONS.dollarYellow}
-                              buttonIconSize={25}
-                              modalCoordY={25}
-                              modalCoordX={-80}
-                              buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
-                              dataArr={[
-                                { label: "No Discount" },
-                                ...discounts.map((o) => ({ label: o.name })),
-                              ]}
-                              onSelect={(item) => {
-                                if (item.label === "No Discount") {
-                                  handleDiscount(wo, line, null);
-                                } else {
-                                  handleDiscount(wo, line, discounts.find((o) => o.name === item.label));
-                                }
+                              {!!line.discountObj?.savings && (
+                                <Text style={{ color: C.lightred, fontSize: 12 }}>
+                                  {"-$" + formatCurrencyDisp(line.discountObj.savings)}
+                                </Text>
+                              )}
+                            </View>
+                          )}
+                          <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+                            <Text
+                              style={{
+                                fontSize: 15,
+                                color: C.text,
+                                fontWeight: "400",
+                                flex: 1,
                               }}
-                            />
-                            )}
-                            <Button_
-                              enabled={canDelete}
-                              onPress={() => deleteLine(wo, lineIdx)}
-                              icon={ICONS.trash}
-                              iconSize={21}
-                              buttonStyle={{ paddingRight: 2, marginLeft: canDiscount ? -8 : 0, opacity: canDelete ? 1 : 0.25 }}
-                            />
-                          </View>
-                        </>
-                      ) : (
-                        <>
-                          <Text
-                            style={{
-                              fontSize: 16,
-                              fontWeight: "500",
-                              color: C.text,
-                              width: 30,
-                              textAlign: "center",
-                            }}
-                          >
-                            {line.qty || 1}
-                          </Text>
-                          <View style={{ alignItems: "flex-end", minWidth: 80 }}>
-                            <Text>
-                              {"$ " + formatCurrencyDisp(price)}
+                              numberOfLines={2}
+                            >
+                              {line.inventoryItem?.formalName ? (
+                                <>
+                                  {(line.inventoryItem.customPart || line.inventoryItem.customLabor) && (
+                                    <Text style={{ fontSize: 13, fontWeight: "600", textTransform: "lowercase" }}>
+                                      {line.inventoryItem.customPart ? "custom part - " : "custom labor - "}
+                                    </Text>
+                                  )}
+                                  {line.inventoryItem.formalName}
+                                </>
+                              ) : name}
                             </Text>
-                            {discount > 0 && (
-                              <Text style={{ color: C.lightred }}>
-                                {"$ -" + formatCurrencyDisp(discount)}
-                              </Text>
-                            )}
-                            {discount > 0 && line.discountObj?.newPrice != null && (
-                              <Text style={{ fontWeight: "600", color: C.text }}>
-                                {formatCurrencyDisp(line.discountObj.newPrice)}
-                              </Text>
-                            )}
                           </View>
-                        </>
-                      )}
+                          {line.intakeNotes ? (
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: gray(0.65),
+                                fontWeight: "500",
+                              }}
+                            >
+                              {line.intakeNotes}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                      <View
+                        style={{
+                          width: "40%",
+                          flexDirection: "row",
+                          justifyContent: "flex-end",
+                          alignItems: "center",
+                          height: "100%",
+                        }}
+                      >
+                        {canEdit ? (
+                          <>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Button_
+                                onPress={() => modifyQty(wo, lineIdx, "up")}
+                                buttonStyle={{
+                                  backgroundColor: "transparent",
+                                  paddingHorizontal: 3,
+                                }}
+                                icon={ICONS.upArrowOrange}
+                                iconSize={23}
+                              />
+                              <Button_
+                                enabled={canQtyDown}
+                                onPress={() => modifyQty(wo, lineIdx, "down")}
+                                buttonStyle={{
+                                  backgroundColor: "transparent",
+                                  paddingHorizontal: 4,
+                                  opacity: canQtyDown ? 1 : 0.25,
+                                }}
+                                icon={ICONS.downArrowOrange}
+                                iconSize={23}
+                              />
+                              <GradientView
+                                style={{
+                                  marginLeft: 7,
+                                  borderRadius: 15,
+                                  width: 31,
+                                  height: 23,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 16,
+                                    fontWeight: "500",
+                                    textAlign: "center",
+                                    color: C.textWhite,
+                                    width: "100%",
+                                  }}
+                                >
+                                  {line.qty || 1}
+                                </Text>
+                              </GradientView>
+                            </View>
+                            <View
+                              style={{
+                                alignItems: "flex-end",
+                                minWidth: 85,
+                                marginHorizontal: 5,
+                                borderWidth: 1,
+                                borderRadius: 7,
+                                borderColor: C.listItemBorder,
+                                height: "100%",
+                                paddingRight: 2,
+                                backgroundColor: C.backgroundWhite,
+                                justifyContent: "center",
+                              }}
+                            >
+                              {(line.qty > 1 || line.discountObj?.newPrice) && (
+                                <Text
+                                  style={{
+                                    color: C.text,
+                                    textDecorationLine: line.discountObj?.newPrice ? "line-through" : "none",
+                                  }}
+                                >
+                                  {"$ " + formatCurrencyDisp(price)}
+                                </Text>
+                              )}
+                              <Text
+                                style={{
+                                  fontWeight: "500",
+                                  minWidth: 30,
+                                  color: C.text,
+                                }}
+                              >
+                                {line.discountObj?.newPrice
+                                  ? "$ " + formatCurrencyDisp(line.discountObj.newPrice)
+                                  : "$" + formatCurrencyDisp(price * (line.qty || 1))}
+                              </Text>
+                            </View>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                justifyContent: "flex-end",
+                                marginLeft: 4,
+                                alignItems: "center",
+                              }}
+                            >
+                              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                {canDiscount && (
+                                  <Tooltip text="Discounts" position="top">
+                                    <DropdownMenu
+                                      buttonIcon={ICONS.dollarYellow}
+                                      buttonIconSize={22}
+                                      modalCoordY={25}
+                                      modalCoordX={-100}
+                                      buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
+                                      dataArr={[
+                                        { label: "No Discount" },
+                                        ...discounts.map((o) => ({ label: o.name })),
+                                      ]}
+                                      onSelect={(item) => {
+                                        if (item.label === "No Discount") {
+                                          handleDiscount(wo, line, null);
+                                        } else {
+                                          handleDiscount(wo, line, discounts.find((o) => o.name === item.label));
+                                        }
+                                      }}
+                                    />
+                                  </Tooltip>
+                                )}
+                              </View>
+                              <Tooltip text="Remove" position="top">
+                                <Button_
+                                  enabled={canDelete}
+                                  onPress={() => deleteLine(wo, lineIdx)}
+                                  icon={ICONS.trash}
+                                  iconSize={21}
+                                  buttonStyle={{
+                                    paddingRight: 2,
+                                    marginLeft: canDiscount ? -8 : 0,
+                                    opacity: canDelete ? 1 : 0.25,
+                                  }}
+                                />
+                              </Tooltip>
+                            </View>
+                          </>
+                        ) : (
+                          <>
+                            <GradientView
+                              style={{
+                                borderRadius: 15,
+                                width: 31,
+                                height: 23,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: "500",
+                                  textAlign: "center",
+                                  color: C.textWhite,
+                                  width: "100%",
+                                }}
+                              >
+                                {line.qty || 1}
+                              </Text>
+                            </GradientView>
+                            <View
+                              style={{
+                                alignItems: "flex-end",
+                                minWidth: 85,
+                                marginHorizontal: 5,
+                                borderWidth: 1,
+                                borderRadius: 7,
+                                borderColor: C.listItemBorder,
+                                height: "100%",
+                                paddingRight: 2,
+                                backgroundColor: C.backgroundWhite,
+                                justifyContent: "center",
+                              }}
+                            >
+                              {(line.qty > 1 || line.discountObj?.newPrice) && (
+                                <Text
+                                  style={{
+                                    color: C.text,
+                                    textDecorationLine: line.discountObj?.newPrice ? "line-through" : "none",
+                                  }}
+                                >
+                                  {"$ " + formatCurrencyDisp(price)}
+                                </Text>
+                              )}
+                              <Text
+                                style={{
+                                  fontWeight: "500",
+                                  minWidth: 30,
+                                  color: C.text,
+                                }}
+                              >
+                                {line.discountObj?.newPrice
+                                  ? "$ " + formatCurrencyDisp(line.discountObj.newPrice)
+                                  : "$" + formatCurrencyDisp(price * (line.qty || 1))}
+                              </Text>
+                            </View>
+                          </>
+                        )}
+                      </View>
                     </View>
                   </View>
                 );

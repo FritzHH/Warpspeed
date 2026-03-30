@@ -1,8 +1,8 @@
 /* eslint-disable */
-import { View, Text, TextInput } from "react-native-web";
+import { View, Text, TextInput, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
-import { Button_ } from "../../../../components";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { Button_, SmallLoadingIndicator } from "../../../../components";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   usdTypeMask,
   formatCurrencyDisp,
@@ -19,6 +19,7 @@ export const CardRefund = memo(function CardRefund({
   onProcessRefund,
   onRefundStarted,
   onRefundFailed,
+  workorderLines = [],
   salesTaxPercent,
   refundComplete = false,
   suggestedAmount = 0,
@@ -115,6 +116,7 @@ export const CardRefund = memo(function CardRefund({
           refundId,
           method: "card",
           salesTax: salesTaxPercent > 0 ? Math.round(sRefundAmount * (salesTaxPercent / (100 + salesTaxPercent))) : 0,
+          workorderLines,
         }
       );
 
@@ -130,6 +132,7 @@ export const CardRefund = memo(function CardRefund({
             refundId: refundId,
             paymentId: selectedPayment.id,
             paymentIntentID: selectedPayment.paymentIntentID,
+            refundObj: result.data?.refundObj || null,
           });
         }
       } else {
@@ -246,36 +249,35 @@ export const CardRefund = memo(function CardRefund({
       </View>
 
       {/* Status Messages */}
-      {sErrorMessage ? (
-        <Text
-          style={{
-            fontSize: 11,
-            color: C.lightred,
-            fontStyle: "italic",
-            marginBottom: 4,
-          }}
-        >
-          {sErrorMessage}
-        </Text>
-      ) : null}
-      {sSuccessMessage ? (
-        <Text
-          style={{
-            fontSize: 11,
-            color: C.green,
-            fontStyle: "italic",
-            marginBottom: 4,
-          }}
-        >
-          {sSuccessMessage}
-        </Text>
-      ) : null}
+      <View style={{ minHeight: 28, justifyContent: "center", marginBottom: 4 }}>
+        {sProcessing && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <SmallLoadingIndicator color={C.orange} text="" message="" containerStyle={{ padding: 2 }} />
+            <Text style={{ fontSize: 12, color: gray(0.5), fontWeight: "600" }}>
+              {sSuccessMessage || "Processing refund..."}
+            </Text>
+          </View>
+        )}
+        {!sProcessing && !!sErrorMessage && (
+          <Text style={{ fontSize: 11, color: C.lightred, fontWeight: "600" }}>
+            {sErrorMessage}
+          </Text>
+        )}
+        {!sProcessing && !!sSuccessMessage && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Image source={ICONS.check} style={{ width: 14, height: 14, tintColor: C.green }} resizeMode="contain" />
+            <Text style={{ fontSize: 12, color: C.green, fontWeight: "600" }}>
+              {sSuccessMessage}
+            </Text>
+          </View>
+        )}
+      </View>
 
       {/* Button */}
       <Button_
         text={sProcessing ? "PROCESSING..." : "PROCESS CARD REFUND"}
         onPress={handleProcessRefund}
-        enabled={isEnabled && sRefundAmount >= 50}
+        enabled={isEnabled && sRefundAmount >= 50 && !sProcessing}
         colorGradientArr={COLOR_GRADIENTS.yellow}
         textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
         buttonStyle={{
@@ -283,7 +285,7 @@ export const CardRefund = memo(function CardRefund({
           borderRadius: 6,
           alignItems: "center",
           justifyContent: "center",
-          opacity: isEnabled && sRefundAmount >= 50 ? 1 : 0.4,
+          opacity: isEnabled && sRefundAmount >= 50 && !sProcessing ? 1 : 0.4,
         }}
       />
     </View>

@@ -3570,16 +3570,30 @@ export const DepositsList = ({ deposits, credits, onPress, onRemoveCredit }) => 
                   {formatMillisForDisplay(item.millis)}
                 </Text>
               </View>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text, marginRight: isCredit && onRemoveCredit ? 8 : 0 }}>
-                {"$" + formatCurrencyDisp(item.amountCents)}
-              </Text>
-              {isCredit && onRemoveCredit && (
-                <TouchableOpacity
-                  onPress={(e) => { e.stopPropagation(); _sSetConfirmId(item.id); }}
-                  style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 3, paddingHorizontal: 8 }}
-                >
-                  <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>Remove</Text>
-                </TouchableOpacity>
+              <View style={{ alignItems: "flex-end", marginRight: isCredit && onRemoveCredit ? 8 : 0 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                  {"$" + formatCurrencyDisp(item.amountCents)}
+                </Text>
+                {(item.reservedCents || 0) > 0 && (
+                  <Text style={{ fontSize: 10, color: C.orange, fontWeight: "600", marginTop: 1 }}>
+                    In use: {"$" + formatCurrencyDisp(item.reservedCents)}
+                  </Text>
+                )}
+                {(item.reservedCents || 0) > 0 && item.amountCents > item.reservedCents && (
+                  <Text style={{ fontSize: 10, color: C.green, fontWeight: "600", marginTop: 1 }}>
+                    Available: {"$" + formatCurrencyDisp(item.amountCents - item.reservedCents)}
+                  </Text>
+                )}
+              </View>
+              {isCredit && onRemoveCredit && !(item.reservedCents > 0) && (
+                <Tooltip text="This will remove the credit from the customer" position="left">
+                  <TouchableOpacity
+                    onPress={(e) => { e.stopPropagation(); _sSetConfirmId(item.id); }}
+                    style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 3, paddingHorizontal: 8 }}
+                  >
+                    <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>Remove</Text>
+                  </TouchableOpacity>
+                </Tooltip>
               )}
             </TouchableOpacity_>
           </View>

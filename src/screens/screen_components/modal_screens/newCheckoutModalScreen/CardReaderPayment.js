@@ -117,6 +117,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   saleID = "",
   customerID = "",
   customerEmail = "",
+  saleSalesTax = 0,
+  saleTotal = 0,
   onCardProcessingStart,
   onCardProcessingEnd,
   onSwitchToManual,
@@ -329,6 +331,11 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     if (onPaymentStarted) onPaymentStarted(transactionID);
 
     try {
+      // Pre-compute proportional salesTax so the webhook can write it directly
+      let proportionalTax = (saleTotal > 0 && saleSalesTax > 0)
+        ? Math.round(saleSalesTax * (sRequestedAmount / saleTotal))
+        : 0;
+
       let result = await newCheckoutProcessStripePayment(
         sRequestedAmount,
         activeReader.id,
@@ -336,7 +343,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
         saleID,
         customerID,
         customerEmail,
-        transactionID
+        transactionID,
+        proportionalTax
       );
 
       if (!result?.success) {
@@ -466,7 +474,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           paddingBottom: 20,
         }}
       >
-        <Text style={{ fontSize: 25, color: gray(0.6), fontWeight: 500 }}>
+        <Text style={{ fontSize: 25, color: C.blue, fontWeight: 500 }}>
           CARD SALE
         </Text>
         {!!readerError && (
@@ -524,7 +532,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           // paddingHorizontal: 30,
         }}
       >
-        <Text style={{ fontSize: 25, color: gray(0.6), fontWeight: 600, marginBottom: 8 }}>
+        <Text style={{ fontSize: 25, color: C.blue, fontWeight: 600, marginBottom: 8 }}>
           CARD SALE
         </Text>
         <View style={{ flex: 1, alignItems: "flex-end" }}>

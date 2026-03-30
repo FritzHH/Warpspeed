@@ -24,6 +24,7 @@ import {
   useTabNamesStore,
   useStripePaymentStore,
   useCurrentCustomerStore,
+  useActiveSalesStore,
   broadcastWorkorderToDisplay,
 } from "../stores";
 import {
@@ -43,6 +44,7 @@ import {
   dbListenToOpenWorkorders,
   dbListenToCurrentPunchClock,
   dbListenToInventory,
+  dbListenToActiveSales,
   dbGetCompletedSale,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
@@ -289,6 +291,10 @@ export function BaseScreen() {
     dbListenToInventory((data) => {
       useInventoryStore.getState().setItems(data);
       // log("inventory", data);
+    });
+
+    dbListenToActiveSales((data) => {
+      useActiveSalesStore.getState().setActiveSales(data);
     });
 
     // Recover any pending auto-text messages from localStorage (crash recovery)

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { View, Text, TextInput, FlatList, TouchableOpacity } from "react-native-web";
+import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import { TAB_NAMES, RECEIPT_TYPES, WORKORDER_PROTO } from "../../../data";
 import { cloneDeep } from "lodash";
 import {
@@ -16,8 +16,9 @@ import {
   ScreenModal,
   Tooltip,
 } from "../../../components";
+import { TicketSearchInput } from "../../../shared/TicketSearchInput";
 import {
-  generate12DigitBarcode,
+  generateEAN13Barcode,
   gray,
   formatCurrencyDisp,
   formatMillisForDisplay,
@@ -28,17 +29,12 @@ import {
   dbSavePrintObj,
   dbGetStandaloneActiveSales,
 } from "../../../db_calls_wrapper";
-import { executeTicketSearch } from "../../../shared/ticketSearch";
-import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 
 export const StandaloneSaleComponent = ({}) => {
   const zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
-  const [sTicketSearch, _setTicketSearch] = useState("");
-  const [sTicketSearching, _setTicketSearching] = useState(false);
   const [sActiveSales, _setActiveSales] = useState([]);
   const [sActiveSalesLoading, _setActiveSalesLoading] = useState(false);
   const [sShowActiveSalesModal, _setShowActiveSalesModal] = useState(false);
-  const [sFoundWorkorder, _setFoundWorkorder] = useState(null);
   const hasCheckedRef = useRef(false);
 
   let clearDisabled = !zOpenWorkorder
@@ -87,19 +83,6 @@ export const StandaloneSaleComponent = ({}) => {
   }
 
   //////////////////////////////////////////////////////////////////////
-
-  async function handleExecuteTicketSearch() {
-    _setTicketSearching(true);
-    try {
-      await executeTicketSearch(sTicketSearch, () => _setTicketSearch(""), {
-        onWorkorderFound: (wo) => _setFoundWorkorder(wo),
-      });
-    } finally {
-      _setTicketSearching(false);
-    }
-  }
-
-  //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   return (
     <View
@@ -110,61 +93,7 @@ export const StandaloneSaleComponent = ({}) => {
         alignItems: "center",
       }}
     >
-      {/* Ticket search input */}
-      <View style={{ width: "100%" }}>
-        <View
-          style={{
-            width: "100%",
-            paddingTop: 10,
-            paddingHorizontal: 20,
-            flexDirection: "row",
-            alignItems: "center",
-          }}
-        >
-          <TextInput
-            value={sTicketSearch}
-            placeholder={"Scan ticket or enter first 4 of barcode"}
-            placeholderTextColor={gray(0.35)}
-            onChangeText={(val) => _setTicketSearch(val)}
-            onSubmitEditing={() => handleExecuteTicketSearch()}
-            style={{
-              flex: 1,
-              caretColor: C.cursorRed,
-              color: C.text,
-              borderWidth: 1,
-              borderColor: gray(0.15),
-              borderRadius: 7,
-              height: 35,
-              outlineStyle: "none",
-              fontSize: 14,
-              paddingHorizontal: 10,
-              backgroundColor: C.listItemWhite,
-            }}
-          />
-          {sTicketSearching && (
-            <View style={{ marginLeft: 8 }}>
-              <SmallLoadingIndicator />
-            </View>
-          )}
-        </View>
-        {sTicketSearch.trim().length === 4 && /^\d{4}$/.test(sTicketSearch.trim()) && (
-          <View style={{ width: "100%", paddingHorizontal: 20, alignItems: "flex-end", marginTop: 3 }}>
-            <Button_
-              text={sTicketSearch.trim()[0] === "3" ? "Search Sales" : sTicketSearch.trim()[0] === "2" ? "Search Legacy" : sTicketSearch.trim()[0] === "1" ? "Search Workorders" : "Search"}
-              onPress={() => handleExecuteTicketSearch()}
-              buttonStyle={{
-                width: 150,
-                borderRadius: 5,
-                paddingVertical: 6,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                backgroundColor: C.buttonLightGreen,
-              }}
-              textStyle={{ fontSize: 11, color: C.text }}
-            />
-          </View>
-        )}
-      </View>
+      <TicketSearchInput />
 
       {/* Existing content */}
       <View
@@ -261,11 +190,6 @@ export const StandaloneSaleComponent = ({}) => {
         />
       )}
 
-      <ClosedWorkorderModal
-        workorder={sFoundWorkorder}
-        onClose={() => _setFoundWorkorder(null)}
-      />
-
       <Button_
         text="CLEAR SALE"
         onPress={() => {
@@ -274,7 +198,7 @@ export const StandaloneSaleComponent = ({}) => {
           if (!oldWo) return;
           store.removeWorkorder(oldWo.id);
           let wo = cloneDeep(WORKORDER_PROTO);
-          wo.id = generate12DigitBarcode();
+          wo.id = generateEAN13Barcode();
           wo.startedBy = useLoginStore.getState().currentUser?.id;
           wo.startedOnMillis = Date.now();
           store.setWorkorder(wo);

@@ -10,7 +10,7 @@ import {
   lightenRGBByPercent,
   log,
   resolveStatus,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
 } from "../../../utils";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
@@ -116,7 +116,7 @@ export function InventoryComponent({}) {
       if (/^\d{12,13}$/.test(searchTerm) && results.length === 0) {
         barcodeModalTimerRef.current = setTimeout(() => {
           let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-          newItem.id = generate12DigitBarcode();
+          newItem.id = generateEAN13Barcode();
           if (searchTerm.length === 12) newItem.upc = searchTerm;
           else newItem.ean = searchTerm;
           _setModalItem(newItem);
@@ -412,7 +412,7 @@ export function InventoryComponent({}) {
             useColorGradient={false}
             onPress={() => {
               let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-              newItem.id = generate12DigitBarcode();
+              newItem.id = generateEAN13Barcode();
               _setModalItem(newItem);
             }}
           />

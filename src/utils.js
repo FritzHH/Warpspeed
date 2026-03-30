@@ -1221,9 +1221,20 @@ export function ean13CheckDigit(first12) {
  * Generate a 12-digit crypto-random numeric ID.
  * @returns {string} 12-digit numeric string
  */
-export function generate12DigitBarcode() {
+export function generateEAN13Barcode() {
   const arr = crypto.getRandomValues(new Uint8Array(12));
-  return Array.from(arr, b => (b % 10).toString()).join('');
+  const digits = Array.from(arr, b => b % 10);
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += digits[i] * (i % 2 === 0 ? 1 : 3);
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return digits.join('') + String(checkDigit);
+}
+
+export function toUPCA(ean13) {
+  if (!ean13 || ean13.length !== 13) return ean13;
+  return ean13.slice(0, 11) + String(Math.floor(Math.random() * 10));
 }
 
 /**
@@ -1921,7 +1932,7 @@ export function createNewWorkorder({
   status,
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
-  wo.id = generate12DigitBarcode();
+  wo.id = generateEAN13Barcode();
   wo.workorderNumber = generateWorkorderNumber(wo.id);
   wo.status = status || SETTINGS_OBJ.statuses[0]?.id || "";
   wo.customerFirst = customerFirst || "";

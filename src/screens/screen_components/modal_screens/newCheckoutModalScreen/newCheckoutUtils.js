@@ -1,6 +1,6 @@
 import { cloneDeep } from "lodash";
 import {
-  generate12DigitBarcode,
+  generateEAN13Barcode,
   calculateRunningTotals,
   formatCurrencyDisp,
   log,
@@ -32,7 +32,7 @@ export function isLightspeedID(id) {
 
 export function createNewSale(settings, createdBy = "") {
   let sale = cloneDeep(SALE_PROTO);
-  sale.id = generate12DigitBarcode();
+  sale.id = generateEAN13Barcode();
   sale.millis = Date.now();
   sale.salesTaxPercent = settings?.salesTaxPercent || 0;
   sale.cardFee = 0;
@@ -153,7 +153,7 @@ export function recomputeSaleAmounts(sale, transactions, credits) {
 
 export function buildCashTransaction(amountCaptured, amountTendered, isCheck) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
-  transaction.id = generate12DigitBarcode();
+  transaction.id = generateEAN13Barcode();
   transaction.method = isCheck ? "check" : "cash";
   transaction.amountCaptured = amountCaptured;
   transaction.amountTendered = amountTendered;
@@ -166,7 +166,7 @@ export function buildCardTransaction(stripeChargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = stripeChargeData?.payment_method_details?.card_present;
 
-  transaction.id = transactionID || generate12DigitBarcode();
+  transaction.id = transactionID || generateEAN13Barcode();
   transaction.method = "card";
   transaction.amountCaptured = stripeChargeData.amount_captured || 0;
   transaction.cardIssuer = card?.receipt?.application_preferred_name || "Unknown";
@@ -189,7 +189,7 @@ export function buildManualCardTransaction(chargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = chargeData?.payment_method_details?.card;
 
-  transaction.id = transactionID || generate12DigitBarcode();
+  transaction.id = transactionID || generateEAN13Barcode();
   transaction.method = "card";
   transaction.amountCaptured = chargeData.amount_captured || 0;
   transaction.cardIssuer = card?.brand || "Unknown";
@@ -271,7 +271,7 @@ export function validateCardRefundAmount(requestedAmount, payment) {
 
 export function buildRefundObject(amount, transactionID, method, selectedLines, stripeRefundID, salesTax, notes) {
   let refund = cloneDeep(REFUND_PROTO);
-  refund.id = generate12DigitBarcode();
+  refund.id = generateEAN13Barcode();
   refund.transactionID = transactionID || "";
   refund.amount = amount;
   refund.method = method || "";

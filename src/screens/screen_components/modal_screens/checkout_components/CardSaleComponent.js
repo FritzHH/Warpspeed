@@ -23,7 +23,7 @@ import {
   usdTypeMask,
   dollarsToCents,
   extractStripeErrorMessage,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
 } from "../../../../utils";
 import { useEffect, useState } from "react";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
@@ -399,7 +399,7 @@ export const StripeCreditCardComponent = ({
             "Unknown";
           payment.cardType =
             paymentMethodDetails?.description || "Unknown Card";
-          payment.id = generate12DigitBarcode();
+          payment.id = generateEAN13Barcode();
           payment.type = sIsRefund ? "refund" : "payment";
           payment.millis = new Date().getTime();
           payment.authorizationCode =

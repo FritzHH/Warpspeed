@@ -8,7 +8,7 @@ import {
   formatMillisForDisplay,
   formatPhoneWithDashes,
   createNewWorkorder,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
   log,
@@ -335,7 +335,6 @@ export const ActiveWorkorderComponent = ({}) => {
       _settings?.salesTaxPercent,
       _ctx
     );
-    log("Print object:", JSON.stringify(toPrint, null, 2));
     dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
   }
 
@@ -1414,6 +1413,7 @@ export const ActiveWorkorderComponent = ({}) => {
             iconSize={35}
             iconStyle={{ paddingHorizontal: 0 }}
             buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
+            onPress={handleIntakePrintPress}
           />
         </Pressable_>
         <Tooltip text="New sale" position="top">

@@ -8,7 +8,7 @@ import { C, COLOR_GRADIENTS } from "../../../../styles";
 import {
   formatCurrencyDisp,
   gray,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
 } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import { INVENTORY_ITEM_PROTO } from "../../../../data";
@@ -93,7 +93,7 @@ export const InventorySearch = memo(function InventorySearch({
 
   function handleCreateNewItem() {
     let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-    newItem.id = generate12DigitBarcode();
+    newItem.id = generateEAN13Barcode();
     newItem.upc = sNotFoundBarcode;
     if (onOpenNewItemModal) onOpenNewItemModal(newItem);
     _setNotFoundBarcode("");

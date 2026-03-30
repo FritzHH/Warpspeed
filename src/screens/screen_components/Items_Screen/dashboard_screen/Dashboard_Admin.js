@@ -18,7 +18,7 @@ import {
   formatMillisForDisplay,
   // searchInventory moved to Web Worker
   generateTimesForListDisplay,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
   getDayOfWeekFrom0To7Input,
   log,
   gray,
@@ -772,7 +772,7 @@ export function Dashboard_Admin({}) {
 
                   const totals = calculateRunningTotals(workorder, settings?.salesTaxPercent, [], false, !!workorder.taxFree);
                   const fakeSale = {
-                    id: generate12DigitBarcode(),
+                    id: generateEAN13Barcode(),
                     millis: Date.now(),
                     subtotal: totals.runningSubtotal,
                     discount: totals.runningDiscount,
@@ -6047,7 +6047,7 @@ const ImportComponent = () => {
         const isLabor = descLower.includes("labor") || descLower.includes("install");
         const upc = (item["UPC"] || "").trim();
         const systemId = (item["System ID"] || "").trim();
-        const id = upc || systemId || generate12DigitBarcode();
+        const id = upc || systemId || generateEAN13Barcode();
         const isTube = desc.includes("TUBE ");
         const tubeCost = dollarsToCents(stripDollar(item["Default Cost"]));
         const price = isTube ? (tubeCost > 600 ? 1878 : 939) : dollarsToCents(stripDollar(item["Price"]));
@@ -6224,7 +6224,7 @@ const ImportComponent = () => {
         const descKey = (item.description || "").toLowerCase().trim();
         const retailPrice = invPriceMap[descKey];
         return {
-          id: item.itemID || crypto.randomUUID(),
+          id: generateEAN13Barcode(),
           formalName: item.description || "",
           informalName: "",
           brand: "",
@@ -6463,7 +6463,7 @@ const ImportComponent = () => {
         const descKey = (item.description || "").toLowerCase().trim();
         const retailPrice = invPriceMap[descKey];
         return {
-          id: item.itemID || crypto.randomUUID(),
+          id: generateEAN13Barcode(),
           formalName: item.description || "",
           informalName: "",
           brand: "",
@@ -7081,7 +7081,7 @@ const ImportComponent = () => {
         const descKey = (item.description || "").toLowerCase().trim();
         const retailPrice = invPriceMap[descKey];
         return {
-          id: item.itemID || crypto.randomUUID(),
+          id: generateEAN13Barcode(),
           formalName: item.description || "",
           informalName: "",
           brand: "",

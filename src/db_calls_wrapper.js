@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage, localStorageWrapper } from "./utils";
+import { log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage, localStorageWrapper, toUPCA } from "./utils";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
@@ -1288,7 +1288,6 @@ export async function dbSavePrintObj(printObj, printerID) {
       };
     }
 
-    printObj.id = crypto.randomUUID();
     printObj.timestamp = Date.now();
     const path = buildPrintObjectPath(
       tenantID,
@@ -1296,6 +1295,10 @@ export async function dbSavePrintObj(printObj, printerID) {
       printerID,
       printObj.id
     );
+    if (printObj.barcode) {
+      printObj.barcode = toUPCA(printObj.barcode);
+    }
+
     let cleanedPrintObj = removeEmptyFields(printObj);
 
     let stringifiedPrintObj = stringifyAllObjectFields(cleanedPrintObj);

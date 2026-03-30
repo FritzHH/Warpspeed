@@ -9,7 +9,7 @@ import {
   log,
   gray,
   localStorageWrapper,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
 } from "../../../../utils";
 import { useStripePaymentStore } from "../../../../stores";
 import { buildCardTransaction } from "./newCheckoutUtils";
@@ -324,7 +324,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     if (callbacksRef.current.onCardProcessingStart) callbacksRef.current.onCardProcessingStart(sRequestedAmount);
 
     // Pre-generate transaction ID so webhook can use it as the document ID
-    let transactionID = generate12DigitBarcode();
+    let transactionID = generateEAN13Barcode();
     pendingTransactionIDRef.current = transactionID;
 
     // Notify parent to add pending ID to sale before payment starts

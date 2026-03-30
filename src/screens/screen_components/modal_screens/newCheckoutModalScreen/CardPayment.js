@@ -3,7 +3,7 @@ import { View, Text, TextInput, Animated, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
 import { Button_, SHADOW_RADIUS_PROTO, SmallLoadingIndicator } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
-import { usdTypeMask, formatCurrencyDisp, log, gray, generate12DigitBarcode } from "../../../../utils";
+import { usdTypeMask, formatCurrencyDisp, log, gray, generateEAN13Barcode } from "../../../../utils";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "../../../../private_user_constants";
@@ -156,7 +156,7 @@ function CardPaymentForm({
 
       if (onCardProcessingStart) onCardProcessingStart(sRequestedAmount);
 
-      let transactionID = generate12DigitBarcode();
+      let transactionID = generateEAN13Barcode();
 
       // Notify parent to add pending ID to sale before payment starts
       if (onPaymentStarted) onPaymentStarted(transactionID);

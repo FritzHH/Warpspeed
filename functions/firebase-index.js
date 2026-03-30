@@ -2822,9 +2822,15 @@ function ean13CheckDigit(first12) {
   return (10 - (sum % 10)) % 10;
 }
 
-function generate12DigitBarcode() {
+function generateEAN13Barcode() {
   const arr = require('crypto').randomBytes(12);
-  return Array.from(arr, b => (b % 10).toString()).join('');
+  const digits = Array.from(arr, b => b % 10);
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += digits[i] * (i % 2 === 0 ? 1 : 3);
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return digits.join('') + String(checkDigit);
 }
 
 // ============================================================================
@@ -6768,7 +6774,7 @@ exports.rehydrateFromArchive = onCall(
 // ============================================================================
 
 function generateSaleID() {
-  return generate12DigitBarcode();
+  return generateEAN13Barcode();
 }
 
 // Helper: calculate workorder totals server-side
@@ -7552,7 +7558,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
 
         // ── Build payment object (mirrors PAYMENT_OBJECT_PROTO) ──
         const payment = {
-          id: generate12DigitBarcode(),
+          id: generateEAN13Barcode(),
           type: "payment",
           method: "card",
           amountCaptured: charge.amount_captured,

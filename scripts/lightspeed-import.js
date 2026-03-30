@@ -92,12 +92,6 @@ function ean13CheckDigit(first12) {
   return (10 - (sum % 10)) % 10;
 }
 
-function generate12DigitBarcode(prefix) {
-  const millis = Date.now().toString();
-  const timePart = millis.slice(-8);
-  const randomPart = Math.floor(100 + Math.random() * 900).toString();
-  return prefix + timePart + randomPart;
-}
 
 function buildLightspeedEAN13(prefix2digit, lsID) {
   let padded = String(lsID).padStart(10, "0");

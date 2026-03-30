@@ -8,7 +8,7 @@ import {
   formatCurrencyDisp,
   log,
   gray,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
 } from "../../../../utils";
 import { useSettingsStore } from "../../../../stores";
 import { newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
@@ -101,7 +101,7 @@ export const CardRefund = memo(function CardRefund({
 
     try {
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
-      let refundId = generate12DigitBarcode();
+      let refundId = generateEAN13Barcode();
 
       // Persist pending refund marker before calling Cloud Function (crash recovery)
       if (onRefundStarted) onRefundStarted({ refundId, transactionID: selectedPayment.id, amount: sRefundAmount });

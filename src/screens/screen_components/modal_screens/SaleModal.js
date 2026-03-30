@@ -41,8 +41,9 @@ const SectionHeader = ({ text }) => (
 
 // ─── Main Modal ─────────────────────────────────────────
 
-export const SaleModal = () => {
-  const sale = useOpenWorkordersStore((s) => s.saleModalObj);
+export const SaleModal = ({ sale: saleProp, onClose: onCloseProp } = {}) => {
+  const storeSale = useOpenWorkordersStore((s) => s.saleModalObj);
+  const sale = saleProp || storeSale;
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
 
@@ -55,7 +56,8 @@ export const SaleModal = () => {
   const isVoided = !!sale?.voidedByRefund;
 
   function handleClose() {
-    useOpenWorkordersStore.getState().setSaleModalObj(null);
+    if (onCloseProp) onCloseProp();
+    else useOpenWorkordersStore.getState().setSaleModalObj(null);
   }
 
   function handleRefund() {
@@ -297,7 +299,10 @@ export const SaleModal = () => {
                     return (
                       <TouchableOpacity
                         key={wo.id}
-                        onPress={() => _sSetClosedWorkorder(wo)}
+                        onPress={() => {
+                          handleClose();
+                          setTimeout(() => _sSetClosedWorkorder(wo), 50);
+                        }}
                         style={{
                           marginBottom: 4,
                           borderRadius: 6,

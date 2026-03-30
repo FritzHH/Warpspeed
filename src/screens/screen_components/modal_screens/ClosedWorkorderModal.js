@@ -17,6 +17,7 @@ import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
 import { dbGetCompletedSale, dbSavePrintObj } from "../../../db_calls_wrapper";
 import { printBuilder } from "../../../utils";
 import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { SaleModal } from "./SaleModal";
 
 // ─── Helper display components ──────────────────────────────────
 
@@ -55,7 +56,7 @@ const SectionHeader = ({ text }) => (
 
 // ─── Sale Card ──────────────────────────────────────────────────
 
-const SaleCard = ({ sale, transactions = [], onRefund }) => {
+const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
   const payments = transactions;
   const credits = sale.creditsApplied || [];
   const allRefunds = transactions.flatMap((t) => (t.refunds || []).map((r) => ({ ...r, _parentMethod: t.method })));
@@ -63,7 +64,9 @@ const SaleCard = ({ sale, transactions = [], onRefund }) => {
   const hasRefunds = totalRefunded > 0;
 
   return (
-    <View
+    <TouchableOpacity
+      onPress={() => onPress && onPress(sale)}
+      activeOpacity={onPress ? 0.7 : 1}
       style={{
         borderRadius: 7,
         borderWidth: 1,
@@ -200,7 +203,7 @@ const SaleCard = ({ sale, transactions = [], onRefund }) => {
           </View>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -267,6 +270,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
   const [sTransactionsMap, _sSetTransactionsMap] = useState({});
   const [sLoadingSales, _sSetLoadingSales] = useState(false);
   const [sShowChangeLog, _sSetShowChangeLog] = useState(false);
+  const [sSaleForModal, _sSetSaleForModal] = useState(null);
 
   // Fetch associated sales when workorder opens
   useEffect(() => {
@@ -348,6 +352,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
   }
 
   return (
+  <>
     <Modal visible={true} transparent={true} animationType="fade">
       <View
         style={{
@@ -805,7 +810,16 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
               ) : sSales.length > 0 ? (
                 <ScrollView style={{ flex: 1, maxHeight: 300 }}>
                   {sSales.map((sale) => (
-                    <SaleCard key={sale.id} sale={sale} transactions={sTransactionsMap[sale.id] || []} onRefund={handleRefund} />
+                    <SaleCard
+                      key={sale.id}
+                      sale={sale}
+                      transactions={sTransactionsMap[sale.id] || []}
+                      onRefund={handleRefund}
+                      onPress={(s) => {
+                        let enriched = { ...s, _transactions: sTransactionsMap[s.id] || [] };
+                        _sSetSaleForModal(enriched);
+                      }}
+                    />
                   ))}
                 </ScrollView>
               ) : (
@@ -818,5 +832,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
         </View>
       </View>
     </Modal>
+    <SaleModal sale={sSaleForModal} onClose={() => _sSetSaleForModal(null)} />
+  </>
   );
 };

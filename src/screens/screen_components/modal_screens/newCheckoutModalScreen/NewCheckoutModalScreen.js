@@ -29,7 +29,7 @@ import {
   findTemplateByType,
   resolveStatus,
   usdTypeMask,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
   createNewWorkorder,
   localStorageWrapper,
 } from "../../../../utils";
@@ -902,7 +902,7 @@ export function NewCheckoutModalScreen() {
     // Create the deposit and add to customer
     let primaryPayment = localTxns[0];
     let newDeposit = { ...CUSTOMER_DEPOSIT_PROTO };
-    newDeposit.id = generate12DigitBarcode();
+    newDeposit.id = generateEAN13Barcode();
     newDeposit.transactionId = primaryPayment?.id || "";
     newDeposit.amountCents = depositInfo.amountCents;
     newDeposit.millis = Date.now();

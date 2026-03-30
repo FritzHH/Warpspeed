@@ -14,7 +14,7 @@ import {
   formatCurrencyDisp,
   formatMillisForDisplay,
   formatPhoneWithDashes,
-  generate12DigitBarcode,
+  generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
   removeDashesFromPhone,
@@ -582,8 +582,12 @@ export const CustomerInfoScreenModalComponent = ({
               onPress={() => loadSales()}
               enabled={!sSalesLoading}
             />
-            {sSalesLoading && <LoadingOverlay text="Loading sales..." />}
-            {!sSalesLoading && sSales.length > 0 && (
+            {sSalesLoading ? (
+              <View style={{ alignItems: "center", paddingVertical: 15 }}>
+                <SmallLoadingIndicator />
+                <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 6 }}>Loading sales...</Text>
+              </View>
+            ) : sSales.length > 0 ? (
               <ScrollView style={{ flexShrink: 1 }}>
                 <SalesList
                   sales={sSales}
@@ -591,14 +595,11 @@ export const CustomerInfoScreenModalComponent = ({
                   onSelect={(sale) => useOpenWorkordersStore.getState().setSaleModalObj(sale)}
                 />
               </ScrollView>
-            )}
-            {!sSalesLoading &&
-              sSales.length === 0 &&
-              (sCustomerInfo.sales || []).length === 0 && (
-                <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
-                  No sales on file
-                </Text>
-              )}
+            ) : (sCustomerInfo.sales || []).length === 0 ? (
+              <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
+                No sales on file
+              </Text>
+            ) : null}
             {/* Deposits section — directly below sales, pushes down until bottom */}
             <DepositsList
               deposits={sCustomerInfo.deposits || []}
@@ -629,7 +630,7 @@ export const CustomerInfoScreenModalComponent = ({
           }}
           onCredit={({ amountCents, text }) => {
             let credit = { ...CUSTOMER_CREDIT_PROTO };
-            credit.id = generate12DigitBarcode();
+            credit.id = generateEAN13Barcode();
             credit.text = text;
             credit.amountCents = amountCents;
             credit.millis = Date.now();

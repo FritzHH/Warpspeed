@@ -19,7 +19,7 @@ import {
   dbSearchSalesByIdPrefix,
   dbCrossStoreSearchByID,
 } from "../db_calls_wrapper";
-import { readActiveSale } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { readActiveSale, readTransaction } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 export function showTicketAlert(message) {
   useAlertScreenStore.getState().setValues({
@@ -74,11 +74,12 @@ export async function executeTicketSearch(searchText, onComplete, options) {
   if (!trimmed) return;
   const onWorkorderFound = options?.onWorkorderFound;
   const onCompletedWorkorderFound = options?.onCompletedWorkorderFound;
+  const onTransactionFound = options?.onTransactionFound;
 
   try {
     const store = useOpenWorkordersStore.getState();
     const openWOs = store.getWorkorders();
-    const isFullBarcode = /^\d{12}$/.test(trimmed);
+    const isFullBarcode = /^\d{13}$/.test(trimmed);
     const isWoNumber = /^\d{5}$/.test(trimmed);
     const isFirst4 = /^\d{4}$/.test(trimmed);
 
@@ -96,6 +97,9 @@ export async function executeTicketSearch(searchText, onComplete, options) {
       // 4. Completed sales
       let completedSale = await dbGetCompletedSale(trimmed);
       if (completedSale) { openSale(completedSale, true); if (onComplete) onComplete(); return; }
+      // 4.5. Transactions
+      let txn = await readTransaction(trimmed);
+      if (txn) { if (onTransactionFound) onTransactionFound(txn); if (onComplete) onComplete(); return; }
       // 5. Cross-store fallback
       let crossResult = await dbCrossStoreSearchByID(trimmed);
       if (crossResult) {
@@ -139,7 +143,7 @@ export async function executeTicketSearch(searchText, onComplete, options) {
       return;
     }
 
-    showTicketAlert("Enter a 12-digit barcode, 5-digit WO #, or first 4 digits");
+    showTicketAlert("Enter a 13-digit barcode, 5-digit WO #, or first 4 digits");
   } catch (err) {
     log("Ticket search error:", err);
     showTicketAlert("Search error — please try again");

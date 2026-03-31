@@ -9,6 +9,7 @@ import {
   formatCurrencyDisp,
   gray,
   generateEAN13Barcode,
+  normalizeBarcode,
 } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import { INVENTORY_ITEM_PROTO } from "../../../../data";
@@ -66,12 +67,13 @@ export const InventorySearch = memo(function InventorySearch({
       return;
     }
 
-    // Check for exact barcode match (12-digit scan)
+    // Check for exact barcode match (12 or 13-digit scan)
     let trimmed = val.trim();
-    if (/^\d{12}$/.test(trimmed)) {
-      let exactMatch = inventory.find(
-        (item) => item.upc === trimmed || item.id === trimmed
-      );
+    if (/^\d{12,13}$/.test(trimmed)) {
+      let normalized = normalizeBarcode(trimmed);
+      let exactMatch = normalized
+        ? inventory.find((item) => item.id === normalized || item.primaryBarcode === normalized || (item.barcodes || []).includes(normalized))
+        : inventory.find((item) => item.id === trimmed);
       if (exactMatch) {
         onAddItem(exactMatch);
         _setSearchString("");
@@ -93,8 +95,9 @@ export const InventorySearch = memo(function InventorySearch({
 
   function handleCreateNewItem() {
     let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-    newItem.id = generateEAN13Barcode();
-    newItem.upc = sNotFoundBarcode;
+    let barcode = normalizeBarcode(sNotFoundBarcode) || generateEAN13Barcode();
+    newItem.id = barcode;
+    newItem.primaryBarcode = barcode;
     if (onOpenNewItemModal) onOpenNewItemModal(newItem);
     _setNotFoundBarcode("");
   }

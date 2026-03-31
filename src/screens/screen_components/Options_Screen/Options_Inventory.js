@@ -11,6 +11,7 @@ import {
   log,
   resolveStatus,
   generateEAN13Barcode,
+  normalizeBarcode,
 } from "../../../utils";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
@@ -91,6 +92,12 @@ export function InventoryComponent({}) {
   ///////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////
 
+  function findInventoryItem(barcode) {
+    let item = zInventoryArr.find((i) => i.id === barcode);
+    if (item) return item;
+    return zInventoryArr.find((i) => (i.barcodes || []).includes(barcode));
+  }
+
   function search(searchTerm) {
     _setSearchTerm(searchTerm);
     if (!searchTerm || searchTerm.length === 0) {
@@ -116,9 +123,9 @@ export function InventoryComponent({}) {
       if (/^\d{12,13}$/.test(searchTerm) && results.length === 0) {
         barcodeModalTimerRef.current = setTimeout(() => {
           let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-          newItem.id = generateEAN13Barcode();
-          if (searchTerm.length === 12) newItem.upc = searchTerm;
-          else newItem.ean = searchTerm;
+          let barcode = normalizeBarcode(searchTerm) || generateEAN13Barcode();
+          newItem.id = barcode;
+          newItem.primaryBarcode = barcode;
           _setModalItem(newItem);
         }, 1500);
       }
@@ -144,7 +151,7 @@ export function InventoryComponent({}) {
     // Resolve inventory items from IDs
     let items = [];
     buttonObj.items?.forEach((id) => {
-      let item = zInventoryArr.find((i) => i.id === id);
+      let item = findInventoryItem(id);
       if (item) items.push(item);
     });
     let hasItems = items.length > 0;
@@ -412,7 +419,9 @@ export function InventoryComponent({}) {
             useColorGradient={false}
             onPress={() => {
               let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-              newItem.id = generateEAN13Barcode();
+              let barcode = generateEAN13Barcode();
+              newItem.id = barcode;
+              newItem.primaryBarcode = barcode;
               _setModalItem(newItem);
             }}
           />

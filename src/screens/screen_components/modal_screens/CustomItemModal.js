@@ -11,7 +11,7 @@ import {
   generateEAN13Barcode,
 } from "../../../utils";
 import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
-import { DISCOUNT_TYPES } from "../../../constants";
+
 import { useSettingsStore } from "../../../stores";
 import { cloneDeep } from "lodash";
 
@@ -29,7 +29,7 @@ export const CustomItemModal = ({
   const isEditing = !!existingLine;
 
   const [sName, _setName] = useState("");
-  const [sPriceDisplay, _setPriceDisplay] = useState("0.00");
+  const [sPriceDisplay, _setPriceDisplay] = useState("");
   const [sPriceCents, _setPriceCents] = useState(0);
   const [sMinutes, _setMinutes] = useState("");
   const [sIntakeNotes, _setIntakeNotes] = useState("");
@@ -53,7 +53,7 @@ export const CustomItemModal = ({
       _setPriceManuallySet(true);
     } else {
       _setName("");
-      _setPriceDisplay("0.00");
+      _setPriceDisplay("");
       _setPriceCents(0);
       _setMinutes("");
       _setIntakeNotes("");
@@ -102,6 +102,10 @@ export const CustomItemModal = ({
   }
 
   function handleDiscountSelect(item) {
+    if (item._customDiscount) {
+      _setDiscountObj(item._customDiscount);
+      return;
+    }
     if (item.label === "No Discount") {
       _setDiscountObj(null);
       return;
@@ -119,9 +123,11 @@ export const CustomItemModal = ({
     invItem.customLabor = isLabor;
     invItem.customPart = !isLabor;
     invItem.minutes = isLabor ? Number(sMinutes) || 0 : 0;
-    invItem.id = isEditing
+    let barcode = isEditing
       ? existingLine.inventoryItem.id
       : generateEAN13Barcode();
+    invItem.id = barcode;
+    invItem.primaryBarcode = barcode;
 
     // Build the workorder line
     let line = isEditing ? cloneDeep(existingLine) : cloneDeep(WORKORDER_ITEM_PROTO);
@@ -376,7 +382,11 @@ export const CustomItemModal = ({
                 color: sDiscountObj ? C.lightred : gray(0.5),
                 fontSize: 14,
               }}
-              modalCoordY={25}
+              enabled={sPriceCents > 0}
+              isDiscountMenu={true}
+              discountMaxCents={sPriceCents}
+              modalCoordY={-175}
+              // modalCoordX={20}
               dataArr={[
                 { label: "No Discount" },
                 ...(zDiscounts || []).map((o) => ({ label: o.name })),

@@ -230,7 +230,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           let newLine = { ...line, qty: overrideQty };
           if (newLine.discountObj?.name) {
             let discounted = applyDiscountToWorkorderItem(newLine);
-            if (discounted.discountObj?.newPrice > 0) return discounted;
+            if (discounted.discountObj?.newPrice != null) return discounted;
           }
           return newLine;
         });
@@ -995,12 +995,12 @@ export const LineItemComponent = ({
               justifyContent: "center",
             }}
           >
-            {(effectiveQty > 1 || workorderLine.discountObj?.newPrice) && (
+            {(effectiveQty > 1 || workorderLine.discountObj?.newPrice != null) && (
               <Text
                 style={{
                   paddingHorizontal: 0,
                   color: C.text,
-                  textDecorationLine: workorderLine.discountObj?.newPrice ? "line-through" : "none",
+                  textDecorationLine: workorderLine.discountObj?.newPrice != null ? "line-through" : "none",
                 }}
               >
                 {"$ " +
@@ -1020,7 +1020,7 @@ export const LineItemComponent = ({
                 color: C.text,
               }}
             >
-              {workorderLine.discountObj?.newPrice
+              {workorderLine.discountObj?.newPrice != null
                 ? "$ " + formatCurrencyDisp(workorderLine.discountObj?.newPrice)
                 : "$" +
                   formatCurrencyDisp(
@@ -1055,13 +1055,17 @@ export const LineItemComponent = ({
                 modalCoordY={25}
                   modalCoordX={-100}
                 enabled={!isLocked && !hasActiveSale}
+                isDiscountMenu={true}
+                discountMaxCents={workorderLine.inventoryItem.price * (workorderLine.qty || 1)}
                 buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
                 dataArr={[
                   { label: "No Discount" },
                   ...(zSettingsObj.discounts || []).map((o) => ({ label: o.name })),
                 ]}
                 onSelect={(item) => {
-                  if (item.label === "No Discount") {
+                  if (item._customDiscount) {
+                    applyDiscount(workorderLine, item._customDiscount);
+                  } else if (item.label === "No Discount") {
                     __setWorkorderLineItem({ ...workorderLine, discountObj: null });
                   } else {
                     applyDiscount(

@@ -96,7 +96,7 @@ export function applyLineItemDiscounts(wo, zInventoryArr) {
     if (discountObj.name) {
       let newDiscountObj = applyDiscountToWorkorderItem(newWOLine);
       // clog(newDiscountObj);
-      if (Number(newDiscountObj.newPrice) > 0) {
+      if (newDiscountObj.newPrice != null) {
         newWOLine.discountObj = cloneDeep(newDiscountObj);
         // log("here");
       }
@@ -1156,8 +1156,7 @@ export function applyDiscountToWorkorderItem(
   let savings;
 
   if (discountObj.type === DISCOUNT_TYPES.percent) {
-    let multiplier = discountObj.value;
-    multiplier = 1 - Number("." + multiplier);
+    let multiplier = 1 - Number(discountObj.value) / 100;
     newPrice =
       workorderLineObj.inventoryItem.price * workorderLineObj.qty * multiplier;
     savings =
@@ -1230,6 +1229,52 @@ export function generateEAN13Barcode() {
   }
   const checkDigit = (10 - (sum % 10)) % 10;
   return digits.join('') + String(checkDigit);
+}
+
+function calculateCheckDigit(digits) {
+  let sum = 0;
+  for (let i = 0; i < digits.length; i++) {
+    sum += Number(digits[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
+function isValidCheckDigit(barcode) {
+  let body = barcode.slice(0, -1);
+  let expected = calculateCheckDigit(body);
+  return barcode[barcode.length - 1] === expected;
+}
+
+export function normalizeBarcode(input) {
+  if (!input) return null;
+  let stripped = input.replace(/\s/g, "");
+  if (/\D/.test(stripped)) {
+    console.log("[normalizeBarcode] contains non-numeric characters — input: " + input);
+    return null;
+  }
+  let len = stripped.length;
+  if (len < 11 || len > 13) {
+    console.log("[normalizeBarcode] invalid length (" + len + ") — input: " + input);
+    return null;
+  }
+  if (len === 11) {
+    let check = calculateCheckDigit(stripped);
+    let upc12 = stripped + check;
+    return "0" + upc12;
+  }
+  if (len === 12) {
+    if (!isValidCheckDigit(stripped)) {
+      console.log("[normalizeBarcode] invalid check digit — input: " + input);
+      return null;
+    }
+    return "0" + stripped;
+  }
+  // len === 13
+  if (!isValidCheckDigit(stripped)) {
+    console.log("[normalizeBarcode] invalid check digit — input: " + input);
+    return null;
+  }
+  return stripped;
 }
 
 export function toUPCA(ean13) {

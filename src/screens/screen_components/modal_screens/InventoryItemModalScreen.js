@@ -575,14 +575,55 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
               {renderField("Cost", "cost", { currency: true, flex: 1, last: true })}
             </View>
 
-            {/* SKU / Barcode row */}
-            <View style={{ flexDirection: "row", marginTop: 4 }}>
-              {renderField("UPC", "upc", { flex: 1 })}
-              {renderField("EAN", "ean", { flex: 1, last: true })}
-            </View>
-            <View style={{ flexDirection: "row", marginTop: 4 }}>
-              {renderField("Custom SKU", "customSku", { flex: 1 })}
-              {renderField("Manufacturer SKU", "manufacturerSku", { flex: 1, last: true })}
+            {/* Barcode */}
+            {renderField("Primary Barcode", "primaryBarcode")}
+
+            {/* Additional Barcodes */}
+            <View style={{ marginTop: 8 }}>
+              <Text style={labelStyle}>Additional Barcodes</Text>
+              {(sItem.barcodes || []).map((code, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                  {sEditing ? (
+                    <TextInput
+                      style={{ ...inputStyle, flex: 1 }}
+                      value={code}
+                      onChangeText={(v) => {
+                        let updated = [...(sItem.barcodes || [])];
+                        updated[i] = v;
+                        handleFieldChange("barcodes", updated);
+                      }}
+                    />
+                  ) : (
+                    <Text style={{ ...valueStyle, flex: 1 }}>{code}</Text>
+                  )}
+                  {sEditing && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        let updated = (sItem.barcodes || []).filter((_, idx) => idx !== i);
+                        handleFieldChange("barcodes", updated);
+                      }}
+                      style={{ padding: 4, marginLeft: 6 }}
+                    >
+                      <Image_ icon={ICONS.trash} size={16} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              {sEditing && (
+                <TouchableOpacity
+                  onPress={() => {
+                    let updated = [...(sItem.barcodes || []), ""];
+                    handleFieldChange("barcodes", updated);
+                  }}
+                  style={{ marginTop: 6, flexDirection: "row", alignItems: "center" }}
+                >
+                  <Image_ icon={ICONS.add} size={20} style={{ tintColor: C.green }} />
+                  <Text style={{ fontSize: 13, color: C.green, marginLeft: 4 }}>Add Barcode</Text>
+                </TouchableOpacity>
+              )}
+              {!sEditing && (sItem.barcodes || []).length === 0 && (
+                <Text style={valueStyle}>-</Text>
+              )}
             </View>
             </View>
 
@@ -701,24 +742,6 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                 <Image_ icon={ICONS.trash} size={40} />
               </TouchableOpacity>
             )}
-            {isNew && (() => {
-              let canSave = !!(sItem.formalName && sItem.formalName.trim() && sItem.price > 0);
-              return (
-                <TouchableOpacity
-                  onPress={canSave ? handleSaveNewItem : undefined}
-                  activeOpacity={canSave ? 0.2 : 1}
-                  style={{
-                    paddingHorizontal: 20,
-                    paddingVertical: 10,
-                    borderRadius: 6,
-                    backgroundColor: C.green,
-                    opacity: canSave ? 1 : 0.35,
-                  }}
-                >
-                  <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Save</Text>
-                </TouchableOpacity>
-              );
-            })()}
             <TouchableOpacity
               onPress={handleExit}
               style={{ padding: 6, borderRadius: 6 }}

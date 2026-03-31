@@ -23,7 +23,7 @@ import { formatCurrencyDisp, formatMillisForDisplay, gray, ifNumIsOdd, lightenRG
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
 import { SETTINGS_OBJ, PRIVILEDGE_LEVELS, CUSTOMER_DEPOST_TYPES } from "./data";
 import { cloneDeep } from "lodash";
-import { DEBOUNCE_DELAY, LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "./constants";
+import { DEBOUNCE_DELAY, DISCOUNT_TYPES, LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "./constants";
 import {
   useInventoryStore,
   useInvModalStore,
@@ -526,7 +526,7 @@ export const ScreenModal = ({
     //   useLoginStore.getState().setModalVisible(false);
     // };
   });
-  if (!openUpward && !centerMenuVertically && modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
+  // if (!openUpward && !centerMenuVertically && modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
   // log("ref in ScreenModal", ref);
   useEffect(() => {
     const el = ref ? ref.current : null;
@@ -623,6 +623,40 @@ export const ScreenModal = ({
   );
 };
 
+const CustomDiscountInput = ({ label, onApply, maxLength = 3, maxVal }) => {
+  const [val, setVal] = useState("");
+  const submit = () => {
+    const num = Number(val);
+    if (!num) return;
+    setVal("");
+    onApply(num);
+  };
+  return (
+    <View onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", flex: 1, height: "100%" }}>
+      <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 6 }}>{label}</Text>
+      <TextInput
+        value={val}
+        placeholder="0"
+        placeholderTextColor={gray(0.3)}
+        maxLength={maxLength}
+        onChangeText={(v) => {
+          let cleaned = v.replace(/[^0-9]/g, "");
+          if (maxVal && Number(cleaned) > maxVal) cleaned = String(maxVal);
+          setVal(cleaned);
+        }}
+        onSubmitEditing={submit}
+        style={{ width: 50, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 13, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
+      />
+      <Button_
+        icon={ICONS.check1}
+        iconSize={14}
+        onPress={submit}
+        buttonStyle={{ marginLeft: 6, backgroundColor: "transparent", borderWidth: 0, padding: 4 }}
+      />
+    </View>
+  );
+};
+
 export const DropdownMenu = ({
   enabled,
   dataArr = [],
@@ -650,12 +684,41 @@ export const DropdownMenu = ({
   openUpward = false,
   menuMaxHeight,
   centerMenuVertically = false,
+  isDiscountMenu = false,
+  discountMaxCents = 0,
 }) => {
   const [sModalVisible, _setModalVisible] = useState(false);
   const ref = useRef();
+
+  const _maxDollars = discountMaxCents ? Math.floor(discountMaxCents / 100) : 999;
+  const _discountRows = isDiscountMenu ? [
+    { component: <View style={{ height: 1, backgroundColor: gray(0.15), width: "100%" }} />, _isDivider: true },
+    {
+      _isCustomInput: true,
+      component: (
+        <CustomDiscountInput label="Custom %" maxLength={3} maxVal={100} onApply={(num) => {
+          _setModalVisible(false);
+          onSelect({ _customDiscount: { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true } });
+        }} />
+      ),
+    },
+    {
+      _isCustomInput: true,
+      component: (
+        <CustomDiscountInput label="Custom $" maxLength={String(_maxDollars).length} maxVal={_maxDollars} onApply={(num) => {
+          _setModalVisible(false);
+          const cents = num * 100;
+          onSelect({ _customDiscount: { id: "custom_" + Date.now(), name: "$" + num + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true } });
+        }} />
+      ),
+    },
+  ] : [];
+
+  const _fullDataArr = [...dataArr, ..._discountRows];
+  const _dividerCount = _fullDataArr.filter((i) => i._isDivider).length;
   const calculatedMenuHeight = menuMaxHeight
-    ? Math.min(dataArr.length * 40, menuMaxHeight)
-    : dataArr.length * 40;
+    ? Math.min((_fullDataArr.length - _dividerCount) * 40 + _dividerCount, menuMaxHeight)
+    : (_fullDataArr.length - _dividerCount) * 40 + _dividerCount;
 
   const BUTTON_STYLE = {
     // width: "100%",
@@ -721,7 +784,7 @@ export const DropdownMenu = ({
         }}
       >
         <FlatList
-          data={dataArr}
+          data={_fullDataArr}
           ItemSeparatorComponent={() => (
             <View
               style={{
@@ -733,6 +796,34 @@ export const DropdownMenu = ({
           renderItem={(item) => {
             let idx = item.index;
             item = item.item;
+
+            if (item.component) {
+              return (
+                <View
+                  style={{
+                    height: item._isDivider ? 1 : 40,
+                    borderRadius: 0,
+                    backgroundColor: item._isDivider ? "transparent" : lightenRGBByPercent(C.blue, 60),
+                    borderTopLeftRadius:
+                      idx == 0 ? menuButtonStyle.borderRadius : null,
+                    borderTopRightRadius:
+                      idx == 0 ? menuButtonStyle.borderRadius : null,
+                    borderBottomLeftRadius:
+                      idx == _fullDataArr.length - 1
+                        ? menuButtonStyle.borderRadius
+                        : null,
+                    borderBottomRightRadius:
+                      idx == _fullDataArr.length - 1
+                        ? menuButtonStyle.borderRadius
+                        : null,
+                    ...itemStyle,
+                  }}
+                >
+                  {item.component}
+                </View>
+              );
+            }
+
             return (
               <Button_
                 mouseOverOptions={mouseOverOptions}
@@ -749,11 +840,11 @@ export const DropdownMenu = ({
                   borderTopRightRadius:
                     idx == 0 ? menuButtonStyle.borderRadius : null,
                   borderBottomLeftRadius:
-                    idx == dataArr.length - 1
+                    idx == _fullDataArr.length - 1
                       ? menuButtonStyle.borderRadius
                       : null,
                   borderBottomRightRadius:
-                    idx == dataArr.length - 1
+                    idx == _fullDataArr.length - 1
                       ? menuButtonStyle.borderRadius
                       : null,
                   ...itemStyle,
@@ -1211,10 +1302,10 @@ export const InventoryItemScreeenModalComponent = ({
               autoFocus={zFocus === INPUT_FIELD_NAMES.upc}
               onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.upc)}
               style={{ fontSize: 12, color: "black", marginTop: 0 }}
-              value={sItem.upc}
+              value={sItem.primaryBarcode}
               onChangeText={(val) => {
                 let newItem = cloneDeep(sItem);
-                newItem.upc = val;
+                newItem.primaryBarcode = val;
                 handleChangeItem(newItem, INPUT_FIELD_NAMES.upc);
               }}
             />

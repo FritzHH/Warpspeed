@@ -37,7 +37,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
     }
     if (newLine.discountObj?.name) {
       let recalc = applyDiscountToWorkorderItem(newLine);
-      if (recalc.discountObj?.newPrice > 0) newLine = recalc;
+      if (recalc.discountObj?.newPrice != null) newLine = recalc;
     }
     onLineChange(wo.id, replaceOrAddToArr(wo.workorderLines, newLine));
   }
@@ -374,11 +374,11 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                 justifyContent: "center",
                               }}
                             >
-                              {(line.qty > 1 || line.discountObj?.newPrice) && (
+                              {(line.qty > 1 || line.discountObj?.newPrice != null) && (
                                 <Text
                                   style={{
                                     color: C.text,
-                                    textDecorationLine: line.discountObj?.newPrice ? "line-through" : "none",
+                                    textDecorationLine: line.discountObj?.newPrice != null ? "line-through" : "none",
                                   }}
                                 >
                                   {"$ " + formatCurrencyDisp(price)}
@@ -391,7 +391,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                   color: C.text,
                                 }}
                               >
-                                {line.discountObj?.newPrice
+                                {line.discountObj?.newPrice != null
                                   ? "$ " + formatCurrencyDisp(line.discountObj.newPrice)
                                   : "$" + formatCurrencyDisp(price * (line.qty || 1))}
                               </Text>
@@ -412,13 +412,17 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                       buttonIconSize={22}
                                       modalCoordY={25}
                                       modalCoordX={-100}
+                                      isDiscountMenu={true}
+                                      discountMaxCents={line.inventoryItem.price * (line.qty || 1)}
                                       buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
                                       dataArr={[
                                         { label: "No Discount" },
                                         ...discounts.map((o) => ({ label: o.name })),
                                       ]}
                                       onSelect={(item) => {
-                                        if (item.label === "No Discount") {
+                                        if (item._customDiscount) {
+                                          handleDiscount(wo, line, item._customDiscount);
+                                        } else if (item.label === "No Discount") {
                                           handleDiscount(wo, line, null);
                                         } else {
                                           handleDiscount(wo, line, discounts.find((o) => o.name === item.label));
@@ -478,11 +482,11 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                 justifyContent: "center",
                               }}
                             >
-                              {(line.qty > 1 || line.discountObj?.newPrice) && (
+                              {(line.qty > 1 || line.discountObj?.newPrice != null) && (
                                 <Text
                                   style={{
                                     color: C.text,
-                                    textDecorationLine: line.discountObj?.newPrice ? "line-through" : "none",
+                                    textDecorationLine: line.discountObj?.newPrice != null ? "line-through" : "none",
                                   }}
                                 >
                                   {"$ " + formatCurrencyDisp(price)}
@@ -495,7 +499,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                   color: C.text,
                                 }}
                               >
-                                {line.discountObj?.newPrice
+                                {line.discountObj?.newPrice != null
                                   ? "$ " + formatCurrencyDisp(line.discountObj.newPrice)
                                   : "$" + formatCurrencyDisp(price * (line.qty || 1))}
                               </Text>

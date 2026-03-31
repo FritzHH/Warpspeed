@@ -522,6 +522,78 @@ var printBuilder = {
 
     return receipt;
   },
+  transaction: function (txn, context) {
+    var _ctx = context || {};
+    var _settings = _ctx.settings || {};
+    var currentUser = _ctx.currentUser || {};
+
+    var receipt = Object.assign({}, RECEIPT_PROTO);
+    receipt.receiptType = RECEIPT_TYPES.transaction;
+    receipt.id = txn.id;
+    receipt.barcode = txn.id;
+    receipt.transactionOnly = true;
+    receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
+    receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
+    receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
+
+    // User who printed
+    var userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
+    var userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
+    receipt.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
+
+    // Payment method
+    receipt.paymentMethod = (txn.method || "card").toUpperCase();
+
+    // Amounts (all in cents)
+    receipt.amountCaptured = txn.amountCaptured || 0;
+    receipt.total = txn.amountCaptured || 0;
+    receipt.subtotal = txn.amountCaptured || 0;
+    receipt.tax = txn.salesTax || 0;
+    receipt.salesTaxPercent = _settings.salesTaxPercent || 0;
+
+    // Cash fields
+    receipt.amountTendered = txn.amountTendered || 0;
+    var cashChange = txn.method === "cash" && txn.amountTendered > txn.amountCaptured
+      ? txn.amountTendered - txn.amountCaptured : 0;
+    receipt.cashChangeGiven = cashChange;
+    receipt.cashChangeGivenDisplay = cashChange ? "$" + (cashChange / 100).toFixed(2) : "";
+    receipt.popCashRegister = false;
+
+    // Card fields
+    receipt.cardType = txn.cardType || "";
+    receipt.last4 = txn.last4 || "";
+    receipt.expMonth = txn.expMonth || "";
+    receipt.expYear = txn.expYear || "";
+    receipt.authorizationCode = txn.authorizationCode || "";
+    receipt.cardIssuer = txn.cardIssuer || "";
+    receipt.chargeID = txn.chargeID || "";
+    receipt.paymentIntentID = txn.paymentIntentID || "";
+    receipt.networkTransactionID = txn.networkTransactionID || "";
+    receipt.receiptURL = txn.receiptURL || "";
+    receipt.paymentProcessor = txn.paymentProcessor || "";
+
+    // Single payment entry for the receipt renderer
+    receipt.payments = [{
+      method: txn.method || "card",
+      paymentType: txn.method === "cash" ? "Cash" : txn.method === "check" ? "Check" : "Card",
+      amountCaptured: txn.amountCaptured || 0,
+      amountTendered: txn.amountTendered || 0,
+      cardType: txn.cardType || "",
+      last4: txn.last4 || "",
+    }];
+
+    // Refunds
+    var refunds = txn.refunds || [];
+    receipt.refunds = refunds;
+    receipt.totalRefunded = refunds.reduce(function (s, r) { return s + (r.amount || 0); }, 0);
+
+    // Timestamp
+    var txDate = txn.millis ? new Date(Number(txn.millis)) : new Date();
+    receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    receipt.dateTime = receipt.transactionDateTime;
+
+    return receipt;
+  },
 };
 
 module.exports = {

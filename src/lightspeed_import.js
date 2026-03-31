@@ -1,4 +1,4 @@
-import { buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex, hexToRgb } from "./utils";
+import { buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex, hexToRgb, normalizeBarcode, generateEAN13Barcode } from "./utils";
 import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES, TAX_FREE_RECEIPT_NOTE, APP_USER, TIME_PUNCH_PROTO } from "./data";
 
 // ============================================================================
@@ -497,6 +497,13 @@ export function mapWorkorders(
     const workorderLines = woItems.map(wi => {
       const item = itemMap[wi.itemID] || null;
 
+      const rawUpc = item ? (item.upc || "") : "";
+      const rawEan = item ? (item.ean || "") : "";
+      const normUpc = normalizeBarcode(rawUpc);
+      const normEan = normalizeBarcode(rawEan);
+      const isNativeEan = normEan && !normEan.startsWith("0");
+      const primaryBarcode = (isNativeEan ? normEan : null) || normUpc || generateEAN13Barcode();
+      const barcodes = [normEan, normUpc].filter(c => c && c !== primaryBarcode);
       const inventoryItem = {
         id: item ? item.itemID : crypto.randomUUID(),
         formalName: item ? (item.description || "Unknown Item") : "Unknown Item",
@@ -506,10 +513,8 @@ export function mapWorkorders(
         salePrice: 0,
         cost: item ? dollarsToCents(item.avgCost || item.defaultCost) : 0,
         category: item && item.itemType === "non_inventory" ? "Labor" : "Part",
-        upc: item ? (item.upc || "") : "",
-        ean: item ? (item.ean || "") : "",
-        customSku: item ? (item.customSku || "") : "",
-        manufacturerSku: item ? (item.manufacturerSku || "") : "",
+        primaryBarcode,
+        barcodes,
         customPart: false,
         customLabor: false,
         minutes: 0,

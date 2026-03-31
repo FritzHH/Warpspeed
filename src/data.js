@@ -319,6 +319,7 @@ export const DISCOUNT_OBJ_PROTO = {
   id: "",
   newPrice: 0,
   savings: 0,
+  custom: false
 };
 
 export const TRANSACTION_PROTO = {
@@ -533,10 +534,8 @@ export const INVENTORY_ITEM_PROTO = {
   category: "Part",
   id: "",
   cost: "",
-  upc: "",
-  ean: "",
-  customSku: "",
-  manufacturerSku: "",
+  primaryBarcode: "",
+  barcodes: [],
   minutes: 0,
   customPart: false,
   customLabor: false,
@@ -1179,6 +1178,7 @@ export const RECEIPT_TYPES = {
   intake: "Intake",
   register: "pop-register",
   test: "Test",
+  transaction: 'Transaction'
 };
 
 export const RECEIPT_PROTO = {

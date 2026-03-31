@@ -19,6 +19,7 @@ import {
   // searchInventory moved to Web Worker
   generateTimesForListDisplay,
   generateEAN13Barcode,
+  normalizeBarcode,
   getDayOfWeekFrom0To7Input,
   log,
   gray,
@@ -6040,14 +6041,28 @@ const ImportComponent = () => {
 
       const toImport = [];
       const skipped = [];
+      let invalidCheckDigits = 0;
       for (const item of activeItems) {
         const desc = item["Description"] || "";
         if (desc.includes("Discontinued")) continue;
         const descLower = desc.toLowerCase();
         const isLabor = descLower.includes("labor") || descLower.includes("install");
-        const upc = (item["UPC"] || "").trim();
+        const rawUpc = (item["UPC"] || "").trim();
+        const rawEan = (item["EAN"] || "").trim();
         const systemId = (item["System ID"] || "").trim();
-        const id = upc || systemId || generateEAN13Barcode();
+        const normEan = normalizeBarcode(rawEan);
+        const normUpc = normalizeBarcode(rawUpc);
+        if (rawEan && !normEan) invalidCheckDigits++;
+        if (rawUpc && !normUpc) invalidCheckDigits++;
+        // Primary: native EAN-13 (non-leading-0) > padded UPC-A > random
+        const isNativeEan = normEan && !normEan.startsWith("0");
+        const primaryBarcode = (isNativeEan ? normEan : null) || normUpc || generateEAN13Barcode();
+        // Collect all unique normalized barcodes (excluding primary)
+        const barcodes = [];
+        for (const code of [normEan, normUpc]) {
+          if (code && code !== primaryBarcode && !barcodes.includes(code)) barcodes.push(code);
+        }
+        const id = primaryBarcode;
         const isTube = desc.includes("TUBE ");
         const tubeCost = dollarsToCents(stripDollar(item["Default Cost"]));
         const price = isTube ? (tubeCost > 600 ? 1878 : 939) : dollarsToCents(stripDollar(item["Price"]));
@@ -6060,10 +6075,8 @@ const ImportComponent = () => {
           salePrice: 0,
           cost: dollarsToCents(stripDollar(item["Default Cost"])),
           category: isLabor ? "Labor" : "Part",
-          upc: upc,
-          ean: (item["EAN"] || "").trim(),
-          customSku: (item["Custom SKU"] || "").trim(),
-          manufacturerSku: (item["Manufact. SKU"] || "").trim(),
+          primaryBarcode,
+          barcodes,
           minutes: 0,
           customPart: false,
           customLabor: false,
@@ -6087,56 +6100,56 @@ const ImportComponent = () => {
         if (aGroup !== bGroup) return aGroup - bGroup;
         return a.formalName.localeCompare(b.formalName);
       });
-      console.log("[Inventory Import] " + toImport.length + " items to import, " + skipped.length + " skipped (no price). Writing to Firestore...");
+      console.log("[Inventory Import] " + toImport.length + " items to import, " + skipped.length + " skipped (no price), " + invalidCheckDigits + " invalid check digits.");
 
       await dbBatchWrite(toImport, "inventory", (done, total) => {
         console.log("[Inventory Import] inventory: " + done + "/" + total + " written.");
       });
 
-      // Download inventory_imported.csv
-      {
-        toImport.sort((a, b) => {
-          const aName = a.formalName.toLowerCase();
-          const bName = b.formalName.toLowerCase();
-          const aGroup = aName.includes("labor") ? 0 : aName.includes("part") ? 1 : 2;
-          const bGroup = bName.includes("labor") ? 0 : bName.includes("part") ? 1 : 2;
-          if (aGroup !== bGroup) return aGroup - bGroup;
-          return a.formalName.localeCompare(b.formalName);
-        });
-        const esc = (v) => '"' + String(v || "").replace(/"/g, '""') + '"';
-        const csvHeader = "Category,Description,Price,Cost,UPC,EAN,Custom SKU,Manufact. SKU";
-        const csvRows = toImport.map(item =>
-          [item.category, esc(item.formalName), (item.price / 100).toFixed(2), (item.cost / 100).toFixed(2), esc(item.upc), esc(item.ean), esc(item.customSku), esc(item.manufacturerSku)].join(",")
-        );
-        const csvContent = csvHeader + "\n" + csvRows.join("\n");
-        const blob = new Blob([csvContent], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "inventory_imported.csv";
-        a.click();
-        URL.revokeObjectURL(url);
-        console.log("[Inventory Import] inventory_imported.csv downloaded (" + toImport.length + " items).");
-      }
+      // // Download inventory_imported.csv
+      // {
+      //   toImport.sort((a, b) => {
+      //     const aName = a.formalName.toLowerCase();
+      //     const bName = b.formalName.toLowerCase();
+      //     const aGroup = aName.includes("labor") ? 0 : aName.includes("part") ? 1 : 2;
+      //     const bGroup = bName.includes("labor") ? 0 : bName.includes("part") ? 1 : 2;
+      //     if (aGroup !== bGroup) return aGroup - bGroup;
+      //     return a.formalName.localeCompare(b.formalName);
+      //   });
+      //   const esc = (v) => '"' + String(v || "").replace(/"/g, '""') + '"';
+      //   const csvHeader = "Category,Description,Price,Cost,Primary Barcode,Other Barcodes";
+      //   const csvRows = toImport.map(item =>
+      //     [item.category, esc(item.formalName), (item.price / 100).toFixed(2), (item.cost / 100).toFixed(2), esc(item.primaryBarcode), esc(item.barcodes.join("; "))].join(",")
+      //   );
+      //   const csvContent = csvHeader + "\n" + csvRows.join("\n");
+      //   const blob = new Blob([csvContent], { type: "text/csv" });
+      //   const url = URL.createObjectURL(blob);
+      //   const a = document.createElement("a");
+      //   a.href = url;
+      //   a.download = "inventory_imported.csv";
+      //   a.click();
+      //   URL.revokeObjectURL(url);
+      //   console.log("[Inventory Import] inventory_imported.csv downloaded (" + toImport.length + " items).");
+      // }
 
-      if (skipped.length > 0) {
-        console.log("[Inventory Import] Generating CSV for " + skipped.length + " skipped items...");
-        const csvHeader = "Group,Description,Price,Cost,UPC,EAN,Custom SKU,Manufact. SKU";
-        const csvRows = skipped.map(item => {
-          const group = item.formalName.toLowerCase().includes("labor") ? "Labor" : item.formalName.toLowerCase().includes("part") ? "Part" : "Other";
-          const esc = (v) => '"' + String(v || "").replace(/"/g, '""') + '"';
-          return [group, esc(item.formalName), item.price, item.cost, esc(item.upc), esc(item.ean), esc(item.customSku), esc(item.manufacturerSku)].join(",");
-        });
-        const csvContent = csvHeader + "\n" + csvRows.join("\n");
-        const blob = new Blob([csvContent], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "inventory_skipped_items.csv";
-        a.click();
-        URL.revokeObjectURL(url);
-        console.log("[Inventory Import] Skipped items CSV downloaded.");
-      }
+      // if (skipped.length > 0) {
+      //   console.log("[Inventory Import] Generating CSV for " + skipped.length + " skipped items...");
+      //   const csvHeader = "Group,Description,Price,Cost,Primary Barcode,Other Barcodes";
+      //   const csvRows = skipped.map(item => {
+      //     const group = item.formalName.toLowerCase().includes("labor") ? "Labor" : item.formalName.toLowerCase().includes("part") ? "Part" : "Other";
+      //     const esc = (v) => '"' + String(v || "").replace(/"/g, '""') + '"';
+      //     return [group, esc(item.formalName), item.price, item.cost, esc(item.primaryBarcode), esc((item.barcodes || []).join("; "))].join(",");
+      //   });
+      //   const csvContent = csvHeader + "\n" + csvRows.join("\n");
+      //   const blob = new Blob([csvContent], { type: "text/csv" });
+      //   const url = URL.createObjectURL(blob);
+      //   const a = document.createElement("a");
+      //   a.href = url;
+      //   a.download = "inventory_skipped_items.csv";
+      //   a.click();
+      //   URL.revokeObjectURL(url);
+      //   console.log("[Inventory Import] Skipped items CSV downloaded.");
+      // }
 
       console.log("[Inventory Import] Complete. " + toImport.length + " imported, " + skipped.length + " skipped.");
       _setLsResult("Inventory Import: " + toImport.length + " imported, " + skipped.length + " skipped (no price)");
@@ -6232,10 +6245,8 @@ const ImportComponent = () => {
           salePrice: 0,
           cost: dollarsToCents(item.avgCost || item.defaultCost),
           category: isLabor ? "Labor" : "Part",
-          upc: item.upc || "",
-          ean: item.ean || "",
-          customSku: item.customSku || "",
-          manufacturerSku: item.manufacturerSku || "",
+          primaryBarcode: normalizeBarcode(item.upc) || normalizeBarcode(item.ean) || generateEAN13Barcode(),
+          barcodes: [normalizeBarcode(item.upc), normalizeBarcode(item.ean)].filter(Boolean),
           minutes: 0,
           customPart: false,
           customLabor: false,
@@ -6471,10 +6482,8 @@ const ImportComponent = () => {
           salePrice: 0,
           cost: dollarsToCents(item.avgCost || item.defaultCost),
           category: isLabor ? "Labor" : "Part",
-          upc: item.upc || "",
-          ean: item.ean || "",
-          customSku: item.customSku || "",
-          manufacturerSku: item.manufacturerSku || "",
+          primaryBarcode: normalizeBarcode(item.upc) || normalizeBarcode(item.ean) || generateEAN13Barcode(),
+          barcodes: [normalizeBarcode(item.upc), normalizeBarcode(item.ean)].filter(Boolean),
           minutes: 0,
           customPart: false,
           customLabor: false,
@@ -6514,8 +6523,8 @@ const ImportComponent = () => {
       await writeCsvToDir(dirHandle, "_import_transactions.csv", buildCsvString(txnHeaders, txnRows));
 
       // _import_inventory.csv
-      const invHeaders = ["id", "formalName", "informalName", "brand", "price", "salePrice", "cost", "category", "upc", "ean", "customSku", "manufacturerSku", "minutes", "customPart", "customLabor"];
-      const invRows = filteredInventory.map(i => [i.id, i.formalName, i.informalName, i.brand, i.price, i.salePrice, i.cost, i.category, i.upc, i.ean, i.customSku, i.manufacturerSku, i.minutes, i.customPart, i.customLabor]);
+      const invHeaders = ["id", "formalName", "informalName", "brand", "price", "salePrice", "cost", "category", "primaryBarcode", "barcodes", "minutes", "customPart", "customLabor"];
+      const invRows = filteredInventory.map(i => [i.id, i.formalName, i.informalName, i.brand, i.price, i.salePrice, i.cost, i.category, i.primaryBarcode, JSON.stringify(i.barcodes || []), i.minutes, i.customPart, i.customLabor]);
       await writeCsvToDir(dirHandle, "_import_inventory.csv", buildCsvString(invHeaders, invRows));
 
       // _import_employees.csv
@@ -7089,10 +7098,8 @@ const ImportComponent = () => {
           salePrice: 0,
           cost: dollarsToCents(item.avgCost || item.defaultCost),
           category: isLabor ? "Labor" : "Part",
-          upc: item.upc || "",
-          ean: item.ean || "",
-          customSku: item.customSku || "",
-          manufacturerSku: item.manufacturerSku || "",
+          primaryBarcode: normalizeBarcode(item.upc) || normalizeBarcode(item.ean) || generateEAN13Barcode(),
+          barcodes: [normalizeBarcode(item.upc), normalizeBarcode(item.ean)].filter(Boolean),
           minutes: 0,
           customPart: false,
           customLabor: false,

@@ -8,6 +8,9 @@ import {
 } from "../../../utils";
 import { C, ICONS } from "../../../styles";
 import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
+import { useSettingsStore, useLoginStore } from "../../../stores";
+import { printBuilder, log } from "../../../utils";
+import { dbSavePrintObj } from "../../../db_calls_wrapper";
 
 // ─── Helper components ──────────────────────────────────
 
@@ -48,6 +51,14 @@ export const TransactionModal = ({ transaction, onClose }) => {
 
   function handleClose() {
     onClose && onClose();
+  }
+
+  function handlePrintTransaction() {
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    let toPrint = printBuilder.transaction(txn, _ctx);
+    log("DEV — transaction receipt:", toPrint);
+    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
   }
 
   return (
@@ -112,14 +123,24 @@ export const TransactionModal = ({ transaction, onClose }) => {
                 {"Txn ID: " + txn.id}
               </Text>
             </View>
-            <Button_
-              text="Close"
-              icon={ICONS.close1}
-              iconSize={14}
-              onPress={handleClose}
-              buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-              textStyle={{ color: gray(0.5), fontSize: 12 }}
-            />
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Button_
+                text="Print Transaction"
+                icon={ICONS.receipt}
+                iconSize={16}
+                onPress={handlePrintTransaction}
+                buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
+                textStyle={{ fontSize: 12, color: C.text }}
+              />
+              <Button_
+                text="Close"
+                icon={ICONS.close1}
+                iconSize={14}
+                onPress={handleClose}
+                buttonStyle={{ paddingHorizontal: 16, height: 32 }}
+                textStyle={{ color: gray(0.5), fontSize: 12 }}
+              />
+            </View>
           </View>
 
           {/* ── Date Banner ── */}

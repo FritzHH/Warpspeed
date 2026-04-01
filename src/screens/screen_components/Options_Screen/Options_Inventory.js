@@ -514,14 +514,23 @@ export function InventoryComponent({}) {
       if (buttonObj.parentID && sMenuPath.some((crumb) => crumb.id === buttonObj.id)) {
         let idx = sMenuPath.findIndex((crumb) => crumb.id === buttonObj.id);
         let newPath = sMenuPath.slice(0, idx);
+        let newParentID;
         if (newPath.length === 0) {
-          _setCurrentParentID(sMenuPath[0].id);
+          newParentID = sMenuPath[0].id;
+          _setCurrentParentID(newParentID);
           _setMenuPath([sMenuPath[0]]);
         } else {
-          _setCurrentParentID(newPath[newPath.length - 1].id);
+          newParentID = newPath[newPath.length - 1].id;
+          _setCurrentParentID(newParentID);
           _setMenuPath(newPath);
         }
-        _setSelectedButtonID(null);
+        // Re-select the parent so its canvas items stay visible
+        let parentBtn = (zQuickItemButtons || []).find((b) => b.id === newParentID);
+        if (parentBtn?.items?.length > 0) {
+          _setSelectedButtonID(parentBtn.id);
+        } else {
+          _setSelectedButtonID(null);
+        }
         _setSearchResults([]);
         return;
       }

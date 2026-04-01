@@ -644,9 +644,10 @@ export function NewCheckoutModalScreen() {
   function handleAddItem(invItem) {
     let primaryWO = sCombinedWorkorders[0];
     if (!primaryWO) return;
+    const { _score, ...cleanItem } = invItem;
     let newLine = {
       qty: 1,
-      inventoryItem: cloneDeep(invItem),
+      inventoryItem: cloneDeep(cleanItem),
       discountObj: null,
       id: crypto.randomUUID(),
       useSalePrice: false,

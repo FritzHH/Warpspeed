@@ -33,6 +33,7 @@ import {
   useInventoryStore,
   useLoginStore,
 } from "../../../stores";
+import { dbSaveSettingsField } from "../../../db_calls_wrapper";
 
 function getQuickButtonFontSize(text, baseFontSize) {
   let len = (text || "").length;
@@ -64,6 +65,7 @@ const QuickItemCanvasCard = ({
   onSelect,
   onPositionChange,
   onPress,
+  onRightClick,
   containerRef,
 }) => {
   const [sDragging, _setDragging] = useState(false);
@@ -123,6 +125,10 @@ const QuickItemCanvasCard = ({
         if (sEditMode) onSelect(itemObj.inventoryItemID);
         else if (onPress) onPress();
       }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (onRightClick) onRightClick(itemObj.inventoryItemID);
+      }}
       style={{
         position: "absolute",
         left: itemObj.x || 0,
@@ -180,6 +186,7 @@ const QuickItemCanvas = ({
   const [sEditMode, _setEditMode] = useState(false);
   const [sSelectedItemId, _setSelectedItemId] = useState(null);
   const canvasRef = useRef(null);
+  const dbSaveTimerRef = useRef(null);
 
   // Normalize items (backward compat: string IDs -> objects)
   let rawItems = (buttonObj.items || []).map(normalizeItemEntry);
@@ -189,11 +196,16 @@ const QuickItemCanvas = ({
   }
 
   function saveItems(updatedItems) {
-    // Update the specific quick button's items in settings
+    // Update store immediately without DB write (keeps drag smooth)
     let updatedButtons = (zQuickItemButtons || []).map((b) =>
       b.id === buttonObj.id ? { ...b, items: updatedItems } : b
     );
-    useSettingsStore.getState().setField("quickItemButtons", updatedButtons);
+    useSettingsStore.getState().setField("quickItemButtons", updatedButtons, false);
+    // Debounce the actual DB save
+    if (dbSaveTimerRef.current) clearTimeout(dbSaveTimerRef.current);
+    dbSaveTimerRef.current = setTimeout(() => {
+      dbSaveSettingsField("quickItemButtons", useSettingsStore.getState().settings?.quickItemButtons);
+    }, 500);
   }
 
   function handlePositionChange(invItemID, x, y) {
@@ -329,6 +341,7 @@ const QuickItemCanvas = ({
               containerRef={canvasRef}
               onPositionChange={handlePositionChange}
               onPress={() => invItem && onItemPress(invItem)}
+              onRightClick={(id) => { _setEditMode(true); _setSelectedItemId(id); }}
             />
           );
         })}
@@ -535,14 +548,30 @@ export function InventoryComponent({}) {
     } else {
       // Leaf button (no children) — toggle selection
       if (sSelectedButtonID === buttonObj.id) {
-        _setSelectedButtonID(null);
-        _setSearchResults([]);
+        // Deselecting child — re-select parent if it has items
+        let parentBtn = buttonObj.parentID ? (zQuickItemButtons || []).find((b) => b.id === buttonObj.parentID) : null;
+        if (parentBtn) {
+          let parentItems = [];
+          parentBtn.items?.forEach((entry) => {
+            let id = typeof entry === "string" ? entry : entry.inventoryItemID;
+            let found = findInventoryItem(id);
+            if (found) parentItems.push(found);
+          });
+          _setSelectedButtonID(parentBtn.id);
+          _setSearchResults(parentItems);
+        } else {
+          _setSelectedButtonID(null);
+          _setSearchResults([]);
+        }
       } else {
         _setSelectedButtonID(buttonObj.id);
         _setSearchResults(items);
       }
-      _setCurrentParentID(null);
-      _setMenuPath([]);
+      // Only clear sub-menu context if this is a root-level button
+      if (!buttonObj.parentID) {
+        _setCurrentParentID(null);
+        _setMenuPath([]);
+      }
     }
     _setSearchTerm("");
   }
@@ -602,7 +631,8 @@ export function InventoryComponent({}) {
         workorderLines[existingIndex].qty = (workorderLines[existingIndex].qty || 1) + 1;
       } else {
         let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-        lineItem.inventoryItem = item;
+        const { _score, ...cleanItem } = item;
+        lineItem.inventoryItem = cleanItem;
         lineItem.id = crypto.randomUUID();
         workorderLines = [...workorderLines, lineItem];
       }
@@ -830,28 +860,6 @@ export function InventoryComponent({}) {
                 flexWrap: "wrap",
               }}
             >
-              <Button_
-                text={"Home"}
-                icon={ICONS.home}
-                iconSize={14}
-                colorGradientArr={COLOR_GRADIENTS.blue}
-                onPress={() => {
-                  let root = sMenuPath[0];
-                  if (root) {
-                    _setCurrentParentID(root.id);
-                    _setMenuPath([root]);
-                    _setSelectedButtonID(null);
-                    _setSearchResults([]);
-                  }
-                }}
-                buttonStyle={{
-                  paddingVertical: 4,
-                  paddingHorizontal: 10,
-                  borderRadius: 5,
-                  marginRight: 8,
-                }}
-                textStyle={{ fontSize: 12 }}
-              />
               {sMenuPath.map((crumb, i) => (
                 <View
                   key={crumb.id}
@@ -887,7 +895,7 @@ export function InventoryComponent({}) {
                           i === sMenuPath.length - 1 ? "bold" : "normal",
                       }}
                     >
-                      {crumb.name || "(unnamed)"}
+                      {(crumb.name || "(unnamed)").toUpperCase()}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -905,15 +913,12 @@ export function InventoryComponent({}) {
               }}
             >
               {currentChildren.map((btn) => {
-                let isDrilledInto = btn.id === sCurrentParentID;
-                let hasChildrenBelow = zQuickItemButtons.some(
-                  (b) => b.parentID === btn.id
-                );
+                let isSelected = sSelectedButtonID === btn.id;
                 return (
                   <Button_
                     key={btn.id}
                     onPress={() => handleQuickButtonPress(btn)}
-                    colorGradientArr={isDrilledInto ? ["rgb(245,166,35)", "rgb(245,166,35)"] : [C.green, C.green]}
+                    colorGradientArr={isSelected ? ["rgb(240,200,40)", "rgb(240,200,40)"] : [C.green, C.green]}
                     buttonStyle={{
                       borderWidth: 1,
                       borderRadius: 5,
@@ -928,7 +933,7 @@ export function InventoryComponent({}) {
                       fontWeight: 400,
                       color: C.textWhite,
                     }}
-                    text={btn.name.toUpperCase() + (isDrilledInto ? " \u25B2" : " \u25B6")}
+                    text={btn.name.toUpperCase() + (isSelected ? " \u25BC" : " \u25B6")}
                   />
                 );
               })}
@@ -956,7 +961,7 @@ export function InventoryComponent({}) {
                 />
               );
             })()
-          ) : sSearchResults.length === 0 && (sCurrentParentID || sSelectedButtonID) ? (
+          ) : sSearchResults.length === 0 && sSelectedButtonID ? (
             <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
               <Image_ icon={ICONS.info} size={40} />
               <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>

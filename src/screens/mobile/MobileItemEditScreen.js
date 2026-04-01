@@ -97,7 +97,8 @@ export function MobileItemEditScreen() {
     useLoginStore.getState().requireLogin(() => {
       let workorderLines = zWorkorder.workorderLines || [];
       let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-      lineItem.inventoryItem = item;
+      const { _score, ...cleanItem } = item;
+      lineItem.inventoryItem = cleanItem;
       lineItem.id = crypto.randomUUID();
       workorderLines = [...workorderLines, lineItem];
       useOpenWorkordersStore

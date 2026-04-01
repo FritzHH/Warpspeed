@@ -83,6 +83,7 @@ import { DB_NODES } from "../../../../constants";
 import { newCheckoutGetStripeReaders } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { StandButtonsCanvasEditor } from "./StandButtonsCanvas";
 
+
 const TAB_NAMES = {
   users: "User Control",
   payments: "Payments/Printers",
@@ -276,7 +277,7 @@ export function Dashboard_Admin({}) {
                   <Image_ icon={ICONS.close1} size={18} />
                 </TouchableOpacity>
               </View>
-              {/* Body: search panel + editor side by side */}
+              {/* Body: search panel + simulator side by side */}
               <div style={{ flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" }}>
                 {/* Left: Inventory Search Panel */}
                 <StandButtonsSearchPanel
@@ -988,6 +989,14 @@ export function Dashboard_Admin({}) {
                   onPress={() => _setShowStandButtonsModal(true)}
                   colorGradientArr={COLOR_GRADIENTS.green}
                   style={{ paddingHorizontal: 24, paddingVertical: 10 }}
+                />
+                <Button_
+                  text="Open Stand Page"
+                  icon={ICONS.bicycle}
+                  iconSize={18}
+                  onPress={() => window.open("/stand", "_blank")}
+                  colorGradientArr={COLOR_GRADIENTS.blue}
+                  style={{ paddingHorizontal: 24, paddingVertical: 10, marginTop: 10 }}
                 />
               </BoxContainerInnerComponent>
             </BoxContainerOuterComponent>
@@ -4474,8 +4483,11 @@ const QuickItemButtonsComponent = () => {
     let updated = (zSettingsObj?.quickItemButtons || []).map((b) => {
       if (b.id !== sCurrentParentID) return b;
       let existing = b.items || [];
-      let newIDs = itemIDs.filter((id) => !existing.includes(id));
-      return { ...b, items: [...existing, ...newIDs] };
+      let existingIDs = existing.map((e) => typeof e === "string" ? e : e.inventoryItemID);
+      let newEntries = itemIDs
+        .filter((id) => !existingIDs.includes(id))
+        .map((id, i) => ({ inventoryItemID: id, x: ((existingIDs.length + i) % 6) * 100, y: Math.floor((existingIDs.length + i) / 6) * 50, w: 90, h: 40, fontSize: 10 }));
+      return { ...b, items: [...existing, ...newEntries] };
     });
     useSettingsStore.getState().setField("quickItemButtons", updated);
   }
@@ -4543,7 +4555,10 @@ const QuickItemButtonsComponent = () => {
     (b) => b.parentID === sCurrentParentID
   );
   let parentButton = sCurrentParentID ? allButtons.find((b) => b.id === sCurrentParentID) : null;
-  let parentItems = (parentButton?.items || []).map((id) => zInventoryArr.find((o) => o.id === id)).filter(Boolean);
+  let parentItems = (parentButton?.items || []).map((entry) => {
+    let id = typeof entry === "string" ? entry : entry.inventoryItemID;
+    return zInventoryArr.find((o) => o.id === id);
+  }).filter(Boolean);
 
   function renderButtonCard(btn, idx, isDraggable, isColumn) {
     let isEditing = sEditingID === btn.id;
@@ -4916,7 +4931,10 @@ const ParentButtonItemsList = ({
 
   let quickItemButtons = zSettingsObj?.quickItemButtons || [];
   let parentButton = quickItemButtons.find((b) => b.id === sCurrentParentID);
-  let parentItems = (parentButton?.items || []).map((id) => zInventoryArr.find((o) => o.id === id)).filter(Boolean);
+  let parentItems = (parentButton?.items || []).map((entry) => {
+    let id = typeof entry === "string" ? entry : entry.inventoryItemID;
+    return zInventoryArr.find((o) => o.id === id);
+  }).filter(Boolean);
 
   function reorderItems(fromIdx, toIdx) {
     if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
@@ -4930,7 +4948,10 @@ const ParentButtonItemsList = ({
   }
 
   function handleDeleteItem(itemId) {
-    let items = (parentButton?.items || []).filter((id) => id !== itemId);
+    let items = (parentButton?.items || []).filter((entry) => {
+      let id = typeof entry === "string" ? entry : entry.inventoryItemID;
+      return id !== itemId;
+    });
     let updated = quickItemButtons.map((b) =>
       b.id === sCurrentParentID ? { ...b, items } : b
     );

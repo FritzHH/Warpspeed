@@ -10,6 +10,7 @@ import {
   gray,
   applyDiscountToWorkorderItem,
   replaceOrAddToArr,
+  formatWorkorderNumber,
 } from "../../../../utils";
 import { cloneDeep } from "lodash";
 import { useSettingsStore } from "../../../../stores";
@@ -120,7 +121,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                 }}
               >
                 <Text style={{ color: C.blue, fontSize: 14, fontWeight: "500", marginRight: 8 }}>
-                  {"Workorder #" + wo.workorderNumber}
+                  {"Workorder #" + formatWorkorderNumber(wo.workorderNumber)}
                 </Text>
                 {!isPrimary && (
                   <CheckBox_

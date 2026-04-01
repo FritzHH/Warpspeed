@@ -47,7 +47,9 @@
       "mcp__claude-terminal__notification_send",
       "WebFetch(domain:docs.stripe.com)",
       "mcp__claude-terminal__db_list_connections",
-      "Bash(FILEPATH=\"/c/Users/hiebf/.claude/projects/C--Users-hiebf-OneDrive-Desktop-warpspeed/68a14752-48fe-45a1-9693-3fef301f3668.jsonl\")"
+      "Bash(FILEPATH=\"/c/Users/hiebf/.claude/projects/C--Users-hiebf-OneDrive-Desktop-warpspeed/68a14752-48fe-45a1-9693-3fef301f3668.jsonl\")",
+      "Bash(grep -n \"setWorkorder\\\\|setOpenWorkorderID\" /c/Users/hiebf/OneDrive/Desktop/warpspeed/src/screens/screen_components/Info_Screen/*.js)",
+      "Bash(xargs grep -l \"useOpenWorkordersStore.*workorders\")"
     ]
   }
 }

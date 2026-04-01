@@ -7285,7 +7285,7 @@ exports.createTextToPayInvoice = onCall(
       }
 
       // ── Create sale object ──
-      const saleID = generateSaleID();
+      const saleID = await _generateId(db, "sales");
       const sale = {
         id: saleID,
         millis: Date.now(),
@@ -7558,7 +7558,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
 
         // ── Build payment object (mirrors PAYMENT_OBJECT_PROTO) ──
         const payment = {
-          id: generateEAN13Barcode(),
+          id: transactionID || await _generateId(db, "transactions"),
           type: "payment",
           method: "card",
           amountCaptured: charge.amount_captured,
@@ -7717,6 +7717,152 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
     } catch (error) {
       log("stripeCheckoutWebhook_LinkToPay: unhandled error", error);
       return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// ============================================================================
+// SEQUENTIAL ID GENERATION
+// ============================================================================
+
+const GENERATE_ID_PREFIXES = { workorders: "1", sales: "2", transactions: "3" };
+
+
+/**
+ * Internal utility for generating sequential 12-digit IDs.
+ * Called directly by other cloud functions — not via HTTP.
+ * @param {Object} db - Firestore admin instance
+ * @param {string} node - "workorders", "sales", or "transactions"
+ * @returns {Promise<string>} 13-digit EAN-13 ID string
+ */
+async function _generateId(db, node) {
+  const prefix = GENERATE_ID_PREFIXES[node];
+  if (!prefix) {
+    throw new Error(
+      `_generateId: invalid node "${node}". Must be one of: workorders, sales, transactions`
+    );
+  }
+
+  const counterRef = db.collection("counters").doc(node);
+  let lastError;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const newId = await db.runTransaction(async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        const data = counterDoc.exists ? counterDoc.data() : {};
+        const returned = data.returned || [];
+
+        if (returned.length > 0) {
+          const reusedId = returned[0];
+          transaction.set(counterRef, { ...data, returned: returned.slice(1) }, { merge: true });
+          log(`_generateId: reusing returned ID for ${node}:`, reusedId);
+          return reusedId;
+        }
+
+        const current = data.current || 0;
+        const next = current + 1;
+        transaction.set(counterRef, { ...data, current: next }, { merge: true });
+
+        const padded = String(next).padStart(11, "0");
+        const reversed = padded.split("").reverse().join("");
+        const first12 = prefix + reversed;
+        return first12 + String(ean13CheckDigit(first12));
+      });
+
+      return newId;
+    } catch (error) {
+      lastError = error;
+      log(`_generateId: attempt ${attempt}/3 failed for ${node}:`, error.message);
+      if (attempt < 3) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 100 * Math.pow(4, attempt - 1))
+        );
+      }
+    }
+  }
+
+  throw new Error(
+    `_generateId: failed after 3 attempts for ${node}: ${lastError?.message}`
+  );
+}
+
+async function _returnId(db, node, id) {
+  if (!GENERATE_ID_PREFIXES[node]) {
+    throw new Error(`_returnId: invalid node "${node}". Must be one of: workorders, sales, transactions`);
+  }
+  if (!id || typeof id !== "string") {
+    throw new Error(`_returnId: invalid id "${id}"`);
+  }
+
+  const counterRef = db.collection("counters").doc(node);
+  let lastError;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await db.runTransaction(async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        const data = counterDoc.exists ? counterDoc.data() : {};
+        const returned = data.returned || [];
+        if (returned.includes(id)) return;
+        transaction.set(counterRef, { ...data, returned: [...returned, id] }, { merge: true });
+      });
+      log(`_returnId: returned ID for ${node}:`, id);
+      return;
+    } catch (error) {
+      lastError = error;
+      log(`_returnId: attempt ${attempt}/3 failed for ${node}:`, error.message);
+      if (attempt < 3) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 100 * Math.pow(4, attempt - 1))
+        );
+      }
+    }
+  }
+
+  throw new Error(`_returnId: failed after 3 attempts for ${node}: ${lastError?.message}`);
+}
+
+exports.generateId = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("generateId: request", request.data);
+
+    const { node, action, id } = request.data;
+
+    if (!node || !GENERATE_ID_PREFIXES[node]) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Invalid node "${node}". Must be one of: workorders, sales, transactions`
+      );
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+
+    if (action === "return") {
+      if (!id || typeof id !== "string") {
+        throw new HttpsError("invalid-argument", "Missing or invalid 'id' parameter for return action");
+      }
+      try {
+        await _returnId(db, node, id);
+        log("generateId: return success", { node, id });
+        return { success: true, returned: true };
+      } catch (error) {
+        log("generateId: return failed", { node, id, error: error.message });
+        throw new HttpsError("internal", `Failed to return ID for ${node}: ${error.message}`);
+      }
+    }
+
+    try {
+      const generatedId = await _generateId(db, node);
+      log("generateId: success", { node, id: generatedId });
+      return { success: true, id: generatedId };
+    } catch (error) {
+      log("generateId: failed", { node, error: error.message });
+      throw new HttpsError(
+        "internal",
+        `Failed to generate ID for ${node}: ${error.message}`
+      );
     }
   }
 );

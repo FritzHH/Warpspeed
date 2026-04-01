@@ -34,11 +34,12 @@ import {
   rehydrateFromArchiveCallable,
   manualArchiveAndCleanupCallable,
   createTextToPayInvoiceCallable,
+  generateIdCallable,
   firestoreBatchWrite,
   firestoreBatchDelete,
 } from "./db_calls";
 import { removeUnusedFields } from "./utils";
-import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores } from "./stores";
+import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores, usePendingIdStore } from "./stores";
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -554,6 +555,14 @@ export async function dbSaveSettings(settings) {
  * @returns {Promise<Object>} Save result
  */
 export async function dbSaveOpenWorkorder(workorder, workorderID = null, isFirstSave = false) {
+  if (workorder._tmpKey) {
+    let entry = usePendingIdStore.getState().getEntry("workorders", workorder._tmpKey);
+    if (entry && entry.status !== "ready") {
+      usePendingIdStore.getState().updateData("workorders", workorder._tmpKey, workorder);
+      return { success: true, deferred: true };
+    }
+  }
+
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -687,6 +696,23 @@ export async function dbSearchCompletedWorkorders(field, value) {
     return results;
   } catch (error) {
     log("Error searching completed workorders:", error);
+    return [];
+  }
+}
+
+export async function dbSearchCompletedWorkordersByNumber(numberPrefix) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+    const prefix = "WO" + numberPrefix;
+    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}`;
+    const results = await firestoreQuery(collectionPath, [
+      { field: "workorderNumber", operator: ">=", value: prefix },
+      { field: "workorderNumber", operator: "<=", value: prefix + "\uf8ff" },
+    ], { limit: 10 });
+    return results;
+  } catch (error) {
+    log("Error searching completed workorders by number:", error);
     return [];
   }
 }
@@ -3242,5 +3268,61 @@ export async function dbManualArchiveAndCleanup() {
   } catch (error) {
     log("Error in dbManualArchiveAndCleanup:", error);
     return { success: false, error: error.message || "Manual archive failed" };
+  }
+}
+
+// ============================================================================
+// SEQUENTIAL ID GENERATION
+// ============================================================================
+
+/**
+ * Request a new sequential ID from the server.
+ * Creates a pending entry immediately and fires the cloud function in the background.
+ * Returns the tmpKey so the UI can start working while the ID resolves.
+ * @param {string} node - "workorders", "sales", or "transactions"
+ * @returns {number} tmpKey - identifier for the pending entry
+ */
+export function dbRequestNewId(node, onReady) {
+  const tmpKey = usePendingIdStore.getState().addEntry(node);
+
+  (async () => {
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await generateIdCallable({ node });
+        const id = result.data?.id;
+
+        if (!id) {
+          throw new Error("No ID returned from generateId");
+        }
+
+        usePendingIdStore.getState().setId(node, tmpKey, id);
+        log("dbRequestNewId: ID ready", { node, id, tmpKey });
+        if (onReady) onReady(id, tmpKey);
+        return;
+      } catch (error) {
+        lastError = error;
+        log(`dbRequestNewId: attempt ${attempt}/3 failed for ${node}:`, error?.message || error);
+        if (attempt < 3) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, 500 * Math.pow(4, attempt - 1))
+          );
+        }
+      }
+    }
+
+    log("dbRequestNewId: all retries failed for " + node, lastError?.message || lastError);
+    usePendingIdStore.getState().setStatus(node, tmpKey, "error");
+  })();
+
+  return tmpKey;
+}
+
+export async function dbReturnId(node, id) {
+  try {
+    await generateIdCallable({ node, action: "return", id });
+    log("dbReturnId: returned", { node, id });
+  } catch (error) {
+    log("dbReturnId: failed", { node, id, error: error?.message });
   }
 }

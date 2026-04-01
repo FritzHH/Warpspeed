@@ -124,6 +124,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   onSwitchToManual,
   onPaymentStarted,
   lockAmount = false,
+  transactionId = null,
+  onTransactionIdUsed,
 }) {
   const [sRequestedAmount, _setRequestedAmount] = useState("");
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState("");
@@ -323,9 +325,10 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
     if (callbacksRef.current.onCardProcessingStart) callbacksRef.current.onCardProcessingStart(sRequestedAmount);
 
-    // Pre-generate transaction ID so webhook can use it as the document ID
-    let transactionID = generateEAN13Barcode();
+    // Use pre-fetched transaction ID so webhook can use it as the document ID
+    let transactionID = transactionId || generateEAN13Barcode();
     pendingTransactionIDRef.current = transactionID;
+    if (transactionId && onTransactionIdUsed) onTransactionIdUsed();
 
     // Notify parent to add pending ID to sale before payment starts
     if (onPaymentStarted) onPaymentStarted(transactionID);

@@ -24,8 +24,10 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
   useActiveSalesStore,
+  useCheckoutStore,
 } from "../../../stores";
-import { dbGetCustomer } from "../../../db_calls_wrapper";
+import { dbGetCustomer, dbGetCompletedWorkorder, dbGetCompletedSale } from "../../../db_calls_wrapper";
+import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
@@ -167,6 +169,61 @@ export function WorkordersComponent({}) {
     }
   }
 
+  function handleSearchChange(val) {
+    _setSearchTerm(val);
+    let digits = val.replace(/\D/g, "");
+    if (digits.length !== 13 || !/^\d{13}$/.test(digits)) return;
+    let prefix = digits[0];
+
+    if (prefix === "1") {
+      let found = zOpenWorkorders.find((w) => w.id === digits);
+      if (found) {
+        useOpenWorkordersStore.getState().setOpenWorkorderID(found.id);
+        if (found.customerID) {
+          dbGetCustomer(found.customerID).then((c) => {
+            if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+          });
+        }
+        useTabNamesStore.getState().setItems({
+          infoTabName: TAB_NAMES.infoTab.workorder,
+          itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+          optionsTabName: TAB_NAMES.optionsTab.inventory,
+        });
+        _setSearchTerm("");
+      } else {
+        dbGetCompletedWorkorder(digits).then((wo) => {
+          if (wo) {
+            let store = useOpenWorkordersStore.getState();
+            store.setWorkorder(wo, false);
+            store.setLockedWorkorderID(wo.id);
+            store.setOpenWorkorderID(wo.id);
+            useTabNamesStore.getState().setItems({
+              infoTabName: TAB_NAMES.infoTab.workorder,
+              itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+              optionsTabName: TAB_NAMES.optionsTab.inventory,
+            });
+            if (wo.customerID) {
+              dbGetCustomer(wo.customerID).then((c) => {
+                if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+              });
+            }
+          }
+          _setSearchTerm("");
+        });
+      }
+    } else if (prefix === "2") {
+      useCheckoutStore.getState().setStringOnly(digits);
+      _setSearchTerm("");
+    } else if (prefix === "3") {
+      readTransaction(digits).then((txn) => {
+        if (txn?.saleID) {
+          useCheckoutStore.getState().setStringOnly(txn.saleID);
+        }
+        _setSearchTerm("");
+      });
+    }
+  }
+
   ///////////////////////////////////////////////////////////////////
 
   ///////////////////////////////////////////////////////////////////////////////////
@@ -280,6 +337,8 @@ export function WorkordersComponent({}) {
         first.includes(term) ||
         last.includes(term) ||
         brand.includes(term) ||
+        (wo.id || "").includes(term) ||
+        (wo.workorderNumber || "").includes(term) ||
         (searchDigits.length >= 2 && phone.includes(searchDigits))
       );
     });
@@ -371,7 +430,7 @@ export function WorkordersComponent({}) {
             placeholder="Search workorders"
             placeholderTextColor={gray(0.2)}
             value={sSearchTerm}
-            onChangeText={(val) => _setSearchTerm(val)}
+            onChangeText={handleSearchChange}
           />
         </View>
         <CheckBox_

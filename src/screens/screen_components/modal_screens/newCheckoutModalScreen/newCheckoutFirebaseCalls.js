@@ -440,7 +440,7 @@ export async function newCheckoutGetStripeReaders() {
   try {
     const callables = await getCallables();
     const result = await callables.getReaders({});
-    log("newCheckout readers fetched:", result.data);
+    // log("newCheckout readers fetched:", result.data);
     return result.data;
   } catch (error) {
     log("newCheckoutGetStripeReaders error:", error);

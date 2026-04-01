@@ -4,7 +4,7 @@ import { View, Text, ScrollView } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
 import { CheckBox_, Button_ } from "../../../../components";
 import { COLOR_GRADIENTS } from "../../../../styles";
-import { formatCurrencyDisp, gray } from "../../../../utils";
+import { formatCurrencyDisp, gray, formatWorkorderNumber } from "../../../../utils";
 
 const RefundItemRow = memo(function RefundItemRow({
   line,
@@ -82,7 +82,7 @@ const RefundItemRow = memo(function RefundItemRow({
         </View>
         {workorderNumber && (
           <Text style={{ fontSize: 10, color: C.lightText }}>
-            WO #{workorderNumber}
+            WO #{formatWorkorderNumber(workorderNumber)}
           </Text>
         )}
       </View>
@@ -242,7 +242,7 @@ export const RefundItemSelector = memo(function RefundItemSelector({
                   paddingBottom: 2,
                 }}
               >
-                WO #{wo.workorderNumber || wo.id?.slice(-4)}
+                WO #{formatWorkorderNumber(wo.workorderNumber) || wo.id?.slice(-4)}
               </Text>
             )}
 

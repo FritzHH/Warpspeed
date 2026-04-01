@@ -19,6 +19,8 @@ export const CashPayment = memo(function CashPayment({
   hasReaders = false,
   isVisible = false,
   lockAmount = false,
+  transactionId = null,
+  onTransactionIdUsed,
 }) {
   const [sPayAmount, _setPayAmount] = useState("");
   const [sPayAmountDisp, _setPayAmountDisp] = useState("");
@@ -94,7 +96,8 @@ export const CashPayment = memo(function CashPayment({
       return;
     }
 
-    let payment = buildCashTransaction(sPayAmount, tenderCents, sIsCheck);
+    let payment = buildCashTransaction(sPayAmount, tenderCents, sIsCheck, transactionId);
+    if (onTransactionIdUsed) onTransactionIdUsed();
 
     // Calculate change
     let change = tenderCents - sPayAmount;

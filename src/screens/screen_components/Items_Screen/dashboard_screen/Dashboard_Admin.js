@@ -31,6 +31,10 @@ import {
   printBuilder,
   calculateRunningTotals,
   localStorageWrapper,
+  createNewWorkorder,
+  formatWorkorderNumber,
+  intakeButtonsToRows,
+  intakeRowsToFlat,
 } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import {
@@ -43,6 +47,7 @@ import {
   useTabNamesStore,
   useStripePaymentStore,
   useMigrationStore,
+  useCurrentCustomerStore,
 } from "../../../../stores";
 import {
   Button,
@@ -65,7 +70,7 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, INTAKE_BUTTON_PROTO, INTAKE_QUICK_BUTTON_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO } from "../../../../data";
+import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -76,6 +81,7 @@ import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPu
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
 import { DB_NODES } from "../../../../constants";
 import { newCheckoutGetStripeReaders } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { StandButtonsCanvasEditor } from "./StandButtonsCanvas";
 
 const TAB_NAMES = {
   users: "User Control",
@@ -85,7 +91,6 @@ const TAB_NAMES = {
   waitTimes: "Wait Times",
   storeInfo: "Store Info",
   quickItems: "Quick Item Buttons",
-  intakeButtons: "Intake Buttons",
   standButtons: "Stand Buttons",
   sales: "Sales Reports",
   payroll: "Payroll",
@@ -117,7 +122,6 @@ export function Dashboard_Admin({}) {
   const [sOrderingMenuSelectionName, _setOrderingMenuSelectionName] = useState(
     DROPDOWN_ORDERING_SELECTION_NAMES.importOrder
   );
-  const [sIntakeEditButtonObj, _setIntakeEditButtonObj] = useState(null);
   const [sStandEditButtonObj, _setStandEditButtonObj] = useState(null);
   const [sShowStandButtonsModal, _setShowStandButtonsModal] = useState(false);
 
@@ -206,29 +210,14 @@ export function Dashboard_Admin({}) {
       {!!sShowPayrollModal && (
         <PayrollModal handleExit={() => _setShowPayrollModal(false)} />
       )}
-      {!!sIntakeEditButtonObj && (
-        <IntakeButtonEditModal
-          buttonObj={sIntakeEditButtonObj}
-          onClose={() => _setIntakeEditButtonObj(null)}
-          onSave={(updatedBtn) => {
-            let updated = (zSettingsObj?.intakeButtons || []).map((o) =>
-              o.id === updatedBtn.id ? updatedBtn : o
-            );
-            handleSettingsFieldChange("intakeButtons", updated);
-            _setIntakeEditButtonObj(null);
-          }}
-        />
-      )}
       {!!sStandEditButtonObj && (
         <StandButtonInventoryModal
           buttonObj={sStandEditButtonObj}
           onClose={() => _setStandEditButtonObj(null)}
           onSave={(updatedBtn) => {
-            let rows = zSettingsObj?.intakeQuickButtons || [];
-            let updatedRows = rows.map((row) =>
-              row.map((btn) => (btn.id === updatedBtn.id ? updatedBtn : btn))
-            );
-            handleSettingsFieldChange("intakeQuickButtons", updatedRows);
+            let flat = zSettingsObj?.intakeQuickButtons || [];
+            let updated = flat.map((btn) => (btn.id === updatedBtn.id ? { ...updatedBtn, row: btn.row } : btn));
+            handleSettingsFieldChange("intakeQuickButtons", updated);
             _setStandEditButtonObj(null);
           }}
         />
@@ -253,8 +242,9 @@ export function Dashboard_Admin({}) {
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                width: 480,
-                maxHeight: "90vh",
+                width: "85vw",
+                maxWidth: 1200,
+                height: "92vh",
                 backgroundColor: "white",
                 borderRadius: 12,
                 display: "flex",
@@ -286,13 +276,22 @@ export function Dashboard_Admin({}) {
                   <Image_ icon={ICONS.close1} size={18} />
                 </TouchableOpacity>
               </View>
-              {/* Body */}
-              <div style={{ flex: 1, overflowY: "auto", padding: 0 }}>
-                <StandButtonsEditorComponent
+              {/* Body: search panel + editor side by side */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" }}>
+                {/* Left: Inventory Search Panel */}
+                <StandButtonsSearchPanel
                   zSettingsObj={zSettingsObj}
                   handleSettingsFieldChange={handleSettingsFieldChange}
-                  _setStandEditButtonObj={_setStandEditButtonObj}
                 />
+                {/* Right: Editor */}
+                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+                  <StandButtonsCanvasEditor
+                    zSettingsObj={zSettingsObj}
+                    handleSettingsFieldChange={handleSettingsFieldChange}
+                    _setStandEditButtonObj={_setStandEditButtonObj}
+                    _setShowStandButtonsModal={_setShowStandButtonsModal}
+                  />
+                </div>
               </div>
             </div>
           </div>,
@@ -340,32 +339,15 @@ export function Dashboard_Admin({}) {
             />
             <VerticalSpacer />
             <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.intakeButtons}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.intakeButtons
-                    ? null
-                    : TAB_NAMES.intakeButtons
-                )
-              }
-              text={TAB_NAMES.intakeButtons}
-              icon={ICONS.bicycle}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.intakeButtons ? 500 : null,
-                color:
-                  sExpand === TAB_NAMES.intakeButtons ? C.green : gray(0.6),
-              }}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.standButtons}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.standButtons
-                    ? null
-                    : TAB_NAMES.standButtons
-                )
-              }
+              handleExpandPress={() => {
+                if (sExpand === TAB_NAMES.standButtons) {
+                  _setExpand(null);
+                } else {
+                  _setExpand(TAB_NAMES.standButtons);
+                  _setShowStandButtonsModal(true);
+                }
+              }}
               text={TAB_NAMES.standButtons}
               icon={ICONS.tools1}
               style={{
@@ -994,17 +976,7 @@ export function Dashboard_Admin({}) {
             />
           )}
           {sExpand === TAB_NAMES.quickItems && (
-            <QuickItemButtonsComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-            />
-          )}
-          {sExpand === TAB_NAMES.intakeButtons && (
-            <IntakeButtonsComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-              _setIntakeEditButtonObj={_setIntakeEditButtonObj}
-            />
+            <QuickItemButtonsComponent />
           )}
           {sExpand === TAB_NAMES.standButtons && (
             <BoxContainerOuterComponent>
@@ -4226,10 +4198,199 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
   );
 };
 
-const QuickItemButtonsComponent = ({
-  zSettingsObj,
-  handleSettingsFieldChange,
-}) => {
+const QBInventorySearchModal = ({ parentName, onClose, onAddItems }) => {
+  const [sInvSearch, _setInvSearch] = useState("");
+  const [sInvResults, _setInvResults] = useState([]);
+  const [sSelectedIDs, _setSelectedIDs] = useState(new Set());
+
+  function doSearch(val) {
+    _setInvSearch(val);
+    if (!val || val.length < 3) { _setInvResults([]); return; }
+    workerSearchInventory(val, (results) => _setInvResults(results));
+  }
+
+  function clearSearch() {
+    _setInvSearch("");
+    _setInvResults([]);
+  }
+
+  function toggleSelected(id) {
+    _setSelectedIDs((prev) => {
+      let next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function handleSingleSelect(id) {
+    onAddItems([id]);
+    onClose();
+  }
+
+  function handleMultiSelect() {
+    if (sSelectedIDs.size === 0) return;
+    onAddItems([...sSelectedIDs]);
+    onClose();
+  }
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.45)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 550,
+          height: window.innerHeight - 100,
+          backgroundColor: C.backgroundWhite,
+          borderRadius: 12,
+          border: "1px solid " + C.buttonLightGreenOutline,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: gray(0.1),
+          }}
+        >
+          <Text style={{ fontSize: 16, fontWeight: "bold", color: C.text }}>
+            {"Add items to "}
+            <Text style={{ color: C.green }}>{parentName}</Text>
+          </Text>
+          <Button_
+            icon={ICONS.close1}
+            iconSize={28}
+            onPress={onClose}
+            buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0, marginBottom: 0 }}
+          />
+        </View>
+
+        {/* Search bar */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+          }}
+        >
+          <Button_
+            icon={ICONS.reset1}
+            iconSize={20}
+            onPress={clearSearch}
+            useColorGradient={false}
+          />
+          <TextInput_
+            autoFocus={true}
+            style={{
+              flex: 1,
+              borderBottomWidth: 1,
+              borderBottomColor: gray(0.2),
+              fontSize: 18,
+              color: C.text,
+              outlineWidth: 0,
+              outlineStyle: "none",
+              paddingVertical: 4,
+              marginLeft: 8,
+            }}
+            placeholder="Search inventory"
+            placeholderTextColor={gray(0.2)}
+            value={sInvSearch}
+            onChangeText={doSearch}
+          />
+        </View>
+
+        {/* Select Items button */}
+        <View style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+          <Button_
+            text={sSelectedIDs.size > 0 ? "Select Items (" + sSelectedIDs.size + ")" : "Select Items"}
+            onPress={handleMultiSelect}
+            enabled={sSelectedIDs.size > 0}
+            colorGradientArr={COLOR_GRADIENTS.green}
+            buttonStyle={{ borderRadius: 5, paddingVertical: 8, opacity: sSelectedIDs.size > 0 ? 1 : 0.4 }}
+            textStyle={{ fontSize: 13, color: C.textWhite }}
+          />
+        </View>
+
+        {/* Results */}
+        <FlatList
+          data={sInvResults.slice(0, 50)}
+          keyExtractor={(item) => item.id}
+          style={{ flex: 1, paddingHorizontal: 8 }}
+          renderItem={({ item, index }) => {
+            let isChecked = sSelectedIDs.has(item.id);
+            return (
+              <div
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  borderRadius: 6,
+                  border: "1px solid " + gray(0.12),
+                  backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
+                  marginBottom: 2,
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                  paddingLeft: 6,
+                  paddingRight: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <CheckBox_
+                  isChecked={isChecked}
+                  onCheck={() => toggleSelected(item.id)}
+                  buttonStyle={{ marginRight: 4 }}
+                />
+                <TouchableOpacity
+                  onPress={() => handleSingleSelect(item.id)}
+                  style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+                >
+                  <View style={{ flex: 1, paddingLeft: 4 }}>
+                    <Text style={{ fontSize: 14, color: C.text }} numberOfLines={1}>
+                      {item.informalName || item.formalName}
+                    </Text>
+                    {!!item.informalName && (
+                      <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
+                        {item.formalName}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={{ fontSize: 13, color: C.text, marginLeft: 8 }}>
+                    {"$" + formatCurrencyDisp(item.price)}
+                  </Text>
+                </TouchableOpacity>
+              </div>
+            );
+          }}
+        />
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+const QuickItemButtonsComponent = () => {
+  const zSettingsObj = useSettingsStore((state) => state.settings);
   const sCurrentParentID = useTabNamesStore((state) => state.getDashboardQBParentID());
   const _setCurrentParentID = useTabNamesStore((state) => state.setDashboardQBParentID);
   const sMenuPath = useTabNamesStore((state) => state.getDashboardQBMenuPath());
@@ -4243,8 +4404,6 @@ const QuickItemButtonsComponent = ({
   };
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
-  const [sItemDragIdx, _setItemDragIdx] = useState(null);
-  const [sItemDragOverIdx, _setItemDragOverIdx] = useState(null);
   const [sEditingID, _setEditingID] = useState(null);
   const [sShowInvSearchModal, _setShowInvSearchModal] = useState(false);
   const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
@@ -4289,7 +4448,7 @@ const QuickItemButtonsComponent = ({
   }
 
   function handleNameChange(btn, val) {
-    handleSettingsFieldChange(
+    useSettingsStore.getState().setField(
       "quickItemButtons",
       zSettingsObj.quickItemButtons.map((o) =>
         o.id === btn.id ? { ...o, name: val } : o
@@ -4306,7 +4465,7 @@ const QuickItemButtonsComponent = ({
       parentID: sCurrentParentID,
       items: [],
     });
-    handleSettingsFieldChange("quickItemButtons", quickButtonsArr);
+    useSettingsStore.getState().setField("quickItemButtons", quickButtonsArr);
     _setEditingID(newID);
   }
 
@@ -4318,200 +4477,20 @@ const QuickItemButtonsComponent = ({
       let newIDs = itemIDs.filter((id) => !existing.includes(id));
       return { ...b, items: [...existing, ...newIDs] };
     });
-    handleSettingsFieldChange("quickItemButtons", updated);
+    useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
-  function InventorySearchModal() {
-    const [sInvSearch, _setInvSearch] = useState("");
-    const [sInvResults, _setInvResults] = useState([]);
-    const [sSelectedIDs, _setSelectedIDs] = useState(new Set());
-
+  // Render the extracted component, passing needed props
+  function renderInvSearchModal() {
+    if (!sShowInvSearchModal) return null;
     const parentBtn = (zSettingsObj?.quickItemButtons || []).find((b) => b.id === sCurrentParentID);
     const parentName = parentBtn?.name || "(unnamed)";
-
-    function doSearch(val) {
-      _setInvSearch(val);
-      if (!val || val.length < 3) { _setInvResults([]); return; }
-      workerSearchInventory(val, (results) => _setInvResults(results));
-    }
-
-    function clearSearch() {
-      _setInvSearch("");
-      _setInvResults([]);
-    }
-
-    function toggleSelected(id) {
-      _setSelectedIDs((prev) => {
-        let next = new Set(prev);
-        if (next.has(id)) next.delete(id); else next.add(id);
-        return next;
-      });
-    }
-
-    function handleSingleSelect(id) {
-      handleAddItemsToButton([id]);
-      _setShowInvSearchModal(false);
-    }
-
-    function handleMultiSelect() {
-      if (sSelectedIDs.size === 0) return;
-      handleAddItemsToButton([...sSelectedIDs]);
-      _setShowInvSearchModal(false);
-    }
-
-    return createPortal(
-      <div
-        style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.45)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 9999,
-        }}
-        onClick={() => _setShowInvSearchModal(false)}
-      >
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            width: 550,
-            height: window.innerHeight - 100,
-            backgroundColor: C.backgroundWhite,
-            borderRadius: 12,
-            border: "1px solid " + C.buttonLightGreenOutline,
-            overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Header */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.1),
-            }}
-          >
-            <Text style={{ fontSize: 16, fontWeight: "bold", color: C.text }}>
-              {"Add items to "}
-              <Text style={{ color: C.green }}>{parentName}</Text>
-            </Text>
-            <Button_
-              icon={ICONS.close1}
-              iconSize={28}
-              onPress={() => _setShowInvSearchModal(false)}
-              buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0, marginBottom: 0 }}
-            />
-          </View>
-
-          {/* Search bar */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-            }}
-          >
-            <Button_
-              icon={ICONS.reset1}
-              iconSize={20}
-              onPress={clearSearch}
-              useColorGradient={false}
-            />
-            <TextInput_
-              autoFocus={true}
-              style={{
-                flex: 1,
-                borderBottomWidth: 1,
-                borderBottomColor: gray(0.2),
-                fontSize: 18,
-                color: C.text,
-                outlineWidth: 0,
-                outlineStyle: "none",
-                paddingVertical: 4,
-                marginLeft: 8,
-              }}
-              placeholder="Search inventory"
-              placeholderTextColor={gray(0.2)}
-              value={sInvSearch}
-              onChangeText={doSearch}
-            />
-          </View>
-
-          {/* Select Items button — always visible, disabled when 0 selected */}
-          <View style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
-            <Button_
-              text={sSelectedIDs.size > 0 ? "Select Items (" + sSelectedIDs.size + ")" : "Select Items"}
-              onPress={handleMultiSelect}
-              enabled={sSelectedIDs.size > 0}
-              colorGradientArr={COLOR_GRADIENTS.green}
-              buttonStyle={{ borderRadius: 5, paddingVertical: 8, opacity: sSelectedIDs.size > 0 ? 1 : 0.4 }}
-              textStyle={{ fontSize: 13, color: C.textWhite }}
-            />
-          </View>
-
-          {/* Results */}
-          <FlatList
-            data={sInvResults}
-            keyExtractor={(item) => item.id}
-            style={{ flex: 1, paddingHorizontal: 8 }}
-            renderItem={({ item, index }) => {
-              let isChecked = sSelectedIDs.has(item.id);
-              return (
-                <div
-                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    borderRadius: 6,
-                    border: "1px solid " + gray(0.12),
-                    backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
-                    marginBottom: 2,
-                    paddingTop: 6,
-                    paddingBottom: 6,
-                    paddingLeft: 6,
-                    paddingRight: 6,
-                    cursor: "pointer",
-                  }}
-                >
-                  <CheckBox_
-                    isChecked={isChecked}
-                    onCheck={() => toggleSelected(item.id)}
-                    buttonStyle={{ marginRight: 4 }}
-                  />
-                  <TouchableOpacity
-                    onPress={() => handleSingleSelect(item.id)}
-                    style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
-                  >
-                    <View style={{ flex: 1, paddingLeft: 4 }}>
-                      <Text style={{ fontSize: 14, color: C.text }} numberOfLines={1}>
-                        {item.informalName || item.formalName}
-                      </Text>
-                      {!!item.informalName && (
-                        <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
-                          {item.formalName}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={{ fontSize: 13, color: C.text, marginLeft: 8 }}>
-                      {"$" + formatCurrencyDisp(item.price)}
-                    </Text>
-                  </TouchableOpacity>
-                </div>
-              );
-            }}
-          />
-        </div>
-      </div>,
-      document.body
+    return (
+      <QBInventorySearchModal
+        parentName={parentName}
+        onClose={() => _setShowInvSearchModal(false)}
+        onAddItems={handleAddItemsToButton}
+      />
     );
   }
 
@@ -4529,19 +4508,7 @@ const QuickItemButtonsComponent = ({
       if (isMatch(b)) return children[childIndex++];
       return b;
     });
-    handleSettingsFieldChange("quickItemButtons", result);
-  }
-
-  function reorderItems(fromIdx, toIdx) {
-    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
-    let updated = allButtons.map((b) => {
-      if (b.id !== sCurrentParentID) return b;
-      let items = [...(b.items || [])];
-      let [dragged] = items.splice(fromIdx, 1);
-      items.splice(toIdx, 0, dragged);
-      return { ...b, items };
-    });
-    handleSettingsFieldChange("quickItemButtons", updated);
+    useSettingsStore.getState().setField("quickItemButtons", result);
   }
 
   function handleToggleDivider(itemID) {
@@ -4554,7 +4521,7 @@ const QuickItemButtonsComponent = ({
       else dividers.push({ itemID, label: "" });
       return { ...b, dividers };
     });
-    handleSettingsFieldChange("quickItemButtons", updated);
+    useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
   function handleDividerLabelChange(itemID, label) {
@@ -4567,7 +4534,7 @@ const QuickItemButtonsComponent = ({
       );
       return { ...b, dividers };
     });
-    handleSettingsFieldChange("quickItemButtons", updated);
+    useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
   let allButtons = zSettingsObj?.quickItemButtons || [];
@@ -4903,7 +4870,7 @@ const QuickItemButtonsComponent = ({
             </View>
           </View>
 
-          {sShowInvSearchModal && <InventorySearchModal />}
+          {renderInvSearchModal()}
 
           {/* Flex-wrap grid of sub-buttons */}
           <div
@@ -4920,91 +4887,12 @@ const QuickItemButtonsComponent = ({
           </div>
 
           {/* Inventory items linked to this button */}
-          {parentItems.length > 0 && (
-            <View style={{ marginTop: 10, width: "100%" }}>
-              <Text style={{ fontSize: 12, fontWeight: "bold", color: gray(0.5), marginBottom: 6 }}>
-                ITEMS ({parentItems.length})
-              </Text>
-              {parentItems.map((inv, i) => {
-                let dividerObj = (parentButton?.dividers || []).find((d) => d.itemID === inv.id);
-                let hasDivider = !!dividerObj && i > 0;
-                let isFirstItem = i === 0;
-                return (
-                  <React.Fragment key={inv.id}>
-                    {hasDivider && (
-                      <View style={{ marginTop: 10, marginBottom: 4 }}>
-                        <View style={{ height: 4, backgroundColor: C.buttonLightGreenOutline, borderRadius: 2 }} />
-                        <TextInput_
-                          placeholder="Divider label (optional)"
-                          value={dividerObj?.label || ""}
-                          onChangeText={(val) => handleDividerLabelChange(inv.id, val)}
-                          debounceMs={500}
-                          style={{
-                            fontSize: 12,
-                            color: gray(0.5),
-                            paddingVertical: 3,
-                            paddingHorizontal: 6,
-                            outlineWidth: 0,
-                            backgroundColor: "transparent",
-                          }}
-                        />
-                      </View>
-                    )}
-                    <div
-                      draggable
-                      onDragStart={() => _setItemDragIdx(i)}
-                      onDragOver={(e) => { e.preventDefault(); _setItemDragOverIdx(i); }}
-                      onDragEnd={() => { _setItemDragIdx(null); _setItemDragOverIdx(null); }}
-                      onDrop={(e) => { e.preventDefault(); reorderItems(sItemDragIdx, i); _setItemDragIdx(null); _setItemDragOverIdx(null); }}
-                      onContextMenu={isFirstItem ? undefined : (e) => { e.preventDefault(); handleToggleDivider(inv.id); }}
-                      title={isFirstItem ? "" : hasDivider ? "Right click to remove divider" : "Right click to add divider above"}
-                      style={{
-                        display: "flex",
-                        flexDirection: "row",
-                        alignItems: "center",
-                        paddingTop: 6,
-                        paddingBottom: 6,
-                        paddingLeft: 8,
-                        paddingRight: 8,
-                        borderRadius: 6,
-                        borderWidth: sItemDragOverIdx === i && sItemDragIdx !== null && sItemDragIdx !== i ? 2 : 1,
-                        borderStyle: "solid",
-                        borderColor: sItemDragOverIdx === i && sItemDragIdx !== null && sItemDragIdx !== i ? C.blue : C.buttonLightGreenOutline,
-                        backgroundColor: i % 2 === 0 ? C.backgroundListWhite : C.listItemWhite,
-                        marginBottom: 2,
-                        cursor: "grab",
-                        opacity: sItemDragIdx === i ? 0.5 : 1,
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, color: C.text }} numberOfLines={1}>
-                          {inv.informalName || inv.formalName}
-                        </Text>
-                        {!!inv.informalName && (
-                          <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
-                            {inv.formalName}
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
-                        {"$" + formatCurrencyDisp(inv.price)}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => {
-                          let updated = allButtons.map((b) => {
-                            if (b.id !== sCurrentParentID) return b;
-                            return { ...b, items: (b.items || []).filter((id) => id !== inv.id) };
-                          });
-                          handleSettingsFieldChange("quickItemButtons", updated);
-                        }}
-                      >
-                        <Image_ icon={ICONS.close1} size={14} />
-                      </TouchableOpacity>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-            </View>
+          {sCurrentParentID && (
+            <ParentButtonItemsList
+              sCurrentParentID={sCurrentParentID}
+              handleDividerLabelChange={handleDividerLabelChange}
+              handleToggleDivider={handleToggleDivider}
+            />
           )}
         </View>
       </BoxContainerInnerComponent>
@@ -5013,513 +4901,146 @@ const QuickItemButtonsComponent = ({
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Intake Buttons Component
+// Parent Button Items List — own drag state, same pattern as WorkorderStatusesComponent
 ////////////////////////////////////////////////////////////////////////////////
 
-const IntakeButtonsComponent = ({ zSettingsObj, handleSettingsFieldChange, _setIntakeEditButtonObj }) => {
+const ParentButtonItemsList = ({
+  sCurrentParentID,
+  handleDividerLabelChange,
+  handleToggleDivider,
+}) => {
+  const zSettingsObj = useSettingsStore((state) => state.settings);
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
 
-  let intakeButtons = zSettingsObj?.intakeButtons || [];
+  let quickItemButtons = zSettingsObj?.quickItemButtons || [];
+  let parentButton = quickItemButtons.find((b) => b.id === sCurrentParentID);
+  let parentItems = (parentButton?.items || []).map((id) => zInventoryArr.find((o) => o.id === id)).filter(Boolean);
 
-  function handleAdd() {
-    let newBtn = {
-      ...cloneDeep(INTAKE_BUTTON_PROTO),
-      id: crypto.randomUUID(),
-      label: "",
-      itemsToAdd: [],
-    };
-    let updated = [...intakeButtons, newBtn];
-    handleSettingsFieldChange("intakeButtons", updated);
-  }
-
-  function handleDelete(btn) {
-    let updated = intakeButtons.filter((o) => o.id !== btn.id);
-    handleSettingsFieldChange("intakeButtons", updated);
-  }
-
-  function handleLabelChange(btn, val) {
-    let updated = intakeButtons.map((o) =>
-      o.id === btn.id ? { ...o, label: val } : o
-    );
-    handleSettingsFieldChange("intakeButtons", updated);
-  }
-
-  function handleReorder(fromIdx, toIdx) {
+  function reorderItems(fromIdx, toIdx) {
     if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
-    let arr = [...intakeButtons];
-    let [dragged] = arr.splice(fromIdx, 1);
-    arr.splice(toIdx, 0, dragged);
-    handleSettingsFieldChange("intakeButtons", arr);
+    let items = [...(parentButton?.items || [])];
+    let [dragged] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, dragged);
+    let updated = quickItemButtons.map((b) =>
+      b.id === sCurrentParentID ? { ...b, items } : b
+    );
+    useSettingsStore.getState().setField("quickItemButtons", updated);
   }
+
+  function handleDeleteItem(itemId) {
+    let items = (parentButton?.items || []).filter((id) => id !== itemId);
+    let updated = quickItemButtons.map((b) =>
+      b.id === sCurrentParentID ? { ...b, items } : b
+    );
+    useSettingsStore.getState().setField("quickItemButtons", updated);
+  }
+
+  if (parentItems.length === 0) return null;
 
   return (
-    <BoxContainerOuterComponent>
-      <BoxContainerInnerComponent
-        style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
-      >
-        <View style={{ width: "100%" }}>
-          <BoxButton1 onPress={handleAdd} style={{ marginBottom: 10 }} />
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              flexWrap: "wrap",
-              marginTop: 10,
-            }}
-          >
-            {intakeButtons.map((btn, idx) => (
-              <IntakeButtonCard
-                key={btn.id}
-                btn={btn}
-                idx={idx}
-                sDragIdx={sDragIdx}
-                sDragOverIdx={sDragOverIdx}
-                _setDragIdx={_setDragIdx}
-                _setDragOverIdx={_setDragOverIdx}
-                handleReorder={handleReorder}
-                handleLabelChange={handleLabelChange}
-                handleDelete={handleDelete}
-                handleEditPress={() => _setIntakeEditButtonObj(btn)}
-              />
-            ))}
-          </div>
-          {intakeButtons.length === 0 && (
-            <Text
-              style={{
-                color: gray(0.4),
-                fontSize: 13,
-                textAlign: "center",
-                paddingVertical: 20,
-              }}
-            >
-              No intake buttons yet. Click + to add one.
-            </Text>
-          )}
-        </View>
-      </BoxContainerInnerComponent>
-    </BoxContainerOuterComponent>
-  );
-};
-
-const IntakeButtonCard = ({
-  btn,
-  idx,
-  sDragIdx,
-  sDragOverIdx,
-  _setDragIdx,
-  _setDragOverIdx,
-  handleReorder,
-  handleLabelChange,
-  handleDelete,
-  handleEditPress,
-}) => {
-  const [sIsEditingLabel, _setIsEditingLabel] = useState(!btn.label);
-
-  return (
-    <div
-      draggable
-      onDragStart={() => _setDragIdx(idx)}
-      onDragOver={(e) => {
-        e.preventDefault();
-        _setDragOverIdx(idx);
-      }}
-      onDragEnd={() => {
-        _setDragIdx(null);
-        _setDragOverIdx(null);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        handleReorder(sDragIdx, idx);
-        _setDragIdx(null);
-        _setDragOverIdx(null);
-      }}
-      onMouseEnter={(e) => {
-        if (!sIsEditingLabel) e.currentTarget.style.opacity = "0.7";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.opacity = "1";
-      }}
-      style={{
-        width: 170,
-        minHeight: 60,
-        margin: 4,
-        padding: 8,
-        display: "flex",
-        flexDirection: "column",
-        borderWidth: sDragOverIdx === idx ? 2 : 1,
-        borderStyle: "solid",
-        borderColor:
-          sDragOverIdx === idx ? C.blue : C.buttonLightGreenOutline,
-        borderRadius: 8,
-        backgroundColor: C.listItemWhite,
-        alignItems: "center",
-        justifyContent: "center",
-        position: "relative",
-        cursor: "grab",
-        opacity: sDragIdx === idx ? 0.5 : 1,
-        boxSizing: "border-box",
-      }}
-    >
-      {/* Label area */}
-      {sIsEditingLabel ? (
-        <TextInput_
-          autoFocus={true}
-          onChangeText={(val) => handleLabelChange(btn, val)}
-          placeholder="Enter label..."
-          placeholderTextColor={gray(0.3)}
-          style={{
-            width: "100%",
-            paddingHorizontal: 5,
-            paddingVertical: 3,
-            fontSize: 13,
-            textAlign: "center",
-            color: C.text,
-            outlineWidth: 0,
-            outlineStyle: "none",
-          }}
-          value={btn.label}
-        />
-      ) : (
-        <Text
-          style={{
-            width: "100%",
-            fontSize: 13,
-            textAlign: "center",
-            color: C.text,
-            paddingHorizontal: 5,
-            paddingVertical: 3,
-          }}
-          numberOfLines={1}
-        >
-          {btn.label || "(unnamed)"}
-        </Text>
-      )}
-
-      {/* Controls row: badge + edit + items + delete */}
-      <div
-        draggable={false}
-        onMouseDown={(e) => e.stopPropagation()}
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          marginTop: 4,
-        }}
-      >
-        {(btn.itemsToAdd?.length || 0) > 0 && (
-          <View
-            style={{
-              backgroundColor: C.blue,
-              borderRadius: 8,
-              minWidth: 16,
-              height: 16,
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 6,
-            }}
-          >
-            <Text
-              style={{
-                color: C.textWhite,
-                fontSize: 10,
-                fontWeight: "bold",
-                paddingHorizontal: 4,
-              }}
-            >
-              {btn.itemsToAdd.length}
-            </Text>
-          </View>
-        )}
-        <BoxButton1
-          onPress={() => _setIsEditingLabel(!sIsEditingLabel)}
-          iconSize={sIsEditingLabel ? 37 : 17}
-          icon={sIsEditingLabel ? ICONS.clickHere : ICONS.editPencil}
-        />
-        <BoxButton1
-          onPress={handleEditPress}
-          style={{ marginLeft: 6 }}
-          iconSize={17}
-          icon={ICONS.search}
-        />
-        <BoxButton1
-          onPress={() => handleDelete(btn)}
-          style={{ marginLeft: 6 }}
-          iconSize={17}
-          icon={ICONS.close1}
-        />
-      </div>
-
-      {/* Drag direction indicators */}
-      {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
-        <Image_
-          icon={ICONS.backRed}
-          size={14}
-          style={{ position: "absolute", bottom: 4, left: 4 }}
-        />
-      )}
-      {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx < idx && (
-        <Image_
-          icon={ICONS.rightArrowBlue}
-          size={14}
-          style={{ position: "absolute", bottom: 4, right: 4 }}
-        />
-      )}
-    </div>
-  );
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// Intake Button Edit Modal — inventory search to add items to itemsToAdd
-////////////////////////////////////////////////////////////////////////////////
-
-const IntakeButtonEditModal = ({ buttonObj, onClose, onSave }) => {
-  const zInventory = useInventoryStore((state) => state.inventoryArr);
-  const [sItemsToAdd, _setItemsToAdd] = useState(buttonObj.itemsToAdd || []);
-  const [sSearchString, _setSearchString] = useState("");
-  const [sSearchResults, _setSearchResults] = useState([]);
-
-  function handleSearch(val) {
-    _setSearchString(val);
-    if (!val || val.length < 3) {
-      _setSearchResults([]);
-      return;
-    }
-    workerSearchInventory(val, (results) => _setSearchResults(results));
-  }
-
-  function handleAddItem(invItem) {
-    if (!sItemsToAdd.includes(invItem.id)) {
-      _setItemsToAdd([...sItemsToAdd, invItem.id]);
-    }
-    _setSearchString("");
-    _setSearchResults([]);
-  }
-
-  function handleRemoveItem(itemId) {
-    _setItemsToAdd(sItemsToAdd.filter((id) => id !== itemId));
-  }
-
-  function resolveItem(itemId) {
-    return zInventory.find((o) => o.id === itemId);
-  }
-
-  return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 9999,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 550,
-          height: "85vh",
-          backgroundColor: "white",
-          borderRadius: 12,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: gray(0.15),
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 16,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.text,
-            }}
-          >
-            {buttonObj.label || "(unnamed)"} — Items
-          </Text>
-          <TouchableOpacity onPress={onClose}>
-            <Image_ icon={ICONS.close1} size={18} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Search Input */}
-        <View style={{ padding: 16, paddingBottom: 8 }}>
-          <TextInput_
-            style={{
-              borderBottomColor: gray(0.3),
-              borderBottomWidth: 1,
-              width: "100%",
-              fontSize: 15,
-              color: C.text,
-              paddingVertical: 6,
-              outlineWidth: 0,
-              outlineStyle: "none",
-            }}
-            value={sSearchString}
-            onChangeText={handleSearch}
-            placeholder="Search inventory..."
-            placeholderTextColor={gray(0.3)}
-            autoFocus
-          />
-        </View>
-
-        {/* Added Items */}
-        <View style={{ padding: 16, paddingTop: 12, maxHeight: "40%" }}>
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.blue,
-              marginBottom: 6,
-            }}
-          >
-            ITEMS ({sItemsToAdd.length})
-          </Text>
-          <ScrollView>
-            {sItemsToAdd.map((itemId, idx) => {
-              let item = resolveItem(itemId);
-              let name = item
-                ? item.formalName || item.informalName || "Unknown"
-                : itemId;
-              return (
-                <View
-                  key={itemId + idx}
+    <View style={{ marginTop: 10, width: "100%" }}>
+      <Text style={{ fontSize: 12, fontWeight: "bold", color: gray(0.5), marginBottom: 6 }}>
+        ITEMS ({parentItems.length})
+      </Text>
+      {parentItems.map((inv, idx) => {
+        let dividerObj = (parentButton?.dividers || []).find((d) => d.itemID === inv.id);
+        let hasDivider = !!dividerObj;
+        return (
+          <React.Fragment key={inv.id}>
+            {hasDivider && (
+              <View style={{ marginTop: 10, marginBottom: 4 }}>
+                <View style={{ height: 4, backgroundColor: C.buttonLightGreenOutline, borderRadius: 2 }} />
+                <TextInput_
+                  placeholder="Divider label (optional)"
+                  value={dividerObj?.label || ""}
+                  onChangeText={(val) => handleDividerLabelChange(inv.id, val)}
+                  debounceMs={500}
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    paddingVertical: 5,
-                    paddingHorizontal: 8,
-                    marginBottom: 3,
-                    backgroundColor: "rgb(230, 240, 252)",
-                    borderRadius: 4,
-                    borderLeftWidth: 3,
-                    borderLeftColor: C.blue,
+                    fontSize: 12,
+                    color: gray(0.5),
+                    paddingVertical: 3,
+                    paddingHorizontal: 6,
+                    outlineWidth: 0,
+                    backgroundColor: "transparent",
                   }}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 12, color: C.text }}>{name}</Text>
-                    {!!item && (
-                      <Text style={{ fontSize: 11, color: C.lightText }}>
-                        ${formatCurrencyDisp(item.price || 0)}
-                      </Text>
-                    )}
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveItem(itemId)}
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      backgroundColor: gray(0.08),
-                      borderRadius: 4,
-                    }}
-                  >
-                    <Text style={{ fontSize: 10, color: C.lightred }}>
-                      Remove
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-            {sItemsToAdd.length === 0 && (
-              <Text style={{ fontSize: 12, color: gray(0.4), textAlign: "center", paddingVertical: 20 }}>
-                No items added yet. Search above to add inventory items.
-              </Text>
+                />
+              </View>
             )}
-          </ScrollView>
-        </View>
-
-        {/* Search Results */}
-        {sSearchResults.length > 0 && (
-          <ScrollView
-            style={{
-              flex: 1,
-              marginHorizontal: 16,
-              marginBottom: 8,
-              borderWidth: 1,
-              borderColor: gray(0.1),
-              borderRadius: 4,
-              backgroundColor: "white",
-            }}
-          >
-            {sSearchResults.map((item, idx) => (
-              <TouchableOpacity
-                key={item.id || idx}
-                onPress={() => handleAddItem(item)}
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: 8,
-                  borderBottomWidth: 1,
-                  borderBottomColor: gray(0.08),
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, color: C.text }}>
-                    {item.formalName || item.informalName || "Unknown"}
-                  </Text>
-                  {!!item.brand && (
-                    <Text style={{ fontSize: 11, color: gray(0.5) }}>
-                      {item.brand}
-                    </Text>
-                  )}
-                </View>
-                <Text style={{ fontSize: 13, color: C.text }}>
-                  ${formatCurrencyDisp(item.price || 0)}
+            <div
+              draggable
+              onDragStart={() => _setDragIdx(idx)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                _setDragOverIdx(idx);
+              }}
+              onDragEnd={() => {
+                _setDragIdx(null);
+                _setDragOverIdx(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                reorderItems(sDragIdx, idx);
+                _setDragIdx(null);
+                _setDragOverIdx(null);
+              }}
+              onContextMenu={(e) => { e.preventDefault(); handleToggleDivider(inv.id); }}
+              title={hasDivider ? "Right click to remove divider" : "Right click to add divider above"}
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                paddingTop: 6,
+                paddingBottom: 6,
+                paddingLeft: 8,
+                paddingRight: 8,
+                borderRadius: 6,
+                borderWidth: sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx ? 2 : 1,
+                borderStyle: "solid",
+                borderColor: sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx ? C.blue : C.buttonLightGreenOutline,
+                backgroundColor: idx % 2 === 0 ? C.backgroundListWhite : C.listItemWhite,
+                marginBottom: 2,
+                cursor: "grab",
+                opacity: sDragIdx === idx ? 0.5 : 1,
+                position: "relative",
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, color: C.text }} numberOfLines={1}>
+                  {inv.informalName || inv.formalName}
                 </Text>
+                {!!inv.informalName && (
+                  <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
+                    {inv.formalName}
+                  </Text>
+                )}
+              </View>
+              <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
+                {"$" + formatCurrencyDisp(inv.price)}
+              </Text>
+              <TouchableOpacity onPress={() => handleDeleteItem(inv.id)}>
+                <Image_ icon={ICONS.close1} size={14} />
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        {/* Footer */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            padding: 16,
-            borderTopWidth: 1,
-            borderTopColor: gray(0.15),
-          }}
-        >
-          <Button_
-            text="Cancel"
-            onPress={onClose}
-            buttonStyle={{
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-              marginRight: 10,
-              backgroundColor: gray(0.15),
-            }}
-            textStyle={{ color: C.text }}
-          />
-          <Button_
-            text="Save"
-            colorGradientArr={COLOR_GRADIENTS.green}
-            onPress={() => onSave({ ...buttonObj, itemsToAdd: sItemsToAdd })}
-            buttonStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
-          />
-        </View>
-      </div>
-    </div>,
-    document.body
+              {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
+                <Image_
+                  icon={ICONS.backRed}
+                  size={14}
+                  style={{ position: "absolute", bottom: 4, left: 4 }}
+                />
+              )}
+              {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx < idx && (
+                <Image_
+                  icon={ICONS.rightArrowBlue}
+                  size={14}
+                  style={{ position: "absolute", bottom: 4, left: 4 }}
+                />
+              )}
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </View>
   );
 };
 
@@ -9287,6 +8808,176 @@ const SPOOF_WORKORDER = {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// Stand Buttons Search Panel (left side of modal)
+////////////////////////////////////////////////////////////////////////////////
+
+const StandButtonsSearchPanel = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const [sSearchString, _setSearchString] = useState("");
+  const [sSearchResults, _setSearchResults] = useState([]);
+  const [sSelectedItems, _setSelectedItems] = useState([]);
+
+  function handleSearch(val) {
+    _setSearchString(val);
+    if (!val || val.length < 2) {
+      _setSearchResults([]);
+      return;
+    }
+    workerSearchInventory(val, (results) => _setSearchResults(results));
+  }
+
+  function toggleItem(item) {
+    _setSelectedItems((prev) => {
+      let exists = prev.find((o) => o.id === item.id);
+      if (exists) return prev.filter((o) => o.id !== item.id);
+      return [...prev, item];
+    });
+  }
+
+  function handleAddSelected() {
+    if (sSelectedItems.length === 0) return;
+    let rows = intakeButtonsToRows(zSettingsObj?.intakeQuickButtons || []);
+
+    let lastRowIdx = rows.length > 0 ? rows.length - 1 : 0;
+    let newButtons = sSelectedItems.map((item) => ({
+      ...cloneDeep(INTAKE_QUICK_BUTTON_PROTO),
+      id: crypto.randomUUID(),
+      label: item.informalName || item.formalName || "",
+      inventoryItemID: item.id,
+      row: lastRowIdx,
+    }));
+
+    if (rows.length === 0) {
+      rows.push(newButtons);
+    } else {
+      rows[rows.length - 1] = [...rows[rows.length - 1], ...newButtons];
+    }
+    handleSettingsFieldChange("intakeQuickButtons", intakeRowsToFlat(rows));
+    _setSelectedItems([]);
+  }
+
+  return (
+    <div
+      style={{
+        width: "35%",
+        minWidth: 280,
+        maxWidth: 420,
+        borderRightWidth: 1,
+        borderRightStyle: "solid",
+        borderRightColor: gray(0.15),
+        display: "flex",
+        flexDirection: "column",
+        flexShrink: 0,
+      }}
+    >
+      {/* Search header */}
+      <View style={{ padding: 12, paddingBottom: 8 }}>
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: Fonts.weight.textHeavy,
+            color: C.blue,
+            marginBottom: 4,
+          }}
+        >
+          SEARCH INVENTORY
+        </Text>
+        <TextInput_
+          style={{
+            borderColor: C.buttonLightGreenOutline,
+            borderWidth: 1,
+            borderRadius: 6,
+            width: "100%",
+            fontSize: 13,
+            color: C.text,
+            paddingVertical: 6,
+            paddingHorizontal: 8,
+            outlineWidth: 0,
+            outlineStyle: "none",
+          }}
+          value={sSearchString}
+          onChangeText={handleSearch}
+          placeholder="Search inventory..."
+          placeholderTextColor={gray(0.35)}
+        />
+      </View>
+
+      {/* Results list */}
+      <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
+        {sSearchResults.slice(0, 50).map((item, idx) => {
+          let isSelected = !!sSelectedItems.find((o) => o.id === item.id);
+          return (
+            <TouchableOpacity
+              key={item.id || idx}
+              onPress={() => toggleItem(item)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 6,
+                paddingHorizontal: 6,
+                borderBottomWidth: 1,
+                borderBottomColor: gray(0.08),
+                backgroundColor: isSelected ? "rgb(230, 245, 235)" : "transparent",
+                borderRadius: 4,
+              }}
+            >
+              <CheckBox_
+                isChecked={isSelected}
+                onCheck={() => toggleItem(item)}
+                buttonStyle={{ marginRight: 8 }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, color: C.text }}>
+                  {item.informalName || item.formalName || "Unknown"}
+                </Text>
+                {!!item.brand && (
+                  <Text style={{ fontSize: 10, color: gray(0.5) }}>
+                    {item.brand}
+                  </Text>
+                )}
+              </View>
+              <Text style={{ fontSize: 12, color: C.text }}>
+                ${formatCurrencyDisp(item.price || 0)}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+        {sSearchString.length >= 2 && sSearchResults.length === 0 && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: gray(0.4),
+              textAlign: "center",
+              paddingVertical: 20,
+            }}
+          >
+            No results found
+          </Text>
+        )}
+      </ScrollView>
+
+      {/* Add Selected button */}
+      {sSelectedItems.length > 0 && (
+        <View
+          style={{
+            padding: 12,
+            borderTopWidth: 1,
+            borderTopColor: gray(0.15),
+            alignItems: "center",
+          }}
+        >
+          <Button_
+            text={`Add ${sSelectedItems.length} Item${sSelectedItems.length > 1 ? "s" : ""}`}
+            colorGradientArr={COLOR_GRADIENTS.green}
+            onPress={handleAddSelected}
+            style={{ paddingHorizontal: 20, paddingVertical: 8, width: "100%" }}
+          />
+        </View>
+      )}
+    </div>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // Stand Buttons Editor Component
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -9294,119 +8985,398 @@ const StandButtonsEditorComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
   _setStandEditButtonObj,
+  _setShowStandButtonsModal,
 }) => {
+  const [sEditMode, _setEditMode] = useState(false);
   const [sDragSource, _setDragSource] = useState(null);
   const [sDragTarget, _setDragTarget] = useState(null);
+  const [sNewRowDropTarget, _setNewRowDropTarget] = useState(null);
+  const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
+  const [sShowWODropdown, _setShowWODropdown] = useState(false);
+  const [sButtonHeight, _setButtonHeight] = useState(40);
+  const [sContainerSize, _setContainerSize] = useState({ w: 0, h: 0 });
+  const resizeObsRef = useRef(null);
+  const containerRefCb = useCallback((node) => {
+    if (resizeObsRef.current) resizeObsRef.current.disconnect();
+    if (!node) return;
+    let obs = new ResizeObserver((entries) => {
+      let { width, height } = entries[0].contentRect;
+      _setContainerSize({ w: Math.floor(width), h: Math.floor(height) });
+    });
+    obs.observe(node);
+    resizeObsRef.current = obs;
+  }, []);
 
-  let rows = zSettingsObj?.intakeQuickButtons || [];
-  // Handle legacy flat format
-  if (rows.length > 0 && !Array.isArray(rows[0])) {
-    rows = [];
-  }
+  const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
+  const zInventory = useInventoryStore((state) => state.inventoryArr);
+
+  let selectedWorkorder = sSelectedWorkorderID
+    ? zWorkorders.find((o) => o.id === sSelectedWorkorderID) || null
+    : null;
+
+  let salesTaxPercent = zSettingsObj?.salesTaxPercent || 0;
+  let totals = selectedWorkorder?.workorderLines?.length > 0
+    ? calculateRunningTotals(selectedWorkorder, salesTaxPercent, [], false, !!selectedWorkorder.taxFree)
+    : { finalTotal: 0, runningSubtotal: 0, runningTax: 0, runningQty: 0 };
+
+  let rows = intakeButtonsToRows(zSettingsObj?.intakeQuickButtons || []);
+  let allButtons = rows.flat();
+  let ROW_HEIGHT = sButtonHeight + 10; // button + 5px padding top + 5px padding bottom
+  let btnMargin = 6; // 3px margin on each side of button
+  let buttonsPerRow = sContainerSize.w > 0 ? Math.floor(sContainerSize.w / (100 + btnMargin)) : 1;
+  let buttonVisualRows = allButtons.length > 0 ? Math.ceil(allButtons.length / buttonsPerRow) : 0;
+  let totalRows = sContainerSize.h > 0 ? Math.floor(sContainerSize.h / ROW_HEIGHT) : 0;
+  let emptyRowCount = Math.max(0, totalRows - buttonVisualRows);
 
   function saveRows(updatedRows) {
-    // Filter out empty rows
     let cleaned = updatedRows.filter((row) => row.length > 0);
-    handleSettingsFieldChange("intakeQuickButtons", cleaned);
+    handleSettingsFieldChange("intakeQuickButtons", intakeRowsToFlat(cleaned));
   }
 
-  function handleAddRow() {
-    saveRows([...rows, []]);
+  function handleDeleteButton(btnId) {
+    saveFlatButtons(allButtons.filter((b) => b.id !== btnId));
   }
 
-  function handleDeleteButton(rowIdx, btnIdx) {
+  function handleLabelChange(btnId, val) {
+    saveFlatButtons(allButtons.map((b) => b.id === btnId ? { ...b, label: val } : b));
+  }
+
+  function saveFlatButtons(flat) {
+    handleSettingsFieldChange("intakeQuickButtons", flat.map((b) => ({ ...b, row: 0 })));
+  }
+
+  function handleReorder(fromRow, fromIdx, toRow, toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+    let flat = [...allButtons];
+    let [dragged] = flat.splice(fromIdx, 1);
+    flat.splice(toIdx, 0, dragged);
+    saveFlatButtons(flat);
+  }
+
+  function handleDropToNewRow(slotIdx) {
+    if (!sDragSource) return;
+    let flat = [...allButtons];
+    let [dragged] = flat.splice(sDragSource.btnIdx, 1);
+    let insertAt = slotIdx * buttonsPerRow;
+    if (insertAt > flat.length) insertAt = flat.length;
+    flat.splice(insertAt, 0, dragged);
+    saveFlatButtons(flat);
+  }
+
+  function handleNewWorkorder() {
+    useLoginStore.getState().requireLogin(() => {
+      useCurrentCustomerStore.getState().setCustomer(null, false);
+      let store = useOpenWorkordersStore.getState();
+      store.setWorkorderPreviewID(null);
+      let wo = createNewWorkorder({
+        startedByFirst: useLoginStore.getState().currentUser?.first,
+        startedByLast: useLoginStore.getState().currentUser?.last,
+      });
+      store.setWorkorder(wo, false);
+      _setSelectedWorkorderID(wo.id);
+    });
+  }
+
+  async function handleQuickButtonPress(btn) {
+    if (!selectedWorkorder || !btn.inventoryItemID) return;
+    let invItem = (zInventory || []).find((o) => o.id === btn.inventoryItemID);
+    if (!invItem) return;
+    await dbSaveOpenWorkorder(selectedWorkorder);
+    let lines = [...(selectedWorkorder.workorderLines || [])];
+    let line = cloneDeep(WORKORDER_ITEM_PROTO);
+    line.inventoryItem = invItem;
+    line.id = crypto.randomUUID();
+    lines.push(line);
+    useOpenWorkordersStore.getState().setField("workorderLines", lines, selectedWorkorder.id, true);
+  }
+
+  function handleModQty(lineId, direction) {
+    if (!selectedWorkorder) return;
+    let lines = selectedWorkorder.workorderLines.map((line) => {
+      if (line.id !== lineId) return line;
+      let newQty = direction === "up" ? line.qty + 1 : Math.max(1, line.qty - 1);
+      return { ...line, qty: newQty };
+    });
+    useOpenWorkordersStore.getState().setField("workorderLines", lines, selectedWorkorder.id, true);
+  }
+
+  function handleDropOnRow(targetRowIdx) {
+    if (!sDragSource) return;
+    if (sDragSource.rowIdx === targetRowIdx) return;
     let updated = rows.map((row) => [...row]);
-    updated[rowIdx].splice(btnIdx, 1);
+    let [dragged] = updated[sDragSource.rowIdx].splice(sDragSource.btnIdx, 1);
+    // Adjust target index if source row will be removed (empty after splice)
+    let adjIdx = targetRowIdx;
+    if (updated[sDragSource.rowIdx].length === 0 && targetRowIdx > sDragSource.rowIdx) {
+      adjIdx = targetRowIdx - 1;
+    }
+    updated = updated.filter((row) => row.length > 0);
+    updated[adjIdx] = [...updated[adjIdx], dragged];
     saveRows(updated);
   }
 
-  function handleLabelChange(rowIdx, btnIdx, val) {
-    let updated = rows.map((row) => [...row]);
-    updated[rowIdx][btnIdx] = { ...updated[rowIdx][btnIdx], label: val };
-    handleSettingsFieldChange("intakeQuickButtons", updated);
-  }
-
-  function handleReorder(fromRow, fromBtn, toRow, toBtn) {
-    if (
-      fromRow === null ||
-      fromBtn === null ||
-      toRow === null ||
-      toBtn === null
-    )
-      return;
-    if (fromRow === toRow && fromBtn === toBtn) return;
-    let updated = rows.map((row) => [...row]);
-    let [dragged] = updated[fromRow].splice(fromBtn, 1);
-    // If source row became empty and target row is after it, adjust index
-    if (updated[fromRow].length === 0 && toRow > fromRow) {
-      updated.splice(fromRow, 1);
-      updated[toRow - 1].splice(toBtn, 0, dragged);
-    } else {
-      updated[toRow].splice(toBtn, 0, dragged);
-      // Clean up empty rows
-      updated = updated.filter((row) => row.length > 0);
-    }
-    handleSettingsFieldChange("intakeQuickButtons", updated);
-  }
+  let woLabel = selectedWorkorder
+    ? `#${formatWorkorderNumber(selectedWorkorder.workorderNumber)} - ${selectedWorkorder.customerFirst || selectedWorkorder.brand || "(no name)"} ${selectedWorkorder.customerLast || ""}`.trim()
+    : "Select Workorder...";
 
   return (
-    <BoxContainerOuterComponent>
-      <BoxContainerInnerComponent
-        style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
-      >
-        <View style={{ width: "100%", alignItems: "center" }}>
-          <Text
-            style={{
-              fontSize: 12,
-              color: gray(0.45),
-              marginBottom: 12,
-              textAlign: "center",
-            }}
-          >
-            This is a preview of the tablet stand layout. Drag buttons to
-            reorder. Press + on a row to add a button.
+    <View style={{ flex: 1, width: "100%", padding: 10, alignItems: "center" }}>
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, width: "70%" }}>
+        <Text style={{ flex: 1, fontSize: 12, color: gray(0.45) }}>
+          {sEditMode ? "Drag buttons to reorder. Drop onto a row or the bottom slot." : "Tap a button to add items to the workorder."}
+        </Text>
+        <TouchableOpacity
+          onPress={() => { _setEditMode(!sEditMode); _setDragSource(null); _setDragTarget(null); _setNewRowDropTarget(null); }}
+          style={{
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 6,
+            backgroundColor: sEditMode ? C.green : gray(0.12),
+            marginLeft: 8,
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "600", color: sEditMode ? "white" : C.text }}>
+            {sEditMode ? "Done" : "Edit Layout"}
           </Text>
+        </TouchableOpacity>
+      </View>
 
-          {/* Tablet mock frame */}
-          <div
+      {sEditMode && (
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, width: "70%" }}>
+          <Text style={{ fontSize: 11, color: gray(0.45), marginRight: 8 }}>Button Height: {sButtonHeight}px</Text>
+          <input
+            type="range"
+            min={30}
+            max={80}
+            value={sButtonHeight}
+            onChange={(e) => _setButtonHeight(Number(e.target.value))}
+            style={{ flex: 1 }}
+          />
+        </View>
+      )}
+
+      {/* Tablet mock frame */}
+      <div
+        style={{
+          width: "70%",
+          flex: 1,
+          borderWidth: 3,
+          borderStyle: "solid",
+          borderColor: gray(0.3),
+          borderRadius: 20,
+          backgroundColor: C.backgroundWhite,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          padding: 12,
+          boxSizing: "border-box",
+        }}
+      >
+        {/* Header row: workorder selector + new button + total */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 8,
+            gap: 6,
+            position: "relative",
+          }}
+        >
+          {/* Workorder selector */}
+          <TouchableOpacity
+            onPress={() => _setShowWODropdown(!sShowWODropdown)}
             style={{
-              width: 400,
-              minHeight: 650,
-              borderWidth: 3,
-              borderStyle: "solid",
-              borderColor: gray(0.3),
-              borderRadius: 20,
-              backgroundColor: C.backgroundWhite,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              padding: 12,
-              boxSizing: "border-box",
+              flex: 1,
+              height: 36,
+              borderWidth: 1,
+              borderColor: gray(0.15),
+              borderRadius: 6,
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 10,
             }}
           >
-            {/* Header placeholder */}
-            <div
+            <Text
+              style={{
+                fontSize: 12,
+                color: selectedWorkorder ? C.text : gray(0.35),
+                flex: 1,
+              }}
+              numberOfLines={1}
+            >
+              {woLabel}
+            </Text>
+            <Image_ icon={ICONS.downChevron} size={10} />
+          </TouchableOpacity>
+
+          {/* New workorder button (icon only) */}
+          <TouchableOpacity
+            onPress={handleNewWorkorder}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 6,
+              backgroundColor: C.blue,
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Image_ icon={ICONS.add} size={16} />
+          </TouchableOpacity>
+
+          {/* Total price */}
+          {selectedWorkorder && (
+            <View
               style={{
                 height: 36,
+                borderRadius: 6,
+                backgroundColor: C.green,
+                paddingHorizontal: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: "white", fontWeight: Fonts.weight.textHeavy }}>
+                ${formatCurrencyDisp(totals.finalTotal)}
+              </Text>
+            </View>
+          )}
+
+          {/* Workorder dropdown */}
+          {sShowWODropdown && (
+            <div
+              style={{
+                position: "absolute",
+                top: 40,
+                left: 0,
+                right: 70,
+                maxHeight: 200,
+                backgroundColor: "white",
                 borderWidth: 1,
                 borderStyle: "solid",
                 borderColor: gray(0.15),
                 borderRadius: 6,
-                display: "flex",
-                alignItems: "center",
-                paddingLeft: 10,
-                marginBottom: 8,
+                zIndex: 100,
+                overflowY: "auto",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               }}
             >
-              <Text style={{ fontSize: 12, color: gray(0.35) }}>
-                Select Workorder...
-              </Text>
+              {zWorkorders.map((wo) => (
+                <TouchableOpacity
+                  key={wo.id}
+                  onPress={() => {
+                    _setSelectedWorkorderID(wo.id);
+                    _setShowWODropdown(false);
+                  }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    padding: 8,
+                    borderBottomWidth: 1,
+                    borderBottomColor: gray(0.06),
+                    backgroundColor: wo.id === sSelectedWorkorderID ? "rgb(230,240,252)" : "white",
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: C.text }} numberOfLines={1}>
+                    #{formatWorkorderNumber(wo.workorderNumber)} - {wo.customerFirst || wo.brand || "(no name)"} {wo.customerLast || ""}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {zWorkorders.length === 0 && (
+                <Text style={{ fontSize: 12, color: gray(0.4), textAlign: "center", padding: 12 }}>
+                  No open workorders
+                </Text>
+              )}
             </div>
+          )}
+        </div>
 
-            {/* Items placeholder */}
+        {/* Scrollable body: line items + quick buttons */}
+        <div style={{ flex: 1, overflowY: sEditMode ? "hidden" : "auto", display: "flex", flexDirection: "column" }}>
+          {/* Line items list */}
+          {selectedWorkorder && selectedWorkorder.workorderLines?.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              {selectedWorkorder.workorderLines.map((line) => {
+                let inv = line.inventoryItem || {};
+                let name = inv.informalName || inv.formalName || "Unknown";
+                let lineTotal = (inv.price || 0) * (line.qty || 1);
+                return (
+                  <div
+                    key={line.id}
+                    style={{
+                      display: "flex",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingVertical: 6,
+                      paddingHorizontal: 8,
+                      marginBottom: 3,
+                      borderWidth: 1,
+                      borderStyle: "solid",
+                      borderColor: gray(0.1),
+                      borderRadius: 6,
+                      backgroundColor: "white",
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, color: C.text }} numberOfLines={1}>
+                        {name}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: gray(0.5) }}>
+                        ${formatCurrencyDisp(lineTotal)}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <TouchableOpacity
+                        onPress={() => handleModQty(line.id, "down")}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Image_ icon={ICONS.downArrowOrange} size={12} />
+                      </TouchableOpacity>
+                      <View
+                        style={{
+                          minWidth: 28,
+                          height: 24,
+                          borderRadius: 4,
+                          backgroundColor: gray(0.08),
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginHorizontal: 2,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, color: C.text, fontWeight: "600" }}>
+                          {line.qty || 1}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleModQty(line.id, "up")}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Image_ icon={ICONS.upArrowOrange} size={12} />
+                      </TouchableOpacity>
+                    </View>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Line items empty state */}
+          {selectedWorkorder && (!selectedWorkorder.workorderLines || selectedWorkorder.workorderLines.length === 0) && (
             <div
               style={{
-                flex: 1,
                 borderWidth: 1,
                 borderStyle: "dashed",
                 borderColor: gray(0.15),
@@ -9415,121 +9385,110 @@ const StandButtonsEditorComponent = ({
                 alignItems: "center",
                 justifyContent: "center",
                 marginBottom: 8,
-                minHeight: 120,
+                paddingVertical: 20,
               }}
             >
               <Text style={{ fontSize: 11, color: gray(0.3) }}>
-                Line Items Area
+                Press a button below to add items
               </Text>
             </div>
+          )}
 
-            {/* Quick Buttons area */}
+          {/* Quick Buttons area */}
+          <div
+            ref={containerRefCb}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              borderTopWidth: 1,
+              borderTopStyle: "solid",
+              borderTopColor: gray(0.15),
+              overflowY: (buttonVisualRows * ROW_HEIGHT) > sContainerSize.h ? "auto" : "hidden",
+            }}
+          >
+            {/* All buttons in a single flex-wrap container */}
             <div
               style={{
-                borderTopWidth: 1,
-                borderTopStyle: "solid",
-                borderTopColor: gray(0.15),
-                paddingTop: 8,
+                display: "flex",
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "flex-start",
               }}
             >
-              {rows.map((row, rowIdx) => (
-                <div
-                  key={rowIdx}
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginBottom: 6,
-                  }}
-                >
-                  {row.map((btn, btnIdx) => (
-                    <StandButtonCard
-                      key={btn.id}
-                      btn={btn}
-                      rowIdx={rowIdx}
-                      btnIdx={btnIdx}
-                      sDragSource={sDragSource}
-                      sDragTarget={sDragTarget}
-                      _setDragSource={_setDragSource}
-                      _setDragTarget={_setDragTarget}
-                      handleReorder={handleReorder}
-                      handleLabelChange={handleLabelChange}
-                      handleDeleteButton={handleDeleteButton}
-                      handleEditPress={() => _setStandEditButtonObj(btn)}
-                    />
-                  ))}
-                  {/* Add button to this row */}
-                  <TouchableOpacity
-                    onPress={() => {
-                      let newBtn = {
-                        ...cloneDeep(INTAKE_QUICK_BUTTON_PROTO),
-                        id: crypto.randomUUID(),
-                      };
-                      let updated = rows.map((r) => [...r]);
-                      updated[rowIdx].push(newBtn);
-                      handleSettingsFieldChange("intakeQuickButtons", updated);
-                      _setStandEditButtonObj(newBtn);
-                    }}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 14,
-                      backgroundColor: C.green,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginLeft: 4,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 18,
-                        fontWeight: "700",
-                        marginTop: -2,
-                      }}
-                    >
-                      +
-                    </Text>
-                  </TouchableOpacity>
-                </div>
+              {rows.flat().map((btn, flatIdx) => (
+                <StandButtonCard
+                  key={btn.id}
+                  btn={btn}
+                  rowIdx={0}
+                  btnIdx={flatIdx}
+                  sEditMode={sEditMode}
+                  sDragSource={sDragSource}
+                  sDragTarget={sDragTarget}
+                  _setDragSource={_setDragSource}
+                  _setDragTarget={_setDragTarget}
+                  handleReorder={handleReorder}
+                  handleLabelChange={handleLabelChange}
+                  handleDeleteButton={handleDeleteButton}
+                  onQuickButtonPress={() => handleQuickButtonPress(btn)}
+                  buttonHeight={sButtonHeight}
+                />
               ))}
-
-              {rows.length === 0 && (
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: gray(0.35),
-                    textAlign: "center",
-                    paddingVertical: 16,
-                  }}
-                >
-                  No rows yet. Press "Add Row" below.
-                </Text>
-              )}
             </div>
 
-            {/* Add Row button */}
-            <TouchableOpacity
-              onPress={handleAddRow}
-              style={{
-                marginTop: 6,
-                paddingVertical: 8,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                borderRadius: 6,
-                alignItems: "center",
-                backgroundColor: C.listItemWhite,
-              }}
-            >
-              <Text style={{ fontSize: 12, color: C.green, fontWeight: "600" }}>
-                + Add Row
+            {/* Empty row drop targets - edit mode only */}
+            {sEditMode && emptyRowCount > 0 && Array.from({ length: emptyRowCount }).map((_, i) => {
+              let slotIdx = buttonVisualRows + i;
+              let isSlotOver = sNewRowDropTarget === slotIdx && !!sDragSource;
+              return (
+                <div
+                  key={"empty-" + slotIdx}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    _setNewRowDropTarget(slotIdx);
+                  }}
+                  onDragLeave={() => _setNewRowDropTarget(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDropToNewRow(slotIdx);
+                    _setDragSource(null);
+                    _setNewRowDropTarget(null);
+                  }}
+                  style={{
+                    height: ROW_HEIGHT,
+                    borderWidth: 2,
+                    borderStyle: "dashed",
+                    borderColor: isSlotOver ? C.green : gray(0.15),
+                    borderRadius: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: isSlotOver ? "rgba(76, 175, 80, 0.1)" : "transparent",
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: isSlotOver ? C.green : gray(0.25) }}>
+                    {isSlotOver ? "Drop to create new row" : ""}
+                  </Text>
+                </div>
+              );
+            })}
+
+            {rows.flat().length === 0 && !sEditMode && (
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: gray(0.35),
+                  textAlign: "center",
+                  paddingVertical: 16,
+                }}
+              >
+                Search and add items from the panel on the left.
               </Text>
-            </TouchableOpacity>
+            )}
           </div>
-        </View>
-      </BoxContainerInnerComponent>
-    </BoxContainerOuterComponent>
+        </div>
+      </div>
+    </View>
   );
 };
 
@@ -9541,6 +9500,7 @@ const StandButtonCard = ({
   btn,
   rowIdx,
   btnIdx,
+  sEditMode,
   sDragSource,
   sDragTarget,
   _setDragSource,
@@ -9548,49 +9508,51 @@ const StandButtonCard = ({
   handleReorder,
   handleLabelChange,
   handleDeleteButton,
-  handleEditPress,
+  onQuickButtonPress,
+  buttonHeight,
 }) => {
   const [sIsEditingLabel, _setIsEditingLabel] = useState(false);
 
   let isOver =
-    sDragTarget &&
-    sDragTarget.rowIdx === rowIdx &&
+    sEditMode && sDragTarget &&
     sDragTarget.btnIdx === btnIdx;
   let isDragging =
-    sDragSource &&
-    sDragSource.rowIdx === rowIdx &&
+    sEditMode && sDragSource &&
     sDragSource.btnIdx === btnIdx;
 
   return (
     <div
-      draggable
-      onDragStart={() => _setDragSource({ rowIdx, btnIdx })}
-      onDragOver={(e) => {
-        e.preventDefault();
-        _setDragTarget({ rowIdx, btnIdx });
+      draggable={sEditMode && !sIsEditingLabel}
+      onClick={() => {
+        if (sEditMode) { _setIsEditingLabel(true); }
+        else if (onQuickButtonPress) { onQuickButtonPress(); }
       }}
-      onDrop={(e) => {
+      onDragStart={sEditMode ? () => _setDragSource({ rowIdx, btnIdx }) : undefined}
+      onDragOver={sEditMode ? (e) => {
         e.preventDefault();
+        e.stopPropagation();
+        _setDragTarget({ rowIdx, btnIdx });
+      } : undefined}
+      onDrop={sEditMode ? (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (sDragSource) {
-          handleReorder(
-            sDragSource.rowIdx,
-            sDragSource.btnIdx,
-            rowIdx,
-            btnIdx
-          );
+          handleReorder(sDragSource.rowIdx, sDragSource.btnIdx, rowIdx, btnIdx);
         }
         _setDragSource(null);
         _setDragTarget(null);
-      }}
-      onDragEnd={() => {
+      } : undefined}
+      onDragEnd={sEditMode ? () => {
         _setDragSource(null);
         _setDragTarget(null);
-      }}
+      } : undefined}
       style={{
-        flex: 1,
-        minHeight: 44,
+        minWidth: 50,
+        maxWidth: 100,
+        height: buttonHeight || 40,
         margin: 3,
-        padding: 6,
+        paddingVertical: 5,
+        paddingHorizontal: 6,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -9601,84 +9563,67 @@ const StandButtonCard = ({
         borderRadius: 8,
         backgroundColor: C.listItemWhite,
         position: "relative",
-        cursor: "grab",
+        cursor: sEditMode ? (sIsEditingLabel ? "text" : "grab") : "pointer",
         opacity: isDragging ? 0.5 : 1,
         boxSizing: "border-box",
       }}
     >
-      {/* Delete button (top-right) */}
-      <TouchableOpacity
-        onPress={() => handleDeleteButton(rowIdx, btnIdx)}
-        style={{
-          position: "absolute",
-          top: 2,
-          right: 2,
-          width: 16,
-          height: 16,
-          borderRadius: 8,
-          backgroundColor: gray(0.12),
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Text style={{ fontSize: 10, color: C.lightred, fontWeight: "700" }}>
-          ×
-        </Text>
-      </TouchableOpacity>
+      {/* Delete button (top-right) - edit mode only */}
+      {sEditMode && (
+        <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 2, right: 2, zIndex: 2 }}>
+          <TouchableOpacity
+            onPress={() => handleDeleteButton(btn.id)}
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: 8,
+              backgroundColor: gray(0.12),
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 10, color: C.lightred, fontWeight: "700" }}>
+              ×
+            </Text>
+          </TouchableOpacity>
+        </div>
+      )}
 
-      {/* Edit button (top-left) */}
-      <TouchableOpacity
-        onPress={handleEditPress}
-        style={{
-          position: "absolute",
-          top: 2,
-          left: 2,
-          width: 16,
-          height: 16,
-          borderRadius: 8,
-          backgroundColor: gray(0.12),
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Image_ icon={ICONS.editPencil} size={9} />
-      </TouchableOpacity>
-
-      {/* Label */}
-      {sIsEditingLabel ? (
-        <TextInput_
-          style={{
-            fontSize: 11,
-            color: C.text,
-            textAlign: "center",
-            borderBottomWidth: 1,
-            borderBottomColor: gray(0.3),
-            paddingVertical: 2,
-            width: "100%",
-            outlineWidth: 0,
-            outlineStyle: "none",
-          }}
-          value={btn.label || ""}
-          onChangeText={(val) => handleLabelChange(rowIdx, btnIdx, val)}
-          onBlur={() => _setIsEditingLabel(false)}
-          autoFocus
-          placeholder="Label..."
-          placeholderTextColor={gray(0.3)}
-        />
-      ) : (
-        <TouchableOpacity onPress={() => _setIsEditingLabel(true)}>
-          <Text
+      {/* Label - inline editable in edit mode */}
+      {sEditMode && sIsEditingLabel ? (
+        <div onClick={(e) => e.stopPropagation()}>
+          <TextInput_
             style={{
               fontSize: 11,
-              color: btn.label ? C.text : gray(0.35),
+              color: C.text,
               textAlign: "center",
-              fontWeight: "500",
+              borderBottomWidth: 1,
+              borderBottomColor: gray(0.3),
+              paddingVertical: 2,
+              width: "100%",
+              outlineWidth: 0,
+              outlineStyle: "none",
             }}
-            numberOfLines={2}
-          >
-            {btn.label || "(tap to name)"}
-          </Text>
-        </TouchableOpacity>
+            value={btn.label || ""}
+            onChangeText={(val) => handleLabelChange(btn.id, val)}
+            onBlur={() => _setIsEditingLabel(false)}
+            autoFocus
+            placeholder="Label..."
+            placeholderTextColor={gray(0.3)}
+          />
+        </div>
+      ) : (
+        <Text
+          style={{
+            fontSize: 11,
+            color: btn.label ? C.text : (sEditMode ? gray(0.35) : gray(0.35)),
+            textAlign: "center",
+            fontWeight: "500",
+          }}
+          numberOfLines={2}
+        >
+          {btn.label || (sEditMode ? "(tap to name)" : "")}
+        </Text>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { jsPDF } from "jspdf";
+import { formatWorkorderNumber } from "./utils";
 
 ////////////////////////////////////////////////////////////////////////////////
 // Default label sets (exported so receiptTranslator can read the keys)
@@ -537,7 +538,7 @@ export function generateWorkorderTicketPDF(data) {
   // Workorder info
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  if (data.workorderNumber) { doc.text("WO #: " + data.workorderNumber, leftX, y); y += 12; }
+  if (data.workorderNumber) { doc.text("WO #: " + formatWorkorderNumber(data.workorderNumber), leftX, y); y += 12; }
   if (data.startedOnMillis) { doc.text("Date: " + new Date(Number(data.startedOnMillis)).toLocaleDateString(), leftX, y); y += 12; }
   if (data.status) { doc.text("Status: " + data.status, leftX, y); y += 12; }
   if (data.startedBy) { doc.text("By: " + data.startedBy, leftX, y); y += 12; }

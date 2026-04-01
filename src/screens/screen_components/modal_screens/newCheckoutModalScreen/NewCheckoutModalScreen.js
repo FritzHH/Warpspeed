@@ -34,7 +34,8 @@ import {
   localStorageWrapper,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, TAX_FREE_RECEIPT_NOTE, CUSTOMER_PROTO } from "../../../../data";
-import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder } from "../../../../db_calls_wrapper";
+import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder, dbReturnId, dbRequestNewId } from "../../../../db_calls_wrapper";
+import { generateIdCallable } from "../../../../db_calls";
 import {
   createNewSale,
   updateSaleWithTotals,
@@ -265,6 +266,7 @@ export function NewCheckoutModalScreen() {
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
   const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
   const salePersistedRef = useRef(false);
+  const prefetchedTxnIdRef = useRef(null);
   // ─── Derived Values ───────────────────────────────────────
   let isDepositMode = !!zDepositInfo;
   let isStandalone = !zOpenWorkorder?.customerID;
@@ -300,6 +302,13 @@ export function NewCheckoutModalScreen() {
     } else {
       initializeCheckout();
     }
+  }
+
+  function handleTransactionIdUsed() {
+    prefetchedTxnIdRef.current = null;
+    generateIdCallable({ node: "transactions" }).then((r) => {
+      prefetchedTxnIdRef.current = r.data?.id || null;
+    }).catch(() => {});
   }
 
   async function initializeCheckout() {
@@ -399,7 +408,17 @@ export function NewCheckoutModalScreen() {
     }
 
     // No existing sale — create a new one and persist immediately
-    let sale = createNewSale(zSettings, createdBy);
+    let saleId = null;
+    try {
+      let saleResult = await generateIdCallable({ node: "sales" });
+      saleId = saleResult.data?.id || null;
+    } catch (e) { log("initializeCheckout: sale ID prefetch failed, using fallback", e?.message); }
+    let sale = createNewSale(zSettings, createdBy, saleId);
+
+    // Pre-fetch a transaction ID for the first payment
+    generateIdCallable({ node: "transactions" }).then((r) => {
+      prefetchedTxnIdRef.current = r.data?.id || null;
+    }).catch(() => {});
 
     if (zOpenWorkorder) {
       // Checkout with workorder
@@ -426,12 +445,23 @@ export function NewCheckoutModalScreen() {
     fetchReaders();
   }
 
-  function initializeDepositCheckout(depositInfo) {
+  async function initializeDepositCheckout(depositInfo) {
     let currentUser = useLoginStore.getState().currentUser;
     let createdBy = currentUser?.first
       ? currentUser.first + " " + (currentUser.last || "")
       : "";
-    let sale = createNewSale(zSettings, createdBy);
+    let saleId = null;
+    try {
+      let saleResult = await generateIdCallable({ node: "sales" });
+      saleId = saleResult.data?.id || null;
+    } catch (e) { log("initializeDepositCheckout: sale ID prefetch failed", e?.message); }
+    let sale = createNewSale(zSettings, createdBy, saleId);
+
+    // Pre-fetch a transaction ID for the first payment
+    generateIdCallable({ node: "transactions" }).then((r) => {
+      prefetchedTxnIdRef.current = r.data?.id || null;
+    }).catch(() => {});
+
     sale.subtotal = depositInfo.amountCents;
     sale.salesTax = 0;
     sale.discount = 0;
@@ -1283,12 +1313,12 @@ export function NewCheckoutModalScreen() {
           useAlertScreenStore.getState().setValues({ showAlert: false });
           let woStore = useOpenWorkordersStore.getState();
           let oldWoId = woStore.openWorkorderID;
+          resetAndClose();
           if (oldWoId) {
             dbDeleteWorkorder(oldWoId);
             woStore.removeWorkorder(oldWoId, false);
           }
           woStore.setOpenWorkorderID(null);
-          resetAndClose();
           useTabNamesStore.getState().setItems({
             infoTabName: TAB_NAMES.infoTab.customer,
             itemsTabName: TAB_NAMES.itemsTab.empty,
@@ -1298,8 +1328,6 @@ export function NewCheckoutModalScreen() {
         btn2Text: "Choose More Items",
         handleBtn2Press: () => {
           useAlertScreenStore.getState().setValues({ showAlert: false });
-          let woId = useOpenWorkordersStore.getState().openWorkorderID;
-          if (woId) dbDeleteWorkorder(woId);
           resetAndClose();
         },
       });
@@ -1312,11 +1340,16 @@ export function NewCheckoutModalScreen() {
     let hasPayments = sTransactions.length > 0 || sCredits.length > 0;
     if (sSale?.id && !hasPayments && salePersistedRef.current) {
       deleteActiveSale(sSale.id);
+      dbReturnId("sales", sSale.id);
       for (let wo of sCombinedWorkorders) {
         let cleaned = cloneDeep(wo);
         cleaned.activeSaleID = "";
         useOpenWorkordersStore.getState().setWorkorder(cleaned, true);
       }
+    }
+    if (prefetchedTxnIdRef.current) {
+      dbReturnId("transactions", prefetchedTxnIdRef.current);
+      prefetchedTxnIdRef.current = null;
     }
     salePersistedRef.current = false;
     broadcastClear();
@@ -1356,10 +1389,24 @@ export function NewCheckoutModalScreen() {
     let store = useOpenWorkordersStore.getState();
     let oldWo = store.getOpenWorkorder();
     if (oldWo) store.removeWorkorder(oldWo.id);
+
+    let tmpKey = dbRequestNewId("workorders", (realId, tmpKey) => {
+      let st = useOpenWorkordersStore.getState();
+      let wo = st.workorders.find((w) => String(w._tmpKey) === String(tmpKey));
+      if (!wo) return;
+      st.removeWorkorder(String(tmpKey), false);
+      let updated = { ...wo, id: realId };
+      delete updated._tmpKey;
+      st.setWorkorder(updated, false);
+      if (st.getOpenWorkorderID() === String(tmpKey)) st.setOpenWorkorderID(realId);
+    });
+
     let wo = createNewWorkorder({
+      id: String(tmpKey),
       startedByFirst: useLoginStore.getState().currentUser?.first,
       startedByLast: useLoginStore.getState().currentUser?.last,
     });
+    wo._tmpKey = tmpKey;
     store.setWorkorder(wo, false);
     store.setOpenWorkorderID(wo.id);
   }
@@ -1534,6 +1581,8 @@ export function NewCheckoutModalScreen() {
                 hasReaders={onlineReaders.length > 0}
                 isVisible={zIsCheckingOut}
                 lockAmount={isDepositMode}
+                transactionId={prefetchedTxnIdRef.current}
+                onTransactionIdUsed={handleTransactionIdUsed}
               />
               {sCardMode === "manual" ? (
                 <CardPayment
@@ -1548,6 +1597,8 @@ export function NewCheckoutModalScreen() {
                   onCardProcessingEnd={() => _setCardProcessingAmount(0)}
                   onSwitchToReader={() => _setCardMode("reader")}
                   lockAmount={isDepositMode}
+                  transactionId={prefetchedTxnIdRef.current}
+                  onTransactionIdUsed={handleTransactionIdUsed}
                 />
               ) : (
                 <CardReaderPayment
@@ -1567,6 +1618,8 @@ export function NewCheckoutModalScreen() {
                     onCardProcessingEnd={() => _setCardProcessingAmount(0)}
                     onSwitchToManual={() => _setCardMode("manual")}
                     lockAmount={isDepositMode}
+                    transactionId={prefetchedTxnIdRef.current}
+                    onTransactionIdUsed={handleTransactionIdUsed}
                   />
               )}
             </View>

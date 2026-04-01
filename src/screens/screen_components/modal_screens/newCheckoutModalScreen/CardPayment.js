@@ -37,6 +37,8 @@ function CardPaymentForm({
   onSwitchToReader,
   onPaymentStarted,
   lockAmount = false,
+  transactionId = null,
+  onTransactionIdUsed,
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -156,7 +158,8 @@ function CardPaymentForm({
 
       if (onCardProcessingStart) onCardProcessingStart(sRequestedAmount);
 
-      let transactionID = generateEAN13Barcode();
+      let transactionID = transactionId || generateEAN13Barcode();
+      if (transactionId && onTransactionIdUsed) onTransactionIdUsed();
 
       // Notify parent to add pending ID to sale before payment starts
       if (onPaymentStarted) onPaymentStarted(transactionID);

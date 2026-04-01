@@ -18,17 +18,25 @@ import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
   useCustomerSearchStore,
+  useWorkorderSearchStore,
   useTabNamesStore,
   useOpenWorkordersStore,
   useLoginStore,
+  useCheckoutStore,
 } from "../../../stores";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
   dbSearchCustomersByEmail,
   dbSearchCustomersByName,
   dbSearchCustomersByPhone,
+  dbSearchCompletedWorkordersByNumber,
+  dbRequestNewId,
+  dbGetCompletedWorkorder,
+  dbGetCompletedSale,
+  dbGetCustomer,
 } from "../../../db_calls_wrapper";
 import { TicketSearchInput } from "../../../shared/TicketSearchInput";
+import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 export function NewWorkorderComponent({}) {
   // store getters ///////////////////////////////////////////////////////////////
@@ -40,6 +48,7 @@ export function NewWorkorderComponent({}) {
   const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
   const [buttonVisible, setButtonVisible] = React.useState(false);
   const searchTimerRef = useRef(null);
+  const woSearchTimerRef = useRef(null);
   const containerRef = useRef(null);
   const phoneInputRef = useRef(null);
 
@@ -50,22 +59,31 @@ export function NewWorkorderComponent({}) {
   // dev ///////////////////////////////////
 
   const zIsSearching = useCustomerSearchStore((s) => s.isSearching);
+  const zWoSearchResults = useWorkorderSearchStore((s) => s.searchResults);
+  const zWoIsSearching = useWorkorderSearchStore((s) => s.isSearching);
 
   useEffect(() => {
-    if (zCustomerSearchResults.length > 0 || zIsSearching) {
+    if (zWoSearchResults.length > 0 || zWoIsSearching) {
+      useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderSearchResults);
+    } else if (zCustomerSearchResults.length > 0 || zIsSearching) {
       useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.customerList);
     } else {
-      // Only clear to empty if items tab is currently showing customerList
-      // (user cleared their search). Don't override other tabs like Dashboard.
       const currentTab = useTabNamesStore.getState().itemsTabName;
-      if (currentTab === TAB_NAMES.itemsTab.customerList) {
+      if (
+        currentTab === TAB_NAMES.itemsTab.customerList ||
+        currentTab === TAB_NAMES.itemsTab.workorderSearchResults
+      ) {
         useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
       }
     }
-  }, [zCustomerSearchResults, zIsSearching]);
+  }, [zCustomerSearchResults, zIsSearching, zWoSearchResults, zWoIsSearching]);
 
   // Update button visibility when dependencies change
   useEffect(() => {
+    if (/^wo/i.test(sTextInput)) {
+      setButtonVisible(false);
+      return;
+    }
     const rawDigits = removeDashesFromPhone(sTextInput);
     const shouldShow =
       (sSearchFieldName === "phone" &&
@@ -77,6 +95,111 @@ export function NewWorkorderComponent({}) {
   }, [sSearchFieldName, sTextInput, zCustomerSearchResults.length]);
 
   async function handleTextChange(incomingText = "") {
+    // Workorder search mode — detect "WO" or "wo" prefix
+    const woMatch = incomingText.match(/^wo/i);
+    if (woMatch) {
+      _setTextInput(incomingText);
+      useCustomerSearchStore.getState().reset();
+
+      const afterPrefix = incomingText.slice(2).trim();
+      if (afterPrefix.length < 1) {
+        useWorkorderSearchStore.getState().reset();
+        return;
+      }
+
+      const searchPrefix = "WO" + afterPrefix.toUpperCase();
+      useWorkorderSearchStore.getState().setSearchQuery(afterPrefix);
+      useWorkorderSearchStore.getState().setIsSearching(true);
+
+      // Immediate: local search against open workorders
+      const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+      const localMatches = openWOs
+        .filter((w) => (w.workorderNumber || "").toUpperCase().startsWith(searchPrefix))
+        .map((w) => ({ data: w, isCompleted: false }));
+
+      useWorkorderSearchStore.getState().setSearchResults(localMatches);
+
+      // Debounced: DB search for completed workorders
+      if (woSearchTimerRef.current) clearTimeout(woSearchTimerRef.current);
+      woSearchTimerRef.current = setTimeout(async () => {
+        try {
+          const completedResults = await dbSearchCompletedWorkordersByNumber(afterPrefix.toUpperCase());
+          const completedMatches = completedResults.map((w) => ({ data: w, isCompleted: true }));
+          const currentLocal = useWorkorderSearchStore.getState().getSearchResults()
+            .filter((r) => !r.isCompleted);
+          const localIDs = new Set(currentLocal.map((r) => r.data.id));
+          const newCompleted = completedMatches.filter((r) => !localIDs.has(r.data.id));
+          useWorkorderSearchStore.getState().setSearchResults([...currentLocal, ...newCompleted]);
+        } catch (e) {
+          // silently fail
+        } finally {
+          useWorkorderSearchStore.getState().setIsSearching(false);
+        }
+      }, 300);
+
+      return;
+    }
+
+    // Clear workorder search when not in WO mode
+    useWorkorderSearchStore.getState().reset();
+
+    // 13-digit barcode scan — auto-search by prefix
+    let rawDigits = incomingText.replace(/\D/g, "");
+    if (rawDigits.length === 13 && /^\d{13}$/.test(rawDigits)) {
+      _setTextInput(rawDigits);
+      useCustomerSearchStore.getState().reset();
+      let prefix = rawDigits[0];
+
+      if (prefix === "1") {
+        // Workorder ID
+        let openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+        let found = openWOs.find((w) => w.id === rawDigits);
+        if (found) {
+          useOpenWorkordersStore.getState().setOpenWorkorderID(found.id);
+          if (found.customerID) {
+            dbGetCustomer(found.customerID).then((c) => {
+              if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+            });
+          }
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.workorder,
+            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+            optionsTabName: TAB_NAMES.optionsTab.inventory,
+          });
+        } else {
+          dbGetCompletedWorkorder(rawDigits).then((wo) => {
+            if (wo) {
+              let store = useOpenWorkordersStore.getState();
+              store.setWorkorder(wo, false);
+              store.setLockedWorkorderID(wo.id);
+              store.setOpenWorkorderID(wo.id);
+              useTabNamesStore.getState().setItems({
+                infoTabName: TAB_NAMES.infoTab.workorder,
+                itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+                optionsTabName: TAB_NAMES.optionsTab.inventory,
+              });
+              if (wo.customerID) {
+                dbGetCustomer(wo.customerID).then((c) => {
+                  if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+                });
+              }
+            }
+          });
+        }
+      } else if (prefix === "2") {
+        // Sale ID — open in checkout
+        useCheckoutStore.getState().setStringOnly(rawDigits);
+      } else if (prefix === "3") {
+        // Transaction ID — open the sale that contains this transaction
+        readTransaction(rawDigits).then((txn) => {
+          if (txn?.saleID) {
+            useCheckoutStore.getState().setStringOnly(txn.saleID);
+          }
+        });
+      }
+      return;
+    }
+
     // log(incomingText);
     let isEmail;
     let rawText = removeDashesFromPhone(incomingText);
@@ -216,10 +339,23 @@ export function NewWorkorderComponent({}) {
       let store = useOpenWorkordersStore.getState();
       store.setWorkorderPreviewID(null);
 
+      let tmpKey = dbRequestNewId("workorders", (realId, tmpKey) => {
+        let st = useOpenWorkordersStore.getState();
+        let wo = st.workorders.find((w) => String(w._tmpKey) === String(tmpKey));
+        if (!wo) return;
+        st.removeWorkorder(String(tmpKey), false);
+        let updated = { ...wo, id: realId };
+        delete updated._tmpKey;
+        st.setWorkorder(updated, false);
+        if (st.getOpenWorkorderID() === String(tmpKey)) st.setOpenWorkorderID(realId);
+      });
+
       let wo = createNewWorkorder({
+        id: String(tmpKey),
         startedByFirst: useLoginStore.getState().currentUser?.first,
         startedByLast: useLoginStore.getState().currentUser?.last,
       });
+      wo._tmpKey = tmpKey;
 
       store.setWorkorder(wo, false);
       store.setOpenWorkorderID(wo.id);
@@ -239,13 +375,30 @@ export function NewWorkorderComponent({}) {
 
   function handleCreateNewCustomerPressed(customerInfoFromModal) {
     useLoginStore.getState().requireLogin(() => {
-      // first create new customer — use the modal's updated state, not the stale local copy
       let newCustomer = cloneDeep(customerInfoFromModal || sCustomerInfo);
       newCustomer.id = crypto.randomUUID();
       newCustomer.millisCreated = new Date().getTime();
 
-      // next create new empty workorder for automatic population of next screen
+      let tmpKey = dbRequestNewId("workorders", (realId, tmpKey) => {
+        let st = useOpenWorkordersStore.getState();
+        let wo = st.workorders.find((w) => String(w._tmpKey) === String(tmpKey));
+        if (!wo) return;
+        st.removeWorkorder(String(tmpKey), false);
+        let updated = { ...wo, id: realId };
+        delete updated._tmpKey;
+        st.setWorkorder(updated, !!updated.customerID);
+        if (st.getOpenWorkorderID() === String(tmpKey)) st.setOpenWorkorderID(realId);
+        let links = st._pendingCustomerLinks || {};
+        if (links[String(tmpKey)]) {
+          let custId = links[String(tmpKey)];
+          let { [String(tmpKey)]: _, ...rest } = links;
+          rest[realId] = custId;
+          st.addPendingCustomerLink(realId, custId);
+        }
+      });
+
       let newWorkorder = createNewWorkorder({
+        id: String(tmpKey),
         customerID: newCustomer.id,
         customerFirst: newCustomer.first,
         customerLast: newCustomer.last,
@@ -258,6 +411,7 @@ export function NewWorkorderComponent({}) {
         startedByLast: useLoginStore.getState().getCurrentUser().last,
         status: SETTINGS_OBJ.statuses[0]?.id || "",
       });
+      newWorkorder._tmpKey = tmpKey;
 
       _setCustomerInfo(newCustomer);
       useCurrentCustomerStore.getState().setCustomer(newCustomer);

@@ -643,6 +643,7 @@ export const createTextToPayInvoiceCallable = httpsCallable(
   functions,
   "createTextToPayInvoice"
 );
+export const generateIdCallable = httpsCallable(functions, "generateId");
 
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)

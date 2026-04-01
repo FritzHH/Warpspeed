@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ScrollView, Image } from "react-native-web";
 import { useParams } from "react-router-dom";
-import { compressImage } from "../utils";
+import { compressImage, formatWorkorderNumber } from "../utils";
 
 const CLOUD_FN_BASE = "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net";
 
@@ -574,7 +574,7 @@ export function CustomerWorkorderScreen() {
       {/* Started date */}
       {!!d.startedOnMillis && (
         <Text style={{ fontSize: 12, color: "#a0aec0", textAlign: "center", marginTop: 4 }}>
-          WO #{d.workorderNumber} — {formatDate(d.startedOnMillis)}
+          WO #{formatWorkorderNumber(d.workorderNumber)} — {formatDate(d.startedOnMillis)}
         </Text>
       )}
 

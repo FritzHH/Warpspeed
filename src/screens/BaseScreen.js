@@ -279,6 +279,7 @@ export function BaseScreen() {
     // tested!!
     dbListenToSettings((data) => {
       // log("settings", data.users[0].faceDescriptor);
+      console.log("SETTINGS LOAD quickItemButtons:", JSON.stringify(data.quickItemButtons, null, 2));
       useSettingsStore.getState().setSettings(data, false, false);
     });
 

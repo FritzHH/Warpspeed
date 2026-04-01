@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import React, { useEffect, useRef, useState } from "react";
 import { View, FlatList, Text, TouchableOpacity, ScrollView } from "react-native-web";
-import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO } from "../../../data";
+import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO, QUICK_BUTTON_ITEM_PROTO } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
 import {
@@ -39,6 +39,336 @@ function getQuickButtonFontSize(text, baseFontSize) {
   if (len <= 15) return baseFontSize;
   return Math.max(7, Math.round(baseFontSize - (len - 15) * 0.5));
 }
+
+/** Normalize legacy string IDs to QUICK_BUTTON_ITEM_PROTO objects */
+function normalizeItemEntry(entry, idx) {
+  if (typeof entry === "string") {
+    return { ...QUICK_BUTTON_ITEM_PROTO, inventoryItemID: entry, x: (idx % 6) * 100, y: Math.floor(idx / 6) * 50 };
+  }
+  return entry;
+}
+
+const SNAP = 10;
+const DEFAULT_ITEM_W = 90;
+const DEFAULT_ITEM_H = 40;
+function snapTo(v) { return Math.round(v / SNAP) * SNAP; }
+
+////////////////////////////////////////////////////////////////////////////////
+// Quick Item Canvas Card
+////////////////////////////////////////////////////////////////////////////////
+const QuickItemCanvasCard = ({
+  itemObj,
+  invItem,
+  sEditMode,
+  isSelected,
+  onSelect,
+  onPositionChange,
+  onPress,
+  containerRef,
+}) => {
+  const [sDragging, _setDragging] = useState(false);
+  const dragStartRef = useRef(null);
+  const didDragRef = useRef(false);
+
+  let w = itemObj.w || DEFAULT_ITEM_W;
+  let h = itemObj.h || DEFAULT_ITEM_H;
+  let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
+  let price = invItem ? formatCurrencyDisp(invItem.price) : "";
+
+  function handleMouseDown(e) {
+    if (!sEditMode) return;
+    e.preventDefault();
+    didDragRef.current = false;
+    let container = containerRef.current;
+    if (!container) return;
+    let rect = container.getBoundingClientRect();
+    dragStartRef.current = {
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startX: itemObj.x || 0,
+      startY: itemObj.y || 0,
+      rect,
+    };
+    _setDragging(true);
+
+    function handleMouseMove(ev) {
+      if (!dragStartRef.current) return;
+      let { startMouseX, startMouseY, startX, startY, rect: r } = dragStartRef.current;
+      let dx = ev.clientX - startMouseX;
+      let dy = ev.clientY - startMouseY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
+      let newX = snapTo(startX + dx);
+      let newY = snapTo(startY + dy);
+      newX = Math.max(0, Math.min(newX, r.width - w));
+      newY = Math.max(0, Math.min(newY, r.height - h));
+      onPositionChange(itemObj.inventoryItemID, newX, newY);
+    }
+
+    function handleMouseUp() {
+      dragStartRef.current = null;
+      _setDragging(false);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }
+
+  return (
+    <div
+      onMouseDown={handleMouseDown}
+      onClick={() => {
+        if (didDragRef.current) return;
+        if (sEditMode) onSelect(itemObj.inventoryItemID);
+        else if (onPress) onPress();
+      }}
+      style={{
+        position: "absolute",
+        left: itemObj.x || 0,
+        top: itemObj.y || 0,
+        width: w,
+        height: h,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: isSelected ? 2 : 1,
+        borderStyle: "solid",
+        borderColor: isSelected ? C.blue : C.buttonLightGreenOutline,
+        borderRadius: 8,
+        backgroundColor: C.listItemWhite,
+        cursor: sEditMode ? (sDragging ? "grabbing" : "grab") : "pointer",
+        opacity: sDragging ? 0.7 : 1,
+        boxSizing: "border-box",
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        userSelect: "none",
+        overflow: "hidden",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: itemObj.fontSize || 10,
+          color: invItem ? C.text : gray(0.35),
+          textAlign: "center",
+          fontWeight: "500",
+          lineHeight: (itemObj.fontSize || 10) + 2,
+        }}
+        numberOfLines={2}
+      >
+        {name}
+      </Text>
+      {!!price && (
+        <Text style={{ fontSize: Math.max(7, (itemObj.fontSize || 10) - 1), color: gray(0.45), textAlign: "center", marginTop: 1 }}>
+          ${price}
+        </Text>
+      )}
+    </div>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Quick Item Canvas (wraps the canvas area + edit banner)
+////////////////////////////////////////////////////////////////////////////////
+const QuickItemCanvas = ({
+  buttonObj,
+  zInventoryArr,
+  zQuickItemButtons,
+  onItemPress,
+}) => {
+  const [sEditMode, _setEditMode] = useState(false);
+  const [sSelectedItemId, _setSelectedItemId] = useState(null);
+  const canvasRef = useRef(null);
+
+  // Normalize items (backward compat: string IDs -> objects)
+  let rawItems = (buttonObj.items || []).map(normalizeItemEntry);
+
+  function findInvItem(inventoryItemID) {
+    return (zInventoryArr || []).find((i) => i.id === inventoryItemID);
+  }
+
+  function saveItems(updatedItems) {
+    // Update the specific quick button's items in settings
+    let updatedButtons = (zQuickItemButtons || []).map((b) =>
+      b.id === buttonObj.id ? { ...b, items: updatedItems } : b
+    );
+    useSettingsStore.getState().setField("quickItemButtons", updatedButtons);
+  }
+
+  function handlePositionChange(invItemID, x, y) {
+    saveItems(rawItems.map((it) => it.inventoryItemID === invItemID ? { ...it, x, y } : it));
+  }
+
+  function handleDeleteItem(invItemID) {
+    if (sSelectedItemId === invItemID) _setSelectedItemId(null);
+    saveItems(rawItems.filter((it) => it.inventoryItemID !== invItemID));
+  }
+
+  function handleResizeSelected(axis, delta) {
+    if (!sSelectedItemId) return;
+    saveItems(rawItems.map((it) => {
+      if (it.inventoryItemID !== sSelectedItemId) return it;
+      if (axis === "w") return { ...it, w: Math.max(SNAP * 3, (it.w || DEFAULT_ITEM_W) + delta) };
+      if (axis === "h") return { ...it, h: Math.max(SNAP * 2, (it.h || DEFAULT_ITEM_H) + delta) };
+      return it;
+    }));
+  }
+
+  function handleFontSizeSelected(delta) {
+    if (!sSelectedItemId) return;
+    saveItems(rawItems.map((it) => {
+      if (it.inventoryItemID !== sSelectedItemId) return it;
+      let newSize = Math.max(6, Math.min(20, (it.fontSize || 10) + delta));
+      return { ...it, fontSize: newSize };
+    }));
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Edit banner */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingVertical: 4,
+          paddingHorizontal: 6,
+          minHeight: 32,
+        }}
+      >
+        <Text style={{ flex: 1, fontSize: 11, color: gray(0.45) }}>
+          {sEditMode ? "Drag items freely. Snap to 10px." : ""}
+        </Text>
+
+        {/* Resize + Font controls */}
+        {sEditMode && sSelectedItemId && (
+          <View style={{ flexDirection: "row", alignItems: "center", marginRight: 6, gap: 2 }}>
+            <Text style={{ fontSize: 10, color: gray(0.45), marginRight: 4 }}>Size:</Text>
+            {[
+              { axis: "w", delta: -SNAP, label: "\u2190" },
+              { axis: "w", delta: SNAP, label: "\u2192" },
+              { axis: "h", delta: -SNAP, label: "\u2191" },
+              { axis: "h", delta: SNAP, label: "\u2193" },
+            ].map((btn, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => handleResizeSelected(btn.axis, btn.delta)}
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 4,
+                  backgroundColor: gray(0.1),
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginLeft: i === 2 ? 4 : 0,
+                }}
+              >
+                <Text style={{ fontSize: 12, color: C.text, fontWeight: "700" }}>{btn.label}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <Text style={{ fontSize: 10, color: gray(0.45), marginLeft: 10, marginRight: 4 }}>Font:</Text>
+            <TouchableOpacity
+              onPress={() => handleFontSizeSelected(-1)}
+              style={{ width: 22, height: 22, borderRadius: 4, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}
+            >
+              <Text style={{ fontSize: 12, color: C.text, fontWeight: "700" }}>A-</Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 10, color: C.text, minWidth: 16, textAlign: "center" }}>
+              {(rawItems.find((it) => it.inventoryItemID === sSelectedItemId)?.fontSize || 10)}
+            </Text>
+            <TouchableOpacity
+              onPress={() => handleFontSizeSelected(1)}
+              style={{ width: 22, height: 22, borderRadius: 4, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}
+            >
+              <Text style={{ fontSize: 12, color: C.text, fontWeight: "700" }}>A+</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <TouchableOpacity
+          onPress={() => { _setEditMode(!sEditMode); _setSelectedItemId(null); }}
+          style={{
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 6,
+            backgroundColor: sEditMode ? C.green : gray(0.12),
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "600", color: sEditMode ? "white" : C.text }}>
+            {sEditMode ? "Done" : "Edit"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Canvas */}
+      <div
+        ref={canvasRef}
+        style={{
+          flex: 1,
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 6,
+          minHeight: 200,
+          ...(sEditMode ? {
+            backgroundImage: `radial-gradient(circle, ${gray(0.12)} 1px, transparent 1px)`,
+            backgroundSize: `${SNAP}px ${SNAP}px`,
+          } : {}),
+        }}
+      >
+        {rawItems.map((itemObj) => {
+          let invItem = findInvItem(itemObj.inventoryItemID);
+          return (
+            <QuickItemCanvasCard
+              key={itemObj.inventoryItemID}
+              itemObj={itemObj}
+              invItem={invItem}
+              sEditMode={sEditMode}
+              isSelected={sSelectedItemId === itemObj.inventoryItemID}
+              onSelect={_setSelectedItemId}
+              containerRef={canvasRef}
+              onPositionChange={handlePositionChange}
+              onPress={() => invItem && onItemPress(invItem)}
+            />
+          );
+        })}
+
+        {/* Delete X overlay for selected item in edit mode */}
+        {sEditMode && sSelectedItemId && (() => {
+          let sel = rawItems.find((it) => it.inventoryItemID === sSelectedItemId);
+          if (!sel) return null;
+          return (
+            <div
+              onClick={() => handleDeleteItem(sSelectedItemId)}
+              style={{
+                position: "absolute",
+                left: (sel.x || 0) + (sel.w || DEFAULT_ITEM_W) - 8,
+                top: (sel.y || 0) - 6,
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: C.lightred,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                zIndex: 10,
+              }}
+            >
+              <Text style={{ fontSize: 10, color: "white", fontWeight: "700", lineHeight: 16 }}>{"\u00D7"}</Text>
+            </div>
+          );
+        })()}
+
+        {rawItems.length === 0 && (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 }}>
+            <Text style={{ fontSize: 13, color: gray(0.4) }}>No items in this button</Text>
+          </View>
+        )}
+      </div>
+    </View>
+  );
+};
 
 export function InventoryComponent({}) {
   // store setters ///////////////////////////////////////////////////////////////
@@ -148,9 +478,10 @@ export function InventoryComponent({}) {
     );
     let hasChildren = children.length > 0;
 
-    // Resolve inventory items from IDs
+    // Resolve inventory items from IDs (handle both legacy string IDs and new objects)
     let items = [];
-    buttonObj.items?.forEach((id) => {
+    buttonObj.items?.forEach((entry) => {
+      let id = typeof entry === "string" ? entry : entry.inventoryItemID;
       let item = findInventoryItem(id);
       if (item) items.push(item);
     });
@@ -233,7 +564,8 @@ export function InventoryComponent({}) {
       // Show parent button's items if it has any
       let parentButton = zQuickItemButtons.find((b) => b.id === newParentID);
       let items = [];
-      parentButton?.items?.forEach((id) => {
+      parentButton?.items?.forEach((entry) => {
+        let id = typeof entry === "string" ? entry : entry.inventoryItemID;
         let item = zInventoryArr.find((i) => i.id === id);
         if (item) items.push(item);
       });
@@ -603,15 +935,35 @@ export function InventoryComponent({}) {
             </View>
           )}
 
-          {/** Section 3: Item list — always present, fills remaining space */}
-          {sSearchResults.length === 0 && (sCurrentParentID || sSelectedButtonID) ? (
+          {/** Section 3: Canvas (quick button selected) or list (search results) */}
+          {sSelectedButtonID && !sSearchTerm ? (
+            (() => {
+              let activeBtn = (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID);
+              if (!activeBtn || !activeBtn.items || activeBtn.items.length === 0) {
+                return (
+                  <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
+                    <Image_ icon={ICONS.info} size={40} />
+                    <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>
+                  </View>
+                );
+              }
+              return (
+                <QuickItemCanvas
+                  buttonObj={activeBtn}
+                  zInventoryArr={zInventoryArr}
+                  zQuickItemButtons={zQuickItemButtons}
+                  onItemPress={inventoryItemSelected}
+                />
+              );
+            })()
+          ) : sSearchResults.length === 0 && (sCurrentParentID || sSelectedButtonID) ? (
             <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
               <Image_ icon={ICONS.info} size={40} />
               <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>
             </View>
           ) : (
             <ScrollView style={{ width: "100%", flex: 1 }}>
-              {sSearchResults.map((item, index) => {
+              {sSearchResults.slice(0, 50).map((item, index) => {
                 let activeBtn = sSelectedButtonID ? (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID) : null;
                 let dividerObj = (activeBtn?.dividers || []).find((d) => d.itemID === item.id);
                 let hasDivider = !!dividerObj;

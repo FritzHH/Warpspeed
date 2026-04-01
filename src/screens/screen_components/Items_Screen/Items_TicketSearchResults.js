@@ -2,7 +2,7 @@
 
 import { View, Text, FlatList } from "react-native-web";
 import { useState } from "react";
-import { formatCurrencyDisp, formatMillisForDisplay, gray, log } from "../../../utils";
+import { formatCurrencyDisp, formatMillisForDisplay, gray, log, formatWorkorderNumber } from "../../../utils";
 import {
   SmallLoadingIndicator,
   TouchableOpacity_,
@@ -75,7 +75,7 @@ export function Items_TicketSearchResults({}) {
       <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>
-            WO #{wo.workorderNumber || wo.id}
+            WO #{formatWorkorderNumber(wo.workorderNumber) || wo.id}
           </Text>
           <Text style={{ fontSize: 13, color: gray(0.45), marginTop: 2 }}>
             {[wo.brand, wo.description].filter(Boolean).join(" / ") || "No vehicle info"}

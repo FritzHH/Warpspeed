@@ -76,9 +76,8 @@ export function DatabaseViewerScreen() {
     cleaned.endedOnMillis = "";
     cleaned.status = "newly_created";
     cleaned.changeLog = (cleaned.changeLog || []).filter(
-      (e) => !(e.action === "completed" && e.field === "payment") &&
-        !(e.action === "changed" && e.field === "status" && (e.to || "").toLowerCase().includes("paid")) &&
-        !(e.action === "recorded" && e.field === "payment")
+      (e) => !(e.field === "payment") &&
+        !(e.action === "changed" && e.field === "status" && (e.to || "").toLowerCase().includes("paid"))
     );
     return cleaned;
   }
@@ -117,6 +116,32 @@ export function DatabaseViewerScreen() {
     }
     updated.sales = (updated.sales || []).filter((sid) => sid !== linkedSale.id);
     await firestoreWrite(customerPath, updated);
+  }
+
+  async function handleCleanLogs() {
+    let openWOs = sData.openWorkorders;
+    if (!openWOs.length) { _setReopenStatus("No open workorders"); return; }
+    _setReopenStatus("Cleaning logs...");
+    let basePath = `tenants/${tenantID}/stores/${storeID}`;
+    try {
+      let cleaned = 0;
+      for (let wo of openWOs) {
+        let original = wo.changeLog || [];
+        let filtered = original.filter(
+          (e) => !(e.field === "payment") &&
+            !(e.action === "changed" && e.field === "status" && (e.to || "").toLowerCase().includes("paid"))
+        );
+        if (filtered.length !== original.length) {
+          let updated = cloneDeep(wo);
+          updated.changeLog = filtered;
+          await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${wo.id}`, updated);
+          cleaned++;
+        }
+      }
+      _setReopenStatus(cleaned ? `Done - cleaned logs on ${cleaned} WO(s)` : "No financial logs found");
+    } catch (err) {
+      _setReopenStatus("Error: " + (err.message || err));
+    }
   }
 
   async function handleReopenFirst() {
@@ -265,6 +290,12 @@ export function DatabaseViewerScreen() {
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
         >
           <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Reopen All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleCleanLogs}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(103, 124, 231)", marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Clean Logs</Text>
         </TouchableOpacity>
         {!!sReopenStatus && (
           <Text style={{ fontSize: 12, color: sReopenStatus.startsWith("Error") ? C.red : C.green, fontWeight: "600", marginRight: 8 }}>

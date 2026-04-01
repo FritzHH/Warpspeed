@@ -10,6 +10,7 @@ import {
   gray,
   lightenRGBByPercent,
   resolveStatus,
+  formatWorkorderNumber,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useCheckoutStore, useSettingsStore, useLoginStore } from "../../../stores";
@@ -403,7 +404,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
               </View>
               {!!workorder.workorderNumber && (
                 <Text style={{ fontSize: 13, fontWeight: "600", color: C.text, marginLeft: 12 }}>
-                  {"#" + workorder.workorderNumber}
+                  {"#" + formatWorkorderNumber(workorder.workorderNumber)}
                 </Text>
               )}
               <Text style={{ fontSize: 10, color: gray(0.35), marginLeft: 12 }}>

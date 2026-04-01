@@ -23,7 +23,8 @@ import { ROUTES } from "../../routes";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 import { Items_ChangeLog } from "../screen_components/Items_Screen/Items_ChangeLog";
 import { Items_TicketSearchResults } from "../screen_components/Items_Screen/Items_TicketSearchResults";
-import { log, gray } from "../../utils";
+import { Items_WorkorderSearchList } from "../screen_components/Items_Screen/Items_WorkorderSearchList";
+import { log, gray, lightenRGBByPercent } from "../../utils";
 import { useTranslation } from "../../useTranslation";
 import {
   broadcastToTranslateDisplay,
@@ -57,6 +58,8 @@ export const Items_Section = React.memo(({}) => {
         return <Items_WorkorderItemsTab />;
       case TAB_NAMES.itemsTab.ticketSearchResults:
         return <Items_TicketSearchResults />;
+      case TAB_NAMES.itemsTab.workorderSearchResults:
+        return <Items_WorkorderSearchList />;
       case TAB_NAMES.itemsTab.empty:
         return <EmptyItemsComponent />;
       default:
@@ -327,6 +330,7 @@ const TranslateModal = ({ visible, onClose }) => {
 const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
+  const zIsPreview = useOpenWorkordersStore((s) => !!s.workorderPreviewID && s.workorderPreviewID !== s.openWorkorderID);
   // log("Items_Section TabBar render");
   return (
     <View
@@ -334,7 +338,8 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
         flexDirection: "row",
         width: "100%",
         justifyContent: "space-between",
-        // backgroundColor: "green",
+        backgroundColor: zIsPreview ? lightenRGBByPercent(C.blue, 70) : undefined,
+        transition: "background-color 0.2s ease",
         // height: 50,
       }}
     >

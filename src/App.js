@@ -96,9 +96,9 @@ function App() {
       setIsMobile(mobile);
       setDeviceType(deviceType);
 
-      log(
-        `Device detected: ${deviceType} (${w}×${window.innerHeight})`
-      );
+      // log(
+      //   `Device detected: ${deviceType} (${w}×${window.innerHeight})`
+      // );
     };
 
     detectDevice();

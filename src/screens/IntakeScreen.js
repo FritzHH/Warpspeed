@@ -15,6 +15,7 @@ import {
   formatCurrencyDisp,
   gray,
   deepEqual,
+  formatWorkorderNumber,
 } from "../utils";
 import { WORKORDER_ITEM_PROTO, COLORS } from "../data";
 import {
@@ -437,7 +438,7 @@ const WorkorderSelector = ({ workorders, statuses, selectedID, onSelect }) => {
                   style={{ fontSize: 13, color: C.text, flex: 1 }}
                   numberOfLines={1}
                 >
-                  #{wo.workorderNumber || "?"} — {wo.customerFirst || wo.brand || "(no name)"}{" "}
+                  #{formatWorkorderNumber(wo.workorderNumber) || "?"} — {wo.customerFirst || wo.brand || "(no name)"}{" "}
                   {wo.customerLast || ""}
                 </Text>
                 <Text style={{ fontSize: 11, color: gray(0.5) }}>

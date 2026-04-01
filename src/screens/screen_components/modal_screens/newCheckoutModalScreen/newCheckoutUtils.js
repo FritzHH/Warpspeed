@@ -30,9 +30,9 @@ export function isLightspeedID(id) {
 // ─── New Sale Object ──────────────────────────────────────────
 // Extends SALE_PROTO with fields needed by the new checkout system.
 
-export function createNewSale(settings, createdBy = "") {
+export function createNewSale(settings, createdBy = "", id = null) {
   let sale = cloneDeep(SALE_PROTO);
-  sale.id = generateEAN13Barcode();
+  sale.id = id || generateEAN13Barcode();
   sale.millis = Date.now();
   sale.salesTaxPercent = settings?.salesTaxPercent || 0;
   sale.cardFee = 0;
@@ -151,9 +151,9 @@ export function recomputeSaleAmounts(sale, transactions, credits) {
 
 // ─── Build Payment Object ─────────────────────────────────────
 
-export function buildCashTransaction(amountCaptured, amountTendered, isCheck) {
+export function buildCashTransaction(amountCaptured, amountTendered, isCheck, id = null) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
-  transaction.id = generateEAN13Barcode();
+  transaction.id = id || generateEAN13Barcode();
   transaction.method = isCheck ? "check" : "cash";
   transaction.amountCaptured = amountCaptured;
   transaction.amountTendered = amountTendered;

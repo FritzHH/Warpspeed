@@ -15,7 +15,7 @@ import { generate } from "random-words";
 import { cloneDeep } from "lodash";
 import dayjs from "dayjs";
 import { C } from "./styles";
-import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
+import { useAlertScreenStore, useLoginStore, useOpenWorkordersStore, useSettingsStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
 const _shared = require("./shared/printBuilder");
 
@@ -515,24 +515,33 @@ export function stringifyAllObjectFields(obj) {
 }
 
 // numbers /////////////////////////////////////////////////////////
-export function generateWorkorderNumber(barcodeNumber) {
-  const numStr = String(barcodeNumber);
+export function formatWorkorderNumber(woNum) {
+  if (!woNum || typeof woNum !== "string" || !woNum.startsWith("WO") || woNum.length < 7) return woNum || "";
+  return woNum.slice(0, 2) + "-" + woNum.slice(2, 6) + "-" + woNum.slice(6);
+}
 
-  if (!numStr || !/^\d{12,13}$/.test(numStr)) {
-    throw new Error("Input must be 12 or 13 digits");
-  }
+export function generateWorkorderNumber() {
+  const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+  const now = new Date();
+  const month = MONTHS[now.getMonth()];
+  const year = String(now.getFullYear()).slice(-2);
 
-  // Generate 5 unique random indexes
-  const indexes = [];
-  while (indexes.length < 5) {
-    const randomIndex = Math.floor(Math.random() * numStr.length);
-    if (!indexes.includes(randomIndex)) {
-      indexes.push(randomIndex);
+  let maxCounter = 1000;
+  const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+  openWOs.forEach((wo) => {
+    const match = wo.workorderNumber?.match(/^WO(\d{4})/);
+    if (match) {
+      // Un-reverse the displayed digits to recover the raw counter
+      const raw = parseInt(match[1].split("").reverse().join(""), 10);
+      if (raw > maxCounter) maxCounter = raw;
     }
-  }
+  });
 
-  const result = indexes.map((index) => numStr[index]).join("");
-  return result;
+  let nextCounter = maxCounter + 1;
+  if (nextCounter > 9999) nextCounter = 1001;
+
+  const reversed = String(nextCounter).padStart(4, "0").split("").reverse().join("");
+  return "WO" + reversed + month + year;
 }
 
 export function stringIsNumeric(str) {
@@ -1964,6 +1973,7 @@ export function extractStripeErrorMessage(data, response = null) {
 }
 
 export function createNewWorkorder({
+  id,
   customerID,
   customerFirst,
   customerLast,
@@ -1977,8 +1987,8 @@ export function createNewWorkorder({
   status,
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
-  wo.id = generateEAN13Barcode();
-  wo.workorderNumber = generateWorkorderNumber(wo.id);
+  wo.id = id || generateEAN13Barcode();
+  wo.workorderNumber = generateWorkorderNumber();
   wo.status = status || SETTINGS_OBJ.statuses[0]?.id || "";
   wo.customerFirst = customerFirst || "";
   wo.customerLast = customerLast || "";
@@ -2365,4 +2375,35 @@ export function recoverPendingAutoTexts() {
   } catch (e) {
     console.log("Error recovering pending auto-texts:", e);
   }
+}
+
+// Intake quick buttons: flat array <-> 2D rows conversion
+// Firestore does not support nested arrays, so we store a flat array with `row` index
+export function intakeButtonsToRows(flatArr) {
+  if (!flatArr || flatArr.length === 0) return [];
+  // Backward compat: if already 2D (old data somehow), flatten first
+  if (Array.isArray(flatArr[0])) {
+    let flat = [];
+    flatArr.forEach((row, rowIdx) => {
+      row.forEach((btn) => flat.push({ ...btn, row: rowIdx }));
+    });
+    flatArr = flat;
+  }
+  let rowMap = {};
+  flatArr.forEach((btn) => {
+    let r = btn.row || 0;
+    if (!rowMap[r]) rowMap[r] = [];
+    rowMap[r].push(btn);
+  });
+  let keys = Object.keys(rowMap).map(Number).sort((a, b) => a - b);
+  return keys.map((k) => rowMap[k]);
+}
+
+export function intakeRowsToFlat(rows2D) {
+  if (!rows2D || rows2D.length === 0) return [];
+  let flat = [];
+  rows2D.forEach((row, rowIdx) => {
+    row.forEach((btn) => flat.push({ ...btn, row: rowIdx }));
+  });
+  return flat;
 }

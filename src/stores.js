@@ -236,6 +236,19 @@ export const useCustomerSearchStore = create((set, get) => ({
   reset: () => set({ searchResults: [], selectedItem: null, searchQuery: "", searchType: "phone", isSearching: false }),
 }));
 
+export const useWorkorderSearchStore = create((set, get) => ({
+  searchResults: [],
+  isSearching: false,
+  searchQuery: "",
+  getSearchResults: () => get().searchResults,
+  getIsSearching: () => get().isSearching,
+  getSearchQuery: () => get().searchQuery,
+  setSearchResults: (searchResults) => set({ searchResults }),
+  setIsSearching: (isSearching) => set({ isSearching }),
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
+  reset: () => set({ searchResults: [], isSearching: false, searchQuery: "" }),
+}));
+
 export const useCheckoutStore = create((set, get) => ({
   isCheckingOut: false,
   saleObj: null,
@@ -1390,6 +1403,73 @@ export const useMigrationStore = create((set, get) => ({
   setStep: (step) => set({ step }),
   setProgress: (progress) => set({ progress }),
   setResult: (result) => set({ result }),
+}));
+
+export const usePendingIdStore = create((set, get) => ({
+  pending: {
+    workorders: [],
+    sales: [],
+    transactions: [],
+  },
+
+  getPending: () => get().pending,
+  getPendingByNode: (node) => get().pending[node] || [],
+  getEntry: (node, tmpKey) =>
+    (get().pending[node] || []).find((e) => e.tmpKey === tmpKey) || null,
+
+  addEntry: (node) => {
+    const tmpKey = Date.now();
+    const entry = { tmpKey, status: "loading", id: null, data: {} };
+    set((state) => ({
+      pending: {
+        ...state.pending,
+        [node]: [...(state.pending[node] || []), entry],
+      },
+    }));
+    return tmpKey;
+  },
+
+  setId: (node, tmpKey, id) => {
+    set((state) => ({
+      pending: {
+        ...state.pending,
+        [node]: (state.pending[node] || []).map((e) =>
+          e.tmpKey === tmpKey ? { ...e, id, status: "ready" } : e
+        ),
+      },
+    }));
+  },
+
+  updateData: (node, tmpKey, fields) => {
+    set((state) => ({
+      pending: {
+        ...state.pending,
+        [node]: (state.pending[node] || []).map((e) =>
+          e.tmpKey === tmpKey ? { ...e, data: { ...e.data, ...fields } } : e
+        ),
+      },
+    }));
+  },
+
+  setStatus: (node, tmpKey, status) => {
+    set((state) => ({
+      pending: {
+        ...state.pending,
+        [node]: (state.pending[node] || []).map((e) =>
+          e.tmpKey === tmpKey ? { ...e, status } : e
+        ),
+      },
+    }));
+  },
+
+  removeEntry: (node, tmpKey) => {
+    set((state) => ({
+      pending: {
+        ...state.pending,
+        [node]: (state.pending[node] || []).filter((e) => e.tmpKey !== tmpKey),
+      },
+    }));
+  },
 }));
 
 /// internal functions ///////////////////////////////////////////

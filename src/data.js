@@ -224,6 +224,7 @@ export const TAB_NAMES = {
     dashboard: "Dashboard",
     customerList: "Customer List",
     ticketSearchResults: "Ticket Search Results",
+    workorderSearchResults: "Workorder Search Results",
     preview: "Preview",
     empty: "Empty",
   },
@@ -559,6 +560,11 @@ export const INTAKE_QUICK_BUTTON_PROTO = {
   id: "",
   label: "",
   inventoryItemID: "",
+  x: 0,
+  y: 0,
+  w: 90,
+  h: 40,
+  fontSize: 11,
 };
 
 export const AUTO_CUSTOMER_NOTE_PROTO = {
@@ -607,13 +613,30 @@ export const NONREMOVABLE_WAIT_TIMES = [
   }
 ]
 
+export const QUICK_BUTTON_ITEM_PROTO = {
+  inventoryItemID: "",
+  x: 0,
+  y: 0,
+  w: 90,
+  h: 40,
+  fontSize: 10,
+}
+
 export const QUICK_ITEM_BUTTON_PROTO = {
   id: "",
   name: "",
   parentID: null,
-  items: [/*inventory item IDs*/],
+  items: [/*QUICK_BUTTON_ITEM_PROTO objects (or legacy string IDs)*/],
   removable: true,
 }
+
+// // fill in this proto
+// export const QUICK_BUTTON_PROTO = {
+//   id: "",
+//   label: "",
+//   inventoryItemIDs: "",
+//   removable: true,
+// }
 
 
 // Objects with initial data /////////////////////////////////////////
@@ -809,6 +832,7 @@ export const SETTINGS_OBJ = {
     { id: "part", name: "$Part", parentID: null, items: [], removable: false },
     { id: "common", name: "Common", parentID: null, items: [], removable: false },
   ],
+  // quickButtons: [],
   // colors:
   bikeBrands: ["Trek", "Specialized", "Sun", "Marin", "Cannondale", "Jamis"],
   bikeBrandsName: "Bikes",
@@ -864,7 +888,6 @@ export const SETTINGS_OBJ = {
       type: DISCOUNT_TYPES.dollar,
     },
   ],
-  intakeQuickButtons: [], // 2D array of rows, each row is array of INTAKE_QUICK_BUTTON_PROTO
   waitTimeLinkedStatus: {},
   waitTimeLabelCategories: [
     {

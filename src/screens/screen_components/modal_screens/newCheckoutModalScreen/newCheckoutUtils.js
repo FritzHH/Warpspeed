@@ -5,7 +5,7 @@ import {
   formatCurrencyDisp,
   log,
 } from "../../../../utils";
-import { dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS } from "../../../../db_calls_wrapper";
+import { dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, dbRequestNewId } from "../../../../db_calls_wrapper";
 import { build_db_path } from "../../../../constants";
 import { useLoginStore, useSettingsStore } from "../../../../stores";
 import { printBuilder } from "../../../../utils";
@@ -153,7 +153,7 @@ export function recomputeSaleAmounts(sale, transactions, credits) {
 
 export function buildCashTransaction(amountCaptured, amountTendered, isCheck, id = null) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
-  transaction.id = id || generateEAN13Barcode();
+  transaction.id = id || dbRequestNewId("transactions");
   transaction.method = isCheck ? "check" : "cash";
   transaction.amountCaptured = amountCaptured;
   transaction.amountTendered = amountTendered;
@@ -166,7 +166,7 @@ export function buildCardTransaction(stripeChargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = stripeChargeData?.payment_method_details?.card_present;
 
-  transaction.id = transactionID || generateEAN13Barcode();
+  transaction.id = transactionID || dbRequestNewId("transactions");
   transaction.method = "card";
   transaction.amountCaptured = stripeChargeData.amount_captured || 0;
   transaction.cardIssuer = card?.receipt?.application_preferred_name || "Unknown";
@@ -189,7 +189,7 @@ export function buildManualCardTransaction(chargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = chargeData?.payment_method_details?.card;
 
-  transaction.id = transactionID || generateEAN13Barcode();
+  transaction.id = transactionID || dbRequestNewId("transactions");
   transaction.method = "card";
   transaction.amountCaptured = chargeData.amount_captured || 0;
   transaction.cardIssuer = card?.brand || "Unknown";

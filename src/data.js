@@ -345,6 +345,7 @@ export const TRANSACTION_PROTO = {
   receiptURL: "",
 
   refunds: [],
+  items: [],
 };
 
 export const REFUND_PROTO = {

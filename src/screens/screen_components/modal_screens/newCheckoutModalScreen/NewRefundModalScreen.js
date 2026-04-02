@@ -64,6 +64,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sInitialized, _setInitialized] = useState(false);
   const [sIsActiveSale, _setIsActiveSale] = useState(false);
   const [sCustomCardPayment, _setCustomCardPayment] = useState(null);
+  const [sCardRefundProcessing, _setCardRefundProcessing] = useState(false);
 
   // ─── Derived Values ───────────────────────────────────────
   let refundLimits = calculateRefundLimits(sOriginalSale, { cardFeeRefund: zCardFeeRefund }, sTransactions);
@@ -592,12 +593,14 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 <Button_
                   text={sIsCustomAmount ? "EXIT CUSTOM REFUND" : "CUSTOM REFUND AMOUNT"}
                   onPress={toggleCustomAmount}
+                  enabled={!sCardRefundProcessing}
                   colorGradientArr={sIsCustomAmount ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.green}
                   textStyle={{ fontSize: 12, fontWeight: Fonts.weight.textHeavy, letterSpacing: 1 }}
                   buttonStyle={{
                     paddingVertical: 5,
                     paddingHorizontal: 14,
                     borderRadius: 6,
+                    opacity: sCardRefundProcessing ? 0.4 : 1,
                   }}
                 />
               ) : (
@@ -668,8 +671,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 }}
               >
                 <View
-                  style={{ flex: 1, opacity: selectedIsCard || !hasCashPayments ? 0.3 : 1 }}
-                  pointerEvents={selectedIsCard || !hasCashPayments ? "none" : "auto"}
+                  style={{ flex: 1, opacity: sCardRefundProcessing || selectedIsCard || !hasCashPayments ? 0.3 : 1 }}
+                  pointerEvents={sCardRefundProcessing || selectedIsCard || !hasCashPayments ? "none" : "auto"}
                 >
                   <CashRefund
                     maxCashRefund={maxCashRefund}
@@ -699,6 +702,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     onProcessRefund={handleProcessRefund}
                     onRefundStarted={handleRefundStarted}
                     onRefundFailed={handleRefundFailed}
+                    onProcessingChange={(val) => _setCardRefundProcessing(val)}
                     workorderLines={sSelectedItems}
                     salesTaxPercent={zSalesTaxPercent}
                     refundComplete={sRefundComplete}
@@ -719,7 +723,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                   width: "29%",
                   borderRightWidth: 1,
                   borderRightColor: gray(0.1),
+                  opacity: sCardRefundProcessing ? 0.4 : 1,
                 }}
+                pointerEvents={sCardRefundProcessing ? "none" : "auto"}
               >
                 <ScrollView style={{ flex: 1 }}>
                   <RefundTotals
@@ -887,9 +893,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 style={{
                   width: "42%",
                   paddingLeft: 10,
-                  opacity: sRefundComplete || sOriginalSale?.isDepositSale ? 0.3 : 1,
+                  opacity: sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale ? 0.3 : 1,
                 }}
-                pointerEvents={sRefundComplete || sOriginalSale?.isDepositSale ? "none" : "auto"}
+                pointerEvents={sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale ? "none" : "auto"}
               >
                 {sIsCustomAmount ? (
                   <View

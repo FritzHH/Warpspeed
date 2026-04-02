@@ -780,6 +780,31 @@ export async function dbSearchSalesByIdPrefix(prefix) {
   }
 }
 
+export async function dbSearchTransactionsByIdPrefix(prefix) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+
+    const txnPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.TRANSACTIONS}`;
+
+    const results = await firestoreQuery(
+      txnPath,
+      [
+        { field: "id", operator: ">=", value: prefix },
+        { field: "id", operator: "<=", value: prefix + "\uf8ff" },
+      ],
+      { limit: 20 }
+    );
+
+    return results
+      .filter((t) => t.id && t.id.startsWith(prefix))
+      .map((t) => ({ type: "transaction", data: t, isCompleted: true }));
+  } catch (error) {
+    log("Error searching transactions by ID prefix:", error);
+    return [];
+  }
+}
+
 export async function dbGetStandaloneActiveSales() {
   try {
     const { tenantID, storeID } = getTenantAndStore();

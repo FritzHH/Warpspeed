@@ -274,6 +274,7 @@ export function NewCheckoutModalScreen() {
   let amountLeftToPay = Math.round((sSale?.total || 0) - (sSale?.amountCaptured || 0));
   if (amountLeftToPay < 0) amountLeftToPay = 0;
   let cashAmountLeftToPay = amountLeftToPay - sCardProcessingAmount;
+  let cardIsProcessing = sCardProcessingAmount > 0;
   if (cashAmountLeftToPay < 0) cashAmountLeftToPay = 0;
   let custFirst = zOpenWorkorder?.customerFirst || zCustomer?.first || "";
   let custLast = zOpenWorkorder?.customerLast || zCustomer?.last || "";
@@ -1282,8 +1283,19 @@ export function NewCheckoutModalScreen() {
       });
       return;
     }
-    // Standalone: no money captured (or fully refunded) — just close modal, keep workorder + tabs
+    // Standalone: no money captured (or fully refunded) — clean up Firestore, keep workorder local
     if (isStandalone && !(sSale?.amountCaptured > 0)) {
+      if (sSale?.id && salePersistedRef.current) {
+        deleteActiveSale(sSale.id);
+      }
+      let woStore = useOpenWorkordersStore.getState();
+      for (let wo of sCombinedWorkorders) {
+        let current = woStore.workorders.find((w) => w.id === wo.id);
+        if (current) {
+          woStore.setWorkorder({ ...current, activeSaleID: "", saleID: "" }, false);
+          dbDeleteWorkorder(wo.id);
+        }
+      }
       resetAndClose();
       return;
     }
@@ -1540,18 +1552,20 @@ export function NewCheckoutModalScreen() {
                 justifyContent: "space-between",
               }}
             >
-              <CashPayment
-                amountLeftToPay={cashAmountLeftToPay}
-                onPaymentCapture={handlePaymentCapture}
-                acceptChecks={zSettings?.acceptChecks}
-                saleComplete={saleComplete}
-                onCashChange={handleCashChange}
-                hasReaders={onlineReaders.length > 0}
-                isVisible={zIsCheckingOut}
-                lockAmount={isDepositMode}
-                transactionId={prefetchedTxnIdRef.current}
-                onTransactionIdUsed={handleTransactionIdUsed}
-              />
+              <View style={{ opacity: cardIsProcessing ? 0.4 : 1 }} pointerEvents={cardIsProcessing ? "none" : "auto"}>
+                <CashPayment
+                  amountLeftToPay={cashAmountLeftToPay}
+                  onPaymentCapture={handlePaymentCapture}
+                  acceptChecks={zSettings?.acceptChecks}
+                  saleComplete={saleComplete}
+                  onCashChange={handleCashChange}
+                  hasReaders={onlineReaders.length > 0}
+                  isVisible={zIsCheckingOut}
+                  lockAmount={isDepositMode}
+                  transactionId={prefetchedTxnIdRef.current}
+                  onTransactionIdUsed={handleTransactionIdUsed}
+                />
+              </View>
               {sCardMode === "manual" ? (
                 <CardPayment
                   amountLeftToPay={amountLeftToPay}
@@ -1594,7 +1608,7 @@ export function NewCheckoutModalScreen() {
 
             {isDepositMode ? (
               /* ── DEPOSIT MODE: Combined middle+right ───── */
-              <View style={{ flex: 1, paddingLeft: 10 }}>
+              <View style={{ flex: 1, paddingLeft: 10, opacity: cardIsProcessing ? 0.4 : 1 }} pointerEvents={cardIsProcessing ? "none" : "auto"}>
                 {/* Deposit Summary Card */}
                 <View
                   style={{
@@ -1731,7 +1745,9 @@ export function NewCheckoutModalScreen() {
                 width: "29%",
                 flex: 1,
                 paddingLeft: 10,
+                opacity: cardIsProcessing ? 0.4 : 1,
               }}
+              pointerEvents={cardIsProcessing ? "none" : "auto"}
             >
               {/* Customer Info */}
               {zCustomer && (
@@ -2042,7 +2058,9 @@ export function NewCheckoutModalScreen() {
               style={{
                 width: "42%",
                 paddingLeft: 10,
+                opacity: cardIsProcessing ? 0.4 : 1,
               }}
+              pointerEvents={cardIsProcessing ? "none" : "auto"}
             >
               <ScrollView style={{ flex: 1 }}>
                 {/* {hasRealPayments ? (
@@ -2214,20 +2232,24 @@ export function NewCheckoutModalScreen() {
         initialPayment={sRefundPayment}
         onClose={() => { _setShowRefundModal(false); _setRefundPayment(null); }}
         onSaleUpdated={(updatedSale, updatedTransactions) => {
+          // Refresh combined workorders from store to pick up refund changelog entries
+          let freshWorkorders = sCombinedWorkorders.map((wo) => {
+            let storeWO = useOpenWorkordersStore.getState().workorders.find((w) => w.id === wo.id);
+            return storeWO ? cloneDeep(storeWO) : wo;
+          });
+          _setCombinedWorkorders(freshWorkorders);
+
           if (updatedSale?.voidedByRefund) {
-            // Sale was fully voided - reset to fresh sale from workorders
-            let currentUser = useLoginStore.getState().currentUser;
-            let createdBy = currentUser?.first ? currentUser.first + " " + (currentUser.last || "") : "";
-            let freshSale = createNewSale(zSettings, createdBy);
-            if (sCombinedWorkorders.length > 0) {
-              freshSale.customerID = sCombinedWorkorders[0]?.customerID || "";
-              freshSale = updateSaleWithTotals(freshSale, sCombinedWorkorders, zSettings);
-              freshSale.workorderIDs = sCombinedWorkorders.map((w) => w.id);
-            }
-            _setSale(freshSale);
-            _setTransactions([]);
+            // Sale was fully voided - reuse the same sale, just reset payment state
+            let resetSale = cloneDeep(updatedSale);
+            delete resetSale.voidedByRefund;
+            resetSale.amountCaptured = 0;
+            resetSale.paymentComplete = false;
+            resetSale = updateSaleWithTotals(resetSale, freshWorkorders, zSettings);
+            _setSale(resetSale);
+            _setTransactions(updatedTransactions || []);
             _setCredits([]);
-            salePersistedRef.current = false;
+            persistSale(resetSale, updatedTransactions || [], []);
           } else {
             _setSale(updatedSale);
             if (updatedTransactions) _setTransactions(updatedTransactions);

@@ -19,6 +19,7 @@ export const CardRefund = memo(function CardRefund({
   onProcessRefund,
   onRefundStarted,
   onRefundFailed,
+  onProcessingChange,
   workorderLines = [],
   salesTaxPercent,
   refundComplete = false,
@@ -96,6 +97,7 @@ export const CardRefund = memo(function CardRefund({
     }
 
     _setProcessing(true);
+    if (onProcessingChange) onProcessingChange(true);
     _setErrorMessage("");
     _setSuccessMessage("Processing refund...");
 
@@ -151,6 +153,7 @@ export const CardRefund = memo(function CardRefund({
     }
 
     _setProcessing(false);
+    if (onProcessingChange) onProcessingChange(false);
   }
 
   let isEnabled =

@@ -9,8 +9,8 @@ import {
   log,
   gray,
   localStorageWrapper,
-  generateEAN13Barcode,
 } from "../../../../utils";
+import { dbRequestNewId } from "../../../../db_calls_wrapper";
 import { useStripePaymentStore } from "../../../../stores";
 import { buildCardTransaction } from "./newCheckoutUtils";
 import {
@@ -326,7 +326,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     if (callbacksRef.current.onCardProcessingStart) callbacksRef.current.onCardProcessingStart(sRequestedAmount);
 
     // Use pre-fetched transaction ID so webhook can use it as the document ID
-    let transactionID = transactionId || generateEAN13Barcode();
+    let transactionID = transactionId || dbRequestNewId("transactions");
     pendingTransactionIDRef.current = transactionID;
     if (transactionId && onTransactionIdUsed) onTransactionIdUsed();
 

@@ -19,7 +19,7 @@ import {
   replaceOrAddToArr,
   resolveStatus,
 } from "./utils";
-import { cloneDeep, debounce } from "lodash";
+import { debounce } from "lodash";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "./broadcastChannel";
 import { calculateRunningTotals } from "./utils";
 
@@ -582,7 +582,7 @@ export const useLoginStore = create(
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
-  currentUser: cloneDeep(FRITZ_USER_OBJ), //testing
+  currentUser: { ...FRITZ_USER_OBJ }, //testing
   // currentUser: null,
   punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
@@ -767,21 +767,18 @@ export const useInventoryStore = create(
         return get().inventoryArr.find((o) => o.id === itemID);
       },
       removeItem: (item, sendToDB = true, batch = true) => {
-        let inventoryArr = cloneDeep(get().inventoryArr);
-        let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
-        inventoryArr = inventoryArr.filter((o) => o.id === item.id);
+        let inventoryArr = get().inventoryArr.filter((o) => o.id !== item.id);
         set({ inventoryArr });
 
         if (sendToDB) dbSaveInventoryItem(item);
       },
       setItem: (item, sendToDB = true, batch = true) => {
-        // clog("item", item);
-        let inventoryArr = cloneDeep(get().inventoryArr);
+        let inventoryArr = get().inventoryArr;
         let invItemIdx = inventoryArr.findIndex((obj) => obj.id === item.id);
         if (invItemIdx >= 0) {
-          inventoryArr[invItemIdx] = item;
+          inventoryArr = inventoryArr.map((o, i) => i === invItemIdx ? item : o);
         } else {
-          inventoryArr.push(item);
+          inventoryArr = [...inventoryArr, item];
         }
         set({ inventoryArr });
         if (sendToDB) dbSaveInventoryItem(item, batch);

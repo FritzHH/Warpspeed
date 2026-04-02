@@ -1464,7 +1464,7 @@ export function checkArr(arr, obj) {
 }
 
 export function moveItemInArr(arr, index, direction) {
-  const newArr = cloneDeep(arr); // copy so original isn’t mutated
+  const newArr = [...arr]; // shallow copy so original isn’t mutated
 
   if (direction === "up" && index > 0) {
     [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
@@ -1600,23 +1600,18 @@ export function replaceOrAddToArr(arr, input, fieldName = "id") {
   if (!arr) arr = [];
   if (!input) return arr;
   let isObj = isObject(input);
-  let copy = cloneDeep(arr);
   if (isObj) {
-    let idx = copy.findIndex((o) => o[fieldName] === input[fieldName]);
+    let idx = arr.findIndex((o) => o[fieldName] === input[fieldName]);
     if (idx >= 0) {
-      copy[idx] = input;
+      return arr.map((o, i) => i === idx ? input : o);
     } else {
-      copy.push(input);
+      return [...arr, input];
     }
   } else {
-    // log("arr", copy);
-    // log("input", input);
-    let idx = copy.findIndex((str) => str === input);
-    if (idx < 0) copy.push(input);
-    // log("copy", copy);
+    let idx = arr.findIndex((str) => str === input);
+    if (idx < 0) return [...arr, input];
+    return arr;
   }
-
-  return copy;
 }
 
 // date & time //////////////////////////////////////////////////////////

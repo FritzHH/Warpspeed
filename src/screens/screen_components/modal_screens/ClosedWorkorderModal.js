@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { View, Text, FlatList, ScrollView, Modal, TouchableOpacity } from "react-native-web";
+import { View, Text, FlatList, ScrollView, Modal, TouchableOpacity, Image } from "react-native-web";
 import { useState, useEffect } from "react";
 import {
   calculateRunningTotals,
@@ -403,11 +403,11 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
                 </Text>
               </View>
               {!!workorder.workorderNumber && (
-                <Text style={{ fontSize: 13, fontWeight: "600", color: C.text, marginLeft: 12 }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text, marginLeft: 12 }}>
                   {"#" + formatWorkorderNumber(workorder.workorderNumber)}
                 </Text>
               )}
-              <Text style={{ fontSize: 10, color: gray(0.35), marginLeft: 12 }}>
+              <Text style={{ fontSize: 13, color: gray(0.35), marginLeft: 12 }}>
                 {"ID: " + workorder.id}
               </Text>
               {!!workorder._importSource && (
@@ -445,19 +445,9 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
                 icon={ICONS.receipt}
                 iconSize={16}
                 onPress={handlePrintWorkorder}
-                buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
+                buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, outlineStyle: "none" }}
                 textStyle={{ fontSize: 12, color: C.text }}
               />
-              {sSales.length > 0 && (
-                <Button_
-                  text="Print Sale"
-                  icon={ICONS.receipt}
-                  iconSize={16}
-                  onPress={handlePrintSale}
-                  buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
-                  textStyle={{ fontSize: 12, color: C.text }}
-                />
-              )}
               <Button_
                 text="Close"
                 colorGradientArr={COLOR_GRADIENTS.red}
@@ -497,30 +487,63 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
                 fontWeight: "700",
                 color: isClosed ? C.lightred : C.green,
                 letterSpacing: 1,
+                flex: 1,
               }}
             >
               {isClosed ? "CLOSED WORKORDER" : "ACTIVE WORKORDER"}
             </Text>
+            {sSales.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  let sale = sSales[0];
+                  let enriched = { ...sale, _transactions: sTransactionsMap[sale.id] || [] };
+                  _sSetSaleForModal(enriched);
+                }}
+                style={{
+                  backgroundColor: "black",
+                  paddingHorizontal: 16,
+                  paddingVertical: 5,
+                  borderRadius: 8,
+                }}
+              >
+                <Text style={{ color: "gold", fontSize: 13, fontWeight: "600" }}>View Sale</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* ── Body: two columns ── */}
+          {/* ── Body: three columns ── */}
           <View style={{ flex: 1, flexDirection: "row", padding: 20 }}>
-            {/* ── Left column: workorder details ── */}
-            <ScrollView style={{ flex: 1, paddingRight: 20 }}>
-              {/* Customer */}
-              <SectionHeader text="CUSTOMER" />
-              <DetailRow label="Name" value={customerName || null} labelSize={13} valueSize={14} />
-              {!!workorder.customerCell && (
-                <DetailRow label="Phone" value={formatPhoneWithDashes(workorder.customerCell)} labelSize={13} valueSize={14} />
-              )}
-              {!!workorder.customerLandline && (
-                <DetailRow label="Landline" value={formatPhoneWithDashes(workorder.customerLandline)} labelSize={13} valueSize={14} />
-              )}
-              {!!workorder.customerEmail && (
-                <DetailRow label="Email" value={workorder.customerEmail} labelSize={13} valueSize={14} />
-              )}
-              {!!workorder.customerContactRestriction && (
-                <DetailRow label="Contact Pref" value={workorder.customerContactRestriction} labelSize={13} valueSize={14} />
+            {/* ── Column 1: customer info (narrow) ── */}
+            <ScrollView style={{ width: "22%", paddingRight: 15 }}>
+              {!workorder.customerID ? (
+                /* Standalone sale infographic */
+                <View style={{ alignItems: "center", paddingTop: 30 }}>
+                  <Image source={ICONS.workorder} style={{ width: 60, height: 60, opacity: 0.25 }} />
+                  <Text style={{ fontSize: 13, color: gray(0.35), marginTop: 12, fontWeight: "600" }}>
+                    Standalone Sale
+                  </Text>
+                  <Text style={{ fontSize: 11, color: gray(0.3), marginTop: 4, textAlign: "center" }}>
+                    No customer attached
+                  </Text>
+                </View>
+              ) : (
+                <View>
+                  {/* Customer */}
+                  <SectionHeader text="CUSTOMER" />
+                  <DetailRow label="Name" value={customerName || null} labelSize={13} valueSize={14} />
+                  {!!workorder.customerCell && (
+                    <DetailRow label="Phone" value={formatPhoneWithDashes(workorder.customerCell)} labelSize={13} valueSize={14} />
+                  )}
+                  {!!workorder.customerLandline && (
+                    <DetailRow label="Landline" value={formatPhoneWithDashes(workorder.customerLandline)} labelSize={13} valueSize={14} />
+                  )}
+                  {!!workorder.customerEmail && (
+                    <DetailRow label="Email" value={workorder.customerEmail} labelSize={13} valueSize={14} />
+                  )}
+                  {!!workorder.customerContactRestriction && (
+                    <DetailRow label="Contact Pref" value={workorder.customerContactRestriction} labelSize={13} valueSize={14} />
+                  )}
+                </View>
               )}
 
               {/* Bike */}
@@ -530,8 +553,8 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
 
               {/* Colors */}
               {(!!workorder.color1?.label || !!workorder.color2?.label) && (
-                <View style={{ flexDirection: "row", marginBottom: 6, alignItems: "center" }}>
-                  <Text style={{ fontSize: 13, color: gray(0.4), width: 110 }}>Colors</Text>
+                <View style={{ flexDirection: "row", marginBottom: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <Text style={{ fontSize: 13, color: gray(0.4), width: "100%", marginBottom: 4 }}>Colors</Text>
                   {!!workorder.color1?.label && (
                     <Text
                       style={{
@@ -708,8 +731,8 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
             {/* ── Vertical divider ── */}
             <View style={{ width: 1, backgroundColor: gray(0.1), marginHorizontal: 5 }} />
 
-            {/* ── Right column: line items + totals + sales ── */}
-            <View style={{ flex: 1, paddingLeft: 15 }}>
+            {/* ── Column 2: line items + totals ── */}
+            <View style={{ flex: 1, paddingHorizontal: 15 }}>
               {/* Line items */}
               <SectionHeader text={"ITEMS (" + lines.length + ")"} />
               <FlatList
@@ -732,6 +755,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
                         backgroundColor: C.listItemWhite,
                         paddingVertical: 6,
                         paddingHorizontal: 10,
+                        width: "115%",
                       }}
                     >
                       {/* Qty x Name + Price */}
@@ -803,13 +827,18 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
                 <View style={{ height: 1, backgroundColor: gray(0.15), marginVertical: 4 }} />
                 <TotalRow label="Total" value={totals.finalTotal} bold />
               </View>
+            </View>
 
-              {/* ── Sales Summary ── */}
+            {/* ── Vertical divider ── */}
+            <View style={{ width: 1, backgroundColor: gray(0.1), marginHorizontal: 5 }} />
+
+            {/* ── Column 3: sales ── */}
+            <View style={{ width: "25%", paddingLeft: 15 }}>
               <SectionHeader text={"SALES (" + sSales.length + ")"} />
               {sLoadingSales ? (
                 <Text style={{ fontSize: 11, color: gray(0.4), fontStyle: "italic" }}>Loading sales...</Text>
               ) : sSales.length > 0 ? (
-                <ScrollView style={{ flex: 1, maxHeight: 300 }}>
+                <ScrollView style={{ flex: 1 }}>
                   {sSales.map((sale) => (
                     <SaleCard
                       key={sale.id}

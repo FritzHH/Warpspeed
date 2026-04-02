@@ -26,8 +26,9 @@ import {
   useActiveSalesStore,
   useCheckoutStore,
 } from "../../../stores";
-import { dbGetCustomer, dbGetCompletedWorkorder, dbGetCompletedSale } from "../../../db_calls_wrapper";
+import { dbGetCustomer, dbGetCompletedWorkorder, dbGetCompletedSale, dbSearchCompletedWorkorders } from "../../../db_calls_wrapper";
 import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
@@ -158,6 +159,8 @@ export function WorkordersComponent({}) {
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
 
   const [sSearchTerm, _setSearchTerm] = useState("");
+  const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
+  const [sSearching, _sSetSearching] = useState(false);
 
   // Sale IDs shared by 2+ workorders (linked/combined sales)
   let linkedSaleIDs = new Set();
@@ -169,58 +172,176 @@ export function WorkordersComponent({}) {
     }
   }
 
-  function handleSearchChange(val) {
-    _setSearchTerm(val);
-    let digits = val.replace(/\D/g, "");
-    if (digits.length !== 13 || !/^\d{13}$/.test(digits)) return;
-    let prefix = digits[0];
+  function getSearchMode(raw) {
+    if (!raw) return null;
+    let upper = raw.toUpperCase();
+    if (upper[0] === "W" && (upper.length === 1 || upper[1] === "O")) return "WO_MODE";
+    if (/^\d/.test(raw)) return "NUMBER_MODE";
+    if (/^[a-zA-Z]/.test(raw)) return "NAME_MODE";
+    return null;
+  }
 
-    if (prefix === "1") {
-      let found = zOpenWorkorders.find((w) => w.id === digits);
-      if (found) {
-        useOpenWorkordersStore.getState().setOpenWorkorderID(found.id);
-        if (found.customerID) {
-          dbGetCustomer(found.customerID).then((c) => {
-            if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+  function formatSearchDisplay(val) {
+    let raw = val.replace(/-/g, "");
+    let mode = getSearchMode(raw);
+
+    if (mode === "WO_MODE") {
+      // Single "W" typed -> autocomplete to "WO-"
+      if (raw.length === 1) return "WO-";
+      // Auto-capitalize WO prefix
+      let formatted = "WO" + raw.slice(2).toUpperCase();
+      // Insert dash after WO
+      if (formatted.length > 2) formatted = "WO-" + formatted.slice(2);
+      // Insert dash after 4 digits (position WO- + 4 digits = index 6 in raw = index 7 in display)
+      if (formatted.length > 7) formatted = formatted.slice(0, 7) + "-" + formatted.slice(7);
+      return formatted;
+    }
+
+    if (mode === "NAME_MODE") {
+      // Auto-capitalize first letter of each word
+      return raw.replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    // NUMBER_MODE or single char - return as-is
+    return raw;
+  }
+
+  function handleSearchChange(val) {
+    // Strip special characters (allow letters, digits, spaces only)
+    val = val.replace(/[^a-zA-Z0-9\s-]/g, "");
+
+    // Backspace from "WO-" -> clear completely
+    let raw = val.replace(/-/g, "");
+    if (sSearchTerm === "WO-" && raw.length < 3) {
+      _setSearchTerm("");
+      _sSetSearching(false);
+      return;
+    }
+
+    let digits = raw.replace(/\D/g, "");
+
+    // 13-digit barcode scanner detection (instant scan)
+    if (digits.length === 13 && /^\d{13}$/.test(raw)) {
+      _setSearchTerm(raw);
+      let prefix = digits[0];
+      if (prefix === "1") {
+        let found = zOpenWorkorders.find((w) => w.id === digits);
+        if (found) {
+          useOpenWorkordersStore.getState().setOpenWorkorderID(found.id);
+          if (found.customerID) {
+            dbGetCustomer(found.customerID).then((c) => {
+              if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+            });
+          }
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.workorder,
+            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+            optionsTabName: TAB_NAMES.optionsTab.inventory,
+          });
+          _setSearchTerm("");
+        } else {
+          dbGetCompletedWorkorder(digits).then((wo) => {
+            if (wo) {
+              let store = useOpenWorkordersStore.getState();
+              store.setWorkorder(wo, false);
+              store.setLockedWorkorderID(wo.id);
+              store.setOpenWorkorderID(wo.id);
+              useTabNamesStore.getState().setItems({
+                infoTabName: TAB_NAMES.infoTab.workorder,
+                itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+                optionsTabName: TAB_NAMES.optionsTab.inventory,
+              });
+              if (wo.customerID) {
+                dbGetCustomer(wo.customerID).then((c) => {
+                  if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+                });
+              }
+            }
+            _setSearchTerm("");
           });
         }
-        useTabNamesStore.getState().setItems({
-          infoTabName: TAB_NAMES.infoTab.workorder,
-          itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-          optionsTabName: TAB_NAMES.optionsTab.inventory,
-        });
+        return;
+      } else if (prefix === "2") {
+        useCheckoutStore.getState().setStringOnly(digits);
         _setSearchTerm("");
-      } else {
-        dbGetCompletedWorkorder(digits).then((wo) => {
-          if (wo) {
-            let store = useOpenWorkordersStore.getState();
-            store.setWorkorder(wo, false);
-            store.setLockedWorkorderID(wo.id);
-            store.setOpenWorkorderID(wo.id);
-            useTabNamesStore.getState().setItems({
-              infoTabName: TAB_NAMES.infoTab.workorder,
-              itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-              optionsTabName: TAB_NAMES.optionsTab.inventory,
-            });
-            if (wo.customerID) {
-              dbGetCustomer(wo.customerID).then((c) => {
-                if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
-              });
-            }
+        return;
+      } else if (prefix === "3") {
+        readTransaction(digits).then((txn) => {
+          if (txn?.saleID) {
+            useCheckoutStore.getState().setStringOnly(txn.saleID);
           }
           _setSearchTerm("");
         });
+        return;
       }
-    } else if (prefix === "2") {
-      useCheckoutStore.getState().setStringOnly(digits);
-      _setSearchTerm("");
-    } else if (prefix === "3") {
-      readTransaction(digits).then((txn) => {
-        if (txn?.saleID) {
-          useCheckoutStore.getState().setStringOnly(txn.saleID);
+    }
+
+    // Format for display and store
+    let display = formatSearchDisplay(val);
+    _setSearchTerm(display);
+    _sSetSearching(false);
+
+    let mode = getSearchMode(raw);
+
+    // Remote search triggers
+    if (mode === "WO_MODE") {
+      let woRaw = "WO" + raw.slice(2).toUpperCase();
+      // Full WO number = 11 chars (WO + 4 digits + 3 month + 2 year)
+      if (woRaw.length >= 11) {
+        let localMatches = zOpenWorkorders.filter((wo) =>
+          (wo.workorderNumber || "").toUpperCase().includes(woRaw)
+        );
+        if (localMatches.length === 0) {
+          _sSetSearching(true);
+          dbSearchCompletedWorkorders("workorderNumber", woRaw).then((results) => {
+            _sSetSearching(false);
+            if (results && results.length > 0) {
+              _sSetClosedWorkorder(results[0]);
+            }
+          });
         }
-        _setSearchTerm("");
-      });
+      }
+    } else if (mode === "NUMBER_MODE") {
+      // 12+ digits with no local ID match -> remote pull by ID
+      if (digits.length >= 12) {
+        let localIDMatch = zOpenWorkorders.find((wo) => (wo.id || "").includes(digits));
+        if (!localIDMatch) {
+          _sSetSearching(true);
+          dbGetCompletedWorkorder(digits).then((wo) => {
+            if (wo) {
+              _sSetSearching(false);
+              _sSetClosedWorkorder(wo);
+            } else if (digits.length >= 10) {
+              // Also try phone search if no ID match
+              let phone = digits.slice(0, 10);
+              dbSearchCompletedWorkorders("customerCell", phone).then((results) => {
+                _sSetSearching(false);
+                if (results && results.length > 0) {
+                  _sSetClosedWorkorder(results[0]);
+                }
+              });
+            } else {
+              _sSetSearching(false);
+            }
+          });
+        }
+      } else if (digits.length >= 10) {
+        // 10+ digits with no local phone match -> remote phone search
+        let phone = digits.slice(0, 10);
+        let localPhoneMatch = zOpenWorkorders.find((wo) => {
+          let woPhone = (wo.customerCell || "").replace(/\D/g, "");
+          return woPhone.includes(phone);
+        });
+        if (!localPhoneMatch) {
+          _sSetSearching(true);
+          dbSearchCompletedWorkorders("customerCell", phone).then((results) => {
+            _sSetSearching(false);
+            if (results && results.length > 0) {
+              _sSetClosedWorkorder(results[0]);
+            }
+          });
+        }
+      }
     }
   }
 
@@ -325,23 +446,41 @@ export function WorkordersComponent({}) {
   }
 
   function filterWorkorders(workorders) {
-    if (!sSearchTerm || sSearchTerm.length < 2) return workorders;
-    let term = sSearchTerm.toLowerCase();
-    return workorders.filter((wo) => {
-      let first = (wo.customerFirst || "").toLowerCase();
-      let last = (wo.customerLast || "").toLowerCase();
-      let brand = (wo.brand || "").toLowerCase();
-      let phone = (wo.customerCell || "").replace(/\D/g, "");
-      let searchDigits = term.replace(/\D/g, "");
-      return (
-        first.includes(term) ||
-        last.includes(term) ||
-        brand.includes(term) ||
-        (wo.id || "").includes(term) ||
-        (wo.workorderNumber || "").includes(term) ||
-        (searchDigits.length >= 2 && phone.includes(searchDigits))
+    let raw = sSearchTerm.replace(/-/g, "");
+    let mode = getSearchMode(raw);
+
+    if (mode === "WO_MODE") {
+      // Search starts at 4+ chars total (WO + 2 digits)
+      if (raw.length < 4) return workorders;
+      let woRaw = "WO" + raw.slice(2).toUpperCase();
+      return workorders.filter((wo) =>
+        (wo.workorderNumber || "").toUpperCase().includes(woRaw)
       );
-    });
+    }
+
+    if (mode === "NUMBER_MODE") {
+      if (raw.length < 2) return workorders;
+      let digits = raw.replace(/\D/g, "");
+      return workorders.filter((wo) => {
+        let phone = (wo.customerCell || "").replace(/\D/g, "");
+        return (wo.id || "").includes(digits) || (digits.length >= 2 && phone.includes(digits));
+      });
+    }
+
+    if (mode === "NAME_MODE") {
+      if (raw.length < 2) return workorders;
+      let parts = raw.toLowerCase().split(/\s+/).filter(Boolean);
+      if (parts.length === 0) return workorders;
+      return workorders.filter((wo) => {
+        let first = (wo.customerFirst || "").toLowerCase();
+        let last = (wo.customerLast || "").toLowerCase();
+        let email = (wo.customerEmail || "").toLowerCase();
+        return parts.some((part) => first.includes(part) || last.includes(part) || email.includes(part));
+      });
+    }
+
+    // PENDING_WO (single "W") or unknown - show all
+    return workorders;
   }
 
   function onMouseEnter(workorder) {
@@ -412,7 +551,11 @@ export function WorkordersComponent({}) {
           <Button_
             icon={ICONS.reset1}
             iconSize={20}
-            onPress={() => _setSearchTerm("")}
+            onPress={() => {
+              _setSearchTerm("");
+              _sSetClosedWorkorder(null);
+              _sSetSearching(false);
+            }}
             useColorGradient={false}
           />
           <TextInput_
@@ -459,6 +602,13 @@ export function WorkordersComponent({}) {
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>
             {!zWorkordersLoaded ? (
               <SmallLoadingIndicator message="Loading workorders...." size={40} textStyle={{ fontSize: 16 }} />
+            ) : sSearching ? (
+              <SmallLoadingIndicator message="Searching..." size={30} textStyle={{ fontSize: 14 }} />
+            ) : sSearchTerm.replace(/-/g, "").length >= 2 ? (
+              <View style={{ alignItems: "center" }}>
+                <Image_ source={ICONS.info} style={{ width: 24, height: 24, marginBottom: 6, opacity: 0.5 }} />
+                <Text style={{ color: gray(0.4), fontSize: 14 }}>No results found</Text>
+              </View>
             ) : (
               <Text style={{ color: gray(0.4), fontSize: 14 }}>No workorders</Text>
             )}
@@ -703,6 +853,10 @@ export function WorkordersComponent({}) {
             </View>
           );
         }}
+      />
+      <ClosedWorkorderModal
+        workorder={sClosedWorkorder}
+        onClose={() => _sSetClosedWorkorder(null)}
       />
     </View>
   );

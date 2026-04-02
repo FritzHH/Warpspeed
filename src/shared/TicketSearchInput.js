@@ -1,26 +1,36 @@
 /* eslint-disable */
 import { View, TextInput } from "react-native-web";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { gray } from "../utils";
-import { Button_, SmallLoadingIndicator } from "../components";
+import { SmallLoadingIndicator } from "../components";
 import { C } from "../styles";
-import { executeTicketSearch } from "./ticketSearch";
+import { executeTicketSearch, executeLiveSearch } from "./ticketSearch";
 import { ClosedWorkorderModal } from "../screens/screen_components/modal_screens/ClosedWorkorderModal";
 import { TransactionModal } from "../screens/screen_components/modal_screens/TransactionModal";
+import { SaleModal } from "../screens/screen_components/modal_screens/SaleModal";
 
 export function TicketSearchInput({}) {
   const [sTicketSearch, _setTicketSearch] = useState("");
   const [sTicketSearching, _setTicketSearching] = useState(false);
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
   const [sTransaction, _sSetTransaction] = useState(null);
+  const [sSale, _sSetSale] = useState(null);
+  const debounceRef = useRef(null);
+
+  const searchCallbacks = {
+    onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
+    onTransactionFound: (txn) => _sSetTransaction(txn),
+    onSaleFound: (sale) => _sSetSale(sale),
+  };
+
+  function stripWoPrefix(val) {
+    return val.replace(/^WO-/i, "").trim();
+  }
 
   async function handleExecuteTicketSearch() {
     _setTicketSearching(true);
     try {
-      await executeTicketSearch(sTicketSearch, () => _setTicketSearch(""), {
-        onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
-        onTransactionFound: (txn) => _sSetTransaction(txn),
-      });
+      await executeTicketSearch(stripWoPrefix(sTicketSearch), () => _setTicketSearch(""), searchCallbacks);
     } finally {
       _setTicketSearching(false);
     }
@@ -39,15 +49,56 @@ export function TicketSearchInput({}) {
       >
         <TextInput
           value={sTicketSearch}
-          placeholder={"Scan ticket or enter first 4 of barcode"}
+          placeholder={"Scan ticket or enter WO number"}
           placeholderTextColor={gray(0.35)}
+          maxLength={16}
           onChangeText={(val) => {
+            // Auto-format "wo" → "WO-"
+            let upper = val.toUpperCase();
+            // Backspace on "WO-" or partial → clear completely
+            if (sTicketSearch === "WO-" && val.length < 3) { _setTicketSearch(""); return; }
+            if (upper === "W" && val.length === 1) { _setTicketSearch("WO-"); return; }
+            if (upper === "WO" && val.length === 2) { _setTicketSearch("WO-"); return; }
+
+            // Only allow letters and numbers (no special characters)
+            if (/[^a-zA-Z0-9\-]/.test(val)) return;
+            let hasWoPrefix = /^WO-/i.test(val);
+            let trimmed = stripWoPrefix(val).trim();
+            // Cap actual input at 13 characters (excluding WO- prefix)
+            if (trimmed.length > 13) { return; }
             _setTicketSearch(val);
-            let trimmed = val.trim();
-            if (/^\d{12}$/.test(trimmed)) {
-              _setTicketSearch("");
-              executeTicketSearch(trimmed, null, {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            if (!/^\d+$/.test(trimmed)) return;
+            let clearOnMatch = () => _setTicketSearch("");
+            // 13 digits (new prefixed EAN-13) — fire immediately via exact search
+            if (trimmed.length === 13) {
+              executeTicketSearch(trimmed, clearOnMatch, searchCallbacks);
+              return;
+            }
+            // 12 digits (old barcodes) — debounce 120ms so scanner can finish 13th char
+            if (trimmed.length === 12) {
+              debounceRef.current = setTimeout(() => {
+                executeTicketSearch(trimmed, clearOnMatch, searchCallbacks);
+              }, 120);
+              return;
+            }
+            // WO mode: auto-search workorderNumber after 1+ digits typed (4th total char = WO- + 1 digit)
+            // Searches open-workorders + completed-workorders only
+            if (hasWoPrefix && trimmed.length >= 1) {
+              executeLiveSearch(trimmed, "woNumber", {
+                onSingleResult: clearOnMatch,
                 onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
+                onSaleFound: (sale) => _sSetSale(sale),
+                onTransactionFound: (txn) => _sSetTransaction(txn),
+              });
+              return;
+            }
+            // Non-WO mode: auto-search sales + transactions after 4 digits typed
+            if (!hasWoPrefix && trimmed.length >= 4) {
+              executeLiveSearch(trimmed, "salesTransactions", {
+                onSingleResult: clearOnMatch,
+                onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
+                onSaleFound: (sale) => _sSetSale(sale),
                 onTransactionFound: (txn) => _sSetTransaction(txn),
               });
             }
@@ -73,23 +124,6 @@ export function TicketSearchInput({}) {
           </View>
         )}
       </View>
-      {sTicketSearch.trim().length === 4 && /^\d{4}$/.test(sTicketSearch.trim()) && (
-        <View style={{ width: "100%", paddingHorizontal: 20, alignItems: "flex-end", marginTop: 3 }}>
-          <Button_
-            text={sTicketSearch.trim()[0] === "3" ? "Search Sales" : sTicketSearch.trim()[0] === "2" ? "Search Legacy" : "Search Workorders"}
-            onPress={() => handleExecuteTicketSearch()}
-            buttonStyle={{
-              width: 150,
-              borderRadius: 5,
-              paddingVertical: 6,
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              backgroundColor: C.buttonLightGreen,
-            }}
-            textStyle={{ fontSize: 11, color: C.text }}
-          />
-        </View>
-      )}
       <ClosedWorkorderModal
         workorder={sClosedWorkorder}
         onClose={() => _sSetClosedWorkorder(null)}
@@ -97,6 +131,10 @@ export function TicketSearchInput({}) {
       <TransactionModal
         transaction={sTransaction}
         onClose={() => _sSetTransaction(null)}
+      />
+      <SaleModal
+        sale={sSale}
+        onClose={() => _sSetSale(null)}
       />
     </View>
   );

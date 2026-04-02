@@ -236,6 +236,34 @@ export async function readCompletedSale(saleID) {
   }
 }
 
+// ─── Find Sale by Transaction ID ─────────────────────────────
+
+export async function findSaleByTransactionID(transactionID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !transactionID) {
+      log("findSaleByTransactionID: missing tenantID/storeID/transactionID");
+      return null;
+    }
+    // Check completed-sales first
+    const completedPath = `tenants/${tenantID}/stores/${storeID}/completed-sales`;
+    let results = await firestoreQuery(completedPath, [
+      { field: "transactionIDs", operator: "array-contains", value: transactionID },
+    ], { limit: 1 });
+    if (results?.length > 0) return results[0];
+    // Fallback to active-sales
+    const activePath = `tenants/${tenantID}/stores/${storeID}/active-sales`;
+    results = await firestoreQuery(activePath, [
+      { field: "transactionIDs", operator: "array-contains", value: transactionID },
+    ], { limit: 1 });
+    if (results?.length > 0) return results[0];
+    return null;
+  } catch (error) {
+    log("findSaleByTransactionID error:", error);
+    return null;
+  }
+}
+
 // ─── Cash Refund (Firestore) ─────────────────────────────────
 
 export async function writeCashRefund(transactionID, refundObj) {

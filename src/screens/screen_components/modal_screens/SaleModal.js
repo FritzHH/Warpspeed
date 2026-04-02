@@ -10,8 +10,10 @@ import {
   resolveStatus,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { useCheckoutStore, useOpenWorkordersStore, useSettingsStore } from "../../../stores";
+import { useCheckoutStore, useOpenWorkordersStore, useSettingsStore, useLoginStore } from "../../../stores";
 import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
+import { printBuilder } from "../../../utils";
+import { dbSavePrintObj, dbGetCompletedWorkorder } from "../../../db_calls_wrapper";
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
 
 // ─── Helper components ──────────────────────────────────
@@ -63,6 +65,29 @@ export const SaleModal = ({ sale: saleProp, onClose: onCloseProp } = {}) => {
   function handleRefund() {
     handleClose();
     useCheckoutStore.getState().setStringOnly(sale.id);
+  }
+
+  function handleViewWorkorder() {
+    // If opened from workorder modal (onCloseProp exists), just close to reveal it
+    if (onCloseProp) { handleClose(); return; }
+    // Otherwise fetch the workorder and open it
+    let woID = sale?.workorderIDs?.[0];
+    if (!woID) return;
+    dbGetCompletedWorkorder(woID).then((wo) => {
+      if (wo) {
+        handleClose();
+        setTimeout(() => _sSetClosedWorkorder(wo), 50);
+      }
+    });
+  }
+
+  function handlePrintSale() {
+    if (!sale) return;
+    let _settings = useSettingsStore.getState().getSettings();
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    let transactions = sale._transactions || [];
+    let toPrint = printBuilder.sale(sale, transactions, null, null, _settings?.salesTaxPercent, _ctx, sale.creditsApplied || []);
+    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
   }
 
   return (
@@ -124,7 +149,7 @@ export const SaleModal = ({ sale: saleProp, onClose: onCloseProp } = {}) => {
                   {isVoided ? "Voided" : sale.paymentComplete ? "Paid" : "Partial"}
                 </Text>
               </View>
-              <Text style={{ fontSize: 10, color: gray(0.35), marginLeft: 12 }}>
+              <Text style={{ fontSize: 13, color: gray(0.35), marginLeft: 12 }}>
                 {"Sale ID: " + sale.id}
               </Text>
               {!!sale._importSource && (
@@ -144,6 +169,14 @@ export const SaleModal = ({ sale: saleProp, onClose: onCloseProp } = {}) => {
               )}
             </View>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Button_
+                text="Print Sale"
+                icon={ICONS.receipt}
+                iconSize={16}
+                onPress={handlePrintSale}
+                buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8 }}
+                textStyle={{ fontSize: 12, color: C.text }}
+              />
               <Button_
                 text="Refund"
                 colorGradientArr={COLOR_GRADIENTS.red}
@@ -203,10 +236,23 @@ export const SaleModal = ({ sale: saleProp, onClose: onCloseProp } = {}) => {
 
           {/* ── Date Banner ── */}
           {!!sale.millis && (
-            <View style={{ paddingHorizontal: 20, paddingVertical: 8, backgroundColor: gray(0.03) }}>
+            <View style={{ paddingHorizontal: 20, paddingVertical: 8, backgroundColor: gray(0.03), flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <Text style={{ fontSize: 13, color: gray(0.4) }}>
                 {formatMillisForDisplay(sale.millis, true)}
               </Text>
+              {(sale.workorderIDs?.length > 0 || onCloseProp) && (
+                <TouchableOpacity
+                  onPress={handleViewWorkorder}
+                  style={{
+                    backgroundColor: "black",
+                    paddingHorizontal: 12,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ color: "gold", fontSize: 12, fontWeight: "600" }}>View Workorder</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 

@@ -6,7 +6,7 @@ import {
   gray,
   lightenRGBByPercent,
 } from "../../../utils";
-import { C, ICONS } from "../../../styles";
+import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
 import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
 import { useSettingsStore, useLoginStore } from "../../../stores";
 import { printBuilder, log } from "../../../utils";
@@ -34,9 +34,118 @@ const SectionHeader = ({ text }) => (
   </Text>
 );
 
+// ─── Refund Infographic ─────────────────────────────────
+
+const RefundInfoGraphic = ({ amountCaptured, totalRefunded }) => {
+  let remaining = Math.max(0, amountCaptured - totalRefunded);
+  let refundedPercent = amountCaptured > 0 ? Math.round((totalRefunded / amountCaptured) * 100) : 0;
+  let fullyRefunded = remaining === 0;
+
+  return (
+    <View
+      style={{
+        borderRadius: 7,
+        borderWidth: 1,
+        borderColor: lightenRGBByPercent(C.lightred, 40),
+        backgroundColor: C.listItemWhite,
+        padding: 12,
+        marginBottom: 12,
+      }}
+    >
+      {/* Labels row */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+        <View style={{ alignItems: "flex-start" }}>
+          <Text style={{ fontSize: 10, color: gray(0.45), marginBottom: 2 }}>REFUNDED</Text>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: C.lightred }}>
+            {"$" + formatCurrencyDisp(totalRefunded)}
+          </Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ fontSize: 10, color: gray(0.45), marginBottom: 2 }}>REMAINING</Text>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: fullyRefunded ? gray(0.3) : C.green }}>
+            {"$" + formatCurrencyDisp(remaining)}
+          </Text>
+        </View>
+      </View>
+      {/* Progress bar */}
+      <View
+        style={{
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: lightenRGBByPercent(C.green, 55),
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            height: 8,
+            borderRadius: 4,
+            width: refundedPercent + "%",
+            backgroundColor: C.lightred,
+          }}
+        />
+      </View>
+      {/* Percent label */}
+      <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 4, textAlign: "center" }}>
+        {refundedPercent + "% of $" + formatCurrencyDisp(amountCaptured) + " refunded"}
+      </Text>
+    </View>
+  );
+};
+
+// ─── Refund Card ────────────────────────────────────────
+
+const RefundCard = ({ refund, index }) => {
+  let r = refund;
+  return (
+    <View
+      style={{
+        marginBottom: 6,
+        borderRadius: 7,
+        borderWidth: 1,
+        borderColor: lightenRGBByPercent(C.lightred, 45),
+        backgroundColor: C.listItemWhite,
+        padding: 10,
+      }}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View
+            style={{
+              backgroundColor: lightenRGBByPercent(C.lightred, 55),
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 4,
+              marginRight: 8,
+            }}
+          >
+            <Text style={{ fontSize: 10, fontWeight: "600", color: C.lightred }}>
+              {(r.method || "card").toUpperCase()}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 12, color: gray(0.45) }}>
+            {"Refund #" + (index + 1)}
+          </Text>
+        </View>
+        <Text style={{ fontSize: 14, fontWeight: "700", color: C.lightred }}>
+          {"-$" + formatCurrencyDisp(r.amount)}
+        </Text>
+      </View>
+      {!!r.notes && (
+        <Text style={{ fontSize: 11, color: gray(0.45), marginTop: 4 }}>{r.notes}</Text>
+      )}
+      {!!r.millis && (
+        <Text style={{ fontSize: 10, color: gray(0.35), marginTop: 3 }}>
+          {formatMillisForDisplay(r.millis, true)}
+        </Text>
+      )}
+    </View>
+  );
+};
+
 // ─── Main Modal ─────────────────────────────────────────
 
-export const TransactionModal = ({ transaction, onClose }) => {
+export const TransactionModal = ({ transaction, onClose, onRefund }) => {
   if (!transaction) return null;
 
   const txn = transaction;
@@ -59,6 +168,10 @@ export const TransactionModal = ({ transaction, onClose }) => {
     let toPrint = printBuilder.transaction(txn, _ctx);
     log("DEV — transaction receipt:", toPrint);
     dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
+  }
+
+  function handleRefund() {
+    onRefund && onRefund(txn);
   }
 
   return (
@@ -124,6 +237,13 @@ export const TransactionModal = ({ transaction, onClose }) => {
               </Text>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Button_
+                text="Refund"
+                colorGradientArr={COLOR_GRADIENTS.red}
+                onPress={handleRefund}
+                buttonStyle={{ paddingHorizontal: 16, height: 32, marginRight: 8 }}
+                textStyle={{ fontSize: 12, color: "#fff" }}
+              />
               <Button_
                 text="Print Transaction"
                 icon={ICONS.receipt}
@@ -198,6 +318,20 @@ export const TransactionModal = ({ transaction, onClose }) => {
               )}
             </View>
 
+            {/* Refund infographic + card list (only if refunds exist) */}
+            {hasRefunds && (
+              <View>
+                <SectionHeader text={"REFUNDS (" + refunds.length + ")"} />
+                <RefundInfoGraphic
+                  amountCaptured={txn.amountCaptured || 0}
+                  totalRefunded={totalRefunded}
+                />
+                {refunds.map((r, idx) => (
+                  <RefundCard key={r.id || idx} refund={r} index={idx} />
+                ))}
+              </View>
+            )}
+
             {/* Card details */}
             {isCard && (
               <View>
@@ -235,49 +369,6 @@ export const TransactionModal = ({ transaction, onClose }) => {
               <View>
                 <SectionHeader text="CASH DETAILS" />
                 <DetailRow label="Processor" value={txn.paymentProcessor || "cash"} />
-              </View>
-            )}
-
-            {/* Refunds */}
-            {hasRefunds && (
-              <View>
-                <SectionHeader text={"REFUNDS (" + refunds.length + ")"} />
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-                  <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "600" }}>Total Refunded</Text>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: C.lightred }}>
-                    {"-$" + formatCurrencyDisp(totalRefunded)}
-                  </Text>
-                </View>
-                {refunds.map((r, idx) => (
-                  <View
-                    key={r.id || idx}
-                    style={{
-                      marginBottom: 4,
-                      borderRadius: 6,
-                      borderWidth: 1,
-                      borderColor: gray(0.1),
-                      backgroundColor: C.listItemWhite,
-                      padding: 8,
-                    }}
-                  >
-                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                      <Text style={{ fontSize: 12, color: C.lightred }}>
-                        {(r.method || "card").toUpperCase() + " Refund"}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: C.lightred }}>
-                        {"-$" + formatCurrencyDisp(r.amount)}
-                      </Text>
-                    </View>
-                    {!!r.notes && (
-                      <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 2 }}>{r.notes}</Text>
-                    )}
-                    {!!r.millis && (
-                      <Text style={{ fontSize: 10, color: gray(0.35), marginTop: 2 }}>
-                        {formatMillisForDisplay(r.millis, true)}
-                      </Text>
-                    )}
-                  </View>
-                ))}
               </View>
             )}
 

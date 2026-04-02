@@ -2,7 +2,7 @@
 
 import { View, Text, FlatList } from "react-native-web";
 import { useState } from "react";
-import { formatCurrencyDisp, formatMillisForDisplay, gray, log, formatWorkorderNumber } from "../../../utils";
+import { formatCurrencyDisp, formatMillisForDisplay, gray, log, formatWorkorderNumber, lightenRGBByPercent } from "../../../utils";
 import {
   SmallLoadingIndicator,
   TouchableOpacity_,
@@ -11,18 +11,26 @@ import {
   useTicketSearchStore,
   useOpenWorkordersStore,
   useTabNamesStore,
-  useCheckoutStore,
   useActiveSalesStore,
+  useAlertScreenStore,
 } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { C } from "../../../styles";
 import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
+import { TransactionModal } from "../modal_screens/TransactionModal";
+import { SaleModal } from "../modal_screens/SaleModal";
+import { NewRefundModalScreen } from "../modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
+import { readTransactions, findSaleByTransactionID } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
 export function Items_TicketSearchResults({}) {
   const zResults = useTicketSearchStore((state) => state.getResults());
   const zIsSearching = useTicketSearchStore((state) => state.getIsSearching());
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
+  const [sTransaction, _sSetTransaction] = useState(null);
+  const [sSale, _sSetSale] = useState(null);
+  const [sRefundSaleID, _sSetRefundSaleID] = useState(null);
+  const [sRefundInitialPayment, _sSetRefundInitialPayment] = useState(null);
 
   function handleWorkorderPress(wo, isCompleted) {
     if (isCompleted) {
@@ -49,22 +57,41 @@ export function Items_TicketSearchResults({}) {
     useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
 
-  function handleSalePress(sale, isCompleted) {
-    if (isCompleted) {
-      // completed sale → open refund screen via receiptScan trigger
-      useCheckoutStore.getState().setStringOnly(sale.id);
-    } else {
-      // partial/active sale → open checkout screen
-      useCheckoutStore.getState().setViewOnlySale(sale);
-      useCheckoutStore.getState().setIsCheckingOut(true);
+  async function handleSalePress(sale) {
+    // Hydrate _transactions then open SaleModal
+    let txns = [];
+    if (sale.transactionIDs?.length > 0) {
+      txns = await readTransactions(sale.transactionIDs);
     }
+    _sSetSale({ ...sale, _transactions: txns });
+  }
+
+  function handleTransactionPress(txn) {
+    _sSetTransaction(txn);
+  }
+
+  async function handleTransactionRefund(txn) {
+    // Find the sale that contains this transaction, then open refund modal
+    let sale = await findSaleByTransactionID(txn.id);
+    if (!sale) {
+      useAlertScreenStore.getState().setAlert({
+        title: "Sale Not Found",
+        message: "Could not find the sale associated with this transaction.",
+      });
+      return;
+    }
+    _sSetTransaction(null);
+    _sSetRefundInitialPayment(txn);
+    _sSetRefundSaleID(sale.id);
   }
 
   function handlePress(item) {
     if (item.type === "workorder") {
       handleWorkorderPress(item.data, item.isCompleted);
     } else if (item.type === "sale") {
-      handleSalePress(item.data, item.isCompleted);
+      handleSalePress(item.data);
+    } else if (item.type === "transaction") {
+      handleTransactionPress(item.data);
     }
   }
 
@@ -157,6 +184,52 @@ export function Items_TicketSearchResults({}) {
     );
   }
 
+  function renderTransactionCard(item) {
+    let txn = item.data;
+    let isCard = txn.method === "card";
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>
+            Txn {"#" + txn.id.slice(-4)}
+          </Text>
+          <Text style={{ fontSize: 13, color: gray(0.45), marginTop: 2 }}>
+            {(txn.method || "unknown").toUpperCase()}
+            {isCard && txn.last4 ? " ..." + txn.last4 : ""}
+            {" - " + formatCurrencyDisp(txn.amountCaptured || 0, true)}
+          </Text>
+          {txn.millis ? (
+            <Text style={{ fontSize: 12, color: gray(0.55), marginTop: 2 }}>
+              {formatMillisForDisplay(txn.millis)}
+            </Text>
+          ) : null}
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <View
+            style={{
+              backgroundColor: isCard
+                ? lightenRGBByPercent(C.blue, 60)
+                : lightenRGBByPercent(C.green, 60),
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 4,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "600",
+                color: isCard ? C.blue : C.green,
+              }}
+            >
+              {isCard ? "CARD" : "CASH"}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   function renderItem({ item }) {
     return (
       <TouchableOpacity_
@@ -171,10 +244,14 @@ export function Items_TicketSearchResults({}) {
           backgroundColor: C.listItemWhite,
           borderRadius: 8,
           borderWidth: 1,
-          borderColor: item.type === "sale" ? C.blue : C.buttonLightGreenOutline,
+          borderColor: item.type === "sale" ? C.blue : item.type === "transaction" ? C.purple : C.buttonLightGreenOutline,
         }}
       >
-        {item.type === "workorder" ? renderWorkorderCard(item) : renderSaleCard(item)}
+        {item.type === "workorder"
+          ? renderWorkorderCard(item)
+          : item.type === "transaction"
+            ? renderTransactionCard(item)
+            : renderSaleCard(item)}
       </TouchableOpacity_>
     );
   }
@@ -189,9 +266,10 @@ export function Items_TicketSearchResults({}) {
       <FlatList
         data={zResults}
         renderItem={renderItem}
-        keyExtractor={(item, index) =>
-          (item.type === "workorder" ? "wo-" : "sale-") + (item.data?.id || index)
-        }
+        keyExtractor={(item, index) => {
+          let pre = item.type === "workorder" ? "wo-" : item.type === "transaction" ? "txn-" : "sale-";
+          return pre + (item.data?.id || index);
+        }}
         ListEmptyComponent={
           zIsSearching ? (
             <SmallLoadingIndicator />
@@ -209,6 +287,23 @@ export function Items_TicketSearchResults({}) {
         workorder={sClosedWorkorder}
         onClose={() => _sSetClosedWorkorder(null)}
       />
+      <TransactionModal
+        transaction={sTransaction}
+        onClose={() => _sSetTransaction(null)}
+        onRefund={handleTransactionRefund}
+      />
+      <SaleModal
+        sale={sSale}
+        onClose={() => _sSetSale(null)}
+      />
+      {!!sRefundSaleID && (
+        <NewRefundModalScreen
+          visible={true}
+          saleID={sRefundSaleID}
+          initialPayment={sRefundInitialPayment}
+          onClose={() => { _sSetRefundSaleID(null); _sSetRefundInitialPayment(null); }}
+        />
+      )}
     </View>
   );
 }

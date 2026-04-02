@@ -65,7 +65,7 @@ import {
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS } from "../../../db_calls_wrapper";
+import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, dbRequestNewId, startNewWorkorder } from "../../../db_calls_wrapper";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -258,16 +258,8 @@ export const ActiveWorkorderComponent = ({}) => {
   function handleStartStandaloneSalePress() {
     useLoginStore.getState().requireLogin(() => {
       useCurrentCustomerStore.getState().setCustomer(null, false);
-      let store = useOpenWorkordersStore.getState();
-      store.setWorkorderPreviewID(null);
-
-      let wo = createNewWorkorder({
-        startedByFirst: useLoginStore.getState().currentUser?.first,
-        startedByLast: useLoginStore.getState().currentUser?.last,
-      });
-
-      store.setWorkorder(wo, false);
-      store.setOpenWorkorderID(wo.id);
+      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+      startNewWorkorder();
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.checkout,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,
@@ -295,24 +287,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
   function handleCustomerNewWorkorderPress(customer) {
     useLoginStore.getState().requireLogin(() => {
-      let _currentUser = useLoginStore.getState().currentUser;
-      let wo = createNewWorkorder({
-        customerID: customer.id,
-        customerFirst: customer.first,
-        customerLast: customer.last,
-        customerCell: customer.customerCell || customer.customerLandline,
-        customerLandline: customer.customerLandline,
-        customerEmail: customer.email,
-        customerContactRestriction: customer.contactRestriction,
-        customerLanguage: customer.language,
-        startedByFirst: _currentUser?.first,
-        startedByLast: _currentUser?.last,
-        status: SETTINGS_OBJ.statuses[0]?.id || "",
-      });
-      let store = useOpenWorkordersStore.getState();
-      store.setWorkorder(wo, false);
-      store.setOpenWorkorderID(wo.id);
-      store.addPendingCustomerLink(wo.id, customer.id);
+      startNewWorkorder(customer);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,

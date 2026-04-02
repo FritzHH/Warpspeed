@@ -66,15 +66,19 @@ const QuickItemCanvasCard = ({
   onPositionChange,
   onPress,
   onRightClick,
+  onLabelChange,
   containerRef,
 }) => {
   const [sDragging, _setDragging] = useState(false);
+  const [sIsEditing, _setIsEditing] = useState(false);
+  const [sEditText, _setEditText] = useState("");
   const dragStartRef = useRef(null);
   const didDragRef = useRef(false);
 
   let w = itemObj.w || DEFAULT_ITEM_W;
   let h = itemObj.h || DEFAULT_ITEM_H;
-  let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
+  let defaultName = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
+  let name = itemObj.label || defaultName;
   let price = invItem ? formatCurrencyDisp(invItem.price) : "";
 
   function handleMouseDown(e) {
@@ -143,7 +147,7 @@ const QuickItemCanvasCard = ({
         borderStyle: "solid",
         borderColor: isSelected ? C.blue : C.buttonLightGreenOutline,
         borderRadius: 8,
-        backgroundColor: C.listItemWhite,
+        backgroundColor: C.buttonLightGreenOutline,
         cursor: sEditMode ? (sDragging ? "grabbing" : "grab") : "pointer",
         opacity: sDragging ? 0.7 : 1,
         boxSizing: "border-box",
@@ -153,22 +157,107 @@ const QuickItemCanvasCard = ({
         overflow: "hidden",
       }}
     >
-      <Text
-        style={{
-          fontSize: itemObj.fontSize || 10,
-          color: invItem ? C.text : gray(0.35),
-          textAlign: "center",
-          fontWeight: "500",
-          lineHeight: (itemObj.fontSize || 10) + 2,
-        }}
-        numberOfLines={2}
-      >
-        {name}
-      </Text>
-      {!!price && (
-        <Text style={{ fontSize: Math.max(7, (itemObj.fontSize || 10) - 1), color: gray(0.45), textAlign: "center", marginTop: 1 }}>
-          ${price}
-        </Text>
+      {/* Pencil icon (top-left) - toggle label editing */}
+      {sEditMode && !sDragging && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            if (sIsEditing) {
+              let val = sEditText.trim();
+              if (onLabelChange) onLabelChange(itemObj.inventoryItemID, val === defaultName ? "" : val);
+              _setIsEditing(false);
+            } else {
+              _setEditText(itemObj.label || defaultName);
+              _setIsEditing(true);
+            }
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            top: -6,
+            left: -6,
+            width: 16,
+            height: 16,
+            borderRadius: 8,
+            backgroundColor: sIsEditing ? C.green : gray(0.12),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            zIndex: 3,
+          }}
+        >
+          <Image_ icon={ICONS.editPencil} size={9} />
+        </div>
+      )}
+
+      {sEditMode && sIsEditing ? (
+        <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+          <textarea
+            style={{
+              fontSize: itemObj.fontSize || 10,
+              color: C.text,
+              textAlign: "center",
+              borderWidth: 0,
+              borderBottomWidth: 1,
+              borderBottomColor: gray(0.3),
+              borderBottomStyle: "solid",
+              paddingTop: 2,
+              paddingBottom: 2,
+              width: w - 10,
+              outline: "none",
+              resize: "none",
+              overflow: "hidden",
+              fontFamily: "inherit",
+              fontWeight: "500",
+              backgroundColor: "transparent",
+              lineHeight: ((itemObj.fontSize || 10) + 2) + "px",
+            }}
+            value={sEditText}
+            autoFocus
+            rows={1}
+            ref={(el) => {
+              if (el) {
+                el.style.height = "auto";
+                el.style.height = el.scrollHeight + "px";
+              }
+            }}
+            onChange={(e) => {
+              _setEditText(e.target.value);
+              let el = e.target;
+              el.style.height = "auto";
+              el.style.height = el.scrollHeight + "px";
+            }}
+            onBlur={(e) => {
+              // Don't save on blur - pencil toggle handles save
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                _setIsEditing(false);
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <>
+          <Text
+            style={{
+              fontSize: itemObj.fontSize || 10,
+              color: invItem ? C.text : gray(0.35),
+              textAlign: "center",
+              fontWeight: "500",
+              lineHeight: (itemObj.fontSize || 10) + 2,
+            }}
+            numberOfLines={2}
+          >
+            {name}
+          </Text>
+          {!!price && (
+            <Text style={{ fontSize: Math.max(7, (itemObj.fontSize || 10) - 1), color: gray(0.45), textAlign: "center", marginTop: 1 }}>
+              ${price}
+            </Text>
+          )}
+        </>
       )}
     </div>
   );
@@ -182,8 +271,15 @@ const QuickItemCanvas = ({
   zInventoryArr,
   zQuickItemButtons,
   onItemPress,
+  forceEditMode,
+  onForceEditConsumed,
 }) => {
   const [sEditMode, _setEditMode] = useState(false);
+
+  if (forceEditMode && !sEditMode) {
+    _setEditMode(true);
+    if (onForceEditConsumed) onForceEditConsumed();
+  }
   const [sSelectedItemId, _setSelectedItemId] = useState(null);
   const canvasRef = useRef(null);
   const dbSaveTimerRef = useRef(null);
@@ -210,6 +306,15 @@ const QuickItemCanvas = ({
 
   function handlePositionChange(invItemID, x, y) {
     saveItems(rawItems.map((it) => it.inventoryItemID === invItemID ? { ...it, x, y } : it));
+  }
+
+  function handleLabelChange(invItemID, label) {
+    let updatedItems = rawItems.map((it) => it.inventoryItemID === invItemID ? { ...it, label } : it);
+    let updatedButtons = (zQuickItemButtons || []).map((b) =>
+      b.id === buttonObj.id ? { ...b, items: updatedItems } : b
+    );
+    useSettingsStore.getState().setField("quickItemButtons", updatedButtons, false);
+    dbSaveSettingsField("quickItemButtons", updatedButtons);
   }
 
   function handleDeleteItem(invItemID) {
@@ -298,19 +403,6 @@ const QuickItemCanvas = ({
           </View>
         )}
 
-        <TouchableOpacity
-          onPress={() => { _setEditMode(!sEditMode); _setSelectedItemId(null); }}
-          style={{
-            paddingHorizontal: 10,
-            paddingVertical: 5,
-            borderRadius: 6,
-            backgroundColor: sEditMode ? C.green : gray(0.12),
-          }}
-        >
-          <Text style={{ fontSize: 11, fontWeight: "600", color: sEditMode ? "white" : C.text }}>
-            {sEditMode ? "Done" : "Edit"}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Canvas */}
@@ -341,7 +433,17 @@ const QuickItemCanvas = ({
               containerRef={canvasRef}
               onPositionChange={handlePositionChange}
               onPress={() => invItem && onItemPress(invItem)}
-              onRightClick={(id) => { _setEditMode(true); _setSelectedItemId(id); }}
+              onRightClick={(id) => {
+                if (sEditMode) {
+                  _setEditMode(false);
+                  _setSelectedItemId(null);
+                  dbSaveSettingsField("quickItemButtons", useSettingsStore.getState().settings?.quickItemButtons);
+                } else {
+                  _setEditMode(true);
+                  _setSelectedItemId(id);
+                }
+              }}
+              onLabelChange={handleLabelChange}
             />
           );
         })}
@@ -414,6 +516,7 @@ export function InventoryComponent({}) {
   const [sMenuPath, _setMenuPath] = useState([]);
   const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
   const [sCustomItemModal, _setCustomItemModal] = useState(null); // "labor" | "part" | null
+  const [sForceEditMode, _setForceEditMode] = useState(false);
   const barcodeModalTimerRef = useRef(null);
 
   // Timeout to batch all store updates and reduce re-renders
@@ -822,29 +925,37 @@ export function InventoryComponent({}) {
                 sSelectedButtonID === item.id ||
                 (sMenuPath.length > 0 && sMenuPath[0].id === item.id);
               return (
-                <Button_
+                <div
                   key={item.id}
-                  onPress={() => handleQuickButtonPress(item)}
-                  colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "part" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
-                  buttonStyle={{
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    borderColor: C.buttonLightGreenOutline,
-                    marginBottom: 10,
-                    paddingHorizontal: 2,
-                    paddingLeft: 2,
-                    paddingVertical: item.id === "common" ? 14 : 5,
-                    backgroundColor: undefined,
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    handleQuickButtonPress(item);
+                    _setForceEditMode(true);
                   }}
-                  numLines={item.name.length > 17 ? 2 : 1}
-                  textStyle={{
-                    fontSize: getQuickButtonFontSize(item.name, 14),
-                    fontWeight: 400,
-                    textAlign: "center",
-                    color: isActive ? "white" : C.textWhite,
-                  }}
-                  text={item.name.toUpperCase()}
-                />
+                >
+                  <Button_
+                    onPress={() => handleQuickButtonPress(item)}
+                    colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "part" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
+                    buttonStyle={{
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      borderColor: C.buttonLightGreenOutline,
+                      marginBottom: 10,
+                      paddingHorizontal: 2,
+                      paddingLeft: 2,
+                      paddingVertical: item.id === "common" ? 14 : 5,
+                      backgroundColor: undefined,
+                    }}
+                    numLines={item.name.length > 17 ? 2 : 1}
+                    textStyle={{
+                      fontSize: getQuickButtonFontSize(item.name, 14),
+                      fontWeight: 400,
+                      textAlign: "center",
+                      color: isActive ? "white" : C.textWhite,
+                    }}
+                    text={item.name.toUpperCase()}
+                  />
+                </div>
               );
             })}
         </View>
@@ -854,7 +965,7 @@ export function InventoryComponent({}) {
           style={{
             height: "100%",
             width: "80%",
-            paddingTop: 10,
+            paddingTop: 0,
             paddingLeft: 3,
             paddingRight: 3,
           }}
@@ -918,7 +1029,7 @@ export function InventoryComponent({}) {
               style={{
                 flexDirection: "row",
                 flexWrap: "wrap",
-                marginBottom: 8,
+                marginBottom: 0,
               }}
             >
               {currentChildren.map((btn) => {
@@ -967,6 +1078,8 @@ export function InventoryComponent({}) {
                   zInventoryArr={zInventoryArr}
                   zQuickItemButtons={zQuickItemButtons}
                   onItemPress={inventoryItemSelected}
+                  forceEditMode={sForceEditMode}
+                  onForceEditConsumed={() => _setForceEditMode(false)}
                 />
               );
             })()

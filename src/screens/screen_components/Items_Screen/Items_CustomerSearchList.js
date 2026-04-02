@@ -7,7 +7,6 @@ import {
   formatPhoneForDisplay,
   gray,
   log,
-  createNewWorkorder
 } from "../../../utils";
 import {
   Button,
@@ -27,6 +26,7 @@ import {
   useTabNamesStore,
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+import { startNewWorkorder } from "../../../db_calls_wrapper";
 import { C, ICONS } from "../../../styles";
 
 export function CustomerSearchListComponent({}) {
@@ -67,25 +67,8 @@ export function CustomerSearchListComponent({}) {
 
   function handleCustomerSelected(customer) {
     useLoginStore.getState().requireLogin(() => {
-      let wo = createNewWorkorder({
-        customerID: customer.id,
-        customerFirst: customer.first,
-        customerLast: customer.last,
-        customerCell: customer.customerCell || customer.customerLandline,
-        customerLandline: customer.customerLandline,
-        customerEmail: customer.email,
-        customerContactRestriction: customer.contactRestriction,
-        customerLanguage: customer.language,
-        startedByFirst: useLoginStore.getState().currentUser?.first,
-        startedByLast: useLoginStore.getState().currentUser?.last,
-        status: SETTINGS_OBJ.statuses[0]?.id || "",
-      });
-
-      let store = useOpenWorkordersStore.getState();
-      store.setWorkorderPreviewID(null);
-      store.setWorkorder(wo, false);
-      store.setOpenWorkorderID(wo.id);
-      store.addPendingCustomerLink(wo.id, customer.id);
+      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+      startNewWorkorder(customer);
       useCurrentCustomerStore.getState().setCustomer(customer);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,

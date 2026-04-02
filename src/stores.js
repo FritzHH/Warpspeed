@@ -1204,6 +1204,7 @@ export const useOpenWorkordersStore = create(
       lockedWorkorderID: null,
       saleModalObj: null,
       _pendingCustomerLinks: {},
+      _lastIdSwap: null,
 
       getOpenWorkorder: () => {
         let id = get().openWorkorderID;
@@ -1224,6 +1225,14 @@ export const useOpenWorkordersStore = create(
       addPendingCustomerLink: (workorderID, customerID) => {
         set({ _pendingCustomerLinks: { ...get()._pendingCustomerLinks, [workorderID]: customerID } });
       },
+      removePendingCustomerLink: (workorderID) => {
+        let links = get()._pendingCustomerLinks;
+        if (!links[workorderID]) return;
+        let { [workorderID]: _, ...rest } = links;
+        set({ _pendingCustomerLinks: rest });
+      },
+      getLastIdSwap: () => get()._lastIdSwap,
+      setLastIdSwap: (swap) => set({ _lastIdSwap: swap }),
       _flushPendingCustomerLink: (workorderID) => {
         let links = get()._pendingCustomerLinks;
         let customerID = links[workorderID];
@@ -1246,11 +1255,25 @@ export const useOpenWorkordersStore = create(
         }
       },
       setOpenWorkorders: (workorders) => {
-        set({ workorders, workordersLoaded: true });
+        const incomingIds = new Set(workorders.map((w) => w.id));
+        const local = get().workorders.filter((w) => (w._pendingId || !w.customerID) && !incomingIds.has(w.id));
+        const merged = [...workorders, ...local];
+        set({ workorders: merged, workordersLoaded: true });
+        // If the active workorder was deleted externally, reset to customer screen
+        let openId = get().openWorkorderID;
+        if (openId && !merged.find((w) => w.id === openId)) {
+          set({ openWorkorderID: null });
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.customer,
+            itemsTabName: TAB_NAMES.itemsTab.empty,
+            optionsTabName: TAB_NAMES.optionsTab.workorders,
+          });
+        }
       },
       setWorkorder: (wo, saveToDB = true, batch = true) => {
         set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
-        if (saveToDB) dbSaveOpenWorkorder(wo);
+        // Standalone workorders are local-only — saved explicitly by checkout on first payment
+        if (saveToDB && !wo._pendingId && wo.customerID) dbSaveOpenWorkorder(wo);
         if (wo.id === get().openWorkorderID) broadcastWorkorderToDisplay(wo);
       },
       setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
@@ -1268,7 +1291,8 @@ export const useOpenWorkordersStore = create(
 
         set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
         // No-customer workorders stay local — saved explicitly by checkout or intake
-        if (saveToDB && workorder.customerID) {
+        // Pending-ID workorders stay local until the ID resolves
+        if (saveToDB && workorder.customerID && !workorder._pendingId) {
           debouncedSaveWorkorder(workorder);
           get()._flushPendingCustomerLink(workorderID);
         }
@@ -1307,7 +1331,7 @@ export const useOpenWorkordersStore = create(
       merge: (persisted, current) => {
         let merged = { ...current, ...persisted };
         let wo = (merged.workorders || []).find((o) => o.id === merged.openWorkorderID);
-        if (wo && !wo.customerID && !(wo.workorderLines?.length > 0)) {
+        if (wo && !wo._pendingId && !wo.customerID && !(wo.workorderLines?.length > 0)) {
           merged.openWorkorderID = null;
           merged.workorders = (merged.workorders || []).filter((o) => o.id !== wo.id);
         }
@@ -1405,72 +1429,101 @@ export const useMigrationStore = create((set, get) => ({
   setResult: (result) => set({ result }),
 }));
 
-export const usePendingIdStore = create((set, get) => ({
-  pending: {
-    workorders: [],
-    sales: [],
-    transactions: [],
-  },
+// Module-level map for timeout handles (not serializable, so kept outside the store)
+const _pendingIdTimers = new Map();
 
-  getPending: () => get().pending,
-  getPendingByNode: (node) => get().pending[node] || [],
-  getEntry: (node, tmpKey) =>
-    (get().pending[node] || []).find((e) => e.tmpKey === tmpKey) || null,
+const PENDING_ID_TIMEOUT_MS = 60000;
 
-  addEntry: (node) => {
-    const tmpKey = Date.now();
-    const entry = { tmpKey, status: "loading", id: null, data: {} };
-    set((state) => ({
-      pending: {
-        ...state.pending,
-        [node]: [...(state.pending[node] || []), entry],
+/**
+ * Resolve a pending ID after timeout: clear _pendingId flag and save to Firestore.
+ * Called when the 60s fallback fires (or on rehydration if expired).
+ */
+function _resolvePendingIdFromStore(placeholderID) {
+  _pendingIdTimers.delete(placeholderID);
+  usePendingIdStore.getState()._removeEntry(placeholderID);
+
+  const st = useOpenWorkordersStore.getState();
+  const wo = st.workorders.find((w) => w.id === placeholderID);
+  if (!wo || !wo._pendingId) return;
+  let updated = { ...wo };
+  delete updated._pendingId;
+  st.setWorkorder(updated, false);
+}
+
+export const usePendingIdStore = create(
+  persist(
+    (set, get) => ({
+      // Map of placeholderID -> { timestamp, node }
+      pending: {},
+
+      getPending: () => get().pending,
+      getEntry: (placeholderID) => get().pending[placeholderID] || null,
+
+      addEntry: (placeholderID, node) => {
+        const timestamp = Date.now();
+        set((state) => ({
+          pending: { ...state.pending, [placeholderID]: { timestamp, node } },
+        }));
+        // Start fallback timer
+        const handle = setTimeout(() => {
+          _resolvePendingIdFromStore(placeholderID);
+        }, PENDING_ID_TIMEOUT_MS);
+        _pendingIdTimers.set(placeholderID, handle);
       },
-    }));
-    return tmpKey;
-  },
 
-  setId: (node, tmpKey, id) => {
-    set((state) => ({
-      pending: {
-        ...state.pending,
-        [node]: (state.pending[node] || []).map((e) =>
-          e.tmpKey === tmpKey ? { ...e, id, status: "ready" } : e
-        ),
+      // Called externally (by _resolvePendingId in db_calls_wrapper) when the
+      // Cloud Function responds successfully — clears timer + store entry.
+      removeEntry: (placeholderID) => {
+        const handle = _pendingIdTimers.get(placeholderID);
+        if (handle) clearTimeout(handle);
+        _pendingIdTimers.delete(placeholderID);
+        set((state) => {
+          const { [placeholderID]: _, ...rest } = state.pending;
+          return { pending: rest };
+        });
       },
-    }));
-  },
 
-  updateData: (node, tmpKey, fields) => {
-    set((state) => ({
-      pending: {
-        ...state.pending,
-        [node]: (state.pending[node] || []).map((e) =>
-          e.tmpKey === tmpKey ? { ...e, data: { ...e.data, ...fields } } : e
-        ),
+      // Internal remove (used by _resolvePendingIdFromStore to avoid clearing
+      // a timer that already fired).
+      _removeEntry: (placeholderID) => {
+        set((state) => {
+          const { [placeholderID]: _, ...rest } = state.pending;
+          return { pending: rest };
+        });
       },
-    }));
-  },
 
-  setStatus: (node, tmpKey, status) => {
-    set((state) => ({
-      pending: {
-        ...state.pending,
-        [node]: (state.pending[node] || []).map((e) =>
-          e.tmpKey === tmpKey ? { ...e, status } : e
-        ),
+      // Called after rehydration to restore timers for any surviving entries.
+      reprocessAfterReload: () => {
+        const entries = get().pending;
+        const now = Date.now();
+        Object.entries(entries).forEach(([placeholderID, entry]) => {
+          const elapsed = now - entry.timestamp;
+          if (elapsed >= PENDING_ID_TIMEOUT_MS) {
+            // Expired — resolve immediately
+            _resolvePendingIdFromStore(placeholderID);
+          } else {
+            // Not expired — set timer for remaining time
+            const remaining = PENDING_ID_TIMEOUT_MS - elapsed;
+            const handle = setTimeout(() => {
+              _resolvePendingIdFromStore(placeholderID);
+            }, remaining);
+            _pendingIdTimers.set(placeholderID, handle);
+          }
+        });
       },
-    }));
-  },
-
-  removeEntry: (node, tmpKey) => {
-    set((state) => ({
-      pending: {
-        ...state.pending,
-        [node]: (state.pending[node] || []).filter((e) => e.tmpKey !== tmpKey),
+    }),
+    {
+      name: "warpspeed_pending_ids",
+      partialize: (s) => ({ pending: s.pending }),
+      onRehydrateStorage: () => {
+        // This function is called AFTER rehydration completes
+        return (state) => {
+          if (state) state.reprocessAfterReload();
+        };
       },
-    }));
-  },
-}));
+    }
+  )
+);
 
 /// internal functions ///////////////////////////////////////////
 function changeItem(arr, item) {

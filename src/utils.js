@@ -1240,6 +1240,23 @@ export function generateEAN13Barcode() {
   return digits.join('') + String(checkDigit);
 }
 
+/**
+ * Generate a 13-digit EAN-13 barcode with a forced first digit (prefix).
+ * Prefix "1" = workorder, "2" = sale, "3" = transaction.
+ * @param {string|number} prefix - Single digit prefix (0-9)
+ * @returns {string} 13-digit EAN-13 barcode string
+ */
+export function generatePrefixedEAN13(prefix) {
+  const arr = crypto.getRandomValues(new Uint8Array(11));
+  const digits = [Number(prefix), ...Array.from(arr, b => b % 10)];
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += digits[i] * (i % 2 === 0 ? 1 : 3);
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return digits.join('') + String(checkDigit);
+}
+
 function calculateCheckDigit(digits) {
   let sum = 0;
   for (let i = 0; i < digits.length; i++) {
@@ -2004,6 +2021,7 @@ export function createNewWorkorder({
   wo.customerPin = String(Math.floor(100 + Math.random() * 900));
   return wo;
 }
+
 
 export function resolveStatus(statusId, statuses) {
   if (!statusId || !statuses?.length)

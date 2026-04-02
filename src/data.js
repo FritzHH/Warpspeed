@@ -615,6 +615,7 @@ export const NONREMOVABLE_WAIT_TIMES = [
 
 export const QUICK_BUTTON_ITEM_PROTO = {
   inventoryItemID: "",
+  label: "",
   x: 0,
   y: 0,
   w: 90,

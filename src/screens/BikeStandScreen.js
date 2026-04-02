@@ -55,6 +55,7 @@ import {
   dbSearchCustomersByPhone,
   dbRequestNewId,
   dbUploadWorkorderMedia,
+  startNewWorkorder,
 } from "../db_calls_wrapper";
 import { WorkorderMediaModal } from "./screen_components/modal_screens/WorkorderMediaModal";
 import { MILLIS_IN_DAY } from "../constants";
@@ -148,9 +149,15 @@ export function BikeStandScreen() {
     });
   }, []);
 
+  let zLastIdSwap = useOpenWorkordersStore((state) => state._lastIdSwap);
+
   let statuses = zStatuses || [];
   let sortedWorkorders = sortWorkorders(zWorkorders || [], statuses, zCurrentUser);
-  let selectedWorkorder = (zWorkorders || []).find((o) => o.id === sSelectedWorkorderID);
+  let effectiveSelectedID = sSelectedWorkorderID;
+  if (zLastIdSwap && zLastIdSwap.oldId === sSelectedWorkorderID) {
+    effectiveSelectedID = zLastIdSwap.newId;
+  }
+  let selectedWorkorder = (zWorkorders || []).find((o) => o.id === effectiveSelectedID);
   let intakeQuickButtons = intakeButtonsToRows(zIntakeQuickButtons || []);
 
   //////////////////////////////////////////////////////////////////////////////
@@ -225,46 +232,8 @@ export function BikeStandScreen() {
     _setShowPhoneSearch(false);
     _setSelectedCustomer(customer);
 
-    let selectedWoID = null;
-
-    let tmpKey = dbRequestNewId("workorders", (realId, tmpKey) => {
-      let st = useOpenWorkordersStore.getState();
-      let wo = st.workorders.find((w) => String(w._tmpKey) === String(tmpKey));
-      if (!wo) return;
-      st.removeWorkorder(String(tmpKey), false);
-      let updated = { ...wo, id: realId };
-      delete updated._tmpKey;
-      st.setWorkorder(updated, !!updated.customerID);
-      _setSelectedWorkorderID((prev) => prev === String(tmpKey) ? realId : prev);
-      let links = st._pendingCustomerLinks || {};
-      if (links[String(tmpKey)]) {
-        let custId = links[String(tmpKey)];
-        let { [String(tmpKey)]: _, ...rest } = links;
-        rest[realId] = custId;
-        st.addPendingCustomerLink(realId, custId);
-      }
-    });
-
-    let newWorkorder = createNewWorkorder({
-      id: String(tmpKey),
-      customerID: customer.id,
-      customerFirst: customer.first,
-      customerLast: customer.last,
-      customerCell: customer.customerCell || customer.customerLandline,
-      customerLandline: customer.customerLandline,
-      customerEmail: customer.email,
-      customerContactRestriction: customer.contactRestriction,
-      customerLanguage: customer.language,
-      startedByFirst: useLoginStore.getState().currentUser?.first,
-      startedByLast: useLoginStore.getState().currentUser?.last,
-      status: (zSettings?.statuses?.[0]?.id) || "",
-    });
-    newWorkorder._tmpKey = tmpKey;
-
-    let store = useOpenWorkordersStore.getState();
-    store.setWorkorder(newWorkorder, false);
-    store.addPendingCustomerLink(newWorkorder.id, customer.id);
-    _setSelectedWorkorderID(newWorkorder.id);
+    let wo = startNewWorkorder(customer);
+    _setSelectedWorkorderID(wo.id);
     _setViewMode("workorder");
   }
 

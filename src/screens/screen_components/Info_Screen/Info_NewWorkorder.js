@@ -34,6 +34,7 @@ import {
   dbGetCompletedWorkorder,
   dbGetCompletedSale,
   dbGetCustomer,
+  startNewWorkorder,
 } from "../../../db_calls_wrapper";
 import { TicketSearchInput } from "../../../shared/TicketSearchInput";
 import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -336,29 +337,8 @@ export function NewWorkorderComponent({}) {
   function handleStartStandaloneSalePress() {
     useLoginStore.getState().requireLogin(() => {
       useCurrentCustomerStore.getState().setCustomer(null, false);
-      let store = useOpenWorkordersStore.getState();
-      store.setWorkorderPreviewID(null);
-
-      let tmpKey = dbRequestNewId("workorders", (realId, tmpKey) => {
-        let st = useOpenWorkordersStore.getState();
-        let wo = st.workorders.find((w) => String(w._tmpKey) === String(tmpKey));
-        if (!wo) return;
-        st.removeWorkorder(String(tmpKey), false);
-        let updated = { ...wo, id: realId };
-        delete updated._tmpKey;
-        st.setWorkorder(updated, false);
-        if (st.getOpenWorkorderID() === String(tmpKey)) st.setOpenWorkorderID(realId);
-      });
-
-      let wo = createNewWorkorder({
-        id: String(tmpKey),
-        startedByFirst: useLoginStore.getState().currentUser?.first,
-        startedByLast: useLoginStore.getState().currentUser?.last,
-      });
-      wo._tmpKey = tmpKey;
-
-      store.setWorkorder(wo, false);
-      store.setOpenWorkorderID(wo.id);
+      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+      startNewWorkorder();
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.checkout,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,
@@ -379,46 +359,9 @@ export function NewWorkorderComponent({}) {
       newCustomer.id = crypto.randomUUID();
       newCustomer.millisCreated = new Date().getTime();
 
-      let tmpKey = dbRequestNewId("workorders", (realId, tmpKey) => {
-        let st = useOpenWorkordersStore.getState();
-        let wo = st.workorders.find((w) => String(w._tmpKey) === String(tmpKey));
-        if (!wo) return;
-        st.removeWorkorder(String(tmpKey), false);
-        let updated = { ...wo, id: realId };
-        delete updated._tmpKey;
-        st.setWorkorder(updated, !!updated.customerID);
-        if (st.getOpenWorkorderID() === String(tmpKey)) st.setOpenWorkorderID(realId);
-        let links = st._pendingCustomerLinks || {};
-        if (links[String(tmpKey)]) {
-          let custId = links[String(tmpKey)];
-          let { [String(tmpKey)]: _, ...rest } = links;
-          rest[realId] = custId;
-          st.addPendingCustomerLink(realId, custId);
-        }
-      });
-
-      let newWorkorder = createNewWorkorder({
-        id: String(tmpKey),
-        customerID: newCustomer.id,
-        customerFirst: newCustomer.first,
-        customerLast: newCustomer.last,
-        customerCell: newCustomer.customerCell || newCustomer.customerLandline,
-        customerLandline: newCustomer.customerLandline,
-        customerEmail: newCustomer.email,
-        customerContactRestriction: newCustomer.contactRestriction,
-        customerLanguage: newCustomer.language,
-        startedByFirst: useLoginStore.getState().getCurrentUser().first,
-        startedByLast: useLoginStore.getState().getCurrentUser().last,
-        status: SETTINGS_OBJ.statuses[0]?.id || "",
-      });
-      newWorkorder._tmpKey = tmpKey;
-
       _setCustomerInfo(newCustomer);
       useCurrentCustomerStore.getState().setCustomer(newCustomer);
-      let store = useOpenWorkordersStore.getState();
-      store.setWorkorder(newWorkorder, false);
-      store.setOpenWorkorderID(newWorkorder.id);
-      store.addPendingCustomerLink(newWorkorder.id, newCustomer.id);
+      startNewWorkorder(newCustomer);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,

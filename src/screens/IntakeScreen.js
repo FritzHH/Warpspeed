@@ -29,6 +29,7 @@ import {
   dbListenToInventory,
   dbListenToOpenWorkorders,
   dbSaveOpenWorkorder,
+  startNewWorkorder,
 } from "../db_calls_wrapper";
 
 const ON_THE_STAND_STATUS_ID = "34kttdkfekj";
@@ -107,17 +108,7 @@ export function IntakeScreen() {
   //////////////////////////////////////////////////////////////////////////////
 
   function handleNewWorkorder() {
-    let wo = createNewWorkorder({
-      customerID: "",
-      customerFirst: "",
-      customerLast: "",
-      customerCell: "",
-      startedByFirst: zCurrentUser?.first || "",
-      startedByLast: zCurrentUser?.last || "",
-      status: ON_THE_STAND_STATUS_ID,
-    });
-    // Add to store locally — do NOT save to DB
-    useOpenWorkordersStore.getState().setWorkorder(wo, false);
+    let wo = startNewWorkorder(null, { status: ON_THE_STAND_STATUS_ID });
     _setSelectedWorkorderID(wo.id);
   }
 

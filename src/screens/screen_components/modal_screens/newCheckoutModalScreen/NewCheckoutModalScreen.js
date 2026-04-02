@@ -326,11 +326,6 @@ export function NewCheckoutModalScreen() {
       }
     }
 
-    // Ensure standalone workorder is persisted to Firestore before creating a sale
-    if (zOpenWorkorder && !zOpenWorkorder.customerID) {
-      await newCheckoutSaveWorkorder(zOpenWorkorder);
-    }
-
     // Check if workorder has an existing active sale to resume
     if (zOpenWorkorder?.activeSaleID) {
       let existingSale = await readActiveSale(zOpenWorkorder.activeSaleID);
@@ -914,7 +909,11 @@ export function NewCheckoutModalScreen() {
       entries.push({ timestamp, user, field: "payment", action: "recorded", from: "", to: paymentLabel + " " + formatCurrencyDisp(entryAmount || 0, true) });
 
       updated.changeLog = [...(updated.changeLog || []), ...entries];
-      if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
+      if (!sDevSkip) {
+        useOpenWorkordersStore.getState().setWorkorder(updated, true);
+        // Standalone workorders are local-only — persist to Firestore on first real payment
+        if (!updated.customerID) newCheckoutSaveWorkorder(updated);
+      }
       updatedWorkorders.push(updated);
     }
     _setCombinedWorkorders(updatedWorkorders);
@@ -1268,11 +1267,31 @@ export function NewCheckoutModalScreen() {
 
   // ─── Close Modal ──────────────────────────────────────────
   function closeModal() {
+    // Standalone: completed sale — clean up workorder and navigate back
+    if (isStandalone && saleComplete) {
+      resetAndClose();
+      let woStore = useOpenWorkordersStore.getState();
+      let oldWoId = woStore.openWorkorderID;
+      if (oldWoId) woStore.removeWorkorder(oldWoId, false);
+      woStore.setOpenWorkorderID(null);
+      useCurrentCustomerStore.getState().setCustomer({ ...CUSTOMER_PROTO }, false);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.customer,
+        itemsTabName: TAB_NAMES.itemsTab.empty,
+        optionsTabName: TAB_NAMES.optionsTab.workorders,
+      });
+      return;
+    }
+    // Standalone: no money captured (or fully refunded) — just close modal, keep workorder + tabs
+    if (isStandalone && !(sSale?.amountCaptured > 0)) {
+      resetAndClose();
+      return;
+    }
+    // Partial payment in progress (standalone with captured money, or regular workorder)
     if (
       (sTransactions.length > 0 || sCredits.length > 0) &&
       !sSale.paymentComplete
     ) {
-      // Partial payment — confirm with user
       useAlertScreenStore.getState().setValues({
         showAlert: true,
         title: "Partial Payment In Progress",
@@ -1290,50 +1309,6 @@ export function NewCheckoutModalScreen() {
       });
       return;
     }
-    if (isStandalone && saleComplete) {
-      resetAndClose();
-      let woStore = useOpenWorkordersStore.getState();
-      let oldWoId = woStore.openWorkorderID;
-      if (oldWoId) woStore.removeWorkorder(oldWoId, false);
-      woStore.setOpenWorkorderID(null);
-      useCurrentCustomerStore.getState().setCustomer({ ...CUSTOMER_PROTO }, false);
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.customer,
-        itemsTabName: TAB_NAMES.itemsTab.empty,
-        optionsTabName: TAB_NAMES.optionsTab.workorders,
-      });
-      return;
-    }
-    if (isStandalone) {
-      useAlertScreenStore.getState().setValues({
-        showAlert: true,
-        title: "Clear the sale?",
-        message: "Or go back to inventory selections",
-        btn1Text: "Clear Sale",
-        handleBtn1Press: () => {
-          useAlertScreenStore.getState().setValues({ showAlert: false });
-          let woStore = useOpenWorkordersStore.getState();
-          let oldWoId = woStore.openWorkorderID;
-          resetAndClose();
-          if (oldWoId) {
-            dbDeleteWorkorder(oldWoId);
-            woStore.removeWorkorder(oldWoId, false);
-          }
-          woStore.setOpenWorkorderID(null);
-          useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.customer,
-            itemsTabName: TAB_NAMES.itemsTab.empty,
-            optionsTabName: TAB_NAMES.optionsTab.workorders,
-          });
-        },
-        btn2Text: "Choose More Items",
-        handleBtn2Press: () => {
-          useAlertScreenStore.getState().setValues({ showAlert: false });
-          resetAndClose();
-        },
-      });
-      return;
-    }
     resetAndClose();
   }
 
@@ -1342,10 +1317,12 @@ export function NewCheckoutModalScreen() {
     if (sSale?.id && !hasPayments && salePersistedRef.current) {
       deleteActiveSale(sSale.id);
       dbReturnId("sales", sSale.id);
+      let woStore = useOpenWorkordersStore.getState();
       for (let wo of sCombinedWorkorders) {
-        let cleaned = cloneDeep(wo);
-        cleaned.activeSaleID = "";
-        useOpenWorkordersStore.getState().setWorkorder(cleaned, true);
+        let current = woStore.workorders.find((w) => w.id === wo.id);
+        if (current && current.activeSaleID) {
+          woStore.setWorkorder({ ...current, activeSaleID: "" }, true);
+        }
       }
     }
     if (prefetchedTxnIdRef.current) {
@@ -1391,23 +1368,13 @@ export function NewCheckoutModalScreen() {
     let oldWo = store.getOpenWorkorder();
     if (oldWo) store.removeWorkorder(oldWo.id);
 
-    let tmpKey = dbRequestNewId("workorders", (realId, tmpKey) => {
-      let st = useOpenWorkordersStore.getState();
-      let wo = st.workorders.find((w) => String(w._tmpKey) === String(tmpKey));
-      if (!wo) return;
-      st.removeWorkorder(String(tmpKey), false);
-      let updated = { ...wo, id: realId };
-      delete updated._tmpKey;
-      st.setWorkorder(updated, false);
-      if (st.getOpenWorkorderID() === String(tmpKey)) st.setOpenWorkorderID(realId);
-    });
-
+    let placeholderID = dbRequestNewId("workorders");
     let wo = createNewWorkorder({
-      id: String(tmpKey),
+      id: placeholderID,
       startedByFirst: useLoginStore.getState().currentUser?.first,
       startedByLast: useLoginStore.getState().currentUser?.last,
     });
-    wo._tmpKey = tmpKey;
+    wo._pendingId = true;
     store.setWorkorder(wo, false);
     store.setOpenWorkorderID(wo.id);
   }

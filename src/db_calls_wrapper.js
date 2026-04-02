@@ -38,7 +38,7 @@ import {
   firestoreBatchWrite,
   firestoreBatchDelete,
 } from "./db_calls";
-import { removeUnusedFields } from "./utils";
+import { removeUnusedFields, generatePrefixedEAN13, createNewWorkorder } from "./utils";
 import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores, usePendingIdStore } from "./stores";
 import {
   onAuthStateChanged,
@@ -555,12 +555,9 @@ export async function dbSaveSettings(settings) {
  * @returns {Promise<Object>} Save result
  */
 export async function dbSaveOpenWorkorder(workorder, workorderID = null, isFirstSave = false) {
-  if (workorder._tmpKey) {
-    let entry = usePendingIdStore.getState().getEntry("workorders", workorder._tmpKey);
-    if (entry && entry.status !== "ready") {
-      usePendingIdStore.getState().updateData("workorders", workorder._tmpKey, workorder);
-      return { success: true, deferred: true };
-    }
+  // Don't save to Firestore while waiting for the sequential ID
+  if (workorder._pendingId) {
+    return { success: true, deferred: true };
   }
 
   try {
@@ -613,7 +610,9 @@ export async function dbSaveOpenWorkorder(workorder, workorderID = null, isFirst
       };
     }
 
-    let workorderToSave = workorder;
+    let workorderToSave = { ...workorder };
+    delete workorderToSave._pendingId;
+    delete workorderToSave._tmpKey;
 
     // Build path: tenants/{tenantID}/stores/{storeID}/open-workorders/{workorderID}
     const path = buildWorkorderPath(tenantID, storeID, id);
@@ -3275,30 +3274,32 @@ export async function dbManualArchiveAndCleanup() {
 // SEQUENTIAL ID GENERATION
 // ============================================================================
 
-/**
- * Request a new sequential ID from the server.
- * Creates a pending entry immediately and fires the cloud function in the background.
- * Returns the tmpKey so the UI can start working while the ID resolves.
- * @param {string} node - "workorders", "sales", or "transactions"
- * @returns {number} tmpKey - identifier for the pending entry
- */
-export function dbRequestNewId(node, onReady) {
-  const tmpKey = usePendingIdStore.getState().addEntry(node);
+const ID_PREFIXES = { workorders: "1", sales: "2", transactions: "3" };
 
+/**
+ * Generate a random prefixed ID immediately and fire the Cloud Function in the
+ * background to get a sequential ID. When it arrives the workorder's id is
+ * swapped automatically. After 60 s the random ID is kept as-is.
+ * @param {string} node - "workorders", "sales", or "transactions"
+ * @returns {string} placeholderID - immediate random EAN-13
+ */
+export function dbRequestNewId(node) {
+  const placeholderID = generatePrefixedEAN13(ID_PREFIXES[node] || "0");
+
+  // Store tracks the timestamp and manages the 60s fallback timer internally
+  usePendingIdStore.getState().addEntry(placeholderID, node);
+
+  // Fire Cloud Function in background
   (async () => {
     let lastError;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const result = await generateIdCallable({ node });
         const id = result.data?.id;
+        if (!id) throw new Error("No ID returned from generateId");
 
-        if (!id) {
-          throw new Error("No ID returned from generateId");
-        }
-
-        usePendingIdStore.getState().setId(node, tmpKey, id);
-        log("dbRequestNewId: ID ready", { node, id, tmpKey });
-        if (onReady) onReady(id, tmpKey);
+        log("dbRequestNewId: ID ready", { node, id, placeholderID });
+        _resolvePendingId(node, placeholderID, id);
         return;
       } catch (error) {
         lastError = error;
@@ -3311,11 +3312,78 @@ export function dbRequestNewId(node, onReady) {
       }
     }
 
-    log("dbRequestNewId: all retries failed for " + node, lastError?.message || lastError);
-    usePendingIdStore.getState().setStatus(node, tmpKey, "error");
+    log("dbRequestNewId: all retries failed for " + node + ", keeping placeholder " + placeholderID, lastError?.message || lastError);
+    _resolvePendingId(node, placeholderID, null);
   })();
 
-  return tmpKey;
+  return placeholderID;
+}
+
+export function startNewWorkorder(customer, { status } = {}) {
+  let _currentUser = useLoginStore.getState().currentUser;
+  let placeholderID = dbRequestNewId("workorders");
+  let wo = createNewWorkorder({
+    id: placeholderID,
+    customerID: customer?.id || "",
+    customerFirst: customer?.first || "",
+    customerLast: customer?.last || "",
+    customerCell: customer?.customerCell || customer?.customerLandline || "",
+    customerLandline: customer?.customerLandline || "",
+    customerEmail: customer?.email || "",
+    customerContactRestriction: customer?.contactRestriction || "",
+    customerLanguage: customer?.language || "",
+    startedByFirst: _currentUser?.first,
+    startedByLast: _currentUser?.last,
+    status: status || useSettingsStore.getState().getSettings()?.statuses?.[0]?.id || "",
+  });
+  wo._pendingId = true;
+  let store = useOpenWorkordersStore.getState();
+  store.setWorkorder(wo, false);
+  store.setOpenWorkorderID(wo.id);
+  if (customer?.id) store.addPendingCustomerLink(wo.id, customer.id);
+  return wo;
+}
+
+/**
+ * Internal: resolve a pending ID by swapping placeholder with the real sequential
+ * ID (or keeping the placeholder if realId is null).
+ */
+function _resolvePendingId(node, placeholderID, realId) {
+  // Clear timeout and remove from pending store
+  usePendingIdStore.getState().removeEntry(placeholderID);
+
+  if (node === "workorders") {
+    const st = useOpenWorkordersStore.getState();
+    const wo = st.workorders.find((w) => w.id === placeholderID);
+    if (!wo) return; // workorder was already removed (user cancelled, etc.)
+
+    if (realId && realId !== placeholderID) {
+      // Swap to the real sequential ID
+      st.removeWorkorder(placeholderID, false);
+      let updated = { ...wo, id: realId };
+      delete updated._pendingId;
+      st.setWorkorder(updated, false);
+
+      if (st.openWorkorderID === placeholderID) {
+        st.setOpenWorkorderID(realId);
+      }
+
+      // Re-key pending customer link
+      let links = st._pendingCustomerLinks || {};
+      if (links[placeholderID]) {
+        let custId = links[placeholderID];
+        st.removePendingCustomerLink(placeholderID);
+        st.addPendingCustomerLink(realId, custId);
+      }
+
+      st.setLastIdSwap({ oldId: placeholderID, newId: realId });
+    } else {
+      // Keep the placeholder ID (timeout fallback)
+      let updated = { ...wo };
+      delete updated._pendingId;
+      st.setWorkorder(updated, false);
+    }
+  }
 }
 
 export async function dbReturnId(node, id) {

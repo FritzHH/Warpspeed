@@ -534,17 +534,9 @@ export function buildWorkorderNumberFromId(id, millis) {
   const month = MONTHS[date.getMonth()];
   const year = String(date.getFullYear()).slice(-2);
 
-  // Extract raw counter from EAN-13: strip 1-char prefix + check digit, reverse, parseInt
-  const idStr = String(id);
-  let counter;
-  if (idStr.length === 13) {
-    const inner = idStr.slice(1, 12);
-    counter = parseInt(inner.split("").reverse().join(""), 10);
-  } else {
-    counter = parseInt(idStr.slice(-5), 10) || 0;
-  }
+  const digits = String(id).slice(0, 5);
 
-  return "W" + counter + month + year;
+  return "W" + digits + month + year;
 }
 
 export function stringIsNumeric(str) {
@@ -1178,7 +1170,7 @@ export function applyDiscountToWorkorderItem(
   } else {
     newPrice =
       workorderLineObj.inventoryItem.price * workorderLineObj.qty -
-      workorderLineObj.qty * discountObj.value;
+      Number(discountObj.value);
     savings =
       workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
   }

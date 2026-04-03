@@ -389,7 +389,7 @@ export const CustomItemModal = ({
               // modalCoordX={20}
               dataArr={[
                 { label: "No Discount" },
-                ...(zDiscounts || []).map((o) => ({ label: o.name })),
+                ...(zDiscounts || []).filter((o) => o.type !== "$" || Number(o.value) <= sPriceCents).map((o) => ({ label: o.name })),
               ]}
               onSelect={handleDiscountSelect}
             />

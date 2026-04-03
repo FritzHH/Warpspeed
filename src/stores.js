@@ -919,9 +919,6 @@ export const useCustMessagesStore = create((set, get) => ({
   clearMessages: () => set({ incomingMessages: [], outgoingMessages: [] }),
 }));
 
-const debouncedSaveWorkorder = debounce((workorder) => {
-  dbSaveOpenWorkorder(workorder);
-}, 500);
 
 export function broadcastWorkorderToDisplay(wo) {
   if (!wo) return;
@@ -1202,6 +1199,7 @@ export const useOpenWorkordersStore = create(
       saleModalObj: null,
       _pendingCustomerLinks: {},
       _lastIdSwap: null,
+      _dirtyFields: {},
 
       getOpenWorkorder: () => {
         let id = get().openWorkorderID;
@@ -1251,11 +1249,29 @@ export const useOpenWorkordersStore = create(
           broadcastClear();
         }
       },
-      setOpenWorkorders: (workorders) => {
-        const incomingIds = new Set(workorders.map((w) => w.id));
-        const local = get().workorders.filter((w) => (w._pendingId || !w.customerID) && !incomingIds.has(w.id));
-        const merged = [...workorders, ...local];
-        set({ workorders: merged, workordersLoaded: true });
+      setOpenWorkorders: (incomingWorkorders) => {
+        const localWorkorders = get().workorders;
+        const incomingIds = new Set(incomingWorkorders.map((w) => w.id));
+        const localOnly = localWorkorders.filter((w) => (w._pendingId || !w.customerID) && !incomingIds.has(w.id));
+
+        const dirtyFields = get()._dirtyFields;
+        const merged = incomingWorkorders.map((incoming) => {
+          const local = localWorkorders.find((w) => w.id === incoming.id);
+          if (!local) return incoming;
+          const woDirty = dirtyFields[incoming.id];
+          let changed = false;
+          const result = { ...local };
+          for (const key of Object.keys(incoming)) {
+            if (woDirty && woDirty[key]) continue; // skip dirty fields
+            if (local[key] !== incoming[key]) {
+              result[key] = incoming[key];
+              changed = true;
+            }
+          }
+          return changed ? result : local;
+        });
+
+        set({ workorders: [...merged, ...localOnly], workordersLoaded: true });
         // If the active workorder was deleted externally, reset to customer screen
         let openId = get().openWorkorderID;
         if (openId && !merged.find((w) => w.id === openId)) {
@@ -1290,7 +1306,28 @@ export const useOpenWorkordersStore = create(
         // No-customer workorders stay local — saved explicitly by checkout or intake
         // Pending-ID workorders stay local until the ID resolves
         if (saveToDB && workorder.customerID && !workorder._pendingId) {
-          debouncedSaveWorkorder(workorder);
+          // Mark field dirty before write
+          const dirtyFields = get()._dirtyFields;
+          const ts = Date.now();
+          const woDirty = { ...dirtyFields[workorderID], [fieldName]: ts };
+          set({ _dirtyFields: { ...dirtyFields, [workorderID]: woDirty } });
+
+          // Capture snapshot of dirty timestamps at write time
+          const dirtySnapshot = { ...woDirty };
+          dbSaveOpenWorkorder(workorder).then(() => {
+            const currentDirty = get()._dirtyFields[workorderID];
+            if (!currentDirty) return;
+            const updated = { ...currentDirty };
+            for (const key of Object.keys(dirtySnapshot)) {
+              if (updated[key] === dirtySnapshot[key]) delete updated[key];
+            }
+            if (Object.keys(updated).length === 0) {
+              const { [workorderID]: _, ...rest } = get()._dirtyFields;
+              set({ _dirtyFields: rest });
+            } else {
+              set({ _dirtyFields: { ...get()._dirtyFields, [workorderID]: updated } });
+            }
+          });
           get()._flushPendingCustomerLink(workorderID);
         }
         if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);

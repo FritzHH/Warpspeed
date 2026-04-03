@@ -623,29 +623,44 @@ export const ScreenModal = ({
   );
 };
 
-const CustomDiscountInput = ({ label, onApply, maxLength = 3, maxVal }) => {
+const CustomDiscountInput = ({ label, onApply, maxLength = 3, maxVal, currencyMode = false, maxCents = 0 }) => {
   const [val, setVal] = useState("");
+  const [cents, setCents] = useState(0);
   const submit = () => {
-    const num = Number(val);
-    if (!num) return;
-    setVal("");
-    onApply(num);
+    if (currencyMode) {
+      if (!cents) return;
+      onApply(cents);
+      setVal("");
+      setCents(0);
+    } else {
+      const num = Number(val);
+      if (!num) return;
+      setVal("");
+      onApply(num);
+    }
   };
   return (
-    <View onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", flex: 1, height: "100%" }}>
+    <View onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", flex: 1, height: "100%", paddingLeft: 2 }}>
       <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 6 }}>{label}</Text>
       <TextInput
         value={val}
-        placeholder="0"
+        placeholder={currencyMode ? "0.00" : "0"}
         placeholderTextColor={gray(0.3)}
-        maxLength={maxLength}
+        maxLength={currencyMode ? undefined : maxLength}
         onChangeText={(v) => {
-          let cleaned = v.replace(/[^0-9]/g, "");
-          if (maxVal && Number(cleaned) > maxVal) cleaned = String(maxVal);
-          setVal(cleaned);
+          if (currencyMode) {
+            let result = usdTypeMask(v);
+            if (maxCents && result.cents > maxCents) result = usdTypeMask(String(maxCents));
+            setVal(result.display);
+            setCents(result.cents);
+          } else {
+            let cleaned = v.replace(/[^0-9]/g, "");
+            if (maxVal && Number(cleaned) > maxVal) cleaned = String(maxVal);
+            setVal(cleaned);
+          }
         }}
         onSubmitEditing={submit}
-        style={{ width: 50, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 13, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
+        style={{ width: currencyMode ? 70 : 50, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 13, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
       />
       <Button_
         icon={ICONS.check1}
@@ -690,7 +705,6 @@ export const DropdownMenu = ({
   const [sModalVisible, _setModalVisible] = useState(false);
   const ref = useRef();
 
-  const _maxDollars = discountMaxCents ? Math.floor(discountMaxCents / 100) : 999;
   const _discountRows = isDiscountMenu ? [
     { component: <View style={{ height: 1, backgroundColor: gray(0.15), width: "100%" }} />, _isDivider: true },
     {
@@ -705,10 +719,10 @@ export const DropdownMenu = ({
     {
       _isCustomInput: true,
       component: (
-        <CustomDiscountInput label="Custom $" maxLength={String(_maxDollars).length} maxVal={_maxDollars} onApply={(num) => {
+        <CustomDiscountInput label="Custom $" currencyMode maxCents={discountMaxCents || 99900} onApply={(cents) => {
           _setModalVisible(false);
-          const cents = num * 100;
-          onSelect({ _customDiscount: { id: "custom_" + Date.now(), name: "$" + num + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true } });
+          const dollars = (cents / 100).toFixed(2);
+          onSelect({ _customDiscount: { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true } });
         }} />
       ),
     },

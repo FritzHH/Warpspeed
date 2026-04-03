@@ -263,7 +263,7 @@ const ChangeLogEntry = ({ entry, index }) => {
 
 // ─── Main Modal ─────────────────────────────────────────────────
 
-export const ClosedWorkorderModal = ({ workorder, onClose }) => {
+export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
 
@@ -492,6 +492,15 @@ export const ClosedWorkorderModal = ({ workorder, onClose }) => {
             >
               {isClosed ? "CLOSED WORKORDER" : "ACTIVE WORKORDER"}
             </Text>
+            {!isClosed && onGoToWorkorder && (
+              <Button_
+                text="Go to Workorder"
+                colorGradientArr={COLOR_GRADIENTS.green}
+                onPress={() => onGoToWorkorder(workorder)}
+                buttonStyle={{ paddingHorizontal: 16, height: 32, marginRight: 8 }}
+                textStyle={{ color: C.textWhite, fontSize: 12 }}
+              />
+            )}
             {sSales.length > 0 && (
               <TouchableOpacity
                 onPress={() => {

@@ -418,7 +418,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                       buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
                                       dataArr={[
                                         { label: "No Discount" },
-                                        ...discounts.map((o) => ({ label: o.name })),
+                                        ...discounts.filter((o) => o.type !== "$" || Number(o.value) <= line.inventoryItem.price * (line.qty || 1)).map((o) => ({ label: o.name })),
                                       ]}
                                       onSelect={(item) => {
                                         if (item._customDiscount) {

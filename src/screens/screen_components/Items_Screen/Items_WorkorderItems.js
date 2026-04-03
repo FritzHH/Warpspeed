@@ -1126,7 +1126,7 @@ export const LineItemComponent = ({
                 buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
                 dataArr={[
                   { label: "No Discount" },
-                  ...(zSettingsObj.discounts || []).map((o) => ({ label: o.name })),
+                  ...(zSettingsObj.discounts || []).filter((o) => o.type !== "$" || Number(o.value) <= workorderLine.inventoryItem.price * (workorderLine.qty || 1)).map((o) => ({ label: o.name })),
                 ]}
                 onSelect={(item) => {
                   if (item._customDiscount) {

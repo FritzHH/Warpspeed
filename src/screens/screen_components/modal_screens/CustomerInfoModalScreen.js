@@ -118,32 +118,37 @@ export const CustomerInfoScreenModalComponent = ({
       _sSetWorkorders([]);
       return [];
     }
-    _sSetWoLoading(true);
-    try {
-      const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
-      const results = await Promise.all(
-        woIDs.map(async (id) => {
-          try {
-            const local = openWOs.find((wo) => wo.id === id);
-            if (local) return local;
-            return await dbGetCompletedWorkorder(id);
-          } catch (e) {
-            return null;
-          }
-        })
-      );
-      console.log("WO IDs from customer:", woIDs);
-      console.log("WO results (before filter):", results.map((r, i) => ({ id: woIDs[i], found: !!r, source: r ? (openWOs.some((o) => o.id === r.id) ? "local" : "completed") : "null" })));
-      let loaded = results.filter(Boolean);
-      if (mountedRef.current) _sSetWorkorders(loaded);
-      return loaded;
-    } catch (e) {
-      console.log("Error loading workorders:", e);
-      if (mountedRef.current) _sSetWorkorders([]);
-      return [];
-    } finally {
-      if (mountedRef.current) _sSetWoLoading(false);
+    const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+    // Show local workorders immediately
+    const localWOs = [];
+    const dbIDs = [];
+    woIDs.forEach((id) => {
+      const local = openWOs.find((wo) => wo.id === id);
+      if (local) localWOs.push(local);
+      else dbIDs.push(id);
+    });
+    if (localWOs.length > 0 && mountedRef.current) _sSetWorkorders(localWOs);
+    // Fetch completed workorders from DB in background
+    if (dbIDs.length > 0) {
+      _sSetWoLoading(true);
+      try {
+        const dbResults = await Promise.all(
+          dbIDs.map(async (id) => {
+            try { return await dbGetCompletedWorkorder(id); }
+            catch (e) { return null; }
+          })
+        );
+        const dbWOs = dbResults.filter(Boolean);
+        if (mountedRef.current) _sSetWorkorders([...localWOs, ...dbWOs]);
+        return [...localWOs, ...dbWOs];
+      } catch (e) {
+        console.log("Error loading workorders:", e);
+        return localWOs;
+      } finally {
+        if (mountedRef.current) _sSetWoLoading(false);
+      }
     }
+    return localWOs;
   }
 
   async function loadSales(customer, loadedWorkorders) {
@@ -152,79 +157,92 @@ export const CustomerInfoScreenModalComponent = ({
       _sSetSales([]);
       return;
     }
-    _sSetSalesLoading(true);
-    try {
-      const results = await Promise.all(
-        saleIDs.map(async (id) => {
-          try {
-            let sale = await dbGetCompletedSale(id);
-            if (!sale) sale = await readActiveSale(id);
-            return sale;
-          } catch (e) {
-            return null;
-          }
-        })
-      );
-      const fetchedSales = results.filter(Boolean);
-
-      // Collect all unique workorder IDs referenced by these sales
-      const allWoIDs = new Set();
-      fetchedSales.forEach((sale) => {
-        (sale.workorderIDs || []).forEach((id) => allWoIDs.add(id));
-      });
-
-      // Build a map from already-loaded workorders
-      const woMap = {};
-      (loadedWorkorders || sWorkorders).forEach((wo) => { woMap[wo.id] = wo; });
-
-      // Fetch any workorder IDs not already loaded
-      const missingIDs = [...allWoIDs].filter((id) => !woMap[id]);
-      if (missingIDs.length > 0) {
-        const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
-        const fetched = await Promise.all(
-          missingIDs.map(async (id) => {
+    // Show active sales from store immediately
+    const activeSales = useActiveSalesStore.getState().getActiveSales() || [];
+    const localSales = [];
+    const dbIDs = [];
+    saleIDs.forEach((id) => {
+      const local = activeSales.find((s) => s.id === id);
+      if (local) localSales.push({ ...local, _isActiveSale: true });
+      else dbIDs.push(id);
+    });
+    if (localSales.length > 0 && mountedRef.current) _sSetSales(localSales);
+    // Fetch completed sales from DB in background
+    if (dbIDs.length > 0) {
+      _sSetSalesLoading(true);
+      try {
+        const results = await Promise.all(
+          dbIDs.map(async (id) => {
             try {
-              const local = openWOs.find((wo) => wo.id === id);
-              if (local) return local;
-              return await dbGetCompletedWorkorder(id);
+              let sale = await dbGetCompletedSale(id);
+              if (!sale) sale = await readActiveSale(id);
+              return sale;
             } catch (e) {
               return null;
             }
           })
         );
-        fetched.filter(Boolean).forEach((wo) => { woMap[wo.id] = wo; });
-      }
+        const fetchedSales = results.filter(Boolean);
 
-      // Attach resolved workorder objects to each sale as _workorders
-      const salesWithWOs = fetchedSales.map((sale) => ({
-        ...sale,
-        _workorders: (sale.workorderIDs || [])
-          .map((id) => woMap[id])
-          .filter(Boolean),
-      }));
+        // Collect all unique workorder IDs referenced by fetched sales
+        const allWoIDs = new Set();
+        fetchedSales.forEach((sale) => {
+          (sale.workorderIDs || []).forEach((id) => allWoIDs.add(id));
+        });
 
-      // Load transactions for each sale and attach as _transactions
-      let txnMap = {};
-      await Promise.all(salesWithWOs.map(async (sale) => {
-        if (sale.transactionIDs?.length > 0) {
-          let txns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
-          sale._transactions = txns;
-          txnMap[sale.id] = txns;
-        } else {
-          sale._transactions = [];
-          txnMap[sale.id] = [];
+        // Build a map from already-loaded workorders
+        const woMap = {};
+        (loadedWorkorders || sWorkorders).forEach((wo) => { woMap[wo.id] = wo; });
+
+        // Fetch any workorder IDs not already loaded
+        const missingIDs = [...allWoIDs].filter((id) => !woMap[id]);
+        if (missingIDs.length > 0) {
+          const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+          const fetched = await Promise.all(
+            missingIDs.map(async (id) => {
+              try {
+                const local = openWOs.find((wo) => wo.id === id);
+                if (local) return local;
+                return await dbGetCompletedWorkorder(id);
+              } catch (e) {
+                return null;
+              }
+            })
+          );
+          fetched.filter(Boolean).forEach((wo) => { woMap[wo.id] = wo; });
         }
-      }));
 
-      if (mountedRef.current) {
-        _sSetSales(salesWithWOs);
-        _sSetSaleTransactionsMap(txnMap);
+        // Attach resolved workorder objects to each sale as _workorders
+        const dbSalesWithWOs = fetchedSales.map((sale) => ({
+          ...sale,
+          _workorders: (sale.workorderIDs || [])
+            .map((id) => woMap[id])
+            .filter(Boolean),
+        }));
+
+        // Load transactions for each sale and attach as _transactions
+        let txnMap = {};
+        await Promise.all(dbSalesWithWOs.map(async (sale) => {
+          if (sale.transactionIDs?.length > 0) {
+            let txns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
+            sale._transactions = txns;
+            txnMap[sale.id] = txns;
+          } else {
+            sale._transactions = [];
+            txnMap[sale.id] = [];
+          }
+        }));
+
+        if (mountedRef.current) {
+          _sSetSales([...localSales, ...dbSalesWithWOs]);
+          _sSetSaleTransactionsMap(txnMap);
+        }
+      } catch (e) {
+        console.log("Error loading sales:", e);
+      } finally {
+        if (mountedRef.current) _sSetSalesLoading(false);
       }
-    } catch (e) {
-      console.log("Error loading sales:", e);
-      if (mountedRef.current) _sSetSales([]);
     }
-    if (mountedRef.current) _sSetSalesLoading(false);
   }
 
   async function autoLoadWorkordersAndSales(customer) {
@@ -536,29 +554,28 @@ export const CustomerInfoScreenModalComponent = ({
               paddingVertical: 5,
             }}
           >
-            <Button_
-              icon={sWoLoading ? null : ICONS.workorder}
-              iconSize={18}
-              textStyle={{ color: gray(0.45), fontSize: 13 }}
-              text={sWoLoading ? "" : "REFRESH WORKORDERS"}
-              TextComponent={sWoLoading ? SmallLoadingIndicator : undefined}
-              buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
-              onPress={() => loadWorkorders()}
-              enabled={!sWoLoading}
-            />
-            {sWoLoading && <LoadingOverlay text="Loading workorders..." />}
-            {!sWoLoading && sWorkorders.length > 0 && (
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <Button_
+                icon={ICONS.workorder}
+                iconSize={18}
+                textStyle={{ color: gray(0.45), fontSize: 13 }}
+                text={"REFRESH WORKORDERS"}
+                buttonStyle={{ paddingHorizontal: 20 }}
+                onPress={() => loadWorkorders()}
+                enabled={!sWoLoading}
+              />
+              {sWoLoading && <View style={{ marginLeft: 8 }}><SmallLoadingIndicator /></View>}
+            </View>
+            {sWorkorders.length > 0 && (
               <WorkordersList
                 workorders={sWorkorders}
                 onSelect={(wo) => {
-                  // TESTING: open closed workorder viewer for all cards
-                  // PRODUCTION: only open for cards without paymentComplete
                   _sSetClosedWorkorder(wo);
                 }}
               />
             )}
-            {!sWoLoading &&
-              sWorkorders.length === 0 &&
+            {sWorkorders.length === 0 &&
+              !sWoLoading &&
               (sCustomerInfo.workorders || []).length === 0 && (
                 <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
                   No workorders on file
@@ -575,30 +592,35 @@ export const CustomerInfoScreenModalComponent = ({
               paddingVertical: 5,
             }}
           >
-            <Button_
-              icon={sSalesLoading ? null : ICONS.dollarYellow}
-              iconSize={20}
-              text={sSalesLoading ? "" : "REFRESH SALES"}
-              TextComponent={sSalesLoading ? SmallLoadingIndicator : undefined}
-              textStyle={{ color: gray(0.45), fontSize: 13 }}
-              buttonStyle={{ paddingHorizontal: 20, marginBottom: 8 }}
-              onPress={() => loadSales()}
-              enabled={!sSalesLoading}
-            />
-            {sSalesLoading ? (
-              <View style={{ alignItems: "center", paddingVertical: 15 }}>
-                <SmallLoadingIndicator />
-                <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 6 }}>Loading sales...</Text>
-              </View>
-            ) : sSales.length > 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <Button_
+                icon={ICONS.dollarYellow}
+                iconSize={20}
+                text={"REFRESH SALES"}
+                textStyle={{ color: gray(0.45), fontSize: 13 }}
+                buttonStyle={{ paddingHorizontal: 20 }}
+                onPress={() => loadSales()}
+                enabled={!sSalesLoading}
+              />
+              {sSalesLoading && <View style={{ marginLeft: 8 }}><SmallLoadingIndicator /></View>}
+            </View>
+            {sSales.length > 0 ? (
               <ScrollView style={{ flexShrink: 1 }}>
                 <SalesList
                   sales={sSales}
                   transactionsMap={sSaleTransactionsMap}
-                  onSelect={(sale) => useOpenWorkordersStore.getState().setSaleModalObj(sale)}
+                  onSelect={(sale) => {
+                    if (sale._isActiveSale) {
+                      if (handleButton2Press) handleButton2Press();
+                      useCheckoutStore.getState().setViewOnlySale(sale);
+                      useCheckoutStore.getState().setIsCheckingOut(true);
+                    } else {
+                      useOpenWorkordersStore.getState().setSaleModalObj(sale);
+                    }
+                  }}
                 />
               </ScrollView>
-            ) : (sCustomerInfo.sales || []).length === 0 ? (
+            ) : !sSalesLoading && (sCustomerInfo.sales || []).length === 0 ? (
               <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
                 No sales on file
               </Text>
@@ -678,6 +700,28 @@ export const CustomerInfoScreenModalComponent = ({
         <ClosedWorkorderModal
           workorder={sClosedWorkorder}
           onClose={() => _sSetClosedWorkorder(null)}
+          onGoToWorkorder={(wo) => {
+            const store = useOpenWorkordersStore.getState();
+            const lockedID = store.lockedWorkorderID;
+            if (lockedID && lockedID !== wo.id) {
+              store.setLockedWorkorderID(null);
+              store.removeWorkorder(lockedID, false);
+            }
+            store.setOpenWorkorderID(wo.id);
+            useTabNamesStore.getState().setItems({
+              infoTabName: TAB_NAMES.infoTab.workorder,
+              itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+              optionsTabName: TAB_NAMES.optionsTab.inventory,
+            });
+            useWorkorderPreviewStore.getState().setPreviewObj(null);
+            if (wo.customerID) {
+              dbGetCustomer(wo.customerID).then((customer) => {
+                if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
+              });
+            }
+            _sSetClosedWorkorder(null);
+            if (handleButton2Press) handleButton2Press();
+          }}
         />
       </View>
     </TouchableWithoutFeedback>
@@ -706,6 +750,218 @@ const LoadingOverlay = ({ text }) => (
   </View>
 );
 
+const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect }) => {
+  const [sShowItems, _sSetShowItems] = useState(false);
+  const rs = resolveStatus(workorder.status, statuses);
+  const totals = calculateRunningTotals(workorder, taxPercent, [], false, !!workorder.taxFree);
+  const itemCount = workorder.workorderLines?.length || 0;
+
+  return (
+    <View
+      style={{
+        marginBottom: 6,
+        borderRadius: 7,
+        borderLeftWidth: 4,
+        borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
+        borderColor: C.buttonLightGreenOutline,
+        borderWidth: 1,
+        backgroundColor: C.listItemWhite,
+      }}
+    >
+    <TouchableOpacity_
+      onPress={() => onSelect(workorder)}
+      style={{
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+      }}
+    >
+      {/* Row 1: Customer name + item count + workorder number + status badge */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 3,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          <Text numberOfLines={1} style={{ fontSize: 13, color: "dimgray" }}>
+            {capitalizeFirstLetterOfString(workorder.customerFirst) +
+              " " +
+              capitalizeFirstLetterOfString(workorder.customerLast)}
+          </Text>
+          {itemCount > 0 && (
+            <View
+              style={{
+                backgroundColor: "gray",
+                borderRadius: 10,
+                paddingHorizontal: 6,
+                paddingVertical: 1,
+                marginLeft: 6,
+              }}
+            >
+              <Text style={{ color: "white", fontSize: 10, fontWeight: "600" }}>
+                {itemCount}
+              </Text>
+            </View>
+          )}
+          {!!workorder.workorderNumber && (
+            <Text style={{ fontSize: 12, color: C.blue, marginLeft: 6, fontWeight: "500" }}>
+              {"#" + workorder.workorderNumber}
+            </Text>
+          )}
+        </View>
+        <View
+          style={{
+            backgroundColor: rs.backgroundColor,
+            paddingHorizontal: 10,
+            paddingVertical: 2,
+            borderRadius: 10,
+          }}
+        >
+          <Text style={{ color: rs.textColor, fontSize: 11, fontWeight: "600" }}>
+            {rs.label}
+          </Text>
+        </View>
+      </View>
+
+      {/* Row 2: Brand / description + color badges */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 4,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          <Text style={{ fontWeight: "500", color: C.text, fontSize: 14 }}>
+            {workorder.brand || ""}
+          </Text>
+          {!!workorder.description && (
+            <View
+              style={{
+                width: 7,
+                height: 2,
+                marginHorizontal: 5,
+                backgroundColor: "lightgray",
+              }}
+            />
+          )}
+          <Text numberOfLines={1} style={{ color: C.text, fontSize: 14 }}>
+            {workorder.description || ""}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", marginLeft: 8 }}>
+          {!!workorder.color1?.label && (
+            <Text
+              style={{
+                fontSize: 10,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 100,
+                backgroundColor: workorder.color1.backgroundColor,
+                color: workorder.color1.textColor,
+              }}
+            >
+              {workorder.color1.label}
+            </Text>
+          )}
+          {!!workorder.color2?.label && (
+            <Text
+              style={{
+                fontSize: 10,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 100,
+                backgroundColor: workorder.color2.backgroundColor,
+                color: workorder.color2.textColor,
+                marginLeft: 4,
+              }}
+            >
+              {workorder.color2.label}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Row 3: Date + wait time + total */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "dimgray", fontSize: 12 }}>
+          {formatMillisForDisplay(
+            workorder.startedOnMillis,
+            new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
+          )}
+        </Text>
+        {!!workorder.waitTime?.label && (
+          <Text style={{ color: gray(0.4), fontSize: 11, fontStyle: "italic" }}>
+            {"est: " + workorder.waitTime.label}
+          </Text>
+        )}
+        {(() => {
+          let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
+          let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
+          if (workorder.paymentComplete) {
+            return (
+              <Text style={{ fontSize: 13, fontWeight: "600", color: C.green }}>
+                {"$" + formatCurrencyDisp(totals.finalTotal)}
+              </Text>
+            );
+          }
+          if (paid > 0) {
+            return (
+              <Text style={{ fontSize: 13, fontWeight: "600", color: C.orange }}>
+                {"$" + formatCurrencyDisp(paid) + " paid"}
+              </Text>
+            );
+          }
+          return (
+            <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>
+              {"$" + formatCurrencyDisp(totals.finalTotal)}
+            </Text>
+          );
+        })()}
+      </View>
+
+    </TouchableOpacity_>
+
+      {/* Show/hide items toggle */}
+      {itemCount > 0 && (
+        <View style={{ paddingHorizontal: 10, paddingBottom: 6 }}>
+          <TouchableOpacity_
+            onPress={() => _sSetShowItems(!sShowItems)}
+            style={{ alignSelf: "flex-start" }}
+          >
+            <Text style={{ fontSize: 11, color: C.blue }}>
+              {sShowItems ? "Hide items" : "Show items"}
+            </Text>
+          </TouchableOpacity_>
+          {sShowItems && (
+            <View style={{ marginTop: 4, paddingLeft: 4 }}>
+              {workorder.workorderLines.map((line) => (
+                <View key={line.id} style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+                  <Text numberOfLines={1} style={{ fontSize: 12, color: C.text, flex: 1 }}>
+                    {line.inventoryItem?.formalName || "Unnamed item"}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: "500", width: 36, textAlign: "right" }}>
+                    {line.qty}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+};
+
 const WorkordersList = ({ workorders, onSelect }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
@@ -716,176 +972,15 @@ const WorkordersList = ({ workorders, onSelect }) => {
       <FlatList
         data={workorders}
         keyExtractor={(item) => item.id}
-        renderItem={(obj) => {
-          const workorder = obj.item;
-          const rs = resolveStatus(workorder.status, statuses);
-          const totals = calculateRunningTotals(workorder, taxPercent, [], false, !!workorder.taxFree);
-          const itemCount = workorder.workorderLines?.length || 0;
-
-          return (
-            <TouchableOpacity_
-              onPress={() => onSelect(workorder)}
-              style={{
-                marginBottom: 6,
-                borderRadius: 7,
-                borderLeftWidth: 4,
-                borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
-                borderColor: C.buttonLightGreenOutline,
-                borderWidth: 1,
-                backgroundColor: C.listItemWhite,
-                paddingVertical: 6,
-                paddingHorizontal: 10,
-              }}
-            >
-              {/* Row 1: Customer name + status badge */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 3,
-                }}
-              >
-                <Text numberOfLines={1} style={{ fontSize: 13, color: "dimgray" }}>
-                  {capitalizeFirstLetterOfString(workorder.customerFirst) +
-                    " " +
-                    capitalizeFirstLetterOfString(workorder.customerLast)}
-                </Text>
-                <View
-                  style={{
-                    backgroundColor: rs.backgroundColor,
-                    paddingHorizontal: 10,
-                    paddingVertical: 2,
-                    borderRadius: 10,
-                  }}
-                >
-                  <Text style={{ color: rs.textColor, fontSize: 11, fontWeight: "600" }}>
-                    {rs.label}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Row 2: Brand / description + color badges + item count */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 4,
-                }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                  <Text style={{ fontWeight: "500", color: C.text, fontSize: 14 }}>
-                    {workorder.brand || ""}
-                  </Text>
-                  {!!workorder.description && (
-                    <View
-                      style={{
-                        width: 7,
-                        height: 2,
-                        marginHorizontal: 5,
-                        backgroundColor: "lightgray",
-                      }}
-                    />
-                  )}
-                  <Text numberOfLines={1} style={{ color: C.text, fontSize: 14 }}>
-                    {workorder.description || ""}
-                  </Text>
-                  {itemCount > 0 && (
-                    <View
-                      style={{
-                        backgroundColor: "gray",
-                        borderRadius: 10,
-                        paddingHorizontal: 6,
-                        paddingVertical: 1,
-                        marginLeft: 8,
-                      }}
-                    >
-                      <Text style={{ color: "white", fontSize: 10, fontWeight: "600" }}>
-                        {itemCount}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <View style={{ flexDirection: "row", marginLeft: 8 }}>
-                  {!!workorder.color1?.label && (
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 100,
-                        backgroundColor: workorder.color1.backgroundColor,
-                        color: workorder.color1.textColor,
-                      }}
-                    >
-                      {workorder.color1.label}
-                    </Text>
-                  )}
-                  {!!workorder.color2?.label && (
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 100,
-                        backgroundColor: workorder.color2.backgroundColor,
-                        color: workorder.color2.textColor,
-                        marginLeft: 4,
-                      }}
-                    >
-                      {workorder.color2.label}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Row 3: Date + wait time + total */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: "dimgray", fontSize: 12 }}>
-                  {formatMillisForDisplay(
-                    workorder.startedOnMillis,
-                    new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
-                  )}
-                </Text>
-                {!!workorder.waitTime?.label && (
-                  <Text style={{ color: gray(0.4), fontSize: 11, fontStyle: "italic" }}>
-                    {"est: " + workorder.waitTime.label}
-                  </Text>
-                )}
-                {(() => {
-                  let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
-                  let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
-                  if (workorder.paymentComplete) {
-                    return (
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: C.green }}>
-                        {"$" + formatCurrencyDisp(totals.finalTotal)}
-                      </Text>
-                    );
-                  }
-                  if (paid > 0) {
-                    return (
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: C.orange }}>
-                        {"$" + formatCurrencyDisp(paid) + " paid"}
-                      </Text>
-                    );
-                  }
-                  return (
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>
-                      {"$" + formatCurrencyDisp(totals.finalTotal)}
-                    </Text>
-                  );
-                })()}
-              </View>
-            </TouchableOpacity_>
-          );
-        }}
+        renderItem={(obj) => (
+          <WorkorderCard
+            workorder={obj.item}
+            statuses={statuses}
+            taxPercent={taxPercent}
+            zActiveSales={zActiveSales}
+            onSelect={onSelect}
+          />
+        )}
       />
     </View>
   );
@@ -1033,9 +1128,11 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
               marginBottom: 6,
               borderRadius: 7,
               borderLeftWidth: 4,
-              borderLeftColor: sale.paymentComplete
-                ? C.green
-                : C.lightred,
+              borderLeftColor: sale._isActiveSale
+                ? C.orange
+                : sale.paymentComplete
+                  ? C.green
+                  : C.lightred,
               borderColor: C.buttonLightGreenOutline,
               borderWidth: 1,
               backgroundColor: C.listItemWhite,
@@ -1056,6 +1153,21 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
                 {formatMillisForDisplay(sale.millis)}
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {sale._isActiveSale && (
+                  <View
+                    style={{
+                      backgroundColor: lightenRGBByPercent(C.orange, 65),
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 10,
+                      marginRight: 6,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: "600", color: C.orange }}>
+                      Active
+                    </Text>
+                  </View>
+                )}
                 {sale.isDepositSale && (
                   <View
                     style={{
@@ -1081,9 +1193,11 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
                 )}
                 <View
                   style={{
-                    backgroundColor: sale.paymentComplete
-                      ? lightenRGBByPercent(C.green, 70)
-                      : lightenRGBByPercent(C.lightred, 60),
+                    backgroundColor: sale._isActiveSale
+                      ? lightenRGBByPercent(C.orange, 65)
+                      : sale.paymentComplete
+                        ? lightenRGBByPercent(C.green, 70)
+                        : lightenRGBByPercent(C.lightred, 60),
                     paddingHorizontal: 8,
                     paddingVertical: 2,
                     borderRadius: 10,
@@ -1093,10 +1207,10 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
                     style={{
                       fontSize: 10,
                       fontWeight: "600",
-                      color: sale.paymentComplete ? C.green : C.lightred,
+                      color: sale._isActiveSale ? C.orange : sale.paymentComplete ? C.green : C.lightred,
                     }}
                   >
-                    {sale.paymentComplete ? "Paid" : "Partial"}
+                    {sale._isActiveSale ? "In Progress" : sale.paymentComplete ? "Paid" : "Partial"}
                   </Text>
                 </View>
               </View>

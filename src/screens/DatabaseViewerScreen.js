@@ -119,26 +119,58 @@ export function DatabaseViewerScreen() {
   }
 
   async function handleCleanLogs() {
-    let openWOs = sData.openWorkorders;
-    if (!openWOs.length) { _setReopenStatus("No open workorders"); return; }
-    _setReopenStatus("Cleaning logs...");
+    _setReopenStatus("Cleaning...");
     let basePath = `tenants/${tenantID}/stores/${storeID}`;
     try {
-      let cleaned = 0;
-      for (let wo of openWOs) {
-        let original = wo.changeLog || [];
-        let filtered = original.filter(
-          (e) => !(e.field === "payment") &&
-            !(e.action === "changed" && e.field === "status" && (e.to || "").toLowerCase().includes("paid"))
-        );
-        if (filtered.length !== original.length) {
-          let updated = cloneDeep(wo);
-          updated.changeLog = filtered;
-          await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${wo.id}`, updated);
-          cleaned++;
+      // 1. Delete all active sales
+      for (let sale of sData.activeSales) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.ACTIVE_SALES}/${sale.id}`);
+      }
+      // 2. Delete all completed sales
+      for (let sale of sData.completedSales) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_SALES}/${sale.id}`);
+      }
+      // 3. Delete all completed workorders
+      for (let wo of sData.completedWorkorders) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}/${wo.id}`);
+      }
+      // 4. Delete all transactions
+      for (let txn of sData.transactions) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.TRANSACTIONS}/${txn.id}`);
+      }
+      // 5. Clean open workorders (remove activeSaleID, saleID, payment fields)
+      for (let wo of sData.openWorkorders) {
+        if (wo.activeSaleID || wo.saleID || wo.paymentComplete) {
+          let cleaned = cleanWOForReopen(wo);
+          await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${cleaned.id}`, cleaned);
         }
       }
-      _setReopenStatus(cleaned ? `Done - cleaned logs on ${cleaned} WO(s)` : "No financial logs found");
+      // 6. Reconcile customers
+      let openWOsByCustomer = {};
+      for (let wo of sData.openWorkorders) {
+        if (wo.customerID) {
+          if (!openWOsByCustomer[wo.customerID]) openWOsByCustomer[wo.customerID] = [];
+          openWOsByCustomer[wo.customerID].push(wo.id);
+        }
+      }
+      let custUpdated = 0;
+      for (let customer of sData.customers) {
+        let updated = cloneDeep(customer);
+        updated.workorders = openWOsByCustomer[customer.id] || [];
+        updated.sales = [];
+        updated.deposits = [];
+        for (let cred of (updated.credits || [])) {
+          if ((cred.reservedCents || 0) > 0) cred.reservedCents = 0;
+        }
+        await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.CUSTOMERS}/${customer.id}`, updated);
+        custUpdated++;
+      }
+
+      _setReopenStatus(
+        `Done - ${sData.activeSales.length} active sale(s), ${sData.completedSales.length} closed sale(s), ` +
+        `${sData.completedWorkorders.length} closed WO(s), ${sData.transactions.length} txn(s) removed, ` +
+        `${custUpdated} customer(s) reconciled`
+      );
     } catch (err) {
       _setReopenStatus("Error: " + (err.message || err));
     }

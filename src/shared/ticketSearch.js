@@ -108,10 +108,10 @@ export async function executeLiveSearch(trimmed, mode, options) {
       const prefix = trimmed[0];
       if (prefix === "1") {
         results = await dbSearchWorkordersByIdPrefix(trimmed);
-      } else if (prefix === "2") {
-        results = await dbSearchSalesByIdPrefix(trimmed);
       } else if (prefix === "3") {
         results = await dbSearchTransactionsByIdPrefix(trimmed);
+      } else if (prefix === "4") {
+        results = await dbSearchSalesByIdPrefix(trimmed);
       } else {
         let [woResults, saleResults, txnResults] = await Promise.all([
           dbSearchWorkordersByIdPrefix(trimmed),
@@ -189,7 +189,13 @@ export async function executeTicketSearch(searchText, onComplete, options) {
           }
           showEmptyResults(); return;
         }
-        if (prefix === "2") {
+        if (prefix === "3") {
+          // Transaction
+          let txn = await readTransaction(trimmed);
+          if (txn) { if (onTransactionFound) onTransactionFound(txn); if (onComplete) onComplete(); return; }
+          showEmptyResults(); return;
+        }
+        if (prefix === "4") {
           // Sale
           let activeSale = await readActiveSale(trimmed);
           if (activeSale) { await openSaleWithHydration(activeSale, false, onSaleFound); if (onComplete) onComplete(); return; }
@@ -200,12 +206,6 @@ export async function executeTicketSearch(searchText, onComplete, options) {
             await openSaleWithHydration(cross.data, cross.isCompleted, onSaleFound);
             if (onComplete) onComplete(); return;
           }
-          showEmptyResults(); return;
-        }
-        if (prefix === "3") {
-          // Transaction
-          let txn = await readTransaction(trimmed);
-          if (txn) { if (onTransactionFound) onTransactionFound(txn); if (onComplete) onComplete(); return; }
           showEmptyResults(); return;
         }
       }
@@ -252,10 +252,10 @@ export async function executeTicketSearch(searchText, onComplete, options) {
 
       if (prefix === "1") {
         results = await dbSearchWorkordersByIdPrefix(trimmed);
-      } else if (prefix === "2") {
-        results = await dbSearchSalesByIdPrefix(trimmed);
       } else if (prefix === "3") {
         results = await dbSearchTransactionsByIdPrefix(trimmed);
+      } else if (prefix === "4") {
+        results = await dbSearchSalesByIdPrefix(trimmed);
       } else {
         let [woResults, saleResults, txnResults] = await Promise.all([
           dbSearchWorkordersByIdPrefix(trimmed),

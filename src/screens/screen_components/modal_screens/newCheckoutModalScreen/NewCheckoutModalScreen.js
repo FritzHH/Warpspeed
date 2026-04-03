@@ -34,7 +34,7 @@ import {
   localStorageWrapper,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, TAX_FREE_RECEIPT_NOTE, CUSTOMER_PROTO } from "../../../../data";
-import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder, dbReturnId, dbRequestNewId } from "../../../../db_calls_wrapper";
+import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder, dbRequestNewId } from "../../../../db_calls_wrapper";
 import { generateIdCallable } from "../../../../db_calls";
 import {
   createNewSale,
@@ -567,7 +567,7 @@ export function NewCheckoutModalScreen() {
   }, [onlineReaders.length, sInitialized]);
 
   // ─── Workorder Combining ──────────────────────────────────
-  function handleToggleWorkorder(wo) {
+  async function handleToggleWorkorder(wo) {
     // Cannot uncheck primary workorder
     if (wo.id === zOpenWorkorder?.id) return;
 
@@ -583,6 +583,21 @@ export function NewCheckoutModalScreen() {
       cleaned.changeLog = [...(cleaned.changeLog || []), { timestamp: Date.now(), user: _user, field: "payment", action: "recorded", from: "", to: "Removed from combined sale" }];
       useOpenWorkordersStore.getState().setWorkorder(cleaned, true);
     } else {
+      // Check if WO has an orphaned active sale from a crashed session
+      if (wo.activeSaleID && wo.activeSaleID !== sSale?.id) {
+        let orphanedSale = await readActiveSale(wo.activeSaleID);
+        if (orphanedSale?.transactionIDs?.length > 0) {
+          useAlertScreenStore.getState().setValues({
+            title: "Cannot Combine",
+            message: "This workorder has an active sale with payments from another session. Close or complete that sale first.",
+            btn1Text: "OK",
+            handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+            canExitOnOuterClick: true,
+          });
+          return;
+        }
+        if (orphanedSale) await deleteActiveSale(orphanedSale.id);
+      }
       let linked = cloneDeep(wo);
       if (sSale?.id) {
         linked.activeSaleID = sSale.id;
@@ -1328,7 +1343,6 @@ export function NewCheckoutModalScreen() {
     let hasPayments = sTransactions.length > 0 || sCredits.length > 0;
     if (sSale?.id && !hasPayments && salePersistedRef.current) {
       deleteActiveSale(sSale.id);
-      dbReturnId("sales", sSale.id);
       let woStore = useOpenWorkordersStore.getState();
       for (let wo of sCombinedWorkorders) {
         let current = woStore.workorders.find((w) => w.id === wo.id);
@@ -1338,7 +1352,6 @@ export function NewCheckoutModalScreen() {
       }
     }
     if (prefetchedTxnIdRef.current) {
-      dbReturnId("transactions", prefetchedTxnIdRef.current);
       prefetchedTxnIdRef.current = null;
     }
     salePersistedRef.current = false;

@@ -8,11 +8,11 @@ import {
   useSettingsStore,
   useLoginStore,
   useCheckoutStore,
+  useActiveSalesStore,
 } from "../../../stores";
 
 import {
   Button_,
-  SmallLoadingIndicator,
   ScreenModal,
   Tooltip,
 } from "../../../components";
@@ -23,42 +23,22 @@ import {
   formatCurrencyDisp,
   formatMillisForDisplay,
 } from "../../../utils";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
   dbSavePrintObj,
-  dbGetStandaloneActiveSales,
 } from "../../../db_calls_wrapper";
 
 export const StandaloneSaleComponent = ({}) => {
   const zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
-  const [sActiveSales, _setActiveSales] = useState([]);
-  const [sActiveSalesLoading, _setActiveSalesLoading] = useState(false);
+  const zActiveSales = useActiveSalesStore((state) => state.activeSales);
+  const standaloneSales = zActiveSales.filter((s) => !s.customerID && !s.paymentComplete);
   const [sShowActiveSalesModal, _setShowActiveSalesModal] = useState(false);
-  const hasCheckedRef = useRef(false);
 
   let clearDisabled = !zOpenWorkorder
     || ((zOpenWorkorder.workorderLines || []).length === 0
       && (zOpenWorkorder.customerNotes || []).length === 0
       && (zOpenWorkorder.internalNotes || []).length === 0);
-
-  // Check for standalone active sales on mount
-  if (!hasCheckedRef.current) {
-    hasCheckedRef.current = true;
-    _setActiveSalesLoading(true);
-    dbGetStandaloneActiveSales().then((sales) => {
-      _setActiveSales(sales);
-      _setActiveSalesLoading(false);
-    });
-  }
-
-  function handleRefreshActiveSales() {
-    _setActiveSalesLoading(true);
-    dbGetStandaloneActiveSales().then((sales) => {
-      _setActiveSales(sales);
-      _setActiveSalesLoading(false);
-    });
-  }
 
   function handleSelectActiveSale(sale) {
     _setShowActiveSalesModal(false);
@@ -106,13 +86,10 @@ export const StandaloneSaleComponent = ({}) => {
       >
         <Text style={{ fontSize: 72, color: gray(0.08) }}>{"SALE"}</Text>
         <Button_
-          text={sActiveSalesLoading ? "Loading..." : "Active Sales" + (sActiveSales.length > 0 ? ` (${sActiveSales.length})` : "")}
-          enabled={sActiveSales.length > 0}
-          onPress={() => {
-            handleRefreshActiveSales();
-            _setShowActiveSalesModal(true);
-          }}
-          colorGradientArr={sActiveSales.length > 0 ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
+          text={"Active Sales" + (standaloneSales.length > 0 ? ` (${standaloneSales.length})` : "")}
+          enabled={standaloneSales.length > 0}
+          onPress={() => _setShowActiveSalesModal(true)}
+          colorGradientArr={standaloneSales.length > 0 ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
           buttonStyle={{
             borderRadius: 5,
             paddingHorizontal: 20,
@@ -132,15 +109,11 @@ export const StandaloneSaleComponent = ({}) => {
           Component={() => (
             <View style={{ width: 400, maxHeight: 500, backgroundColor: C.backgroundWhite, borderRadius: 10, padding: 20 }}>
               <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, marginBottom: 15 }}>Active Sales</Text>
-              {sActiveSalesLoading ? (
-                <View style={{ alignItems: "center", paddingVertical: 30 }}>
-                  <SmallLoadingIndicator />
-                </View>
-              ) : sActiveSales.length === 0 ? (
+              {standaloneSales.length === 0 ? (
                 <Text style={{ color: gray(0.5), textAlign: "center", paddingVertical: 20 }}>No active sales</Text>
               ) : (
                 <FlatList
-                  data={sActiveSales}
+                  data={standaloneSales}
                   keyExtractor={(item) => item.id}
                   renderItem={({ item }) => (
                     <TouchableOpacity

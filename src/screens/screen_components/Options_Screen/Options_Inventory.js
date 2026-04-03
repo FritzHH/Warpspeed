@@ -1001,8 +1001,21 @@ export function InventoryComponent({}) {
                       let newPath = sMenuPath.slice(0, i + 1);
                       _setMenuPath(newPath);
                       _setCurrentParentID(crumb.id);
-                      _setSelectedButtonID(null);
-                      _setSearchResults([]);
+                      // Restore the crumb's items (same logic as handleBackPress)
+                      let crumbBtn = (zQuickItemButtons || []).find((b) => b.id === crumb.id);
+                      let items = [];
+                      crumbBtn?.items?.forEach((entry) => {
+                        let id = typeof entry === "string" ? entry : entry.inventoryItemID;
+                        let item = zInventoryArr.find((inv) => inv.id === id);
+                        if (item) items.push(item);
+                      });
+                      if (items.length > 0) {
+                        _setSelectedButtonID(crumb.id);
+                        _setSearchResults(items);
+                      } else {
+                        _setSelectedButtonID(null);
+                        _setSearchResults([]);
+                      }
                       _setSearchTerm("");
                     }}
                   >

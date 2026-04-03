@@ -141,7 +141,7 @@ export function calculateRunningTotals(
         )
       )
         return;
-      let qty = line.qty;
+      let qty = Number(line.qty) || 0;
       // clog("line", line.discountObj);
       runningSubtotal = runningSubtotal + line.inventoryItem.price * qty;
       if (line.discountObj?.value) {
@@ -516,32 +516,35 @@ export function stringifyAllObjectFields(obj) {
 
 // numbers /////////////////////////////////////////////////////////
 export function formatWorkorderNumber(woNum) {
-  if (!woNum || typeof woNum !== "string" || !woNum.startsWith("WO") || woNum.length < 7) return woNum || "";
-  return woNum.slice(0, 2) + "-" + woNum.slice(2, 6) + "-" + woNum.slice(6);
+  if (!woNum || typeof woNum !== "string") return woNum || "";
+  // New format: W12000APR26 -> W-12000APR26
+  if (woNum.startsWith("W") && !woNum.startsWith("WO")) {
+    return "W-" + woNum.slice(1);
+  }
+  // Legacy format: WO1234JAN26 -> WO-1234-JAN26
+  if (woNum.startsWith("WO") && woNum.length >= 7) {
+    return woNum.slice(0, 2) + "-" + woNum.slice(2, 6) + "-" + woNum.slice(6);
+  }
+  return woNum;
 }
 
-export function generateWorkorderNumber() {
+export function buildWorkorderNumberFromId(id, millis) {
   const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-  const now = new Date();
-  const month = MONTHS[now.getMonth()];
-  const year = String(now.getFullYear()).slice(-2);
+  const date = millis ? new Date(millis) : new Date();
+  const month = MONTHS[date.getMonth()];
+  const year = String(date.getFullYear()).slice(-2);
 
-  let maxCounter = 1000;
-  const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
-  openWOs.forEach((wo) => {
-    const match = wo.workorderNumber?.match(/^WO(\d{4})/);
-    if (match) {
-      // Un-reverse the displayed digits to recover the raw counter
-      const raw = parseInt(match[1].split("").reverse().join(""), 10);
-      if (raw > maxCounter) maxCounter = raw;
-    }
-  });
+  // Extract raw counter from EAN-13: strip 1-char prefix + check digit, reverse, parseInt
+  const idStr = String(id);
+  let counter;
+  if (idStr.length === 13) {
+    const inner = idStr.slice(1, 12);
+    counter = parseInt(inner.split("").reverse().join(""), 10);
+  } else {
+    counter = parseInt(idStr.slice(-5), 10) || 0;
+  }
 
-  let nextCounter = maxCounter + 1;
-  if (nextCounter > 9999) nextCounter = 1001;
-
-  const reversed = String(nextCounter).padStart(4, "0").split("").reverse().join("");
-  return "WO" + reversed + month + year;
+  return "W" + counter + month + year;
 }
 
 export function stringIsNumeric(str) {
@@ -2000,7 +2003,7 @@ export function createNewWorkorder({
 }) {
   let wo = cloneDeep(WORKORDER_PROTO);
   wo.id = id || generateEAN13Barcode();
-  wo.workorderNumber = generateWorkorderNumber();
+  wo.workorderNumber = "";
   wo.status = status || SETTINGS_OBJ.statuses[0]?.id || "";
   wo.customerFirst = customerFirst || "";
   wo.customerLast = customerLast || "";

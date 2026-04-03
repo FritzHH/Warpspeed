@@ -7751,18 +7751,10 @@ async function _generateId(db, node) {
       const newId = await db.runTransaction(async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         const data = counterDoc.exists ? counterDoc.data() : {};
-        const returned = data.returned || [];
-
-        if (returned.length > 0) {
-          const reusedId = returned[0];
-          transaction.set(counterRef, { ...data, returned: returned.slice(1) }, { merge: true });
-          log(`_generateId: reusing returned ID for ${node}:`, reusedId);
-          return reusedId;
-        }
 
         const current = data.current || 0;
         const next = current + 1;
-        transaction.set(counterRef, { ...data, current: next }, { merge: true });
+        transaction.set(counterRef, { current: next }, { merge: true });
 
         const padded = String(next).padStart(11, "0");
         const reversed = padded.split("").reverse().join("");
@@ -7787,48 +7779,12 @@ async function _generateId(db, node) {
   );
 }
 
-async function _returnId(db, node, id) {
-  if (!GENERATE_ID_PREFIXES[node]) {
-    throw new Error(`_returnId: invalid node "${node}". Must be one of: workorders, sales, transactions`);
-  }
-  if (!id || typeof id !== "string") {
-    throw new Error(`_returnId: invalid id "${id}"`);
-  }
-
-  const counterRef = db.collection("counters").doc(node);
-  let lastError;
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await db.runTransaction(async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        const data = counterDoc.exists ? counterDoc.data() : {};
-        const returned = data.returned || [];
-        if (returned.includes(id)) return;
-        transaction.set(counterRef, { ...data, returned: [...returned, id] }, { merge: true });
-      });
-      log(`_returnId: returned ID for ${node}:`, id);
-      return;
-    } catch (error) {
-      lastError = error;
-      log(`_returnId: attempt ${attempt}/3 failed for ${node}:`, error.message);
-      if (attempt < 3) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, 100 * Math.pow(4, attempt - 1))
-        );
-      }
-    }
-  }
-
-  throw new Error(`_returnId: failed after 3 attempts for ${node}: ${lastError?.message}`);
-}
-
 exports.generateId = onCall(
   { secrets: [firebaseServiceAccountKey] },
   async (request) => {
     log("generateId: request", request.data);
 
-    const { node, action, id } = request.data;
+    const { node } = request.data;
 
     if (!node || !GENERATE_ID_PREFIXES[node]) {
       throw new HttpsError(
@@ -7838,20 +7794,6 @@ exports.generateId = onCall(
     }
 
     const db = await getDB(firebaseServiceAccountKey);
-
-    if (action === "return") {
-      if (!id || typeof id !== "string") {
-        throw new HttpsError("invalid-argument", "Missing or invalid 'id' parameter for return action");
-      }
-      try {
-        await _returnId(db, node, id);
-        log("generateId: return success", { node, id });
-        return { success: true, returned: true };
-      } catch (error) {
-        log("generateId: return failed", { node, id, error: error.message });
-        throw new HttpsError("internal", `Failed to return ID for ${node}: ${error.message}`);
-      }
-    }
 
     try {
       const generatedId = await _generateId(db, node);

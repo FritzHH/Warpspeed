@@ -931,6 +931,21 @@ export const ActiveWorkorderComponent = ({}) => {
                       const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
                       scheduleAutoText(rule, wo, zSettings);
                     }
+                    // Notify linked users: add this workorder to their pendingWorkorderIDs
+                    const woID = zOpenWorkorder.id;
+                    const users = zSettings?.users || [];
+                    const currentUserID = useLoginStore.getState().getCurrentUser()?.id;
+                    let usersChanged = false;
+                    const updatedUsers = users.map((u) => {
+                      if (!(u.statuses || []).includes(val.id)) return u;
+                      if ((u.pendingWorkorderIDs || []).includes(woID)) return u;
+                      if (u.id === currentUserID) return u;
+                      usersChanged = true;
+                      return { ...u, pendingWorkorderIDs: [...(u.pendingWorkorderIDs || []), woID] };
+                    });
+                    if (usersChanged) {
+                      useSettingsStore.getState().setField("users", updatedUsers);
+                    }
                   }}
                   buttonStyle={{
                     width: "100%",

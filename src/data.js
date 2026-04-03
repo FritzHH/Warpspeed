@@ -263,6 +263,7 @@ export const APP_USER = {
   preview: true,
   forwardSMS: false,
   statuses: [/*status id's go in here*/],
+  pendingWorkorderIDs: [],
 };
 
 export const TIME_PUNCH_PROTO = {
@@ -458,7 +459,7 @@ export const WORKORDER_PROTO = {
   taxFreeReceiptNote: "",
 };
 
-export const TAX_FREE_RECEIPT_NOTE = "No items on this workorder were taxable under Florida law. All items are, be labor-only, and no shop parts or material left the shop with the customer."
+export const TAX_FREE_RECEIPT_NOTE = "No items on this workorder were taxable under Florida law. All items are labor-only, and no shop parts or material left the shop with the customer."
 
 export const WORKORDER_ITEM_PROTO = {
   qty: 1,
@@ -509,6 +510,7 @@ export const CUSTOMER_PROTO = {
   id: "",
   interactionRating: "",
   gatedCommunity: false,
+  notes: "",
   workorders: [],
   previousBikes: [],
   sales: [],

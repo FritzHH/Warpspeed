@@ -3095,6 +3095,13 @@ export const Tooltip = ({
   const [sRect, _setRect] = useState(null);
   const GAP = 6;
 
+  useEffect(() => {
+    if (!sRect) return;
+    const dismiss = () => _setRect(null);
+    document.addEventListener("mousedown", dismiss);
+    return () => document.removeEventListener("mousedown", dismiss);
+  }, [sRect]);
+
   function handleMouseEnter(e) {
     _setRect(e.currentTarget.getBoundingClientRect());
   }
@@ -3576,8 +3583,7 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
   );
 };
 
-export const DepositsList = ({ deposits, credits, onPress, onRemoveCredit }) => {
-  let [sConfirmId, _sSetConfirmId] = useState(null);
+export const DepositsList = ({ deposits, credits, onDepositPress, onCreditPress }) => {
   let activeDeposits = (deposits || []).filter((d) => d.amountCents > 0);
   let activeCredits = (credits || []).filter((d) => d.amountCents > 0);
   let allItems = [
@@ -3599,95 +3605,67 @@ export const DepositsList = ({ deposits, credits, onPress, onRemoveCredit }) => 
         let isGiftCard = item.type === "giftcard";
         let badgeColor = isGiftCard ? C.orange : isCredit ? C.blue : C.green;
         let noteText = item.note || item.text || "";
-        let isConfirming = sConfirmId === item.id;
         return (
-          <View key={item.id}>
-            {isConfirming && (
-              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 4, gap: 6 }}>
-                <TouchableOpacity
-                  onPress={() => { _sSetConfirmId(null); if (onRemoveCredit) onRemoveCredit(item); }}
-                  style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 4, paddingHorizontal: 10 }}
+          <TouchableOpacity_
+            key={item.id}
+            onPress={() => isCredit ? onCreditPress?.(item) : onDepositPress?.(item)}
+            hoverOpacity={0.7}
+            style={{
+              marginBottom: 4,
+              borderRadius: 7,
+              borderLeftWidth: 4,
+              borderLeftColor: badgeColor,
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+              backgroundColor: C.listItemWhite,
+              paddingVertical: 6,
+              paddingHorizontal: 10,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={{
+                    backgroundColor: lightenRGBByPercent(badgeColor, 70),
+                    paddingHorizontal: 6,
+                    paddingVertical: 1,
+                    borderRadius: 8,
+                    marginRight: 6,
+                  }}
                 >
-                  <Text style={{ color: C.textWhite, fontSize: 11, fontWeight: "600" }}>Confirm Remove</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => _sSetConfirmId(null)}
-                  style={{ backgroundColor: gray(0.6), borderRadius: 5, paddingVertical: 4, paddingHorizontal: 10 }}
-                >
-                  <Text style={{ color: C.textWhite, fontSize: 11, fontWeight: "600" }}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <TouchableOpacity_
-              onPress={() => onPress && onPress(item)}
-              hoverOpacity={onPress ? 0.7 : 1}
-              style={{
-                marginBottom: 4,
-                borderRadius: 7,
-                borderLeftWidth: 4,
-                borderLeftColor: badgeColor,
-                borderColor: C.buttonLightGreenOutline,
-                borderWidth: 1,
-                backgroundColor: C.listItemWhite,
-                paddingVertical: 6,
-                paddingHorizontal: 10,
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View
-                    style={{
-                      backgroundColor: lightenRGBByPercent(badgeColor, 70),
-                      paddingHorizontal: 6,
-                      paddingVertical: 1,
-                      borderRadius: 8,
-                      marginRight: 6,
-                    }}
-                  >
-                    <Text style={{ fontSize: 10, fontWeight: "600", color: badgeColor }}>
-                      {isGiftCard ? "Gift Card" : isCredit ? "Credit" : "Deposit"}
-                    </Text>
-                  </View>
-                  {!!noteText && (
-                    <Text numberOfLines={1} style={{ fontSize: 11, color: gray(0.5), flex: 1 }}>
-                      {noteText}
-                    </Text>
-                  )}
+                  <Text style={{ fontSize: 10, fontWeight: "600", color: badgeColor }}>
+                    {isGiftCard ? "Gift Card" : isCredit ? "Credit" : "Deposit"}
+                  </Text>
                 </View>
-                <Text style={{ fontSize: 12, color: gray(0.4), marginTop: 2 }}>
-                  {formatMillisForDisplay(item.millis)}
-                </Text>
-              </View>
-              <View style={{ alignItems: "flex-end", marginRight: isCredit && onRemoveCredit ? 8 : 0 }}>
-                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
-                  {"$" + formatCurrencyDisp(item.amountCents)}
-                </Text>
-                {(item.reservedCents || 0) > 0 && (
-                  <Text style={{ fontSize: 10, color: C.orange, fontWeight: "600", marginTop: 1 }}>
-                    In use: {"$" + formatCurrencyDisp(item.reservedCents)}
-                  </Text>
-                )}
-                {(item.reservedCents || 0) > 0 && item.amountCents > item.reservedCents && (
-                  <Text style={{ fontSize: 10, color: C.green, fontWeight: "600", marginTop: 1 }}>
-                    Available: {"$" + formatCurrencyDisp(item.amountCents - item.reservedCents)}
+                {!!noteText && (
+                  <Text numberOfLines={1} style={{ fontSize: 11, color: gray(0.5), flex: 1 }}>
+                    {noteText}
                   </Text>
                 )}
               </View>
-              {isCredit && onRemoveCredit && !(item.reservedCents > 0) && (
-                <Tooltip text="This will remove the credit from the customer" position="left">
-                  <TouchableOpacity
-                    onPress={(e) => { e.stopPropagation(); _sSetConfirmId(item.id); }}
-                    style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 3, paddingHorizontal: 8 }}
-                  >
-                    <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>Remove</Text>
-                  </TouchableOpacity>
-                </Tooltip>
+              <Text style={{ fontSize: 12, color: gray(0.4), marginTop: 2 }}>
+                {formatMillisForDisplay(item.millis)}
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                {"$" + formatCurrencyDisp(item.amountCents)}
+              </Text>
+              {(item.reservedCents || 0) > 0 && (
+                <Text style={{ fontSize: 10, color: C.orange, fontWeight: "600", marginTop: 1 }}>
+                  In use: {"$" + formatCurrencyDisp(item.reservedCents)}
+                </Text>
               )}
-            </TouchableOpacity_>
-          </View>
+              {(item.reservedCents || 0) > 0 && item.amountCents > item.reservedCents && (
+                <Text style={{ fontSize: 10, color: C.green, fontWeight: "600", marginTop: 1 }}>
+                  Available: {"$" + formatCurrencyDisp(item.amountCents - item.reservedCents)}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity_>
         );
       })}
     </View>

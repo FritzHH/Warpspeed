@@ -8,6 +8,9 @@ import { executeTicketSearch, executeLiveSearch } from "./ticketSearch";
 import { ClosedWorkorderModal } from "../screens/screen_components/modal_screens/ClosedWorkorderModal";
 import { TransactionModal } from "../screens/screen_components/modal_screens/TransactionModal";
 import { SaleModal } from "../screens/screen_components/modal_screens/SaleModal";
+import { NewRefundModalScreen } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
+import { findSaleByTransactionID } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { useAlertScreenStore } from "../stores";
 
 export function TicketSearchInput({}) {
   const [sTicketSearch, _setTicketSearch] = useState("");
@@ -15,6 +18,8 @@ export function TicketSearchInput({}) {
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
   const [sTransaction, _sSetTransaction] = useState(null);
   const [sSale, _sSetSale] = useState(null);
+  const [sRefundSaleID, _sSetRefundSaleID] = useState(null);
+  const [sRefundInitialPayment, _sSetRefundInitialPayment] = useState(null);
   const debounceRef = useRef(null);
 
   const searchCallbacks = {
@@ -22,6 +27,20 @@ export function TicketSearchInput({}) {
     onTransactionFound: (txn) => _sSetTransaction(txn),
     onSaleFound: (sale) => _sSetSale(sale),
   };
+
+  async function handleTransactionRefund(txn) {
+    let sale = await findSaleByTransactionID(txn.id);
+    if (!sale) {
+      useAlertScreenStore.getState().setAlert({
+        title: "Sale Not Found",
+        message: "Could not find the sale associated with this transaction.",
+      });
+      return;
+    }
+    _sSetTransaction(null);
+    _sSetRefundInitialPayment(txn);
+    _sSetRefundSaleID(sale.id);
+  }
 
   function stripWoPrefix(val) {
     return val.replace(/^WO-/i, "").trim();
@@ -131,11 +150,20 @@ export function TicketSearchInput({}) {
       <TransactionModal
         transaction={sTransaction}
         onClose={() => _sSetTransaction(null)}
+        onRefund={handleTransactionRefund}
       />
       <SaleModal
         sale={sSale}
         onClose={() => _sSetSale(null)}
       />
+      {!!sRefundSaleID && (
+        <NewRefundModalScreen
+          visible={true}
+          saleID={sRefundSaleID}
+          initialPayment={sRefundInitialPayment}
+          onClose={() => { _sSetRefundSaleID(null); _sSetRefundInitialPayment(null); }}
+        />
+      )}
     </View>
   );
 }

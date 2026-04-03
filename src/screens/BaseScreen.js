@@ -52,6 +52,20 @@ import { clog, log, recoverPendingAutoTexts } from "../utils";
 import { cloneDeep, throttle } from "lodash";
 import { ROUTES } from "../routes";
 
+function playNotificationBeep() {
+  try {
+    let ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let osc = ctx.createOscillator();
+    let gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.value = 0.3;
+    osc.start();
+    osc.stop(ctx.currentTime + 0.15);
+  } catch (e) {}
+}
+
 export function BaseScreen() {
   document.title = "Workorders";
   // store getters /////////////////////////////////////////////////////////////////
@@ -273,13 +287,21 @@ export function BaseScreen() {
   useEffect(() => {
     // Workorders first — small collection, needed immediately for UI
     dbListenToOpenWorkorders((data) => {
+      let prev = useOpenWorkordersStore.getState().workorders;
+      let newSMS = data.some((wo) => {
+        if (!wo.hasNewSMS) return false;
+        let old = prev.find((p) => p.id === wo.id);
+        return !old || !old.hasNewSMS;
+      });
+      if (newSMS && localStorage.getItem("warpspeed_sms_sound") !== "false") {
+        playNotificationBeep();
+      }
       useOpenWorkordersStore.getState().setOpenWorkorders(data);
     });
 
     // tested!!
     dbListenToSettings((data) => {
       // log("settings", data.users[0].faceDescriptor);
-      console.log("SETTINGS LOAD quickItemButtons:", JSON.stringify(data.quickItemButtons, null, 2));
       useSettingsStore.getState().setSettings(data, false, false);
     });
 

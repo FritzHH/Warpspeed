@@ -13,6 +13,9 @@ export function HomeScreen() {
   const [sHasDisplay, _setHasDisplay] = useState(
     localStorage.getItem("warpspeed_has_secondary_display") === "true"
   );
+  const [sSmsSound, _setSmsSound] = useState(
+    localStorage.getItem("warpspeed_sms_sound") !== "false"
+  );
 
   let isMobileOrTablet = deviceType === "mobile" || deviceType === "tablet";
   let isDesktop = deviceType === "desktop";
@@ -145,6 +148,19 @@ export function HomeScreen() {
           }}
           textStyle={{ fontSize: 14, color: C.lightText }}
           buttonStyle={{ marginTop: 20 }}
+        />
+      )}
+      {isDesktop && (
+        <CheckBox_
+          text="SMS notification sound"
+          isChecked={sSmsSound}
+          onCheck={() => {
+            let newVal = !sSmsSound;
+            _setSmsSound(newVal);
+            localStorage.setItem("warpspeed_sms_sound", String(newVal));
+          }}
+          textStyle={{ fontSize: 14, color: C.lightText }}
+          buttonStyle={{ marginTop: 10 }}
         />
       )}
     </ScrollView>

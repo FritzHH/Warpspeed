@@ -104,7 +104,6 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
             {/* Workorder card */}
             <View
               style={{
-                opacity: isPrimary ? 1 : isCombined ? 1 : 0.4,
                 borderColor: C.buttonLightGreenOutline,
                 borderWidth: 1,
                 borderRadius: 8,
@@ -137,7 +136,8 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                   />
                 )}
               </View>
-              {/* WO Header */}
+              {/* WO Header + Line Items + Subtotals */}
+              <View style={{ opacity: isPrimary ? 1 : isCombined ? 1 : 0.4 }}>
               <View
                 style={{
                   flexDirection: "row",
@@ -571,6 +571,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                     )}
                   </Text>
                 </Text>
+              </View>
               </View>
             </View>
           </View>

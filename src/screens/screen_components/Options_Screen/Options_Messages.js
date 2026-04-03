@@ -99,6 +99,7 @@ export function MessagesComponent({}) {
   const [sTranslateActive, _setTranslateActive] = useState(false);
   const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
   const [sCustomPhoneMode, _setCustomPhoneMode] = useState(false);
+  const [sShowReplyModal, _setShowReplyModal] = useState(false);
   const [sCustomPhone, _setCustomPhone] = useState("");
   const [sCustomPhoneMessages, _setCustomPhoneMessages] = useState([]);
   const textInputRef = useRef("");
@@ -120,6 +121,7 @@ export function MessagesComponent({}) {
 
     // Update state immediately for responsive UI
     _setNewMessage(val);
+    if (sShowReplyModal) _setShowReplyModal(false);
 
     // Imperative height adjustment — reset to 0 then measure scrollHeight so it shrinks on delete
     if (textInputRef.current) {
@@ -244,7 +246,7 @@ export function MessagesComponent({}) {
       msg.senderUserObj = zCurrentUserObj;
       _setNewMessage("");
       _setInputHeight(36);
-      if (!sCustomPhoneMode) _setCanRespond(false);
+      _setShowReplyModal(true);
       clearTranslation();
       // Optimistically add message to local list in custom phone mode
       if (sCustomPhoneMode) {
@@ -591,7 +593,7 @@ export function MessagesComponent({}) {
             </View>
           ) : null}
           <View style={{ width: "100%" }}>
-              <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: sCanRespond ? C.red : gray(0.15), backgroundColor: "white" }}>
+              <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
                 <TextInput
                   onChangeText={handleMessageChange}
                   ref={textInputRef}
@@ -630,12 +632,49 @@ export function MessagesComponent({}) {
                   }}
                   value={sNewMessage}
                 />
-                <TouchableOpacity
-                  onPress={() => { if (sNewMessage.trim() && sNewMessage.length <= 1600) sendMessage(sNewMessage); }}
-                  style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() && sNewMessage.length <= 1600 ? 1 : 0.3 }}
-                >
-                  <Image_ icon={ICONS.airplane} size={41} />
-                </TouchableOpacity>
+                <View style={{ position: "relative" }}>
+                  {sShowReplyModal && (
+                    <View style={{
+                      position: "absolute",
+                      bottom: 55,
+                      right: 0,
+                      backgroundColor: "white",
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: gray(0.2),
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      shadowColor: "black",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 4,
+                      elevation: 4,
+                      zIndex: 10,
+                    }}>
+                      <Text style={{ fontSize: 12, color: C.text, marginRight: 8 }}>User can reply?</Text>
+                      <TouchableOpacity
+                        onPress={() => { _setCanRespond(true); _setShowReplyModal(false); }}
+                        style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: C.green, justifyContent: "center", alignItems: "center", marginRight: 6 }}
+                      >
+                        <Text style={{ fontSize: 15, color: "white", fontWeight: "bold" }}>✓</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => { _setCanRespond(false); _setShowReplyModal(false); }}
+                        style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: C.red, justifyContent: "center", alignItems: "center" }}
+                      >
+                        <Text style={{ fontSize: 15, color: "white", fontWeight: "bold" }}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => { if (sNewMessage.trim() && sNewMessage.length <= 1600) sendMessage(sNewMessage); }}
+                    style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() && sNewMessage.length <= 1600 ? 1 : 0.3 }}
+                  >
+                    <Image_ icon={ICONS.airplane} size={41} />
+                  </TouchableOpacity>
+                </View>
               </View>
             <Text style={{ fontSize: 10, color: sNewMessage.length > 1600 ? C.red : gray(0.4), alignSelf: "flex-end", marginTop: 2 }}>
               {sNewMessage.length} / 1600
@@ -672,12 +711,6 @@ export function MessagesComponent({}) {
                 />
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <CheckBox_
-                  buttonStyle={{}}
-                  text={"Can Respond"}
-                  isChecked={sCanRespond}
-                  onCheck={() => _setCanRespond(!sCanRespond)}
-                />
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <CheckBox_
                     text={"Translate"}

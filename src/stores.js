@@ -21,7 +21,7 @@ import {
 } from "./utils";
 import { debounce } from "lodash";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "./broadcastChannel";
-import { calculateRunningTotals } from "./utils";
+import { calculateRunningTotals, buildWorkorderNumberFromId } from "./utils";
 
 import {
   dbDeleteWorkorder,
@@ -1444,6 +1444,7 @@ function _resolvePendingIdFromStore(placeholderID) {
   if (!wo || !wo._pendingId) return;
   let updated = { ...wo };
   delete updated._pendingId;
+  updated.workorderNumber = buildWorkorderNumberFromId(wo.id, wo.startedOnMillis);
   st.setWorkorder(updated, false);
 }
 

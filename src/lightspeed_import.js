@@ -1,4 +1,4 @@
-import { buildLightspeedEAN13, generateWorkorderNumber, bestForegroundHex, hexToRgb, normalizeBarcode, generateEAN13Barcode } from "./utils";
+import { buildLightspeedEAN13, buildWorkorderNumberFromId, bestForegroundHex, hexToRgb, normalizeBarcode, generateEAN13Barcode } from "./utils";
 import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES, TAX_FREE_RECEIPT_NOTE, APP_USER, TIME_PUNCH_PROTO } from "./data";
 
 // ============================================================================
@@ -100,42 +100,6 @@ export function mapStatuses(statusesCSVText) {
       };
     });
 
-  return [...NONREMOVABLE_STATUSES, ...csvStatuses];
-}
-
-/**
- * Extract unique status names from workorders.csv and merge with NONREMOVABLE_STATUSES.
- * Use this when statuses.csv is not available.
- */
-export function extractStatusesFromWorkorders(workorderCSVText) {
-  const rows = parseCSV(workorderCSVText);
-  const seen = new Set();
-  const extracted = [];
-  for (const row of rows) {
-    const name = (row.statusName || "").trim();
-    if (!name || seen.has(name.toLowerCase())) continue;
-    seen.add(name.toLowerCase());
-    extracted.push(name);
-  }
-  const nonremovableLabels = new Set(
-    NONREMOVABLE_STATUSES.map(s => s.label.toLowerCase())
-  );
-  // Also exclude aliased names (e.g. "Done & Paid" → "Finished & Paid")
-  for (const alias of Object.keys(STATUS_ALIASES)) nonremovableLabels.add(alias);
-  const csvStatuses = extracted
-    .filter(name => !nonremovableLabels.has(name.toLowerCase()))
-    .map(name => {
-      const bgHex = "#B8B8B8";
-      const textColor = bestForegroundHex(bgHex);
-      const { r, g, b } = hexToRgb(bgHex);
-      return {
-        id: "ls_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
-        label: name,
-        textColor,
-        backgroundColor: "rgb(" + r + "," + g + "," + b + ")",
-        removable: true,
-      };
-    });
   return [...NONREMOVABLE_STATUSES, ...csvStatuses];
 }
 
@@ -581,7 +545,7 @@ export function mapWorkorders(
 
     const ean13 = buildLightspeedEAN13("25", woID);
     const mappedWo = {
-      workorderNumber: generateWorkorderNumber(ean13),
+      workorderNumber: buildWorkorderNumberFromId(ean13),
       id: ean13,
       lightspeed_id: woID,
       customerID: resolvedCustomerID || "",

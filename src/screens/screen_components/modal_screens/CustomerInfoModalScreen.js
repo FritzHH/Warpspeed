@@ -19,6 +19,7 @@ import {
   lightenRGBByPercent,
   removeDashesFromPhone,
   resolveStatus,
+  usdTypeMask,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useState, useEffect, useRef } from "react";
@@ -75,6 +76,8 @@ export const CustomerInfoScreenModalComponent = ({
   const [sSalesLoading, _sSetSalesLoading] = useState(false);
   const [sShowDepositModal, _sSetShowDepositModal] = useState(false);
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
+  const [sDepositLoading, _sSetDepositLoading] = useState(false);
+  const [sEditingCredit, _sSetEditingCredit] = useState(null);
   const mountedRef = useRef(true);
 
   // Fetch fresh customer on mount (background refresh even if we have cached data)
@@ -601,21 +604,21 @@ export const CustomerInfoScreenModalComponent = ({
               </Text>
             ) : null}
             {/* Deposits section — directly below sales, pushes down until bottom */}
+            {sDepositLoading && <LoadingOverlay text="Loading transaction..." />}
             <DepositsList
               deposits={sCustomerInfo.deposits || []}
               credits={sCustomerInfo.credits || []}
-              onPress={async (deposit) => {
+              onDepositPress={async (deposit) => {
                 if (!deposit.id) return;
-                let sale = await dbGetCompletedSale(deposit.id);
-                if (sale) useOpenWorkordersStore.getState().setSaleModalObj(sale);
+                _sSetDepositLoading(true);
+                try {
+                  let sale = await dbGetCompletedSale(deposit.id);
+                  if (sale) useOpenWorkordersStore.getState().setSaleModalObj(sale);
+                } finally {
+                  if (mountedRef.current) _sSetDepositLoading(false);
+                }
               }}
-              onRemoveCredit={(credit) => {
-                let updatedCredits = (sCustomerInfo.credits || []).filter((c) => c.id !== credit.id);
-                let updated = { ...sCustomerInfo, credits: updatedCredits };
-                _setCustomerInfo(updated);
-                useCurrentCustomerStore.getState().setCustomer(updated);
-                dbSaveCustomer(updated);
-              }}
+              onCreditPress={(credit) => _sSetEditingCredit(credit)}
             />
           </View>
         )}
@@ -638,6 +641,38 @@ export const CustomerInfoScreenModalComponent = ({
             _setCustomerInfo(updated);
             useCurrentCustomerStore.getState().setCustomer(updated);
             dbSaveCustomer(updated);
+          }}
+        />
+        <CreditEditModal
+          credit={sEditingCredit}
+          onClose={() => _sSetEditingCredit(null)}
+          onSave={(credit, newAmountCents) => {
+            if (newAmountCents <= 0) {
+              // 0 or negative = delete
+              let updatedCredits = (sCustomerInfo.credits || []).filter((c) => c.id !== credit.id);
+              let updated = { ...sCustomerInfo, credits: updatedCredits };
+              _setCustomerInfo(updated);
+              useCurrentCustomerStore.getState().setCustomer(updated);
+              dbSaveCustomer(updated);
+              _sSetEditingCredit(null);
+            } else {
+              let updatedCredits = (sCustomerInfo.credits || []).map((c) =>
+                c.id === credit.id ? { ...c, amountCents: newAmountCents } : c
+              );
+              let updated = { ...sCustomerInfo, credits: updatedCredits };
+              _setCustomerInfo(updated);
+              useCurrentCustomerStore.getState().setCustomer(updated);
+              dbSaveCustomer(updated);
+              _sSetEditingCredit(null);
+            }
+          }}
+          onDelete={(credit) => {
+            let updatedCredits = (sCustomerInfo.credits || []).filter((c) => c.id !== credit.id);
+            let updated = { ...sCustomerInfo, credits: updatedCredits };
+            _setCustomerInfo(updated);
+            useCurrentCustomerStore.getState().setCustomer(updated);
+            dbSaveCustomer(updated);
+            _sSetEditingCredit(null);
           }}
         />
         <ClosedWorkorderModal
@@ -852,6 +887,132 @@ const WorkordersList = ({ workorders, onSelect }) => {
           );
         }}
       />
+    </View>
+  );
+};
+
+const CreditEditModal = ({ credit, onClose, onSave, onDelete }) => {
+  const [sDisplay, _sSetDisplay] = useState("");
+  const [sCents, _sSetCents] = useState(0);
+
+  useEffect(() => {
+    if (credit) {
+      let result = usdTypeMask((credit.amountCents / 100).toFixed(2));
+      _sSetDisplay(result.display);
+      _sSetCents(credit.amountCents);
+    }
+  }, [credit?.id]);
+
+  if (!credit) return null;
+
+  function handleChange(val) {
+    let result = usdTypeMask(val);
+    _sSetDisplay(result.display);
+    _sSetCents(result.cents);
+  }
+
+  function handleConfirm() {
+    let finalCents = sCents;
+    // 0 < val < 1 dollar (i.e. < 100 cents but > 0) -> auto-change to $1.00
+    if (finalCents > 0 && finalCents < 100) finalCents = 100;
+    onSave(credit, finalCents);
+  }
+
+  return (
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 100,
+        borderRadius: 15,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onClose}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      <View
+        style={{
+          width: 320,
+          backgroundColor: C.backgroundWhite,
+          borderRadius: 12,
+          borderWidth: 2,
+          borderColor: C.buttonLightGreenOutline,
+          padding: 20,
+        }}
+      >
+        <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 6 }}>
+          Edit Credit
+        </Text>
+        {!!(credit.text || credit.note) && (
+          <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 12 }}>
+            {credit.text || credit.note}
+          </Text>
+        )}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            borderColor: C.buttonLightGreenOutline,
+            borderWidth: 1,
+            borderRadius: 7,
+            backgroundColor: C.listItemWhite,
+            marginBottom: 16,
+            paddingHorizontal: 10,
+            height: 40,
+          }}
+        >
+          <Text style={{ fontSize: 16, color: gray(0.4), marginRight: 4 }}>$</Text>
+          <TextInput_
+            placeholder={formatCurrencyDisp(credit.amountCents)}
+            placeholderTextColor={gray(0.35)}
+            value={sDisplay}
+            onChangeText={handleChange}
+            debounceMs={0}
+            onFocus={() => { _sSetDisplay(""); _sSetCents(0); }}
+            style={{
+              flex: 1,
+              fontSize: 16,
+              outlineWidth: 0,
+              outlineStyle: "none",
+              borderWidth: 0,
+              height: 38,
+              color: C.text,
+            }}
+          />
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Button_
+            text="Delete Credit"
+            colorGradientArr={COLOR_GRADIENTS.red}
+            textStyle={{ color: C.textWhite, fontSize: 13 }}
+            buttonStyle={{ height: 34, borderRadius: 5, paddingHorizontal: 14 }}
+            onPress={() => onDelete(credit)}
+          />
+          <View style={{ flexDirection: "row" }}>
+            <Button_
+              text="Cancel"
+              buttonStyle={{ height: 34, borderRadius: 5, paddingHorizontal: 14, marginRight: 8 }}
+              textStyle={{ color: gray(0.5), fontSize: 13 }}
+              onPress={onClose}
+            />
+            <Button_
+              text="Save"
+              colorGradientArr={COLOR_GRADIENTS.green}
+              textStyle={{ color: C.textWhite, fontSize: 13 }}
+              buttonStyle={{ height: 34, borderRadius: 5, paddingHorizontal: 20 }}
+              onPress={handleConfirm}
+            />
+          </View>
+        </View>
+      </View>
     </View>
   );
 };

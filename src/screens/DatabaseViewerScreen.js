@@ -319,7 +319,7 @@ export function DatabaseViewerScreen() {
             let output = COLLECTIONS.map((col) => {
               return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
             }).join("\n\n");
-            navigator.clipboard.writeText(NOTIFY_HINT + "Examine the db contents. Ignore change logs. Cross-check for errors in math and field updates. summarize the action you saw take place. then cross-check with the previous object to find an errors from one db state to the next for the transaction. " + output);
+            navigator.clipboard.writeText(NOTIFY_HINT + "Examine the db contents. Cross-check for errors in math and field updates. You must cross-reference every field pre and post-operation, across every object. Summarize the action you saw take place and report any errors. for errors, provide a numbered list of each error accompanied with the best possible solution for us to discuss. " + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.purple, marginRight: 8 }}
         >
@@ -337,7 +337,7 @@ export function DatabaseViewerScreen() {
         <TouchableOpacity
           onPress={() => {
             let output = COLLECTIONS.map((col) => `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`).join("\n\n");
-            navigator.clipboard.writeText(NOTIFY_HINT + "This is the current state of the database. Ignore change logs. Use it as a starting point for the upcoming checkout screen and refund screen tests for comparisons. Analyze it and report any inconsistencies or relics from previous delete operations. Ignore the change logs as they may be inacurrate due to manual operations" + output);
+            navigator.clipboard.writeText(NOTIFY_HINT + "This is the current state of the database. Use it as a starting point for the upcoming tests of workorder changes, checkout screen and refund screen as well as any and other other changes to any object field. Analyze it and report any inconsistencies or relics from previous delete operations, and summarize what has transpired." + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
         >

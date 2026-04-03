@@ -38,7 +38,7 @@ import {
   firestoreBatchWrite,
   firestoreBatchDelete,
 } from "./db_calls";
-import { removeUnusedFields, generatePrefixedEAN13, createNewWorkorder } from "./utils";
+import { removeUnusedFields, generatePrefixedEAN13, createNewWorkorder, buildWorkorderNumberFromId } from "./utils";
 import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores, usePendingIdStore } from "./stores";
 import {
   onAuthStateChanged,
@@ -3299,7 +3299,7 @@ export async function dbManualArchiveAndCleanup() {
 // SEQUENTIAL ID GENERATION
 // ============================================================================
 
-const ID_PREFIXES = { workorders: "1", sales: "2", transactions: "3" };
+const ID_PREFIXES = { workorders: "1", sales: "4", transactions: "3" };
 
 /**
  * Generate a random prefixed ID immediately and fire the Cloud Function in the
@@ -3387,6 +3387,7 @@ function _resolvePendingId(node, placeholderID, realId) {
       st.removeWorkorder(placeholderID, false);
       let updated = { ...wo, id: realId };
       delete updated._pendingId;
+      updated.workorderNumber = buildWorkorderNumberFromId(realId, wo.startedOnMillis);
       st.setWorkorder(updated, false);
 
       if (st.openWorkorderID === placeholderID) {
@@ -3406,16 +3407,10 @@ function _resolvePendingId(node, placeholderID, realId) {
       // Keep the placeholder ID (timeout fallback)
       let updated = { ...wo };
       delete updated._pendingId;
+      updated.workorderNumber = buildWorkorderNumberFromId(wo.id, wo.startedOnMillis);
       st.setWorkorder(updated, false);
     }
   }
 }
 
-export async function dbReturnId(node, id) {
-  try {
-    await generateIdCallable({ node, action: "return", id });
-    log("dbReturnId: returned", { node, id });
-  } catch (error) {
-    log("dbReturnId: failed", { node, id, error: error?.message });
-  }
-}
+

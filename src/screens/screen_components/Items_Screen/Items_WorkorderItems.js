@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { View, Text, TextInput, FlatList, Image, TouchableOpacity, Animated } from "react-native-web";
+import { View, Text, FlatList, Image, TouchableOpacity, Animated } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
@@ -73,7 +73,10 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
   const isLocked = isDonePaid;
-  const hasActiveSale = !!zOpenWorkorder?.activeSaleID;
+  const activeSale = zOpenWorkorder?.activeSaleID
+    ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID)
+    : null;
+  const hasActiveSale = !!activeSale && (activeSale.amountCaptured || 0) > 0;
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -198,6 +201,34 @@ export const Items_WorkorderItemsTab = ({}) => {
     });
   }
 
+  function saveQtyMapToDb() {
+    let storeWo = useOpenWorkordersStore.getState().workorders.find(
+      (o) => o.id === zOpenWorkorder.id
+    );
+    if (!storeWo) return;
+
+    let updatedLines = storeWo.workorderLines.map((line) => {
+      let overrideQty = qtyMapRef.current[line.id];
+      if (overrideQty === undefined) return line;
+      let newLine = { ...line, qty: overrideQty };
+      if (newLine.discountObj?.name) {
+        let discounted = applyDiscountToWorkorderItem(newLine);
+        if (discounted.discountObj?.newPrice != null) return discounted;
+      }
+      return newLine;
+    });
+
+    useOpenWorkordersStore.getState().setField(
+      "workorderLines",
+      updatedLines,
+      zOpenWorkorder.id,
+      true
+    );
+
+    qtyMapRef.current = {};
+    _setQtyMap({});
+  }
+
   function modifyQtyPressed(workorderLine, option) {
     useLoginStore.getState().requireLogin(() => {
       let currentQty = qtyMapRef.current[workorderLine.id] !== undefined
@@ -218,33 +249,28 @@ export const Items_WorkorderItemsTab = ({}) => {
 
       // Debounce DB write
       clearTimeout(qtyTimerRef.current);
-      qtyTimerRef.current = setTimeout(() => {
-        let storeWo = useOpenWorkordersStore.getState().workorders.find(
-          (o) => o.id === zOpenWorkorder.id
-        );
-        if (!storeWo) return;
+      qtyTimerRef.current = setTimeout(() => saveQtyMapToDb(), 700);
+    });
+  }
 
-        let updatedLines = storeWo.workorderLines.map((line) => {
-          let overrideQty = qtyMapRef.current[line.id];
-          if (overrideQty === undefined) return line;
-          let newLine = { ...line, qty: overrideQty };
-          if (newLine.discountObj?.name) {
-            let discounted = applyDiscountToWorkorderItem(newLine);
-            if (discounted.discountObj?.newPrice != null) return discounted;
-          }
-          return newLine;
-        });
+  function handleQtyTextInput(workorderLine, newQty) {
+    useLoginStore.getState().requireLogin(() => {
+      qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: newQty };
+      _setQtyMap({ ...qtyMapRef.current });
 
-        useOpenWorkordersStore.getState().setField(
-          "workorderLines",
-          updatedLines,
-          zOpenWorkorder.id,
-          true
-        );
+      clearTimeout(qtyTimerRef.current);
+      qtyTimerRef.current = setTimeout(() => saveQtyMapToDb(), 1500);
+    });
+  }
 
-        qtyMapRef.current = {};
-        _setQtyMap({});
-      }, 700);
+  function handleQtyBlurSave(workorderLine, rawVal) {
+    useLoginStore.getState().requireLogin(() => {
+      let qty = Number(rawVal);
+      if (!qty || qty <= 0) qty = 1;
+      clearTimeout(qtyTimerRef.current);
+      qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: qty };
+      _setQtyMap({ ...qtyMapRef.current });
+      saveQtyMapToDb();
     });
   }
 
@@ -328,22 +354,43 @@ export const Items_WorkorderItemsTab = ({}) => {
         useOpenWorkordersStore.getState().setField("taxFree", false);
         useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", "");
       } else {
-        useAlertScreenStore.getState().setValues({
-          showAlert: true,
-          fullScreen: true,
-          title: "Tax-Free Confirmation",
-          message: "No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.",
-          btn1Text: "Confirm Tax-Free",
-          handleBtn1Press: () => {
-            useAlertScreenStore.getState().setValues({ showAlert: false });
-            useOpenWorkordersStore.getState().setField("taxFree", true);
-            useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", TAX_FREE_RECEIPT_NOTE);
-          },
-          btn2Text: "Cancel",
-          handleBtn2Press: () => {
-            useAlertScreenStore.getState().setValues({ showAlert: false });
-          },
+        const partLines = (zOpenWorkorder.workorderLines || []).filter(line => {
+          const inv = line.inventoryItem;
+          return !inv.customLabor && inv.category !== "Labor";
         });
+
+        if (partLines.length > 0) {
+          const itemList = partLines.map(line =>
+            "\u2022 " + line.inventoryItem.formalName + (line.qty > 1 ? " (x" + line.qty + ")" : "")
+          ).join("\n");
+          useAlertScreenStore.getState().setValues({
+            showAlert: true,
+            fullScreen: true,
+            title: "Cannot Mark Tax-Free",
+            message: "The following parts must be removed before this workorder can be marked tax-free:\n\n" + itemList,
+            btn1Text: "OK",
+            handleBtn1Press: () => {
+              useAlertScreenStore.getState().setValues({ showAlert: false });
+            },
+          });
+        } else {
+          useAlertScreenStore.getState().setValues({
+            showAlert: true,
+            fullScreen: true,
+            title: "Tax-Free Confirmation",
+            message: "No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.",
+            btn1Text: "Confirm Tax-Free",
+            handleBtn1Press: () => {
+              useAlertScreenStore.getState().setValues({ showAlert: false });
+              useOpenWorkordersStore.getState().setField("taxFree", true);
+              useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", TAX_FREE_RECEIPT_NOTE);
+            },
+            btn2Text: "Cancel",
+            handleBtn2Press: () => {
+              useAlertScreenStore.getState().setValues({ showAlert: false });
+            },
+          });
+        }
       }
     });
   }
@@ -503,6 +550,8 @@ export const Items_WorkorderItemsTab = ({}) => {
               workorderLine={item}
               __splitItems={splitItems}
               __modQtyPressed={modifyQtyPressed}
+              __handleQtyTextInput={handleQtyTextInput}
+              __handleQtyBlurSave={handleQtyBlurSave}
               localQty={sQtyMap[item.id]}
               index={idx}
               applyDiscount={applyDiscount}
@@ -711,6 +760,8 @@ export const LineItemComponent = ({
   zSettingsObj = SETTINGS_OBJ,
   __deleteWorkorderLine,
   __modQtyPressed,
+  __handleQtyTextInput,
+  __handleQtyBlurSave,
   __setWorkorderLineItem,
   __splitItems,
   localQty,
@@ -722,7 +773,13 @@ export const LineItemComponent = ({
 }) => {
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
   const effectiveQty = localQty !== undefined ? localQty : workorderLine.qty;
-  const [sTempQtyVal, _setTempQtyVal] = useState(null);
+  const [sQtyFocused, _setQtyFocused] = useState(false);
+  const [sQtyInputVal, _setQtyInputVal] = useState("");
+  const qtyBlurredRef = useRef(false);
+
+  const qtyDisplayStr = sQtyFocused ? sQtyInputVal : String(effectiveQty);
+  const qtyDigits = qtyDisplayStr.length || 1;
+  const qtyBoxWidth = qtyDigits <= 2 ? 31 : 31 + (qtyDigits - 2) * 10;
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
   const [sActiveNoteField, _sSetActiveNoteField] = useState(null);
 
@@ -952,12 +1009,14 @@ export const LineItemComponent = ({
               style={{
                 marginLeft: 7,
                 borderRadius: 15,
-                width: 31,
+                width: qtyBoxWidth,
                 height: 23,
               }}
             >
-              <TextInput
+              <TextInput_
                 editable={!isLocked}
+                debounceMs={0}
+                maxLength={4}
                 style={{
                   fontSize: 16,
                   fontWeight: 500,
@@ -965,18 +1024,25 @@ export const LineItemComponent = ({
                   color: C.textWhite,
                   outlineWidth: 0,
                   width: "100%",
+                  height: "100%",
                 }}
-                value={sTempQtyVal === "" ? sTempQtyVal : effectiveQty}
+                value={qtyDisplayStr}
+                onFocus={() => {
+                  qtyBlurredRef.current = false;
+                  _setQtyFocused(true);
+                  _setQtyInputVal("");
+                }}
+                onBlur={(e) => {
+                  qtyBlurredRef.current = true;
+                  let rawVal = (e?.target?.value || "").replace(/\D/g, "").slice(0, 4);
+                  _setQtyFocused(false);
+                  __handleQtyBlurSave(workorderLine, rawVal);
+                }}
                 onChangeText={(val) => {
-                  if (isNaN(val) || val < 0) return;
-                  if (val === "") {
-                    _setTempQtyVal("");
-                    val = 0;
-                  } else {
-                    _setTempQtyVal(null);
-                  }
-                  let line = { ...workorderLine, qty: Number(val) };
-                  __setWorkorderLineItem(line);
+                  if (qtyBlurredRef.current) return;
+                  val = val.replace(/\D/g, "").slice(0, 4);
+                  _setQtyInputVal(val);
+                  __handleQtyTextInput(workorderLine, Number(val) || 0);
                 }}
               />
             </GradientView>

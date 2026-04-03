@@ -14,7 +14,7 @@ import {
 import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_, Button_, TextInput_ } from "../../../components";
 import { C, Colors, Fonts, ICONS } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { sortBy } from "lodash";
 import {
   useCurrentCustomerStore,
@@ -32,6 +32,7 @@ import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
+const EMPTY_PENDING = [];
 
 function computeWaitInfo(workorder) {
   let label = calculateWaitEstimateLabel(workorder, useSettingsStore.getState().getSettings());
@@ -155,12 +156,21 @@ export function WorkordersComponent({}) {
   const zOpenWorkorderID = useOpenWorkordersStore((state) => state.openWorkorderID);
   const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
-  const zUsers = useSettingsStore((state) => state.settings?.users, deepEqual);
+  const zUsers = useSettingsStore((state) => state.settings?.users);
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
+  const zPendingWOIDs = (zUsers || []).find((u) => u.id === zCurrentUser?.id)?.pendingWorkorderIDs || EMPTY_PENDING;
 
   const [sSearchTerm, _setSearchTerm] = useState("");
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
   const [sSearching, _sSetSearching] = useState(false);
+  const [sStatusBlink, _setStatusBlink] = useState(false);
+
+  useEffect(() => {
+    if (zPendingWOIDs.length === 0) { _setStatusBlink(false); return; }
+    _setStatusBlink(true);
+    const interval = setInterval(() => { _setStatusBlink((prev) => !prev); }, 500);
+    return () => clearInterval(interval);
+  }, [zPendingWOIDs.length]);
 
   // Sale IDs shared by 2+ workorders (linked/combined sales)
   let linkedSaleIDs = new Set();
@@ -261,10 +271,6 @@ export function WorkordersComponent({}) {
           });
         }
         return;
-      } else if (prefix === "2") {
-        useCheckoutStore.getState().setStringOnly(digits);
-        _setSearchTerm("");
-        return;
       } else if (prefix === "3") {
         readTransaction(digits).then((txn) => {
           if (txn?.saleID) {
@@ -272,6 +278,10 @@ export function WorkordersComponent({}) {
           }
           _setSearchTerm("");
         });
+        return;
+      } else if (prefix === "4") {
+        useCheckoutStore.getState().setStringOnly(digits);
+        _setSearchTerm("");
         return;
       }
     }
@@ -631,6 +641,15 @@ export function WorkordersComponent({}) {
                 }}
                 onPress={() => {
                   workorderSelected(workorder);
+                  if (zPendingWOIDs.includes(workorder.id)) {
+                    const uid = useLoginStore.getState().getCurrentUser()?.id;
+                    const users = useSettingsStore.getState().getSettings()?.users || [];
+                    const updatedUsers = users.map((u) => {
+                      if (u.id !== uid) return u;
+                      return { ...u, pendingWorkorderIDs: (u.pendingWorkorderIDs || []).filter((id) => id !== workorder.id) };
+                    });
+                    useSettingsStore.getState().setField("users", updatedUsers);
+                  }
                 }}
               >
                 <View
@@ -643,7 +662,9 @@ export function WorkordersComponent({}) {
                     opacity: workorder.id === zPreviewID ? 0.6 : 1,
                     backgroundColor: workorder.id === zOpenWorkorderID
                       ? lightenRGBByPercent(C.lightred, 60)
-                      : C.listItemWhite,
+                      : (zPendingWOIDs.includes(workorder.id) && sStatusBlink)
+                        ? "rgba(255, 255, 0, 0.35)"
+                        : C.listItemWhite,
                     flexDirection: "column",
                     width: "100%",
                     paddingLeft: 5,
@@ -743,6 +764,9 @@ export function WorkordersComponent({}) {
                               {workorder.workorderLines.length}
                             </Text>
                           </View>
+                        )}
+                        {workorder.hasNewSMS && (
+                          <Image_ icon={ICONS.paperPlane} size={14} style={{ marginLeft: 6 }} />
                         )}
                       </View>
                     </View>

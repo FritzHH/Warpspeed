@@ -165,7 +165,7 @@ export const SaleTotals = memo(function SaleTotals({
       {/* Totals Box */}
       <View
         style={{
-          backgroundColor: C.listItemWhite,
+          backgroundColor: "#FFFCF2",
           borderRadius: 10,
           borderWidth: 1,
           borderColor: C.buttonLightGreenOutline,

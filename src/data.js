@@ -375,6 +375,7 @@ export const SALE_PROTO = {
   pendingRefundIDs: [],
   amountCaptured: 0,
   creditsApplied: [],
+  depositsApplied: [],
   subtotal: 0,
   discount: 0,
   salesTax: 0,
@@ -457,6 +458,7 @@ export const WORKORDER_PROTO = {
   media: [],
   customerPin: "",
   taxFreeReceiptNote: "",
+  salesTax: ""
 };
 
 export const TAX_FREE_RECEIPT_NOTE = "No items on this workorder were taxable under Florida law. All items are labor-only, and no shop parts or material left the shop with the customer."
@@ -517,7 +519,6 @@ export const CUSTOMER_PROTO = {
   millisCreated: "",
   deposits: [],
   credits: [],
-  payments: [],
   language: CUSTOMER_LANGUAGES.english
 };
 

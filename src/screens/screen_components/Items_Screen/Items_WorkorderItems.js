@@ -995,7 +995,7 @@ export const LineItemComponent = ({
               iconSize={23}
             />
             <Button_
-              enabled={!isLocked && !hasActiveSale}
+              enabled={!isLocked && !hasActiveSale && effectiveQty > 1}
               onPress={() => __modQtyPressed(workorderLine, "down", index)}
               buttonStyle={{
                 paddingHorizontal: 4,

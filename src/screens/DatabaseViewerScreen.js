@@ -22,6 +22,20 @@ const COLLECTIONS = [
 
 const NOTIFY_HINT = " ";
 
+const FRESH_WORKORDERS_DATA = {
+  activeSales: [],
+  completedSales: [],
+  completedWorkorders: [],
+  transactions: [],
+  openWorkorders: [
+    {"id":"1250000000008","hasNewSMS":false,"customerID":"b3cffc73-e0c0-4540-b1ad-1eb0578f88b5","customerContactRestriction":"email","partToBeOrdered":false,"customerLast":"Hieb","endedOnMillis":"","workorderLines":[{"warranty":false,"inventoryItem":{"cost":919,"salePrice":0,"customLabor":false,"primaryBarcode":"0727746323980","informalName":"","minutes":0,"category":"Part","brand":"","barcodes":[],"price":1878,"customPart":false,"id":"0727746323980","formalName":"TUBE SUNLT 26x2.75-3.00 SV32 FFW73mm"},"qty":1,"id":"ed6341b5-9dad-4dc6-a352-5065e0048f55","intakeNotes":"","useSalePrice":false,"receiptNotes":"","discountObj":""},{"inventoryItem":{"barcodes":[],"price":939,"customPart":false,"id":"0609149894831","formalName":"TUBE SUNLT 700x35-43 SV48mm FFW33mm","minutes":0,"category":"Part","brand":"","cost":289,"customLabor":false,"salePrice":0,"primaryBarcode":"0609149894831","informalName":""},"warranty":false,"intakeNotes":"","id":"83f308f3-ffe0-448b-90f6-68a34d461137","useSalePrice":false,"qty":1,"discountObj":"","receiptNotes":""},{"receiptNotes":"","discountObj":"","qty":2,"id":"d371a46d-5cbc-4167-802d-a83da807f07e","useSalePrice":false,"intakeNotes":"","warranty":false,"inventoryItem":{"minutes":0,"category":"Part","brand":"","barcodes":[],"customPart":false,"price":4000,"id":"0047853643756","formalName":"TIRE KEN KWICK TRAX 700x28 BK/BK/REF SRC/ICAP/60 WIRE 100psi","cost":2149,"salePrice":0,"customLabor":false,"primaryBarcode":"0047853643756","informalName":""}},{"receiptNotes":"","discountObj":{"name":"50% Off Item","type":"%","id":"1333k","newPrice":2500,"savings":2500,"value":"50"},"qty":2,"useSalePrice":false,"id":"efa92d35-1d94-4cd9-b0b6-8903f0313d52","intakeNotes":"","warranty":false,"inventoryItem":{"cost":1850,"customLabor":false,"salePrice":0,"informalName":"","primaryBarcode":"0072774596072","price":2500,"customPart":false,"barcodes":[],"id":"0072774596072","formalName":"TIRE SUNLT 26x2.25 BK/BK CRUISER K912 w/SUN LOGO WIRE","minutes":0,"brand":"","category":"Part"}},{"discountObj":"","receiptNotes":"","id":"5799981c-741b-45c5-8572-3c60706d5a8a","intakeNotes":"","useSalePrice":false,"qty":1,"inventoryItem":{"cost":1089,"customLabor":false,"salePrice":0,"primaryBarcode":"0072774600083","informalName":"","barcodes":[],"customPart":false,"price":3000,"id":"0072774600083","formalName":"TIRE SUNLT 700x38 BK/BK HYBRID K189 WIRE","minutes":0,"category":"Part","brand":""},"warranty":false},{"qty":1,"intakeNotes":"","id":"73ae3784-0fe0-4e72-899f-13578d9ab295","useSalePrice":false,"receiptNotes":"","discountObj":"","warranty":false,"inventoryItem":{"cost":249,"customLabor":false,"salePrice":0,"primaryBarcode":"0727740637890","informalName":"","barcodes":[],"customPart":false,"price":939,"id":"0727740637890","formalName":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","minutes":0,"category":"Part","brand":""}},{"inventoryItem":{"primaryBarcode":"0330312449090","informalName":"","customLabor":false,"salePrice":0,"cost":249,"formalName":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","id":"0330312449090","barcodes":[],"customPart":false,"price":939,"category":"Part","brand":"","minutes":0},"warranty":false,"intakeNotes":"","id":"f7dcc26e-e209-4ddd-a352-4921c8f9727d","useSalePrice":false,"qty":1,"discountObj":"","receiptNotes":""}],"brand":"","description":"","activeSaleID":"","customerLandline":"","saleID":"","customerFirst":"Fritz","taxFreeReceiptNote":"","customerNotes":[],"partOrderEstimateMillis":"","waitTimeEstimateLabel":"","workorderNumber":"W12500APR26","startedOnMillis":1775268823968,"customerEmail":"hieb.fritz@gmail.com","internalNotes":[],"status":"finished","partOrderedMillis":"","color2":{"textColor":"","backgroundColor":"","label":""},"waitTime":"","media":[],"customerLanguage":"English","customerPin":"908","paidOnMillis":"","taxFree":false,"customerCell":"2393369177","paymentComplete":false,"changeLog":["Started by: Fritz Hieb",{"field":"status","to":"Finished","timestamp":1775268828419,"from":"Newly Created","user":"System","action":"changed"},{"to":"TUBE SUNLT 26x2.75-3.00 SV32 FFW73mm","field":"workorderLines","timestamp":1775268833697,"user":"Fritz","action":"added"},{"to":"TUBE SUNLT 700x35-43 SV48mm FFW33mm","field":"workorderLines","timestamp":1775268836136,"user":"Fritz","action":"added"},{"timestamp":1775268841923,"field":"workorderLines","to":"TIRE KEN KWICK TRAX 700x28 BK/BK/REF SRC/ICAP/60 WIRE 100psi","action":"added","user":"Fritz"},{"user":"Fritz","action":"added","field":"workorderLines","to":"TIRE SUNLT 26x2.25 BK/BK CRUISER K912 w/SUN LOGO WIRE","timestamp":1775268845473},{"field":"workorderLines","to":"TIRE SUNLT 700x38 BK/BK HYBRID K189 WIRE","timestamp":1775268850058,"user":"Fritz","action":"added"},{"to":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","field":"workorderLines","timestamp":1775268856563,"user":"Fritz","action":"added"},{"user":"Fritz","action":"added","field":"workorderLines","to":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","timestamp":1775268861661},{"user":"Fritz","action":"changed","from":"1","detail":"qty","to":"2","field":"workorderLines","item":"TIRE SUNLT 26x2.25 BK/BK CRUISER K912 w/SUN LOGO WIRE","timestamp":1775269215353},{"user":"Fritz","action":"changed","from":"1","detail":"qty","to":"2","item":"TIRE KEN KWICK TRAX 700x28 BK/BK/REF SRC/ICAP/60 WIRE 100psi","field":"workorderLines","timestamp":1775269223605},{"user":"Fritz","action":"changed","to":"50% Off Item","item":"TIRE SUNLT 26x2.25 BK/BK CRUISER K912 w/SUN LOGO WIRE","field":"workorderLines","timestamp":1775269232910,"from":"none","detail":"discount"}],"archived":false,"partOrdered":"","startedBy":"Fritz Hieb","color1":{"textColor":"","label":"","backgroundColor":""},"partSource":""},
+    {"id":"1350000000005","archived":false,"partOrdered":"","partSource":"","color1":{"backgroundColor":"","label":"","textColor":""},"startedBy":"Fritz Hieb","partOrderedMillis":"","status":"newly_created","internalNotes":[],"media":[],"color2":{"textColor":"","label":"","backgroundColor":""},"waitTime":"","changeLog":["Started by: Fritz Hieb",{"action":"added","user":"Fritz","timestamp":1775269035868,"field":"workorderLines","to":"TUBE SUNLT 26x2.75-3.00 SV32 FFW73mm"},{"user":"Fritz","action":"added","field":"workorderLines","to":"TUBE SUNLT 700x35-43 SV48mm FFW33mm","timestamp":1775269039069},{"user":"Fritz","action":"added","field":"workorderLines","to":"TIRE KEN KWICK TRAX 700x28 BK/BK/REF SRC/ICAP/60 WIRE 100psi","timestamp":1775269042864},{"field":"workorderLines","to":"TIRE SUNLT 26x2.25 BK/BK CRUISER K912 w/SUN LOGO WIRE","timestamp":1775269046941,"user":"Fritz","action":"added"},{"to":"TIRE SUNLT 700x38 BK/BK HYBRID K189 WIRE","field":"workorderLines","timestamp":1775269052526,"user":"Fritz","action":"added"},{"user":"Fritz","action":"changed","to":"2","item":"TIRE SUNLT 26x2.25 BK/BK CRUISER K912 w/SUN LOGO WIRE","field":"workorderLines","timestamp":1775269057872,"from":"1","detail":"qty"},{"timestamp":1775269065284,"field":"workorderLines","to":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","action":"added","user":"Fritz"},{"to":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","field":"workorderLines","timestamp":1775269070444,"user":"Fritz","action":"added"},{"item":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","field":"workorderLines","to":"40% Off Item","timestamp":1775269077799,"from":"none","detail":"discount","user":"Fritz","action":"changed"},{"action":"changed","user":"Fritz","timestamp":1775269085133,"to":"2","field":"workorderLines","item":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","detail":"qty","from":"1"}],"paymentComplete":false,"customerCell":"2393369177","taxFree":false,"customerLanguage":"English","paidOnMillis":"","customerPin":"776","customerFirst":"Fritz","saleID":"","customerLandline":"","customerNotes":[],"taxFreeReceiptNote":"","workorderNumber":"W13500APR26","waitTimeEstimateLabel":"","partOrderEstimateMillis":"","startedOnMillis":1775269024302,"customerEmail":"hieb.fritz@gmail.com","customerContactRestriction":"email","customerID":"b3cffc73-e0c0-4540-b1ad-1eb0578f88b5","hasNewSMS":false,"workorderLines":[{"qty":1,"id":"954a31fe-aea2-467a-b61a-bba9d0784dcb","intakeNotes":"","useSalePrice":false,"receiptNotes":"","discountObj":"","warranty":false,"inventoryItem":{"primaryBarcode":"0727746323980","informalName":"","customLabor":false,"salePrice":0,"cost":919,"formalName":"TUBE SUNLT 26x2.75-3.00 SV32 FFW73mm","id":"0727746323980","barcodes":[],"customPart":false,"price":1878,"brand":"","category":"Part","minutes":0}},{"receiptNotes":"","discountObj":"","qty":1,"intakeNotes":"","useSalePrice":false,"id":"e8a519dd-8ec1-4ce8-806f-6316c0daec33","warranty":false,"inventoryItem":{"customLabor":false,"salePrice":0,"cost":289,"primaryBarcode":"0609149894831","informalName":"","minutes":0,"brand":"","category":"Part","id":"0609149894831","barcodes":[],"customPart":false,"price":939,"formalName":"TUBE SUNLT 700x35-43 SV48mm FFW33mm"}},{"warranty":false,"inventoryItem":{"barcodes":[],"price":4000,"customPart":false,"id":"0047853643756","formalName":"TIRE KEN KWICK TRAX 700x28 BK/BK/REF SRC/ICAP/60 WIRE 100psi","minutes":0,"category":"Part","brand":"","cost":2149,"salePrice":0,"customLabor":false,"primaryBarcode":"0047853643756","informalName":""},"qty":1,"useSalePrice":false,"id":"05bf69b7-119c-4941-87ba-8f6920395602","intakeNotes":"","receiptNotes":"","discountObj":""},{"warranty":false,"inventoryItem":{"brand":"","category":"Part","minutes":0,"formalName":"TIRE SUNLT 26x2.25 BK/BK CRUISER K912 w/SUN LOGO WIRE","barcodes":[],"price":2500,"customPart":false,"id":"0072774596072","primaryBarcode":"0072774596072","informalName":"","cost":1850,"salePrice":0,"customLabor":false},"receiptNotes":"","discountObj":"","qty":2,"useSalePrice":false,"intakeNotes":"","id":"fb20949c-4bc3-4e04-86bb-18ad1ec9042e"},{"qty":1,"id":"41fafa82-a78c-4363-b99f-a2d79e5a5f73","useSalePrice":false,"intakeNotes":"","receiptNotes":"","discountObj":"","warranty":false,"inventoryItem":{"cost":1089,"customLabor":false,"salePrice":0,"primaryBarcode":"0072774600083","informalName":"","minutes":0,"category":"Part","brand":"","barcodes":[],"customPart":false,"price":3000,"id":"0072774600083","formalName":"TIRE SUNLT 700x38 BK/BK HYBRID K189 WIRE"}},{"warranty":false,"inventoryItem":{"minutes":0,"brand":"","category":"Part","id":"0727740637890","customPart":false,"price":939,"barcodes":[],"formalName":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","salePrice":0,"customLabor":false,"cost":249,"informalName":"","primaryBarcode":"0727740637890"},"qty":2,"intakeNotes":"","id":"2530388d-2176-40f4-b0c2-6654edd13b37","useSalePrice":false,"receiptNotes":"","discountObj":{"value":"40","name":"40% Off Item","newPrice":1127,"type":"%","id":"3943933","savings":751}},{"inventoryItem":{"minutes":0,"category":"Part","brand":"","id":"0330312449090","barcodes":[],"customPart":false,"price":939,"formalName":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","salePrice":0,"customLabor":false,"cost":249,"primaryBarcode":"0330312449090","informalName":""},"warranty":false,"discountObj":"","receiptNotes":"","intakeNotes":"","useSalePrice":false,"id":"d9c0bd0a-5d2f-4de4-9c38-9c8024514c47","qty":1}],"endedOnMillis":"","partToBeOrdered":false,"customerLast":"Hieb","description":"","brand":"","activeSaleID":""},
+  ],
+  customers: [
+    {"id":"b3cffc73-e0c0-4540-b1ad-1eb0578f88b5","deposits":[],"unit":"#101","first":"Fritz","sales":[],"payments":[],"state":"FL","contactRestriction":"email","customerCell":"2393369177","last":"Hieb","gatedCommunity":true,"millisCreated":1774882480742,"interactionRating":"","language":"English","addressNotes":"","workorders":["1250000000008","1350000000005"],"previousBikes":[],"customerLandline":"","credits":[{"text":"test credit","amountCents":1500,"reservedCents":0,"id":"3587818371920","millis":1775178911702}],"city":"Bonita Springs","notes":"Bonita Bay","streetAddress":"13660 Bonita Beach Rd SE","email":"hieb.fritz@gmail.com","zip":"34135"},
+  ],
+};
+
 export function DatabaseViewerScreen() {
   const settings = useSettingsStore((state) => state.settings);
   const tenantID = settings?.tenantID || "";
@@ -50,6 +64,39 @@ export function DatabaseViewerScreen() {
       unsubscribes.forEach((unsub) => { if (unsub) unsub(); });
     };
   }, [tenantID, storeID]);
+
+  async function handleFreshWorkorders() {
+    _setReopenStatus("Resetting to fresh...");
+    let basePath = `tenants/${tenantID}/stores/${storeID}`;
+    try {
+      // 1. Clear all 6 collections
+      for (let col of COLLECTIONS) {
+        let docs = sData[col.key];
+        for (let d of docs) {
+          await firestoreDelete(`${basePath}/${col.node}/${d.id}`);
+        }
+      }
+      // 2. Write fresh data
+      let freshMap = {
+        activeSales: FRESH_WORKORDERS_DATA.activeSales,
+        completedSales: FRESH_WORKORDERS_DATA.completedSales,
+        openWorkorders: FRESH_WORKORDERS_DATA.openWorkorders,
+        completedWorkorders: FRESH_WORKORDERS_DATA.completedWorkorders,
+        customers: FRESH_WORKORDERS_DATA.customers,
+        transactions: FRESH_WORKORDERS_DATA.transactions,
+      };
+      for (let col of COLLECTIONS) {
+        let docs = freshMap[col.key] || [];
+        for (let doc of docs) {
+          await firestoreWrite(`${basePath}/${col.node}/${doc.id}`, doc);
+        }
+      }
+      let total = Object.values(freshMap).reduce((sum, arr) => sum + arr.length, 0);
+      _setReopenStatus(`Fresh - ${total} doc(s) written`);
+    } catch (err) {
+      _setReopenStatus("Error: " + (err.message || err));
+    }
+  }
 
   async function handleClearAll() {
     await Promise.all(COLLECTIONS.flatMap((col) => {
@@ -83,7 +130,7 @@ export function DatabaseViewerScreen() {
   }
 
   async function restoreCreditsAndCleanCustomer(linkedSale, basePath) {
-    let creditsApplied = linkedSale.creditsApplied || [];
+    let creditsApplied = [...(linkedSale.creditsApplied || []), ...(linkedSale.depositsApplied || [])];
     let customerID = linkedSale.customerID || "";
     if (!customerID) return;
     let customerPath = `${basePath}/${DB_NODES.FIRESTORE.CUSTOMERS}/${customerID}`;
@@ -328,6 +375,12 @@ export function DatabaseViewerScreen() {
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(103, 124, 231)", marginRight: 8 }}
         >
           <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Clean Logs</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleFreshWorkorders}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(34, 139, 34)", marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Fresh workorders</Text>
         </TouchableOpacity>
         {!!sReopenStatus && (
           <Text style={{ fontSize: 12, color: sReopenStatus.startsWith("Error") ? C.red : C.green, fontWeight: "600", marginRight: 8 }}>

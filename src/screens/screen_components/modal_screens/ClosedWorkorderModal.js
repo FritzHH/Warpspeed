@@ -59,7 +59,7 @@ const SectionHeader = ({ text }) => (
 
 const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
   const payments = transactions;
-  const credits = sale.creditsApplied || [];
+  const credits = [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])];
   const allRefunds = transactions.flatMap((t) => (t.refunds || []).map((r) => ({ ...r, _parentMethod: t.method })));
   const totalRefunded = allRefunds.reduce((s, r) => s + (r.amount || 0), 0);
   const hasRefunds = totalRefunded > 0;
@@ -348,7 +348,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
     const _settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     const transactions = sTransactionsMap[sale.id] || [];
-    let toPrint = printBuilder.sale(sale, transactions, _getCustomerFromWorkorder(), workorder, _settings?.salesTaxPercent, _ctx, sale.creditsApplied || []);
+    let toPrint = printBuilder.sale(sale, transactions, _getCustomerFromWorkorder(), workorder, _settings?.salesTaxPercent, _ctx, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
     dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
   }
 

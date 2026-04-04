@@ -27,6 +27,7 @@ import {
   splitWorkorderLinesToSingleQty,
   sendRefundReceipt,
   recomputeSaleAmounts,
+  getAllAppliedCredits,
 } from "./newCheckoutUtils";
 import {
   readCompletedSale,
@@ -168,7 +169,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
       // Reconcile pending refunds (crash recovery)
       if (saleCopy.pendingRefundIDs?.length > 0) {
-        recomputeSaleAmounts(saleCopy, txnsCopy, saleCopy.creditsApplied || []);
+        recomputeSaleAmounts(saleCopy, txnsCopy, getAllAppliedCredits(saleCopy));
         saleCopy.pendingRefundIDs = [];
         if (!saleCopy.paymentComplete) {
           writeActiveSale(saleCopy);
@@ -217,7 +218,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
       // Reconcile pending refunds (crash recovery)
       if (sale.pendingRefundIDs?.length > 0) {
-        recomputeSaleAmounts(sale, txns, sale.creditsApplied || []);
+        recomputeSaleAmounts(sale, txns, getAllAppliedCredits(sale));
         sale.pendingRefundIDs = [];
         await writeCompletedSale(sale);
       }
@@ -364,7 +365,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
 
     // Recompute sale amounts from updated transactions
-    recomputeSaleAmounts(sale, updatedTxns, sale.creditsApplied || []);
+    recomputeSaleAmounts(sale, updatedTxns, getAllAppliedCredits(sale));
 
     // Clear pending refund marker (refund completed successfully on client)
     sale.pendingRefundIDs = [];

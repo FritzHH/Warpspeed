@@ -517,9 +517,9 @@ export function stringifyAllObjectFields(obj) {
 // numbers /////////////////////////////////////////////////////////
 export function formatWorkorderNumber(woNum) {
   if (!woNum || typeof woNum !== "string") return woNum || "";
-  // New format: W12000APR26 -> W-12000APR26
-  if (woNum.startsWith("W") && !woNum.startsWith("WO")) {
-    return "W-" + woNum.slice(1);
+  // New format: W12345APR26 -> W-12345-APR26
+  if (woNum.startsWith("W") && !woNum.startsWith("WO") && woNum.length >= 10) {
+    return "W-" + woNum.slice(1, 6) + "-" + woNum.slice(6);
   }
   // Legacy format: WO1234JAN26 -> WO-1234-JAN26
   if (woNum.startsWith("WO") && woNum.length >= 7) {

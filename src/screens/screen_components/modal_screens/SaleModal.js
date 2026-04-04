@@ -50,7 +50,7 @@ export const SaleModal = ({ sale: saleProp, onClose: onCloseProp } = {}) => {
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
 
   const payments = sale?._transactions || [];
-  const credits = sale?.creditsApplied || [];
+  const credits = [...(sale?.creditsApplied || []), ...(sale?.depositsApplied || [])];
   const linkedWOs = sale?._workorders || [];
   const allRefunds = payments.flatMap((t) => (t.refunds || []).map((r) => ({ ...r, _parentMethod: t.method })));
   const totalRefunded = allRefunds.reduce((s, r) => s + (r.amount || 0), 0);
@@ -86,7 +86,7 @@ export const SaleModal = ({ sale: saleProp, onClose: onCloseProp } = {}) => {
     let _settings = useSettingsStore.getState().getSettings();
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let transactions = sale._transactions || [];
-    let toPrint = printBuilder.sale(sale, transactions, null, null, _settings?.salesTaxPercent, _ctx, sale.creditsApplied || []);
+    let toPrint = printBuilder.sale(sale, transactions, null, null, _settings?.salesTaxPercent, _ctx, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
     dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
   }
 

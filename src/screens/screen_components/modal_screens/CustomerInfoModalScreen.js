@@ -17,6 +17,7 @@ import {
   generateEAN13Barcode,
   gray,
   lightenRGBByPercent,
+  formatWorkorderNumber,
   removeDashesFromPhone,
   resolveStatus,
   usdTypeMask,
@@ -665,6 +666,32 @@ export const CustomerInfoScreenModalComponent = ({
             dbSaveCustomer(updated);
           }}
         />
+        <ClosedWorkorderModal
+          workorder={sClosedWorkorder}
+          onClose={() => _sSetClosedWorkorder(null)}
+          onGoToWorkorder={(wo) => {
+            const store = useOpenWorkordersStore.getState();
+            const lockedID = store.lockedWorkorderID;
+            if (lockedID && lockedID !== wo.id) {
+              store.setLockedWorkorderID(null);
+              store.removeWorkorder(lockedID, false);
+            }
+            store.setOpenWorkorderID(wo.id);
+            useTabNamesStore.getState().setItems({
+              infoTabName: TAB_NAMES.infoTab.workorder,
+              itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+              optionsTabName: TAB_NAMES.optionsTab.inventory,
+            });
+            useWorkorderPreviewStore.getState().setPreviewObj(null);
+            if (wo.customerID) {
+              dbGetCustomer(wo.customerID).then((customer) => {
+                if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
+              });
+            }
+            _sSetClosedWorkorder(null);
+            if (handleButton2Press) handleButton2Press();
+          }}
+        />
         <CreditEditModal
           credit={sEditingCredit}
           onClose={() => _sSetEditingCredit(null)}
@@ -695,32 +722,6 @@ export const CustomerInfoScreenModalComponent = ({
             useCurrentCustomerStore.getState().setCustomer(updated);
             dbSaveCustomer(updated);
             _sSetEditingCredit(null);
-          }}
-        />
-        <ClosedWorkorderModal
-          workorder={sClosedWorkorder}
-          onClose={() => _sSetClosedWorkorder(null)}
-          onGoToWorkorder={(wo) => {
-            const store = useOpenWorkordersStore.getState();
-            const lockedID = store.lockedWorkorderID;
-            if (lockedID && lockedID !== wo.id) {
-              store.setLockedWorkorderID(null);
-              store.removeWorkorder(lockedID, false);
-            }
-            store.setOpenWorkorderID(wo.id);
-            useTabNamesStore.getState().setItems({
-              infoTabName: TAB_NAMES.infoTab.workorder,
-              itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-              optionsTabName: TAB_NAMES.optionsTab.inventory,
-            });
-            useWorkorderPreviewStore.getState().setPreviewObj(null);
-            if (wo.customerID) {
-              dbGetCustomer(wo.customerID).then((customer) => {
-                if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
-              });
-            }
-            _sSetClosedWorkorder(null);
-            if (handleButton2Press) handleButton2Press();
           }}
         />
       </View>
@@ -807,7 +808,7 @@ const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect
           )}
           {!!workorder.workorderNumber && (
             <Text style={{ fontSize: 12, color: C.blue, marginLeft: 6, fontWeight: "500" }}>
-              {"#" + workorder.workorderNumber}
+              {"#" + formatWorkorderNumber(workorder.workorderNumber)}
             </Text>
           )}
         </View>
@@ -1002,14 +1003,21 @@ const CreditEditModal = ({ credit, onClose, onSave, onDelete }) => {
 
   function handleChange(val) {
     let result = usdTypeMask(val);
-    _sSetDisplay(result.display);
-    _sSetCents(result.cents);
+    if (result.cents > credit.amountCents) {
+      let capped = usdTypeMask((credit.amountCents / 100).toFixed(2));
+      _sSetDisplay(capped.display);
+      _sSetCents(credit.amountCents);
+    } else {
+      _sSetDisplay(result.display);
+      _sSetCents(result.cents);
+    }
   }
 
   function handleConfirm() {
     let finalCents = sCents;
     // 0 < val < 1 dollar (i.e. < 100 cents but > 0) -> auto-change to $1.00
     if (finalCents > 0 && finalCents < 100) finalCents = 100;
+    if (finalCents > credit.amountCents) finalCents = credit.amountCents;
     onSave(credit, finalCents);
   }
 

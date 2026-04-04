@@ -6928,7 +6928,7 @@ async function completeSaleServerSide({
     if (txnSnap.exists) allTransactions.push(txnSnap.data());
   }
 
-  recomputeSaleAmountsServer(sale, allTransactions, sale.creditsApplied || []);
+  recomputeSaleAmountsServer(sale, allTransactions, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
 
   // Check if fully paid
   if (!sale.paymentComplete) {
@@ -7055,7 +7055,7 @@ async function completeSaleServerSide({
         customerLandline: customer?.customerLandline || "",
         email: customer?.email || primaryWO?.customerEmail || "",
       };
-      const printObj = sharedPrintBuilder.sale(sale, allTransactions, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext, sale.creditsApplied);
+      const printObj = sharedPrintBuilder.sale(sale, allTransactions, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
       printObj.id = crypto.randomUUID();
       printObj.timestamp = Date.now();
 

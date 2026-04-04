@@ -21,6 +21,7 @@ export const CashPayment = memo(function CashPayment({
   lockAmount = false,
   transactionId = null,
   onTransactionIdUsed,
+  cardIsProcessing = false,
 }) {
   const [sPayAmount, _setPayAmount] = useState("");
   const [sPayAmountDisp, _setPayAmountDisp] = useState("");
@@ -163,7 +164,7 @@ export const CashPayment = memo(function CashPayment({
 
   return (
     <View
-      pointerEvents={saleComplete || amountLeftToPay <= 0 ? "none" : "auto"}
+      pointerEvents={saleComplete || amountLeftToPay <= 0 || cardIsProcessing ? "none" : "auto"}
       style={{
         alignItems: "center",
         paddingTop: 20,
@@ -173,7 +174,7 @@ export const CashPayment = memo(function CashPayment({
         ...SHADOW_RADIUS_PROTO,
         justifyContent: "space-between",
         paddingBottom: 20,
-        opacity: saleComplete || amountLeftToPay <= 0 ? 0.2 : 1,
+        opacity: saleComplete || amountLeftToPay <= 0 ? 0.2 : cardIsProcessing ? 0.4 : 1,
       }}
     >
       {/* Check checkbox */}

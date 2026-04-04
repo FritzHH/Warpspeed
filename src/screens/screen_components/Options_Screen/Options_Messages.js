@@ -51,6 +51,7 @@ import {
   useLoginStore,
   useSettingsStore,
   useAlertScreenStore,
+  useActiveSalesStore,
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
@@ -387,20 +388,17 @@ export function MessagesComponent({}) {
       });
       return;
     }
-    if (zWorkorderObj.activeSaleID) {
-      useAlertScreenStore.getState().setValues({
-        title: "Payment In Progress",
-        message: "This workorder already has an active payment in progress.",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
-      });
-      return;
-    }
     useLoginStore.getState().requireLogin(async () => {
-      let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent, [], false, !!zWorkorderObj.taxFree);
-      let amountDue = totals.finalTotal - (zWorkorderObj.amountPaid || 0);
+      let amountDue = 0;
+      let activeSale = zWorkorderObj.activeSaleID
+        ? useActiveSalesStore.getState().getActiveSale(zWorkorderObj.activeSaleID)
+        : null;
+      if (activeSale) {
+        amountDue = (activeSale.total || 0) - (activeSale.amountCaptured || 0);
+      } else {
+        let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent, [], false, !!zWorkorderObj.taxFree);
+        amountDue = totals.finalTotal;
+      }
       let displayAmount = "$" + (amountDue / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       useAlertScreenStore.getState().setValues({
         title: "Send SMS Payment",

@@ -131,7 +131,7 @@ export const FullSaleModal = ({ item, onClose }) => {
 
   // Derived
   const payments = sTransactions;
-  const credits = sSale?.creditsApplied || [];
+  const credits = [...(sSale?.creditsApplied || []), ...(sSale?.depositsApplied || [])];
   const allRefunds = sTransactions.flatMap((t) => (t.refunds || []).map((r) => ({ ...r, _parentMethod: t.method, _parentLast4: t.last4 })));
   const totalRefunded = allRefunds.reduce((s, r) => s + (r.amount || 0), 0);
   const hasRefunds = totalRefunded > 0;

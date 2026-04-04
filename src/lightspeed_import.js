@@ -773,6 +773,7 @@ export function mapSales(
       pendingTransactionIDs: [],
       pendingRefundIDs: [],
       creditsApplied: [],
+      depositsApplied: [],
       customerID: resolvedCustID,
       refunds: [],
       textToPay: false,

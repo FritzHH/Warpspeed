@@ -130,15 +130,21 @@ export function updateSaleWithTotals(sale, combinedWorkorders, settings) {
   return updated;
 }
 
+// ─── Credit/Deposit Helpers ─────────────────────────────────
+
+export function getAllAppliedCredits(sale) {
+  return [...(sale?.creditsApplied || []), ...(sale?.depositsApplied || [])];
+}
+
 // ─── Recompute Sale Amounts ──────────────────────────────────
 // Call after any mutation to transactions or credits.
 // Derives amountCaptured (true net) and paymentComplete from transactions.
 // transactions = array of real payment objects (cash/card)
-// credits = array of credit application objects (creditsApplied)
+// credits = array of credit application objects (creditsApplied + depositsApplied)
 
 export function recomputeSaleAmounts(sale, transactions, credits) {
   let txns = transactions || [];
-  let creds = credits || sale.creditsApplied || [];
+  let creds = credits || getAllAppliedCredits(sale);
   let txnTotal = txns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
   let creditTotal = creds.reduce((sum, c) => sum + (c.amount || 0), 0);
   let totalRefunded = txns.reduce((sum, t) =>
@@ -217,7 +223,8 @@ export function calculateRefundLimits(originalSale, settings, transactions) {
   );
 
   let totalCaptured = txns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
-  let maxRefund = totalCaptured - totalPreviouslyRefunded;
+  let depositTotal = (originalSale?.depositsApplied || []).reduce((sum, d) => sum + (d.amount || 0), 0);
+  let maxRefund = totalCaptured + depositTotal - totalPreviouslyRefunded;
   if (maxRefund < 0) maxRefund = 0;
 
   // If cardFeeRefund is false, subtract the card fee from the max refund

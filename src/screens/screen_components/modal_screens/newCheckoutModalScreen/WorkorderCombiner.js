@@ -21,7 +21,6 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
   onToggle,
   onLineChange,
   primaryWorkorderID,
-  saleHasPayments = false,
   salesTaxPercent = 0,
   saleTotal = 0,
   amountCaptured = 0,
@@ -69,18 +68,19 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
   let allWOs = [...combinedWorkorders, ...uncombinedWOs];
 
   let hasUncombined = uncombinedWOs.length > 0;
+  let hasCombinedNonPrimary = combinedWorkorders.length > 1;
 
   return (
     <View>
-      {saleHasPayments && hasUncombined && (
+      {amountCaptured > 0 && hasCombinedNonPrimary && (
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
-            backgroundColor: lightenRGBByPercent(C.orange, 85),
+            backgroundColor: "rgb(255, 245, 157)",
             borderRadius: 6,
             borderWidth: 1,
-            borderColor: lightenRGBByPercent(C.orange, 50),
+            borderColor: "rgb(255, 224, 50)",
             paddingVertical: 6,
             paddingHorizontal: 10,
             marginBottom: 8,
@@ -88,7 +88,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
         >
           <Image_ source={ICONS.info} style={{ width: 18, height: 18, marginRight: 8 }} />
           <Text style={{ color: C.text, fontSize: 13, flex: 1 }}>
-            {"Remove all payments and credits to combine workorders"}
+            {"Remove all payments and credits to uncombine workorders"}
           </Text>
         </View>
       )}
@@ -124,7 +124,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                 </Text>
                 {!isPrimary && (
                   <CheckBox_
-                    enabled={!saleHasPayments}
+                    enabled={isCombined ? !(amountCaptured > 0) : true}
                     buttonStyle={{
                       marginTop: 0,
                       marginBottom: 0,

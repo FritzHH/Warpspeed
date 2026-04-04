@@ -228,7 +228,7 @@ export function generateSaleReceiptPDF(data, labels) {
 
   // Workorder #
   if (data.workorderNumber) {
-    doc.text(L.woNumber + ": " + data.workorderNumber, leftX, y);
+    doc.text(L.woNumber + ": " + formatWorkorderNumber(data.workorderNumber), leftX, y);
     y += 11;
   }
 

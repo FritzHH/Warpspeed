@@ -345,7 +345,7 @@ const WorkorderSelector = ({ workorders, statuses, selectedID, onSelect }) => {
 
   let selected = workorders.find((o) => o.id === selectedID);
   let label = selected
-    ? `#${selected.workorderNumber || "?"} — ${
+    ? `#${formatWorkorderNumber(selected.workorderNumber) || "?"} — ${
         selected.customerFirst || selected.brand || "(no name)"
       } ${selected.customerLast || ""}`.trim()
     : "Select Workorder...";

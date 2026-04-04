@@ -42,6 +42,7 @@ import {
   calculateSaleTotals,
   sendSaleReceipt,
   recomputeSaleAmounts,
+  getAllAppliedCredits,
 } from "./newCheckoutUtils";
 import { translateSalesReceipt } from "../../../../shared/receiptTranslator";
 import { generateSaleReceiptPDF } from "../../../../pdfGenerator";
@@ -353,7 +354,7 @@ export function NewCheckoutModalScreen() {
         if (existingSale.transactionIDs?.length > 0) {
           loadedTxns = (await readTransactions(existingSale.transactionIDs)).filter(Boolean);
         }
-        let loadedCredits = existingSale.creditsApplied || [];
+        let loadedCredits = getAllAppliedCredits(existingSale);
 
         // Reconcile pending transactions (crash recovery)
         if (existingSale.pendingTransactionIDs?.length > 0) {
@@ -496,7 +497,7 @@ export function NewCheckoutModalScreen() {
     if (sale.transactionIDs?.length > 0) {
       loadedTxns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
     }
-    let loadedCredits = sale.creditsApplied || [];
+    let loadedCredits = getAllAppliedCredits(sale);
     _setTransactions(loadedTxns);
     _setCredits(loadedCredits);
 
@@ -530,11 +531,13 @@ export function NewCheckoutModalScreen() {
   // Shared: build a thin sale object and write all transaction docs
   function prepareSaleForPersist(sale, txns, creds) {
     let saleToPersist = { ...sale };
-    saleToPersist.creditsApplied = (creds || sCredits).map((c) => {
-      let entry = { creditId: c.creditId, amount: c.amount, type: c.type };
-      if (c.type !== "credit") entry.transactionId = c.transactionId || "";
-      return entry;
-    });
+    let allCreds = creds || sCredits;
+    saleToPersist.creditsApplied = allCreds
+      .filter((c) => c.type === "credit")
+      .map((c) => ({ creditId: c.creditId, amount: c.amount, type: c.type }));
+    saleToPersist.depositsApplied = allCreds
+      .filter((c) => c.type !== "credit")
+      .map((c) => ({ creditId: c.creditId, amount: c.amount, type: c.type, transactionId: c.transactionId || "" }));
     let existingIDs = saleToPersist.transactionIDs || [];
     let currentIDs = (txns || sTransactions).map((t) => t.id);
     saleToPersist.transactionIDs = [...new Set([...existingIDs, ...currentIDs])];
@@ -572,9 +575,10 @@ export function NewCheckoutModalScreen() {
     if (wo.id === zOpenWorkorder?.id) return;
 
     let newArr;
+    let carriedCredits = [];
     if (sCombinedWorkorders.find((o) => o.id === wo.id)) {
-      // Block unlink if payments exist (transactionIDs is not empty)
-      if (sSale?.transactionIDs?.length > 0) return;
+      // Block unlink if payments exist
+      if ((sSale?.amountCaptured || 0) > 0) return;
       // Removing WO from combined sale — clean up its sale references
       newArr = sCombinedWorkorders.filter((o) => o.id !== wo.id);
       let cleaned = cloneDeep(wo);
@@ -596,7 +600,11 @@ export function NewCheckoutModalScreen() {
           });
           return;
         }
-        if (orphanedSale) await deleteActiveSale(orphanedSale.id);
+        if (orphanedSale) {
+          // Carry over any applied credits/deposits before deleting
+          carriedCredits = getAllAppliedCredits(orphanedSale);
+          await deleteActiveSale(orphanedSale.id);
+        }
       }
       let linked = cloneDeep(wo);
       if (sSale?.id) {
@@ -609,11 +617,16 @@ export function NewCheckoutModalScreen() {
     }
     _setCombinedWorkorders(newArr);
 
-    // Recalculate totals
+    // Merge carried-over credits into local state
+    let mergedCredits = carriedCredits.length > 0 ? [...sCredits, ...carriedCredits] : sCredits;
+    if (carriedCredits.length > 0) _setCredits(mergedCredits);
+
+    // Recalculate totals and recompute amounts with carried credits
     let updated = updateSaleWithTotals(sSale, newArr, zSettings);
     updated.workorderIDs = newArr.map((o) => o.id);
+    recomputeSaleAmounts(updated, sTransactions, mergedCredits);
     _setSale(updated);
-    if (salePersistedRef.current) persistSale(updated);
+    if (salePersistedRef.current) persistSale(updated, sTransactions, mergedCredits);
     broadcastSaleToDisplay(updated, newArr, custFirst, custLast, custLanguage);
   }
 
@@ -1565,20 +1578,19 @@ export function NewCheckoutModalScreen() {
                 justifyContent: "space-between",
               }}
             >
-              <View style={{ opacity: cardIsProcessing ? 0.4 : 1 }} pointerEvents={cardIsProcessing ? "none" : "auto"}>
-                <CashPayment
-                  amountLeftToPay={cashAmountLeftToPay}
-                  onPaymentCapture={handlePaymentCapture}
-                  acceptChecks={zSettings?.acceptChecks}
-                  saleComplete={saleComplete}
-                  onCashChange={handleCashChange}
-                  hasReaders={onlineReaders.length > 0}
-                  isVisible={zIsCheckingOut}
-                  lockAmount={isDepositMode}
-                  transactionId={prefetchedTxnIdRef.current}
-                  onTransactionIdUsed={handleTransactionIdUsed}
-                />
-              </View>
+              <CashPayment
+                amountLeftToPay={cashAmountLeftToPay}
+                onPaymentCapture={handlePaymentCapture}
+                acceptChecks={zSettings?.acceptChecks}
+                saleComplete={saleComplete}
+                onCashChange={handleCashChange}
+                hasReaders={onlineReaders.length > 0}
+                isVisible={zIsCheckingOut}
+                lockAmount={isDepositMode}
+                transactionId={prefetchedTxnIdRef.current}
+                onTransactionIdUsed={handleTransactionIdUsed}
+                cardIsProcessing={cardIsProcessing}
+              />
               {sCardMode === "manual" ? (
                 <CardPayment
                   amountLeftToPay={amountLeftToPay}
@@ -2100,7 +2112,6 @@ export function NewCheckoutModalScreen() {
                     onToggle={handleToggleWorkorder}
                     onLineChange={handleWorkorderLineChange}
                     primaryWorkorderID={zOpenWorkorder?.id}
-                          saleHasPayments={hasRealPayments}
                     salesTaxPercent={zSettings?.salesTaxPercent || 0}
                           saleTotal={sSale?.total || 0}
                           amountCaptured={sSale?.amountCaptured || 0}

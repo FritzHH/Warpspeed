@@ -189,6 +189,37 @@ export function DatabaseViewerScreen() {
     }
   }
 
+  async function handleStartHere() {
+    _setReopenStatus("Resetting to Start Here...");
+    let basePath = `tenants/${tenantID}/stores/${storeID}`;
+    try {
+      for (let col of COLLECTIONS) {
+        let docs = sData[col.key];
+        for (let d of docs) {
+          await firestoreDelete(`${basePath}/${col.node}/${d.id}`);
+        }
+      }
+      let freshMap = {
+        activeSales: START_HERE_DATA.activeSales,
+        completedSales: START_HERE_DATA.completedSales,
+        openWorkorders: START_HERE_DATA.openWorkorders,
+        completedWorkorders: START_HERE_DATA.completedWorkorders,
+        customers: START_HERE_DATA.customers,
+        transactions: START_HERE_DATA.transactions,
+      };
+      for (let col of COLLECTIONS) {
+        let docs = freshMap[col.key] || [];
+        for (let doc of docs) {
+          await firestoreWrite(`${basePath}/${col.node}/${doc.id}`, doc);
+        }
+      }
+      let total = Object.values(freshMap).reduce((sum, arr) => sum + arr.length, 0);
+      _setReopenStatus(`Start Here - ${total} doc(s) written`);
+    } catch (err) {
+      _setReopenStatus("Error: " + (err.message || err));
+    }
+  }
+
   async function handleClearAll() {
     await Promise.all(COLLECTIONS.flatMap((col) => {
       let basePath = `tenants/${tenantID}/stores/${storeID}/${col.node}`;
@@ -478,6 +509,12 @@ export function DatabaseViewerScreen() {
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(34, 139, 34)", marginRight: 8 }}
         >
           <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Fresh workorders</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleStartHere}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(75, 0, 130)", marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Start Here</Text>
         </TouchableOpacity>
         <Text style={{ fontSize: 18, fontWeight: "700", color: C.text, flex: 1 }}>Database Viewer</Text>
         <TouchableOpacity

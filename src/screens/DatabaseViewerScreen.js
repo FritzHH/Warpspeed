@@ -263,13 +263,13 @@ export function DatabaseViewerScreen() {
       let isCredit = cred.type === "credit";
       let arrKey = isCredit ? "credits" : "deposits";
       let arr = updated[arrKey] || [];
-      let existing = arr.find((d) => d.id === cred.creditId);
+      let existing = arr.find((d) => d.id === cred.id);
       if (existing) {
         existing.amountCents = (existing.amountCents || 0) + cred.amount;
         existing.reservedCents = 0;
       } else {
         arr.push({
-          id: cred.creditId, amountCents: cred.amount, reservedCents: 0,
+          id: cred.id, amountCents: cred.amount, reservedCents: 0,
           millis: Date.now(), method: "", note: "Restored by reopen",
           type: cred.type === "giftcard" ? "giftcard" : (isCredit ? "credit" : "deposit"),
           last4: "", text: isCredit ? "Restored by reopen" : "",
@@ -551,7 +551,7 @@ export function DatabaseViewerScreen() {
         <TouchableOpacity
           onPress={() => {
             let output = COLLECTIONS.map((col) => `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`).join("\n\n");
-            navigator.clipboard.writeText(NOTIFY_HINT + "This is the current state of the database. Use it as a starting point for the upcoming tests of workorder changes, checkout screen and refund screen as well as any and other other changes to any object field. Analyze it and report any inconsistencies or relics from previous delete operations, and summarize what has transpired." + output);
+            navigator.clipboard.writeText(NOTIFY_HINT + "This is the current state of the database. Use it as a starting point for the upcoming tests of workorder changes, checkout screen and refund screen as well as any and other other changes to any object field. Ignore any outstanding logging issues, but check the logging moving forward from this point. Analyze it and report any inconsistencies or relics from previous delete operations, and summarize what has transpired." + output);
           }}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
         >

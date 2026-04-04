@@ -11,6 +11,7 @@ import {
   lightenRGBByPercent,
   resolveStatus,
   formatWorkorderNumber,
+  localStorageWrapper,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useCheckoutStore, useSettingsStore, useLoginStore } from "../../../stores";
@@ -176,7 +177,7 @@ const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
         <View style={{ marginTop: 4 }}>
           <Text style={{ fontSize: 12, fontWeight: "600", color: C.orange, marginBottom: 3 }}>CREDITS / DEPOSITS</Text>
           {credits.map((c, idx) => (
-            <View key={c.creditId || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+            <View key={c.id || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
               <Text style={{ fontSize: 13, color: C.orange }}>
                 {capitalizeFirstLetterOfString(c.type || "deposit")}
               </Text>
@@ -339,7 +340,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
     const _settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let toPrint = printBuilder.workorder(workorder, _getCustomerFromWorkorder(), _settings?.salesTaxPercent, _ctx);
-    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
+    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
   function handlePrintSale() {
@@ -349,7 +350,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     const transactions = sTransactionsMap[sale.id] || [];
     let toPrint = printBuilder.sale(sale, transactions, _getCustomerFromWorkorder(), workorder, _settings?.salesTaxPercent, _ctx, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
-    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
+    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
   return (

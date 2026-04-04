@@ -18,6 +18,7 @@ import {
   log,
   gray,
   printBuilder,
+  localStorageWrapper,
 } from "../../../../utils";
 import { dbSavePrintObj } from "../../../../db_calls_wrapper";
 import {
@@ -433,7 +434,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
 
     let settings = useSettingsStore.getState().getSettings();
-    let printerID = settings?.selectedPrinterID || "";
+    let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
     let currentUser = useLoginStore.getState().getCurrentUser();
     let _ctx = { currentUser, settings };
     let refundReceipt = printBuilder.refund(

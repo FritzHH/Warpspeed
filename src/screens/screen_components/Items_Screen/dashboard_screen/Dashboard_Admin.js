@@ -658,7 +658,7 @@ export function Dashboard_Admin({}) {
                   customerNotes: ["Customer requested rush service", "Pickup after 5pm"],
                   internalNotes: ["Rear derailleur cable frayed — replaced"],
                 };
-                dbSavePrintObj(printObj, zSettingsObj?.selectedPrinterID || "");
+                dbSavePrintObj(printObj, localStorageWrapper.getItem("selectedPrinterID") || "");
               }}
               style={{
                 paddingVertical: 10,
@@ -807,7 +807,7 @@ export function Dashboard_Admin({}) {
                   log("SPOOF SALE RECEIPT", JSON.stringify(receiptData, null, 2));
 
                   // Send to thermal printer
-                  dbSavePrintObj(receiptData, zSettingsObj?.selectedPrinterID || "");
+                  dbSavePrintObj(receiptData, localStorageWrapper.getItem("selectedPrinterID") || "");
 
                   // Generate and upload PDF
                   const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
@@ -3504,17 +3504,28 @@ const PaymentProcessingComponent = ({
   );
 };
 
-const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+const PrintersComponent = ({ zSettingsObj }) => {
   const printersObj = zSettingsObj?.printers || {};
   const printersList = Object.values(printersObj);
-  const selectedPrinterID = zSettingsObj?.selectedPrinterID || "";
+  const [sSelectedReceiptPrinter, _setSelectedReceiptPrinter] = useState(localStorageWrapper.getItem("selectedPrinterID") || "");
+  const [sSelectedLabelPrinter, _setSelectedLabelPrinter] = useState(localStorageWrapper.getItem("selectedLabelPrinterID") || "");
+
+  function handleSelectReceiptPrinter(printerID) {
+    localStorageWrapper.setItem("selectedPrinterID", printerID);
+    _setSelectedReceiptPrinter(printerID);
+  }
+
+  function handleSelectLabelPrinter(printerID) {
+    localStorageWrapper.setItem("selectedLabelPrinterID", printerID);
+    _setSelectedLabelPrinter(printerID);
+  }
 
   return (
     <>
     <BoxContainerOuterComponent style={{ marginTop: 20 }}>
       <BoxContainerInnerComponent>
         <View style={{ width: "100%", marginBottom: 10 }}>
-          <Text style={{ fontSize: 12, color: gray(0.6) }}>PRINTERS</Text>
+          <Text style={{ fontSize: 12, color: gray(0.6) }}>RECEIPT PRINTER (this device)</Text>
         </View>
         {printersList.length === 0 && (
           <Text style={{ fontSize: 13, color: gray(0.5) }}>No printers configured</Text>
@@ -3525,7 +3536,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             style={{
               borderRadius: 8,
               borderWidth: 1,
-              borderColor: selectedPrinterID === printer.id ? C.green : C.buttonLightGreenOutline,
+              borderColor: sSelectedReceiptPrinter === printer.id ? C.green : C.buttonLightGreenOutline,
               backgroundColor: C.backgroundListWhite,
               padding: 10,
               marginBottom: idx < printersList.length - 1 ? 8 : 0,
@@ -3540,11 +3551,50 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               </View>
             </View>
             <CheckBox_
-              isChecked={selectedPrinterID === printer.id}
-              text="Use this printer"
+              isChecked={sSelectedReceiptPrinter === printer.id}
+              text="Use for receipts"
               textStyle={{ fontSize: 13 }}
               buttonStyle={{ backgroundColor: "transparent", marginTop: 8 }}
-              onCheck={() => handleSettingsFieldChange("selectedPrinterID", printer.id)}
+              onCheck={() => handleSelectReceiptPrinter(printer.id)}
+            />
+          </View>
+        ))}
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
+      <BoxContainerInnerComponent>
+        <View style={{ width: "100%", marginBottom: 10 }}>
+          <Text style={{ fontSize: 12, color: gray(0.6) }}>LABEL PRINTER (this device)</Text>
+        </View>
+        {printersList.length === 0 && (
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>No printers configured</Text>
+        )}
+        {printersList.map((printer, idx) => (
+          <View
+            key={printer.id || idx}
+            style={{
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: sSelectedLabelPrinter === printer.id ? C.green : C.buttonLightGreenOutline,
+              backgroundColor: C.backgroundListWhite,
+              padding: 10,
+              marginBottom: idx < printersList.length - 1 ? 8 : 0,
+              width: "100%",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: printer.online === true ? C.green : C.red, marginRight: 8 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
+                <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
+              </View>
+            </View>
+            <CheckBox_
+              isChecked={sSelectedLabelPrinter === printer.id}
+              text="Use for labels"
+              textStyle={{ fontSize: 13 }}
+              buttonStyle={{ backgroundColor: "transparent", marginTop: 8 }}
+              onCheck={() => handleSelectLabelPrinter(printer.id)}
             />
           </View>
         ))}

@@ -260,7 +260,7 @@ export const PaymentsList = memo(function PaymentsList({ payments = [], credits 
         {/* Credit rows first */}
         {credits.map((credit, idx) => (
           <CreditRow
-            key={credit.creditId || idx}
+            key={credit.id || idx}
             credit={credit}
             onPrintDepositReceipt={onPrintDepositReceipt ? () => onPrintDepositReceipt(credit) : null}
             onRemoveDeposit={onRemoveDeposit ? () => onRemoveDeposit(credit) : null}

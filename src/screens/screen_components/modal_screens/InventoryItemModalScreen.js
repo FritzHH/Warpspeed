@@ -31,11 +31,14 @@ import {
   log,
   showAlert,
   deepEqual,
+  localStorageWrapper,
 } from "../../../utils";
 import {
   dbSaveInventoryItem,
   dbDeleteInventoryItem,
+  dbSavePrintObj,
 } from "../../../db_calls_wrapper";
+import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 
 const CATEGORIES = ["Part", "Labor"];
 
@@ -294,6 +297,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   const [sShowQBSection, _setShowQBSection] = useState(true);
   const [sShowAutoNote, _setShowAutoNote] = useState(true);
   const [sDirty, _setDirty] = useState(false);
+  const [sPrintSuccess, _setPrintSuccess] = useState(false);
 
   // debounced inventory save
   const debouncedInvSaveRef = useRef(
@@ -405,6 +409,29 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
     }
     useSettingsStore.getState().setField("autoCustomerNoteTexts", updatedArr, false);
     debouncedAutoNoteSaveRef.current(updatedArr);
+  }
+
+  // ─── quick print label ─────────────────────────────────────────────────
+
+  let zSettings = useSettingsStore.getState().settings;
+  let allLayouts = zSettings?.labelLayouts || [];
+  let quickPrintIDs = zSettings?.quickPrintLayouts || [];
+  let quickPrintLayoutsList = allLayouts.filter((l) => quickPrintIDs.includes(l.id));
+
+  function handleQuickPrint(layout) {
+    let printerID = localStorageWrapper.getItem("selectedLabelPrinterID") || "";
+    if (!printerID) {
+      showAlert({
+        title: "No Label Printer",
+        message: "Select a label printer for this device in Settings.",
+        btn1Text: "OK",
+      });
+      return;
+    }
+    let printObj = labelPrintBuilder.label(layout, sItem);
+    dbSavePrintObj(printObj, printerID);
+    _setPrintSuccess(true);
+    setTimeout(() => _setPrintSuccess(false), 2000);
   }
 
   // ─── quick button helpers ──────────────────────────────────────────────
@@ -524,6 +551,26 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
               {isNew ? "New Inventory Item" : "Inventory Item"}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {/* Print Label */}
+              {!isNew && allLayouts.length > 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", marginRight: 10 }}>
+                  <DropdownMenu
+                    dataArr={allLayouts.map((l) => l.name)}
+                    onSelect={(name, idx) => handleQuickPrint(allLayouts[idx])}
+                    buttonText=""
+                    buttonIcon={ICONS.print}
+                    buttonIconSize={26}
+                    buttonStyle={{
+                      backgroundColor: "transparent",
+                      borderWidth: 0,
+                      padding: 6,
+                    }}
+                  />
+                  {sPrintSuccess && (
+                    <Text style={{ fontSize: 11, color: C.green, marginLeft: 4 }}>Sent!</Text>
+                  )}
+                </View>
+              )}
               <TouchableOpacity
                 onPress={() => _setEditing(!sEditing)}
                 style={{ padding: 6, marginRight: 10 }}

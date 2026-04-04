@@ -448,7 +448,7 @@ export const FullSaleModal = ({ item, onClose }) => {
                       <SectionHeader text={"CREDITS / DEPOSITS (" + credits.length + ")"} />
                       {credits.map((c, idx) => (
                         <View
-                          key={c.creditId || idx}
+                          key={c.id || idx}
                           style={{
                             marginBottom: 4,
                             borderRadius: 6,

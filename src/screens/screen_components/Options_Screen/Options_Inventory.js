@@ -12,6 +12,8 @@ import {
   resolveStatus,
   generateEAN13Barcode,
   normalizeBarcode,
+  showAlert,
+  localStorageWrapper,
 } from "../../../utils";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
@@ -33,7 +35,8 @@ import {
   useInventoryStore,
   useLoginStore,
 } from "../../../stores";
-import { dbSaveSettingsField } from "../../../db_calls_wrapper";
+import { dbSaveSettingsField, dbSavePrintObj } from "../../../db_calls_wrapper";
+import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 
 function getQuickButtonFontSize(text, baseFontSize) {
   let len = (text || "").length;
@@ -66,14 +69,49 @@ const QuickItemCanvasCard = ({
   onPositionChange,
   onPress,
   onRightClick,
+  onInfoPress,
   onLabelChange,
   containerRef,
 }) => {
   const [sDragging, _setDragging] = useState(false);
   const [sIsEditing, _setIsEditing] = useState(false);
   const [sEditText, _setEditText] = useState("");
+  const [sShowActions, _setShowActions] = useState(false);
+  const [sShowPrintPicker, _setShowPrintPicker] = useState(false);
+  const [sPrintSuccess, _setPrintSuccess] = useState(false);
   const dragStartRef = useRef(null);
   const didDragRef = useRef(false);
+
+  function handlePrintWithLayout(layout) {
+    if (!invItem) return;
+    let printerID = localStorageWrapper.getItem("selectedLabelPrinterID") || "";
+    if (!printerID) {
+      showAlert({ title: "No Label Printer", message: "Select a label printer for this device in Settings.", btn1Text: "OK" });
+      return;
+    }
+    let printObj = labelPrintBuilder.label(layout, invItem);
+    dbSavePrintObj(printObj, printerID);
+    _setShowPrintPicker(false);
+    _setPrintSuccess(true);
+    setTimeout(() => _setPrintSuccess(false), 1500);
+  }
+
+  function handlePrintClick() {
+    if (!invItem) return;
+    let settings = useSettingsStore.getState().settings;
+    let allLayouts = settings?.labelLayouts || [];
+    let quickPrintIDs = settings?.quickPrintLayouts || [];
+    let qpLayouts = allLayouts.filter((l) => quickPrintIDs.includes(l.id));
+    if (qpLayouts.length === 0) {
+      showAlert({ title: "No Quick Print Layouts", message: "Mark layouts as Quick Print in the Label Designer.", btn1Text: "OK" });
+      return;
+    }
+    if (qpLayouts.length === 1) {
+      handlePrintWithLayout(qpLayouts[0]);
+    } else {
+      _setShowPrintPicker(true);
+    }
+  }
 
   let w = itemObj.w || DEFAULT_ITEM_W;
   let h = itemObj.h || DEFAULT_ITEM_H;
@@ -152,7 +190,8 @@ const QuickItemCanvasCard = ({
         opacity: sDragging ? 0.7 : 1,
         boxSizing: "border-box",
         paddingHorizontal: 4,
-        paddingVertical: 2,
+        paddingTop: 2,
+        paddingBottom: sEditMode ? 2 : (sShowActions ? 20 : 2),
         userSelect: "none",
         overflow: "hidden",
       }}
@@ -259,6 +298,129 @@ const QuickItemCanvasCard = ({
           )}
         </>
       )}
+      {!sEditMode && (
+        <>
+          {/* Caret toggle */}
+          <div
+            onClick={(e) => { e.stopPropagation(); _setShowActions((v) => !v); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              bottom: sShowActions ? 18 : 1,
+              right: 1,
+              width: 14,
+              height: 14,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              zIndex: 4,
+            }}
+          >
+            <Text style={{ fontSize: 8, color: gray(0.4), lineHeight: 14 }}>{sShowActions ? "\u25BC" : "\u25B6"}</Text>
+          </div>
+          {/* Action row */}
+          {sShowActions && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.stopPropagation()}
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                display: "flex",
+                flexDirection: "row",
+                justifyContent: "space-evenly",
+                alignItems: "center",
+                borderTopWidth: 1,
+                borderTopStyle: "solid",
+                borderTopColor: gray(0.15),
+                height: 18,
+                backgroundColor: C.buttonLightGreenOutline,
+              }}
+            >
+              <div
+                onClick={() => { if (invItem && onInfoPress) onInfoPress(); }}
+                style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <Image_ icon={ICONS.info} size={11} />
+              </div>
+              {(useLoginStore.getState().currentUser?.permissions?.level || 0) >= 4 && (
+                <div
+                  onClick={() => { if (onRightClick) onRightClick(itemObj.inventoryItemID); _setShowActions(false); }}
+                  style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <Image_ icon={ICONS.editPencil} size={11} />
+                </div>
+              )}
+              <div
+                onClick={() => handlePrintClick()}
+                style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                <Image_ icon={ICONS.print} size={11} />
+              </div>
+            </div>
+          )}
+          {/* Print layout picker */}
+          {sShowPrintPicker && (() => {
+            let settings = useSettingsStore.getState().settings;
+            let allLayouts = settings?.labelLayouts || [];
+            let quickPrintIDs = settings?.quickPrintLayouts || [];
+            let qpLayouts = allLayouts.filter((l) => quickPrintIDs.includes(l.id));
+            return (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  bottom: 20,
+                  left: 0,
+                  zIndex: 10,
+                  backgroundColor: "white",
+                  borderRadius: 6,
+                  border: "1px solid " + gray(0.2),
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  minWidth: 120,
+                  overflow: "hidden",
+                }}
+              >
+                {qpLayouts.map((layout) => (
+                  <div
+                    key={layout.id}
+                    onClick={() => handlePrintWithLayout(layout)}
+                    style={{
+                      padding: "5px 8px",
+                      cursor: "pointer",
+                      fontSize: 10,
+                      color: C.text,
+                      borderBottom: "1px solid " + gray(0.1),
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+                  >
+                    {layout.name}
+                  </div>
+                ))}
+                <div
+                  onClick={() => _setShowPrintPicker(false)}
+                  style={{ padding: "4px 8px", cursor: "pointer", fontSize: 9, color: gray(0.5), textAlign: "center" }}
+                >
+                  Cancel
+                </div>
+              </div>
+            );
+          })()}
+          {/* Print success flash */}
+          {sPrintSuccess && (
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(88,145,65,0.15)", borderRadius: 8, zIndex: 5, pointerEvents: "none" }}>
+              <Text style={{ fontSize: 9, color: C.green, fontWeight: "600" }}>Sent!</Text>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
@@ -271,6 +433,7 @@ const QuickItemCanvas = ({
   zInventoryArr,
   zQuickItemButtons,
   onItemPress,
+  onInfoPress,
   forceEditMode,
   onForceEditConsumed,
 }) => {
@@ -433,6 +596,7 @@ const QuickItemCanvas = ({
               containerRef={canvasRef}
               onPositionChange={handlePositionChange}
               onPress={() => invItem && onItemPress(invItem)}
+              onInfoPress={() => invItem && onInfoPress(invItem)}
               onRightClick={(id) => {
                 if (sEditMode) {
                   _setEditMode(false);
@@ -1091,6 +1255,7 @@ export function InventoryComponent({}) {
                   zInventoryArr={zInventoryArr}
                   zQuickItemButtons={zQuickItemButtons}
                   onItemPress={inventoryItemSelected}
+                  onInfoPress={handleInventoryInfoPress}
                   forceEditMode={sForceEditMode}
                   onForceEditConsumed={() => _setForceEditMode(false)}
                 />

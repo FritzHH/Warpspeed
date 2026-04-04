@@ -21,11 +21,16 @@ import {
   formatCurrencyDisp,
   gray,
   lightenRGBByPercent,
+  localStorageWrapper,
 } from "../../../utils";
 import { useSettingsStore, useInventoryStore, useAlertScreenStore } from "../../../stores";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import { cloneDeep } from "lodash";
+import {
+  generateZPLTemplate as _generateZPLTemplate,
+  substituteZPLData as _substituteZPLData,
+} from "../../../shared/labelPrintBuilder";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -69,47 +74,10 @@ const DEFAULT_BARCODE_FIELD = {
 const MAX_CANVAS_WIDTH = 520;
 const MAX_CANVAS_HEIGHT = 380;
 
-// ─── ZPL Functions ──────────────────────────────────────────────────────────
+// ─── ZPL Functions (delegated to shared/labelPrintBuilder.js) ───────────────
 
-function generateZPLTemplate(labelSize, fields) {
-  let lines = [];
-  lines.push("^XA");
-  lines.push("^PW" + labelSize.width);
-  lines.push("^LL" + labelSize.height);
-
-  for (let field of fields) {
-    if (field.type === "text") {
-      let fontW = field.bold
-        ? Math.round(field.fontHeight * 1.4)
-        : field.fontWidth;
-      lines.push(
-        "^FO" + field.x + "," + field.y +
-        "^A0N," + field.fontHeight + "," + fontW +
-        "^FD{" + field.name + "}^FS"
-      );
-    } else if (field.type === "barcode") {
-      lines.push(
-        "^FO" + field.x + "," + field.y +
-        "^BY" + field.moduleWidth +
-        "^BCN," + field.barcodeHeight + ",Y,N,N" +
-        "^FD{" + field.name + "}^FS"
-      );
-    }
-  }
-
-  lines.push("^XZ");
-  return lines.join("\n");
-}
-
-function substituteZPLData(zplTemplate, item) {
-  return zplTemplate
-    .replace("{formalName}", item.formalName || "")
-    .replace("{id}", item.id || "")
-    .replace("{brand}", item.brand || "")
-    .replace("{price}", formatCurrencyDisp(item.price, true))
-    .replace("{salePrice}", formatCurrencyDisp(item.salePrice, true))
-    .replace("{primaryBarcode}", item.primaryBarcode || item.id || "");
-}
+export const generateZPLTemplate = _generateZPLTemplate;
+export const substituteZPLData = _substituteZPLData;
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
@@ -462,7 +430,14 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
   const zSettingsObj = useSettingsStore((state) => state.settings);
 
   // Layout state
-  const [sLabelSize, _setLabelSize] = useState(LABEL_SIZES[0]);
+  const [sLabelSize, _setLabelSize] = useState(() => {
+    let saved = zSettingsObj?.defaultLabelSize;
+    if (saved) {
+      let match = LABEL_SIZES.find((s) => s.width === saved.width && s.height === saved.height);
+      if (match) return match;
+    }
+    return LABEL_SIZES[0];
+  });
   const [sFields, _setFields] = useState([]);
   const [sSelectedFieldIdx, _setSelectedFieldIdx] = useState(null);
   const [sLayoutName, _setLayoutName] = useState("");
@@ -477,8 +452,11 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
 
   // Derived
   let layouts = zSettingsObj?.labelLayouts || [];
+  let quickPrintIDs = zSettingsObj?.quickPrintLayouts || [];
+  let isQuickPrint = sCurrentLayout ? quickPrintIDs.includes(sCurrentLayout.id) : false;
   let selectedField = sSelectedFieldIdx !== null ? sFields[sSelectedFieldIdx] : null;
   let zplTemplate = generateZPLTemplate(sLabelSize, sFields);
+  let isDefaultSize = zSettingsObj?.defaultLabelSize?.width === sLabelSize.width && zSettingsObj?.defaultLabelSize?.height === sLabelSize.height;
 
   // Canvas scale
   let scaleX = MAX_CANVAS_WIDTH / sLabelSize.width;
@@ -603,6 +581,10 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
           (l) => l.id !== sCurrentLayout.id
         );
         handleSettingsFieldChange("labelLayouts", updatedLayouts);
+        let currentQP = zSettingsObj?.quickPrintLayouts || [];
+        if (currentQP.includes(sCurrentLayout.id)) {
+          handleSettingsFieldChange("quickPrintLayouts", currentQP.filter((id) => id !== sCurrentLayout.id));
+        }
         _setCurrentLayout(null);
         _setFields([]);
         _setLayoutName("");
@@ -633,11 +615,11 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
       zpl: finalZPL,
       copies: sCopies,
     };
-    let printerID = zSettingsObj?.selectedLabelPrinterID || "";
+    let printerID = localStorageWrapper.getItem("selectedLabelPrinterID") || "";
     if (!printerID) {
       useAlertScreenStore.getState().showAlert({
         title: "No Label Printer",
-        message: "No label printer is configured. Set selectedLabelPrinterID in settings.",
+        message: "Select a label printer for this device in Settings.",
         btn1Text: "OK",
       });
       return;
@@ -654,6 +636,22 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
       _setLabelSize(size);
       _setIsDirty(true);
     }
+  }
+
+  function handleSetDefaultSize() {
+    handleSettingsFieldChange("defaultLabelSize", { name: sLabelSize.name, width: sLabelSize.width, height: sLabelSize.height });
+  }
+
+  function handleToggleQuickPrint() {
+    if (!sCurrentLayout) return;
+    let current = zSettingsObj?.quickPrintLayouts || [];
+    let updated;
+    if (current.includes(sCurrentLayout.id)) {
+      updated = current.filter((id) => id !== sCurrentLayout.id);
+    } else {
+      updated = [...current, sCurrentLayout.id];
+    }
+    handleSettingsFieldChange("quickPrintLayouts", updated);
   }
 
   // ─── Render ───────────────────────────────────────────────────────
@@ -704,14 +702,24 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                   />
                 )}
 
-                {/* Label size dropdown */}
-                <DropdownMenu
-                  dataArr={LABEL_SIZES.map((s) => s.name)}
-                  onSelect={(item) => handleLabelSizeChange(item)}
-                  buttonText={sLabelSize.name}
-                  buttonStyle={{ paddingHorizontal: 10, paddingVertical: 4, marginRight: 8 }}
-                  buttonTextStyle={{ fontSize: 12 }}
-                />
+                {/* Label size dropdown + set default */}
+                <View style={{ flexDirection: "row", alignItems: "center", marginRight: 8 }}>
+                  <DropdownMenu
+                    dataArr={LABEL_SIZES.map((s) => s.name)}
+                    onSelect={(item) => handleLabelSizeChange(item)}
+                    buttonText={sLabelSize.name}
+                    buttonStyle={{ paddingHorizontal: 10, paddingVertical: 4 }}
+                    buttonTextStyle={{ fontSize: 12 }}
+                  />
+                  {!isDefaultSize && (
+                    <TouchableOpacity onPress={handleSetDefaultSize} style={{ marginLeft: 4 }}>
+                      <Text style={{ fontSize: 10, color: C.blue, textDecorationLine: "underline" }}>Set Default</Text>
+                    </TouchableOpacity>
+                  )}
+                  {isDefaultSize && (
+                    <Text style={{ fontSize: 10, color: C.green, marginLeft: 4 }}>Default</Text>
+                  )}
+                </View>
 
                 {/* Save */}
                 <Button_
@@ -732,6 +740,19 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                     style={{ marginRight: 6, paddingHorizontal: 12 }}
                     textStyle={{ fontSize: 12 }}
                   />
+                )}
+
+                {/* Quick Print toggle */}
+                {sCurrentLayout && (
+                  <View style={{ flexDirection: "row", alignItems: "center", marginRight: 8 }}>
+                    <CheckBox_
+                      isChecked={isQuickPrint}
+                      onPress={handleToggleQuickPrint}
+                    />
+                    <Text style={{ fontSize: 11, color: isQuickPrint ? C.green : gray(0.5), marginLeft: 4 }}>
+                      Quick Print
+                    </Text>
+                  </View>
                 )}
 
                 {/* Dirty indicator */}

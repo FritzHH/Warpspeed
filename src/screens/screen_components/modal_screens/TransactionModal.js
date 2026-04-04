@@ -5,6 +5,7 @@ import {
   formatMillisForDisplay,
   gray,
   lightenRGBByPercent,
+  localStorageWrapper,
 } from "../../../utils";
 import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
 import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
@@ -167,7 +168,7 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let toPrint = printBuilder.transaction(txn, _ctx);
     log("DEV — transaction receipt:", toPrint);
-    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
+    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
   function handleRefund() {

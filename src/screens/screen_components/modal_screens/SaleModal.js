@@ -8,6 +8,7 @@ import {
   lightenRGBByPercent,
   capitalizeFirstLetterOfString,
   resolveStatus,
+  localStorageWrapper,
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useCheckoutStore, useOpenWorkordersStore, useSettingsStore, useLoginStore } from "../../../stores";
@@ -87,7 +88,7 @@ export const SaleModal = ({ sale: saleProp, onClose: onCloseProp } = {}) => {
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let transactions = sale._transactions || [];
     let toPrint = printBuilder.sale(sale, transactions, null, null, _settings?.salesTaxPercent, _ctx, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
-    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
+    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
   return (

@@ -534,10 +534,10 @@ export function NewCheckoutModalScreen() {
     let allCreds = creds || sCredits;
     saleToPersist.creditsApplied = allCreds
       .filter((c) => c.type === "credit")
-      .map((c) => ({ creditId: c.creditId, amount: c.amount, type: c.type }));
+      .map((c) => ({ id: c.id, amount: c.amount, type: c.type }));
     saleToPersist.depositsApplied = allCreds
       .filter((c) => c.type !== "credit")
-      .map((c) => ({ creditId: c.creditId, amount: c.amount, type: c.type, transactionId: c.transactionId || "" }));
+      .map((c) => ({ id: c.id, amount: c.amount, type: c.type, transactionId: c.transactionId || "" }));
     let existingIDs = saleToPersist.transactionIDs || [];
     let currentIDs = (txns || sTransactions).map((t) => t.id);
     saleToPersist.transactionIDs = [...new Set([...existingIDs, ...currentIDs])];
@@ -691,7 +691,7 @@ export function NewCheckoutModalScreen() {
 
     // Create a credit entry (not a transaction)
     let credit = {
-      creditId: deposit.id,
+      id: deposit.id,
       ...(isCredit ? {} : { transactionId: deposit.transactionId || deposit.id || "" }),
       amount: appliedAmount,
       type: isCredit ? "credit" : deposit._type === "giftcard" ? "giftcard" : "deposit",
@@ -740,7 +740,7 @@ export function NewCheckoutModalScreen() {
     let isCredit = credit.type === "credit";
     let arrKey = isCredit ? "credits" : "deposits";
     let customerArr = cloneDeep(zCustomer?.[arrKey] || []);
-    let existing = customerArr.find((d) => d.id === credit.creditId);
+    let existing = customerArr.find((d) => d.id === credit.id);
     if (existing) {
       existing.reservedCents = Math.max(0, (existing.reservedCents || 0) - credit.amount);
     }
@@ -749,7 +749,7 @@ export function NewCheckoutModalScreen() {
     dbSaveCustomer(updatedCustomer);
 
     // Remove credit from sCredits
-    let newCredits = sCredits.filter((c) => c.creditId !== credit.creditId);
+    let newCredits = sCredits.filter((c) => c.id !== credit.id);
     _setCredits(newCredits);
     let sale = cloneDeep(sSale);
     recomputeSaleAmounts(sale, sTransactions, newCredits);
@@ -786,11 +786,11 @@ export function NewCheckoutModalScreen() {
     }
 
     let difference = credit.amount - newAmountCents; // positive = decrease, negative = increase
-    log("handleSplitDeposit: credit.amount=", credit.amount, "newAmountCents=", newAmountCents, "difference=", difference, "creditId=", credit.creditId, "zCustomer?.id=", zCustomer?.id);
+    log("handleSplitDeposit: credit.amount=", credit.amount, "newAmountCents=", newAmountCents, "difference=", difference, "id=", credit.id, "zCustomer?.id=", zCustomer?.id);
 
     // Update the credit in sCredits
     let newCredits = sCredits.map((c) =>
-      c.creditId === credit.creditId ? { ...c, amount: newAmountCents } : c
+      c.id === credit.id ? { ...c, amount: newAmountCents } : c
     );
     _setCredits(newCredits);
     let sale = cloneDeep(sSale);
@@ -802,7 +802,7 @@ export function NewCheckoutModalScreen() {
     let isCredit = credit.type === "credit";
     let arrKey = isCredit ? "credits" : "deposits";
     let customerArr = cloneDeep(zCustomer?.[arrKey] || []);
-    let existing = customerArr.find((d) => d.id === credit.creditId);
+    let existing = customerArr.find((d) => d.id === credit.id);
     if (existing) {
       // difference > 0 means user reduced the applied amount (release some reservation)
       // difference < 0 means user increased the applied amount (reserve more)
@@ -838,7 +838,7 @@ export function NewCheckoutModalScreen() {
     let sale = await dbGetCompletedSale(credit._depositSaleID);
     if (!sale) return;
     let settings = useSettingsStore.getState().getSettings();
-    let printerID = settings?.selectedPrinterID || "";
+    let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
     if (!printerID) return;
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let customerInfo = {
@@ -897,7 +897,7 @@ export function NewCheckoutModalScreen() {
       // Print receipt after partial cash payment (includes popCashRegister if change is due)
       if (payment.method === "cash") {
         let settings = useSettingsStore.getState().getSettings();
-        let printerID = settings?.selectedPrinterID || "";
+        let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
         if (printerID) {
           let primaryWO = sCombinedWorkorders[0];
           let _noCustomer = !primaryWO?.customerID;
@@ -924,7 +924,7 @@ export function NewCheckoutModalScreen() {
   function updateWorkordersWithPaymentStatus(sale, entry, txns) {
     let user = useLoginStore.getState().currentUser?.first || "System";
     let timestamp = Date.now();
-    let isCredit = !!entry.creditId;
+    let isCredit = ["credit", "deposit", "giftcard"].includes(entry.type);
     let paymentLabel = isCredit ? "Deposit/credit applied" : entry.method === "cash" ? "Cash payment" : "Card payment";
     let entryAmount = isCredit ? entry.amount : entry.amountCaptured;
 
@@ -982,7 +982,7 @@ export function NewCheckoutModalScreen() {
 
     // Receipt actions based on settings
     let settings = useSettingsStore.getState().getSettings();
-    let printerID = settings?.selectedPrinterID || "";
+    let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let emptyWO = { workorderLines: [], taxFree: false };
     let customerInfo = { first: zCustomer?.first || "", last: zCustomer?.last || "", phone: zCustomer?.customerCell || "", id: zCustomer?.id || "" };
@@ -1106,7 +1106,7 @@ export function NewCheckoutModalScreen() {
         let isCredit = cred.type === "credit";
         let arrKey = isCredit ? "credits" : "deposits";
         let arr = currentCustomer[arrKey] || [];
-        let idx = arr.findIndex((d) => d.id === cred.creditId);
+        let idx = arr.findIndex((d) => d.id === cred.id);
         if (idx >= 0) {
           let dep = arr[idx];
           dep.amountCents = Math.max(0, (dep.amountCents || 0) - cred.amount);
@@ -1135,7 +1135,7 @@ export function NewCheckoutModalScreen() {
     const customerForReceipt = primaryWO
       ? { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" }
       : { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" };
-    const printerID = settings?.selectedPrinterID || "";
+    const printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
 
     // Build receipt context
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
@@ -1205,7 +1205,7 @@ export function NewCheckoutModalScreen() {
         ? { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" }
         : { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" };
       const settings = useSettingsStore.getState().getSettings();
-      const printerID = settings?.selectedPrinterID || "";
+      const printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
       let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
       let saleReceipt = printBuilder.sale(sSale, sTransactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
@@ -1445,7 +1445,7 @@ export function NewCheckoutModalScreen() {
       }
     }
 
-    const printerID = zSettings?.selectedPrinterID || "";
+    const printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
     toPrint.popCashRegister = false;
     dbSavePrintObj(toPrint, printerID);
   }
@@ -1469,7 +1469,7 @@ export function NewCheckoutModalScreen() {
       receipt.popCashRegister = false;
     }
     log("handlePrintReceipt receipt:", JSON.stringify(receipt));
-    let printerID = settings?.selectedPrinterID || "";
+    let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
     if (printerID) dbSavePrintObj(receipt, printerID);
   }
 
@@ -1477,7 +1477,7 @@ export function NewCheckoutModalScreen() {
     let settings = useSettingsStore.getState().getSettings();
     let printObj = { id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register };
     log("handlePopRegister printObj:", JSON.stringify(printObj));
-    dbSavePrintObj(printObj, settings?.selectedPrinterID || "");
+    dbSavePrintObj(printObj, localStorageWrapper.getItem("selectedPrinterID") || "");
     _setShowPopConfirm(true);
     setTimeout(() => _setShowPopConfirm(false), 1000);
   }
@@ -1841,7 +1841,7 @@ export function NewCheckoutModalScreen() {
 
               {/* Customer Deposits / Credits */}
               {(() => {
-                      let appliedCreditIds = new Set(sCredits.map((c) => c.creditId));
+                      let appliedCreditIds = new Set(sCredits.map((c) => c.id));
                       let availableDeposits = (zCustomer?.deposits || []).filter((d) => (d.amountCents - (d.reservedCents || 0)) > 0 && !appliedCreditIds.has(d.id)).map((d) => ({ ...d, amountCents: d.amountCents - (d.reservedCents || 0), _type: d.type === "giftcard" ? "giftcard" : "deposit" }));
                       let availableCredits = (zCustomer?.credits || []).filter((d) => (d.amountCents - (d.reservedCents || 0)) > 0 && !appliedCreditIds.has(d.id)).map((d) => ({ ...d, amountCents: d.amountCents - (d.reservedCents || 0), _type: "credit" }));
                       let allAvailable = [...availableDeposits, ...availableCredits];
@@ -1969,7 +1969,7 @@ export function NewCheckoutModalScreen() {
                         let isCredit = sSplitDepositPayment.type === "credit";
                         let customerArr = isCredit ? (zCustomer?.credits || []) : (zCustomer?.deposits || []);
                         let customerRemaining = customerArr
-                          .filter((d) => d.id === sSplitDepositPayment.creditId)
+                          .filter((d) => d.id === sSplitDepositPayment.id)
                           .reduce((sum, d) => sum + (d.amountCents || 0), 0);
                         let totalDeposit = customerRemaining + sSplitDepositPayment.amount;
                         let originalAmount = sSplitDepositPayment._originalAmount || totalDeposit;

@@ -1,3 +1,2 @@
 
 
-using the contents of the csv files in the inventory folder, i want you to go into the Full Migration process in Dashboard_Admin initiated in the button and perform a full audit. tell me any bugs, or issues that might cause even minor hiccups down the road. follow each mapping process thoroughly to arrive at your conclusions. when you are finished, present a list of the issues you found. then, we will go through the issues one by one. you will create a summary of the issue and potential solutions to the issue. then, i will choose which solution i want to implement. after i choose, you will write the code to implement the solution. we will repeat this process for each issue you found. 

@@ -19,6 +19,7 @@ import {
   findTemplateByType,
   compressImage,
   scheduleAutoText,
+  localStorageWrapper,
 } from "../../../utils";
 import {
   ScreenModal,
@@ -310,7 +311,7 @@ export const ActiveWorkorderComponent = ({}) => {
       _settings?.salesTaxPercent,
       _ctx
     );
-    dbSavePrintObj(toPrint, _settings?.selectedPrinterID || "");
+    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
   function handleIntakePrintPress(e) {
@@ -329,7 +330,7 @@ export const ActiveWorkorderComponent = ({}) => {
         _ctx
       );
       log("INTAKE PRINT OBJ", JSON.stringify(toPrint, null, 2));
-      dbSavePrintObj(toPrint, settings?.selectedPrinterID || "");
+      dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
     }
 
     // Look up templates
@@ -372,7 +373,7 @@ export const ActiveWorkorderComponent = ({}) => {
       settings?.salesTaxPercent,
       _ctx
     );
-    dbSavePrintObj(toPrint, settings?.selectedPrinterID || "");
+    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
   function handleIntakeRightClick() {

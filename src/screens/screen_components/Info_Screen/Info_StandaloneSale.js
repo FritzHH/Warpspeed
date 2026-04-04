@@ -22,6 +22,7 @@ import {
   gray,
   formatCurrencyDisp,
   formatMillisForDisplay,
+  localStorageWrapper,
 } from "../../../utils";
 import { useState } from "react";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
@@ -217,7 +218,7 @@ export const StandaloneSaleComponent = ({}) => {
             onPress={() =>
               dbSavePrintObj(
                 { id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register },
-                useSettingsStore.getState().getSettings()?.selectedPrinterID || ""
+                localStorageWrapper.getItem("selectedPrinterID") || ""
               )
             }
           />

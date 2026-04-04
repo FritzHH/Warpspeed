@@ -385,7 +385,7 @@ export const SALE_PROTO = {
 };
 
 export const CREDIT_APPLIED_PROTO = {
-  creditId: "",
+  id: "",
   transactionId: "",
   amount: 0,
   type: "",           // "deposit" | "giftcard" | "credit"
@@ -1029,7 +1029,8 @@ export const SETTINGS_OBJ = {
 
   },
   labelLayouts: [],
-  selectedLabelPrinterID: "",
+  quickPrintLayouts: [],
+  defaultLabelSize: { name: '2.25" x 1.25"', width: 464, height: 254 },
   autoSMSIntakeReceipt: true,
   autoEmailIntakeReceipt: true,
   autoPrintIntakeReceipt: true,
@@ -1039,7 +1040,6 @@ export const SETTINGS_OBJ = {
   shopContactBlurb: "9102 Bonita Beach Rd SE\nBonita Springs, FL\n(239) 291-9396\nsupport@bonitabikes.com\nwww.bonitabikes.com",
   intakeBlurb: "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.",
   thankYouBlurb: "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
-  selectedPrinterID: "",
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   smsConversationLockTimeout: 2, //days

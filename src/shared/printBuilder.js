@@ -506,7 +506,7 @@ var printBuilder = {
     receipt.cashChangeGiven = cashChange;
     receipt.cashChangeGivenDisplay = cashChange ? "$" + (cashChange / 100).toFixed(2) : "";
     receipt.depositsApplied = (credits || []).map(function (c) {
-      return { creditId: c.creditId, amount: c.amount, type: c.type, depositType: c.type };
+      return { id: c.id, amount: c.amount, type: c.type, depositType: c.type };
     });
     var txDate = workorder?.finishedOnMillis ? new Date(Number(workorder.finishedOnMillis)) : new Date();
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });

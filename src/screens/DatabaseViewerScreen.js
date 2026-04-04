@@ -36,6 +36,23 @@ const FRESH_WORKORDERS_DATA = {
   ],
 };
 
+const START_HERE_DATA = {
+  activeSales: [],
+  completedSales: [],
+  completedWorkorders: [],
+  openWorkorders: [
+    {"id":"1450000000002","waitTimeEstimateLabel":"","customerCell":"2393369177","activeSaleID":"","partToBeOrdered":false,"customerPin":"439","customerLandline":"2392222222","status":"finished","taxFree":false,"paymentComplete":false,"internalNotes":[],"customerLast":"Hieb","workorderLines":[{"useSalePrice":false,"id":"aec217a0-2272-4f92-94fa-3a860e48bace","qty":1,"discountObj":"","receiptNotes":"","intakeNotes":"","warranty":false,"inventoryItem":{"barcodes":[],"customPart":false,"informalName":"","id":"0727746323980","formalName":"TUBE SUNLT 26x2.75-3.00 SV32 FFW73mm","salePrice":0,"cost":919,"brand":"","category":"Part","primaryBarcode":"0727746323980","price":1878,"minutes":0,"customLabor":false}},{"useSalePrice":false,"inventoryItem":{"barcodes":[],"customPart":false,"informalName":"","id":"0609149894831","formalName":"TUBE SUNLT 700x35-43 SV48mm FFW33mm","salePrice":0,"cost":289,"brand":"","category":"Part","primaryBarcode":"0609149894831","price":939,"minutes":0,"customLabor":false},"warranty":false,"receiptNotes":"","discountObj":"","intakeNotes":"","id":"78c08995-81be-419f-a88e-fe1ce753480c","qty":1},{"useSalePrice":false,"qty":1,"id":"a8ba2356-9b94-47c1-afce-edf053318052","discountObj":"","receiptNotes":"","intakeNotes":"","warranty":false,"inventoryItem":{"barcodes":[],"customPart":false,"informalName":"","id":"0047853643756","formalName":"TIRE KEN KWICK TRAX 700x28 BK/BK/REF SRC/ICAP/60 WIRE 100psi","salePrice":0,"brand":"","cost":2149,"primaryBarcode":"0047853643756","category":"Part","price":4000,"minutes":0,"customLabor":false}},{"useSalePrice":false,"id":"5b506450-4afb-4f77-a944-0440f0ea0ef6","qty":2,"receiptNotes":"","intakeNotes":"","discountObj":{"value":"30","savings":563,"type":"%","newPrice":1315,"name":"30% Off Item","id":"394393d"},"warranty":false,"inventoryItem":{"formalName":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","salePrice":0,"primaryBarcode":"0727740637890","category":"Part","price":939,"cost":249,"brand":"","minutes":0,"customLabor":false,"customPart":false,"barcodes":[],"informalName":"","id":"0727740637890"}},{"useSalePrice":false,"id":"f9e3590e-ede0-41eb-b61f-eea1a950ad02","qty":2,"receiptNotes":"","discountObj":"","intakeNotes":"","warranty":false,"inventoryItem":{"customLabor":false,"minutes":0,"cost":249,"brand":"","price":939,"primaryBarcode":"0330312449090","category":"Part","salePrice":0,"formalName":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","id":"0330312449090","informalName":"","barcodes":[],"customPart":false}}],"startedBy":"Fritz Hieb","taxFreeReceiptNote":"","waitTime":"","customerEmail":"hieb.fritz@gmail.com","color2":{"textColor":"","label":"","backgroundColor":""},"hasNewSMS":false,"media":[],"customerFirst":"Fritz","customerLanguage":"English","customerContactRestriction":"","salesTax":"","description":"","workorderNumber":"W14500APR26","partOrdered":"","customerID":"48ce95ce-28e7-4418-b08c-24e3c749d98d","archived":false,"endedOnMillis":"","customerNotes":[],"saleID":"","startedOnMillis":1775303488345,"changeLog":["Started by: Fritz Hieb",{"action":"changed","to":"Finished","field":"status","user":"Fritz","from":"Newly Created","timestamp":1775303494841},{"timestamp":1775303498920,"user":"Fritz","action":"added","field":"workorderLines","to":"TUBE SUNLT 26x2.75-3.00 SV32 FFW73mm"},{"to":"TUBE SUNLT 700x35-43 SV48mm FFW33mm","field":"workorderLines","action":"added","timestamp":1775303500545,"user":"Fritz"},{"user":"Fritz","timestamp":1775303503493,"action":"added","field":"workorderLines","to":"TIRE KEN KWICK TRAX 700x28 BK/BK/REF SRC/ICAP/60 WIRE 100psi"},{"timestamp":1775303573280,"user":"Fritz","field":"workorderLines","to":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","action":"added"},{"timestamp":1775303575690,"user":"Fritz","to":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","field":"workorderLines","action":"added"},{"from":"1","item":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","timestamp":1775303589533,"detail":"qty","user":"Fritz","action":"changed","to":"2","field":"workorderLines"},{"field":"workorderLines","to":"2","action":"changed","user":"Fritz","detail":"qty","item":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","timestamp":1775303594191,"from":"1"},{"from":"none","item":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","timestamp":1775303599603,"detail":"discount","user":"Fritz","action":"changed","to":"30% Off Item","field":"workorderLines"}],"paidOnMillis":"","partOrderedMillis":"","partOrderEstimateMillis":"","partSource":"","brand":"","color1":{"textColor":"","backgroundColor":"","label":""}},
+    {"id":"1550000000009","waitTimeEstimateLabel":"","customerPin":"900","partToBeOrdered":false,"activeSaleID":"","customerCell":"2393369177","internalNotes":[],"customerLast":"Hieb","customerLandline":"2392222222","paymentComplete":false,"taxFree":false,"status":"finished","startedBy":"Fritz Hieb","taxFreeReceiptNote":"","workorderLines":[{"useSalePrice":false,"id":"1c7bbe73-2d0a-4b7c-88ed-358ae0c63e95","qty":1,"receiptNotes":"","discountObj":"","intakeNotes":"","warranty":false,"inventoryItem":{"salePrice":0,"formalName":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm","customLabor":false,"minutes":0,"cost":249,"brand":"","price":939,"primaryBarcode":"0727740637890","category":"Part","barcodes":[],"customPart":false,"id":"0727740637890","informalName":""}},{"useSalePrice":false,"id":"aedf113b-c57d-4c7e-b00d-5295b6cacca4","qty":1,"receiptNotes":"","discountObj":"","intakeNotes":"","inventoryItem":{"price":939,"primaryBarcode":"0330312449090","category":"Part","cost":249,"brand":"","customLabor":false,"minutes":0,"salePrice":0,"formalName":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","id":"0330312449090","informalName":"","customPart":false,"barcodes":[]},"warranty":false},{"receiptNotes":"","intakeNotes":"","discountObj":"","qty":1,"id":"fb3c916b-2631-49d0-ac33-b9e9c86ae59c","warranty":false,"inventoryItem":{"minutes":0,"customLabor":false,"brand":"","cost":919,"primaryBarcode":"0727746323980","category":"Part","price":1878,"formalName":"TUBE SUNLT 26x2.75-3.00 SV32 FFW73mm","salePrice":0,"informalName":"","id":"0727746323980","barcodes":[],"customPart":false},"useSalePrice":false},{"intakeNotes":"","receiptNotes":"","discountObj":"","qty":1,"id":"55f5acfc-b545-40bc-85d5-7ce50de546d7","inventoryItem":{"customLabor":false,"minutes":0,"cost":289,"brand":"","price":939,"primaryBarcode":"0609149894831","category":"Part","salePrice":0,"formalName":"TUBE SUNLT 700x35-43 SV48mm FFW33mm","id":"0609149894831","informalName":"","barcodes":[],"customPart":false},"warranty":false,"useSalePrice":false},{"qty":1,"id":"67e1114f-0924-405d-9c6b-6dbc233a14af","intakeNotes":"","receiptNotes":"","discountObj":"","inventoryItem":{"id":"0193751005926","informalName":"","barcodes":[],"customPart":false,"cost":4059,"brand":"","price":7000,"category":"Part","primaryBarcode":"0193751005926","customLabor":false,"minutes":0,"salePrice":0,"formalName":"TIRE LINER TANNUS ARMOUR INSERT 24x3.0-4.0"},"warranty":false,"useSalePrice":false},{"warranty":false,"inventoryItem":{"formalName":"TIRE SUNLT 26x2.125 BK/BK STREET K130 WIRE","salePrice":0,"minutes":0,"customLabor":false,"brand":"","cost":1399,"primaryBarcode":"0072774592340","category":"Part","price":2500,"barcodes":[],"customPart":false,"informalName":"","id":"0072774592340"},"discountObj":"","receiptNotes":"","intakeNotes":"","qty":2,"id":"469cdd4c-0796-4b4a-8cc2-1e622f46b2e4","useSalePrice":false},{"useSalePrice":false,"receiptNotes":"","intakeNotes":"","discountObj":"","id":"12d42a36-5ff5-44c6-8781-76265b951be3","qty":2,"warranty":false,"inventoryItem":{"primaryBarcode":"0072774598441","category":"Part","price":3000,"cost":1299,"brand":"","minutes":0,"customLabor":false,"formalName":"TIRE SUNLT 26x2.125 CST241 BK/BLK CRUISER WIRE","salePrice":0,"informalName":"","id":"0072774598441","customPart":false,"barcodes":[]}},{"inventoryItem":{"formalName":"TIRE SUNLT UTILIT 16x2.125 BK/BK ALPHABITE H518 WIRE","salePrice":0,"brand":"","cost":649,"primaryBarcode":"0124592505733","category":"Part","price":1500,"minutes":0,"customLabor":false,"barcodes":[],"customPart":false,"informalName":"","id":"0124592505733"},"warranty":false,"intakeNotes":"","receiptNotes":"","discountObj":{"id":"1333k","name":"50% Off Item","newPrice":750,"value":"50","savings":750,"type":"%"},"id":"f25f7435-51c0-49ae-a18b-278ac9ef7f9c","qty":1,"useSalePrice":false},{"warranty":false,"inventoryItem":{"customLabor":false,"minutes":0,"price":3000,"category":"Part","primaryBarcode":"0072774590087","cost":1149,"brand":"","salePrice":0,"formalName":"TIRE SUNLT 26x2.1 BK/BK ATB K850 WIRE MTB","id":"0072774590087","informalName":"","customPart":false,"barcodes":[]},"qty":1,"id":"0d61dc3a-2488-4002-9e8d-3e73a704c403","intakeNotes":"","receiptNotes":"","discountObj":"","useSalePrice":false}],"customerEmail":"hieb.fritz@gmail.com","media":[],"color2":{"textColor":"","backgroundColor":"","label":""},"hasNewSMS":false,"waitTime":"","partOrdered":"","salesTax":"","workorderNumber":"W15500APR26","description":"","customerContactRestriction":"","endedOnMillis":"","archived":false,"customerID":"48ce95ce-28e7-4418-b08c-24e3c749d98d","customerLanguage":"English","customerFirst":"Fritz","startedOnMillis":1775303620127,"customerNotes":[],"saleID":"","partSource":"","partOrderEstimateMillis":"","partOrderedMillis":"","color1":{"textColor":"","label":"","backgroundColor":""},"brand":"","paidOnMillis":"","changeLog":["Started by: Fritz Hieb",{"user":"Fritz","timestamp":1775303622862,"action":"added","field":"workorderLines","to":"TUBE SUNLT 700x28-35 (27x1-1/8x1-1/4) SV32 FFW30mm"},{"user":"Fritz","timestamp":1775303624553,"to":"TUBE SUNLT UTILIT 20x1.50-1.95 SV48 FFW 39mm","field":"workorderLines","action":"added"},{"action":"added","field":"workorderLines","to":"TUBE SUNLT 26x2.75-3.00 SV32 FFW73mm","timestamp":1775303628078,"user":"Fritz"},{"timestamp":1775303630061,"user":"Fritz","action":"added","to":"TUBE SUNLT 700x35-43 SV48mm FFW33mm","field":"workorderLines"},{"user":"Fritz","timestamp":1775303633356,"action":"added","field":"workorderLines","to":"TIRE LINER TANNUS ARMOUR INSERT 24x3.0-4.0"},{"timestamp":1775303635134,"user":"Fritz","action":"added","field":"workorderLines","to":"TIRE SUNLT 26x2.125 BK/BK STREET K130 WIRE"},{"field":"workorderLines","to":"2","action":"changed","item":"TIRE SUNLT 26x2.125 BK/BK STREET K130 WIRE","timestamp":1775303639092,"from":"1","detail":"qty","user":"Fritz"},{"timestamp":1775303642721,"user":"Fritz","action":"added","to":"TIRE SUNLT UTILIT 16x2.125 BK/BK ALPHABITE H518 WIRE","field":"workorderLines"},{"field":"workorderLines","to":"TIRE SUNLT 26x2.1 BK/BK ATB K850 WIRE MTB","action":"added","user":"Fritz","timestamp":1775303658779},{"action":"changed","to":"2","field":"workorderLines","from":"1","item":"TIRE SUNLT 26x2.125 CST241 BK/BLK CRUISER WIRE","timestamp":1775303664940,"user":"Fritz","detail":"qty"},{"action":"changed","to":"50% Off Item","field":"workorderLines","from":"none","item":"TIRE SUNLT UTILIT 16x2.125 BK/BK ALPHABITE H518 WIRE","timestamp":1775303670462,"user":"Fritz","detail":"discount"},{"user":"Fritz","timestamp":1775303809240,"from":"Newly Created","field":"status","to":"Finished","action":"changed"}]},
+  ],
+  customers: [
+    {"id":"48ce95ce-28e7-4418-b08c-24e3c749d98d","contactRestriction":"","workorders":["1450000000002","1550000000009"],"customerLandline":"2392222222","state":"FL","last":"Hieb","email":"hieb.fritz@gmail.com","millisCreated":1775303488343,"sales":[],"notes":"9102 Bonita Beach Rd SE","gatedCommunity":true,"previousBikes":[],"language":"English","city":"Bonita Springs","addressNotes":"","streetAddress":"9102 Bonita Beach Rd SE","zip":"34135","interactionRating":"","credits":[{"millis":1775303841010,"text":"Test customer credit","reservedCents":0,"id":"2818478851462","amountCents":3500},{"text":"Another test customer credit","millis":1775303860205,"reservedCents":0,"id":"9990293694097","amountCents":2000}],"first":"Fritz","customerCell":"2393369177","deposits":[{"amountCents":2000,"transactionId":"3650000000004","type":"deposit","method":"cash","reservedCents":0,"note":"","id":"6746289475187","last4":"","millis":1775303764934},{"type":"deposit","transactionId":"3850000000008","method":"card","reservedCents":0,"amountCents":3000,"millis":1775303791014,"note":"","id":"3410113015827","last4":"4242"}],"unit":"#101"},
+  ],
+  transactions: [
+    {"id":"3650000000004","receiptURL":"","paymentProcessor":"cash","amountCaptured":2000,"salesTax":0,"refunds":[],"chargeID":"","items":[],"paymentIntentID":"","authorizationCode":"","amountTendered":2000,"last4":"","cardType":"","expMonth":"","networkTransactionID":"","cardIssuer":"","expYear":"","millis":1775303764925,"method":"cash"},
+    {"id":"3850000000008","expMonth":12,"cardIssuer":"Unknown","networkTransactionID":"122747278109561","millis":1775303791013,"expYear":2027,"cardType":"Visa Classic","last4":"4242","method":"card","amountCaptured":3000,"paymentProcessor":"stripe","salesTax":0,"refunds":[],"receiptURL":"https://pay.stripe.com/receipts/payment/CAcaFwoVYWNjdF8xUlJMQjlRSUpRcGNYUDlkKO74w84GMgb-Gib7SGQ6LBb9hfi3qdwI1Q0Qii4LPVTHDlBhwRXqYVtcBEoCC28pOD5lNq3AFfh8YEeU","authorizationCode":"980224","paymentIntentID":"pi_3TISoKQIJQpcXP9d19YOGIGV","chargeID":"ch_3TISoKQIJQpcXP9d1KS60Q0g","items":[],"amountTendered":0},
+  ],
+};
+
 export function DatabaseViewerScreen() {
   const settings = useSettingsStore((state) => state.settings);
   const tenantID = settings?.tenantID || "";
@@ -64,6 +81,80 @@ export function DatabaseViewerScreen() {
       unsubscribes.forEach((unsub) => { if (unsub) unsub(); });
     };
   }, [tenantID, storeID]);
+
+  async function handleRefreshState() {
+    _setReopenStatus("Refreshing state...");
+    let basePath = `tenants/${tenantID}/stores/${storeID}`;
+    try {
+      // 1. Identify deposit-sale transaction IDs to preserve
+      let depositTxnIDs = new Set();
+      for (let sale of [...sData.completedSales, ...sData.activeSales]) {
+        if (sale.isDepositSale) {
+          for (let txnID of (sale.transactionIDs || [])) depositTxnIDs.add(txnID);
+        }
+      }
+
+      // 2. Delete all active sales and completed sales
+      for (let sale of sData.activeSales) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.ACTIVE_SALES}/${sale.id}`);
+      }
+      for (let sale of sData.completedSales) {
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_SALES}/${sale.id}`);
+      }
+
+      // 3. Move first completed workorder back to open (cleaned), delete the rest
+      let firstCompleted = sData.completedWorkorders[0];
+      for (let i = 0; i < sData.completedWorkorders.length; i++) {
+        let wo = sData.completedWorkorders[i];
+        if (i === 0) {
+          let cleaned = cleanWOForReopen(wo);
+          cleaned.amountPaid = "";
+          await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${cleaned.id}`, cleaned);
+        }
+        await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}/${wo.id}`);
+      }
+
+      // 4. Clean all open workorders of payment activity and sale links
+      for (let wo of sData.openWorkorders) {
+        if (wo.activeSaleID || wo.saleID || wo.paymentComplete || wo.amountPaid) {
+          let cleaned = cleanWOForReopen(wo);
+          cleaned.amountPaid = "";
+          await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.OPEN_WORKORDERS}/${cleaned.id}`, cleaned);
+        }
+      }
+
+      // 5. Delete non-deposit transactions, preserve deposit ones
+      let deletedTxns = 0;
+      for (let txn of sData.transactions) {
+        if (!depositTxnIDs.has(txn.id)) {
+          await firestoreDelete(`${basePath}/${DB_NODES.FIRESTORE.TRANSACTIONS}/${txn.id}`);
+          deletedTxns++;
+        }
+      }
+
+      // 6. Reconcile customers - fix workorder refs, clear sales, restore credits/deposits
+      let allOpenWOIDs = new Set(sData.openWorkorders.map((w) => w.id));
+      if (firstCompleted) allOpenWOIDs.add(firstCompleted.id);
+
+      for (let customer of sData.customers) {
+        let updated = cloneDeep(customer);
+        updated.workorders = (updated.workorders || []).filter((id) => allOpenWOIDs.has(id));
+        updated.sales = [];
+        for (let cred of (updated.credits || [])) cred.reservedCents = 0;
+        for (let dep of (updated.deposits || [])) dep.reservedCents = 0;
+        await firestoreWrite(`${basePath}/${DB_NODES.FIRESTORE.CUSTOMERS}/${customer.id}`, updated);
+      }
+
+      let reopened = firstCompleted ? 1 : 0;
+      let deletedWOs = Math.max(0, sData.completedWorkorders.length - 1);
+      _setReopenStatus(
+        `Refreshed - ${reopened} WO reopened, ${deletedWOs} WO(s) deleted, ` +
+        `${sData.activeSales.length + sData.completedSales.length} sale(s) deleted, ${deletedTxns} txn(s) deleted`
+      );
+    } catch (err) {
+      _setReopenStatus("Error: " + (err.message || err));
+    }
+  }
 
   async function handleFreshWorkorders() {
     _setReopenStatus("Resetting to fresh...");
@@ -377,16 +468,17 @@ export function DatabaseViewerScreen() {
           <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Clean Logs</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          onPress={handleRefreshState}
+          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(0, 128, 128)", marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Refresh State</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={handleFreshWorkorders}
           style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(34, 139, 34)", marginRight: 8 }}
         >
           <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Fresh workorders</Text>
         </TouchableOpacity>
-        {!!sReopenStatus && (
-          <Text style={{ fontSize: 12, color: sReopenStatus.startsWith("Error") ? C.red : C.green, fontWeight: "600", marginRight: 8 }}>
-            {sReopenStatus}
-          </Text>
-        )}
         <Text style={{ fontSize: 18, fontWeight: "700", color: C.text, flex: 1 }}>Database Viewer</Text>
         <TouchableOpacity
           onPress={() => {

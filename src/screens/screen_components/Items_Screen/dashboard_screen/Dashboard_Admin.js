@@ -82,6 +82,7 @@ import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestore
 import { DB_NODES } from "../../../../constants";
 import { newCheckoutGetStripeReaders } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { StandButtonsCanvasEditor } from "./StandButtonsCanvas";
+import { LabelDesignerModal } from "../../modal_screens/LabelDesignerModal";
 
 
 const TAB_NAMES = {
@@ -101,6 +102,7 @@ const TAB_NAMES = {
   blockedNumbers: "Blocked Numbers",
   import: "Import",
   backup: "Backup & Recovery",
+  labelDesigner: "Label Designer",
 };
 
 const DROPDOWN_ORDERING_SELECTION_NAMES = {
@@ -125,6 +127,7 @@ export function Dashboard_Admin({}) {
   );
   const [sStandEditButtonObj, _setStandEditButtonObj] = useState(null);
   const [sShowStandButtonsModal, _setShowStandButtonsModal] = useState(false);
+  const [sShowLabelDesigner, _setShowLabelDesigner] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -210,6 +213,12 @@ export function Dashboard_Admin({}) {
       )}
       {!!sShowPayrollModal && (
         <PayrollModal handleExit={() => _setShowPayrollModal(false)} />
+      )}
+      {!!sShowLabelDesigner && (
+        <LabelDesignerModal
+          handleExit={() => _setShowLabelDesigner(false)}
+          handleSettingsFieldChange={handleSettingsFieldChange}
+        />
       )}
       {!!sStandEditButtonObj && (
         <StandButtonInventoryModal
@@ -566,6 +575,13 @@ export function Dashboard_Admin({}) {
               }}
               text={TAB_NAMES.backup}
               icon={ICONS.tools}
+            />
+            <VerticalSpacer />
+            {/****************** label designer *****************************/}
+            <MenuListLabelComponent
+              handleExpandPress={() => _setShowLabelDesigner(true)}
+              text={TAB_NAMES.labelDesigner}
+              icon={ICONS.print}
             />
           </View>
         </ScrollView>

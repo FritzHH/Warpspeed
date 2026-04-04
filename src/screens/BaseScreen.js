@@ -38,7 +38,7 @@ import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheck
 import { SaleModal } from "./screen_components/modal_screens/SaleModal";
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode } from "../utils";
-import { newCheckoutGetStripeReaders, readActiveSale } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import {
   dbListenToSettings,
   dbListenToOpenWorkorders,
@@ -316,8 +316,13 @@ export function BaseScreen() {
       // log("inventory", data);
     });
 
+    let activeSalesRecoveryDone = false;
     dbListenToActiveSales((data) => {
       useActiveSalesStore.getState().setActiveSales(data);
+      if (!activeSalesRecoveryDone) {
+        activeSalesRecoveryDone = true;
+        recoverPendingActiveSales(data);
+      }
     });
 
     // Recover any pending auto-text messages from localStorage (crash recovery)

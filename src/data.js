@@ -1028,6 +1028,8 @@ export const SETTINGS_OBJ = {
   printers: {
 
   },
+  labelLayouts: [],
+  selectedLabelPrinterID: "",
   autoSMSIntakeReceipt: true,
   autoEmailIntakeReceipt: true,
   autoPrintIntakeReceipt: true,

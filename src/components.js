@@ -3511,7 +3511,7 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
         placeholder={isCredit ? "Reason (required)" : "Note (optional)"}
           placeholderTextColor={gray(0.35)}
           value={sDepositNote}
-          onChangeText={(val) => _sSetDepositNote(val)}
+          onChangeText={(val) => _sSetDepositNote(val.length === 1 ? val.toUpperCase() : val.charAt(0).toUpperCase() + val.slice(1))}
           debounceMs={0}
           multiline={true}
           numberOfLines={5}

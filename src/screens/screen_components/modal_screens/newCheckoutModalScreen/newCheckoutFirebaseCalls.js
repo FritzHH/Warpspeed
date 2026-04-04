@@ -9,8 +9,9 @@ import {
   firestoreCount,
 } from "../../../../db_calls";
 import { useSettingsStore, useOpenWorkordersStore } from "../../../../stores";
-import { log } from "../../../../utils";
-import { ITEM_SALE_PROTO } from "../../../../data";
+import { log, generateEAN13Barcode } from "../../../../utils";
+import { ITEM_SALE_PROTO, CUSTOMER_DEPOSIT_PROTO } from "../../../../data";
+import { recomputeSaleAmounts, getAllAppliedCredits } from "./newCheckoutUtils";
 import { cloneDeep } from "lodash";
 
 // ─── Callable Function References ─────────────────────────────
@@ -738,4 +739,97 @@ export async function queryCompletedSalesReport(startMillis, endMillis) {
     log("queryCompletedSalesReport error:", error);
     return [];
   }
+}
+
+// ─── Pending Transaction Recovery (App Init) ─────────────────────
+// Runs once on first active-sales snapshot. Reconciles sales that have
+// pendingTransactionIDs left over from a page reload or network drop
+// while a card payment was in flight. The Stripe webhook writes the
+// transaction doc to Firestore independently, so if it exists we can
+// promote the pending ID and complete the sale client-side.
+
+export async function recoverPendingActiveSales(activeSales) {
+  if (!activeSales?.length) return;
+
+  let salesToRecover = activeSales.filter((s) => s.pendingTransactionIDs?.length > 0);
+  if (!salesToRecover.length) return;
+
+  log("recoverPendingActiveSales: found", salesToRecover.length, "sale(s) with pending transactions");
+
+  for (let sale of salesToRecover) {
+    try {
+      // Load existing confirmed transactions
+      let loadedTxns = [];
+      if (sale.transactionIDs?.length > 0) {
+        loadedTxns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
+      }
+
+      // Check pending transactions — did the webhook write them?
+      let pendingResults = await readTransactions(sale.pendingTransactionIDs);
+      for (let i = 0; i < sale.pendingTransactionIDs.length; i++) {
+        let txn = pendingResults[i];
+        if (txn) {
+          loadedTxns.push(txn);
+          if (!(sale.transactionIDs || []).includes(txn.id)) {
+            sale.transactionIDs = [...(sale.transactionIDs || []), txn.id];
+          }
+          log("recoverPendingActiveSales: recovered transaction", txn.id, "for sale", sale.id);
+        }
+      }
+      sale.pendingTransactionIDs = [];
+
+      // Recompute amounts with reconciled transactions
+      let credits = getAllAppliedCredits(sale);
+      recomputeSaleAmounts(sale, loadedTxns, credits);
+
+      // Deposit sale fully paid → complete the deposit on the customer
+      if (sale.isDepositSale && sale.paymentComplete && sale.customerID) {
+        await _completeRecoveredDeposit(sale, loadedTxns);
+      } else {
+        // Persist the reconciled state (clears ghost pending IDs)
+        await writeActiveSale(sale);
+      }
+    } catch (e) {
+      log("recoverPendingActiveSales error for sale", sale.id, ":", e?.message || e);
+    }
+  }
+}
+
+async function _completeRecoveredDeposit(sale, transactions) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID || !sale.customerID) return;
+
+  // Read the customer
+  let customerPath = `tenants/${tenantID}/stores/${storeID}/customers/${sale.customerID}`;
+  let customer = await firestoreRead(customerPath);
+  if (!customer) {
+    log("_completeRecoveredDeposit: customer not found", sale.customerID);
+    await writeActiveSale(sale); // at least persist the reconciled state
+    return;
+  }
+
+  // Build deposit from sale + transaction data
+  let primaryTxn = transactions[0];
+  let newDeposit = { ...CUSTOMER_DEPOSIT_PROTO };
+  newDeposit.id = generateEAN13Barcode();
+  newDeposit.transactionId = primaryTxn?.id || "";
+  newDeposit.amountCents = sale.subtotal || 0;
+  newDeposit.millis = Date.now();
+  newDeposit.method = primaryTxn?.method || "card";
+  newDeposit.note = sale.depositNote || "";
+  newDeposit.last4 = primaryTxn?.last4 || "";
+  newDeposit.type = sale.depositType === "giftcard" ? "giftcard" : "deposit";
+
+  // Add deposit to customer and persist
+  customer.deposits = [...(customer.deposits || []), newDeposit];
+  await firestoreWrite(customerPath, customer);
+
+  // Write all transactions (idempotent — webhook may have already written them)
+  await Promise.all(transactions.map((t) => writeTransaction(t)));
+
+  // Delete the active sale
+  await deleteActiveSale(sale.id);
+
+  log("_completeRecoveredDeposit: deposit added to customer", sale.customerID,
+    "amount:", sale.subtotal, "method:", newDeposit.method, "sale deleted:", sale.id);
 }

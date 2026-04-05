@@ -867,26 +867,42 @@ export const useCurrentCustomerStore = create(
     {
       name: "warpspeed_customer",
       partialize: (s) => ({ customer: s.customer }),
-      onRehydrateStorage: () => (state, error) => {
-        if (error || !state) return;
-        const cachedCustomer = state.customer;
-        if (cachedCustomer?.id) {
-          dbGetCustomer(cachedCustomer.id).then((freshCustomer) => {
-            if (freshCustomer) {
-              useCurrentCustomerStore.setState({ customer: freshCustomer, customerRefreshed: true });
-            } else {
-              useCurrentCustomerStore.setState({ customerRefreshed: true });
-            }
-          }).catch(() => {
-            useCurrentCustomerStore.setState({ customerRefreshed: true });
-          });
-        } else {
-          useCurrentCustomerStore.setState({ customerRefreshed: true });
-        }
-      },
     }
   )
 );
+
+// Run after store is fully created to avoid "cannot access before initialization" error
+function _initCustomerRefresh() {
+  const cachedCustomer = useCurrentCustomerStore.getState().customer;
+  if (cachedCustomer?.id) {
+    const fetchFreshCustomer = () => {
+      dbGetCustomer(cachedCustomer.id).then((freshCustomer) => {
+        if (freshCustomer) {
+          useCurrentCustomerStore.setState({ customer: freshCustomer, customerRefreshed: true });
+        } else {
+          useCurrentCustomerStore.setState({ customerRefreshed: true });
+        }
+      }).catch(() => {
+        useCurrentCustomerStore.setState({ customerRefreshed: true });
+      });
+    };
+    if (useSettingsStore.persist.hasHydrated()) {
+      fetchFreshCustomer();
+    } else {
+      useSettingsStore.persist.onFinishHydration(fetchFreshCustomer);
+    }
+  } else {
+    useCurrentCustomerStore.setState({ customerRefreshed: true });
+  }
+}
+// Defer to next microtask so all stores are initialized
+Promise.resolve().then(() => {
+  if (useCurrentCustomerStore.persist.hasHydrated()) {
+    _initCustomerRefresh();
+  } else {
+    useCurrentCustomerStore.persist.onFinishHydration(_initCustomerRefresh);
+  }
+});
 
 export const useCustMessagesStore = create((set, get) => ({
   incomingMessages: [],
@@ -1209,7 +1225,29 @@ function appendToChangeLog(workorder, fieldName, oldVal, newVal) {
       if (entries.length === 0) return;
       let updatedLog = [...(currentWo.changeLog || []), ...entries];
       let updatedWo = { ...currentWo, changeLog: updatedLog };
-      useOpenWorkordersStore.getState().setWorkorder(updatedWo);
+      const woID = workorder.id;
+      // Mark changeLog dirty so the Firestore echo doesn't overwrite it
+      const dirtyFields = useOpenWorkordersStore.getState()._dirtyFields;
+      const ts = Date.now();
+      const woDirty = { ...dirtyFields[woID], changeLog: ts };
+      const dirtySnapshot = { ...woDirty };
+      useOpenWorkordersStore.setState({ _dirtyFields: { ...dirtyFields, [woID]: woDirty } });
+      // Update store locally, skip DB (we handle the write + dirty cleanup below)
+      useOpenWorkordersStore.getState().setWorkorder(updatedWo, false);
+      dbSaveOpenWorkorder(updatedWo).then(() => {
+        const currentDirty = useOpenWorkordersStore.getState()._dirtyFields[woID];
+        if (!currentDirty) return;
+        const cleaned = { ...currentDirty };
+        for (const k of Object.keys(dirtySnapshot)) {
+          if (cleaned[k] === dirtySnapshot[k]) delete cleaned[k];
+        }
+        if (Object.keys(cleaned).length === 0) {
+          const { [woID]: _, ...rest } = useOpenWorkordersStore.getState()._dirtyFields;
+          useOpenWorkordersStore.setState({ _dirtyFields: rest });
+        } else {
+          useOpenWorkordersStore.setState({ _dirtyFields: { ...useOpenWorkordersStore.getState()._dirtyFields, [woID]: cleaned } });
+        }
+      });
     }, 2000);
     return null; // don't append immediately
   }

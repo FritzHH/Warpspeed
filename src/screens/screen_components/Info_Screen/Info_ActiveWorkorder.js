@@ -12,6 +12,7 @@ import {
   gray,
   lightenRGBByPercent,
   log,
+  deepEqual,
   printBuilder,
   removeUnusedFields,
   resolveStatus,
@@ -76,10 +77,13 @@ const RECEIPT_DROPDOWN_SELECTIONS = [
 
 export const ActiveWorkorderComponent = ({}) => {
   // store getters ///////////////////////////////////////////////////////////////////
-  const zOpenWorkorder = useOpenWorkordersStore((state) => {
-    let id = state.workorderPreviewID || state.openWorkorderID;
-    return state.workorders.find((o) => o.id === id) || null;
-  });
+  const zOpenWorkorder = useOpenWorkordersStore(
+    (state) => {
+      let id = state.workorderPreviewID || state.openWorkorderID;
+      return state.workorders.find((o) => o.id === id) || null;
+    },
+    deepEqual
+  );
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
   const zIsLocked = useOpenWorkordersStore((state) => !!state.lockedWorkorderID && state.lockedWorkorderID === (state.workorderPreviewID || state.openWorkorderID));
   const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);

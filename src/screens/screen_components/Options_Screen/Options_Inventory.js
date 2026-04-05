@@ -1226,7 +1226,7 @@ export function InventoryComponent({}) {
                       paddingVertical: 8,
                     }}
                     textStyle={{
-                      fontSize: getQuickButtonFontSize(btn.name, 13),
+                      fontSize: getQuickButtonFontSize(btn.name, 12),
                       fontWeight: 400,
                       color: C.textWhite,
                     }}

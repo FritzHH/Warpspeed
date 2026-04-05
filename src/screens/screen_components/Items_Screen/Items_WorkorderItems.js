@@ -527,7 +527,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           }}
         >
           <Text style={{ color: "black", fontSize: 12, fontWeight: "600" }}>
-            Sale in progress - go to checkout to remove/reduce items
+            Sale in progress - go to checkout to edit items
           </Text>
         </Animated.View>
       )}
@@ -985,11 +985,12 @@ export const LineItemComponent = ({
             </Tooltip>
             }
             <Button_
-              enabled={!isLocked}
+              enabled={!isLocked && !hasActiveSale}
               onPress={() => __modQtyPressed(workorderLine, "up", index)}
               buttonStyle={{
                 backgroundColor: "transparent",
                 paddingHorizontal: 3,
+                opacity: hasActiveSale ? 0.3 : 1,
               }}
               icon={ICONS.upArrowOrange}
               iconSize={23}
@@ -1014,7 +1015,7 @@ export const LineItemComponent = ({
               }}
             >
               <TextInput_
-                editable={!isLocked}
+                editable={!isLocked && !hasActiveSale}
                 debounceMs={0}
                 maxLength={4}
                 style={{

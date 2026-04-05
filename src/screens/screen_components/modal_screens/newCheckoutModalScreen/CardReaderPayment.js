@@ -123,6 +123,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   onCardProcessingEnd,
   onSwitchToManual,
   onPaymentStarted,
+  onPaymentFailed,
   lockAmount = false,
   transactionId = null,
   onTransactionIdUsed,
@@ -137,8 +138,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   const autoLoadedRef = useRef(false);
   const prevAmountLeftRef = useRef(0);
   const pendingTransactionIDRef = useRef(null);
-  const callbacksRef = useRef({ onPaymentCapture, onCardProcessingEnd, onCardProcessingStart, amountLeftToPay });
-  callbacksRef.current = { onPaymentCapture, onCardProcessingEnd, onCardProcessingStart, amountLeftToPay };
+  const callbacksRef = useRef({ onPaymentCapture, onCardProcessingEnd, onCardProcessingStart, onPaymentFailed, amountLeftToPay });
+  callbacksRef.current = { onPaymentCapture, onCardProcessingEnd, onCardProcessingStart, onPaymentFailed, amountLeftToPay };
 
   const showSuccessRef = useRef(null);
   showSuccessRef.current = (payment) => {
@@ -204,11 +205,14 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
         if (data.status === "failed" || data.failure_code || data.decline_code) {
           if (s._cardTimeout) { clearTimeout(s._cardTimeout); s._cardTimeout = null; }
+          let failedID = pendingTransactionIDRef.current;
+          pendingTransactionIDRef.current = null;
           s.setCardError(buildCompletionError(data));
           s.setCardMessage("");
           s.setCardStatus("idle");
           s.setPaymentIntentID(null);
           cleanupStoreListeners();
+          if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
           if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
           return;
         }
@@ -228,11 +232,14 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
     store._cardTimeout = setTimeout(() => {
       let s = useStripePaymentStore.getState();
+      let failedID = pendingTransactionIDRef.current;
+      pendingTransactionIDRef.current = null;
       s.setCardError("Payment timed out — card reader may be unresponsive");
       s.setCardMessage("");
       s.setCardStatus("idle");
       s.setPaymentIntentID(null);
       cleanupStoreListeners();
+      if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
       if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     }, PAYMENT_TIMEOUT_MS);
   }
@@ -351,9 +358,12 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       );
 
       if (!result?.success) {
+        let failedID = pendingTransactionIDRef.current;
+        pendingTransactionIDRef.current = null;
         _zSetCardError(result?.message || "Payment initiation failed");
         _zSetCardMessage("");
         _zSetCardStatus("failed");
+        if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
         if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
         return;
       }
@@ -366,6 +376,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       setupListeners(activeReader.id, piID);
     } catch (error) {
       log("newCheckout card payment error:", error);
+      let failedID = pendingTransactionIDRef.current;
+      pendingTransactionIDRef.current = null;
       let msg = error?.message || "Payment failed";
       let code = error?.code || "";
 
@@ -381,6 +393,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       }
       _zSetCardMessage("");
       cleanupStoreListeners();
+      if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
       if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     }
   }
@@ -394,8 +407,11 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
     try {
       let result = await newCheckoutCancelStripePayment(activeReader.id);
+      let failedID = pendingTransactionIDRef.current;
+      pendingTransactionIDRef.current = null;
       _zSetCardMessage(result?.message || "Reader cleared");
       _zResetCardTransaction();
+      if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
       if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     } catch (error) {
       log("clearReader error:", error);

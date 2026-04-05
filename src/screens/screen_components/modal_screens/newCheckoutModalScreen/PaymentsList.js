@@ -3,7 +3,7 @@ import { memo } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
 import { Tooltip, Pressable_ } from "../../../../components";
-import { formatCurrencyDisp, gray } from "../../../../utils";
+import { formatCurrencyDisp, formatMillisForDisplay, gray } from "../../../../utils";
 
 const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
   let isCash = payment.method === "cash";
@@ -47,7 +47,7 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
           {getPaymentLabel()}
         </Text>
         {fullyRefunded && (
-          <View style={{ backgroundColor: C.red, borderRadius: 5, paddingVertical: 2, paddingHorizontal: 8 }}>
+          <View style={{ backgroundColor: gray(0.5), borderRadius: 5, paddingVertical: 2, paddingHorizontal: 8 }}>
             <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>Fully Refunded</Text>
           </View>
         )}
@@ -56,7 +56,7 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
             <TouchableOpacity
               onPress={(e) => { e.stopPropagation(); onRefund(); }}
               style={{
-                backgroundColor: isCash ? C.green : C.blue,
+                backgroundColor: C.green,
                 borderRadius: 5,
                 paddingVertical: 2,
                 paddingHorizontal: 8,
@@ -158,7 +158,7 @@ const CreditRow = memo(function CreditRow({ credit, onPrintDepositReceipt, onRem
     return "DEPOSIT";
   }
 
-  let labelColor = isGiftCard ? C.orange : (paidByCash ? C.orange : C.blue);
+  let labelColor = isGiftCard ? C.orange : isCredit ? C.orange : C.blue;
 
   let content = (
     <View
@@ -204,17 +204,17 @@ const CreditRow = memo(function CreditRow({ credit, onPrintDepositReceipt, onRem
         </View>
       )}
 
-      {/* Card details for deposits paid by card */}
-      {(paidByCard && credit._last4) ? (
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text style={{ color: gray(0.4), fontSize: 13 }}>
-            {"***" + credit._last4}
+      {/* Date and payment details */}
+      {credit._millis ? (
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: gray(0.4), fontSize: 12 }}>
+            {formatMillisForDisplay(credit._millis)}
           </Text>
+          {!isCredit && (
+            <Text style={{ color: gray(0.4), fontSize: 12 }}>
+              {paidByCard && credit._last4 ? "Card ***" + credit._last4 : paidByCash ? "Cash" : ""}
+            </Text>
+          )}
         </View>
       ) : null}
 

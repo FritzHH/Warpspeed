@@ -55,7 +55,7 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToCustomerMessages } from "../../../db_calls_wrapper";
+import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToCustomerMessages, dbToggleSMSForwarding, dbGetConversationForwardState } from "../../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { sendSaleReceipt } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 
@@ -103,10 +103,12 @@ export function MessagesComponent({}) {
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
   const [sCustomPhone, _setCustomPhone] = useState("");
   const [sCustomPhoneMessages, _setCustomPhoneMessages] = useState([]);
+  const [sForwardReplies, _setForwardReplies] = useState(false);
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const cursorPositionRef = useRef(0);
+  const forwardLoadedPhoneRef = useRef(null);
 
   const {
     translatedText, isEnToEs, isLoading: sTranslateLoading,
@@ -172,6 +174,17 @@ export function MessagesComponent({}) {
 
   // log("res", sCanRespond);
   useEffect(() => {
+    // Load forwarding state once per phone number change
+    const phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
+    if (phone && phone.length === 10 && phone !== forwardLoadedPhoneRef.current) {
+      forwardLoadedPhoneRef.current = phone;
+      const currentUser = useLoginStore.getState().getCurrentUser();
+      if (currentUser?.id) {
+        dbGetConversationForwardState(phone, currentUser.id).then(isForwarding => {
+          _setForwardReplies(isForwarding);
+        });
+      }
+    }
     try {
       let arr = combine2ArraysOrderByMillis(
         zIncomingMessagesArr,
@@ -225,6 +238,28 @@ export function MessagesComponent({}) {
     flipDirection();
     let newTarget = isEnToEs ? "en" : "es";
     if (sTranslateActive && sNewMessage.trim()) doTranslate(sNewMessage, newTarget);
+  }
+
+  async function handleToggleForwardReplies() {
+    const phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
+    if (!phone || phone.length !== 10) return;
+    const currentUser = useLoginStore.getState().getCurrentUser();
+    if (!currentUser?.id) return;
+    if (!currentUser?.phone) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Phone Number",
+        message: "Your account needs a personal phone number to enable SMS forwarding. Ask an admin to add one.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    const newState = !sForwardReplies;
+    _setForwardReplies(newState);
+    const result = await dbToggleSMSForwarding(phone, currentUser.id, newState, currentUser.phone, currentUser.first);
+    if (!result.success) _setForwardReplies(!newState);
   }
 
   async function sendMessage(text, imageUrl = "") {
@@ -463,6 +498,8 @@ export function MessagesComponent({}) {
     _setCustomPhoneMessages([]);
     _setCanRespond(true);
     _setNewMessage("");
+    _setForwardReplies(false);
+    forwardLoadedPhoneRef.current = null;
     clearTranslation();
   }
 
@@ -471,6 +508,8 @@ export function MessagesComponent({}) {
     _setCustomPhone("");
     _setCustomPhoneMessages([]);
     _setNewMessage("");
+    _setForwardReplies(false);
+    forwardLoadedPhoneRef.current = null;
     clearTranslation();
   }
 
@@ -721,6 +760,12 @@ export function MessagesComponent({}) {
                     </TouchableOpacity>
                   )}
                 </View>
+                <CheckBox_
+                  text={"Forward replies"}
+                  isChecked={sForwardReplies}
+                  onCheck={handleToggleForwardReplies}
+                  enabled={hasActivePhone}
+                />
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <Button_

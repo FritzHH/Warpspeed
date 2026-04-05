@@ -1624,56 +1624,31 @@ exports.incomingSMSEnhanced = onRequest(
           });
         }
 
-        // 6b: Forward SMS to last sender if they have forwardSMS enabled
-        const lastOutgoing = await db
-          .collection("customer_phone")
-          .doc(normalizedPhone)
-          .collection("messages")
-          .where("type", "==", "outgoing")
-          .orderBy("millis", "desc")
-          .limit(1)
-          .get();
-
-        if (!lastOutgoing.empty) {
-          const lastMsg = lastOutgoing.docs[0].data();
-          const senderID = lastMsg.senderUserObj?.id;
-
-          if (senderID) {
-            // Fetch settings to get current user data
-            const settingsSnap = await db
-              .collection("tenants")
-              .doc(tenantID)
-              .collection("stores")
-              .doc(storeID)
-              .collection("settings")
-              .doc("settings")
-              .get();
-            const settings = settingsSnap.exists ? settingsSnap.data() : {};
-            const users = settings.users || [];
-            const senderUser = users.find((u) => u.id === senderID);
-
-            if (senderUser && senderUser.forwardSMS && senderUser.phone) {
-              // Lazy-init Twilio client if needed
-              if (!twilioClient) {
-                twilioClient = require("twilio")(
-                  twilioSecretAccountNumber.value(),
-                  twilioSecretKey.value()
-                );
-              }
-
-              const forwardBody = `New SMS from ${customerData.first || ""} ${customerData.last || ""}: ${incomingMessage}`;
+        // 6b: Forward SMS to all users in the forwardTo map
+        const forwardTo = conversationData.forwardTo || {};
+        const forwardEntries = Object.entries(forwardTo);
+        if (forwardEntries.length > 0) {
+          if (!twilioClient) {
+            twilioClient = require("twilio")(
+              twilioSecretAccountNumber.value(),
+              twilioSecretKey.value()
+            );
+          }
+          const forwardBody = `Reply from ${customerData.first || ""} ${customerData.last || ""}: ${incomingMessage}`;
+          const fromNumber = twilioData.To || "+12393171234";
+          await Promise.all(forwardEntries.map(async ([userID, userData]) => {
+            try {
+              if (!userData.phone) return;
               await twilioClient.messages.create({
                 body: forwardBody,
-                to: `+1${senderUser.phone}`,
-                from: twilioData.To || "+12393171234",
+                to: `+1${userData.phone}`,
+                from: fromNumber,
               });
-
-              log("Forwarded SMS to staff user", {
-                userID: senderID,
-                userName: `${senderUser.first} ${senderUser.last}`,
-              });
+              log("Forwarded SMS to user", { userID, userName: userData.first });
+            } catch (fwdError) {
+              log("Error forwarding SMS to user", { userID, error: fwdError.message });
             }
-          }
+          }));
         }
       } catch (step6Error) {
         // Non-blocking — don't fail the incoming SMS response

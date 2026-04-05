@@ -1,7 +1,7 @@
 /* eslint-disable */
-import { View, Text, TextInput } from "react-native-web";
+import { View, Text, TextInput, Image } from "react-native-web";
 import { useState, memo } from "react";
-import { C, Fonts } from "../../../../styles";
+import { C, Fonts, ICONS } from "../../../../styles";
 import {
   formatCurrencyDisp,
   usdTypeMask,
@@ -239,18 +239,26 @@ export const RefundTotals = memo(function RefundTotals({
       {refundComplete && (
         <View
           style={{
-            backgroundColor: "rgb(232, 243, 239)",
-            borderRadius: 6,
-            padding: 8,
-            marginTop: 8,
+            backgroundColor: C.green,
+            borderRadius: 10,
+            paddingBottom: 10,
+            paddingHorizontal: 14,
+            marginTop: 4,
             alignItems: "center",
+            justifyContent: "center",
           }}
         >
+          <Image
+            source={ICONS.popperCelebration}
+            style={{ width: 130, height: 130, marginTop: -5 }}
+            resizeMode="contain"
+          />
           <Text
             style={{
-              fontSize: 14,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.green,
+              fontSize: 17,
+              fontWeight: Fonts.weight.textSuperheavy,
+              color: "white",
+              letterSpacing: 1.5,
             }}
           >
             REFUND COMPLETE

@@ -132,8 +132,28 @@ export function updateSaleWithTotals(sale, combinedWorkorders, settings) {
 
 // ─── Credit/Deposit Helpers ─────────────────────────────────
 
-export function getAllAppliedCredits(sale) {
-  return [...(sale?.creditsApplied || []), ...(sale?.depositsApplied || [])];
+export function getAllAppliedCredits(sale, customer) {
+  let raw = [...(sale?.creditsApplied || []), ...(sale?.depositsApplied || [])];
+  if (!customer) return raw;
+  let custCredits = customer.credits || [];
+  let custDeposits = customer.deposits || [];
+  return raw.map((c) => {
+    if (c._method) return c; // already hydrated
+    let isCredit = c.type === "credit";
+    let source = isCredit
+      ? custCredits.find((d) => d.id === c.id)
+      : custDeposits.find((d) => d.id === c.id);
+    if (!source) return c;
+    return {
+      ...c,
+      _originalAmount: source.amountCents || 0,
+      _note: isCredit ? (source.text || "") : (source.note || ""),
+      _last4: source.last4 || "",
+      _method: source.method || "cash",
+      _millis: source.millis || 0,
+      _depositSaleID: source.saleID || "",
+    };
+  });
 }
 
 // ─── Recompute Sale Amounts ──────────────────────────────────

@@ -354,7 +354,7 @@ export function NewCheckoutModalScreen() {
         if (existingSale.transactionIDs?.length > 0) {
           loadedTxns = (await readTransactions(existingSale.transactionIDs)).filter(Boolean);
         }
-        let loadedCredits = getAllAppliedCredits(existingSale);
+        let loadedCredits = getAllAppliedCredits(existingSale, useCurrentCustomerStore.getState().customer);
 
         // Reconcile pending transactions (crash recovery)
         if (existingSale.pendingTransactionIDs?.length > 0) {
@@ -497,7 +497,7 @@ export function NewCheckoutModalScreen() {
     if (sale.transactionIDs?.length > 0) {
       loadedTxns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
     }
-    let loadedCredits = getAllAppliedCredits(sale);
+    let loadedCredits = getAllAppliedCredits(sale, useCurrentCustomerStore.getState().customer);
     _setTransactions(loadedTxns);
     _setCredits(loadedCredits);
 
@@ -602,7 +602,7 @@ export function NewCheckoutModalScreen() {
         }
         if (orphanedSale) {
           // Carry over any applied credits/deposits before deleting
-          carriedCredits = getAllAppliedCredits(orphanedSale);
+          carriedCredits = getAllAppliedCredits(orphanedSale, useCurrentCustomerStore.getState().customer);
           await deleteActiveSale(orphanedSale.id);
         }
       }
@@ -634,6 +634,16 @@ export function NewCheckoutModalScreen() {
     let newArr = sCombinedWorkorders.map((wo) =>
       wo.id === woId ? { ...wo, workorderLines: newLines } : wo
     );
+
+    // Floor check: never allow total to drop below amountCaptured
+    if ((sSale?.amountCaptured || 0) > 0) {
+      let preview = updateSaleWithTotals(sSale, newArr, zSettings);
+      if (preview.total < sSale.amountCaptured) {
+        log("handleWorkorderLineChange: blocked — new total", preview.total, "below amountCaptured", sSale.amountCaptured);
+        return;
+      }
+    }
+
     _setCombinedWorkorders(newArr);
     let woStore = useOpenWorkordersStore.getState();
     let fullWO = newArr.find((wo) => wo.id === woId);
@@ -862,6 +872,14 @@ export function NewCheckoutModalScreen() {
     _setSale(sale);
 
     // Persist the pending transaction ID on the sale (already in Firestore)
+    if (!sDevSkip) persistSale(sale);
+  }
+
+  function handlePaymentFailed(transactionID) {
+    if (!transactionID) return;
+    let sale = cloneDeep(sSale);
+    sale.pendingTransactionIDs = (sale.pendingTransactionIDs || []).filter((id) => id !== transactionID);
+    _setSale(sale);
     if (!sDevSkip) persistSale(sale);
   }
 
@@ -1596,6 +1614,7 @@ export function NewCheckoutModalScreen() {
                   amountLeftToPay={amountLeftToPay}
                   onPaymentCapture={handlePaymentCapture}
                   onPaymentStarted={handlePaymentStarted}
+                  onPaymentFailed={handlePaymentFailed}
                   saleComplete={saleComplete}
                   saleID={sSale?.id || ""}
                   customerID={sSale?.customerID || zCustomer?.id || ""}
@@ -1612,6 +1631,7 @@ export function NewCheckoutModalScreen() {
                   amountLeftToPay={amountLeftToPay}
                   onPaymentCapture={handlePaymentCapture}
                   onPaymentStarted={handlePaymentStarted}
+                  onPaymentFailed={handlePaymentFailed}
                     stripeReaders={zStripeReaders}
                     settings={zSettings}
                     saleComplete={saleComplete}

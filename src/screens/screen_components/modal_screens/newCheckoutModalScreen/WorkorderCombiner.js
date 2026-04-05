@@ -222,7 +222,16 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                 let oneUnitWithTax = price + Math.round(price * effectiveTaxPercent / 100);
                 let canDelete = !hasPayments || lineWithTax <= buffer;
                 let canQtyDown = (line.qty > 1) && (!hasPayments || oneUnitWithTax <= buffer);
-                let canDiscount = !hasPayments;
+                let lineTotal = price * (line.qty || 1);
+                let currentSavings = line.discountObj?.savings || 0;
+                let safeDiscounts = discounts.filter((o) => {
+                  if (o.type === "$" && Number(o.value) > lineTotal) return false;
+                  if (!hasPayments) return true;
+                  let newSavings = o.type === "%" ? Math.round(lineTotal * (Number(o.value) / 100)) : Math.min(Number(o.value), lineTotal);
+                  let additional = newSavings - currentSavings;
+                  if (additional <= 0) return true;
+                  return additional + Math.round(additional * effectiveTaxPercent / 100) <= buffer;
+                });
 
                 return (
                   <View
@@ -233,7 +242,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                       style={{
                         flexDirection: "row",
                         width: "100%",
-                        alignItems: "center",
+                        // alignItems: "center",
                         backgroundColor: line.inventoryItem?.customLabor ? lightenRGBByPercent(C.blue, 80) : line.inventoryItem?.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
                         paddingVertical: 3,
                         paddingRight: 5,
@@ -242,7 +251,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                         borderColor: C.listItemBorder,
                         borderLeftColor: line.discountObj?.name ? C.lightred : lightenRGBByPercent(C.green, 60),
                         borderWidth: 1,
-                        borderRadius: 15,
+                        borderRadius: 7,
                         borderLeftWidth: 3,
                       }}
                     >
@@ -251,12 +260,11 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                           width: "60%",
                           justifyContent: "center",
                           flexDirection: "column",
-                          overflow: "hidden",
                         }}
                       >
                         <View style={{ width: "100%" }}>
                           {!!(line.discountObj?.name || line.discountObj?.discountName) && (
-                            <View style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <View style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center" }}>
                               <Text style={{ color: C.lightred, fontSize: 12, marginRight: 5 }}>
                                 {line.discountObj.name || line.discountObj.discountName}
                               </Text>
@@ -273,8 +281,9 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                 fontSize: 15,
                                 color: C.text,
                                 fontWeight: "400",
-                                flex: 1,
+                                // flex: 1,
                               }}
+
                               numberOfLines={2}
                             >
                               {line.inventoryItem?.formalName ? (
@@ -327,7 +336,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                   paddingHorizontal: 3,
                                 }}
                                 icon={ICONS.upArrowOrange}
-                                iconSize={23}
+                                iconSize={19}
                               />
                               <Button_
                                 enabled={canQtyDown}
@@ -338,19 +347,19 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                   opacity: canQtyDown ? 1 : 0.25,
                                 }}
                                 icon={ICONS.downArrowOrange}
-                                iconSize={23}
+                                iconSize={19}
                               />
                               <GradientView
                                 style={{
-                                  marginLeft: 7,
-                                  borderRadius: 15,
-                                  width: 31,
-                                  height: 23,
+                                  marginLeft: 2,
+                                  borderRadius: 10,
+                                  width: 30,
+                                  height: 22,
                                 }}
                               >
                                 <Text
                                   style={{
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: "500",
                                     textAlign: "center",
                                     color: C.textWhite,
@@ -364,8 +373,8 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                             <View
                               style={{
                                 alignItems: "flex-end",
-                                minWidth: 85,
-                                marginHorizontal: 5,
+                                minWidth: 65,
+                                marginHorizontal: 3,
                                 borderWidth: 1,
                                 borderRadius: 7,
                                 borderColor: C.listItemBorder,
@@ -380,6 +389,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                   style={{
                                     color: C.text,
                                     textDecorationLine: line.discountObj?.newPrice != null ? "line-through" : "none",
+                                    fontSize: 13
                                   }}
                                 >
                                   {"$ " + formatCurrencyDisp(price)}
@@ -390,6 +400,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                   fontWeight: "500",
                                   minWidth: 30,
                                   color: C.text,
+                                  fontSize: 13
                                 }}
                               >
                                 {line.discountObj?.newPrice != null
@@ -406,19 +417,18 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                               }}
                             >
                               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                {canDiscount && (
                                   <Tooltip text="Discounts" position="top">
                                     <DropdownMenu
                                       buttonIcon={ICONS.dollarYellow}
                                       buttonIconSize={22}
                                       modalCoordY={25}
                                       modalCoordX={-100}
-                                      isDiscountMenu={true}
-                                      discountMaxCents={line.inventoryItem.price * (line.qty || 1)}
+                                    isDiscountMenu={!hasPayments}
+                                    discountMaxCents={lineTotal}
                                       buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
                                       dataArr={[
                                         { label: "No Discount" },
-                                        ...discounts.filter((o) => o.type !== "$" || Number(o.value) <= line.inventoryItem.price * (line.qty || 1)).map((o) => ({ label: o.name })),
+                                        ...safeDiscounts.map((o) => ({ label: o.name })),
                                       ]}
                                       onSelect={(item) => {
                                         if (item._customDiscount) {
@@ -430,8 +440,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                         }
                                       }}
                                     />
-                                  </Tooltip>
-                                )}
+                                </Tooltip>
                               </View>
                               <Tooltip text="Remove" position="top">
                                 <Button_
@@ -441,7 +450,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                   iconSize={21}
                                   buttonStyle={{
                                     paddingRight: 2,
-                                    marginLeft: canDiscount ? -8 : 0,
+                                    marginLeft: -8,
                                     opacity: canDelete ? 1 : 0.25,
                                   }}
                                 />

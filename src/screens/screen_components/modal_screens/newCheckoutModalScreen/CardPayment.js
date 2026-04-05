@@ -37,6 +37,7 @@ function CardPaymentForm({
   onCardProcessingEnd,
   onSwitchToReader,
   onPaymentStarted,
+  onPaymentFailed,
   lockAmount = false,
   transactionId = null,
   onTransactionIdUsed,
@@ -193,12 +194,14 @@ function CardPaymentForm({
       } else {
         _setError(result?.message || "Payment failed");
         _setProcessing(false);
+        if (onPaymentFailed) onPaymentFailed(transactionID);
         if (onCardProcessingEnd) onCardProcessingEnd();
       }
     } catch (error) {
       log("CardPayment charge error:", error);
       _setError(error?.message || "Payment failed");
       _setProcessing(false);
+      if (onPaymentFailed) onPaymentFailed(transactionID);
       if (onCardProcessingEnd) onCardProcessingEnd();
     }
   }

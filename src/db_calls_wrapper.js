@@ -45,7 +45,7 @@ import {
   sendPasswordResetEmail,
   updatePassword,
 } from "firebase/auth";
-import { collection, doc, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, doc, query, orderBy, onSnapshot, deleteField } from "firebase/firestore";
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -2840,6 +2840,39 @@ export async function dbSendSMS(
       },
       timestamp: new Date().toISOString(),
     };
+  }
+}
+
+export async function dbToggleSMSForwarding(phone, userID, enable, userPhone, userFirst) {
+  try {
+    const cleanPhone = (phone || "").replace(/\D/g, "");
+    if (cleanPhone.length !== 10) return { success: false, error: "Invalid phone" };
+    if (!userID) return { success: false, error: "No user ID" };
+    const path = `customer_phone/${cleanPhone}`;
+    const fieldKey = `forwardTo.${userID}`;
+    if (enable) {
+      if (!userPhone) return { success: false, error: "No user phone" };
+      await firestoreUpdate(path, { [fieldKey]: { phone: userPhone, first: userFirst || "" } });
+    } else {
+      await firestoreUpdate(path, { [fieldKey]: deleteField() });
+    }
+    log("SMS forwarding toggled", { phone: cleanPhone, userID, enable });
+    return { success: true };
+  } catch (error) {
+    log("Error toggling SMS forwarding", { error: error.message, phone, userID });
+    return { success: false, error: error.message };
+  }
+}
+
+export async function dbGetConversationForwardState(phone, userID) {
+  try {
+    const cleanPhone = (phone || "").replace(/\D/g, "");
+    if (cleanPhone.length !== 10 || !userID) return false;
+    const data = await firestoreRead(`customer_phone/${cleanPhone}`);
+    return !!(data?.forwardTo?.[userID]);
+  } catch (error) {
+    log("Error reading forward state", { error: error.message, phone });
+    return false;
   }
 }
 

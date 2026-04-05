@@ -19,6 +19,7 @@ import {
   onSnapshot,
   writeBatch as firestoreWriteBatch,
   getCountFromServer,
+  deleteField,
 } from "firebase/firestore";
 import {
   getDatabase,

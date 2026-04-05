@@ -2,8 +2,8 @@
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, memo, useMemo } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_ } from "../../../../components";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, DropdownMenu, Image_ } from "../../../../components";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   useSettingsStore,
   useLoginStore,
@@ -47,6 +47,7 @@ import { CardRefund } from "./CardRefund";
 import { RefundTotals } from "./RefundTotals";
 import { RefundItemSelector } from "./RefundItemSelector";
 import { RefundPaymentSelector } from "./RefundPaymentSelector";
+import { SendReceiptModal } from "./SendReceiptModal";
 
 export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible, saleID, sale: saleProp, transactions: transactionsProp, initialPayment, onClose, onSaleUpdated }) {
   const zSalesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent);
@@ -67,6 +68,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sIsActiveSale, _setIsActiveSale] = useState(false);
   const [sCustomCardPayment, _setCustomCardPayment] = useState(null);
   const [sCardRefundProcessing, _setCardRefundProcessing] = useState(false);
+  const [sLastRefundReceipt, _setLastRefundReceipt] = useState(null);
+  const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
 
   // ─── Derived Values ───────────────────────────────────────
   let refundLimits = calculateRefundLimits(sOriginalSale, { cardFeeRefund: zCardFeeRefund }, sTransactions);
@@ -446,6 +449,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       _ctx
     );
 
+    _setLastRefundReceipt(refundReceipt);
+
     // Always print a paper copy
     if (printerID) {
       dbSavePrintObj(refundReceipt, printerID);
@@ -509,6 +514,59 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     if (onSaleUpdated) onSaleUpdated(sale, updatedTxns);
   }
 
+  // ─── Send Refund Receipt (Text / Email) ─────────────────
+  function handleSendRefundReceipt() {
+    if (!sLastRefundReceipt) return;
+    let settings = useSettingsStore.getState().getSettings();
+    let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
+    let emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+
+    let primaryWO = sWorkordersInSale[0];
+    let customerForReceipt = {
+      first: (primaryWO && primaryWO.id !== "standalone") ? (primaryWO.customerFirst || "") : (useCurrentCustomerStore.getState().getCustomer()?.first || ""),
+      last: (primaryWO && primaryWO.id !== "standalone") ? (primaryWO.customerLast || "") : (useCurrentCustomerStore.getState().getCustomer()?.last || ""),
+      customerCell: (primaryWO && primaryWO.id !== "standalone") ? (primaryWO.customerCell || "") : (useCurrentCustomerStore.getState().getCustomer()?.customerCell || ""),
+      email: (primaryWO && primaryWO.id !== "standalone") ? (primaryWO.customerEmail || "") : (useCurrentCustomerStore.getState().getCustomer()?.email || ""),
+      id: (primaryWO && primaryWO.id !== "standalone") ? (primaryWO.customerID || "") : (useCurrentCustomerStore.getState().getCustomer()?.id || sOriginalSale?.customerID || ""),
+    };
+
+    if (customerForReceipt.customerCell || customerForReceipt.email) {
+      let smsContent = smsTemplate?.content || smsTemplate?.message || "";
+      let emailContent = emailTemplate?.content || emailTemplate?.body || "";
+      let canSMS = customerForReceipt.customerCell && smsContent.trim();
+      let canEmail = customerForReceipt.email && emailContent.trim();
+      if (canSMS || canEmail) {
+        sendRefundReceipt(sLastRefundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+      }
+    } else {
+      _sSetShowSendReceiptModal(true);
+    }
+  }
+
+  async function handleSendRefundReceiptFromModal({ phone, email }) {
+    if (!sLastRefundReceipt) return;
+    let settings = useSettingsStore.getState().getSettings();
+    let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
+    let emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+    let smsContent = smsTemplate?.content || smsTemplate?.message || "";
+    let emailContent = emailTemplate?.content || emailTemplate?.body || "";
+
+    let primaryWO = sWorkordersInSale[0];
+    let customerForReceipt = {
+      first: primaryWO?.customerFirst || useCurrentCustomerStore.getState().getCustomer()?.first || "Customer",
+      last: primaryWO?.customerLast || useCurrentCustomerStore.getState().getCustomer()?.last || "",
+      customerCell: phone || "",
+      email: email || "",
+      id: primaryWO?.customerID || useCurrentCustomerStore.getState().getCustomer()?.id || "",
+    };
+
+    let canSMS = phone && smsContent.trim();
+    let canEmail = email && emailContent.trim();
+    if (canSMS || canEmail) {
+      await sendRefundReceipt(sLastRefundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+    }
+  }
+
   // ─── Close Modal ──────────────────────────────────────────
   function handleClose() {
     _setOriginalSale(null);
@@ -520,6 +578,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _setCustomRefundAmount(0);
     _setCustomCardPayment(null);
     _setRefundComplete(false);
+    _setLastRefundReceipt(null);
+    _sSetShowSendReceiptModal(false);
     _setIsActiveSale(false);
     _setLoading(false);
     _setLoadMessage("");
@@ -873,21 +933,35 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
                 </ScrollView>
 
-                <Button_
-                  text="EXIT REFUND SCREEN"
-                  onPress={handleClose}
-                  colorGradientArr={COLOR_GRADIENTS.red}
-                  textStyle={{
-                    fontSize: 11,
-                    fontWeight: Fonts.weight.textHeavy,
-                  }}
-                  buttonStyle={{
-                    paddingVertical: 8,
-                    paddingHorizontal: 14,
-                    borderRadius: 6,
-                    margin: 10,
-                  }}
-                />
+                <View style={{ flexDirection: "row", justifyContent: sRefundComplete ? "space-evenly" : "center", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: gray(0.1) }}>
+                  {sRefundComplete && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
+                        if (printerID && sLastRefundReceipt) {
+                          dbSavePrintObj(sLastRefundReceipt, printerID);
+                        }
+                      }}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image_ icon={ICONS.print} size={35} />
+                    </TouchableOpacity>
+                  )}
+                  {sRefundComplete && (
+                    <TouchableOpacity
+                      onPress={handleSendRefundReceipt}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image_ icon={ICONS.paperPlane} size={35} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    onPress={handleClose}
+                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                  >
+                    <Image_ icon={ICONS.close1} size={35} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* ── RIGHT COLUMN: Item Selector ──────────── */}
@@ -954,6 +1028,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
               </Text>
             </View>
           )}
+
+          {/* ── Send Receipt Modal ───────────────────── */}
+          <SendReceiptModal
+            visible={sShowSendReceiptModal}
+            onSend={handleSendRefundReceiptFromModal}
+            onClose={() => _sSetShowSendReceiptModal(false)}
+          />
         </View>
       )}
     />

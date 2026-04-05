@@ -312,7 +312,7 @@ export function MessagesComponent({}) {
     if (!result.success) _setForwardReplies(!newState);
   }
 
-  async function sendMessage(text, imageUrl = "") {
+  async function sendMessage(text, imageUrl = "", canRespondVal) {
     if ((!text || !text.trim()) && !imageUrl) return;
     let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer.customerCell;
     if (!sendPhone || sendPhone.length !== 10) return;
@@ -324,7 +324,8 @@ export function MessagesComponent({}) {
       msg.phoneNumber = sendPhone;
       msg.firstName = sCustomPhoneMode ? "" : zCustomer.first;
       msg.lastName = sCustomPhoneMode ? "" : zCustomer.last;
-      msg.canRespond = sCanRespond ? new Date().getTime() : null;
+      let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+      msg.canRespond = useCanRespond ? new Date().getTime() : null;
       msg.millis = new Date().getTime();
       msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
       msg.id = crypto.randomUUID();
@@ -332,7 +333,7 @@ export function MessagesComponent({}) {
       msg.senderUserObj = zCurrentUserObj;
       _setNewMessage("");
       _setInputHeight(36);
-      _setShowReplyModal(true);
+      _setShowReplyModal(false);
       clearTranslation();
       // Optimistically add message to local list in custom phone mode
       if (sCustomPhoneMode) {
@@ -700,6 +701,44 @@ export function MessagesComponent({}) {
             </View>
           ) : null}
           <View style={{ width: "100%" }}>
+              {sShowReplyModal && (
+                <View style={{
+                  backgroundColor: "white",
+                  borderRadius: 8,
+                  borderWidth: 2,
+                  borderColor: gray(0.2),
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  marginBottom: 6,
+                  shadowColor: "black",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 4,
+                  elevation: 4,
+                }}>
+                  <Text style={{ fontSize: 15, color: C.text, fontWeight: "600", marginBottom: 10 }}>User can reply?</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => { _setCanRespond(true); _setShowReplyModal(false); sendMessage(sNewMessage, "", true); }}
+                      style={{ flexDirection: "row", alignItems: "center", backgroundColor: C.green, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16, marginRight: 10 }}
+                    >
+                      <Text style={{ fontSize: 14, color: "white", fontWeight: "bold" }}>Yes</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => { _setCanRespond(false); _setShowReplyModal(false); sendMessage(sNewMessage, "", false); }}
+                      style={{ flexDirection: "row", alignItems: "center", backgroundColor: C.red, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16 }}
+                    >
+                      <Text style={{ fontSize: 14, color: "white", fontWeight: "bold" }}>No</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <CheckBox_
+                    text={"Forward replies"}
+                    isChecked={sForwardReplies}
+                    onCheck={handleToggleForwardReplies}
+                    enabled={hasActivePhone}
+                  />
+                </View>
+              )}
               <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
                 <TextInput
                   onChangeText={handleMessageChange}
@@ -740,43 +779,8 @@ export function MessagesComponent({}) {
                   value={sNewMessage}
                 />
                 <View style={{ position: "relative" }}>
-                  {sShowReplyModal && (
-                    <View style={{
-                      position: "absolute",
-                      bottom: 55,
-                      right: 0,
-                      backgroundColor: "white",
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: gray(0.2),
-                      paddingVertical: 6,
-                      paddingHorizontal: 10,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      shadowColor: "black",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.15,
-                      shadowRadius: 4,
-                      elevation: 4,
-                      zIndex: 10,
-                    }}>
-                      <Text style={{ fontSize: 12, color: C.text, marginRight: 8 }}>User can reply?</Text>
-                      <TouchableOpacity
-                        onPress={() => { _setCanRespond(true); _setShowReplyModal(false); }}
-                        style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: C.green, justifyContent: "center", alignItems: "center", marginRight: 6 }}
-                      >
-                        <Text style={{ fontSize: 15, color: "white", fontWeight: "bold" }}>✓</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => { _setCanRespond(false); _setShowReplyModal(false); }}
-                        style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: C.red, justifyContent: "center", alignItems: "center" }}
-                      >
-                        <Text style={{ fontSize: 15, color: "white", fontWeight: "bold" }}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
                   <TouchableOpacity
-                    onPress={() => { if (sNewMessage.trim() && sNewMessage.length <= 1600) sendMessage(sNewMessage); }}
+                    onPress={() => { if (sNewMessage.trim() && sNewMessage.length <= 1600) _setShowReplyModal(true); }}
                     style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() && sNewMessage.length <= 1600 ? 1 : 0.3 }}
                   >
                     <Image_ icon={ICONS.airplane} size={41} />
@@ -817,7 +821,7 @@ export function MessagesComponent({}) {
                   buttonStyle={{ borderRadius: 5, paddingHorizontal: 10 }}
                 />
               </View>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <CheckBox_
                     text={"Translate"}
@@ -830,12 +834,6 @@ export function MessagesComponent({}) {
                     </TouchableOpacity>
                   )}
                 </View>
-                <CheckBox_
-                  text={"Forward replies"}
-                  isChecked={sForwardReplies}
-                  onCheck={handleToggleForwardReplies}
-                  enabled={hasActivePhone}
-                />
               </View>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <Button_

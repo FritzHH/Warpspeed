@@ -617,13 +617,17 @@ export const NONREMOVABLE_WAIT_TIMES = [
   }
 ]
 
+export const QB_DEFAULT_W = 10;
+export const QB_DEFAULT_H = 8;
+export const QB_SNAP_PCT = 1;
+
 export const QUICK_BUTTON_ITEM_PROTO = {
   inventoryItemID: "",
   label: "",
   x: 0,
   y: 0,
-  w: 90,
-  h: 40,
+  w: QB_DEFAULT_W,
+  h: QB_DEFAULT_H,
   fontSize: 10,
 }
 

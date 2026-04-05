@@ -70,7 +70,7 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES } from "../../../../data";
+import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -4552,7 +4552,7 @@ const QuickItemButtonsComponent = () => {
       let existingIDs = existing.map((e) => typeof e === "string" ? e : e.inventoryItemID);
       let newEntries = itemIDs
         .filter((id) => !existingIDs.includes(id))
-        .map((id, i) => ({ inventoryItemID: id, x: ((existingIDs.length + i) % 6) * 100, y: Math.floor((existingIDs.length + i) / 6) * 50, w: 90, h: 40, fontSize: 10 }));
+        .map((id, i) => ({ inventoryItemID: id, x: ((existingIDs.length + i) % 6) * (QB_DEFAULT_W + QB_SNAP_PCT), y: Math.floor((existingIDs.length + i) / 6) * (QB_DEFAULT_H + QB_SNAP_PCT), w: QB_DEFAULT_W, h: QB_DEFAULT_H, fontSize: 10 }));
       return { ...b, items: [...existing, ...newEntries] };
     });
     useSettingsStore.getState().setField("quickItemButtons", updated);

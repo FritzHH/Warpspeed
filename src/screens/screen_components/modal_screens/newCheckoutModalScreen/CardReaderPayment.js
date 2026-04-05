@@ -505,6 +505,9 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           paddingBottom: 20,
         }}
       >
+        <Text style={{ position: "absolute", top: 8, left: 10, fontSize: 11, color: gray(0.55), fontStyle: "italic" }}>
+          Scanning for readers
+        </Text>
         <Text style={{ fontSize: 25, color: C.blue, fontWeight: 500 }}>
           CARD SALE
         </Text>

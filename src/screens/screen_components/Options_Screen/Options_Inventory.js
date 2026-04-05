@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import React, { useEffect, useRef, useState } from "react";
 import { View, FlatList, Text, TouchableOpacity, ScrollView } from "react-native-web";
-import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO, QUICK_BUTTON_ITEM_PROTO } from "../../../data";
+import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO, QUICK_BUTTON_ITEM_PROTO, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../data";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
 import {
@@ -47,15 +47,26 @@ function getQuickButtonFontSize(text, baseFontSize) {
 /** Normalize legacy string IDs to QUICK_BUTTON_ITEM_PROTO objects */
 function normalizeItemEntry(entry, idx) {
   if (typeof entry === "string") {
-    return { ...QUICK_BUTTON_ITEM_PROTO, inventoryItemID: entry, x: (idx % 6) * 100, y: Math.floor(idx / 6) * 50 };
+    return { ...QUICK_BUTTON_ITEM_PROTO, inventoryItemID: entry, x: (idx % 6) * (QB_DEFAULT_W + QB_SNAP_PCT), y: Math.floor(idx / 6) * (QB_DEFAULT_H + QB_SNAP_PCT) };
   }
   return entry;
 }
 
-const SNAP = 10;
-const DEFAULT_ITEM_W = 90;
-const DEFAULT_ITEM_H = 40;
-function snapTo(v) { return Math.round(v / SNAP) * SNAP; }
+const SNAP_PCT = QB_SNAP_PCT;
+const DEFAULT_ITEM_W = QB_DEFAULT_W;
+const DEFAULT_ITEM_H = QB_DEFAULT_H;
+function snapTo(v) { return Math.round(v / SNAP_PCT) * SNAP_PCT; }
+
+/** Convert pixel-based item to percentage-based using reference canvas dimensions */
+function migrateItemToPercent(item, refW, refH) {
+  return {
+    ...item,
+    x: Math.min(100, Math.round((item.x / refW) * 100)),
+    y: Math.min(100, Math.round((item.y / refH) * 100)),
+    w: Math.max(DEFAULT_ITEM_W, Math.min(100, Math.round((item.w / refW) * 100))),
+    h: Math.max(DEFAULT_ITEM_H, Math.min(100, Math.round((item.h / refH) * 100))),
+  };
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Quick Item Canvas Card
@@ -126,25 +137,29 @@ const QuickItemCanvasCard = ({
     let container = containerRef.current;
     if (!container) return;
     let rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
     dragStartRef.current = {
       startMouseX: e.clientX,
       startMouseY: e.clientY,
       startX: itemObj.x || 0,
       startY: itemObj.y || 0,
-      rect,
+      rectW: rect.width,
+      rectH: rect.height,
     };
     _setDragging(true);
 
     function handleMouseMove(ev) {
       if (!dragStartRef.current) return;
-      let { startMouseX, startMouseY, startX, startY, rect: r } = dragStartRef.current;
+      let { startMouseX, startMouseY, startX, startY, rectW, rectH } = dragStartRef.current;
       let dx = ev.clientX - startMouseX;
       let dy = ev.clientY - startMouseY;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
-      let newX = snapTo(startX + dx);
-      let newY = snapTo(startY + dy);
-      newX = Math.max(0, Math.min(newX, r.width - w));
-      newY = Math.max(0, Math.min(newY, r.height - h));
+      let dxPct = (dx / rectW) * 100;
+      let dyPct = (dy / rectH) * 100;
+      let newX = snapTo(startX + dxPct);
+      let newY = snapTo(startY + dyPct);
+      newX = Math.max(0, Math.min(newX, 100 - w));
+      newY = Math.max(0, Math.min(newY, 100 - h));
       onPositionChange(itemObj.inventoryItemID, newX, newY);
     }
 
@@ -173,10 +188,10 @@ const QuickItemCanvasCard = ({
       }}
       style={{
         position: "absolute",
-        left: itemObj.x || 0,
-        top: itemObj.y || 0,
-        width: w,
-        height: h,
+        left: (itemObj.x || 0) + "%",
+        top: (itemObj.y || 0) + "%",
+        width: w + "%",
+        height: h + "%",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -243,7 +258,7 @@ const QuickItemCanvasCard = ({
               borderBottomStyle: "solid",
               paddingTop: 2,
               paddingBottom: 2,
-              width: w - 10,
+              width: "90%",
               outline: "none",
               resize: "none",
               overflow: "hidden",
@@ -446,9 +461,25 @@ const QuickItemCanvas = ({
   const [sSelectedItemId, _setSelectedItemId] = useState(null);
   const canvasRef = useRef(null);
   const dbSaveTimerRef = useRef(null);
+  const migratedRef = useRef(false);
 
   // Normalize items (backward compat: string IDs -> objects)
   let rawItems = (buttonObj.items || []).map(normalizeItemEntry);
+
+  // One-time migration: convert old pixel-based positions to percentages
+  if (!migratedRef.current && !buttonObj._pctLayout && rawItems.length > 0) {
+    migratedRef.current = true;
+    let rect = canvasRef.current?.getBoundingClientRect();
+    let refW = (rect?.width > 0 ? rect.width : 900);
+    let refH = (rect?.height > 0 ? rect.height : 500);
+    let migrated = rawItems.map((it) => migrateItemToPercent(it, refW, refH));
+    rawItems = migrated;
+    let updatedButtons = (zQuickItemButtons || []).map((b) =>
+      b.id === buttonObj.id ? { ...b, items: migrated, _pctLayout: true } : b
+    );
+    useSettingsStore.getState().setField("quickItemButtons", updatedButtons, false);
+    dbSaveSettingsField("quickItemButtons", updatedButtons);
+  }
 
   function findInvItem(inventoryItemID) {
     return (zInventoryArr || []).find((i) => i.id === inventoryItemID);
@@ -489,8 +520,8 @@ const QuickItemCanvas = ({
     if (!sSelectedItemId) return;
     saveItems(rawItems.map((it) => {
       if (it.inventoryItemID !== sSelectedItemId) return it;
-      if (axis === "w") return { ...it, w: Math.max(SNAP * 3, (it.w || DEFAULT_ITEM_W) + delta) };
-      if (axis === "h") return { ...it, h: Math.max(SNAP * 2, (it.h || DEFAULT_ITEM_H) + delta) };
+      if (axis === "w") return { ...it, w: Math.max(SNAP_PCT * 3, (it.w || DEFAULT_ITEM_W) + delta) };
+      if (axis === "h") return { ...it, h: Math.max(SNAP_PCT * 2, (it.h || DEFAULT_ITEM_H) + delta) };
       return it;
     }));
   }
@@ -517,7 +548,7 @@ const QuickItemCanvas = ({
         }}
       >
         <Text style={{ flex: 1, fontSize: 11, color: gray(0.45) }}>
-          {sEditMode ? "Drag items freely. Snap to 10px." : ""}
+          {sEditMode ? "Drag items freely. Snap to grid." : ""}
         </Text>
 
         {/* Resize + Font controls */}
@@ -525,10 +556,10 @@ const QuickItemCanvas = ({
           <View style={{ flexDirection: "row", alignItems: "center", marginRight: 6, gap: 2 }}>
             <Text style={{ fontSize: 10, color: gray(0.45), marginRight: 4 }}>Size:</Text>
             {[
-              { axis: "w", delta: -SNAP, label: "\u2190" },
-              { axis: "w", delta: SNAP, label: "\u2192" },
-              { axis: "h", delta: -SNAP, label: "\u2191" },
-              { axis: "h", delta: SNAP, label: "\u2193" },
+              { axis: "w", delta: -SNAP_PCT, label: "\u2190" },
+              { axis: "w", delta: SNAP_PCT, label: "\u2192" },
+              { axis: "h", delta: -SNAP_PCT, label: "\u2191" },
+              { axis: "h", delta: SNAP_PCT, label: "\u2193" },
             ].map((btn, i) => (
               <TouchableOpacity
                 key={i}
@@ -579,7 +610,7 @@ const QuickItemCanvas = ({
           minHeight: 200,
           ...(sEditMode ? {
             backgroundImage: `radial-gradient(circle, ${gray(0.12)} 1px, transparent 1px)`,
-            backgroundSize: `${SNAP}px ${SNAP}px`,
+            backgroundSize: `${SNAP_PCT}% ${SNAP_PCT}%`,
           } : {}),
         }}
       >
@@ -621,8 +652,8 @@ const QuickItemCanvas = ({
               onClick={() => handleDeleteItem(sSelectedItemId)}
               style={{
                 position: "absolute",
-                left: (sel.x || 0) + (sel.w || DEFAULT_ITEM_W) - 8,
-                top: (sel.y || 0) - 6,
+                left: `calc(${(sel.x || 0) + (sel.w || DEFAULT_ITEM_W)}% - 8px)`,
+                top: `calc(${(sel.y || 0)}% - 6px)`,
                 width: 16,
                 height: 16,
                 borderRadius: 8,

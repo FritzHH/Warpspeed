@@ -511,7 +511,7 @@ export function NewCheckoutModalScreen() {
       }
     } catch (e) {
       log("Failed to fetch card readers:", e);
-      _setReaderError("No card readers connected to account");
+      // Don't set error — polling will keep retrying automatically
     }
   }
 
@@ -1399,6 +1399,10 @@ export function NewCheckoutModalScreen() {
     _setCashChangeNeeded(0);
     _setCardProcessingAmount(0);
     _setReaderError("");
+    if (readerPollRef.current) {
+      clearInterval(readerPollRef.current);
+      readerPollRef.current = null;
+    }
     _setInitialized(false);
     _setReceiptLanguage("english");
     // Clean up card payment state + listeners

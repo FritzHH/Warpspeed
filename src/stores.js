@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { clearIdPool } from "./idPool";
 import {
   CUSTOMER_PROTO,
   FRITZ_USER_OBJ,
@@ -21,7 +22,7 @@ import {
 } from "./utils";
 import { debounce } from "lodash";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "./broadcastChannel";
-import { calculateRunningTotals, buildWorkorderNumberFromId } from "./utils";
+import { calculateRunningTotals } from "./utils";
 
 import {
   dbDeleteWorkorder,
@@ -591,6 +592,7 @@ export const useLoginStore = create(
   showLoginScreen: false,
   cameraStatus: "loading", // "loading" | "ready" | "failed" | "idle" | "matched"
   cameraError: null,
+  cameraRetryTrigger: 0,
 
   // face login
   runBackgroundRecognition: true,
@@ -644,6 +646,7 @@ export const useLoginStore = create(
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
   setCameraStatus: (cameraStatus) => set({ cameraStatus }),
   setCameraError: (cameraError) => set({ cameraError }),
+  triggerCameraRetry: () => set((state) => ({ cameraRetryTrigger: state.cameraRetryTrigger + 1, cameraStatus: "loading", cameraError: null })),
   setPostLoginFunctionCallback: (postLoginFunctionCallback) => set({ postLoginFunctionCallback }),
   setRunBackgroundRecognition: (runBackgroundRecognition) =>
     set(() => ({ runBackgroundRecognition })),
@@ -889,10 +892,24 @@ export const useCustMessagesStore = create((set, get) => ({
   incomingMessages: [],
   outgoingMessages: [],
   messagesLoading: false,
+  messagesHasMore: false,
+  messagesNextCursor: null,
+  messagesLoadingMore: false,
+  messagesPhone: null,
+
   getIncomingMessages: () => get().incomingMessages,
   getOutgoingMessages: () => get().outgoingMessages,
   getMessagesLoading: () => get().messagesLoading,
+  getMessagesHasMore: () => get().messagesHasMore,
+  getMessagesNextCursor: () => get().messagesNextCursor,
+  getMessagesLoadingMore: () => get().messagesLoadingMore,
+  getMessagesPhone: () => get().messagesPhone,
+
   setMessagesLoading: (messagesLoading) => set({ messagesLoading }),
+  setMessagesHasMore: (messagesHasMore) => set({ messagesHasMore }),
+  setMessagesNextCursor: (messagesNextCursor) => set({ messagesNextCursor }),
+  setMessagesLoadingMore: (messagesLoadingMore) => set({ messagesLoadingMore }),
+  setMessagesPhone: (messagesPhone) => set({ messagesPhone }),
   setOutgoingMessages: (outgoingMessages) => set({ outgoingMessages }),
   setIncomingMessages: (incomingMessages) => set({ incomingMessages }),
   setIncomingMessage: (obj) => {
@@ -916,7 +933,23 @@ export const useCustMessagesStore = create((set, get) => ({
       ),
     }));
   },
-  clearMessages: () => set({ incomingMessages: [], outgoingMessages: [] }),
+  prependMessages: (newMessages) => {
+    let newIncoming = newMessages.filter((m) => m.type === "incoming");
+    let newOutgoing = newMessages.filter((m) => m.type !== "incoming");
+    set((state) => ({
+      incomingMessages: [...newIncoming, ...state.incomingMessages],
+      outgoingMessages: [...newOutgoing, ...state.outgoingMessages],
+    }));
+  },
+  clearMessages: () => set({
+    incomingMessages: [],
+    outgoingMessages: [],
+    messagesLoading: false,
+    messagesHasMore: false,
+    messagesNextCursor: null,
+    messagesLoadingMore: false,
+    messagesPhone: null,
+  }),
 }));
 
 
@@ -1198,7 +1231,6 @@ export const useOpenWorkordersStore = create(
       lockedWorkorderID: null,
       saleModalObj: null,
       _pendingCustomerLinks: {},
-      _lastIdSwap: null,
       _dirtyFields: {},
 
       getOpenWorkorder: () => {
@@ -1226,8 +1258,6 @@ export const useOpenWorkordersStore = create(
         let { [workorderID]: _, ...rest } = links;
         set({ _pendingCustomerLinks: rest });
       },
-      getLastIdSwap: () => get()._lastIdSwap,
-      setLastIdSwap: (swap) => set({ _lastIdSwap: swap }),
       _flushPendingCustomerLink: (workorderID) => {
         let links = get()._pendingCustomerLinks;
         let customerID = links[workorderID];
@@ -1247,12 +1277,13 @@ export const useOpenWorkordersStore = create(
           if (wo) broadcastWorkorderToDisplay(wo);
         } else {
           broadcastClear();
+          useCustMessagesStore.getState().clearMessages();
         }
       },
       setOpenWorkorders: (incomingWorkorders) => {
         const localWorkorders = get().workorders;
         const incomingIds = new Set(incomingWorkorders.map((w) => w.id));
-        const localOnly = localWorkorders.filter((w) => (w._pendingId || !w.customerID) && !incomingIds.has(w.id));
+        const localOnly = localWorkorders.filter((w) => !w.customerID && !incomingIds.has(w.id));
 
         const dirtyFields = get()._dirtyFields;
         const merged = incomingWorkorders.map((incoming) => {
@@ -1286,7 +1317,7 @@ export const useOpenWorkordersStore = create(
       setWorkorder: (wo, saveToDB = true, batch = true) => {
         set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
         // Standalone workorders are local-only — saved explicitly by checkout on first payment
-        if (saveToDB && !wo._pendingId && wo.customerID) dbSaveOpenWorkorder(wo);
+        if (saveToDB && wo.customerID) dbSaveOpenWorkorder(wo);
         if (wo.id === get().openWorkorderID) broadcastWorkorderToDisplay(wo);
       },
       setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
@@ -1304,8 +1335,7 @@ export const useOpenWorkordersStore = create(
 
         set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
         // No-customer workorders stay local — saved explicitly by checkout or intake
-        // Pending-ID workorders stay local until the ID resolves
-        if (saveToDB && workorder.customerID && !workorder._pendingId) {
+        if (saveToDB && workorder.customerID) {
           // Mark field dirty before write
           const dirtyFields = get()._dirtyFields;
           const ts = Date.now();
@@ -1365,7 +1395,7 @@ export const useOpenWorkordersStore = create(
       merge: (persisted, current) => {
         let merged = { ...current, ...persisted };
         let wo = (merged.workorders || []).find((o) => o.id === merged.openWorkorderID);
-        if (wo && !wo._pendingId && !wo.customerID && !(wo.workorderLines?.length > 0)) {
+        if (wo && !wo.customerID && !(wo.workorderLines?.length > 0)) {
           merged.openWorkorderID = null;
           merged.workorders = (merged.workorders || []).filter((o) => o.id !== wo.id);
         }
@@ -1463,103 +1493,6 @@ export const useMigrationStore = create((set, get) => ({
   setResult: (result) => set({ result }),
 }));
 
-// Module-level map for timeout handles (not serializable, so kept outside the store)
-const _pendingIdTimers = new Map();
-
-const PENDING_ID_TIMEOUT_MS = 60000;
-
-/**
- * Resolve a pending ID after timeout: clear _pendingId flag and save to Firestore.
- * Called when the 60s fallback fires (or on rehydration if expired).
- */
-function _resolvePendingIdFromStore(placeholderID) {
-  _pendingIdTimers.delete(placeholderID);
-  usePendingIdStore.getState()._removeEntry(placeholderID);
-
-  const st = useOpenWorkordersStore.getState();
-  const wo = st.workorders.find((w) => w.id === placeholderID);
-  if (!wo || !wo._pendingId) return;
-  let updated = { ...wo };
-  delete updated._pendingId;
-  updated.workorderNumber = buildWorkorderNumberFromId(wo.id, wo.startedOnMillis);
-  st.setWorkorder(updated, false);
-}
-
-export const usePendingIdStore = create(
-  persist(
-    (set, get) => ({
-      // Map of placeholderID -> { timestamp, node }
-      pending: {},
-
-      getPending: () => get().pending,
-      getEntry: (placeholderID) => get().pending[placeholderID] || null,
-
-      addEntry: (placeholderID, node) => {
-        const timestamp = Date.now();
-        set((state) => ({
-          pending: { ...state.pending, [placeholderID]: { timestamp, node } },
-        }));
-        // Start fallback timer
-        const handle = setTimeout(() => {
-          _resolvePendingIdFromStore(placeholderID);
-        }, PENDING_ID_TIMEOUT_MS);
-        _pendingIdTimers.set(placeholderID, handle);
-      },
-
-      // Called externally (by _resolvePendingId in db_calls_wrapper) when the
-      // Cloud Function responds successfully — clears timer + store entry.
-      removeEntry: (placeholderID) => {
-        const handle = _pendingIdTimers.get(placeholderID);
-        if (handle) clearTimeout(handle);
-        _pendingIdTimers.delete(placeholderID);
-        set((state) => {
-          const { [placeholderID]: _, ...rest } = state.pending;
-          return { pending: rest };
-        });
-      },
-
-      // Internal remove (used by _resolvePendingIdFromStore to avoid clearing
-      // a timer that already fired).
-      _removeEntry: (placeholderID) => {
-        set((state) => {
-          const { [placeholderID]: _, ...rest } = state.pending;
-          return { pending: rest };
-        });
-      },
-
-      // Called after rehydration to restore timers for any surviving entries.
-      reprocessAfterReload: () => {
-        const entries = get().pending;
-        const now = Date.now();
-        Object.entries(entries).forEach(([placeholderID, entry]) => {
-          const elapsed = now - entry.timestamp;
-          if (elapsed >= PENDING_ID_TIMEOUT_MS) {
-            // Expired — resolve immediately
-            _resolvePendingIdFromStore(placeholderID);
-          } else {
-            // Not expired — set timer for remaining time
-            const remaining = PENDING_ID_TIMEOUT_MS - elapsed;
-            const handle = setTimeout(() => {
-              _resolvePendingIdFromStore(placeholderID);
-            }, remaining);
-            _pendingIdTimers.set(placeholderID, handle);
-          }
-        });
-      },
-    }),
-    {
-      name: "warpspeed_pending_ids",
-      partialize: (s) => ({ pending: s.pending }),
-      onRehydrateStorage: () => {
-        // This function is called AFTER rehydration completes
-        return (state) => {
-          if (state) state.reprocessAfterReload();
-        };
-      },
-    }
-  )
-);
-
 /// internal functions ///////////////////////////////////////////
 function changeItem(arr, item) {
   return arr.map((o) => (o.id === item.id ? item : o));
@@ -1585,4 +1518,5 @@ export function clearPersistedStores() {
   useInventoryStore.persist.clearStorage();
   useSettingsStore.persist.clearStorage();
   useLoginStore.persist.clearStorage();
+  clearIdPool();
 }

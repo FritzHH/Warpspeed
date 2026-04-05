@@ -7,6 +7,7 @@ import {
   usdTypeMask,
   gray,
 } from "../../../../utils";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 function TotalRow({ label, value, color, bold, fontSize = 13 }) {
   return (
@@ -69,6 +70,7 @@ export const RefundTotals = memo(function RefundTotals({
   let exceedsLimit = grandTotalRefund > maxRefundAllowed;
 
   function handleCustomAmountInput(val) {
+    dlog(DCAT.INPUT, "handleCustomAmountInput", "RefundTotals", { cents: usdTypeMask(val, { withDollar: false }).cents });
     let result = usdTypeMask(val, { withDollar: false });
     _setCustomDisp(result.display);
     if (onCustomAmountChange) onCustomAmountChange(result.cents);

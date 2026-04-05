@@ -32,7 +32,8 @@ import {
   off,
 } from "firebase/database";
 import {
-  getAuth,
+  initializeAuth,
+  browserLocalPersistence,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
@@ -54,7 +55,7 @@ import { firebaseApp } from "./init";
 // Initialize services using the existing Firebase app
 export const DB = getFirestore(firebaseApp);
 export const RDB = getDatabase(firebaseApp);
-export const AUTH = getAuth(firebaseApp);
+export const AUTH = initializeAuth(firebaseApp, { persistence: browserLocalPersistence });
 export const STORAGE = getStorage(firebaseApp);
 // Initialize Firebase Functions with region
 export const FUNCTIONS = getFunctions(firebaseApp, "us-central1");

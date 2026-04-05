@@ -42,6 +42,7 @@ import {
   readTransactions,
 } from "./newCheckoutFirebaseCalls";
 
+import { dlog, DCAT } from "./checkoutDebugLog";
 import { CashRefund } from "./CashRefund";
 import { CardRefund } from "./CardRefund";
 import { RefundTotals } from "./RefundTotals";
@@ -156,6 +157,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   // ─── Initialization ──────────────────────────────────────
   if (visible && !sInitialized && (saleID || saleProp)) {
+    dlog(DCAT.INIT, "refund_modal_init", "RefundModal", { saleID: saleID || saleProp?.id || null, fromProp: !!saleProp, hasInitialPayment: !!initialPayment });
     _setInitialized(true);
     if (saleProp) {
       loadSaleFromProp(saleProp, transactionsProp || []);
@@ -165,6 +167,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   }
 
   async function loadSaleFromProp(sale, txns) {
+    dlog(DCAT.INIT, "load_sale_from_prop", "RefundModal", { saleID: sale?.id, txnCount: txns?.length || 0, paymentComplete: sale?.paymentComplete });
     _setLoading(true);
     _setLoadMessage("Loading sale...");
     try {
@@ -203,6 +206,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   }
 
   async function loadSaleData(id) {
+    dlog(DCAT.INIT, "load_sale_data", "RefundModal", { saleID: id });
     _setLoading(true);
     _setLoadMessage("Loading sale...");
 
@@ -252,6 +256,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   // ─── Item Selection ───────────────────────────────────────
   function handleToggleItem(line) {
+    dlog(DCAT.CHECKBOX, "toggle_item", "RefundModal", { lineID: line?.id, alreadySelected: !!sSelectedItems.find((s) => s.id === line?.id), hasPaymentSelection });
     if (hasPaymentSelection) return; // items disabled when payments are selected
     let exists = sSelectedItems.find((s) => s.id === line.id);
     if (exists) {
@@ -269,6 +274,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
 
   function handleSelectPayment(payment) {
+    dlog(DCAT.BUTTON, "select_payment", "RefundModal", { paymentID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured, alreadySelected: !!sSelectedPayments.find((p) => p.id === payment?.id) });
     let alreadySelected = sSelectedPayments.find((p) => p.id === payment.id);
     if (alreadySelected) {
       _setSelectedPayments([]);
@@ -282,10 +288,12 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   // ─── Custom Amount ────────────────────────────────────────
   function handleCustomAmountChange(cents) {
+    dlog(DCAT.INPUT, "custom_amount_change", "RefundModal", { cents });
     _setCustomRefundAmount(cents);
   }
 
   function toggleCustomAmount() {
+    dlog(DCAT.BUTTON, "toggle_custom_amount", "RefundModal", { entering: !sIsCustomAmount });
     let entering = !sIsCustomAmount;
     _setIsCustomAmount(entering);
     if (entering) {
@@ -305,6 +313,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   }
 
   function handleSelectCustomCard(payment) {
+    dlog(DCAT.BUTTON, "select_custom_card", "RefundModal", { paymentID: payment?.id, amountCaptured: payment?.amountCaptured, last4: payment?.last4, deselecting: sCustomCardPayment?.id === payment?.id });
     if (sCustomCardPayment?.id === payment.id) {
       _setCustomCardPayment(null);
     } else {
@@ -314,6 +323,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   // ─── Pending Refund Tracking (crash recovery) ────────────
   function handleRefundStarted({ refundId, transactionID, amount }) {
+    dlog(DCAT.ACTION, "refund_started", "RefundModal", { refundId, transactionID, amount });
     let sale = cloneDeep(sOriginalSale);
     sale.pendingRefundIDs = [...(sale.pendingRefundIDs || []), { refundId, transactionID, amount }];
     _setOriginalSale(sale);
@@ -325,6 +335,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   }
 
   function handleRefundFailed(refundId) {
+    dlog(DCAT.ACTION, "refund_failed", "RefundModal", { refundId });
     let sale = cloneDeep(sOriginalSale);
     sale.pendingRefundIDs = (sale.pendingRefundIDs || []).filter((p) => p.refundId !== refundId);
     _setOriginalSale(sale);
@@ -337,6 +348,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   // ─── Process Refund ───────────────────────────────────────
   async function handleProcessRefund(amount, type, cardDetails) {
+    dlog(DCAT.ACTION, "process_refund_start", "RefundModal", { amount, type, paymentId: cardDetails?.paymentId || null, refundId: cardDetails?.refundId || null, saleID: sOriginalSale?.id, selectedItemCount: sSelectedItems.length, isActiveSale: sIsActiveSale });
     let sale = cloneDeep(sOriginalSale);
     let updatedTxns = cloneDeep(sTransactions);
 
@@ -511,11 +523,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
 
     // Sync parent sale state (checkout modal)
+    dlog(DCAT.ACTION, "process_refund_complete", "RefundModal", { amount, type, saleID: sale?.id, newTotal: sale?.total, voidedByRefund: !!sale?.voidedByRefund });
     if (onSaleUpdated) onSaleUpdated(sale, updatedTxns);
   }
 
   // ─── Send Refund Receipt (Text / Email) ─────────────────
   function handleSendRefundReceipt() {
+    dlog(DCAT.RECEIPT, "send_refund_receipt", "RefundModal", { hasReceipt: !!sLastRefundReceipt, saleID: sOriginalSale?.id });
     if (!sLastRefundReceipt) return;
     let settings = useSettingsStore.getState().getSettings();
     let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
@@ -544,6 +558,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   }
 
   async function handleSendRefundReceiptFromModal({ phone, email }) {
+    dlog(DCAT.RECEIPT, "send_refund_receipt_from_modal", "RefundModal", { hasReceipt: !!sLastRefundReceipt, hasPhone: !!phone, hasEmail: !!email });
     if (!sLastRefundReceipt) return;
     let settings = useSettingsStore.getState().getSettings();
     let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
@@ -569,6 +584,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   // ─── Close Modal ──────────────────────────────────────────
   function handleClose() {
+    dlog(DCAT.BUTTON, "close_refund_modal", "RefundModal", { saleID: sOriginalSale?.id, refundComplete: sRefundComplete });
     _setOriginalSale(null);
     _setTransactions([]);
     _setWorkordersInSale([]);
@@ -937,6 +953,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                   {sRefundComplete && (
                     <TouchableOpacity
                       onPress={() => {
+                        dlog(DCAT.BUTTON, "reprint_refund_receipt", "RefundModal", { hasReceipt: !!sLastRefundReceipt });
                         let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
                         if (printerID && sLastRefundReceipt) {
                           dbSavePrintObj(sLastRefundReceipt, printerID);
@@ -997,7 +1014,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     workordersInSale={sWorkordersInSale}
                     selectedItems={sSelectedItems}
                     onToggleItem={handleToggleItem}
-                    onClearItems={() => _setSelectedItems([])}
+                    onClearItems={() => { dlog(DCAT.BUTTON, "clear_selected_items", "RefundModal"); _setSelectedItems([]); }}
                     previouslyRefundedIDs={previouslyRefundedIDs}
                     disabledItemIDs={disabledItemIDs}
                     hasPaymentSelection={hasPaymentSelection}

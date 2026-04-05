@@ -25,6 +25,7 @@ import {
 import { log } from "./utils";
 import { useLayoutStore } from "./stores";
 import { ROUTES } from "./routes";
+import { topUpPool } from "./idPool";
 import { BUILD_VERSION } from "./buildVersion";
 
 // Re-export ROUTES for backward compatibility
@@ -111,6 +112,7 @@ function App() {
       if (firebaseUser) {
         try {
           await loadTenantAndSettings(firebaseUser.uid);
+          topUpPool(); // Pre-fetch IDs for workorders, sales, transactions
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,

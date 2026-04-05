@@ -4,6 +4,7 @@ import { View, Text } from "react-native-web";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { Button_ } from "../../../../components";
 import { gray } from "../../../../utils";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 export const SaleHeader = memo(function SaleHeader({
   sale,
@@ -29,7 +30,7 @@ export const SaleHeader = memo(function SaleHeader({
       {saleComplete && onReprint && (
         <Button_
           text="REPRINT"
-          onPress={onReprint}
+          onPress={() => { dlog(DCAT.BUTTON, "reprint", "SaleHeader", {}); onReprint(); }}
           colorGradientArr={COLOR_GRADIENTS.greenblue}
           textStyle={{ color: C.textWhite }}
           buttonStyle={{ width: 150, marginRight: 10 }}
@@ -39,7 +40,7 @@ export const SaleHeader = memo(function SaleHeader({
       {/* Close / Cancel */}
       <Button_
         text={saleComplete ? "CLOSE" : "CANCEL"}
-        onPress={onClose}
+        onPress={() => { dlog(DCAT.BUTTON, saleComplete ? "close" : "cancel", "SaleHeader", {}); onClose(); }}
         enabled={
           saleComplete ||
           (!sale?.amountCaptured > 0 && !saleComplete)

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button_ } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { formatPhoneWithDashes, removeDashesFromPhone, gray } from "../../../../utils";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 export function SendReceiptModal({ visible, onSend, onClose }) {
   const [sPhone, _sSetPhone] = useState("");
@@ -15,12 +16,14 @@ export function SendReceiptModal({ visible, onSend, onClose }) {
   if (!visible) return null;
 
   function handlePhoneChange(val) {
+    dlog(DCAT.INPUT, "handlePhoneChange", "SendReceiptModal", { digitCount: val.replace(/\D/g, "").length });
     let digits = val.replace(/\D/g, "").slice(0, 10);
     _sSetPhone(formatPhoneWithDashes(digits));
     _sSetError("");
   }
 
   function handleEmailChange(val) {
+    dlog(DCAT.INPUT, "handleEmailChange", "SendReceiptModal", { hasAt: val.includes("@") });
     _sSetEmail(val);
     _sSetError("");
   }
@@ -37,6 +40,7 @@ export function SendReceiptModal({ visible, onSend, onClose }) {
   }
 
   async function handleSend() {
+    dlog(DCAT.BUTTON, "handleSend", "SendReceiptModal", { hasPhone: sPhone.replace(/\D/g, "").length > 0, hasEmail: sEmail.trim().length > 0 });
     let err = validate();
     if (err) {
       _sSetError(err);
@@ -167,7 +171,7 @@ export function SendReceiptModal({ visible, onSend, onClose }) {
         <View style={{ flexDirection: "row", justifyContent: "space-between", width: "100%", marginTop: 10 }}>
           <Button_
             text="CANCEL"
-            onPress={onClose}
+            onPress={() => { dlog(DCAT.BUTTON, "cancel", "SendReceiptModal", {}); onClose(); }}
             enabled={!formLocked}
             colorGradientArr={COLOR_GRADIENTS.grey}
             textStyle={{ color: C.textWhite, fontSize: 14 }}

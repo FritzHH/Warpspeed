@@ -107,8 +107,8 @@ export function IntakeScreen() {
   // New Workorder
   //////////////////////////////////////////////////////////////////////////////
 
-  function handleNewWorkorder() {
-    let wo = startNewWorkorder(null, { status: ON_THE_STAND_STATUS_ID });
+  async function handleNewWorkorder() {
+    let wo = await startNewWorkorder(null, { status: ON_THE_STAND_STATUS_ID });
     _setSelectedWorkorderID(wo.id);
   }
 

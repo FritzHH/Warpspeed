@@ -9,6 +9,8 @@ import {
   gray,
 } from "../../../../utils";
 import { buildCashTransaction } from "./newCheckoutUtils";
+import { takeId, getId } from "../../../../idPool";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 export const CashPayment = memo(function CashPayment({
   amountLeftToPay = 0,
@@ -19,8 +21,6 @@ export const CashPayment = memo(function CashPayment({
   hasReaders = false,
   isVisible = false,
   lockAmount = false,
-  transactionId = null,
-  onTransactionIdUsed,
   cardIsProcessing = false,
 }) {
   const [sPayAmount, _setPayAmount] = useState("");
@@ -64,6 +64,7 @@ export const CashPayment = memo(function CashPayment({
 
   function handlePayAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
+    dlog(DCAT.INPUT, "payAmount_change", "CashPayment", { cents: result.cents, capped: result.cents > amountLeftToPay });
     if (result.cents > amountLeftToPay) {
       _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
       _setPayAmount(amountLeftToPay);
@@ -77,11 +78,13 @@ export const CashPayment = memo(function CashPayment({
 
   function handleTenderAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
+    dlog(DCAT.INPUT, "tenderAmount_change", "CashPayment", { cents: result.cents });
     _setTenderAmountDisp(result.display);
     _setTenderAmount(result.cents);
   }
 
-  function handleProcessPayment() {
+  async function handleProcessPayment() {
+    dlog(DCAT.BUTTON, "COMPLETE_PAYMENT", "CashPayment", { payAmount: sPayAmount, tenderAmount: sTenderAmount, isCheck: sIsCheck, amountLeftToPay });
     if (!sPayAmount || sPayAmount <= 0) {
       _setStatusMessage("Enter a payment amount");
       return;
@@ -97,8 +100,8 @@ export const CashPayment = memo(function CashPayment({
       return;
     }
 
-    let payment = buildCashTransaction(sPayAmount, tenderCents, sIsCheck, transactionId);
-    if (onTransactionIdUsed) onTransactionIdUsed();
+    let txnId = takeId("transactions") || await getId("transactions");
+    let payment = buildCashTransaction(sPayAmount, tenderCents, sIsCheck, txnId);
 
     // Calculate change
     let change = tenderCents - sPayAmount;
@@ -186,7 +189,7 @@ export const CashPayment = memo(function CashPayment({
             enabled={isEnabled}
             textStyle={{ fontSize: 12 }}
             text={"Paper Check"}
-            onCheck={() => _setIsCheck(!sIsCheck)}
+            onCheck={() => { dlog(DCAT.CHECKBOX, "paperCheck_toggle", "CashPayment", { newValue: !sIsCheck }); _setIsCheck(!sIsCheck); }}
             isChecked={sIsCheck}
           />
         </View>

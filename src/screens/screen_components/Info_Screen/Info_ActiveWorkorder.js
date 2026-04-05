@@ -66,7 +66,7 @@ import {
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, dbRequestNewId, startNewWorkorder } from "../../../db_calls_wrapper";
+import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, startNewWorkorder } from "../../../db_calls_wrapper";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -86,6 +86,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const zCustomerRefreshed = useCurrentCustomerStore((state) => state.customerRefreshed);
   const zCustomerLanguage = useCurrentCustomerStore((state) => state.customer?.language || "");
   const zCustomerDeposits = useCurrentCustomerStore((state) => state.customer?.deposits) || [];
+  const zCustomerCredits = useCurrentCustomerStore((state) => state.customer?.credits) || [];
   const zCustomer = {
     first: zOpenWorkorder?.customerFirst || "",
     last: zOpenWorkorder?.customerLast || "",
@@ -257,10 +258,10 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleStartStandaloneSalePress() {
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().requireLogin(async () => {
       useCurrentCustomerStore.getState().setCustomer(null, false);
       useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
-      startNewWorkorder();
+      await startNewWorkorder();
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.checkout,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,
@@ -287,8 +288,8 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   function handleCustomerNewWorkorderPress(customer) {
-    useLoginStore.getState().requireLogin(() => {
-      startNewWorkorder(customer);
+    useLoginStore.getState().requireLogin(async () => {
+      await startNewWorkorder(customer);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,
@@ -497,17 +498,17 @@ export const ActiveWorkorderComponent = ({}) => {
         >
           {/* Deposits / Credits on file */}
           {(() => {
-            let deps = zCustomerDeposits.filter((d) => d.amountCents > 0);
-            if (deps.length === 0) return null;
-            let totalDeposit = deps.filter((d) => d.type === "deposit").reduce((s, d) => s + d.amountCents, 0);
-            let totalCredit = deps.filter((d) => d.type === "credit").reduce((s, d) => s + d.amountCents, 0);
+            let activeDeps = zCustomerDeposits.filter((d) => d.amountCents > 0);
+            let activeCreds = zCustomerCredits.filter((d) => d.amountCents > 0);
+            let totalDeposit = activeDeps.reduce((s, d) => s + d.amountCents, 0);
+            let totalCredit = activeCreds.reduce((s, d) => s + d.amountCents, 0);
             if (totalDeposit === 0 && totalCredit === 0) return null;
             return (
               <View style={{ flexDirection: "row", justifyContent: "space-between", width: "95%", paddingHorizontal: 5, paddingVertical: 1 }}>
                 {totalDeposit > 0 ? (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                     <View style={{ backgroundColor: lightenRGBByPercent(C.green, 70), paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "600", color: C.green }}>Deposit</Text>
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: C.green }}>{activeDeps.length > 1 ? "Deposits" : "Deposit"}</Text>
                     </View>
                     <Text style={{ fontSize: 11, fontWeight: "600", color: C.green }}>{formatCurrencyDisp(totalDeposit, true)}</Text>
                   </View>
@@ -515,7 +516,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 {totalCredit > 0 ? (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                     <View style={{ backgroundColor: lightenRGBByPercent(C.blue, 70), paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "600", color: C.blue }}>Credit</Text>
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: C.blue }}>{activeCreds.length > 1 ? "Credits" : "Credit"}</Text>
                     </View>
                     <Text style={{ fontSize: 11, fontWeight: "600", color: C.blue }}>{formatCurrencyDisp(totalCredit, true)}</Text>
                   </View>

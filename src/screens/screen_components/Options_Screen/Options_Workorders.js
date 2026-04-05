@@ -25,8 +25,9 @@ import {
   useWorkorderPreviewStore,
   useActiveSalesStore,
   useCheckoutStore,
+  useCustMessagesStore,
 } from "../../../stores";
-import { dbGetCustomer, dbGetCompletedWorkorder, dbGetCompletedSale, dbSearchCompletedWorkorders } from "../../../db_calls_wrapper";
+import { dbGetCustomer, dbGetCompletedWorkorder, dbGetCompletedSale, dbSearchCompletedWorkorders, dbGetCustomerMessages } from "../../../db_calls_wrapper";
 import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 
@@ -242,6 +243,7 @@ export function WorkordersComponent({}) {
             dbGetCustomer(found.customerID).then((c) => {
               if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
             });
+            if (found.customerCell) fetchCustomerMessages(found.customerCell);
           }
           useTabNamesStore.getState().setItems({
             infoTabName: TAB_NAMES.infoTab.workorder,
@@ -265,6 +267,7 @@ export function WorkordersComponent({}) {
                 dbGetCustomer(wo.customerID).then((c) => {
                   if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
                 });
+                if (wo.customerCell) fetchCustomerMessages(wo.customerCell);
               }
             }
             _setSearchTerm("");
@@ -376,6 +379,31 @@ export function WorkordersComponent({}) {
   ///////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////
 
+  function fetchCustomerMessages(customerCell) {
+    if (!customerCell || customerCell.length !== 10) return;
+    let msgStore = useCustMessagesStore.getState();
+    if (msgStore.messagesPhone === customerCell && (msgStore.incomingMessages.length + msgStore.outgoingMessages.length) > 0) return;
+    msgStore.clearMessages();
+    msgStore.setMessagesLoading(true);
+    msgStore.setMessagesPhone(customerCell);
+    dbGetCustomerMessages(customerCell, null, 7).then((result) => {
+      if (!result.success || useCustMessagesStore.getState().getMessagesPhone() !== customerCell) {
+        useCustMessagesStore.getState().setMessagesLoading(false);
+        return;
+      }
+      let incoming = result.messages.filter((m) => m.type === "incoming");
+      let outgoing = result.messages.filter((m) => m.type !== "incoming");
+      let store = useCustMessagesStore.getState();
+      store.setIncomingMessages(incoming);
+      store.setOutgoingMessages(outgoing);
+      store.setMessagesHasMore(result.hasMore);
+      store.setMessagesNextCursor(result.nextPageTimestamp);
+      store.setMessagesLoading(false);
+    }).catch(() => {
+      useCustMessagesStore.getState().setMessagesLoading(false);
+    });
+  }
+
   function workorderSelected(obj) {
     const store = useOpenWorkordersStore.getState();
     // Clear locked (completed) workorder if switching away
@@ -397,6 +425,7 @@ export function WorkordersComponent({}) {
       dbGetCustomer(obj.customerID).then((customer) => {
         if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
       });
+      if (obj.customerCell) fetchCustomerMessages(obj.customerCell);
     }
   }
 

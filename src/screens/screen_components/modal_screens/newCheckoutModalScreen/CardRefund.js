@@ -12,6 +12,7 @@ import {
 } from "../../../../utils";
 import { useSettingsStore } from "../../../../stores";
 import { newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 export const CardRefund = memo(function CardRefund({
   selectedPayment,
@@ -55,6 +56,7 @@ export const CardRefund = memo(function CardRefund({
   }
 
   function handleAmountChange(val) {
+    dlog(DCAT.INPUT, "handleAmountChange", "CardRefund", { cents: usdTypeMask(val, { withDollar: false }).cents });
     let result = usdTypeMask(val, { withDollar: false });
     // Cap to the lesser of max card refund and selected card's available amount
     let maxAllowed = maxCardRefund;
@@ -72,6 +74,7 @@ export const CardRefund = memo(function CardRefund({
   }
 
   async function handleProcessRefund() {
+    dlog(DCAT.BUTTON, "handleProcessRefund", "CardRefund", { amount: sRefundAmount, chargeID: selectedPayment?.chargeID });
     if (!selectedPayment) {
       _setErrorMessage("Select a card payment to refund against");
       return;
@@ -123,6 +126,7 @@ export const CardRefund = memo(function CardRefund({
       );
 
       if (result?.success) {
+        dlog(DCAT.ACTION, "refundSuccess", "CardRefund", { amount: sRefundAmount, refundId });
         _setSuccessMessage(
           `Refund of ${formatCurrencyDisp(sRefundAmount)} processed`
         );
@@ -138,12 +142,14 @@ export const CardRefund = memo(function CardRefund({
           });
         }
       } else {
+        dlog(DCAT.ACTION, "refundFailed", "CardRefund", { error: result?.message || "Refund failed" });
         // Cloud Function returned explicit failure — refund did not happen
         if (onRefundFailed) onRefundFailed(refundId);
         _setErrorMessage(result?.message || "Refund failed");
         _setSuccessMessage("");
       }
     } catch (error) {
+      dlog(DCAT.ACTION, "refundError", "CardRefund", { error: error?.message || "Unknown error" });
       log("Card refund error:", error);
       // HttpsError has a .code property — means the Cloud Function responded (refund failed server-side)
       // No .code means network/timeout — refund may have succeeded, keep pending marker for reconciliation

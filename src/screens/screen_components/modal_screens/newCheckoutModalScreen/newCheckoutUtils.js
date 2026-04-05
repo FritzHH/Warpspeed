@@ -5,7 +5,8 @@ import {
   formatCurrencyDisp,
   log,
 } from "../../../../utils";
-import { dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, dbRequestNewId } from "../../../../db_calls_wrapper";
+import { dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS } from "../../../../db_calls_wrapper";
+import { generatePrefixedEAN13 } from "../../../../utils";
 import { build_db_path } from "../../../../constants";
 import { useLoginStore, useSettingsStore } from "../../../../stores";
 import { printBuilder } from "../../../../utils";
@@ -14,6 +15,7 @@ import {
   TRANSACTION_PROTO,
   REFUND_PROTO,
 } from "../../../../data";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 // ─── Sale ID ──────────────────────────────────────────────────
 // Sale IDs are 12-digit barcodes starting with "3".
@@ -179,7 +181,7 @@ export function recomputeSaleAmounts(sale, transactions, credits) {
 
 export function buildCashTransaction(amountCaptured, amountTendered, isCheck, id = null) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
-  transaction.id = id || dbRequestNewId("transactions");
+  transaction.id = id || generatePrefixedEAN13("3");
   transaction.method = isCheck ? "check" : "cash";
   transaction.amountCaptured = amountCaptured;
   transaction.amountTendered = amountTendered;
@@ -192,7 +194,7 @@ export function buildCardTransaction(stripeChargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = stripeChargeData?.payment_method_details?.card_present;
 
-  transaction.id = transactionID || dbRequestNewId("transactions");
+  transaction.id = transactionID || generatePrefixedEAN13("3");
   transaction.method = "card";
   transaction.amountCaptured = stripeChargeData.amount_captured || 0;
   transaction.cardIssuer = card?.receipt?.application_preferred_name || "Unknown";
@@ -215,7 +217,7 @@ export function buildManualCardTransaction(chargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = chargeData?.payment_method_details?.card;
 
-  transaction.id = transactionID || dbRequestNewId("transactions");
+  transaction.id = transactionID || generatePrefixedEAN13("3");
   transaction.method = "card";
   transaction.amountCaptured = chargeData.amount_captured || 0;
   transaction.cardIssuer = card?.brand || "Unknown";
@@ -361,6 +363,7 @@ function applyVars(template, vars) {
 }
 
 export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels, langCode, transactions, credits) {
+  dlog(DCAT.RECEIPT, "sendSaleReceipt_start", "CheckoutUtils", { saleId: sale?.id, hasCustomer: !!customer, hasSmsTemplate: !!smsTemplate, hasEmailTemplate: !!emailTemplate });
   if (!sale || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
@@ -407,6 +410,7 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
         messageID: crypto.randomUUID(),
       });
       if (result?.data?.url) receiptURL = result.data.url;
+      dlog(DCAT.RECEIPT, "sendSaleReceipt_sms_sent", "CheckoutUtils", { saleId: sale?.id });
       log("Sent sale receipt SMS to", customer.customerCell);
     } else {
       // No SMS but still upload PDF for email link
@@ -415,6 +419,7 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
       if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
     }
   } catch (e) {
+    dlog(DCAT.RECEIPT, "sendSaleReceipt_error", "CheckoutUtils", { message: e?.message });
     log("Error generating/uploading sale receipt PDF:", e);
   }
 
@@ -441,6 +446,7 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
       }
     }
     dbSendEmail(customer.email, subject, html);
+    dlog(DCAT.RECEIPT, "sendSaleReceipt_email_sent", "CheckoutUtils", { saleId: sale?.id });
     log("Sent sale receipt email to", customer.email);
   }
 }
@@ -448,6 +454,7 @@ export async function sendSaleReceipt(sale, customer, workorder, settings, smsTe
 // ─── Send Refund Receipt (SMS + Email) ────────────────────────
 
 export async function sendRefundReceipt(refundReceiptData, customer, settings, smsTemplate, emailTemplate) {
+  dlog(DCAT.RECEIPT, "sendRefundReceipt_start", "CheckoutUtils", { hasCustomer: !!customer });
   if (!refundReceiptData || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
@@ -482,6 +489,7 @@ export async function sendRefundReceipt(refundReceiptData, customer, settings, s
       if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
     }
   } catch (e) {
+    dlog(DCAT.RECEIPT, "sendRefundReceipt_error", "CheckoutUtils", { message: e?.message });
     log("Error generating/uploading refund receipt PDF:", e);
   }
 
@@ -496,4 +504,5 @@ export async function sendRefundReceipt(refundReceiptData, customer, settings, s
     dbSendEmail(customer.email, subject, html);
     log("Sent refund receipt email to", customer.email);
   }
+  dlog(DCAT.RECEIPT, "sendRefundReceipt_complete", "CheckoutUtils", {});
 }

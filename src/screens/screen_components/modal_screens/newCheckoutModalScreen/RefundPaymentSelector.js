@@ -5,6 +5,7 @@ import { TouchableOpacity } from "react-native";
 import { C, Fonts } from "../../../../styles";
 import { formatCurrencyDisp, gray } from "../../../../utils";
 import dayjs from "dayjs";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 function formatTransactionDate(millis) {
   let d = dayjs(millis);
@@ -25,7 +26,10 @@ const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, o
   return (
     <TouchableOpacity
       onPress={() => {
-        if (!isDisabled && !fullyRefunded) onSelect(payment);
+        if (!isDisabled && !fullyRefunded) {
+          dlog(DCAT.BUTTON, "selectPayment", "RefundPaymentSelector", { paymentId: payment.id, method: payment.method });
+          onSelect(payment);
+        }
       }}
       style={{
         flexDirection: "row",

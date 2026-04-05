@@ -13,6 +13,7 @@ import { log, generateEAN13Barcode } from "../../../../utils";
 import { ITEM_SALE_PROTO, CUSTOMER_DEPOSIT_PROTO } from "../../../../data";
 import { recomputeSaleAmounts, getAllAppliedCredits } from "./newCheckoutUtils";
 import { cloneDeep } from "lodash";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 // ─── Callable Function References ─────────────────────────────
 // These are lazily initialized to avoid import-order issues with
@@ -94,37 +95,47 @@ function buildCompletedSalePath(tenantID, storeID, saleID) {
 // ─── Transactions (Firestore) ────────────────────────────────
 
 export async function writeTransaction(transaction) {
+  dlog(DCAT.FIREBASE_REQ, "writeTransaction", "FirebaseCalls", { transactionId: transaction?.id, method: transaction?.method, amount: transaction?.amountCaptured });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !transaction?.id) {
       log("writeTransaction: missing tenantID/storeID/transaction.id");
+      dlog(DCAT.FIREBASE_ERR, "writeTransaction", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
     const path = buildTransactionPath(tenantID, storeID, transaction.id);
     await firestoreWrite(path, transaction);
+    dlog(DCAT.FIREBASE_RES, "writeTransaction", "FirebaseCalls", { success: true, path });
     return { success: true };
   } catch (error) {
     log("writeTransaction error:", error);
+    dlog(DCAT.FIREBASE_ERR, "writeTransaction", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
 
 export async function readTransaction(txnID) {
+  dlog(DCAT.FIREBASE_REQ, "readTransaction", "FirebaseCalls", { txnID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !txnID) {
       log("readTransaction: missing tenantID/storeID/txnID");
+      dlog(DCAT.FIREBASE_ERR, "readTransaction", "FirebaseCalls", { reason: "missing params" });
       return null;
     }
     const path = buildTransactionPath(tenantID, storeID, txnID);
-    return await firestoreRead(path);
+    const result = await firestoreRead(path);
+    dlog(DCAT.FIREBASE_RES, "readTransaction", "FirebaseCalls", { txnID, found: !!result });
+    return result;
   } catch (error) {
     log("readTransaction error:", error);
+    dlog(DCAT.FIREBASE_ERR, "readTransaction", "FirebaseCalls", { txnID, message: error?.message });
     return null;
   }
 }
 
 export async function readTransactions(txnIDs) {
+  dlog(DCAT.FIREBASE_REQ, "readTransactions", "FirebaseCalls", { count: txnIDs?.length });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !txnIDs?.length) return [];
@@ -134,25 +145,32 @@ export async function readTransactions(txnIDs) {
         return firestoreRead(path);
       })
     );
-    return results.filter(Boolean);
+    const filtered = results.filter(Boolean);
+    dlog(DCAT.FIREBASE_RES, "readTransactions", "FirebaseCalls", { requested: txnIDs.length, found: filtered.length });
+    return filtered;
   } catch (error) {
     log("readTransactions error:", error);
+    dlog(DCAT.FIREBASE_ERR, "readTransactions", "FirebaseCalls", { message: error?.message });
     return [];
   }
 }
 
 export async function deleteTransaction(txnID) {
+  dlog(DCAT.FIREBASE_REQ, "deleteTransaction", "FirebaseCalls", { txnID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !txnID) {
       log("deleteTransaction: missing tenantID/storeID/txnID");
+      dlog(DCAT.FIREBASE_ERR, "deleteTransaction", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
     const path = buildTransactionPath(tenantID, storeID, txnID);
     await firestoreDelete(path);
+    dlog(DCAT.FIREBASE_RES, "deleteTransaction", "FirebaseCalls", { success: true, path });
     return { success: true };
   } catch (error) {
     log("deleteTransaction error:", error);
+    dlog(DCAT.FIREBASE_ERR, "deleteTransaction", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
@@ -160,79 +178,101 @@ export async function deleteTransaction(txnID) {
 // ─── Thin Sale (Firestore) ───────────────────────────────────
 
 export async function writeActiveSale(sale) {
+  dlog(DCAT.FIREBASE_REQ, "writeActiveSale", "FirebaseCalls", { saleId: sale?.id, total: sale?.total, paymentComplete: sale?.paymentComplete });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !sale?.id) {
       log("writeActiveSale: missing tenantID/storeID/sale.id");
+      dlog(DCAT.FIREBASE_ERR, "writeActiveSale", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
     const path = buildActiveSalePath(tenantID, storeID, sale.id);
     await firestoreWrite(path, sale);
+    dlog(DCAT.FIREBASE_RES, "writeActiveSale", "FirebaseCalls", { success: true, path });
     return { success: true };
   } catch (error) {
     log("writeActiveSale error:", error);
+    dlog(DCAT.FIREBASE_ERR, "writeActiveSale", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
 
 export async function readActiveSale(saleID) {
+  dlog(DCAT.FIREBASE_REQ, "readActiveSale", "FirebaseCalls", { saleID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !saleID) {
       log("readActiveSale: missing tenantID/storeID/saleID");
+      dlog(DCAT.FIREBASE_ERR, "readActiveSale", "FirebaseCalls", { reason: "missing params" });
       return null;
     }
     const path = buildActiveSalePath(tenantID, storeID, saleID);
-    return await firestoreRead(path);
+    const result = await firestoreRead(path);
+    dlog(DCAT.FIREBASE_RES, "readActiveSale", "FirebaseCalls", { saleID, found: !!result });
+    return result;
   } catch (error) {
     log("readActiveSale error:", error);
+    dlog(DCAT.FIREBASE_ERR, "readActiveSale", "FirebaseCalls", { saleID, message: error?.message });
     return null;
   }
 }
 
 export async function deleteActiveSale(saleID) {
+  dlog(DCAT.FIREBASE_REQ, "deleteActiveSale", "FirebaseCalls", { saleID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !saleID) {
       log("deleteActiveSale: missing tenantID/storeID/saleID");
+      dlog(DCAT.FIREBASE_ERR, "deleteActiveSale", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
     const path = buildActiveSalePath(tenantID, storeID, saleID);
     await firestoreDelete(path);
+    dlog(DCAT.FIREBASE_RES, "deleteActiveSale", "FirebaseCalls", { success: true, path });
     return { success: true };
   } catch (error) {
     log("deleteActiveSale error:", error);
+    dlog(DCAT.FIREBASE_ERR, "deleteActiveSale", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
 
 export async function writeCompletedSale(sale) {
+  dlog(DCAT.FIREBASE_REQ, "writeCompletedSale", "FirebaseCalls", { saleId: sale?.id, total: sale?.total, paymentComplete: sale?.paymentComplete });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !sale?.id) {
       log("writeCompletedSale: missing tenantID/storeID/sale.id");
+      dlog(DCAT.FIREBASE_ERR, "writeCompletedSale", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
     const path = buildCompletedSalePath(tenantID, storeID, sale.id);
     await firestoreWrite(path, sale);
+    dlog(DCAT.FIREBASE_RES, "writeCompletedSale", "FirebaseCalls", { success: true, path });
     return { success: true };
   } catch (error) {
     log("writeCompletedSale error:", error);
+    dlog(DCAT.FIREBASE_ERR, "writeCompletedSale", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
 
 export async function readCompletedSale(saleID) {
+  dlog(DCAT.FIREBASE_REQ, "readCompletedSale", "FirebaseCalls", { saleID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !saleID) {
       log("readCompletedSale: missing tenantID/storeID/saleID");
+      dlog(DCAT.FIREBASE_ERR, "readCompletedSale", "FirebaseCalls", { reason: "missing params" });
       return null;
     }
     const path = buildCompletedSalePath(tenantID, storeID, saleID);
-    return await firestoreRead(path);
+    const result = await firestoreRead(path);
+    dlog(DCAT.FIREBASE_RES, "readCompletedSale", "FirebaseCalls", { saleID, found: !!result });
+    return result;
   } catch (error) {
     log("readCompletedSale error:", error);
+    dlog(DCAT.FIREBASE_ERR, "readCompletedSale", "FirebaseCalls", { saleID, message: error?.message });
     return null;
   }
 }
@@ -240,10 +280,12 @@ export async function readCompletedSale(saleID) {
 // ─── Find Sale by Transaction ID ─────────────────────────────
 
 export async function findSaleByTransactionID(transactionID) {
+  dlog(DCAT.FIREBASE_REQ, "findSaleByTransactionID", "FirebaseCalls", { transactionID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !transactionID) {
       log("findSaleByTransactionID: missing tenantID/storeID/transactionID");
+      dlog(DCAT.FIREBASE_ERR, "findSaleByTransactionID", "FirebaseCalls", { reason: "missing params" });
       return null;
     }
     // Check completed-sales first
@@ -251,16 +293,24 @@ export async function findSaleByTransactionID(transactionID) {
     let results = await firestoreQuery(completedPath, [
       { field: "transactionIDs", operator: "array-contains", value: transactionID },
     ], { limit: 1 });
-    if (results?.length > 0) return results[0];
+    if (results?.length > 0) {
+      dlog(DCAT.FIREBASE_RES, "findSaleByTransactionID", "FirebaseCalls", { transactionID, foundIn: "completed-sales", saleId: results[0]?.id });
+      return results[0];
+    }
     // Fallback to active-sales
     const activePath = `tenants/${tenantID}/stores/${storeID}/active-sales`;
     results = await firestoreQuery(activePath, [
       { field: "transactionIDs", operator: "array-contains", value: transactionID },
     ], { limit: 1 });
-    if (results?.length > 0) return results[0];
+    if (results?.length > 0) {
+      dlog(DCAT.FIREBASE_RES, "findSaleByTransactionID", "FirebaseCalls", { transactionID, foundIn: "active-sales", saleId: results[0]?.id });
+      return results[0];
+    }
+    dlog(DCAT.FIREBASE_RES, "findSaleByTransactionID", "FirebaseCalls", { transactionID, found: false });
     return null;
   } catch (error) {
     log("findSaleByTransactionID error:", error);
+    dlog(DCAT.FIREBASE_ERR, "findSaleByTransactionID", "FirebaseCalls", { transactionID, message: error?.message });
     return null;
   }
 }
@@ -268,24 +318,29 @@ export async function findSaleByTransactionID(transactionID) {
 // ─── Cash Refund (Firestore) ─────────────────────────────────
 
 export async function writeCashRefund(transactionID, refundObj) {
+  dlog(DCAT.FIREBASE_REQ, "writeCashRefund", "FirebaseCalls", { transactionID, refundAmount: refundObj?.amount, refundId: refundObj?.id });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !transactionID || !refundObj) {
       log("writeCashRefund: missing tenantID/storeID/transactionID/refundObj");
+      dlog(DCAT.FIREBASE_ERR, "writeCashRefund", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
     const path = buildTransactionPath(tenantID, storeID, transactionID);
     const transaction = await firestoreRead(path);
     if (!transaction) {
       log("writeCashRefund: transaction not found");
+      dlog(DCAT.FIREBASE_ERR, "writeCashRefund", "FirebaseCalls", { reason: "transaction not found", transactionID });
       return { success: false };
     }
     const refunds = transaction.refunds || [];
     refunds.push(refundObj);
     await firestoreWrite(path, { ...transaction, refunds });
+    dlog(DCAT.FIREBASE_RES, "writeCashRefund", "FirebaseCalls", { success: true, transactionID, totalRefunds: refunds.length });
     return { success: true };
   } catch (error) {
     log("writeCashRefund error:", error);
+    dlog(DCAT.FIREBASE_ERR, "writeCashRefund", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
@@ -293,61 +348,75 @@ export async function writeCashRefund(transactionID, refundObj) {
 // ─── Workorders ───────────────────────────────────────────────
 
 export async function newCheckoutSaveWorkorder(workorder) {
+  dlog(DCAT.FIREBASE_REQ, "newCheckoutSaveWorkorder", "FirebaseCalls", { workorderId: workorder?.id });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !workorder?.id) {
       log("newCheckoutSaveWorkorder: missing tenantID/storeID/workorder.id");
+      dlog(DCAT.FIREBASE_ERR, "newCheckoutSaveWorkorder", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
     const path = buildWorkorderPath(tenantID, storeID, workorder.id);
     await firestoreWrite(path, workorder);
+    dlog(DCAT.FIREBASE_RES, "newCheckoutSaveWorkorder", "FirebaseCalls", { success: true, path });
     return { success: true };
   } catch (error) {
     log("newCheckoutSaveWorkorder error:", error);
+    dlog(DCAT.FIREBASE_ERR, "newCheckoutSaveWorkorder", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
 
 export async function newCheckoutCompleteWorkorder(workorder) {
+  dlog(DCAT.FIREBASE_REQ, "newCheckoutCompleteWorkorder", "FirebaseCalls", { workorderId: workorder?.id });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !workorder?.id) {
       log("newCheckoutCompleteWorkorder: missing tenantID/storeID/workorder.id");
+      dlog(DCAT.FIREBASE_ERR, "newCheckoutCompleteWorkorder", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
 
     // Write to completed-workorders in Firestore
     const completedPath = buildCompletedWorkorderPath(tenantID, storeID, workorder.id);
     await firestoreWrite(completedPath, workorder);
+    dlog(DCAT.FIREBASE_RES, "newCheckoutCompleteWorkorder_write", "FirebaseCalls", { completedPath });
 
     // Delete from open-workorders
     const openPath = buildWorkorderPath(tenantID, storeID, workorder.id);
     await firestoreDelete(openPath);
+    dlog(DCAT.FIREBASE_RES, "newCheckoutCompleteWorkorder_delete", "FirebaseCalls", { openPath });
 
     return { success: true };
   } catch (error) {
     log("newCheckoutCompleteWorkorder error:", error);
+    dlog(DCAT.FIREBASE_ERR, "newCheckoutCompleteWorkorder", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
 
 export async function newCheckoutUpdateCompletedWorkorder(workorder) {
+  dlog(DCAT.FIREBASE_REQ, "newCheckoutUpdateCompletedWorkorder", "FirebaseCalls", { workorderId: workorder?.id });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !workorder?.id) {
       log("newCheckoutUpdateCompletedWorkorder: missing tenantID/storeID/workorder.id");
+      dlog(DCAT.FIREBASE_ERR, "newCheckoutUpdateCompletedWorkorder", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
     const path = buildCompletedWorkorderPath(tenantID, storeID, workorder.id);
     await firestoreWrite(path, workorder);
+    dlog(DCAT.FIREBASE_RES, "newCheckoutUpdateCompletedWorkorder", "FirebaseCalls", { success: true, path });
     return { success: true };
   } catch (error) {
     log("newCheckoutUpdateCompletedWorkorder error:", error);
+    dlog(DCAT.FIREBASE_ERR, "newCheckoutUpdateCompletedWorkorder", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
 
 export async function newCheckoutFetchWorkordersForSale(workorderIDs) {
+  dlog(DCAT.FIREBASE_REQ, "newCheckoutFetchWorkordersForSale", "FirebaseCalls", { count: workorderIDs?.length, ids: workorderIDs });
   if (!workorderIDs || workorderIDs.length === 0) return [];
 
   // Check local store first (always has fresh open workorders)
@@ -356,6 +425,8 @@ export async function newCheckoutFetchWorkordersForSale(workorderIDs) {
   const { tenantID, storeID } = getTenantAndStore();
 
   let workorders = [];
+  let localCount = 0;
+  let fetchedCount = 0;
   for (let i = 0; i < workorderIDs.length; i++) {
     let woID = workorderIDs[i];
 
@@ -363,6 +434,7 @@ export async function newCheckoutFetchWorkordersForSale(workorderIDs) {
     let localMatch = openWorkorders.find((w) => w.id === woID);
     if (localMatch) {
       workorders.push(localMatch);
+      localCount++;
       continue;
     }
 
@@ -371,42 +443,51 @@ export async function newCheckoutFetchWorkordersForSale(workorderIDs) {
     try {
       const completedPath = buildCompletedWorkorderPath(tenantID, storeID, woID);
       let wo = await firestoreRead(completedPath);
-      if (wo) workorders.push(wo);
+      if (wo) { workorders.push(wo); fetchedCount++; }
     } catch (error) {
       log("newCheckoutFetchWorkordersForSale error for " + woID, error);
+      dlog(DCAT.FIREBASE_ERR, "newCheckoutFetchWorkordersForSale", "FirebaseCalls", { woID, message: error?.message });
     }
   }
+  dlog(DCAT.FIREBASE_RES, "newCheckoutFetchWorkordersForSale", "FirebaseCalls", { total: workorders.length, fromLocal: localCount, fromFirestore: fetchedCount });
   return workorders;
 }
 
 // ─── Payment Listener (Firestore Real-time) ───────────────────
 
 export function newCheckoutListenToPaymentUpdates(readerID, paymentIntentID, onUpdate) {
+  dlog(DCAT.LISTENER, "subscribe", "FirebaseCalls", { readerID, paymentIntentID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !readerID || !paymentIntentID) {
       log("newCheckoutListenToPaymentUpdates: missing required params — tenantID:", tenantID, "storeID:", storeID, "readerID:", readerID, "piID:", paymentIntentID);
+      dlog(DCAT.FIREBASE_ERR, "listenToPaymentUpdates", "FirebaseCalls", { reason: "missing params" });
       return null;
     }
 
     const updatesPath = buildPaymentUpdatesPath(tenantID, storeID, readerID, paymentIntentID);
     log("newCheckoutListenToPaymentUpdates: subscribing to", updatesPath);
+    dlog(DCAT.LISTENER, "subscribing", "FirebaseCalls", { path: updatesPath });
 
     const unsubscribe = firestoreSubscribe(updatesPath, (data, error) => {
       if (error) {
         log("Payment updates listener error:", error);
+        dlog(DCAT.LISTENER_DATA, "paymentUpdate_error", "FirebaseCalls", { message: error?.message });
         return;
       }
+      dlog(DCAT.LISTENER_DATA, "paymentUpdate", "FirebaseCalls", { status: data?.status, action: data?.action, amount: data?.amount_captured });
       if (onUpdate) onUpdate(data);
     });
 
     return {
       unsubscribe: () => {
+        dlog(DCAT.LISTENER, "unsubscribe", "FirebaseCalls", { readerID, paymentIntentID });
         if (unsubscribe) unsubscribe();
       },
     };
   } catch (error) {
     log("newCheckoutListenToPaymentUpdates error:", error);
+    dlog(DCAT.FIREBASE_ERR, "listenToPaymentUpdates", "FirebaseCalls", { message: error?.message });
     return null;
   }
 }
@@ -414,6 +495,7 @@ export function newCheckoutListenToPaymentUpdates(readerID, paymentIntentID, onU
 // ─── Stripe Callable Wrappers ─────────────────────────────────
 
 export async function newCheckoutProcessStripePayment(amount, readerID, paymentIntentID, saleID, customerID, customerEmail, transactionID, salesTax) {
+  dlog(DCAT.STRIPE_REQ, "processStripePayment", "FirebaseCalls", { amount, readerID, saleID, transactionID, salesTax });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     const callables = await getCallables();
@@ -430,26 +512,32 @@ export async function newCheckoutProcessStripePayment(amount, readerID, paymentI
       salesTax: salesTax || 0,
     });
     log("newCheckout payment initiated:", result.data);
+    dlog(DCAT.STRIPE_RES, "processStripePayment", "FirebaseCalls", { success: true, paymentIntentID: result.data?.paymentIntentID });
     return result.data;
   } catch (error) {
     log("newCheckoutProcessStripePayment error:", error);
+    dlog(DCAT.STRIPE_ERR, "processStripePayment", "FirebaseCalls", { message: error?.message, code: error?.code });
     throw error;
   }
 }
 
 export async function newCheckoutCancelStripePayment(readerID) {
+  dlog(DCAT.STRIPE_REQ, "cancelStripePayment", "FirebaseCalls", { readerID });
   try {
     const callables = await getCallables();
     const result = await callables.cancelPayment({ readerID });
     log("newCheckout payment cancelled:", result.data);
+    dlog(DCAT.STRIPE_RES, "cancelStripePayment", "FirebaseCalls", { success: true });
     return result.data;
   } catch (error) {
     log("newCheckoutCancelStripePayment error:", error);
+    dlog(DCAT.STRIPE_ERR, "cancelStripePayment", "FirebaseCalls", { message: error?.message, code: error?.code });
     throw error;
   }
 }
 
 export async function newCheckoutProcessStripeRefund(amount, chargeID, transactionFields) {
+  dlog(DCAT.STRIPE_REQ, "processStripeRefund", "FirebaseCalls", { amount, chargeID, transactionID: transactionFields?.transactionID });
   try {
     const callables = await getCallables();
     const result = await callables.processRefund({
@@ -458,26 +546,32 @@ export async function newCheckoutProcessStripeRefund(amount, chargeID, transacti
       ...(transactionFields || {}),
     });
     log("newCheckout refund processed:", result.data);
+    dlog(DCAT.STRIPE_RES, "processStripeRefund", "FirebaseCalls", { success: true, refundID: result.data?.refundID });
     return result.data;
   } catch (error) {
     log("newCheckoutProcessStripeRefund error:", error);
+    dlog(DCAT.STRIPE_ERR, "processStripeRefund", "FirebaseCalls", { message: error?.message, code: error?.code });
     throw error;
   }
 }
 
 export async function newCheckoutGetStripeReaders() {
+  dlog(DCAT.STRIPE_REQ, "getStripeReaders", "FirebaseCalls", {});
   try {
     const callables = await getCallables();
     const result = await callables.getReaders({});
     // log("newCheckout readers fetched:", result.data);
+    dlog(DCAT.STRIPE_RES, "getStripeReaders", "FirebaseCalls", { readerCount: result.data?.readers?.length });
     return result.data;
   } catch (error) {
     log("newCheckoutGetStripeReaders error:", error);
+    dlog(DCAT.STRIPE_ERR, "getStripeReaders", "FirebaseCalls", { message: error?.message, code: error?.code });
     throw error;
   }
 }
 
 export async function newCheckoutProcessManualCardPayment(amount, paymentMethodID, saleID, customerID, customerEmail, transactionID) {
+  dlog(DCAT.STRIPE_REQ, "processManualCardPayment", "FirebaseCalls", { amount, saleID, transactionID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     const callables = await getCallables();
@@ -492,9 +586,11 @@ export async function newCheckoutProcessManualCardPayment(amount, paymentMethodI
       transactionID: transactionID || "",
     });
     log("newCheckout manual card payment:", result.data);
+    dlog(DCAT.STRIPE_RES, "processManualCardPayment", "FirebaseCalls", { success: true, chargeID: result.data?.chargeID, amountCaptured: result.data?.amount_captured });
     return result.data;
   } catch (error) {
     log("newCheckoutProcessManualCardPayment error:", error);
+    dlog(DCAT.STRIPE_ERR, "processManualCardPayment", "FirebaseCalls", { message: error?.message, code: error?.code });
     throw error;
   }
 }
@@ -502,10 +598,12 @@ export async function newCheckoutProcessManualCardPayment(amount, paymentMethodI
 // ─── Deposit Void (Remove from Customer) ────────────────────────────
 
 export async function voidCustomerDeposit(saleID, customerID) {
+  dlog(DCAT.FIREBASE_REQ, "voidCustomerDeposit", "FirebaseCalls", { saleID, customerID });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !saleID || !customerID) {
       log("voidCustomerDeposit: missing tenantID/storeID/saleID/customerID");
+      dlog(DCAT.FIREBASE_ERR, "voidCustomerDeposit", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
 
@@ -514,6 +612,7 @@ export async function voidCustomerDeposit(saleID, customerID) {
     const customer = await firestoreRead(customerPath);
     if (!customer) {
       log("voidCustomerDeposit: customer not found", customerID);
+      dlog(DCAT.FIREBASE_ERR, "voidCustomerDeposit", "FirebaseCalls", { reason: "customer not found", customerID });
       return { success: false };
     }
 
@@ -522,14 +621,17 @@ export async function voidCustomerDeposit(saleID, customerID) {
     const filtered = deposits.filter((d) => d.id !== saleID);
     if (filtered.length === deposits.length) {
       log("voidCustomerDeposit: no matching deposit found for saleID", saleID);
+      dlog(DCAT.FIREBASE_RES, "voidCustomerDeposit", "FirebaseCalls", { success: true, noDepositFound: true });
       return { success: true }; // nothing to remove
     }
 
     customer.deposits = filtered;
     await firestoreWrite(customerPath, customer);
+    dlog(DCAT.FIREBASE_RES, "voidCustomerDeposit", "FirebaseCalls", { success: true, depositsRemoved: deposits.length - filtered.length });
     return { success: true };
   } catch (error) {
     log("voidCustomerDeposit error:", error);
+    dlog(DCAT.FIREBASE_ERR, "voidCustomerDeposit", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
@@ -537,10 +639,12 @@ export async function voidCustomerDeposit(saleID, customerID) {
 // ─── Item Sales Tracking ─────────────────────────────────────────────
 
 export async function saveItemSales(sale, workorderLines) {
+  dlog(DCAT.FIREBASE_REQ, "saveItemSales", "FirebaseCalls", { saleId: sale?.id, lineCount: workorderLines?.length });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !sale?.id) {
       log("saveItemSales: missing tenantID/storeID/sale.id");
+      dlog(DCAT.FIREBASE_ERR, "saveItemSales", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
 
@@ -574,18 +678,22 @@ export async function saveItemSales(sale, workorderLines) {
 
     if (items.length === 0) return { success: true };
     await firestoreBatchWrite(items);
+    dlog(DCAT.FIREBASE_RES, "saveItemSales", "FirebaseCalls", { success: true, itemsWritten: items.length });
     return { success: true };
   } catch (error) {
     log("saveItemSales error:", error);
+    dlog(DCAT.FIREBASE_ERR, "saveItemSales", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
 
 export async function markItemSalesRefunded(saleID, refundedLines) {
+  dlog(DCAT.FIREBASE_REQ, "markItemSalesRefunded", "FirebaseCalls", { saleID, refundedLineCount: refundedLines?.length });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !saleID) {
       log("markItemSalesRefunded: missing tenantID/storeID/saleID");
+      dlog(DCAT.FIREBASE_ERR, "markItemSalesRefunded", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
 
@@ -607,9 +715,11 @@ export async function markItemSalesRefunded(saleID, refundedLines) {
     }));
 
     await firestoreBatchWrite(updates);
+    dlog(DCAT.FIREBASE_RES, "markItemSalesRefunded", "FirebaseCalls", { success: true, markedCount: updates.length });
     return { success: true };
   } catch (error) {
     log("markItemSalesRefunded error:", error);
+    dlog(DCAT.FIREBASE_ERR, "markItemSalesRefunded", "FirebaseCalls", { message: error?.message });
     return { success: false, error };
   }
 }
@@ -636,10 +746,12 @@ async function readCustomersBatch(customerIDs) {
 }
 
 export async function queryCompletedSalesReport(startMillis, endMillis) {
+  dlog(DCAT.FIREBASE_REQ, "queryCompletedSalesReport", "FirebaseCalls", { startMillis, endMillis });
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) {
       log("queryCompletedSalesReport: missing tenantID/storeID");
+      dlog(DCAT.FIREBASE_ERR, "queryCompletedSalesReport", "FirebaseCalls", { reason: "missing params" });
       return [];
     }
 
@@ -734,9 +846,11 @@ export async function queryCompletedSalesReport(startMillis, endMillis) {
       }
     }
 
+    dlog(DCAT.FIREBASE_RES, "queryCompletedSalesReport", "FirebaseCalls", { salesCount: sales.length, rowCount: flatRows.length });
     return flatRows;
   } catch (error) {
     log("queryCompletedSalesReport error:", error);
+    dlog(DCAT.FIREBASE_ERR, "queryCompletedSalesReport", "FirebaseCalls", { message: error?.message });
     return [];
   }
 }
@@ -755,6 +869,7 @@ export async function recoverPendingActiveSales(activeSales) {
   if (!salesToRecover.length) return;
 
   log("recoverPendingActiveSales: found", salesToRecover.length, "sale(s) with pending transactions");
+  dlog(DCAT.FIREBASE_REQ, "recoverPendingActiveSales", "FirebaseCalls", { count: salesToRecover.length });
 
   for (let sale of salesToRecover) {
     try {

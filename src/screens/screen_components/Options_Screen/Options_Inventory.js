@@ -292,7 +292,7 @@ const QuickItemCanvasCard = ({
             {name}
           </Text>
           {!!price && (
-            <Text style={{ fontSize: Math.max(7, (itemObj.fontSize || 10) - 1), color: gray(0.45), textAlign: "center", marginTop: 1 }}>
+            <Text style={{ fontSize: Math.min(13, Math.max(7, (itemObj.fontSize || 10) - 1)), color: gray(0.45), textAlign: "center", marginTop: 1 }}>
               ${price}
             </Text>
           )}

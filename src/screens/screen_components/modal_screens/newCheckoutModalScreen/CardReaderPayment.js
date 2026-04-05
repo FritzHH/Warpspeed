@@ -10,7 +10,7 @@ import {
   gray,
   localStorageWrapper,
 } from "../../../../utils";
-import { dbRequestNewId } from "../../../../db_calls_wrapper";
+import { takeId, getId } from "../../../../idPool";
 import { useStripePaymentStore } from "../../../../stores";
 import { buildCardTransaction } from "./newCheckoutUtils";
 import {
@@ -19,6 +19,7 @@ import {
   newCheckoutListenToPaymentUpdates,
 } from "./newCheckoutFirebaseCalls";
 import { pad } from "lodash";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 function PulsingText({ text }) {
   const opacity = useRef(new Animated.Value(0.3)).current;
@@ -189,6 +190,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
         let s = useStripePaymentStore.getState();
 
         if (data.status === "succeeded" && (data.payment_intent || data.amount_captured)) {
+          dlog(DCAT.ACTION, "paymentSuccess", "CardReaderPayment", { paymentIntent: data.payment_intent, amountCaptured: data.amount_captured, transactionId: pendingTransactionIDRef.current });
           if (s._cardTimeout) { clearTimeout(s._cardTimeout); s._cardTimeout = null; }
           let payment = buildCardTransaction(data, pendingTransactionIDRef.current);
           pendingTransactionIDRef.current = null;
@@ -204,6 +206,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
         }
 
         if (data.status === "failed" || data.failure_code || data.decline_code) {
+          dlog(DCAT.ACTION, "paymentFailed", "CardReaderPayment", { status: data.status, failureCode: data.failure_code, declineCode: data.decline_code, transactionId: pendingTransactionIDRef.current });
           if (s._cardTimeout) { clearTimeout(s._cardTimeout); s._cardTimeout = null; }
           let failedID = pendingTransactionIDRef.current;
           pendingTransactionIDRef.current = null;
@@ -231,6 +234,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     store._cardListeners = listener;
 
     store._cardTimeout = setTimeout(() => {
+      dlog(DCAT.ACTION, "paymentTimeout", "CardReaderPayment", { readerId: readerID, paymentIntentId: piID, transactionId: pendingTransactionIDRef.current });
       let s = useStripePaymentStore.getState();
       let failedID = pendingTransactionIDRef.current;
       pendingTransactionIDRef.current = null;
@@ -275,6 +279,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   }, [activeReader?.id, activeReader?.action?.type, zCardStatus]);
 
   function handleAmountChange(val) {
+    dlog(DCAT.INPUT, "handleAmountChange", "CardReaderPayment", { val, amountLeftToPay });
     let result = usdTypeMask(val, { withDollar: false });
     if (result.cents > amountLeftToPay) {
       _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
@@ -286,6 +291,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   }
 
   function handleReaderSelect(item) {
+    dlog(DCAT.DROPDOWN, "handleReaderSelect", "CardReaderPayment", { selectedId: item.id, selectedLabel: item.label });
     let reader = stripeReaders.find((r) => r.id === item.id);
     _setCardReader(reader || null);
     _zSetCardError("");
@@ -312,6 +318,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   }
 
   async function startPayment() {
+    dlog(DCAT.BUTTON, "startPayment", "CardReaderPayment", { amount: sRequestedAmount, readerId: activeReader?.id, zCardStatus, saleID });
     if (zCardStatus !== "idle") return;
     if (!activeReader) {
       _zSetCardError("No card reader selected");
@@ -333,9 +340,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     if (callbacksRef.current.onCardProcessingStart) callbacksRef.current.onCardProcessingStart(sRequestedAmount);
 
     // Use pre-fetched transaction ID so webhook can use it as the document ID
-    let transactionID = transactionId || dbRequestNewId("transactions");
+    let transactionID = takeId("transactions") || await getId("transactions");
     pendingTransactionIDRef.current = transactionID;
-    if (transactionId && onTransactionIdUsed) onTransactionIdUsed();
 
     // Notify parent to add pending ID to sale before payment starts
     if (onPaymentStarted) onPaymentStarted(transactionID);
@@ -358,6 +364,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       );
 
       if (!result?.success) {
+        dlog(DCAT.ACTION, "startPaymentInitFailed", "CardReaderPayment", { message: result?.message, transactionId: pendingTransactionIDRef.current });
         let failedID = pendingTransactionIDRef.current;
         pendingTransactionIDRef.current = null;
         _zSetCardError(result?.message || "Payment initiation failed");
@@ -369,12 +376,14 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       }
 
       let piID = result.data?.paymentIntentID;
+      dlog(DCAT.ACTION, "startPaymentInitSuccess", "CardReaderPayment", { paymentIntentId: piID, readerId: activeReader.id, amount: sRequestedAmount });
       _zSetPaymentIntentID(piID);
       _zSetCardStatus("waitingForCard");
       _zSetCardMessage("Card reader ready to accept payment");
 
       setupListeners(activeReader.id, piID);
     } catch (error) {
+      dlog(DCAT.ACTION, "startPaymentError", "CardReaderPayment", { errorMessage: error?.message, errorCode: error?.code, transactionId: pendingTransactionIDRef.current });
       log("newCheckout card payment error:", error);
       let failedID = pendingTransactionIDRef.current;
       pendingTransactionIDRef.current = null;
@@ -399,6 +408,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   }
 
   async function clearReader() {
+    dlog(DCAT.BUTTON, "clearReader", "CardReaderPayment", { readerId: activeReader?.id, zCardStatus });
     if (!activeReader) return;
     _zSetCardStatus("clearing");
     _zSetCardMessage("Clearing reader...");
@@ -407,6 +417,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
     try {
       let result = await newCheckoutCancelStripePayment(activeReader.id);
+      dlog(DCAT.ACTION, "clearReaderSuccess", "CardReaderPayment", { readerId: activeReader.id, message: result?.message });
       let failedID = pendingTransactionIDRef.current;
       pendingTransactionIDRef.current = null;
       _zSetCardMessage(result?.message || "Reader cleared");
@@ -414,6 +425,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
       if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     } catch (error) {
+      dlog(DCAT.ACTION, "clearReaderError", "CardReaderPayment", { readerId: activeReader?.id, errorMessage: error?.message });
       log("clearReader error:", error);
       _zSetCardError(error?.message || "Failed to clear reader");
       _zSetCardMessage("");
@@ -506,7 +518,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           <View style={{ marginTop: 12 }}>
             <Button_
               text="Manual Entry"
-              onPress={onSwitchToManual}
+              onPress={() => { dlog(DCAT.BUTTON, "manualEntryNoReaders", "CardReaderPayment"); onSwitchToManual(); }}
               enabled={true}
               colorGradientArr={COLOR_GRADIENTS.blue}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
@@ -605,6 +617,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           <View style={{ width: 100, alignItems: "flex-end", paddingRight: 5 }}>
             <TextInput
               onFocus={() => {
+                dlog(DCAT.INPUT, "amountFocus", "CardReaderPayment", { lockAmount });
                 if (lockAmount) return;
                 _setFocused("amount");
                 _setRequestedAmountDisp("");
@@ -630,6 +643,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           <Button_
             text="MAX"
             onPress={() => {
+              dlog(DCAT.BUTTON, "maxAmount", "CardReaderPayment", { amountLeftToPay });
               _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
               _setRequestedAmount(amountLeftToPay);
             }}
@@ -691,7 +705,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           {onSwitchToManual && (
             <Button_
               text="Manual Entry"
-              onPress={onSwitchToManual}
+              onPress={() => { dlog(DCAT.BUTTON, "manualEntry", "CardReaderPayment", { isProcessing, zCardStatus }); onSwitchToManual(); }}
               enabled={!isProcessing && zCardStatus !== "waitingForCard"}
               colorGradientArr={COLOR_GRADIENTS.blue}
               textStyle={{ color: C.textWhite, fontSize: 11 }}

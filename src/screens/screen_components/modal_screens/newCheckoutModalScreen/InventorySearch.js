@@ -13,6 +13,7 @@ import {
 } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import { INVENTORY_ITEM_PROTO } from "../../../../data";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 function SearchResultRow({ item, onAdd }) {
   let name = item.formalName || item.informalName || "Unknown";
@@ -59,6 +60,7 @@ export const InventorySearch = memo(function InventorySearch({
   const [sNotFoundBarcode, _setNotFoundBarcode] = useState("");
 
   function handleSearch(val) {
+    dlog(DCAT.INPUT, "handleSearch", "InventorySearch", { query: val, resultCount: sSearchResults.length });
     _setSearchString(val);
     _setNotFoundBarcode("");
 
@@ -75,12 +77,14 @@ export const InventorySearch = memo(function InventorySearch({
         ? inventory.find((item) => item.id === normalized || item.primaryBarcode === normalized || (item.barcodes || []).includes(normalized))
         : inventory.find((item) => item.id === trimmed);
       if (exactMatch) {
+        dlog(DCAT.ACTION, "barcodeScan_found", "InventorySearch", { itemId: exactMatch.id, itemName: exactMatch.formalName });
         onAddItem(exactMatch);
         _setSearchString("");
         _setSearchResults([]);
         return;
       }
       // Not found in inventory
+      dlog(DCAT.ACTION, "barcodeScan_notFound", "InventorySearch", { barcode: trimmed });
       _setNotFoundBarcode(trimmed);
       _setSearchString("");
       _setSearchResults([]);
@@ -94,6 +98,7 @@ export const InventorySearch = memo(function InventorySearch({
   }
 
   function handleCreateNewItem() {
+    dlog(DCAT.BUTTON, "handleCreateNewItem", "InventorySearch", { barcode: sNotFoundBarcode });
     let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
     let barcode = normalizeBarcode(sNotFoundBarcode) || generateEAN13Barcode();
     newItem.id = barcode;
@@ -103,6 +108,7 @@ export const InventorySearch = memo(function InventorySearch({
   }
 
   function handleAddItem(invItem) {
+    dlog(DCAT.BUTTON, "handleAddItem", "InventorySearch", { itemId: invItem?.id, itemName: invItem?.formalName });
     if (onAddItem) onAddItem(invItem);
     _setSearchString("");
     _setSearchResults([]);

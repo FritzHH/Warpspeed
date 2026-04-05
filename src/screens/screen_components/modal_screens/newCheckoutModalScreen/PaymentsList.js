@@ -4,6 +4,7 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
 import { Tooltip, Pressable_ } from "../../../../components";
 import { formatCurrencyDisp, formatMillisForDisplay, gray } from "../../../../utils";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
   let isCash = payment.method === "cash";
@@ -54,7 +55,7 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
         {onRefund && !fullyRefunded && (
           <Tooltip text="Refund this payment" position="top">
             <TouchableOpacity
-              onPress={(e) => { e.stopPropagation(); onRefund(); }}
+              onPress={(e) => { e.stopPropagation(); dlog(DCAT.BUTTON, "refund", "PaymentsList", { paymentId: payment.id, method: payment.method, amount: payment.amountCaptured }); onRefund(); }}
               style={{
                 backgroundColor: C.green,
                 borderRadius: 5,

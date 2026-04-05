@@ -2,6 +2,7 @@
 // This file contains all business logic and calls the "dumb" db.js functions
 
 import { log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage, localStorageWrapper } from "./utils";
+import { takeId, getId } from "./idPool";
 import {
   DB_NODES,
   MILLIS_IN_MINUTE,
@@ -34,12 +35,11 @@ import {
   rehydrateFromArchiveCallable,
   manualArchiveAndCleanupCallable,
   createTextToPayInvoiceCallable,
-  generateIdCallable,
   firestoreBatchWrite,
   firestoreBatchDelete,
 } from "./db_calls";
-import { removeUnusedFields, generatePrefixedEAN13, createNewWorkorder, buildWorkorderNumberFromId } from "./utils";
-import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores, usePendingIdStore } from "./stores";
+import { removeUnusedFields, createNewWorkorder, buildWorkorderNumberFromId } from "./utils";
+import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores } from "./stores";
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -555,11 +555,6 @@ export async function dbSaveSettings(settings) {
  * @returns {Promise<Object>} Save result
  */
 export async function dbSaveOpenWorkorder(workorder, workorderID = null, isFirstSave = false) {
-  // Don't save to Firestore while waiting for the sequential ID
-  if (workorder._pendingId) {
-    return { success: true, deferred: true };
-  }
-
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -611,7 +606,6 @@ export async function dbSaveOpenWorkorder(workorder, workorderID = null, isFirst
     }
 
     let workorderToSave = { ...workorder };
-    delete workorderToSave._pendingId;
     delete workorderToSave._tmpKey;
 
     // Build path: tenants/{tenantID}/stores/{storeID}/open-workorders/{workorderID}
@@ -3016,7 +3010,8 @@ export async function dbTestCustomerPhoneWriteHTTP() {
  */
 export async function dbGetCustomerMessages(
   customerPhone,
-  startAfterTimestamp = null
+  startAfterTimestamp = null,
+  pageSize = 10
 ) {
   try {
     // Validate phone number
@@ -3050,11 +3045,11 @@ export async function dbGetCustomerMessages(
         messagesRef,
         orderBy("timestamp", "desc"),
         startAfter(startAfterTimestamp),
-        limit(10)
+        limit(pageSize)
       );
     } else {
-      // First page - get most recent 10 messages
-      q = query(messagesRef, orderBy("timestamp", "desc"), limit(10));
+      // First page - get most recent messages
+      q = query(messagesRef, orderBy("timestamp", "desc"), limit(pageSize));
     }
 
     // Execute query
@@ -3105,13 +3100,13 @@ export async function dbGetCustomerMessages(
     log("Messages retrieved successfully", {
       phone: cleanPhone,
       count: messages.length,
-      hasMore: messages.length === 10,
+      hasMore: messages.length === pageSize,
     });
 
     return {
       success: true,
       messages: messages,
-      hasMore: messages.length === 10, // If we got 10, there might be more
+      hasMore: messages.length === pageSize,
       count: messages.length,
       customerPhone: cleanPhone,
       nextPageTimestamp: nextPageTimestamp,
@@ -3328,60 +3323,11 @@ export async function dbManualArchiveAndCleanup() {
   }
 }
 
-// ============================================================================
-// SEQUENTIAL ID GENERATION
-// ============================================================================
-
-const ID_PREFIXES = { workorders: "1", sales: "4", transactions: "3" };
-
-/**
- * Generate a random prefixed ID immediately and fire the Cloud Function in the
- * background to get a sequential ID. When it arrives the workorder's id is
- * swapped automatically. After 60 s the random ID is kept as-is.
- * @param {string} node - "workorders", "sales", or "transactions"
- * @returns {string} placeholderID - immediate random EAN-13
- */
-export function dbRequestNewId(node) {
-  const placeholderID = generatePrefixedEAN13(ID_PREFIXES[node] || "0");
-
-  // Store tracks the timestamp and manages the 60s fallback timer internally
-  usePendingIdStore.getState().addEntry(placeholderID, node);
-
-  // Fire Cloud Function in background
-  (async () => {
-    let lastError;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const result = await generateIdCallable({ node });
-        const id = result.data?.id;
-        if (!id) throw new Error("No ID returned from generateId");
-
-        log("dbRequestNewId: ID ready", { node, id, placeholderID });
-        _resolvePendingId(node, placeholderID, id);
-        return;
-      } catch (error) {
-        lastError = error;
-        log(`dbRequestNewId: attempt ${attempt}/3 failed for ${node}:`, error?.message || error);
-        if (attempt < 3) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, 500 * Math.pow(4, attempt - 1))
-          );
-        }
-      }
-    }
-
-    log("dbRequestNewId: all retries failed for " + node + ", keeping placeholder " + placeholderID, lastError?.message || lastError);
-    _resolvePendingId(node, placeholderID, null);
-  })();
-
-  return placeholderID;
-}
-
-export function startNewWorkorder(customer, { status } = {}) {
+export async function startNewWorkorder(customer, { status } = {}) {
   let _currentUser = useLoginStore.getState().currentUser;
-  let placeholderID = dbRequestNewId("workorders");
+  let id = takeId("workorders") || await getId("workorders");
   let wo = createNewWorkorder({
-    id: placeholderID,
+    id,
     customerID: customer?.id || "",
     customerFirst: customer?.first || "",
     customerLast: customer?.last || "",
@@ -3394,56 +3340,12 @@ export function startNewWorkorder(customer, { status } = {}) {
     startedByLast: _currentUser?.last,
     status: status || useSettingsStore.getState().getSettings()?.statuses?.[0]?.id || "",
   });
-  wo._pendingId = true;
+  wo.workorderNumber = buildWorkorderNumberFromId(id, wo.startedOnMillis);
   let store = useOpenWorkordersStore.getState();
   store.setWorkorder(wo, false);
   store.setOpenWorkorderID(wo.id);
   if (customer?.id) store.addPendingCustomerLink(wo.id, customer.id);
   return wo;
-}
-
-/**
- * Internal: resolve a pending ID by swapping placeholder with the real sequential
- * ID (or keeping the placeholder if realId is null).
- */
-function _resolvePendingId(node, placeholderID, realId) {
-  // Clear timeout and remove from pending store
-  usePendingIdStore.getState().removeEntry(placeholderID);
-
-  if (node === "workorders") {
-    const st = useOpenWorkordersStore.getState();
-    const wo = st.workorders.find((w) => w.id === placeholderID);
-    if (!wo) return; // workorder was already removed (user cancelled, etc.)
-
-    if (realId && realId !== placeholderID) {
-      // Swap to the real sequential ID
-      st.removeWorkorder(placeholderID, false);
-      let updated = { ...wo, id: realId };
-      delete updated._pendingId;
-      updated.workorderNumber = buildWorkorderNumberFromId(realId, wo.startedOnMillis);
-      st.setWorkorder(updated, false);
-
-      if (st.openWorkorderID === placeholderID) {
-        st.setOpenWorkorderID(realId);
-      }
-
-      // Re-key pending customer link
-      let links = st._pendingCustomerLinks || {};
-      if (links[placeholderID]) {
-        let custId = links[placeholderID];
-        st.removePendingCustomerLink(placeholderID);
-        st.addPendingCustomerLink(realId, custId);
-      }
-
-      st.setLastIdSwap({ oldId: placeholderID, newId: realId });
-    } else {
-      // Keep the placeholder ID (timeout fallback)
-      let updated = { ...wo };
-      delete updated._pendingId;
-      updated.workorderNumber = buildWorkorderNumberFromId(wo.id, wo.startedOnMillis);
-      st.setWorkorder(updated, false);
-    }
-  }
 }
 
 

@@ -14,6 +14,7 @@ import {
 } from "../../../../utils";
 import { cloneDeep } from "lodash";
 import { useSettingsStore } from "../../../../stores";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 export const WorkorderCombiner = memo(function WorkorderCombiner({
   combinedWorkorders = [],
@@ -28,6 +29,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
   let discounts = useSettingsStore((s) => s.settings?.discounts) || [];
 
   function modifyQty(wo, lineIdx, direction) {
+    dlog(DCAT.BUTTON, "modifyQty", "WorkorderCombiner", { woId: wo.id, lineId: wo.workorderLines[lineIdx]?.id, direction });
     let newLine = cloneDeep(wo.workorderLines[lineIdx]);
     if (direction === "up") {
       newLine.qty = newLine.qty + 1;
@@ -43,11 +45,13 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
   }
 
   function deleteLine(wo, lineIdx) {
+    dlog(DCAT.BUTTON, "deleteLine", "WorkorderCombiner", { woId: wo.id, lineId: wo.workorderLines[lineIdx]?.id });
     let lines = wo.workorderLines.filter((_, idx) => idx !== lineIdx);
     onLineChange(wo.id, lines);
   }
 
   function handleDiscount(wo, line, discountObj) {
+    dlog(DCAT.DROPDOWN, "handleDiscount", "WorkorderCombiner", { woId: wo.id, lineId: line.id, discountName: discountObj?.name || "No Discount" });
     let lines = wo.workorderLines.map((o) => {
       if (o.id === line.id) {
         let updated = { ...o, discountObj };
@@ -132,7 +136,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                     isChecked={isCombined}
                     textStyle={{ color: C.text }}
                     text={"ADD TO SALE"}
-                    onCheck={() => onToggle(wo)}
+                    onCheck={() => { dlog(DCAT.CHECKBOX, "toggleWorkorder", "WorkorderCombiner", { woId: wo.id }); onToggle(wo); }}
                   />
                 )}
               </View>

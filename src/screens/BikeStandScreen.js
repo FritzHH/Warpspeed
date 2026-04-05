@@ -53,7 +53,6 @@ import {
   dbListenToOpenWorkorders,
   dbSaveOpenWorkorder,
   dbSearchCustomersByPhone,
-  dbRequestNewId,
   dbUploadWorkorderMedia,
   startNewWorkorder,
 } from "../db_calls_wrapper";
@@ -149,15 +148,9 @@ export function BikeStandScreen() {
     });
   }, []);
 
-  let zLastIdSwap = useOpenWorkordersStore((state) => state._lastIdSwap);
-
   let statuses = zStatuses || [];
   let sortedWorkorders = sortWorkorders(zWorkorders || [], statuses, zCurrentUser);
-  let effectiveSelectedID = sSelectedWorkorderID;
-  if (zLastIdSwap && zLastIdSwap.oldId === sSelectedWorkorderID) {
-    effectiveSelectedID = zLastIdSwap.newId;
-  }
-  let selectedWorkorder = (zWorkorders || []).find((o) => o.id === effectiveSelectedID);
+  let selectedWorkorder = (zWorkorders || []).find((o) => o.id === sSelectedWorkorderID);
   let intakeQuickButtons = intakeButtonsToRows(zIntakeQuickButtons || []);
 
   //////////////////////////////////////////////////////////////////////////////
@@ -228,11 +221,11 @@ export function BikeStandScreen() {
   // Customer search + workorder creation
   //////////////////////////////////////////////////////////////////////////////
 
-  function handleCustomerSelect(customer) {
+  async function handleCustomerSelect(customer) {
     _setShowPhoneSearch(false);
     _setSelectedCustomer(customer);
 
-    let wo = startNewWorkorder(customer);
+    let wo = await startNewWorkorder(customer);
     _setSelectedWorkorderID(wo.id);
     _setViewMode("workorder");
   }

@@ -14,6 +14,7 @@ import {
   useCurrentCustomerStore,
   useStripePaymentStore,
   useTabNamesStore,
+  useActiveSalesStore,
   getChangeLogUser,
   diffWorkorderLines,
 } from "../../../../stores";
@@ -34,8 +35,8 @@ import {
   localStorageWrapper,
 } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, TAX_FREE_RECEIPT_NOTE, CUSTOMER_PROTO } from "../../../../data";
-import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder, dbRequestNewId } from "../../../../db_calls_wrapper";
-import { generateIdCallable } from "../../../../db_calls";
+import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder } from "../../../../db_calls_wrapper";
+import { takeId, getId } from "../../../../idPool";
 import {
   createNewSale,
   updateSaleWithTotals,
@@ -72,6 +73,7 @@ import { InventorySearch } from "./InventorySearch";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
 import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
 import { NewRefundModalScreen } from "./NewRefundModalScreen";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 // DEV FLAG default — toggled via on-screen switch
 let _devSkipCompletion = false;
@@ -267,7 +269,6 @@ export function NewCheckoutModalScreen() {
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
   const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
   const salePersistedRef = useRef(false);
-  const prefetchedTxnIdRef = useRef(null);
   // ─── Derived Values ───────────────────────────────────────
   let isDepositMode = !!zDepositInfo;
   let isStandalone = !zOpenWorkorder?.customerID;
@@ -289,10 +290,14 @@ export function NewCheckoutModalScreen() {
   // Called once when the modal opens. We use a flag to avoid
   // repeated init without adding a useEffect.
   if (zIsCheckingOut && !sInitialized) {
+    dlog(DCAT.INIT, "checkout_modal_open", "CheckoutModal", { workorderID: zOpenWorkorder?.id, customerID: zOpenWorkorder?.customerID, hasDepositInfo: !!useCheckoutStore.getState().depositInfo, hasViewOnlySale: !!useCheckoutStore.getState().viewOnlySale });
     _setInitialized(true);
     _setReceiptLanguage(
       Object.keys(CUSTOMER_LANGUAGES).find((k) => CUSTOMER_LANGUAGES[k] === zCustomer?.language) || "english"
     );
+
+    // Start fetching card readers immediately — no dependency on sale
+    fetchReaders();
 
     // Check if we're opening a partial sale from ticket search
     let viewOnlySale = useCheckoutStore.getState().viewOnlySale;
@@ -306,32 +311,33 @@ export function NewCheckoutModalScreen() {
     }
   }
 
-  function handleTransactionIdUsed() {
-    prefetchedTxnIdRef.current = null;
-    generateIdCallable({ node: "transactions" }).then((r) => {
-      prefetchedTxnIdRef.current = r.data?.id || null;
-    }).catch(() => {});
-  }
+
 
   async function initializeCheckout() {
+    dlog(DCAT.INIT, "initializeCheckout", "CheckoutModal", { workorderID: zOpenWorkorder?.id, activeSaleID: zOpenWorkorder?.activeSaleID, customerID: zOpenWorkorder?.customerID });
     let currentUser = useLoginStore.getState().currentUser;
     let createdBy = currentUser?.first
       ? currentUser.first + " " + (currentUser.last || "")
       : "";
 
-    // Fetch fresh customer from DB to ensure deposits/credits are current
+    // Refresh customer in background — Zustand already has the data from workorder selection
     let customerID = zOpenWorkorder?.customerID || zCustomer?.id || "";
     if (customerID) {
-      let freshCustomer = await dbGetCustomer(customerID);
-      if (freshCustomer) {
-        useCurrentCustomerStore.getState().setCustomer(freshCustomer, false);
-      }
+      dbGetCustomer(customerID).then((freshCustomer) => {
+        if (freshCustomer) useCurrentCustomerStore.getState().setCustomer(freshCustomer, false);
+      }).catch(() => {});
     }
 
     // Check if workorder has an existing active sale to resume
     if (zOpenWorkorder?.activeSaleID) {
-      let existingSale = await readActiveSale(zOpenWorkorder.activeSaleID);
+      // Use Zustand listener copy first (instant), then reconcile from Firestore in background
+      let existingSale = useActiveSalesStore.getState().getActiveSale(zOpenWorkorder.activeSaleID);
+      if (!existingSale) {
+        // Fallback: not in listener yet — must await Firestore
+        existingSale = await readActiveSale(zOpenWorkorder.activeSaleID);
+      }
       if (existingSale && !existingSale.voidedByRefund) {
+        existingSale = cloneDeep(existingSale);
         log("Resuming existing sale:", existingSale.id);
 
         // Rebuild combined workorders from the sale's workorderIDs
@@ -349,52 +355,58 @@ export function NewCheckoutModalScreen() {
         // (items may have been added/removed on the main screen since last checkout)
         existingSale = updateSaleWithTotals(existingSale, combined, zSettings);
 
-        // Load transactions from collection, credits from sale
-        let loadedTxns = [];
-        if (existingSale.transactionIDs?.length > 0) {
-          loadedTxns = (await readTransactions(existingSale.transactionIDs)).filter(Boolean);
-        }
-        let loadedCredits = getAllAppliedCredits(existingSale, useCurrentCustomerStore.getState().customer);
+        // Show sale immediately — transactions and reconciliation happen in background
+        let initialCredits = getAllAppliedCredits(existingSale, useCurrentCustomerStore.getState().customer);
+        _setCredits(initialCredits);
+        _setSale(existingSale);
+        salePersistedRef.current = true;
+        broadcastSaleToDisplay(existingSale, combined, custFirst, custLast, custLanguage);
 
-        // Reconcile pending transactions (crash recovery)
-        if (existingSale.pendingTransactionIDs?.length > 0) {
-          let pendingResults = await readTransactions(existingSale.pendingTransactionIDs);
-          for (let i = 0; i < existingSale.pendingTransactionIDs.length; i++) {
-            let txn = pendingResults[i];
-            if (txn) {
-              loadedTxns.push(txn);
-              if (!existingSale.transactionIDs.includes(txn.id)) {
-                existingSale.transactionIDs.push(txn.id);
+        // Background: load transactions and reconcile crash-recovery state
+        (async () => {
+          let loadedTxns = [];
+          if (existingSale.transactionIDs?.length > 0) {
+            loadedTxns = (await readTransactions(existingSale.transactionIDs)).filter(Boolean);
+          }
+
+          // Reconcile pending transactions (crash recovery)
+          let needsPersist = false;
+          if (existingSale.pendingTransactionIDs?.length > 0) {
+            let pendingResults = await readTransactions(existingSale.pendingTransactionIDs);
+            for (let i = 0; i < existingSale.pendingTransactionIDs.length; i++) {
+              let txn = pendingResults[i];
+              if (txn) {
+                loadedTxns.push(txn);
+                if (!existingSale.transactionIDs.includes(txn.id)) {
+                  existingSale.transactionIDs.push(txn.id);
+                }
               }
             }
+            existingSale.pendingTransactionIDs = [];
+            needsPersist = true;
           }
-          existingSale.pendingTransactionIDs = [];
-        }
 
-        // Reconcile pending refunds (crash recovery)
-        // Transaction docs already contain refund arrays written by the Cloud Function.
-        // recomputeSaleAmounts below derives amountCaptured (true net) from loaded transactions.
-        if (existingSale.pendingRefundIDs?.length > 0) {
-          existingSale.pendingRefundIDs = [];
-        }
+          // Reconcile pending refunds (crash recovery)
+          if (existingSale.pendingRefundIDs?.length > 0) {
+            existingSale.pendingRefundIDs = [];
+            needsPersist = true;
+          }
 
-        _setTransactions(loadedTxns);
-        _setCredits(loadedCredits);
+          let reconciledCredits = getAllAppliedCredits(existingSale, useCurrentCustomerStore.getState().customer);
+          _setTransactions(loadedTxns);
+          _setCredits(reconciledCredits);
 
-        recomputeSaleAmounts(existingSale, loadedTxns, loadedCredits);
-        salePersistedRef.current = true;
+          recomputeSaleAmounts(existingSale, loadedTxns, reconciledCredits);
+          _setSale(cloneDeep(existingSale));
 
-        // Persist reconciled state (clears pending IDs, updates amounts)
-        persistSale(existingSale, loadedTxns, loadedCredits);
+          if (needsPersist) persistSale(existingSale, loadedTxns, reconciledCredits);
 
-        _setSale(existingSale);
-        broadcastSaleToDisplay(existingSale, combined, custFirst, custLast, custLanguage);
-        fetchReaders();
+          // If reconciliation completed the sale, trigger completion
+          if (existingSale.paymentComplete) {
+            handleSaleComplete(existingSale, loadedTxns, reconciledCredits);
+          }
+        })();
 
-        // If reconciliation completed the sale, trigger completion
-        if (existingSale.paymentComplete) {
-          handleSaleComplete(existingSale, loadedTxns, loadedCredits);
-        }
         return;
       }
       // Stale or voided activeSaleID — clean up the workorder
@@ -405,17 +417,8 @@ export function NewCheckoutModalScreen() {
     }
 
     // No existing sale — create a new one and persist immediately
-    let saleId = null;
-    try {
-      let saleResult = await generateIdCallable({ node: "sales" });
-      saleId = saleResult.data?.id || null;
-    } catch (e) { log("initializeCheckout: sale ID prefetch failed, using fallback", e?.message); }
+    let saleId = takeId("sales") || await getId("sales");
     let sale = createNewSale(zSettings, createdBy, saleId);
-
-    // Pre-fetch a transaction ID for the first payment
-    generateIdCallable({ node: "transactions" }).then((r) => {
-      prefetchedTxnIdRef.current = r.data?.id || null;
-    }).catch(() => {});
 
     if (zOpenWorkorder) {
       // Checkout with workorder
@@ -437,27 +440,16 @@ export function NewCheckoutModalScreen() {
     salePersistedRef.current = true;
     persistSale(sale, [], []);
     broadcastSaleToDisplay(sale, zOpenWorkorder ? [cloneDeep(zOpenWorkorder)] : [], custFirst, custLast, custLanguage);
-
-    // Fetch card readers
-    fetchReaders();
   }
 
   async function initializeDepositCheckout(depositInfo) {
+    dlog(DCAT.INIT, "initializeDepositCheckout", "CheckoutModal", { amountCents: depositInfo?.amountCents, type: depositInfo?.type, customerID: zCustomer?.id });
     let currentUser = useLoginStore.getState().currentUser;
     let createdBy = currentUser?.first
       ? currentUser.first + " " + (currentUser.last || "")
       : "";
-    let saleId = null;
-    try {
-      let saleResult = await generateIdCallable({ node: "sales" });
-      saleId = saleResult.data?.id || null;
-    } catch (e) { log("initializeDepositCheckout: sale ID prefetch failed", e?.message); }
+    let saleId = takeId("sales") || await getId("sales");
     let sale = createNewSale(zSettings, createdBy, saleId);
-
-    // Pre-fetch a transaction ID for the first payment
-    generateIdCallable({ node: "transactions" }).then((r) => {
-      prefetchedTxnIdRef.current = r.data?.id || null;
-    }).catch(() => {});
 
     sale.subtotal = depositInfo.amountCents;
     sale.salesTax = 0;
@@ -474,10 +466,10 @@ export function NewCheckoutModalScreen() {
     sale.customerID = zCustomer?.id || "";
     _setCombinedWorkorders([]);
     _setSale(sale);
-    fetchReaders();
   }
 
   async function initializeFromViewOnlySale(sale) {
+    dlog(DCAT.INIT, "initializeFromViewOnlySale", "CheckoutModal", { saleID: sale?.id, paymentComplete: sale?.paymentComplete, amountCaptured: sale?.amountCaptured, total: sale?.total, workorderIDCount: sale?.workorderIDs?.length });
     // Rebuild combined workorders from the sale's workorderIDs
     let combined = [];
     let openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
@@ -503,11 +495,10 @@ export function NewCheckoutModalScreen() {
 
     recomputeSaleAmounts(sale, loadedTxns, loadedCredits);
     _setSale(sale);
-
-    fetchReaders();
   }
 
   async function fetchReaders() {
+    dlog(DCAT.ACTION, "fetchReaders", "CheckoutModal", {});
     try {
       let result = await newCheckoutGetStripeReaders();
       let readersArr = result?.data?.data || [];
@@ -553,6 +544,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function persistSale(sale, txns, creds) {
+    dlog(DCAT.ACTION, "persistSale", "CheckoutModal", { saleID: sale?.id, total: sale?.total, amountCaptured: sale?.amountCaptured, transactionCount: (txns || sTransactions)?.length });
     let saleToPersist = prepareSaleForPersist(sale, txns, creds);
     Promise.all([writeActiveSale(saleToPersist), ...((txns || sTransactions).map((t) => writeTransaction(t)))]);
     salePersistedRef.current = true;
@@ -571,6 +563,7 @@ export function NewCheckoutModalScreen() {
 
   // ─── Workorder Combining ──────────────────────────────────
   async function handleToggleWorkorder(wo) {
+    dlog(DCAT.CHECKBOX, "handleToggleWorkorder", "CheckoutModal", { woID: wo?.id, isPrimary: wo?.id === zOpenWorkorder?.id, currentlyIncluded: !!sCombinedWorkorders.find((o) => o.id === wo?.id) });
     // Cannot uncheck primary workorder
     if (wo.id === zOpenWorkorder?.id) return;
 
@@ -631,6 +624,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handleWorkorderLineChange(woId, newLines) {
+    dlog(DCAT.ACTION, "handleWorkorderLineChange", "CheckoutModal", { woID: woId, lineCount: newLines?.length });
     let newArr = sCombinedWorkorders.map((wo) =>
       wo.id === woId ? { ...wo, workorderLines: newLines } : wo
     );
@@ -676,6 +670,7 @@ export function NewCheckoutModalScreen() {
 
   // ─── Inventory Item Management ────────────────────────────
   function handleAddItem(invItem) {
+    dlog(DCAT.BUTTON, "handleAddItem", "CheckoutModal", { itemID: invItem?.id, itemName: invItem?.formalName, price: invItem?.price });
     let primaryWO = sCombinedWorkorders[0];
     if (!primaryWO) return;
     const { _score, ...cleanItem } = invItem;
@@ -692,6 +687,7 @@ export function NewCheckoutModalScreen() {
 
   // ─── Deposit / Credit Application ───────────────────────
   function handleApplyDeposit(deposit) {
+    dlog(DCAT.BUTTON, "handleApplyDeposit", "CheckoutModal", { depositID: deposit?.id, amountCents: deposit?.amountCents, type: deposit?._type, saleID: sSale?.id });
     if (!sSale || sSale.paymentComplete) return;
     let amountNeeded = (sSale.total || 0) - (sSale.amountCaptured || 0);
     if (amountNeeded <= 0) return;
@@ -743,6 +739,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handleRemoveDeposit(credit) {
+    dlog(DCAT.BUTTON, "handleRemoveDeposit", "CheckoutModal", { creditID: credit?.id, amount: credit?.amount, type: credit?.type, saleID: sSale?.id });
     if (!sSale || sSale.paymentComplete) return;
     if (!credit.type) return;
 
@@ -782,6 +779,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handleSplitDeposit(credit, newAmountCents) {
+    dlog(DCAT.ACTION, "handleSplitDeposit", "CheckoutModal", { creditID: credit?.id, currentAmount: credit?.amount, newAmountCents: newAmountCents, type: credit?.type });
     if (!sSale || sSale.paymentComplete) return;
     if (!credit.type) return;
 
@@ -844,6 +842,7 @@ export function NewCheckoutModalScreen() {
   }
 
   async function handlePrintDepositReceipt(credit) {
+    dlog(DCAT.RECEIPT, "handlePrintDepositReceipt", "CheckoutModal", { creditID: credit?.id, depositSaleID: credit?._depositSaleID });
     if (!credit._depositSaleID) return;
     let sale = await dbGetCompletedSale(credit._depositSaleID);
     if (!sale) return;
@@ -867,6 +866,7 @@ export function NewCheckoutModalScreen() {
 
   // ─── Payment Handling ─────────────────────────────────────
   function handlePaymentStarted(transactionID) {
+    dlog(DCAT.ACTION, "handlePaymentStarted", "CheckoutModal", { transactionID: transactionID, saleID: sSale?.id });
     let sale = cloneDeep(sSale);
     sale.pendingTransactionIDs = [...(sale.pendingTransactionIDs || []), transactionID];
     _setSale(sale);
@@ -876,6 +876,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handlePaymentFailed(transactionID) {
+    dlog(DCAT.ACTION, "handlePaymentFailed", "CheckoutModal", { transactionID: transactionID, saleID: sSale?.id });
     if (!transactionID) return;
     let sale = cloneDeep(sSale);
     sale.pendingTransactionIDs = (sale.pendingTransactionIDs || []).filter((id) => id !== transactionID);
@@ -884,6 +885,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handlePaymentCapture(payment) {
+    dlog(DCAT.ACTION, "handlePaymentCapture", "CheckoutModal", { transactionID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured, saleID: sSale?.id, saleComplete: sSale?.paymentComplete });
     log("handlePaymentCapture called:", JSON.stringify(payment));
     // Guard: if sale is already marked complete locally, skip
     if (sSale?.paymentComplete) {
@@ -967,6 +969,7 @@ export function NewCheckoutModalScreen() {
   }
 
   async function handleDepositSaleComplete(sale, txns, creds) {
+    dlog(DCAT.ACTION, "handleDepositSaleComplete", "CheckoutModal", { saleID: sale?.id, total: sale?.total, amountCaptured: sale?.amountCaptured, transactionCount: (txns || sTransactions)?.length, creditCount: (creds || sCredits)?.length });
     let localTxns = txns || sTransactions;
     let localCreds = creds || sCredits;
     if (sDevSkip) {
@@ -1060,6 +1063,7 @@ export function NewCheckoutModalScreen() {
   }
 
   async function handleSaleComplete(sale, txns, creds) {
+    dlog(DCAT.ACTION, "handleSaleComplete", "CheckoutModal", { saleID: sale?.id, total: sale?.total, amountCaptured: sale?.amountCaptured, paymentComplete: sale?.paymentComplete, isDepositSale: sale?.isDepositSale, transactionCount: (txns || sTransactions)?.length, creditCount: (creds || sCredits)?.length, workorderCount: sCombinedWorkorders?.length });
     let localTxns = txns || sTransactions;
     let localCreds = creds || sCredits;
     log("handleSaleComplete entered, paymentComplete:", sale.paymentComplete, "isDepositSale:", sale.isDepositSale);
@@ -1210,10 +1214,12 @@ export function NewCheckoutModalScreen() {
   }
 
   function handleCashChange(change) {
+    dlog(DCAT.ACTION, "handleCashChange", "CheckoutModal", { changeCents: change });
     _setCashChangeNeeded(prev => prev + change);
   }
 
   function handlePartialPayment() {
+    dlog(DCAT.BUTTON, "handlePartialPayment", "CheckoutModal", { saleID: sSale?.id, total: sSale?.total, amountCaptured: sSale?.amountCaptured, remaining: (sSale?.total || 0) - (sSale?.amountCaptured || 0) });
     let remaining = (sSale?.total || 0) - (sSale?.amountCaptured || 0);
 
     function buildPartialReceipt() {
@@ -1314,6 +1320,7 @@ export function NewCheckoutModalScreen() {
 
   // ─── Close Modal ──────────────────────────────────────────
   function closeModal() {
+    dlog(DCAT.BUTTON, "closeModal", "CheckoutModal", { saleID: sSale?.id, saleComplete: saleComplete, isStandalone: isStandalone, hasRealPayments: hasRealPayments, amountCaptured: sSale?.amountCaptured });
     // Standalone: completed sale — clean up workorder and navigate back
     if (isStandalone && saleComplete) {
       resetAndClose();
@@ -1371,6 +1378,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function resetAndClose() {
+    dlog(DCAT.ACTION, "resetAndClose", "CheckoutModal", { saleID: sSale?.id, transactionCount: sTransactions?.length, creditCount: sCredits?.length, salePersistedRef: salePersistedRef.current });
     let hasPayments = sTransactions.length > 0 || sCredits.length > 0;
     if (sSale?.id && !hasPayments && salePersistedRef.current) {
       deleteActiveSale(sSale.id);
@@ -1381,9 +1389,6 @@ export function NewCheckoutModalScreen() {
           woStore.setWorkorder({ ...current, activeSaleID: "" }, true);
         }
       }
-    }
-    if (prefetchedTxnIdRef.current) {
-      prefetchedTxnIdRef.current = null;
     }
     salePersistedRef.current = false;
     broadcastClear();
@@ -1419,23 +1424,24 @@ export function NewCheckoutModalScreen() {
     useCheckoutStore.getState().setIsCheckingOut(false);
   }
 
-  function resetStandaloneWorkorder() {
+  async function resetStandaloneWorkorder() {
+    dlog(DCAT.ACTION, "resetStandaloneWorkorder", "CheckoutModal", { currentWorkorderID: useOpenWorkordersStore.getState().openWorkorderID });
     let store = useOpenWorkordersStore.getState();
     let oldWo = store.getOpenWorkorder();
     if (oldWo) store.removeWorkorder(oldWo.id);
 
-    let placeholderID = dbRequestNewId("workorders");
+    let id = takeId("workorders") || await getId("workorders");
     let wo = createNewWorkorder({
-      id: placeholderID,
+      id,
       startedByFirst: useLoginStore.getState().currentUser?.first,
       startedByLast: useLoginStore.getState().currentUser?.last,
     });
-    wo._pendingId = true;
     store.setWorkorder(wo, false);
     store.setOpenWorkorderID(wo.id);
   }
 
   async function handleReprint() {
+    dlog(DCAT.RECEIPT, "handleReprint", "CheckoutModal", { saleID: sSale?.id, receiptLanguage: sReceiptLanguage });
     if (!sSale) return;
     const primaryWO = sCombinedWorkorders[0];
     const _noCustomer = !primaryWO?.customerID;
@@ -1469,6 +1475,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handlePrintReceipt(payment) {
+    dlog(DCAT.RECEIPT, "handlePrintReceipt", "CheckoutModal", { saleID: sSale?.id, transactionID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured });
     if (!sSale) return;
     let settings = useSettingsStore.getState().getSettings();
     let isDeposit = sSale.isDepositSale;
@@ -1492,6 +1499,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handlePopRegister() {
+    dlog(DCAT.BUTTON, "handlePopRegister", "CheckoutModal", {});
     let settings = useSettingsStore.getState().getSettings();
     let printObj = { id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register };
     log("handlePopRegister printObj:", JSON.stringify(printObj));
@@ -1501,6 +1509,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function applyTaxFree(newVal) {
+    dlog(DCAT.CHECKBOX, "applyTaxFree", "CheckoutModal", { taxFree: newVal, saleID: sSale?.id });
     let note = newVal ? TAX_FREE_RECEIPT_NOTE : "";
     let newCombined = sCombinedWorkorders.map((wo) => ({
       ...wo,
@@ -1523,6 +1532,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handleTaxFreeToggle() {
+    dlog(DCAT.CHECKBOX, "handleTaxFreeToggle", "CheckoutModal", { currentlyTaxFree: !!sCombinedWorkorders[0]?.taxFree });
     const primaryWO = sCombinedWorkorders[0];
     if (!primaryWO) return;
     const currentlyTaxFree = !!primaryWO.taxFree;
@@ -1576,7 +1586,7 @@ export function NewCheckoutModalScreen() {
             <CheckBox_
               text={"DEV: Skip DB/Print"}
               isChecked={sDevSkip}
-              onCheck={() => _setDevSkip(!sDevSkip)}
+              onCheck={() => { dlog(DCAT.CHECKBOX, "devSkipToggle", "CheckoutModal", { newValue: !sDevSkip }); _setDevSkip(!sDevSkip); }}
               textStyle={{ fontSize: 11, color: sDevSkip ? C.red : gray(0.4) }}
             />
           </View>
@@ -1605,8 +1615,6 @@ export function NewCheckoutModalScreen() {
                 hasReaders={onlineReaders.length > 0}
                 isVisible={zIsCheckingOut}
                 lockAmount={isDepositMode}
-                transactionId={prefetchedTxnIdRef.current}
-                onTransactionIdUsed={handleTransactionIdUsed}
                 cardIsProcessing={cardIsProcessing}
               />
               {sCardMode === "manual" ? (
@@ -1619,12 +1627,10 @@ export function NewCheckoutModalScreen() {
                   saleID={sSale?.id || ""}
                   customerID={sSale?.customerID || zCustomer?.id || ""}
                   customerEmail={zCustomer?.email || ""}
-                  onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
-                  onCardProcessingEnd={() => _setCardProcessingAmount(0)}
-                  onSwitchToReader={() => _setCardMode("reader")}
+                  onCardProcessingStart={(amount) => { dlog(DCAT.ACTION, "cardProcessingStart_manual", "CheckoutModal", { amountCents: amount }); _setCardProcessingAmount(amount); }}
+                  onCardProcessingEnd={() => { dlog(DCAT.ACTION, "cardProcessingEnd_manual", "CheckoutModal", {}); _setCardProcessingAmount(0); }}
+                  onSwitchToReader={() => { dlog(DCAT.BUTTON, "switchToReader", "CheckoutModal", {}); _setCardMode("reader"); }}
                   lockAmount={isDepositMode}
-                  transactionId={prefetchedTxnIdRef.current}
-                  onTransactionIdUsed={handleTransactionIdUsed}
                 />
               ) : (
                 <CardReaderPayment
@@ -1641,12 +1647,10 @@ export function NewCheckoutModalScreen() {
                     customerEmail={zCustomer?.email || ""}
                     saleSalesTax={sSale?.salesTax || 0}
                     saleTotal={sSale?.total || 0}
-                    onCardProcessingStart={(amount) => _setCardProcessingAmount(amount)}
-                    onCardProcessingEnd={() => _setCardProcessingAmount(0)}
-                    onSwitchToManual={() => _setCardMode("manual")}
+                    onCardProcessingStart={(amount) => { dlog(DCAT.ACTION, "cardProcessingStart_reader", "CheckoutModal", { amountCents: amount }); _setCardProcessingAmount(amount); }}
+                    onCardProcessingEnd={() => { dlog(DCAT.ACTION, "cardProcessingEnd_reader", "CheckoutModal", {}); _setCardProcessingAmount(0); }}
+                    onSwitchToManual={() => { dlog(DCAT.BUTTON, "switchToManual", "CheckoutModal", {}); _setCardMode("manual"); }}
                     lockAmount={isDepositMode}
-                    transactionId={prefetchedTxnIdRef.current}
-                    onTransactionIdUsed={handleTransactionIdUsed}
                   />
               )}
             </View>
@@ -1735,7 +1739,7 @@ export function NewCheckoutModalScreen() {
                   <PaymentsList
                     payments={sTransactions}
                     credits={sCredits}
-                    onRefund={(payment) => { _setRefundPayment(payment); _setShowRefundModal(true); }}
+                    onRefund={(payment) => { dlog(DCAT.BUTTON, "openRefundModal_deposit", "CheckoutModal", { transactionID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured }); _setRefundPayment(payment); _setShowRefundModal(true); }}
                     onPrintReceipt={handlePrintReceipt}
                   />
                 </View>
@@ -1978,7 +1982,7 @@ export function NewCheckoutModalScreen() {
                       <PaymentsList
                           payments={sTransactions}
                           credits={sCredits}
-                  onRefund={(payment) => { _setRefundPayment(payment); _setShowRefundModal(true); }}
+                  onRefund={(payment) => { dlog(DCAT.BUTTON, "openRefundModal", "CheckoutModal", { transactionID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured }); _setRefundPayment(payment); _setShowRefundModal(true); }}
                   onPrintReceipt={handlePrintReceipt}
                   onPrintDepositReceipt={handlePrintDepositReceipt}
                   onRemoveDeposit={!saleComplete ? (credit) => _setSplitDepositPayment(credit) : null}
@@ -2050,7 +2054,7 @@ export function NewCheckoutModalScreen() {
                     dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
                     selectedIdx={Object.keys(CUSTOMER_LANGUAGES).indexOf(sReceiptLanguage || "english")}
                     useSelectedAsButtonTitle={true}
-                    onSelect={(item) => _setReceiptLanguage(item.key)}
+                    onSelect={(item) => { dlog(DCAT.DROPDOWN, "receiptLanguageSelect", "CheckoutModal", { language: item?.key }); _setReceiptLanguage(item.key); }}
                     buttonStyle={{ marginLeft: 5, paddingHorizontal: 2, paddingVertical: 3 }}
                     buttonTextStyle={{ fontSize: 12 }}
                     buttonIcon={null}
@@ -2274,8 +2278,9 @@ export function NewCheckoutModalScreen() {
         sale={prepareSaleForPersist(sSale)}
         transactions={sTransactions}
         initialPayment={sRefundPayment}
-        onClose={() => { _setShowRefundModal(false); _setRefundPayment(null); }}
+        onClose={() => { dlog(DCAT.BUTTON, "refundModal_onClose", "CheckoutModal", {}); _setShowRefundModal(false); _setRefundPayment(null); }}
         onSaleUpdated={(updatedSale, updatedTransactions) => {
+          dlog(DCAT.ACTION, "refundModal_onSaleUpdated", "CheckoutModal", { saleID: updatedSale?.id, voidedByRefund: !!updatedSale?.voidedByRefund, amountCaptured: updatedSale?.amountCaptured, transactionCount: updatedTransactions?.length });
           // Refresh combined workorders from store to pick up refund changelog entries
           let freshWorkorders = sCombinedWorkorders.map((wo) => {
             let storeWO = useOpenWorkordersStore.getState().workorders.find((w) => w.id === wo.id);

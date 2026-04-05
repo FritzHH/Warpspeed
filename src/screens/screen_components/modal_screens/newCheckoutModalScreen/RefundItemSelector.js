@@ -5,6 +5,7 @@ import { C, Fonts } from "../../../../styles";
 import { CheckBox_, Button_ } from "../../../../components";
 import { COLOR_GRADIENTS } from "../../../../styles";
 import { formatCurrencyDisp, gray, formatWorkorderNumber } from "../../../../utils";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 const RefundItemRow = memo(function RefundItemRow({
   line,
@@ -43,7 +44,10 @@ const RefundItemRow = memo(function RefundItemRow({
       <CheckBox_
         isChecked={isSelected || isRefunded}
         onCheck={() => {
-          if (!isRefunded && !isDisabled) onToggle(line);
+          if (!isRefunded && !isDisabled) {
+            dlog(DCAT.CHECKBOX, "toggleItem", "RefundItemSelector", { lineId: line.id, itemName: line.inventoryItem?.formalName || line.inventoryItem?.informalName });
+            onToggle(line);
+          }
         }}
         enabled={!isRefunded && !isDisabled}
         buttonStyle={{ marginRight: 8 }}
@@ -214,7 +218,7 @@ export const RefundItemSelector = memo(function RefundItemSelector({
         </View>
         <Button_
           text="CLEAR LIST"
-          onPress={onClearItems}
+          onPress={() => { dlog(DCAT.BUTTON, "clearList", "RefundItemSelector"); onClearItems(); }}
           enabled={selectedItems.length > 0}
           colorGradientArr={COLOR_GRADIENTS.grey}
           textStyle={{ fontSize: 10 }}

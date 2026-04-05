@@ -29,6 +29,8 @@ import {
   DropdownMenu,
   Image_,
   PhoneNumberInput,
+  LoadingIndicator,
+  SmallLoadingIndicator,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
 import { useTranslation } from "../../../useTranslation";
@@ -55,7 +57,7 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToCustomerMessages, dbToggleSMSForwarding, dbGetConversationForwardState } from "../../../db_calls_wrapper";
+import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToCustomerMessages, dbToggleSMSForwarding, dbGetConversationForwardState, dbGetCustomerMessages } from "../../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { sendSaleReceipt } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 
@@ -87,12 +89,38 @@ export function MessagesComponent({}) {
   const zOutgoingMessagesArr = useCustMessagesStore(
     (state) => state.outgoingMessages
   );
+  const zMessagesLoading = useCustMessagesStore((state) => state.messagesLoading);
+  const zMessagesLoadingMore = useCustMessagesStore((state) => state.messagesLoadingMore);
+  const zMessagesHasMore = useCustMessagesStore((state) => state.messagesHasMore);
   //////////////////////////////////////////////////////////////////////////
 
-  // Clear hasNewSMS flag when messages are viewed
-  if (zWorkorderObj?.hasNewSMS) {
-    useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
-  }
+  // Clear hasNewSMS flag when messages are viewed, and refresh messages
+  useEffect(() => {
+    if (zWorkorderObj?.hasNewSMS) {
+      useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
+      // Re-fetch latest messages to pick up the new incoming SMS
+      let phone = zWorkorderObj.customerCell;
+      if (phone && phone.length === 10 && !sCustomPhoneMode) {
+        let msgStore = useCustMessagesStore.getState();
+        msgStore.setMessagesPhone(phone);
+        msgStore.setMessagesLoading(true);
+        dbGetCustomerMessages(phone, null, 7).then((result) => {
+          if (!result.success || useCustMessagesStore.getState().getMessagesPhone() !== phone) {
+            useCustMessagesStore.getState().setMessagesLoading(false);
+            return;
+          }
+          let store = useCustMessagesStore.getState();
+          store.setIncomingMessages(result.messages.filter((m) => m.type === "incoming"));
+          store.setOutgoingMessages(result.messages.filter((m) => m.type !== "incoming"));
+          store.setMessagesHasMore(result.hasMore);
+          store.setMessagesNextCursor(result.nextPageTimestamp);
+          store.setMessagesLoading(false);
+        }).catch(() => {
+          useCustMessagesStore.getState().setMessagesLoading(false);
+        });
+      }
+    }
+  }, [zWorkorderObj?.hasNewSMS, zWorkorderObj?.id]);
 
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);
@@ -146,6 +174,28 @@ export function MessagesComponent({}) {
       // Currently just using for debouncing the state update itself
     }, DEBOUNCE_DELAY);
   }, [sTranslateActive, debouncedTranslate, targetLang]);
+
+  // Load more messages on scroll to top (pagination)
+  const loadMoreMessages = useCallback(() => {
+    let msgStore = useCustMessagesStore.getState();
+    if (msgStore.messagesLoadingMore || !msgStore.messagesHasMore || !msgStore.messagesPhone) return;
+    let cursor = msgStore.messagesNextCursor;
+    if (!cursor) return;
+    msgStore.setMessagesLoadingMore(true);
+    dbGetCustomerMessages(msgStore.messagesPhone, cursor, 10).then((result) => {
+      if (!result.success) {
+        useCustMessagesStore.getState().setMessagesLoadingMore(false);
+        return;
+      }
+      let store = useCustMessagesStore.getState();
+      store.prependMessages(result.messages);
+      store.setMessagesHasMore(result.hasMore);
+      store.setMessagesNextCursor(result.nextPageTimestamp);
+      store.setMessagesLoadingMore(false);
+    }).catch(() => {
+      useCustMessagesStore.getState().setMessagesLoadingMore(false);
+    });
+  }, []);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -532,7 +582,12 @@ export function MessagesComponent({}) {
           overflow: "hidden",
         }}
       >
-        {messagesArr.length < 1 && (
+        {zMessagesLoading && !sCustomPhoneMode && (
+          <View style={{ width: "100%", height: "100%", justifyContent: "center", alignItems: "center" }}>
+            <LoadingIndicator message="Loading messages..." />
+          </View>
+        )}
+        {(!zMessagesLoading || sCustomPhoneMode) && messagesArr.length < 1 && (
           <View
             style={{
               width: "100%",
@@ -556,27 +611,42 @@ export function MessagesComponent({}) {
             </Text>
           </View>
         )}
-        {messagesArr.length > 0 && (
-          <FlatList
-            onScrollToIndexFailed={(info) => {
-              const wait = new Promise((resolve) => setTimeout(resolve, 50));
-              wait.then(() => {
-                messageListRef.current?.scrollToIndex({
-                  index: info.index,
-                  animated: true,
+        {(!zMessagesLoading || sCustomPhoneMode) && messagesArr.length > 0 && (
+          <View style={{ width: "100%", flex: 1 }}>
+            {zMessagesLoadingMore && !sCustomPhoneMode && (
+              <View style={{ width: "100%", paddingVertical: 8, alignItems: "center" }}>
+                <SmallLoadingIndicator />
+              </View>
+            )}
+            <FlatList
+              onScrollToIndexFailed={(info) => {
+                const wait = new Promise((resolve) => setTimeout(resolve, 50));
+                wait.then(() => {
+                  messageListRef.current?.scrollToIndex({
+                    index: info.index,
+                    animated: true,
+                  });
                 });
-              });
-            }}
-            ref={messageListRef}
-            data={messagesArr}
-            renderItem={(item) => {
-              let idx = item.index;
-              item = item.item;
-              if (item.type === "incoming")
-                return <IncomingMessageComponent msgObj={item} />;
-              return <OutgoingMessageComponent msgObj={item} />;
-            }}
-          />
+              }}
+              ref={messageListRef}
+              data={messagesArr}
+              renderItem={(item) => {
+                let idx = item.index;
+                item = item.item;
+                if (item.type === "incoming")
+                  return <IncomingMessageComponent msgObj={item} />;
+                return <OutgoingMessageComponent msgObj={item} />;
+              }}
+              onScroll={(e) => {
+                if (sCustomPhoneMode) return;
+                let { contentOffset } = e.nativeEvent;
+                if (contentOffset.y <= 0 && zMessagesHasMore && !zMessagesLoadingMore) {
+                  loadMoreMessages();
+                }
+              }}
+              scrollEventThrottle={200}
+            />
+          </View>
         )}
       </View>
       {!hasActivePhone ? (

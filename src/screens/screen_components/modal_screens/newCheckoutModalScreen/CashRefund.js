@@ -4,6 +4,7 @@ import { useState, useRef, memo } from "react";
 import { Button_ } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp, gray } from "../../../../utils";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 export const CashRefund = memo(function CashRefund({
   maxCashRefund = 0,
@@ -39,6 +40,7 @@ export const CashRefund = memo(function CashRefund({
   }
 
   function handleAmountChange(val) {
+    dlog(DCAT.INPUT, "handleAmountChange", "CashRefund", { cents: usdTypeMask(val, { withDollar: false }).cents });
     let result = usdTypeMask(val, { withDollar: false });
     if (result.cents > maxCashRefund) {
       _setRefundAmountDisp(formatCurrencyDisp(maxCashRefund));
@@ -50,6 +52,7 @@ export const CashRefund = memo(function CashRefund({
   }
 
   function handleProcessRefund() {
+    dlog(DCAT.BUTTON, "handleProcessRefund", "CashRefund", { amount: sRefundAmount, maxCashRefund });
     if (!sRefundAmount || sRefundAmount <= 0) {
       _setStatusMessage("Enter a refund amount");
       return;

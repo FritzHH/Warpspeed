@@ -66,9 +66,9 @@ export function CustomerSearchListComponent({}) {
   const [sCustomerInfo, _setCustomerInfo] = useState();
 
   function handleCustomerSelected(customer) {
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().requireLogin(async () => {
       useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
-      startNewWorkorder(customer);
+      await startNewWorkorder(customer);
       useCurrentCustomerStore.getState().setCustomer(customer);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,

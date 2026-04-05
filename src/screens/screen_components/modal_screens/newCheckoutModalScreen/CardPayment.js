@@ -4,12 +4,13 @@ import { useState, useRef, memo } from "react";
 import { Button_, SHADOW_RADIUS_PROTO, SmallLoadingIndicator } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp, log, gray } from "../../../../utils";
-import { dbRequestNewId } from "../../../../db_calls_wrapper";
+import { takeId, getId } from "../../../../idPool";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "../../../../private_user_constants";
 import { buildManualCardTransaction } from "./newCheckoutUtils";
 import { newCheckoutProcessManualCardPayment } from "./newCheckoutFirebaseCalls";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
@@ -99,6 +100,7 @@ function CardPaymentForm({
   // ── Amount handler ──
   function handleAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
+    dlog(DCAT.INPUT, "amount_change", "CardPayment", { cents: result.cents, capped: result.cents > amountLeftToPay });
     if (result.cents > amountLeftToPay) {
       _setRequestedAmountDisp(formatCurrencyDisp(amountLeftToPay));
       _setRequestedAmount(amountLeftToPay);
@@ -110,6 +112,7 @@ function CardPaymentForm({
 
   function handleZipChange(val) {
     let digits = val.replace(/\D/g, "").slice(0, 5);
+    dlog(DCAT.INPUT, "zip_change", "CardPayment", { length: digits.length });
     _setZip(digits);
     if (digits.length >= 5) focusExpiry();
   }
@@ -127,8 +130,10 @@ function CardPaymentForm({
 
   // ── Charge handler ──
   async function handleCharge() {
+    dlog(DCAT.BUTTON, "START_MANUAL_CARD_PAYMENT", "CardPayment", { amount: sRequestedAmount, saleID });
     let err = validate();
     if (err) {
+      dlog(DCAT.ACTION, "manualCardPayment_validation_failed", "CardPayment", { error: err });
       _setError(err);
       return;
     }
@@ -160,8 +165,7 @@ function CardPaymentForm({
 
       if (onCardProcessingStart) onCardProcessingStart(sRequestedAmount);
 
-      let transactionID = transactionId || dbRequestNewId("transactions");
-      if (transactionId && onTransactionIdUsed) onTransactionIdUsed();
+      let transactionID = takeId("transactions") || await getId("transactions");
 
       // Notify parent to add pending ID to sale before payment starts
       if (onPaymentStarted) onPaymentStarted(transactionID);
@@ -177,6 +181,7 @@ function CardPaymentForm({
 
       if (result?.success) {
         let payment = buildManualCardTransaction(result.data.charge, transactionID);
+        dlog(DCAT.ACTION, "manualCardPayment_success", "CardPayment", { amountCaptured: payment.amountCaptured, transactionID });
         _setSuccess(`Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`);
         _setDone(true);
         _setProcessing(false);
@@ -199,6 +204,7 @@ function CardPaymentForm({
       }
     } catch (error) {
       log("CardPayment charge error:", error);
+      dlog(DCAT.ACTION, "manualCardPayment_error", "CardPayment", { message: error?.message });
       _setError(error?.message || "Payment failed");
       _setProcessing(false);
       if (onPaymentFailed) onPaymentFailed(transactionID);
@@ -388,6 +394,7 @@ function CardPaymentForm({
               options={STRIPE_ELEMENT_OPTIONS}
               onReady={() => _setCardReady(true)}
               onChange={(e) => {
+                dlog(DCAT.INPUT, "cardNumber_complete", "CardPayment", { complete: e.complete });
                 _setCardComplete(e.complete);
                 if (e.complete) focusZip();
               }}
@@ -419,6 +426,7 @@ function CardPaymentForm({
             <CardExpiryElement
               options={STRIPE_ELEMENT_OPTIONS}
               onChange={(e) => {
+                dlog(DCAT.INPUT, "cardExpiry_complete", "CardPayment", { complete: e.complete });
                 _setExpComplete(e.complete);
                 if (e.complete) focusCvc();
               }}
@@ -431,6 +439,7 @@ function CardPaymentForm({
             <CardCvcElement
               options={STRIPE_ELEMENT_OPTIONS}
               onChange={(e) => {
+                dlog(DCAT.INPUT, "cardCvc_complete", "CardPayment", { complete: e.complete });
                 _setCvcComplete(e.complete);
                 if (e.complete) focusStartButton();
               }}
@@ -480,7 +489,7 @@ function CardPaymentForm({
         <View style={{ width: "33%", alignItems: "flex-end", paddingRight: 7 }}>
           <Button_
             text="Card Reader"
-            onPress={onSwitchToReader}
+            onPress={() => { dlog(DCAT.BUTTON, "SWITCH_TO_READER", "CardPayment", {}); if (onSwitchToReader) onSwitchToReader(); }}
             enabled={!formLocked}
             colorGradientArr={COLOR_GRADIENTS.blue}
             textStyle={{ color: C.textWhite, fontSize: 11 }}

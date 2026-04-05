@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button_, CheckBox_ } from "../../../../components";
 import { useSettingsStore } from "../../../../stores";
 import { C, gray } from "../../../../styles";
+import { copyToClipboard } from "../../../../utils";
 import { dbSaveSettingsField } from "../../../../db_calls_wrapper";
 
 export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldChange }) {
@@ -72,7 +73,7 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
   };
 
   const handleCopyStoreId = () => {
-    navigator.clipboard.writeText(generatedStoreId);
+    copyToClipboard(generatedStoreId);
     _setMessage({ text: "✓ Store ID copied to clipboard!", type: "success" });
     setTimeout(() => _setMessage({ text: "", type: "" }), 3000);
   };

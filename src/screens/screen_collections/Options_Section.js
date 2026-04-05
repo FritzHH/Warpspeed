@@ -129,8 +129,10 @@ export const TabBar = ({
     useAlertScreenStore.getState().setValues({
       title: "CAMERA ERROR",
       message: zCameraError || "Unknown camera error",
-      btn1Text: "OK",
-      handleBtn1Press: () => null,
+      btn1Text: "Retry Camera",
+      handleBtn1Press: () => useLoginStore.getState().triggerCameraRetry(),
+      btn2Text: "OK",
+      handleBtn2Press: () => null,
       showAlert: true,
     });
   }

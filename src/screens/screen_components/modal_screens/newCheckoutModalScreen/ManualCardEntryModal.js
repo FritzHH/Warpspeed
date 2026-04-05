@@ -6,6 +6,7 @@ import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { formatCurrencyDisp, log, gray } from "../../../../utils";
 import { newCheckoutProcessManualCardPayment } from "./newCheckoutFirebaseCalls";
 import { buildManualCardTransaction } from "./newCheckoutUtils";
+import { dlog, DCAT } from "./checkoutDebugLog";
 
 function formatCardNumber(raw) {
   let digits = raw.replace(/\D/g, "").slice(0, 16);
@@ -39,30 +40,35 @@ export function ManualCardEntryModal({
   const zipRef = useRef(null);
 
   function handleCardNumberChange(val) {
+    dlog(DCAT.INPUT, "handleCardNumberChange", "ManualCardEntry", { length: val.replace(/\D/g, "").length });
     let digits = val.replace(/\D/g, "").slice(0, 16);
     _setCardNumber(digits);
     _setCardNumberDisp(formatCardNumber(digits));
   }
 
   function handleExpMonthChange(val) {
+    dlog(DCAT.INPUT, "handleExpMonthChange", "ManualCardEntry", { length: val.replace(/\D/g, "").length });
     let digits = val.replace(/\D/g, "").slice(0, 2);
     _setExpMonth(digits);
     if (digits.length === 2 && expYearRef.current) expYearRef.current.focus();
   }
 
   function handleExpYearChange(val) {
+    dlog(DCAT.INPUT, "handleExpYearChange", "ManualCardEntry", { length: val.replace(/\D/g, "").length });
     let digits = val.replace(/\D/g, "").slice(0, 2);
     _setExpYear(digits);
     if (digits.length === 2 && cvcRef.current) cvcRef.current.focus();
   }
 
   function handleCvcChange(val) {
+    dlog(DCAT.INPUT, "handleCvcChange", "ManualCardEntry", { length: val.replace(/\D/g, "").length });
     let digits = val.replace(/\D/g, "").slice(0, 4);
     _setCvc(digits);
     if (digits.length >= 3 && zipRef.current) zipRef.current.focus();
   }
 
   function handleZipChange(val) {
+    dlog(DCAT.INPUT, "handleZipChange", "ManualCardEntry", { length: val.replace(/\D/g, "").length });
     let digits = val.replace(/\D/g, "").slice(0, 5);
     _setZip(digits);
   }
@@ -77,8 +83,10 @@ export function ManualCardEntryModal({
   }
 
   async function handleCharge() {
+    dlog(DCAT.BUTTON, "handleCharge", "ManualCardEntry", { amount, saleID, customerID });
     let err = validate();
     if (err) {
+      dlog(DCAT.ACTION, "handleCharge_validationError", "ManualCardEntry", { error: err });
       _setError(err);
       return;
     }
@@ -104,6 +112,7 @@ export function ManualCardEntryModal({
 
       if (result?.success) {
         let payment = buildManualCardTransaction(result.data.charge);
+        dlog(DCAT.ACTION, "handleCharge_success", "ManualCardEntry", { amountCaptured: payment.amountCaptured });
         _setSuccess(`Payment of ${formatCurrencyDisp(payment.amountCaptured)} approved`);
         _setDone(true);
         _setProcessing(false);
@@ -111,11 +120,13 @@ export function ManualCardEntryModal({
         if (onCardProcessingEnd) onCardProcessingEnd();
         setTimeout(() => { if (onClose) onClose(); }, 1200);
       } else {
+        dlog(DCAT.ACTION, "handleCharge_failed", "ManualCardEntry", { message: result?.message });
         _setError(result?.message || "Payment failed");
         _setProcessing(false);
         if (onCardProcessingEnd) onCardProcessingEnd();
       }
     } catch (error) {
+      dlog(DCAT.ACTION, "handleCharge_error", "ManualCardEntry", { message: error?.message });
       log("ManualCardEntryModal charge error:", error);
       _setError(error?.message || "Payment failed");
       _setProcessing(false);
@@ -281,7 +292,7 @@ export function ManualCardEntryModal({
         <View style={{ flexDirection: "row", justifyContent: "space-between", width: "100%", marginTop: 10 }}>
           <Button_
             text="CANCEL"
-            onPress={onClose}
+            onPress={() => { dlog(DCAT.BUTTON, "cancel", "ManualCardEntry", {}); onClose(); }}
             enabled={!formLocked}
             colorGradientArr={COLOR_GRADIENTS.grey}
             textStyle={{ color: C.textWhite, fontSize: 14 }}

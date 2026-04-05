@@ -366,7 +366,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
       >
         <View
           style={{
-            width: "70%",
+            width: "85%",
             height: "90%",
             backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
             borderRadius: 8,
@@ -524,7 +524,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
           {/* ── Body: three columns ── */}
           <View style={{ flex: 1, flexDirection: "row", padding: 20 }}>
             {/* ── Column 1: customer info (narrow) ── */}
-            <ScrollView style={{ width: "22%", paddingRight: 15 }}>
+            <ScrollView style={{ width: "25%", paddingRight: 15 }}>
               {!workorder.customerID ? (
                 /* Standalone sale infographic */
                 <View style={{ alignItems: "center", paddingTop: 30 }}>
@@ -742,7 +742,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
             <View style={{ width: 1, backgroundColor: gray(0.1), marginHorizontal: 5 }} />
 
             {/* ── Column 2: line items + totals ── */}
-            <View style={{ flex: 1, paddingHorizontal: 15 }}>
+            <View style={{ width: "40%", paddingHorizontal: 15 }}>
               {/* Line items */}
               <SectionHeader text={"ITEMS (" + lines.length + ")"} />
               <FlatList
@@ -765,7 +765,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
                         backgroundColor: C.listItemWhite,
                         paddingVertical: 6,
                         paddingHorizontal: 10,
-                        width: "115%",
+                        width: "100%",
                       }}
                     >
                       {/* Qty x Name + Price */}
@@ -843,7 +843,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
             <View style={{ width: 1, backgroundColor: gray(0.1), marginHorizontal: 5 }} />
 
             {/* ── Column 3: sales ── */}
-            <View style={{ width: "25%", paddingLeft: 15 }}>
+            <View style={{ width: "35%", paddingLeft: 15 }}>
               <SectionHeader text={"SALES (" + sSales.length + ")"} />
               {sLoadingSales ? (
                 <Text style={{ fontSize: 11, color: gray(0.4), fontStyle: "italic" }}>Loading sales...</Text>

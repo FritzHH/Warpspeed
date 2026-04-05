@@ -67,7 +67,9 @@
     "dfun": "firebase deploy --only functions",
     "dprocess": "firebase deploy --only functions:processServerDrivenStripePayment",
     "dhook": "firebase deploy --only functions:createTenant",
-    "login": "firebase login --reauth"
+    "login": "firebase login --reauth",
+    "begin": "yarn build && serve -s build",
+    "refresh": "yarn build"
   },
   "eslintConfig": {
     "extends": [

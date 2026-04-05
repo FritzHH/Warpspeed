@@ -216,8 +216,8 @@ export function BaseScreen() {
       }
     });
 
-    // Ping to discover if display is already open
-    broadcastDisplayStatus(DISPLAY_STATUS.PING);
+    // Ping to discover if display is already open (only if secondary display is enabled)
+    if (hasSecondary) broadcastDisplayStatus(DISPLAY_STATUS.PING);
 
     // Auto-open on mount if secondary display is configured and display is not already open
     let autoOpenTimer = null;

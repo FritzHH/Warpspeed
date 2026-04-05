@@ -118,6 +118,9 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   const zRunBackgroundRecognition = useLoginStore(
     useCallback((state) => state.runBackgroundRecognition, [])
   );
+  const zCameraRetryTrigger = useLoginStore(
+    useCallback((state) => state.cameraRetryTrigger, [])
+  );
   const zUsers = useSettingsStore(
     useCallback((state) => state.settings?.users, [])
   );
@@ -151,6 +154,17 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // 1. Load models + start video //////////////////////////////////////////
   useEffect(() => {
     let cancelled = false;
+
+    // on retry, stop any existing stream and reset ready state
+    if (zCameraRetryTrigger > 0) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) videoRef.current.srcObject = null;
+      _setReady(false);
+    }
 
     async function setup() {
       try {
@@ -187,7 +201,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
     setup();
     return () => { cancelled = true; };
-  }, []);
+  }, [zCameraRetryTrigger]);
 
   // 2. Cleanup — stop video + clear interval on unmount ////////////////////
   useEffect(() => {

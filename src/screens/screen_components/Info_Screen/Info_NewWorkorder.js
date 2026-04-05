@@ -30,7 +30,6 @@ import {
   dbSearchCustomersByName,
   dbSearchCustomersByPhone,
   dbSearchCompletedWorkordersByNumber,
-  dbRequestNewId,
   dbGetCompletedWorkorder,
   dbGetCompletedSale,
   dbGetCustomer,
@@ -335,10 +334,10 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleStartStandaloneSalePress() {
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().requireLogin(async () => {
       useCurrentCustomerStore.getState().setCustomer(null, false);
       useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
-      startNewWorkorder();
+      await startNewWorkorder();
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.checkout,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,
@@ -354,14 +353,14 @@ export function NewWorkorderComponent({}) {
   }
 
   function handleCreateNewCustomerPressed(customerInfoFromModal) {
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().requireLogin(async () => {
       let newCustomer = cloneDeep(customerInfoFromModal || sCustomerInfo);
       newCustomer.id = crypto.randomUUID();
       newCustomer.millisCreated = new Date().getTime();
 
       _setCustomerInfo(newCustomer);
       useCurrentCustomerStore.getState().setCustomer(newCustomer);
-      startNewWorkorder(newCustomer);
+      await startNewWorkorder(newCustomer);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,
         itemsTabName: TAB_NAMES.itemsTab.workorderItems,

@@ -866,6 +866,7 @@ export const DropdownMenu = ({
                 textStyle={{
                   ...itemTextStyle,
                   color: item.textColor || C.text,
+                  ...(item.strikethrough ? { textDecorationLine: "line-through" } : {}),
                 }}
                 text={item.label || item}
                 onPress={(e) => {
@@ -1653,7 +1654,7 @@ export const LoadingIndicator = ({
   return (
     <View style={defaultContainerStyle} {...props}>
       <ActivityIndicator size={sizeValue} color={color} />
-      {(text || message) && (
+      {!!(text || message) && (
         <Text style={defaultTextStyle}>{text || message}</Text>
       )}
     </View>
@@ -1707,6 +1708,12 @@ export const PhoneNumberInput = ({
   const [cursorPosition, setCursorPosition] = React.useState(0);
   const [isFocused, setIsFocused] = React.useState(false);
   const textInputRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (autoFocus && textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  }, []);
 
   // Ensure we only have digits and limit to maxLength
   const digits = value.replace(/\D/g, "").slice(0, maxLength);
@@ -2172,7 +2179,8 @@ export const CheckBox_ = ({
   isChecked,
   buttonStyle = {},
   textStyle = {},
-  enabled,
+  enabled = true,
+  enableMouseOver = true,
 }) => {
   return (
     <Button_
@@ -2189,7 +2197,7 @@ export const CheckBox_ = ({
       }}
       textStyle={{ color: C.text, fontSize: 15, ...textStyle }}
       onPress={onCheck}
-      enableMouseOver={false}
+      enableMouseOver={enableMouseOver}
     />
   );
 };
@@ -2345,7 +2353,7 @@ export const Button_ = ({
             justifyContent: "center",
             flexDirection: "row",
             borderRadius: 5,
-            paddingVertical: 5,
+            // paddingVertical: 5,
             paddingHorizontal: 15,
             paddingLeft: icon ? 10 : null,
             ...shadowStyle,

@@ -85,6 +85,7 @@ export const ICONS = {
   expandGreen: require(ASSETS_PATH + "expandGreen.png"),
   expandYellow: require(ASSETS_PATH + "expandYellow.png"),
   blocked: require(ASSETS_PATH + "blocked.png"),
+  unblock: require(ASSETS_PATH + "unblock.png"),
   colorWheel: require(ASSETS_PATH + "colorWheel.png"),
   tools1: require(ASSETS_PATH + "tools1.png"),
   upArrowOrange: require(ASSETS_PATH + "up_arrow_orange.png"),
@@ -154,6 +155,7 @@ export const ICONS = {
   display: require(ASSETS_PATH + "display.png"),
   thoughtBubble: require(ASSETS_PATH + "thoughtBubble.png"),
   print: require(ASSETS_PATH + "print.png"),
+  variable: require(ASSETS_PATH + "variable.png"),
 };
 
 // rgb(64, 174, 113)

@@ -3,8 +3,8 @@
 // Filter in DevTools: [CHECKOUT_DEBUG]
 
 const LS_KEY = "warpspeed_checkout_debug";
-let DEBUG_ENABLED = false;
-try { DEBUG_ENABLED = localStorage.getItem(LS_KEY) === "true"; } catch (e) {}
+let DEBUG_ENABLED = true;
+try { DEBUG_ENABLED = localStorage.getItem(LS_KEY) === "true" || localStorage.getItem(LS_KEY) === null; } catch (e) {}
 
 export function enableCheckoutDebug(on = true) {
   DEBUG_ENABLED = on;

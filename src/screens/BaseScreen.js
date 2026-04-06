@@ -37,7 +37,7 @@ import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newChe
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { SaleModal } from "./screen_components/modal_screens/SaleModal";
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
-import { decodeLightspeedBarcode } from "../utils";
+import { decodeLightspeedBarcode, lightenRGBByPercent } from "../utils";
 import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import {
   dbListenToSettings,
@@ -248,11 +248,15 @@ export function BaseScreen() {
   // Pre-load Stripe card readers on mount + refresh every 5 minutes
   useEffect(() => {
     async function fetchReaders() {
+      console.log("[CARD_READER] BaseScreen fetchReaders called");
       try {
         let result = await newCheckoutGetStripeReaders();
         let readersArr = result?.data?.data || [];
+        console.log("[CARD_READER] BaseScreen fetchReaders:", readersArr.length, "readers found", readersArr.map(r => ({ id: r.id, label: r.label, status: r.status })));
         useStripePaymentStore.getState().setReadersArr(readersArr);
-      } catch (e) {}
+      } catch (e) {
+        console.log("[CARD_READER] BaseScreen fetchReaders ERROR:", e?.message, e);
+      }
     }
     fetchReaders();
     let interval = setInterval(fetchReaders, 5 * 60 * 1000);
@@ -556,9 +560,7 @@ export function BaseScreen() {
           // width: "100%",
           width: "34%",
           height: "99%",
-          backgroundColor: C.backgroundWhite,
-          // borderColor: APP_BASE_COLORS.green,
-          // borderWidth: 1,
+          backgroundColor: 'rgb(250, 248, 242)',
           borderRadius: 15,
           shadowColor: C.green,
           shadowOffset: {

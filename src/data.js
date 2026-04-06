@@ -303,6 +303,8 @@ export const SMS_PROTO = {
   millis: "",
   message: "",
   imageUrl: "",
+  mediaUrls: [],
+  hasMedia: false,
   customerID: "",
   read: false,
   id: "",

@@ -213,6 +213,51 @@ export function buildCardTransaction(stripeChargeData, transactionID) {
   return transaction;
 }
 
+/**
+ * Build a TRANSACTION_PROTO from the Terminal JS SDK's processPayment() result.
+ * processPayment() returns a Stripe.PaymentIntent with charges expanded.
+ * The charge is at paymentIntent.charges.data[0], and the card data is at
+ * charge.payment_method_details.card_present — same nested structure as the
+ * webhook-provided charge.
+ */
+export function buildCardTransactionFromSDK(paymentIntent, transactionID) {
+  let transaction = cloneDeep(TRANSACTION_PROTO);
+
+  // The PI from processPayment() includes charges expanded
+  let charge = paymentIntent?.charges?.data?.[0] || null;
+  let card = null;
+
+  // If charge is an expanded object (not just an ID string)
+  if (charge && typeof charge === "object") {
+    card = charge.payment_method_details?.card_present;
+    transaction.chargeID = charge.id || "";
+    transaction.receiptURL = charge.receipt_url || "";
+    transaction.amountCaptured = charge.amount_captured || paymentIntent.amount_received || paymentIntent.amount || 0;
+  } else {
+    // Charge not expanded — use PI-level data, webhook safety net fills in the rest
+    transaction.chargeID = typeof charge === "string" ? charge : (typeof paymentIntent?.latest_charge === "string" ? paymentIntent.latest_charge : "");
+    transaction.amountCaptured = paymentIntent?.amount_received || paymentIntent?.amount || 0;
+  }
+
+  transaction.id = transactionID || generatePrefixedEAN13("3");
+  transaction.method = "card";
+  transaction.millis = Date.now();
+  transaction.paymentIntentID = paymentIntent?.id || "";
+  transaction.paymentProcessor = "stripe";
+
+  if (card) {
+    transaction.last4 = card.last4 || "";
+    transaction.expMonth = card.exp_month || "";
+    transaction.expYear = card.exp_year || "";
+    transaction.cardType = card.description || "";
+    transaction.cardIssuer = card.receipt?.application_preferred_name || "Unknown";
+    transaction.authorizationCode = card.receipt?.authorization_code || "";
+    transaction.networkTransactionID = card.network_transaction_id || "";
+  }
+
+  return transaction;
+}
+
 export function buildManualCardTransaction(chargeData, transactionID) {
   let transaction = cloneDeep(TRANSACTION_PROTO);
   let card = chargeData?.payment_method_details?.card;

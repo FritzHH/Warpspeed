@@ -270,7 +270,9 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           _zSetCardStatus("waitingForCard");
           _zSetCardMessage("Card reader ready to accept payment");
           setupListeners(activeReader.id, zPaymentIntentID);
-        } else {
+        } else if (zPaymentIntentID) {
+          // Only flag busy if we have our own PI and the reader has a different one.
+          // If zPaymentIntentID is null (after clear/reset), the reader action is stale.
           _zSetCardStatus("readerBusy");
           _zSetCardError("Reader has an active payment (" + actionPiID + ")");
         }
@@ -425,11 +427,23 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
       if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     } catch (error) {
-      dlog(DCAT.ACTION, "clearReaderError", "CardReaderPayment", { readerId: activeReader?.id, errorMessage: error?.message });
-      log("clearReader error:", error);
-      _zSetCardError(error?.message || "Failed to clear reader");
-      _zSetCardMessage("");
-      _zSetCardStatus("readerBusy");
+      let msg = error?.message || "";
+      // "not currently processing" means the reader is already clear — treat as success
+      if (msg.includes("not currently processing")) {
+        dlog(DCAT.ACTION, "clearReaderAlreadyClear", "CardReaderPayment", { readerId: activeReader?.id });
+        let failedID = pendingTransactionIDRef.current;
+        pendingTransactionIDRef.current = null;
+        _zSetCardMessage("Reader cleared");
+        _zResetCardTransaction();
+        if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
+        if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
+      } else {
+        dlog(DCAT.ACTION, "clearReaderError", "CardReaderPayment", { readerId: activeReader?.id, errorMessage: msg });
+        log("clearReader error:", error);
+        _zSetCardError(msg || "Failed to clear reader");
+        _zSetCardMessage("");
+        _zSetCardStatus("readerBusy");
+      }
     }
   }
 

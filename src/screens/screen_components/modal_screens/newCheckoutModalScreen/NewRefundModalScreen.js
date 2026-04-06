@@ -2,7 +2,7 @@
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, memo, useMemo } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, DropdownMenu, Image_ } from "../../../../components";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, DropdownMenu, Image_, Tooltip } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   useSettingsStore,
@@ -951,33 +951,39 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
                 <View style={{ flexDirection: "row", justifyContent: sRefundComplete ? "space-evenly" : "center", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: gray(0.1) }}>
                   {sRefundComplete && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        dlog(DCAT.BUTTON, "reprint_refund_receipt", "RefundModal", { hasReceipt: !!sLastRefundReceipt });
-                        let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
-                        if (printerID && sLastRefundReceipt) {
-                          dbSavePrintObj(sLastRefundReceipt, printerID);
-                        }
-                      }}
-                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                    >
-                      <Image_ icon={ICONS.print} size={35} />
-                    </TouchableOpacity>
+                    <Tooltip text="Reprint receipt" position="top">
+                      <TouchableOpacity
+                        onPress={() => {
+                          dlog(DCAT.BUTTON, "reprint_refund_receipt", "RefundModal", { hasReceipt: !!sLastRefundReceipt });
+                          let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
+                          if (printerID && sLastRefundReceipt) {
+                            dbSavePrintObj(sLastRefundReceipt, printerID);
+                          }
+                        }}
+                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                      >
+                        <Image_ icon={ICONS.print} size={35} />
+                      </TouchableOpacity>
+                    </Tooltip>
                   )}
                   {sRefundComplete && (
+                    <Tooltip text="Send receipt" position="top">
+                      <TouchableOpacity
+                        onPress={handleSendRefundReceipt}
+                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                      >
+                        <Image_ icon={ICONS.paperPlane} size={35} />
+                      </TouchableOpacity>
+                    </Tooltip>
+                  )}
+                  <Tooltip text="Close" position="top">
                     <TouchableOpacity
-                      onPress={handleSendRefundReceipt}
+                      onPress={handleClose}
                       style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
                     >
-                      <Image_ icon={ICONS.paperPlane} size={35} />
+                      <Image_ icon={ICONS.close1} size={35} />
                     </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    onPress={handleClose}
-                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                  >
-                    <Image_ icon={ICONS.close1} size={35} />
-                  </TouchableOpacity>
+                  </Tooltip>
                 </View>
               </View>
 

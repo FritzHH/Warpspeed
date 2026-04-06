@@ -813,47 +813,6 @@ async function batchWrite(collectionPath, docs, label) {
   logSuccess(`${label} written (${totalBatches} batch${totalBatches > 1 ? "es" : ""}, ${elapsed}s)`);
 }
 
-async function batchWriteCustomerPhoneIndex(customers, label) {
-  const withPhone = customers.filter(c => c.customerCell);
-  if (withPhone.length === 0) {
-    logInfo(`${label}: 0 customers with phone — skipping`);
-    return;
-  }
-
-  logInfo(`Writing ${label}... (${withPhone.length.toLocaleString()} docs)`);
-  const startTime = Date.now();
-  let totalBatches = Math.ceil(withPhone.length / CONFIG.BATCH_SIZE);
-
-  for (let i = 0; i < withPhone.length; i += CONFIG.BATCH_SIZE) {
-    const chunk = withPhone.slice(i, i + CONFIG.BATCH_SIZE);
-    const batch = db.batch();
-    for (const c of chunk) {
-      const ref = db.doc(`customer_phone/${c.customerCell}`);
-      batch.set(ref, {
-        id: c.id,
-        first: c.first,
-        last: c.last,
-        customerCell: c.customerCell,
-        customerLandline: c.customerLandline || "",
-        email: c.email || "",
-        tenantID: CONFIG.tenantID,
-        storeID: CONFIG.storeID,
-        lastUpdated: Date.now(),
-      });
-    }
-    await batch.commit();
-
-    const batchNum = Math.floor(i / CONFIG.BATCH_SIZE) + 1;
-    if (totalBatches > 1) {
-      process.stdout.write(`\r[${timestamp()}]   ... batch ${batchNum}/${totalBatches}`);
-    }
-  }
-
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  if (totalBatches > 1) process.stdout.write("\r" + " ".repeat(80) + "\r");
-  logSuccess(`${label} written (${totalBatches} batch${totalBatches > 1 ? "es" : ""}, ${elapsed}s)`);
-}
-
 // ============================================================================
 // CSV File Reader
 // ============================================================================
@@ -1005,7 +964,6 @@ async function main() {
 
   // 7c: Customers
   await batchWrite(`${basePath}/customers`, customers, "customers");
-  await batchWriteCustomerPhoneIndex(customers, "customer phone index");
 
   // 7d: Open workorders
   await batchWrite(`${basePath}/open-workorders`, openWorkorders, "open workorders");

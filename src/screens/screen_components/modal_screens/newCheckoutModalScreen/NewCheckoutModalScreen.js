@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { View, Text, ScrollView, Image } from "react-native-web";
+import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import { cloneDeep } from "lodash";
 import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator } from "../../../../components";
@@ -73,6 +73,7 @@ import { InventorySearch } from "./InventorySearch";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
 import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
 import { NewRefundModalScreen } from "./NewRefundModalScreen";
+import { SendReceiptModal } from "./SendReceiptModal";
 import { dlog, DCAT } from "./checkoutDebugLog";
 
 // DEV FLAG default — toggled via on-screen switch
@@ -266,6 +267,7 @@ export function NewCheckoutModalScreen() {
   const [sRefundPayment, _setRefundPayment] = useState(null);
   const [sSplitDepositPayment, _setSplitDepositPayment] = useState(null);
   const [sExpandedCreditIds, _setExpandedCreditIds] = useState([]);
+  const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
   const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
   const salePersistedRef = useRef(false);
@@ -499,19 +501,22 @@ export function NewCheckoutModalScreen() {
 
   async function fetchReaders() {
     dlog(DCAT.ACTION, "fetchReaders", "CheckoutModal", {});
+    console.log("[CARD_READER] fetchReaders called");
     try {
       let result = await newCheckoutGetStripeReaders();
       let readersArr = result?.data?.data || [];
+      console.log("[CARD_READER] fetchReaders:", readersArr.length, "readers found", readersArr.map(r => ({ id: r.id, label: r.label, status: r.status, deviceType: r.device_type })));
       useStripePaymentStore.getState().setReadersArr(readersArr);
       let online = readersArr.filter((r) => r.status === "online");
+      console.log("[CARD_READER] Online readers:", online.length);
       if (online.length > 0) {
         _setReaderError("");
       } else {
         _setReaderError("No card readers connected to account");
       }
     } catch (e) {
+      console.log("[CARD_READER] fetchReaders ERROR:", e?.message, e);
       log("Failed to fetch card readers:", e);
-      // Don't set error — polling will keep retrying automatically
     }
   }
 
@@ -1296,11 +1301,11 @@ export function NewCheckoutModalScreen() {
       fullScreen: true,
       title: "Partial Payment",
       message:
-        "Close this sale with a remaining balance of $" +
+        "Remaining balance: $" +
         formatCurrencyDisp(remaining) +
-        "?\nAll payments are saved and you may return at any time",
+        "\n\nAll payments have been saved. You can close this checkout and continue the sale later.",
       alertBoxStyle: { minWidth: "50%" },
-      btn1Text: "Exit",
+      btn1Text: "Close",
       handleBtn1Press: () => {
         resetAndClose();
       },
@@ -1476,6 +1481,62 @@ export function NewCheckoutModalScreen() {
     const printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
     toPrint.popCashRegister = false;
     dbSavePrintObj(toPrint, printerID);
+  }
+
+  function handleSendSaleReceipt() {
+    dlog(DCAT.RECEIPT, "handleSendSaleReceipt", "CheckoutModal", { saleID: sSale?.id });
+    if (!sSale) return;
+    let settings = useSettingsStore.getState().getSettings();
+    let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
+    let emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+
+    const primaryWO = sCombinedWorkorders[0];
+    const _noCustomer = !primaryWO?.customerID;
+    const customerForReceipt = (!_noCustomer)
+      ? { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" }
+      : { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" };
+
+    if (customerForReceipt.customerCell || customerForReceipt.email) {
+      let smsContent = smsTemplate?.content || smsTemplate?.message || "";
+      let emailContent = emailTemplate?.content || emailTemplate?.body || "";
+      let canSMS = customerForReceipt.customerCell && smsContent.trim();
+      let canEmail = customerForReceipt.email && emailContent.trim();
+      if (canSMS || canEmail) {
+        const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+        let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
+        let receipt = printBuilder.sale(sSale, sTransactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
+        sendSaleReceipt(sSale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, null, null, getTranslateCode(sReceiptLanguage), sTransactions, sCredits);
+      }
+    } else {
+      _sSetShowSendReceiptModal(true);
+    }
+  }
+
+  async function handleSendSaleReceiptFromModal({ phone, email }) {
+    dlog(DCAT.RECEIPT, "handleSendSaleReceiptFromModal", "CheckoutModal", { saleID: sSale?.id, hasPhone: !!phone, hasEmail: !!email });
+    if (!sSale) return;
+    let settings = useSettingsStore.getState().getSettings();
+    let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
+    let emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+    let smsContent = smsTemplate?.content || smsTemplate?.message || "";
+    let emailContent = emailTemplate?.content || emailTemplate?.body || "";
+
+    const primaryWO = sCombinedWorkorders[0];
+    let customerForReceipt = {
+      first: primaryWO?.customerFirst || zCustomer?.first || "Customer",
+      last: primaryWO?.customerLast || zCustomer?.last || "",
+      customerCell: phone || "",
+      email: email || "",
+      id: primaryWO?.customerID || zCustomer?.id || "",
+    };
+
+    let canSMS = phone && smsContent.trim();
+    let canEmail = email && emailContent.trim();
+    if (canSMS || canEmail) {
+      let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
+      await sendSaleReceipt(sSale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, null, null, getTranslateCode(sReceiptLanguage), sTransactions, sCredits);
+    }
+    _sSetShowSendReceiptModal(false);
   }
 
   function handlePrintReceipt(payment) {
@@ -1764,29 +1825,41 @@ export function NewCheckoutModalScreen() {
                     marginTop: 5,
                   }}
                 >
-                  <Button_
-                    enabled={saleComplete || !(sTransactions.length > 0 || sCredits.length > 0)}
-                    colorGradientArr={COLOR_GRADIENTS.red}
-                    text={saleComplete ? "CLOSE" : isStandalone ? "CANCEL SALE" : "CANCEL"}
-                    onPress={closeModal}
-                    textStyle={{ color: C.textWhite, fontSize: 13 }}
-                    buttonStyle={{ width: 80, height: 30, borderRadius: 5, marginRight: 10 }}
-                  />
                   {saleComplete && (
-                    <Button_
-                      colorGradientArr={COLOR_GRADIENTS.greenblue}
-                      text="REPRINT"
-                      onPress={handleReprint}
-                      textStyle={{ color: C.textWhite }}
-                      buttonStyle={{ width: 100, borderRadius: 5, marginRight: 10 }}
-                    />
+                    <Tooltip text="Reprint receipt" position="top">
+                      <TouchableOpacity
+                        onPress={handleReprint}
+                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                      >
+                        <Image_ icon={ICONS.print} size={35} />
+                      </TouchableOpacity>
+                    </Tooltip>
                   )}
+                  {saleComplete && (
+                    <Tooltip text="Send receipt" position="top">
+                      <TouchableOpacity
+                        onPress={handleSendSaleReceipt}
+                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                      >
+                        <Image_ icon={ICONS.paperPlane} size={35} />
+                      </TouchableOpacity>
+                    </Tooltip>
+                  )}
+                  <Tooltip text={saleComplete ? "Close" : isStandalone ? "Cancel sale" : "Cancel"} position="top">
+                    <TouchableOpacity
+                      onPress={closeModal}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image_ icon={ICONS.close1} size={35} />
+                    </TouchableOpacity>
+                  </Tooltip>
                   <Tooltip text="Pop register" position="top">
-                    <Button_
+                    <TouchableOpacity
                       onPress={handlePopRegister}
-                      icon={ICONS.openCashRegister}
-                      iconSize={30}
-                    />
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image_ icon={ICONS.openCashRegister} size={30} />
+                    </TouchableOpacity>
                   </Tooltip>
                 </View>
               </View>
@@ -2068,39 +2141,41 @@ export function NewCheckoutModalScreen() {
                     openUpward={true}
                   />
                 </View>
-                      {!saleComplete && hasRealPayments && (
-                  <Button_
-                          colorGradientArr={COLOR_GRADIENTS.red}
-                          text="EXIT PARTIAL PAYMENT"
-                    onPress={handlePartialPayment}
-                    textStyle={{ color: C.textWhite, fontSize: 13 }}
-                          buttonStyle={{ height: 35, borderRadius: 5 }}
-                  />
-                )}
-                      {(saleComplete || !hasRealPayments) && (
-                        <Button_
-                          colorGradientArr={COLOR_GRADIENTS.red}
-                          text={saleComplete ? "CLOSE" : isStandalone ? "CANCEL SALE" : "CLOSE CHECKOUT"}
-                          onPress={closeModal}
-                          textStyle={{ color: C.textWhite, fontSize: 13 }}
-                          buttonStyle={{ height: 30, borderRadius: 5 }}
-                        />
-                      )}
                 {saleComplete && (
-                  <Button_
-                    colorGradientArr={COLOR_GRADIENTS.greenblue}
-                    text="REPRINT"
-                    onPress={handleReprint}
-                    textStyle={{ color: C.textWhite }}
-                          buttonStyle={{ width: 100, borderRadius: 5 }}
-                  />
+                  <Tooltip text="Reprint receipt" position="top">
+                    <TouchableOpacity
+                      onPress={handleReprint}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image_ icon={ICONS.print} size={35} />
+                    </TouchableOpacity>
+                  </Tooltip>
                 )}
+                {saleComplete && (
+                  <Tooltip text="Send receipt" position="top">
+                    <TouchableOpacity
+                      onPress={handleSendSaleReceipt}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image_ icon={ICONS.paperPlane} size={35} />
+                    </TouchableOpacity>
+                  </Tooltip>
+                )}
+                <Tooltip text={hasRealPayments && !saleComplete ? "Close with partial payment" : saleComplete ? "Close" : isStandalone ? "Cancel sale" : "Close checkout"} position="top">
+                  <TouchableOpacity
+                    onPress={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
+                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                  >
+                    <Image_ icon={ICONS.close1} size={35} />
+                  </TouchableOpacity>
+                </Tooltip>
                 <Tooltip text="Pop register" position="top">
-                  <Button_
+                  <TouchableOpacity
                     onPress={handlePopRegister}
-                    icon={ICONS.openCashRegister}
-                    iconSize={30}
-                  />
+                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                  >
+                    <Image_ icon={ICONS.openCashRegister} size={30} />
+                  </TouchableOpacity>
                 </Tooltip>
 
               </View>
@@ -2276,6 +2351,11 @@ export function NewCheckoutModalScreen() {
         </View>
       )}
     />
+    <SendReceiptModal
+      visible={sShowSendReceiptModal}
+      onSend={handleSendSaleReceiptFromModal}
+      onClose={() => _sSetShowSendReceiptModal(false)}
+    />
     {sShowRefundModal && (
       <NewRefundModalScreen
         visible={true}
@@ -2293,16 +2373,15 @@ export function NewCheckoutModalScreen() {
           _setCombinedWorkorders(freshWorkorders);
 
           if (updatedSale?.voidedByRefund) {
-            // Sale was fully voided - reuse the same sale, just reset payment state
+            // All payments refunded - reset payment state but keep credits applied
             let resetSale = cloneDeep(updatedSale);
             delete resetSale.voidedByRefund;
-            resetSale.amountCaptured = 0;
             resetSale.paymentComplete = false;
+            recomputeSaleAmounts(resetSale, updatedTransactions || [], getAllAppliedCredits(resetSale));
             resetSale = updateSaleWithTotals(resetSale, freshWorkorders, zSettings);
             _setSale(resetSale);
             _setTransactions(updatedTransactions || []);
-            _setCredits([]);
-            persistSale(resetSale, updatedTransactions || [], []);
+            persistSale(resetSale, updatedTransactions || []);
           } else {
             _setSale(updatedSale);
             if (updatedTransactions) _setTransactions(updatedTransactions);

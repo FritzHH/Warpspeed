@@ -29,6 +29,7 @@ async function getFunctionsInstance() {
 }
 
 let _newCheckoutInitiatePaymentIntentCallable = null;
+let _newCheckoutCreatePaymentIntentCallable = null;
 let _newCheckoutCancelPaymentCallable = null;
 let _newCheckoutProcessRefundCallable = null;
 let _newCheckoutGetAvailableReadersCallable = null;
@@ -38,6 +39,7 @@ async function getCallables() {
   if (!_newCheckoutInitiatePaymentIntentCallable) {
     const fns = await getFunctionsInstance();
     _newCheckoutInitiatePaymentIntentCallable = httpsCallable(fns, "newCheckoutInitiatePaymentIntentCallable");
+    _newCheckoutCreatePaymentIntentCallable = httpsCallable(fns, "newCheckoutCreatePaymentIntentCallable");
     _newCheckoutCancelPaymentCallable = httpsCallable(fns, "newCheckoutCancelPaymentCallable");
     _newCheckoutProcessRefundCallable = httpsCallable(fns, "newCheckoutProcessRefundCallable");
     _newCheckoutGetAvailableReadersCallable = httpsCallable(fns, "newCheckoutGetAvailableReadersCallable");
@@ -45,6 +47,7 @@ async function getCallables() {
   }
   return {
     initiatePayment: _newCheckoutInitiatePaymentIntentCallable,
+    createPaymentIntent: _newCheckoutCreatePaymentIntentCallable,
     cancelPayment: _newCheckoutCancelPaymentCallable,
     processRefund: _newCheckoutProcessRefundCallable,
     getReaders: _newCheckoutGetAvailableReadersCallable,
@@ -517,6 +520,35 @@ export async function newCheckoutProcessStripePayment(amount, readerID, paymentI
   } catch (error) {
     log("newCheckoutProcessStripePayment error:", error);
     dlog(DCAT.STRIPE_ERR, "processStripePayment", "FirebaseCalls", { message: error?.message, code: error?.code });
+    throw error;
+  }
+}
+
+/**
+ * Creates a PaymentIntent and returns clientSecret for client-driven Terminal SDK flow.
+ * Does NOT send the PI to a reader — the client SDK handles reader interaction directly.
+ */
+export async function newCheckoutCreatePaymentIntent(amount, saleID, customerID, customerEmail, transactionID, salesTax) {
+  dlog(DCAT.STRIPE_REQ, "createPaymentIntent", "FirebaseCalls", { amount, saleID, transactionID, salesTax });
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    const callables = await getCallables();
+    const result = await callables.createPaymentIntent({
+      amount: Number(amount),
+      tenantID,
+      storeID,
+      saleID: saleID || "",
+      customerID: customerID || "",
+      customerEmail: customerEmail || "",
+      transactionID: transactionID || "",
+      salesTax: salesTax || 0,
+    });
+    log("newCheckout payment intent created (client-driven):", result.data);
+    dlog(DCAT.STRIPE_RES, "createPaymentIntent", "FirebaseCalls", { success: true, paymentIntentID: result.data?.data?.paymentIntentID });
+    return result.data;
+  } catch (error) {
+    log("newCheckoutCreatePaymentIntent error:", error);
+    dlog(DCAT.STRIPE_ERR, "createPaymentIntent", "FirebaseCalls", { message: error?.message, code: error?.code });
     throw error;
   }
 }

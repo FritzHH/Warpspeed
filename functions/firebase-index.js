@@ -14,6 +14,7 @@ const { onInit } = require("firebase-functions/v2/core");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const fetch = require("node-fetch");
+const sharp = require("sharp");
 const { printBuilder: sharedPrintBuilder } = require("./shared/printBuilder");
 
 // Firebase Admin SDK - initialize once at module load (don't delete/recreate)
@@ -133,6 +134,29 @@ const SMS_PROTO = {
 
 const CLOSED_THREAD_RESPONSE =
   "Thank you for messaging Bonita Bikes. Due to staffing limitations, we cannot keep messaging open for all return responses. If you need to send a picture, for immediate service please call (239) 291-9396 and we can open the messaging service, or include the picture/video in an email to support@bonitabikes.com. Thank you and we'll chat soon!";
+
+async function compressImageServer(inputBuffer, contentType) {
+  const compressibleTypes = ["image/jpeg", "image/png", "image/webp", "image/tiff", "image/avif"];
+  if (!compressibleTypes.some(t => contentType.startsWith(t))) {
+    return { compressedBuffer: null, thumbnailBuffer: null };
+  }
+  if (inputBuffer.length < 100000) {
+    return { compressedBuffer: null, thumbnailBuffer: null };
+  }
+  try {
+    const compressedBuffer = await sharp(inputBuffer)
+      .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 65 })
+      .toBuffer();
+    const thumbnailBuffer = await sharp(inputBuffer)
+      .resize(300, 300, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 50 })
+      .toBuffer();
+    return { compressedBuffer, thumbnailBuffer };
+  } catch (error) {
+    return { compressedBuffer: null, thumbnailBuffer: null };
+  }
+}
 
 function log(one, two) {
   let str = "[MY LOG ====>] ";
@@ -673,6 +697,7 @@ exports.sendSMSEnhanced = onCall(
         customerID,
         messageID,
         canRespond: canRespondParam = false,
+        forwardTo: forwardToParam = null,
         fromNumber = "+12393171234", // Default from number
       } = request.data;
 
@@ -749,19 +774,41 @@ exports.sendSMSEnhanced = onCall(
         status: twilioResponse.status,
       });
 
-      // Store message in Firestore if customerID and messageID provided
-      if (customerID && messageID) {
+      // Store message in Firestore if messageID provided
+      if (messageID) {
         try {
-          // Store outgoing message in customer_phone/{phone}/messages
-          const messageRef = db
-            .collection("customer_phone")
-            .doc(cleanPhoneNumber)
-            .collection("messages")
-            .doc(messageID);
+          const conversationRef = db
+            .collection("tenants").doc(tenantID)
+            .collection("stores").doc(storeID)
+            .collection("sms-messages").doc(cleanPhoneNumber);
+
+          // Read recent messages to find last outgoing for current forwardTo state
+          let currentForwardTo = {};
+          try {
+            const recent = await conversationRef
+              .collection("messages")
+              .orderBy("millis", "desc")
+              .limit(10)
+              .get();
+            const prev = recent.docs.map(d => d.data()).find(m => m.type === "outgoing");
+            if (prev) currentForwardTo = prev.forwardTo || {};
+          } catch (e) { /* no prior outgoing messages */ }
+
+          // Apply the change from this send
+          if (forwardToParam && forwardToParam.userID) {
+            if (forwardToParam.enable && forwardToParam.phone) {
+              currentForwardTo[forwardToParam.userID] = { phone: forwardToParam.phone, first: forwardToParam.first || "" };
+            } else if (!forwardToParam.enable) {
+              delete currentForwardTo[forwardToParam.userID];
+            }
+          }
+
+          // Store outgoing message in sms-messages
+          const messageRef = conversationRef.collection("messages").doc(messageID);
 
           await messageRef.set({
             id: messageID,
-            customerID: customerID,
+            customerID: customerID || "",
             message: message.trim(),
             phoneNumber: cleanPhoneNumber,
             messageSid: twilioResponse.sid,
@@ -771,25 +818,17 @@ exports.sendSMSEnhanced = onCall(
             storeID: storeID,
             type: "outgoing",
             millis: Date.now(),
+            canRespond: canRespondParam || null,
+            forwardTo: currentForwardTo,
           });
 
-          log("Outgoing message stored at customer_phone path", {
+          log("Outgoing message stored", {
             messageID,
-            customerID,
+            customerID: customerID || "",
             phone: cleanPhoneNumber,
-            path: `customer_phone/${cleanPhoneNumber}/messages/${messageID}`,
+            path: `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhoneNumber}/messages/${messageID}`,
           });
 
-          // Update canRespond and lastMessageMillis on conversation root doc
-          await db.collection("customer_phone").doc(cleanPhoneNumber).set({
-            canRespond: !!canRespondParam,
-            lastMessageMillis: Date.now(),
-          }, { merge: true });
-
-          log("Conversation root updated", {
-            phone: cleanPhoneNumber,
-            canRespond: !!canRespondParam,
-          });
         } catch (firestoreError) {
           log("Error storing outgoing message in Firestore", {
             error: firestoreError.message,
@@ -884,184 +923,6 @@ exports.sendSMSEnhanced = onCall(
   }
 );
 
-exports.incomingSMS = onRequest(
-  { cors: true, secrets: [firebaseServiceAccountKey] },
-  async (request, response) => {
-    // Set CORS headers
-    response.set("Access-Control-Allow-Origin", "*");
-    response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    response.set("Access-Control-Allow-Headers", "Content-Type");
-
-    // Initialize Firestore with service account
-    const db = await getDB(firebaseServiceAccountKey);
-
-    let body = request.body;
-    log("incoming sms body", body);
-
-    let incomingPhone = body.From.slice(2, body.From.length);
-    let incomingMessage = body.Body;
-    const messageSid = body.SmsSid;
-    log("phone", incomingPhone);
-    log("message", incomingMessage);
-
-    // get the customer from customer_phone index
-    let customerObj = null;
-    let tenantID = null;
-    let storeID = null;
-
-    try {
-      // Try customer_phone index first
-      const customerPhoneRef = db
-        .collection("customer_phone")
-        .doc(incomingPhone);
-      const customerPhoneDoc = await customerPhoneRef.get();
-
-      if (customerPhoneDoc.exists) {
-        const indexData = customerPhoneDoc.data();
-        const info = indexData.info || indexData;
-
-        customerObj = {
-          id: info.id,
-          first: info.first,
-          last: info.last,
-          customerCell: info.customerCell || info.cell,
-          customerLandline: info.customerLandline || info.landline,
-          email: info.email,
-        };
-        tenantID = info.tenantID;
-        storeID = info.storeID;
-
-        log("found customer via customer_phone index", {
-          customerObj,
-          tenantID,
-          storeID,
-        });
-      } else {
-        log("no customer found with phone", incomingPhone);
-        return response
-          .status(200)
-          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-      }
-    } catch (error) {
-      log("error searching for customer", error);
-      return response
-        .status(200)
-        .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-    }
-
-    // get the last message from customer_phone to see if they are allowed to respond
-    let lastOutgoingMessage = null;
-    try {
-      const lastMessageSnapshot = await db
-        .collection("customer_phone")
-        .doc(incomingPhone)
-        .collection("messages")
-        .where("type", "==", "outgoing")
-        .orderBy("millis", "desc")
-        .limit(1)
-        .get();
-
-      if (!lastMessageSnapshot.empty) {
-        lastOutgoingMessage = lastMessageSnapshot.docs[0].data();
-      }
-    } catch (error) {
-      log("error getting last outgoing message", error);
-    }
-
-    log("last outgoing message", lastOutgoingMessage);
-    let canRespond = lastOutgoingMessage
-      ? lastOutgoingMessage.canRespond
-      : null;
-
-    // if not allowed to respond, send a bounceback message
-    if (!canRespond) {
-      log("cannot respond", lastOutgoingMessage?.canRespond);
-
-      // Store the message even though thread is closed
-      try {
-        await db
-          .collection("customer_phone")
-          .doc(incomingPhone)
-          .collection("messages")
-          .doc(messageSid)
-          .set({
-            id: messageSid,
-            customerID: customerObj.id,
-            firstName: customerObj.first,
-            lastName: customerObj.last,
-            millis: Date.now(),
-            phoneNumber: incomingPhone,
-            message: incomingMessage,
-            type: "incoming",
-            threadStatus: "closed",
-            autoResponseSent: true,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            tenantID,
-            storeID,
-          });
-      } catch (error) {
-        log("error storing closed thread message", error);
-      }
-
-      // Send bounceback via TwiML
-      const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>${CLOSED_THREAD_RESPONSE}</Message>
-</Response>`;
-
-      return response.status(200).type("text/xml").send(twimlResponse);
-    }
-
-    // if allowed to respond, create and store the message
-    const message = {
-      id: messageSid,
-      firstName: customerObj.first,
-      lastName: customerObj.last,
-      millis: Date.now(),
-      phoneNumber: incomingPhone,
-      message: incomingMessage,
-      customerID: customerObj.id,
-      type: "incoming",
-      threadStatus: "open",
-      read: false,
-      tenantID,
-      storeID,
-    };
-
-    // Store incoming message in customer_phone/{phone}/messages
-    try {
-      const incomingMessageRef = db
-        .collection("customer_phone")
-        .doc(incomingPhone)
-        .collection("messages")
-        .doc(messageSid);
-
-      await incomingMessageRef.set({
-        ...message,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      log("Incoming message stored at customer_phone path", {
-        phone: incomingPhone,
-        messageSid,
-      });
-
-      // Update customer last contact timestamp
-      await db.collection("customer_phone").doc(incomingPhone).update({
-        "info.lastIncomingSMS": admin.firestore.FieldValue.serverTimestamp(),
-        "info.lastIncomingSMSMillis": Date.now(),
-      });
-    } catch (error) {
-      log("error storing incoming message in Firestore", error);
-    }
-
-    // Return empty TwiML response
-    return response
-      .status(200)
-      .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-  }
-);
-
 /**
  * Enhanced incoming SMS webhook handler with comprehensive error handling
  * Processes incoming SMS messages from Twilio with proper validation and response management
@@ -1078,6 +939,7 @@ exports.incomingSMS = onRequest(
 exports.incomingSMSEnhanced = onRequest(
   {
     cors: true,
+    memory: "512MiB",
     secrets: [
       twilioSecretKey,
       twilioSecretAccountNumber,
@@ -1106,7 +968,7 @@ exports.incomingSMSEnhanced = onRequest(
       if (
         !twilioData ||
         !twilioData.From ||
-        !twilioData.Body ||
+        (!twilioData.Body && twilioData.Body !== "" && !parseInt(twilioData.NumMedia || "0", 10)) ||
         !twilioData.MessageSid
       ) {
         log("Invalid Twilio webhook - missing required parameters", twilioData);
@@ -1143,237 +1005,98 @@ exports.incomingSMSEnhanced = onRequest(
       });
 
       // ============================================================================
-      // STEP 2: FIND CUSTOMER ACROSS ALL TENANTS/STORES
+      // STEP 2: RESOLVE STORE FROM TWILIO NUMBER (store_phones lookup)
       // ============================================================================
 
-      let customerData = null;
+      const rawStorePhone = twilioData.To || "";
+      const normalizedStorePhone = rawStorePhone.replace(/^\+1/, "").replace(/\D/g, "");
       let tenantID = null;
       let storeID = null;
 
       try {
-        // OPTION 1: Try customer_phone index first (most efficient)
-        const db = await getDB(firebaseServiceAccountKey);
+        if (normalizedStorePhone.length !== 10) {
+          log("Invalid store phone number format", { rawStorePhone, normalizedStorePhone });
+          return response.status(400).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+        }
 
-        const customerPhoneRef = db
-          .collection("customer_phone")
-          .doc(normalizedPhone);
-        const customerPhoneDoc = await customerPhoneRef.get();
+        const storePhoneDoc = await db.collection("store_phones").doc(normalizedStorePhone).get();
+        if (!storePhoneDoc.exists) {
+          log("No store_phones entry found", { storePhone: normalizedStorePhone });
+          return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+        }
 
-        if (customerPhoneDoc.exists) {
-          const indexData = customerPhoneDoc.data();
+        const storePhoneData = storePhoneDoc.data();
+        tenantID = storePhoneData.tenantId || storePhoneData.tentantId;
+        storeID = storePhoneData.storeId;
 
-          // Extract data from "info" field
-          const info = indexData.info || indexData; // Fallback to root if no "info" field
+        if (!tenantID || !storeID) {
+          log("store_phones doc missing tenantId or storeId", { normalizedStorePhone, storePhoneData });
+          return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+        }
 
+        log("Store resolved via store_phones", { tenantID, storeID, storePhone: normalizedStorePhone });
+      } catch (error) {
+        log("Error looking up store_phones", { error: error.message, storePhone: normalizedStorePhone });
+        return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
+
+      // Helper: sms-messages conversation root ref
+      const conversationRef = db
+        .collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("sms-messages").doc(normalizedPhone);
+
+      // Helper: sms-messages/{phone}/messages/{msgId} ref
+      const messageDocRef = (msgId) => conversationRef.collection("messages").doc(msgId);
+
+      // ============================================================================
+      // STEP 3: OPTIONAL CUSTOMER LOOKUP (metadata only, not for routing)
+      // ============================================================================
+
+      let customerData = { id: "", first: "Unknown", last: "", customerCell: normalizedPhone };
+
+      try {
+        const customersSnapshot = await db
+          .collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("customers")
+          .where("customerCell", "==", normalizedPhone)
+          .limit(1)
+          .get();
+
+        if (!customersSnapshot.empty) {
+          const cust = customersSnapshot.docs[0].data();
           customerData = {
-            id: info.id,
-            first: info.first,
-            last: info.last,
-            customerCell: info.customerCell || info.cell,
-            customerLandline: info.customerLandline || info.landline,
-            email: info.email,
+            id: cust.id || "",
+            first: cust.first || "Unknown",
+            last: cust.last || "",
+            customerCell: cust.customerCell || normalizedPhone,
           };
-          tenantID = info.tenantID;
-          storeID = info.storeID;
-
-          log("Customer found via customer_phone index", {
+          log("Customer found for incoming SMS", {
             customerID: customerData.id,
-            tenantID,
-            storeID,
             customerName: `${customerData.first} ${customerData.last}`,
-            lookupBy: "customerCell",
           });
-        }
-
-        // OPTION 2: If not in index, fall back to searching all tenants/stores
-        if (!customerData) {
-          log("Customer not in phone index, searching all tenants/stores", {
-            phone: normalizedPhone,
-          });
-
-          // Get all tenants
-          const tenantsSnapshot = await db.collection("tenants").get();
-
-          if (tenantsSnapshot.empty) {
-            log("No tenants found in system");
-            return response
-              .status(404)
-              .send(
-                '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
-              );
-          }
-
-          // Search across all tenants and stores
-          let found = false;
-          for (const tenantDoc of tenantsSnapshot.docs) {
-            if (found) break;
-
-            const currentTenantID = tenantDoc.id;
-            const storesSnapshot = await db
-              .collection("tenants")
-              .doc(currentTenantID)
-              .collection("stores")
-              .get();
-
-            for (const storeDoc of storesSnapshot.docs) {
-              if (found) break;
-
-              const currentStoreID = storeDoc.id;
-
-              // Query customers by phone number using Admin SDK
-              try {
-                const customersSnapshot = await db
-                  .collection("tenants")
-                  .doc(currentTenantID)
-                  .collection("stores")
-                  .doc(currentStoreID)
-                  .collection("customers")
-                  .where("customerCell", "==", normalizedPhone)
-                  .limit(1)
-                  .get();
-
-                if (!customersSnapshot.empty) {
-                  customerData = customersSnapshot.docs[0].data();
-                  tenantID = currentTenantID;
-                  storeID = currentStoreID;
-                  found = true;
-
-                  log("Customer found via tenant/store search", {
-                    customerID: customerData.id,
-                    tenantID,
-                    storeID,
-                    customerName: `${customerData.first} ${customerData.last}`,
-                  });
-
-                  // Create customer_phone index for future fast lookups
-                  try {
-                    await db
-                      .collection("customer_phone")
-                      .doc(normalizedPhone)
-                      .set({
-                        info: {
-                          id: customerData.id,
-                          first: customerData.first || "",
-                          last: customerData.last || "",
-                          customerCell: customerData.customerCell || customerData.cell || "",
-                          customerLandline: customerData.customerLandline || customerData.landline || "",
-                          email: customerData.email || "",
-                          tenantID,
-                          storeID,
-                          lastUpdated: Date.now(),
-                        },
-                      });
-                    log("customer_phone index created for future lookups", {
-                      phone: normalizedPhone,
-                      customerID: customerData.id,
-                    });
-                  } catch (indexError) {
-                    log("Error creating customer_phone index", {
-                      error: indexError.message,
-                    });
-                  }
-                }
-              } catch (queryError) {
-                log("Error querying customers in store", {
-                  error: queryError.message,
-                  errorCode: queryError.code,
-                  tenantID: currentTenantID,
-                  storeID: currentStoreID,
-                });
-                // Continue to next store even if this one fails
-                continue;
-              }
-            }
-          }
-        }
-
-        // Customer not found — allow unknown numbers through
-        if (!customerData || !tenantID || !storeID) {
-          log("No customer found for phone number — creating conversation for unknown sender", { phone: normalizedPhone });
-
-          // Log unknown sender for analytics
-          await db
-            .collection("sms-analytics")
-            .doc("unknown-senders")
-            .collection("messages")
-            .add({
-              phoneNumber: normalizedPhone,
-              message: incomingMessage,
-              messageSid,
-              timestamp: admin.firestore.FieldValue.serverTimestamp(),
-              twilioData,
-            });
-
-          // Use the first available tenant/store
-          if (!tenantID || !storeID) {
-            const tenantsSnap = await db.collection("tenants").get();
-            if (!tenantsSnap.empty) {
-              const firstTenant = tenantsSnap.docs[0];
-              tenantID = firstTenant.id;
-              const storesSnap = await db.collection("tenants").doc(tenantID).collection("stores").get();
-              if (!storesSnap.empty) {
-                storeID = storesSnap.docs[0].id;
-              }
-            }
-          }
-
-          // Create customer_phone root doc for this unknown number
-          customerData = {
-            id: "",
-            first: "Unknown",
-            last: "",
-            cell: normalizedPhone,
-          };
-
-          try {
-            await db.collection("customer_phone").doc(normalizedPhone).set({
-              info: {
-                id: "",
-                first: "Unknown",
-                last: "",
-                cell: normalizedPhone,
-                tenantID: tenantID || "",
-                storeID: storeID || "",
-                lastUpdated: Date.now(),
-              },
-              canRespond: false,
-              lastMessageMillis: Date.now(),
-            }, { merge: true });
-
-            log("Created customer_phone entry for unknown sender", { phone: normalizedPhone });
-          } catch (indexError) {
-            log("Error creating customer_phone for unknown sender", { error: indexError.message });
-          }
-
-          // Fall through to Step 3+ (will be treated as closed thread)
+        } else {
+          log("No customer found - treating as unknown sender", { phone: normalizedPhone });
         }
       } catch (error) {
-        log("Error searching for customer", {
-          error: error.message,
-          phone: normalizedPhone,
-        });
-
-        return response
-          .status(500)
-          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+        log("Error looking up customer (non-fatal)", { error: error.message, phone: normalizedPhone });
       }
 
       // ============================================================================
-      // STEP 3: CHECK THREAD STATUS, TIMEOUT, & BLOCKLIST
+      // STEP 4: CHECK THREAD STATUS, TIMEOUT, & BLOCKLIST
       // ============================================================================
 
       let canRespond = false;
       let threadStatus = "closed";
+      let conversationData = {};
 
       try {
         // Fetch settings for timeout and blocklist
         const settingsDoc = await db
-          .collection("tenants")
-          .doc(tenantID)
-          .collection("stores")
-          .doc(storeID)
-          .collection("settings")
-          .doc("settings")
+          .collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("settings").doc("settings")
           .get();
         const storeSettings = settingsDoc.exists ? settingsDoc.data() : {};
 
@@ -1382,7 +1105,6 @@ exports.incomingSMSEnhanced = onRequest(
         if (blockedNumbers.includes(normalizedPhone)) {
           log("Blocked number detected", { phone: normalizedPhone, tenantID, storeID });
 
-          // Log to analytics
           await db.collection("sms-analytics").doc("blocked-numbers").collection("messages").add({
             phoneNumber: normalizedPhone,
             message: incomingMessage,
@@ -1392,7 +1114,6 @@ exports.incomingSMSEnhanced = onRequest(
             storeID,
           });
 
-          // Send auto-response and return
           const blockedResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Message>This number is no longer able to receive messages at this number. If you believe this is an error, please call us directly.</Message>
@@ -1400,93 +1121,54 @@ exports.incomingSMSEnhanced = onRequest(
           return response.status(200).type("text/xml").send(blockedResponse);
         }
 
-        // Read canRespond and lastMessageMillis from conversation root doc
-        const conversationDoc = await db
-          .collection("customer_phone")
-          .doc(normalizedPhone)
+        // Read recent messages and find the last outgoing (avoids composite index)
+        const recentMsgSnapshot = await conversationRef
+          .collection("messages")
+          .orderBy("millis", "desc")
+          .limit(10)
           .get();
-        const conversationData = conversationDoc.exists ? conversationDoc.data() : {};
 
-        canRespond = conversationData.canRespond === true;
-        const lastMessageMillis = conversationData.lastMessageMillis || 0;
+        const lastOutgoing = recentMsgSnapshot.docs
+          .map(d => d.data())
+          .find(m => m.type === "outgoing");
 
-        // Apply timeout check — auto-close if last message is older than lockTimeout
-        const lockTimeoutDays = storeSettings.smsConversationLockTimeout || 2;
-        const lockTimeoutMs = lockTimeoutDays * 86400000;
-        if (canRespond && lastMessageMillis > 0 && (lastMessageMillis + lockTimeoutMs < Date.now())) {
-          canRespond = false;
-          log("Conversation auto-closed due to timeout", {
-            lastMessageMillis,
-            lockTimeoutDays,
-            elapsed: Date.now() - lastMessageMillis,
-          });
+        if (lastOutgoing) {
+          canRespond = !!lastOutgoing.canRespond;
+          conversationData = { forwardTo: lastOutgoing.forwardTo || {} };
+          const lastMessageMillis = lastOutgoing.millis || 0;
+
+          // Apply timeout check
+          const lockTimeoutDays = storeSettings.smsConversationLockTimeout || 2;
+          const lockTimeoutMs = lockTimeoutDays * 86400000;
+          if (canRespond && lastMessageMillis > 0 && (lastMessageMillis + lockTimeoutMs < Date.now())) {
+            canRespond = false;
+            log("Conversation auto-closed due to timeout", {
+              lastMessageMillis,
+              lockTimeoutDays,
+              elapsed: Date.now() - lastMessageMillis,
+            });
+          }
+        } else {
+          // No outgoing messages yet — new contact or incoming-only thread.
+          // Allow through so the store can see the message and decide.
+          canRespond = true;
+          log("No outgoing messages found - allowing message through", { phone: normalizedPhone });
         }
 
         threadStatus = canRespond ? "open" : "closed";
 
-        log("Thread status determined", {
-          canRespond,
-          threadStatus,
-          lastMessageMillis,
-          lockTimeoutDays,
-        });
+        log("Thread status determined", { canRespond, threadStatus });
       } catch (error) {
-        log("Error checking thread status", {
-          error: error.message,
-          errorCode: error.code,
-          customerID: customerData.id,
-        });
+        log("Error checking thread status", { error: error.message, customerID: customerData.id });
         // Continue processing - default to closed thread
       }
 
       // ============================================================================
-      // STEP 4: HANDLE CLOSED THREAD - SEND AUTO-RESPONSE
+      // STEP 5: HANDLE CLOSED THREAD - SEND AUTO-RESPONSE
       // ============================================================================
 
       if (!canRespond) {
-        log("Thread closed - sending auto-response", {
-          customerID: customerData.id,
-          threadStatus,
-        });
-
-        // Store the incoming message even though thread is closed
-        try {
-          await db
-            .collection("customer_phone")
-            .doc(normalizedPhone)
-            .collection("messages")
-            .doc(messageSid)
-            .set({
-              id: messageSid,
-              customerID: customerData.id,
-              firstName: customerData.first || "",
-              lastName: customerData.last || "",
-              phoneNumber: normalizedPhone,
-              message: incomingMessage,
-              millis: Date.now(),
-              timestamp: admin.firestore.FieldValue.serverTimestamp(),
-              type: "incoming",
-              threadStatus: "closed",
-              autoResponseSent: true,
-              hasMedia: numMedia > 0,
-              numMedia,
-              messageStatus,
-              tenantID,
-              storeID,
-              messageSid,
-              messageStatus,
-            });
-
-          log("Closed thread message stored at customer_phone path", {
-            phone: normalizedPhone,
-            messageSid,
-          });
-        } catch (error) {
-          log("Error storing closed thread message", {
-            error: error.message,
-            messageSid,
-          });
-        }
+        log("Thread closed - sending auto-response", { customerID: customerData.id, threadStatus });
 
         // Send auto-response using TwiML
         const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
@@ -1494,32 +1176,11 @@ exports.incomingSMSEnhanced = onRequest(
   <Message>${CLOSED_THREAD_RESPONSE}</Message>
 </Response>`;
 
-        // Also send via Twilio client for tracking
-        if (twilioClient) {
-          try {
-            await twilioClient.messages.create({
-              body: CLOSED_THREAD_RESPONSE,
-              to: `+1${normalizedPhone}`,
-              from: twilioData.To || "+12393171234",
-            });
-
-            log("Auto-response sent successfully", {
-              customerID: customerData.id,
-              phone: normalizedPhone,
-            });
-          } catch (twilioError) {
-            log("Error sending auto-response via Twilio", {
-              error: twilioError.message,
-              code: twilioError.code,
-            });
-          }
-        }
-
         return response.status(200).type("text/xml").send(twimlResponse);
       }
 
       // ============================================================================
-      // STEP 5: STORE INCOMING MESSAGE (OPEN THREAD)
+      // STEP 6: STORE INCOMING MESSAGE (OPEN THREAD)
       // ============================================================================
 
       const incomingMessageData = {
@@ -1530,6 +1191,7 @@ exports.incomingSMSEnhanced = onRequest(
         phoneNumber: normalizedPhone,
         message: incomingMessage,
         millis: Date.now(),
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
         type: "incoming",
         threadStatus: "open",
         read: false,
@@ -1539,92 +1201,110 @@ exports.incomingSMSEnhanced = onRequest(
         tenantID,
         storeID,
         messageSid,
-        messageStatus,
         to: twilioData.From,
         from: twilioData.To,
       };
 
-      // Handle media attachments if present
+      // Download media from Twilio and store in Cloud Storage
       if (numMedia > 0) {
         const mediaUrls = [];
+        const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+        const accountSid = twilioSecretAccountNumber.value();
+        const authToken = twilioSecretKey.value();
+        const authHeader = "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+
         for (let i = 0; i < numMedia; i++) {
-          const mediaUrl = twilioData[`MediaUrl${i}`];
-          const mediaContentType = twilioData[`MediaContentType${i}`];
-          if (mediaUrl) {
-            mediaUrls.push({
-              url: mediaUrl,
-              contentType: mediaContentType || "unknown",
-            });
+          const twilioUrl = twilioData[`MediaUrl${i}`];
+          const contentType = twilioData[`MediaContentType${i}`] || "application/octet-stream";
+          if (!twilioUrl) continue;
+          try {
+            const mediaResponse = await fetch(twilioUrl, { headers: { Authorization: authHeader } });
+            if (!mediaResponse.ok) throw new Error(`Twilio fetch failed: ${mediaResponse.status}`);
+            const arrayBuffer = await mediaResponse.arrayBuffer();
+            const rawBuffer = Buffer.from(arrayBuffer);
+
+            const { compressedBuffer, thumbnailBuffer } = await compressImageServer(rawBuffer, contentType);
+
+            if (compressedBuffer && thumbnailBuffer) {
+              const mainPath = `${tenantID}/${storeID}/sms-media/${normalizedPhone}/${messageSid}_${i}.jpg`;
+              const thumbPath = `${tenantID}/${storeID}/sms-media/${normalizedPhone}/thumbnails/${messageSid}_${i}.jpg`;
+              const mainFile = bucket.file(mainPath);
+              await mainFile.save(compressedBuffer, { contentType: "image/jpeg", metadata: { contentType: "image/jpeg" } });
+              await mainFile.makePublic();
+              const mainUrl = `https://storage.googleapis.com/${bucket.name}/${mainPath}`;
+              const thumbFile = bucket.file(thumbPath);
+              await thumbFile.save(thumbnailBuffer, { contentType: "image/jpeg", metadata: { contentType: "image/jpeg" } });
+              await thumbFile.makePublic();
+              const thumbUrl = `https://storage.googleapis.com/${bucket.name}/${thumbPath}`;
+              mediaUrls.push({ url: mainUrl, thumbnailUrl: thumbUrl, contentType: "image/jpeg" });
+              log("Compressed media saved", { index: i, originalSize: rawBuffer.length, compressedSize: compressedBuffer.length, thumbSize: thumbnailBuffer.length });
+            } else {
+              const ext = contentType.startsWith("image/jpeg") ? ".jpg"
+                : contentType.startsWith("image/png") ? ".png"
+                : contentType.startsWith("image/gif") ? ".gif"
+                : contentType.startsWith("video/mp4") ? ".mp4"
+                : contentType.startsWith("application/pdf") ? ".pdf"
+                : "";
+              const storagePath = `${tenantID}/${storeID}/sms-media/${normalizedPhone}/${messageSid}_${i}${ext}`;
+              const file = bucket.file(storagePath);
+              await file.save(rawBuffer, { contentType, metadata: { contentType } });
+              await file.makePublic();
+              const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+              mediaUrls.push({ url: publicUrl, contentType });
+              log("Raw media saved (not compressed)", { index: i, storagePath, contentType });
+            }
+          } catch (mediaError) {
+            log("Error downloading media from Twilio", { index: i, error: mediaError.message });
+            mediaUrls.push({ url: twilioUrl, contentType, storageFailed: true });
           }
         }
         incomingMessageData.mediaUrls = mediaUrls;
       }
 
       try {
-        // Store incoming message in customer_phone/{phone}/messages
-        const incomingMessageRef = db
-          .collection("customer_phone")
-          .doc(normalizedPhone)
-          .collection("messages")
-          .doc(messageSid);
+        await messageDocRef(messageSid).set(incomingMessageData);
 
-        await incomingMessageRef.set(incomingMessageData);
-
-        // Update lastMessageMillis on conversation root
-        await db.collection("customer_phone").doc(normalizedPhone).set({
-          lastMessageMillis: Date.now(),
+        // Update conversation root
+        await conversationRef.set({
+          customerInfo: { id: customerData.id, first: customerData.first || "", last: customerData.last || "" },
         }, { merge: true });
 
-        log("Incoming message stored successfully at customer_phone path", {
+        log("Incoming message stored successfully", {
           phone: normalizedPhone,
           messageSid,
           customerID: customerData.id,
-          messageLength: incomingMessage.length,
-          hasMedia: numMedia > 0,
-          path: `customer_phone/${normalizedPhone}/messages/${messageSid}`,
+          path: `tenants/${tenantID}/stores/${storeID}/sms-messages/${normalizedPhone}/messages/${messageSid}`,
         });
       } catch (error) {
-        log("Error storing incoming message", {
-          error: error.message,
-          errorCode: error.code,
-          messageSid,
-          customerID: customerData.id,
-        });
-
-        // Still return success to Twilio to avoid retries
-        return response
-          .status(200)
-          .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+        log("Error storing incoming message", { error: error.message, messageSid, customerID: customerData.id });
+        return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
       }
 
       // ============================================================================
-      // STEP 6: FLAG WORKORDERS & FORWARD SMS
+      // STEP 7: FLAG WORKORDERS & FORWARD SMS
       // ============================================================================
 
       try {
-        // 6a: Set hasNewSMS on all open workorders for this customer
-        const woQuery = await db
-          .collection("tenants")
-          .doc(tenantID)
-          .collection("stores")
-          .doc(storeID)
-          .collection("open-workorders")
-          .where("customerID", "==", customerData.id)
-          .get();
+        // 7a: Set hasNewSMS on all open workorders for this customer
+        if (customerData.id) {
+          const woQuery = await db
+            .collection("tenants").doc(tenantID)
+            .collection("stores").doc(storeID)
+            .collection("open-workorders")
+            .where("customerID", "==", customerData.id)
+            .get();
 
-        if (!woQuery.empty) {
-          const batch = db.batch();
-          woQuery.docs.forEach((doc) => {
-            batch.update(doc.ref, { hasNewSMS: true, lastSMSSenderUserID: "" });
-          });
-          await batch.commit();
-          log("Flagged workorders with hasNewSMS", {
-            count: woQuery.size,
-            customerID: customerData.id,
-          });
+          if (!woQuery.empty) {
+            const batch = db.batch();
+            woQuery.docs.forEach((doc) => {
+              batch.update(doc.ref, { hasNewSMS: true, lastSMSSenderUserID: "" });
+            });
+            await batch.commit();
+            log("Flagged workorders with hasNewSMS", { count: woQuery.size, customerID: customerData.id });
+          }
         }
 
-        // 6b: Forward SMS to all users in the forwardTo map
+        // 7b: Forward SMS to all users in the forwardTo map
         const forwardTo = conversationData.forwardTo || {};
         const forwardEntries = Object.entries(forwardTo);
         if (forwardEntries.length > 0) {
@@ -1650,24 +1330,20 @@ exports.incomingSMSEnhanced = onRequest(
             }
           }));
         }
-      } catch (step6Error) {
-        // Non-blocking — don't fail the incoming SMS response
-        log("Error in STEP 6 (flag/forward)", {
-          error: step6Error.message,
-          customerID: customerData.id,
-        });
+      } catch (step7Error) {
+        log("Error in STEP 7 (flag/forward)", { error: step7Error.message, customerID: customerData.id });
       }
 
       // ============================================================================
-      // STEP 7: RETURN SUCCESS RESPONSE
+      // STEP 8: RETURN SUCCESS RESPONSE
       // ============================================================================
 
       log("Incoming SMS processed successfully", {
         messageSid,
         customerID: customerData.id,
-        processingTimeMs: processingTime,
+        processingTimeMs: Date.now() - requestStartTime,
         threadStatus: "open",
-        storagePath: `customer_phone/${normalizedPhone}/messages/${messageSid}`,
+        storagePath: `tenants/${tenantID}/stores/${storeID}/sms-messages/${normalizedPhone}/messages/${messageSid}`,
       });
 
       // Return empty TwiML response (no auto-reply for open threads)
@@ -3799,169 +3475,6 @@ function generateTenantID() {
   return Math.floor(100000000000 + Math.random() * 900000000000).toString();
 }
 
-/**
- * Test callable function - writes test data to customer_phone/test
- * Used to verify callable functions and permissions are working correctly
- */
-exports.testCustomerPhoneWrite = onCall(
-  {
-    secrets: [firebaseServiceAccountKey],
-    enforceAppCheck: false, // Allow unauthenticated calls for testing
-  },
-  async (request) => {
-    log("Test customer_phone write callable invoked", {
-      data: request.data,
-      hasAuth: !!request.auth,
-      uid: request.auth?.uid || "none",
-    });
-
-    try {
-      const { testData, timestamp } = request.data;
-
-      // Initialize Admin SDK with service account from Secret Manager
-      const db = await getDB(firebaseServiceAccountKey);
-
-      log("Admin SDK initialized successfully with service account (callable)");
-
-      // Create test document
-      const testDocData = {
-        testData: testData || "Test data from callable function",
-        timestamp: timestamp || Date.now(),
-        calledAt: admin.firestore.FieldValue.serverTimestamp(),
-        calledBy: request.auth?.uid || "anonymous",
-        userEmail: request.auth?.token?.email || "not authenticated",
-        method: "callable",
-        success: true,
-      };
-
-      // Write to customer_phone/test
-      await db.collection("customer_phone").doc("test").set(testDocData);
-
-      log(
-        "Test data written successfully to customer_phone/test (callable)",
-        testDocData
-      );
-
-      return {
-        success: true,
-        message:
-          "✅ Test data written successfully to customer_phone/test via callable",
-        data: testDocData,
-        path: "customer_phone/test",
-      };
-    } catch (error) {
-      log("Error writing test data (callable)", {
-        error: error.message,
-        code: error.code,
-      });
-
-      throw new HttpsError(
-        "internal",
-        `Failed to write test data: ${error.message}`
-      );
-    }
-  }
-);
-
-/**
- * Test HTTP endpoint - writes test data to customer_phone/test
- * Used to verify HTTP requests and permissions are working correctly
- */
-exports.testCustomerPhoneWriteHTTP = onRequest(
-  { cors: true, secrets: [firebaseServiceAccountKey] },
-  async (req, res) => {
-    // Set CORS headers
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
-
-    // Handle preflight requests
-    if (req.method === "OPTIONS") {
-      return res.status(200).end();
-    }
-
-    log("Test customer_phone write HTTP endpoint invoked", req.body);
-
-    try {
-      const { testData, timestamp } = req.body;
-
-      // Initialize Admin SDK with service account from Secret Manager
-      const db = await getDB(firebaseServiceAccountKey);
-
-      log("Admin SDK initialized successfully with service account");
-
-      // TEST 1: Try Realtime Database to verify Admin SDK works
-      try {
-        const rtdb = admin.database();
-        await rtdb.ref("test_write").set({
-          testData: "RTDB test",
-          timestamp: Date.now(),
-        });
-        log("✅ TEST 1: Realtime Database write SUCCESS");
-      } catch (rtdbError) {
-        log("❌ TEST 1: Realtime Database write FAILED", {
-          error: rtdbError.message,
-          code: rtdbError.code,
-        });
-      }
-
-      // TEST 2: Try Firestore root collection
-      try {
-        await db.collection("test_writes").doc("test").set({
-          testData: "Root collection test",
-          timestamp: Date.now(),
-        });
-        log("✅ TEST 2: Firestore root collection write SUCCESS");
-      } catch (rootError) {
-        log("❌ TEST 2: Firestore root collection write FAILED", {
-          error: rootError.message,
-          code: rootError.code,
-        });
-      }
-
-      // TEST 3: Try customer_phone collection
-      const testDocData = {
-        testData: testData || "Test data from HTTP endpoint",
-        timestamp: timestamp || Date.now(),
-        calledAt: admin.firestore.FieldValue.serverTimestamp(),
-        method: "http",
-        requestMethod: req.method,
-        success: true,
-      };
-
-      log("TEST 3: Attempting write to customer_phone/test");
-      await db.collection("customer_phone").doc("test").set(testDocData);
-
-      log(
-        "Test data written successfully to customer_phone/test via HTTP",
-        testDocData
-      );
-
-      return res.status(200).json({
-        success: true,
-        message:
-          "✅ Test data written successfully to customer_phone/test via HTTP",
-        data: testDocData,
-        path: "customer_phone/test",
-      });
-    } catch (error) {
-      log("Error writing test data via HTTP", {
-        error: error.message,
-        code: error.code,
-      });
-
-      return res.status(500).json({
-        success: false,
-        message: `Failed to write test data: ${error.message}`,
-        error: {
-          message: error.message,
-          code: error.code || "unknown",
-        },
-      });
-    }
-  }
-);
-
 // ═══════════════════════════════════════════════════════════════
 // NEW CHECKOUT SYSTEM — Cloud Functions
 // Prefix: newCheckout
@@ -5758,6 +5271,8 @@ exports.uploadPDFAndSendSMSCallable = onCall(
         storeID,
         customerID,
         messageID,
+        canRespond,
+        forwardTo: forwardToParam = null,
         fromNumber = "+12393171234",
       } = request.data;
 
@@ -5829,17 +5344,39 @@ exports.uploadPDFAndSendSMSCallable = onCall(
       });
 
       // Store outgoing message in Firestore
-      if (customerID && messageID) {
+      if (messageID) {
         try {
-          const messageRef = db
-            .collection("customer_phone")
-            .doc(cleanPhoneNumber)
-            .collection("messages")
-            .doc(messageID);
+          const conversationRef = db
+            .collection("tenants").doc(tenantID)
+            .collection("stores").doc(storeID)
+            .collection("sms-messages").doc(cleanPhoneNumber);
+
+          // Read recent messages to find last outgoing for current forwardTo state
+          let currentForwardTo = {};
+          try {
+            const recent = await conversationRef
+              .collection("messages")
+              .orderBy("millis", "desc")
+              .limit(10)
+              .get();
+            const prev = recent.docs.map(d => d.data()).find(m => m.type === "outgoing");
+            if (prev) currentForwardTo = prev.forwardTo || {};
+          } catch (e) { /* no prior outgoing messages */ }
+
+          // Apply the change from this send
+          if (forwardToParam && forwardToParam.userID) {
+            if (forwardToParam.enable && forwardToParam.phone) {
+              currentForwardTo[forwardToParam.userID] = { phone: forwardToParam.phone, first: forwardToParam.first || "" };
+            } else if (!forwardToParam.enable) {
+              delete currentForwardTo[forwardToParam.userID];
+            }
+          }
+
+          const messageRef = conversationRef.collection("messages").doc(messageID);
 
           await messageRef.set({
             id: messageID,
-            customerID: customerID,
+            customerID: customerID || "",
             message: finalMessage.trim(),
             phoneNumber: cleanPhoneNumber,
             messageSid: twilioResponse.sid,
@@ -5849,6 +5386,8 @@ exports.uploadPDFAndSendSMSCallable = onCall(
             storeID: storeID,
             type: "outgoing",
             millis: Date.now(),
+            canRespond: canRespond || null,
+            forwardTo: currentForwardTo,
           });
         } catch (firestoreError) {
           log("Error storing outgoing message in Firestore", firestoreError.message);
@@ -7110,7 +6649,9 @@ async function completeSaleServerSide({
         from: "+12393171234",
       });
       const receiptMsgID = crypto.randomUUID();
-      await db.collection("customer_phone").doc(cleanPhone)
+      await db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("sms-messages").doc(cleanPhone)
         .collection("messages").doc(receiptMsgID)
         .set({
           id: receiptMsgID,
@@ -7357,7 +6898,9 @@ exports.createTextToPayInvoice = onCall(
         // Store in customer message queue
         const messageID = crypto.randomUUID();
         await db
-          .collection("customer_phone").doc(cleanPhone)
+          .collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("sms-messages").doc(cleanPhone)
           .collection("messages").doc(messageID)
           .set({
             id: messageID,
@@ -7370,11 +6913,6 @@ exports.createTextToPayInvoice = onCall(
             millis: Date.now(),
             textToPay: true,
           });
-
-        await db.collection("customer_phone").doc(cleanPhone).set(
-          { canRespond: true, lastMessageMillis: Date.now() },
-          { merge: true }
-        );
 
         log("createTextToPayInvoice: SMS sent", { phone: cleanPhone });
       }
@@ -7661,7 +7199,9 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
               const expMsg = `Your payment link from ${storeName} has expired. Please contact us if you'd like a new one.`;
               const expMsgID = crypto.randomUUID();
               await db
-                .collection("customer_phone").doc(cleanPhone)
+                .collection("tenants").doc(tenantID)
+                .collection("stores").doc(storeID)
+                .collection("sms-messages").doc(cleanPhone)
                 .collection("messages").doc(expMsgID)
                 .set({
                   id: expMsgID,
@@ -7780,6 +7320,52 @@ exports.generateId = onCall(
         "internal",
         `Failed to generate ID for ${node}: ${error.message}`
       );
+    }
+  }
+);
+
+// ============================================================================
+// SMS STATUS CALLBACK - Twilio delivery status webhook
+// ============================================================================
+
+exports.smsStatusCallback = onRequest(
+  {
+    cors: true,
+    secrets: [firebaseServiceAccountKey],
+  },
+  async (request, response) => {
+    const db = await getDB(firebaseServiceAccountKey);
+
+    try {
+      const { MessageSid, MessageStatus } = request.body || {};
+
+      if (!MessageSid || !MessageStatus) {
+        log("smsStatusCallback: missing params", request.body);
+        return response.status(200).send("OK");
+      }
+
+      log("smsStatusCallback", { MessageSid, MessageStatus });
+
+      // Find the message by messageSid using collection group query
+      const snapshot = await db.collectionGroup("messages")
+        .where("messageSid", "==", MessageSid)
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        log("smsStatusCallback: no message found for SID", { MessageSid });
+        return response.status(200).send("OK");
+      }
+
+      const docRef = snapshot.docs[0].ref;
+      await docRef.update({ status: MessageStatus });
+
+      log("smsStatusCallback: status updated", { MessageSid, MessageStatus, path: docRef.path });
+
+      return response.status(200).send("OK");
+    } catch (error) {
+      log("smsStatusCallback error", { error: error.message });
+      return response.status(200).send("OK");
     }
   }
 );

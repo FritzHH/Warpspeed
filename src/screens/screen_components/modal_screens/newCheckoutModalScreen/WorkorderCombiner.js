@@ -28,6 +28,26 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
 }) {
   let discounts = useSettingsStore((s) => s.settings?.discounts) || [];
 
+  // Floor check: recalculate proposed sale total and block if it would
+  // drop below amountCaptured.  Uses the same logic as calculateSaleTotals.
+  function wouldDropBelowFloor(modifiedWoId, proposedLines) {
+    if (amountCaptured <= 0) return false;
+    let taxableTotal = 0;
+    let taxFreeTotal = 0;
+    combinedWorkorders.forEach((wo) => {
+      let lines = wo.id === modifiedWoId ? proposedLines : wo.workorderLines;
+      let result = calculateRunningTotals({ ...wo, workorderLines: lines }, 0);
+      if (wo.taxFree) {
+        taxFreeTotal += result.runningTotal;
+      } else {
+        taxableTotal += result.runningTotal;
+      }
+    });
+    let tax = Math.round(taxableTotal * (salesTaxPercent / 100));
+    let proposedTotal = Math.round(taxFreeTotal + taxableTotal + tax);
+    return proposedTotal < amountCaptured;
+  }
+
   function modifyQty(wo, lineIdx, direction) {
     dlog(DCAT.BUTTON, "modifyQty", "WorkorderCombiner", { woId: wo.id, lineId: wo.workorderLines[lineIdx]?.id, direction });
     let newLine = cloneDeep(wo.workorderLines[lineIdx]);
@@ -41,12 +61,15 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
       let recalc = applyDiscountToWorkorderItem(newLine);
       if (recalc.discountObj?.newPrice != null) newLine = recalc;
     }
-    onLineChange(wo.id, replaceOrAddToArr(wo.workorderLines, newLine));
+    let lines = replaceOrAddToArr(wo.workorderLines, newLine);
+    if (direction === "down" && wouldDropBelowFloor(wo.id, lines)) return;
+    onLineChange(wo.id, lines);
   }
 
   function deleteLine(wo, lineIdx) {
     dlog(DCAT.BUTTON, "deleteLine", "WorkorderCombiner", { woId: wo.id, lineId: wo.workorderLines[lineIdx]?.id });
     let lines = wo.workorderLines.filter((_, idx) => idx !== lineIdx);
+    if (wouldDropBelowFloor(wo.id, lines)) return;
     onLineChange(wo.id, lines);
   }
 
@@ -59,6 +82,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
       }
       return o;
     });
+    if (wouldDropBelowFloor(wo.id, lines)) return;
     onLineChange(wo.id, lines);
   }
 
@@ -236,6 +260,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                   if (additional <= 0) return true;
                   return additional + Math.round(additional * effectiveTaxPercent / 100) <= buffer;
                 });
+                let canDiscount = !hasPayments || safeDiscounts.length > 0 || !!line.discountObj?.name;
 
                 return (
                   <View
@@ -423,13 +448,14 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                               <View style={{ flexDirection: "row", alignItems: "center" }}>
                                   <Tooltip text="Discounts" position="top">
                                     <DropdownMenu
+                                      enabled={canDiscount}
                                       buttonIcon={ICONS.dollarYellow}
                                       buttonIconSize={22}
                                       modalCoordY={25}
                                       modalCoordX={-100}
                                     isDiscountMenu={!hasPayments}
                                     discountMaxCents={lineTotal}
-                                      buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
+                                      buttonStyle={{ borderWidth: 0, backgroundColor: "transparent", opacity: canDiscount ? 1 : 0.25 }}
                                       dataArr={[
                                         { label: "No Discount" },
                                         ...safeDiscounts.map((o) => ({ label: o.name })),

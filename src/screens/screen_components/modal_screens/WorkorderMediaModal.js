@@ -11,6 +11,7 @@ import {
   useLayoutStore,
   useSettingsStore,
   useLoginStore,
+  useCustMessagesStore,
 } from "../../../stores";
 import {
   dbUploadWorkorderMedia,
@@ -95,12 +96,19 @@ export const WorkorderMediaModal = ({
     const messageText = `${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:\n\n${links}`;
 
     if (sendSms) {
+      // Derive canRespond and forwardTo from last outgoing message
+      let msgStore = useCustMessagesStore.getState();
+      let lastOutgoing = [...msgStore.outgoingMessages].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+      let useCanRespond = lastOutgoing?.canRespond ? new Date().getTime() : null;
+      let useForwardTo = lastOutgoing?.forwardTo || null;
+
       let msg = cloneDeep(SMS_PROTO);
       msg.message = messageText;
       msg.phoneNumber = zWorkorder.customerCell;
       msg.firstName = zWorkorder.customerFirst || "";
       msg.lastName = zWorkorder.customerLast || "";
-      msg.canRespond = new Date().getTime();
+      msg.canRespond = useCanRespond;
+      msg.forwardTo = useForwardTo;
       msg.millis = new Date().getTime();
       msg.customerID = zWorkorder.customerID || "";
       msg.id = crypto.randomUUID();

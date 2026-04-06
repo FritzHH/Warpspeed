@@ -571,10 +571,6 @@ export const useStripePaymentStore = create((set, get) => ({
       cardMessage: "",
       paymentIntentID: null,
     }),
-
-  // Non-reactive refs (set via getState(), not in set())
-  // _cardListeners: null   — Firestore listener { unsubscribe }
-  // _cardTimeout: null      — payment timeout ID
 }));
 
 export const useLoginStore = create(
@@ -904,7 +900,7 @@ Promise.resolve().then(() => {
   }
 });
 
-export const useCustMessagesStore = create((set, get) => ({
+export const useCustMessagesStore = create(persist((set, get) => ({
   incomingMessages: [],
   outgoingMessages: [],
   messagesLoading: false,
@@ -912,6 +908,7 @@ export const useCustMessagesStore = create((set, get) => ({
   messagesNextCursor: null,
   messagesLoadingMore: false,
   messagesPhone: null,
+  _messagesUnsub: null,
 
   getIncomingMessages: () => get().incomingMessages,
   getOutgoingMessages: () => get().outgoingMessages,
@@ -949,6 +946,13 @@ export const useCustMessagesStore = create((set, get) => ({
       ),
     }));
   },
+  updateMessageField: (messageId, field, value) => {
+    set((state) => ({
+      outgoingMessages: state.outgoingMessages.map((msg) =>
+        msg.id === messageId ? { ...msg, [field]: value } : msg
+      ),
+    }));
+  },
   prependMessages: (newMessages) => {
     let newIncoming = newMessages.filter((m) => m.type === "incoming");
     let newOutgoing = newMessages.filter((m) => m.type !== "incoming");
@@ -957,16 +961,37 @@ export const useCustMessagesStore = create((set, get) => ({
       outgoingMessages: [...newOutgoing, ...state.outgoingMessages],
     }));
   },
-  clearMessages: () => set({
-    incomingMessages: [],
-    outgoingMessages: [],
-    messagesLoading: false,
-    messagesHasMore: false,
-    messagesNextCursor: null,
-    messagesLoadingMore: false,
-    messagesPhone: null,
-  }),
-}));
+  setMessagesUnsub: (unsub) => {
+    let prev = get()._messagesUnsub;
+    if (prev) prev();
+    set({ _messagesUnsub: unsub });
+  },
+  clearMessages: () => {
+    let prev = get()._messagesUnsub;
+    if (prev) prev();
+    set({
+      incomingMessages: [],
+      outgoingMessages: [],
+      messagesLoading: false,
+      messagesHasMore: false,
+      messagesNextCursor: null,
+      messagesLoadingMore: false,
+      messagesPhone: null,
+      _messagesUnsub: null,
+    });
+  },
+}),
+  {
+    name: "warpspeed_messages",
+    partialize: (s) => ({
+      incomingMessages: s.incomingMessages,
+      outgoingMessages: s.outgoingMessages,
+      messagesPhone: s.messagesPhone,
+      messagesHasMore: s.messagesHasMore,
+      messagesNextCursor: s.messagesNextCursor,
+    }),
+  }
+));
 
 
 export function broadcastWorkorderToDisplay(wo) {

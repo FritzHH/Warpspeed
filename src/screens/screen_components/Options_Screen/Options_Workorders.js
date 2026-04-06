@@ -27,7 +27,7 @@ import {
   useCheckoutStore,
   useCustMessagesStore,
 } from "../../../stores";
-import { dbGetCustomer, dbGetCompletedWorkorder, dbGetCompletedSale, dbSearchCompletedWorkorders, dbGetCustomerMessages } from "../../../db_calls_wrapper";
+import { dbGetCustomer, dbGetCompletedWorkorder, dbGetCompletedSale, dbSearchCompletedWorkorders, dbGetCustomerMessages, dbListenToNewMessages } from "../../../db_calls_wrapper";
 import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 
@@ -172,6 +172,39 @@ export function WorkordersComponent({}) {
     const interval = setInterval(() => { _setStatusBlink((prev) => !prev); }, 500);
     return () => clearInterval(interval);
   }, [zPendingWOIDs.length]);
+
+  // Rehydration: remount real-time listener if messages are already persisted, or fetch fresh
+  const hasRehydratedMsgsRef = useRef(false);
+  useEffect(() => {
+    if (hasRehydratedMsgsRef.current) return;
+    if (!zOpenWorkorderID || !zOpenWorkorders.length) return;
+    let wo = zOpenWorkorders.find((o) => o.id === zOpenWorkorderID);
+    if (!wo?.customerCell) return;
+    hasRehydratedMsgsRef.current = true;
+    let msgStore = useCustMessagesStore.getState();
+    let hasPersistedMessages = msgStore.messagesPhone === wo.customerCell && (msgStore.incomingMessages.length + msgStore.outgoingMessages.length) > 0;
+    if (hasPersistedMessages) {
+      // Messages already in store from persist — just remount the listener
+      let allMsgs = [...msgStore.incomingMessages, ...msgStore.outgoingMessages];
+      let lastMillis = 0;
+      allMsgs.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
+      if (!lastMillis) lastMillis = Date.now();
+      let unsub = dbListenToNewMessages(wo.customerCell, lastMillis, (newMessages) => {
+        if (useCustMessagesStore.getState().getMessagesPhone() !== wo.customerCell) return;
+        let s = useCustMessagesStore.getState();
+        let existingIDs = new Set([...s.incomingMessages, ...s.outgoingMessages].map((m) => m.id));
+        let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
+        if (!fresh.length) return;
+        let newIncoming = fresh.filter((m) => m.type === "incoming");
+        let newOutgoing = fresh.filter((m) => m.type !== "incoming");
+        if (newIncoming.length) set_store_incoming(s, newIncoming);
+        if (newOutgoing.length) set_store_outgoing(s, newOutgoing);
+      });
+      msgStore.setMessagesUnsub(unsub);
+    } else {
+      fetchCustomerMessages(wo.customerCell);
+    }
+  }, [zOpenWorkorderID, zOpenWorkorders]);
 
   // Sale IDs shared by 2+ workorders (linked/combined sales)
   let linkedSaleIDs = new Set();
@@ -399,9 +432,36 @@ export function WorkordersComponent({}) {
       store.setMessagesHasMore(result.hasMore);
       store.setMessagesNextCursor(result.nextPageTimestamp);
       store.setMessagesLoading(false);
+      // Mount real-time listener for messages newer than what we fetched
+      let lastMillis = 0;
+      result.messages.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
+      if (!lastMillis) lastMillis = Date.now();
+      let unsub = dbListenToNewMessages(customerCell, lastMillis, (newMessages) => {
+        if (useCustMessagesStore.getState().getMessagesPhone() !== customerCell) return;
+        let s = useCustMessagesStore.getState();
+        let existingIDs = new Set([...s.incomingMessages, ...s.outgoingMessages].map((m) => m.id));
+        let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
+        if (!fresh.length) return;
+        let newIncoming = fresh.filter((m) => m.type === "incoming");
+        let newOutgoing = fresh.filter((m) => m.type !== "incoming");
+        if (newIncoming.length) set_store_incoming(s, newIncoming);
+        if (newOutgoing.length) set_store_outgoing(s, newOutgoing);
+      });
+      store.setMessagesUnsub(unsub);
     }).catch(() => {
       useCustMessagesStore.getState().setMessagesLoading(false);
     });
+  }
+
+  function set_store_incoming(store, msgs) {
+    useCustMessagesStore.setState((state) => ({
+      incomingMessages: [...state.incomingMessages, ...msgs],
+    }));
+  }
+  function set_store_outgoing(store, msgs) {
+    useCustMessagesStore.setState((state) => ({
+      outgoingMessages: [...state.outgoingMessages, ...msgs],
+    }));
   }
 
   function workorderSelected(obj) {
@@ -749,7 +809,7 @@ export function WorkordersComponent({}) {
                         })()}
                         {!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID) && (
                           <Text style={{ fontSize: 12, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
-                            Linked
+                            Combined Sale
                           </Text>
                         )}
                       </View>

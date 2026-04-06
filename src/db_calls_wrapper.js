@@ -45,7 +45,7 @@ import {
   sendPasswordResetEmail,
   updatePassword,
 } from "firebase/auth";
-import { collection, doc, query, orderBy, onSnapshot, deleteField } from "firebase/firestore";
+import { collection, doc, query, orderBy, where, onSnapshot, deleteField } from "firebase/firestore";
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -981,36 +981,6 @@ export async function dbSaveCustomer(customer) {
       customerToSave
     );
 
-    // Save customer contact info to phone/email index for fast lookups
-    try {
-      let contactIndexData = {
-        id: customer.id,
-        first: customer.first || "",
-        last: customer.last || "",
-        customerCell: customer.customerCell || "",
-        customerLandline: customer.customerLandline || "",
-        email: customer.email || "",
-        tenantID,
-        storeID,
-        lastUpdated: new Date().getTime(),
-      };
-
-      // Remove unused fields before saving
-      contactIndexData = removeUnusedFields(contactIndexData);
-
-      // Save by cell phone if exists - store under "info" field
-      if (customer.customerCell && customer.customerCell.length === 10) {
-        await firestoreWrite(`customer_phone/${customer.customerCell}`, {
-          info: contactIndexData,
-        });
-      }
-    } catch (indexError) {
-      log("Error updating customer contact index", {
-        error: indexError.message,
-        customerID: customer.id,
-      });
-      // Don't fail the main save if index update fails
-    }
 
     return {
       success: true,
@@ -2798,7 +2768,8 @@ export async function dbSendSMS(
       storeID: storeID,
       customerID: message.customerID || "",
       messageID: message.id || "",
-      canRespond: !!message.canRespond,
+      canRespond: message.canRespond || null,
+      forwardTo: message.forwardTo || null,
     };
 
     // Call the enhanced SMS function
@@ -2842,7 +2813,9 @@ export async function dbToggleSMSForwarding(phone, userID, enable, userPhone, us
     const cleanPhone = (phone || "").replace(/\D/g, "");
     if (cleanPhone.length !== 10) return { success: false, error: "Invalid phone" };
     if (!userID) return { success: false, error: "No user ID" };
-    const path = `customer_phone/${cleanPhone}`;
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+    const path = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`;
     const fieldKey = `forwardTo.${userID}`;
     if (enable) {
       if (!userPhone) return { success: false, error: "No user phone" };
@@ -2862,11 +2835,30 @@ export async function dbGetConversationForwardState(phone, userID) {
   try {
     const cleanPhone = (phone || "").replace(/\D/g, "");
     if (cleanPhone.length !== 10 || !userID) return false;
-    const data = await firestoreRead(`customer_phone/${cleanPhone}`);
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return false;
+    const data = await firestoreRead(`tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`);
     return !!(data?.forwardTo?.[userID]);
   } catch (error) {
     log("Error reading forward state", { error: error.message, phone });
     return false;
+  }
+}
+
+export async function dbUpdateMessageCanRespond(phone, messageId, canRespond) {
+  try {
+    const cleanPhone = (phone || "").replace(/\D/g, "");
+    if (cleanPhone.length !== 10) return { success: false, error: "Invalid phone" };
+    if (!messageId) return { success: false, error: "No message ID" };
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+    const path = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}/messages/${messageId}`;
+    await firestoreUpdate(path, { canRespond: canRespond });
+    log("Updated message canRespond", { phone: cleanPhone, messageId, canRespond });
+    return { success: true };
+  } catch (error) {
+    log("Error updating message canRespond", { error: error.message, phone, messageId });
+    return { success: false, error: error.message };
   }
 }
 
@@ -2923,82 +2915,6 @@ export async function dbSendEmail(to, subject, htmlBody) {
 }
 
 /**
- * Test callable function - writes test data to customer_phone/test
- * @returns {Promise<Object>} Result with success status
- */
-export async function dbTestCustomerPhoneWrite() {
-  try {
-    const { testCustomerPhoneWriteCallable } = await import("./db_calls");
-
-    const result = await testCustomerPhoneWriteCallable({
-      testData: "Hello from client",
-      timestamp: Date.now(),
-    });
-
-    return {
-      success: true,
-      data: result.data,
-      message: "Test write completed successfully",
-    };
-  } catch (error) {
-    log("Error in dbTestCustomerPhoneWrite", {
-      error: error.message,
-      code: error.code,
-    });
-
-    return {
-      success: false,
-      error: error.message || "Test write failed",
-      code: error.code,
-    };
-  }
-}
-
-/**
- * Test HTTP endpoint - writes test data to customer_phone/test using fetch
- * @returns {Promise<Object>} Result with success status
- */
-export async function dbTestCustomerPhoneWriteHTTP() {
-  try {
-    const response = await fetch(
-      "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/testCustomerPhoneWriteHTTP",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          testData: "Hello from HTTP client",
-          timestamp: Date.now(),
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    const result = await response.json();
-
-    return {
-      success: result.success,
-      data: result.data,
-      message: result.message,
-    };
-  } catch (error) {
-    log("Error in dbTestCustomerPhoneWriteHTTP", {
-      error: error.message,
-    });
-
-    return {
-      success: false,
-      error: error.message || "Test HTTP write failed",
-    };
-  }
-}
-
-/**
  * Retrieve customer's last 10 messages with pagination support
  * @param {string} customerPhone - Customer's phone number (10 digits)
  * @param {Timestamp|null} startAfterTimestamp - Firestore timestamp to paginate from (optional)
@@ -3030,26 +2946,29 @@ export async function dbGetCustomerMessages(
     const { DB } = await import("./db_calls");
 
     // Build collection reference
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      throw new Error("Missing tenantID or storeID");
+    }
     const messagesRef = collection(
       DB,
-      "customer_phone",
-      cleanPhone,
+      "tenants", tenantID,
+      "stores", storeID,
+      "sms-messages", cleanPhone,
       "messages"
     );
 
-    // Build query - order by timestamp descending (newest first)
+    // Build query - order by millis descending (newest first)
     let q;
     if (startAfterTimestamp) {
-      // Paginated query - start after the provided timestamp
       q = query(
         messagesRef,
-        orderBy("timestamp", "desc"),
+        orderBy("millis", "desc"),
         startAfter(startAfterTimestamp),
         limit(pageSize)
       );
     } else {
-      // First page - get most recent messages
-      q = query(messagesRef, orderBy("timestamp", "desc"), limit(pageSize));
+      q = query(messagesRef, orderBy("millis", "desc"), limit(pageSize));
     }
 
     // Execute query
@@ -3090,18 +3009,14 @@ export async function dbGetCustomerMessages(
         mediaUrls: data.mediaUrls || [],
         autoResponseSent: data.autoResponseSent || false,
         canRespond: data.canRespond,
+        forwardTo: data.forwardTo || null,
+        senderUserObj: data.senderUserObj || null,
       });
     });
 
     // Get the last message timestamp for pagination
     const lastMessage = messages[messages.length - 1];
-    const nextPageTimestamp = lastMessage ? lastMessage.timestamp : null;
-
-    log("Messages retrieved successfully", {
-      phone: cleanPhone,
-      count: messages.length,
-      hasMore: messages.length === pageSize,
-    });
+    const nextPageMillis = lastMessage ? lastMessage.millis : null;
 
     return {
       success: true,
@@ -3109,9 +3024,7 @@ export async function dbGetCustomerMessages(
       hasMore: messages.length === pageSize,
       count: messages.length,
       customerPhone: cleanPhone,
-      nextPageTimestamp: nextPageTimestamp,
-      firstMessageTimestamp: messages[0]?.timestamp,
-      lastMessageTimestamp: lastMessage?.timestamp,
+      nextPageTimestamp: nextPageMillis,
     };
   } catch (error) {
     log("Error retrieving customer messages", {
@@ -3141,7 +3054,12 @@ export function dbListenToCustomerMessages(customerPhone, callback) {
       log("Error: phone must be 10 digits for dbListenToCustomerMessages");
       return null;
     }
-    const messagesRef = collection(DB, "customer_phone", cleanPhone, "messages");
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: missing tenantID/storeID for dbListenToCustomerMessages");
+      return null;
+    }
+    const messagesRef = collection(DB, "tenants", tenantID, "stores", storeID, "sms-messages", cleanPhone, "messages");
     const messagesQuery = query(messagesRef, orderBy("millis", "asc"));
     const unsubscribe = onSnapshot(
       messagesQuery,
@@ -3169,6 +3087,8 @@ export function dbListenToCustomerMessages(customerPhone, callback) {
             mediaUrls: data.mediaUrls || [],
             autoResponseSent: data.autoResponseSent || false,
             canRespond: data.canRespond,
+            forwardTo: data.forwardTo || null,
+            senderUserObj: data.senderUserObj || null,
           });
         });
         callback(messages);
@@ -3181,6 +3101,58 @@ export function dbListenToCustomerMessages(customerPhone, callback) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up customer messages listener:", error);
+    return null;
+  }
+}
+
+export function dbListenToNewMessages(customerPhone, afterMillis, callback) {
+  try {
+    if (!customerPhone || typeof customerPhone !== "string") return null;
+    const cleanPhone = customerPhone.replace(/\D/g, "");
+    if (cleanPhone.length !== 10) return null;
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return null;
+    const messagesRef = collection(DB, "tenants", tenantID, "stores", storeID, "sms-messages", cleanPhone, "messages");
+    const messagesQuery = query(messagesRef, orderBy("millis", "asc"), where("millis", ">", afterMillis));
+    const unsubscribe = onSnapshot(
+      messagesQuery,
+      (querySnapshot) => {
+        const messages = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          messages.push({
+            id: doc.id,
+            customerID: data.customerID,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phoneNumber: data.phoneNumber,
+            message: data.message,
+            type: data.type,
+            millis: data.millis,
+            timestamp: data.timestamp,
+            threadStatus: data.threadStatus,
+            read: data.read,
+            tenantID: data.tenantID,
+            storeID: data.storeID,
+            messageSid: data.messageSid,
+            status: data.status || data.messageStatus,
+            hasMedia: data.hasMedia || false,
+            mediaUrls: data.mediaUrls || [],
+            autoResponseSent: data.autoResponseSent || false,
+            canRespond: data.canRespond,
+            forwardTo: data.forwardTo || null,
+            senderUserObj: data.senderUserObj || null,
+          });
+        });
+        callback(messages);
+      },
+      (error) => {
+        log("New messages listener error", { phone: cleanPhone, error });
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    log("Error setting up new messages listener:", error);
     return null;
   }
 }
@@ -3256,7 +3228,7 @@ export async function dbDeleteWorkorderMedia(mediaItem) {
   }
 }
 
-export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phoneNumber, customerID, messageID }) {
+export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phoneNumber, customerID, messageID, canRespond, forwardTo }) {
   const { tenantID, storeID } = getTenantAndStore();
   try {
     let result = await uploadPDFAndSendSMS({
@@ -3268,6 +3240,8 @@ export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phon
       storeID,
       customerID,
       messageID,
+      canRespond,
+      forwardTo: forwardTo || null,
     });
     return result;
   } catch (error) {

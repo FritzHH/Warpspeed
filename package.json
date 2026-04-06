@@ -47,6 +47,7 @@
     "react-scripts": "5.0.1",
     "react-tabs": "^6.1.0",
     "react-to-print": "^3.0.6",
+    "react-zoom-pan-pinch": "^3.7.0",
     "string_decoder": "^1.3.0",
     "stripe": "^18.0.0",
     "twilio": "^5.6.1",
@@ -68,8 +69,8 @@
     "dprocess": "firebase deploy --only functions:processServerDrivenStripePayment",
     "dhook": "firebase deploy --only functions:createTenant",
     "login": "firebase login --reauth",
-    "begin": "yarn build && serve -s build",
-    "refresh": "yarn build"
+    "begin": "yarn build && serve -s build --ssl-cert cert.pem --ssl-key key.pem",
+    "serveit": "serve -s build --ssl-cert cert.pem --ssl-key key.pem"
   },
   "eslintConfig": {
     "extends": [

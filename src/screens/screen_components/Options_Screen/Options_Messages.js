@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Image,
+  ActivityIndicator,
 } from "react-native-web";
+import { createPortal } from "react-dom";
 import {
   capitalizeFirstLetterOfString,
   combine2ArraysOrderByMillis,
@@ -31,6 +33,8 @@ import {
   PhoneNumberInput,
   LoadingIndicator,
   SmallLoadingIndicator,
+  Tooltip,
+  TouchableOpacity_,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
 import { useTranslation } from "../../../useTranslation";
@@ -57,9 +61,10 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToCustomerMessages, dbToggleSMSForwarding, dbGetConversationForwardState, dbGetCustomerMessages } from "../../../db_calls_wrapper";
+import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond } from "../../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { sendSaleReceipt } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
+import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
+
 
 const TEXT_TEMPLATE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
@@ -73,6 +78,24 @@ const TEXT_TEMPLATE_VARIABLES = [
   { label: "Store Hours", variable: "{storeHours}" },
   { label: "Store Phone", variable: "{storePhone}" },
 ];
+
+// Module-level auto-send timer — survives component unmount
+let _autoSendTimer = null;
+let _autoSendThunk = null;
+function scheduleAutoSend(thunk) {
+  clearAutoSend();
+  _autoSendThunk = thunk;
+  _autoSendTimer = setTimeout(() => {
+    if (_autoSendThunk) _autoSendThunk();
+    _autoSendThunk = null;
+    _autoSendTimer = null;
+  }, 10000);
+}
+function clearAutoSend() {
+  if (_autoSendTimer) clearTimeout(_autoSendTimer);
+  _autoSendTimer = null;
+  _autoSendThunk = null;
+}
 
 export function MessagesComponent({}) {
   // getters ///////////////////////////////////////////////////////////////
@@ -94,31 +117,10 @@ export function MessagesComponent({}) {
   const zMessagesHasMore = useCustMessagesStore((state) => state.messagesHasMore);
   //////////////////////////////////////////////////////////////////////////
 
-  // Clear hasNewSMS flag when messages are viewed, and refresh messages
+  // Clear hasNewSMS flag when messages are viewed
   useEffect(() => {
     if (zWorkorderObj?.hasNewSMS) {
       useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
-      // Re-fetch latest messages to pick up the new incoming SMS
-      let phone = zWorkorderObj.customerCell;
-      if (phone && phone.length === 10 && !sCustomPhoneMode) {
-        let msgStore = useCustMessagesStore.getState();
-        msgStore.setMessagesPhone(phone);
-        msgStore.setMessagesLoading(true);
-        dbGetCustomerMessages(phone, null, 7).then((result) => {
-          if (!result.success || useCustMessagesStore.getState().getMessagesPhone() !== phone) {
-            useCustMessagesStore.getState().setMessagesLoading(false);
-            return;
-          }
-          let store = useCustMessagesStore.getState();
-          store.setIncomingMessages(result.messages.filter((m) => m.type === "incoming"));
-          store.setOutgoingMessages(result.messages.filter((m) => m.type !== "incoming"));
-          store.setMessagesHasMore(result.hasMore);
-          store.setMessagesNextCursor(result.nextPageTimestamp);
-          store.setMessagesLoading(false);
-        }).catch(() => {
-          useCustMessagesStore.getState().setMessagesLoading(false);
-        });
-      }
     }
   }, [zWorkorderObj?.hasNewSMS, zWorkorderObj?.id]);
 
@@ -136,7 +138,9 @@ export function MessagesComponent({}) {
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
   const cursorPositionRef = useRef(0);
-  const forwardLoadedPhoneRef = useRef(null);
+  const pendingActionRef = useRef(null);
+  const userOverrodeForwardRef = useRef(false);
+  const userOverrodeCanRespondRef = useRef(false);
 
   const {
     translatedText, isEnToEs, isLoading: sTranslateLoading,
@@ -150,9 +154,12 @@ export function MessagesComponent({}) {
       clearTimeout(debounceTimerRef.current);
     }
 
+    // Cap at 10,000 characters
+    if (val.length > 10000) val = val.slice(0, 10000);
+
     // Update state immediately for responsive UI
     _setNewMessage(val);
-    if (sShowReplyModal) _setShowReplyModal(false);
+    if (sShowReplyModal) { _setShowReplyModal(false); clearAutoSend(); }
 
     // Imperative height adjustment — reset to 0 then measure scrollHeight so it shrinks on delete
     if (textInputRef.current) {
@@ -206,46 +213,57 @@ export function MessagesComponent({}) {
     };
   }, []);
 
-  // Custom phone mode: listen to message thread for the entered phone number
+  // Custom phone mode: fetch last 7 messages then listen for new ones
   useEffect(() => {
     if (!sCustomPhoneMode || sCustomPhone.length !== 10) {
       _setCustomPhoneMessages([]);
       return;
     }
-    const unsubscribe = dbListenToCustomerMessages(sCustomPhone, (messages) => {
-      if (messages) {
-        _setCustomPhoneMessages(messages);
-      }
-    });
+    let unsub = null;
+    let cancelled = false;
+    dbGetCustomerMessages(sCustomPhone, null, 7).then((result) => {
+      if (cancelled) return;
+      if (!result.success) return;
+      _setCustomPhoneMessages(result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0)));
+      let lastMillis = 0;
+      result.messages.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
+      if (!lastMillis) lastMillis = Date.now();
+      unsub = dbListenToNewMessages(sCustomPhone, lastMillis, (newMessages) => {
+        if (cancelled) return;
+        _setCustomPhoneMessages((prev) => {
+          let existingIDs = new Set(prev.map((m) => m.id));
+          let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
+          if (!fresh.length) return prev;
+          return [...prev, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+        });
+      });
+    }).catch(() => { });
     return () => {
-      if (unsubscribe) unsubscribe();
+      cancelled = true;
+      if (unsub) unsub();
     };
   }, [sCustomPhoneMode, sCustomPhone]);
 
   // log("res", sCanRespond);
   useEffect(() => {
-    // Load forwarding state once per phone number change
-    const phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
-    if (phone && phone.length === 10 && phone !== forwardLoadedPhoneRef.current) {
-      forwardLoadedPhoneRef.current = phone;
-      const currentUser = useLoginStore.getState().getCurrentUser();
-      if (currentUser?.id) {
-        dbGetConversationForwardState(phone, currentUser.id).then(isForwarding => {
-          _setForwardReplies(isForwarding);
-        });
-      }
-    }
     try {
       let arr = combine2ArraysOrderByMillis(
         zIncomingMessagesArr,
         zOutgoingMessagesArr
       );
 
-      let lastMessage = arr[arr.length - 1];
-      console.log(lastMessage);
-      if (!lastMessage.senderUserObj || lastMessage.canRespond) {
-        _setCanRespond(true);
+      let lastOutgoing = [...zOutgoingMessagesArr].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+      if (lastOutgoing) {
+        if (!userOverrodeCanRespondRef.current) {
+          _setCanRespond(!lastOutgoing.senderUserObj || !!lastOutgoing.canRespond);
+        }
+        if (!userOverrodeForwardRef.current) {
+          const currentUser = useLoginStore.getState().getCurrentUser();
+          let fwd = lastOutgoing.forwardTo;
+          _setForwardReplies(!!fwd && fwd.userID === currentUser?.id && !!fwd.enable);
+        }
       }
+
       if (arr.length - 1 > 0) {
         messageListRef.current?.scrollToIndex({
           index: arr.length - 1,
@@ -258,11 +276,27 @@ export function MessagesComponent({}) {
   // Auto-scroll custom phone messages to bottom
   useEffect(() => {
     try {
-      if (!sCustomPhoneMode || sCustomPhoneMessages.length < 2) return;
-      messageListRef.current?.scrollToIndex({
-        index: sCustomPhoneMessages.length - 1,
-        animated: true,
-      });
+      if (!sCustomPhoneMode || sCustomPhoneMessages.length < 1) return;
+
+      // Derive canRespond and forward replies state from last outgoing message
+      let lastOutgoing = sCustomPhoneMessages.filter(m => m.type === "outgoing").sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+      if (lastOutgoing) {
+        if (!userOverrodeCanRespondRef.current) {
+          _setCanRespond(!lastOutgoing.senderUserObj || !!lastOutgoing.canRespond);
+        }
+        if (!userOverrodeForwardRef.current) {
+          const currentUser = useLoginStore.getState().getCurrentUser();
+          let fwd = lastOutgoing.forwardTo;
+          _setForwardReplies(!!fwd && fwd.userID === currentUser?.id && !!fwd.enable);
+        }
+      }
+
+      if (sCustomPhoneMessages.length > 1) {
+        messageListRef.current?.scrollToIndex({
+          index: sCustomPhoneMessages.length - 1,
+          animated: true,
+        });
+      }
     } catch (e) {}
   }, [sCustomPhoneMessages]);
 
@@ -270,9 +304,9 @@ export function MessagesComponent({}) {
     let cursorPos = cursorPositionRef.current ?? sNewMessage.length;
     let before = sNewMessage.slice(0, cursorPos);
     let after = sNewMessage.slice(cursorPos);
-    let newMessage = before + variableStr + after;
+    let newMessage = before + variableStr + " " + after;
     _setNewMessage(newMessage);
-    cursorPositionRef.current = cursorPos + variableStr.length;
+    cursorPositionRef.current = cursorPos + variableStr.length + 1;
     textInputRef.current?.focus();
     if (sTranslateActive) debouncedTranslate(newMessage, targetLang);
   }
@@ -290,9 +324,7 @@ export function MessagesComponent({}) {
     if (sTranslateActive && sNewMessage.trim()) doTranslate(sNewMessage, newTarget);
   }
 
-  async function handleToggleForwardReplies() {
-    const phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
-    if (!phone || phone.length !== 10) return;
+  function handleToggleForwardReplies() {
     const currentUser = useLoginStore.getState().getCurrentUser();
     if (!currentUser?.id) return;
     if (!currentUser?.phone) {
@@ -306,59 +338,105 @@ export function MessagesComponent({}) {
       });
       return;
     }
-    const newState = !sForwardReplies;
-    _setForwardReplies(newState);
-    const result = await dbToggleSMSForwarding(phone, currentUser.id, newState, currentUser.phone, currentUser.first);
-    if (!result.success) _setForwardReplies(!newState);
+    userOverrodeForwardRef.current = true;
+    let newVal = !sForwardReplies;
+    _setForwardReplies(newVal);
+    if (newVal) {
+      clearAutoSend();
+      _setCanRespond(true);
+      _setShowReplyModal(false);
+      if (pendingActionRef.current === "intake") {
+        handleSendWorkorderTicket(true, true);
+        pendingActionRef.current = null;
+      } else {
+        sendMessage(sNewMessage, "", true, true);
+      }
+    }
   }
 
-  async function sendMessage(text, imageUrl = "", canRespondVal) {
+  function buildForwardToPayload(forwardOverride) {
+    const currentUser = useLoginStore.getState().getCurrentUser();
+    if (!currentUser?.id) return null;
+    let shouldForward = forwardOverride !== undefined ? forwardOverride : sForwardReplies;
+    if (shouldForward) {
+      if (!currentUser.phone) return null;
+      return { userID: currentUser.id, phone: currentUser.phone, first: currentUser.first || "", enable: true };
+    }
+    return { userID: currentUser.id, enable: false };
+  }
+
+  function splitIntoChunks(text, maxLen = 1600) {
+    if (text.length <= maxLen) return [text];
+    let chunks = [];
+    let remaining = text;
+    while (remaining.length > 0) {
+      if (remaining.length <= maxLen) { chunks.push(remaining); break; }
+      let splitAt = remaining.lastIndexOf(" ", maxLen);
+      if (splitAt <= 0) splitAt = maxLen;
+      chunks.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    return chunks;
+  }
+
+  async function sendMessage(text, imageUrl = "", canRespondVal, forwardOverride) {
     if ((!text || !text.trim()) && !imageUrl) return;
     let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer.customerCell;
     if (!sendPhone || sendPhone.length !== 10) return;
     useLoginStore.getState().requireLogin(async () => {
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-      let msg = { ...SMS_PROTO };
-      msg.message = text || "";
-      msg.imageUrl = imageUrl;
-      msg.phoneNumber = sendPhone;
-      msg.firstName = sCustomPhoneMode ? "" : zCustomer.first;
-      msg.lastName = sCustomPhoneMode ? "" : zCustomer.last;
       let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-      msg.canRespond = useCanRespond ? new Date().getTime() : null;
-      msg.millis = new Date().getTime();
-      msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
-      msg.id = crypto.randomUUID();
-      msg.type = "outgoing";
-      msg.senderUserObj = zCurrentUserObj;
+      let forwardTo = buildForwardToPayload(forwardOverride);
+      userOverrodeForwardRef.current = false;
+      userOverrodeCanRespondRef.current = false;
       _setNewMessage("");
       _setInputHeight(36);
       _setShowReplyModal(false);
       clearTranslation();
-      // Optimistically add message to local list in custom phone mode
-      if (sCustomPhoneMode) {
-        _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
+
+      let chunks = splitIntoChunks(text || "");
+      let anyFailed = false;
+      let lastError = "";
+
+      for (let i = 0; i < chunks.length; i++) {
+        let isLastChunk = i === chunks.length - 1;
+        let msg = { ...SMS_PROTO };
+        msg.message = chunks[i];
+        msg.imageUrl = i === 0 ? imageUrl : "";
+        msg.phoneNumber = sendPhone;
+        msg.firstName = sCustomPhoneMode ? "" : zCustomer.first;
+        msg.lastName = sCustomPhoneMode ? "" : zCustomer.last;
+        msg.canRespond = isLastChunk && useCanRespond ? new Date().getTime() : null;
+        msg.millis = new Date().getTime() + i;
+        msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
+        msg.id = crypto.randomUUID();
+        msg.type = "outgoing";
+        msg.senderUserObj = zCurrentUserObj;
+        if (isLastChunk && forwardTo) msg.forwardTo = forwardTo;
+        if (sCustomPhoneMode) {
+          _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
+        }
+        let result = await smsService.send(msg);
+        if (sCustomPhoneMode) {
+          _setCustomPhoneMessages(prev => prev.map(m =>
+            m.id === msg.id
+              ? { ...m, status: result.success ? "sent" : "failed", errorMessage: result.success ? "" : (result.error || "") }
+              : m
+          ));
+        }
+        if (!result.success) { anyFailed = true; lastError = result.error || ""; break; }
       }
-      let result = await smsService.send(msg);
-      // Update status in local list for custom phone mode
-      if (sCustomPhoneMode) {
-        _setCustomPhoneMessages(prev => prev.map(m =>
-          m.id === msg.id
-            ? { ...m, status: result.success ? "sent" : "failed", errorMessage: result.success ? "" : (result.error || "") }
-            : m
-        ));
-      }
-      if (result.success && !sCustomPhoneMode) {
-        // Flag all customer workorders so the sender's list prioritizes them
+
+      if (!anyFailed && !sCustomPhoneMode) {
         let allWOs = useOpenWorkordersStore.getState().workorders;
         allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
           useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
         });
       }
-      if (!result.success) {
+      if (anyFailed) {
         useAlertScreenStore.getState().setValues({
           title: "Message Failed",
-          message: result.error || "Failed to send message",
+          message: lastError || "Failed to send message",
           btn1Text: "OK",
           handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
           showAlert: true,
@@ -401,7 +479,7 @@ export function MessagesComponent({}) {
       .replace(/\{storeHours\}/g, storeHoursText)
       .replace(/\{storePhone\}/g, ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || ""));
   }
-  async function handleSendWorkorderTicket() {
+  async function handleSendWorkorderTicket(canRespondVal, forwardOverride) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
     useLoginStore.getState().requireLogin(async () => {
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
@@ -413,6 +491,8 @@ export function MessagesComponent({}) {
       let messageTemplate = zSettings?.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
       let message = resolveTemplate(messageTemplate);
       let messageID = crypto.randomUUID();
+      let canRespondMillis = canRespondVal ? new Date().getTime() : null;
+      let forwardTo = buildForwardToPayload(forwardOverride);
       let result = await dbUploadPDFAndSendSMS({
         base64,
         storagePath,
@@ -420,9 +500,21 @@ export function MessagesComponent({}) {
         phoneNumber: zCustomer.customerCell,
         customerID: zCustomer.id,
         messageID,
+        canRespond: canRespondMillis,
+        forwardTo,
       });
       if (result && result.success) {
-        sendMessage(message.replace(/\{link\}/g, "[PDF link]"));
+        useCustMessagesStore.getState().setOutgoingMessage({
+          id: messageID,
+          message: message.replace(/\{link\}/g, "[PDF link]"),
+          phoneNumber: zCustomer.customerCell,
+          customerID: zCustomer.id,
+          millis: new Date().getTime(),
+          type: "outgoing",
+          status: "sent",
+          canRespond: canRespondMillis,
+          senderUserObj: useLoginStore.getState().getCurrentUser(),
+        });
       } else {
         useAlertScreenStore.getState().setValues({
           title: "Workorder Send Failed",
@@ -436,20 +528,6 @@ export function MessagesComponent({}) {
     });
   }
 
-  function handleSendSaleReceipt() {
-    if (!zWorkorderObj || !zCustomer?.customerCell) return;
-    useLoginStore.getState().requireLogin(() => {
-      const settings = useSettingsStore.getState().getSettings();
-      const customer = {
-        first: zWorkorderObj.customerFirst || "",
-        last: zWorkorderObj.customerLast || "",
-        customerCell: zWorkorderObj.customerPhone || "",
-        email: zWorkorderObj.customerEmail || "",
-        id: zWorkorderObj.customerID || "",
-      };
-      sendSaleReceipt(zWorkorderObj, customer, zWorkorderObj, settings);
-    });
-  }
   async function handleSendSMSPayment() {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
     if (!zWorkorderObj.workorderLines || zWorkorderObj.workorderLines.length === 0) {
@@ -467,6 +545,17 @@ export function MessagesComponent({}) {
       useAlertScreenStore.getState().setValues({
         title: "Already Paid",
         message: "This workorder is already paid.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    if (zWorkorderObj.activeSaleID) {
+      useAlertScreenStore.getState().setValues({
+        title: "Active Sale In Progress",
+        message: "This workorder has an active sale. Complete or cancel the sale before sending a payment link.",
         btn1Text: "OK",
         handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
         showAlert: true,
@@ -550,7 +639,6 @@ export function MessagesComponent({}) {
     _setCanRespond(true);
     _setNewMessage("");
     _setForwardReplies(false);
-    forwardLoadedPhoneRef.current = null;
     clearTranslation();
   }
 
@@ -560,8 +648,24 @@ export function MessagesComponent({}) {
     _setCustomPhoneMessages([]);
     _setNewMessage("");
     _setForwardReplies(false);
-    forwardLoadedPhoneRef.current = null;
     clearTranslation();
+  }
+
+  async function handleToggleBlockResponses() {
+    let phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
+    if (!phone || phone.length !== 10) return;
+    let outgoing = (sCustomPhoneMode ? sCustomPhoneMessages : zOutgoingMessagesArr).filter(m => m.type === "outgoing");
+    if (!outgoing.length) return;
+    let sorted = [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0));
+    let lastOutgoing = sorted[0];
+    if (!lastOutgoing?.id) return;
+    let newCanRespond = sCanRespond ? null : new Date().getTime();
+    let result = await dbUpdateMessageCanRespond(phone, lastOutgoing.id, newCanRespond);
+    if (result.success) {
+      userOverrodeCanRespondRef.current = true;
+      _setCanRespond(!sCanRespond);
+      useCustMessagesStore.getState().updateMessageField(lastOutgoing.id, "canRespond", newCanRespond);
+    }
   }
 
   // Whether the compose area should show
@@ -700,43 +804,40 @@ export function MessagesComponent({}) {
               }
             </View>
           ) : null}
-          <View style={{ width: "100%" }}>
+            <View style={{ width: "100%" }}>
+
               {sShowReplyModal && (
-                <View style={{
-                  backgroundColor: "white",
-                  borderRadius: 8,
-                  borderWidth: 2,
-                  borderColor: gray(0.2),
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  marginBottom: 6,
-                  shadowColor: "black",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.15,
-                  shadowRadius: 4,
-                  elevation: 4,
-                }}>
-                  <Text style={{ fontSize: 15, color: C.text, fontWeight: "600", marginBottom: 10 }}>User can reply?</Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
-                    <TouchableOpacity
-                      onPress={() => { _setCanRespond(true); _setShowReplyModal(false); sendMessage(sNewMessage, "", true); }}
-                      style={{ flexDirection: "row", alignItems: "center", backgroundColor: C.green, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16, marginRight: 10 }}
-                    >
-                      <Text style={{ fontSize: 14, color: "white", fontWeight: "bold" }}>Yes</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => { _setCanRespond(false); _setShowReplyModal(false); sendMessage(sNewMessage, "", false); }}
-                      style={{ flexDirection: "row", alignItems: "center", backgroundColor: C.red, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16 }}
-                    >
-                      <Text style={{ fontSize: 14, color: "white", fontWeight: "bold" }}>No</Text>
-                    </TouchableOpacity>
+                <View style={{ width: '100%', justifyContent: "space-between", flexDirection: 'row', marginBottom: 4, backgroundColor: 'orange', padding: 10, borderRadius: 6 }}>
+                  {/**install an indicator here showing countdown to auto-send */}
+                  <View style={{ alignItems: 'flex-start' }}><Text style={{ color: 'dimgray' }}>Auto-sending in 10 seconds</Text></View>
+                  <View style={{ alignItems: 'flex-end' }}>
+
+                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}>
+                      <Text style={{ fontSize: 15, color: 'dimgray', fontWeight: "500", marginRight: 10 }}>Can reply?</Text>
+                      <TouchableOpacity_
+                        onPress={() => { clearAutoSend(); _setCanRespond(true); _setShowReplyModal(false); if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(true); pendingActionRef.current = null; } else { sendMessage(sNewMessage, "", true); } }}
+                        style={{ padding: 10, marginRight: 6 }}
+                        hoverOpacity={0.5}
+                      >
+                        <Image_ icon={ICONS.check} size={70} />
+                      </TouchableOpacity_>
+                      <TouchableOpacity_
+                        onPress={() => { clearAutoSend(); _setCanRespond(false); _setShowReplyModal(false); if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(false); pendingActionRef.current = null; } else { sendMessage(sNewMessage, "", false); } }}
+                        style={{ padding: 10 }}
+                        hoverOpacity={0.5}
+                      >
+                        <Image_ icon={ICONS.redx} size={70} />
+                      </TouchableOpacity_>
+                    </View>
+                    <CheckBox_
+                      text={"Forward replies to me"}
+                      isChecked={sForwardReplies}
+                      onCheck={handleToggleForwardReplies}
+                      enabled={hasActivePhone}
+                      textStyle={{ fontSize: 17, color: C.text }}
+                      enableMouseOver={true}
+                    />
                   </View>
-                  <CheckBox_
-                    text={"Forward replies"}
-                    isChecked={sForwardReplies}
-                    onCheck={handleToggleForwardReplies}
-                    enabled={hasActivePhone}
-                  />
                 </View>
               )}
               <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
@@ -780,19 +881,21 @@ export function MessagesComponent({}) {
                 />
                 <View style={{ position: "relative" }}>
                   <TouchableOpacity
-                    onPress={() => { if (sNewMessage.trim() && sNewMessage.length <= 1600) _setShowReplyModal(true); }}
-                    style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() && sNewMessage.length <= 1600 ? 1 : 0.3 }}
+                    onPress={() => { if (sNewMessage.trim()) { _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); sendMessage(sNewMessage, "", sCanRespond); }); } }}
+                    style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() ? 1 : 0.3 }}
                   >
                     <Image_ icon={ICONS.airplane} size={41} />
                   </TouchableOpacity>
                 </View>
               </View>
-            <Text style={{ fontSize: 10, color: sNewMessage.length > 1600 ? C.red : gray(0.4), alignSelf: "flex-end", marginTop: 2 }}>
-              {sNewMessage.length} / 1600
-            </Text>
           </View>
             <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 10 }}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <CheckBox_
+                  text={"Translate"}
+                  isChecked={sTranslateActive}
+                  onCheck={handleToggleTranslate}
+                />
                 <DropdownMenu
                   dataArr={(zSettings?.smsTemplates || zSettings?.textTemplates || []).map((t) => ({ label: t.label || t.name || t.buttonLabel || "Untitled", message: t.content || t.message || t.text || "" }))}
                   onSelect={(item) => {
@@ -804,69 +907,63 @@ export function MessagesComponent({}) {
                   buttonStyle={{ paddingVertical: 5 }}
                   openUpward={true}
                 />
-                <DropdownMenu
-                  dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
-                  onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
-                  buttonText={"Variables"}
-                  buttonStyle={{ paddingVertical: 5 }}
-                  openUpward={true}
-                />
-                <Button_
-                  onPress={() => _setShowMediaPicker(true)}
-                  text={"Attach Media"}
-                  icon={ICONS.viewPhoto}
-                  iconSize={16}
-                  enabled={!!(zWorkorderObj?.media?.length)}
-                  colorGradientArr={COLOR_GRADIENTS.purple}
-                  buttonStyle={{ borderRadius: 5, paddingHorizontal: 10 }}
-                />
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <CheckBox_
-                    text={"Translate"}
-                    isChecked={sTranslateActive}
-                    onCheck={handleToggleTranslate}
+                <Tooltip text="Variables" position="top">
+                  <DropdownMenu
+                    dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
+                    onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
+                    buttonIcon={ICONS.variable}
+                    buttonIconSize={40}
+                    buttonStyle={{ alignItems: "center", justifyContent: "center", padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
+                    openUpward={true}
                   />
-                  {sTranslateActive && (
-                    <TouchableOpacity onPress={handleFlipDirection} style={{ marginLeft: 4, paddingHorizontal: 6 }}>
-                      <Image_ icon={isEnToEs ? ICONS.exportIcon : ICONS.importIcon} size={18} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <Button_
-                  onPress={handleSendWorkorderTicket}
-                  text={"Send Workorder"}
-                  enabled={!!zWorkorderObj && !!zCustomer?.customerCell}
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
-                />
-                <Button_
-                  onPress={handleSendSaleReceipt}
-                  text={"Send Receipt"}
-                  enabled={!!zWorkorderObj && !!zCustomer?.customerCell}
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
-                />
-                <Button_
-                  onPress={handleSendSMSPayment}
-                  text={"Send SMS Payment"}
-                  enabled={!!zWorkorderObj && !!zCustomer?.customerCell && !zWorkorderObj.paymentComplete && !zWorkorderObj.activeSaleID}
-                  colorGradientArr={COLOR_GRADIENTS.blue}
-                  buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
-                />
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                {hasCustomer && !sCustomPhoneMode ? (
+                </Tooltip>
+                <Tooltip text="Send Info" position="top">
+                  <DropdownMenu
+                    dataArr={(() => {
+                      let items = [
+                        { label: "Send Intake Ticket", key: "workorder" },
+                      ];
+                      let paymentError = zWorkorderObj?.paymentComplete ? "Already paid" : (!zWorkorderObj?.workorderLines?.length ? "No line items" : (zWorkorderObj?.activeSaleID ? "Active sale in progress" : ""));
+                      if (paymentError) {
+                        items.push({ label: "Send Payment Link", key: "payment", textColor: C.text, strikethrough: true });
+                      } else {
+                        items.push({ label: "Send Payment Link", key: "payment" });
+                      }
+                      if (!zWorkorderObj?.media?.length) {
+                        items.push({ label: "Send Media", key: "media", textColor: C.text, strikethrough: true });
+                      } else {
+                        items.push({ label: "Send Media", key: "media" });
+                      }
+                      return items;
+                    })()}
+                    onSelect={(item) => {
+                      if (item.key === "workorder") { pendingActionRef.current = "intake"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendWorkorderTicket(sCanRespond); pendingActionRef.current = null; }); }
+                      else if (item.key === "payment") handleSendSMSPayment();
+                      else if (item.key === "media") _setShowMediaPicker(true);
+                    }}
+                    buttonIcon={ICONS.paperPlane}
+                    buttonIconSize={35}
+                    buttonStyle={{ alignItems: "center", justifyContent: "center", padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
+                    openUpward={true}
+                  />
+                </Tooltip>
+                <Tooltip text={sCanRespond ? "Block response" : "Allow responses from user"} position="top">
                   <TouchableOpacity
-                    onPress={handleEnterCustomPhoneMode}
-                    style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, borderWidth: 1, borderColor: gray(0.3) }}
-                    title="Enter a phone number"
+                    onPress={handleToggleBlockResponses}
+                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
                   >
-                    <Text style={{ fontSize: 13, color: gray(0.4) }}>Clear customer</Text>
+                    <Image_ icon={sCanRespond ? ICONS.unblock : ICONS.blocked} size={35} />
                   </TouchableOpacity>
+                </Tooltip>
+                {hasCustomer && !sCustomPhoneMode ? (
+                  <Tooltip text="Number entry" position="top">
+                    <TouchableOpacity
+                      onPress={handleEnterCustomPhoneMode}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image_ icon={ICONS.cellPhone} size={35} />
+                    </TouchableOpacity>
+                  </Tooltip>
                 ) : null}
                 {sCustomPhoneMode ? (
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -911,6 +1008,13 @@ const OUTER_MSG_BOX_STYLE = {
   // padding: 5,
 };
 
+function ZoomCursorHelper({ wrapperRef }) {
+  useTransformEffect(({ state }) => {
+    if (wrapperRef.current) wrapperRef.current.style.cursor = state.scale > 1 ? "grab" : "default";
+  });
+  return null;
+}
+
 const MESSAGE_TEXT_STYLE = {
   fontSize: 14,
 };
@@ -920,20 +1024,155 @@ const INFO_TEXT_STYLE = {
   marginTop: 2,
 };
 
+const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
+  const [sLoading, _setLoading] = useState(true);
+  const [sError, _setError] = useState(false);
+  const [sFullView, _setFullView] = useState(false);
+  const [sFullLoading, _setFullLoading] = useState(true);
+  const wrapperDivRef = useRef(null);
+  const isVideo = (contentType || "").startsWith("video/");
+
+  function handleDownload() {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = url.split("/").pop() || "download";
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  return (
+    <>
+      <TouchableOpacity
+        onPress={() => { _setFullView(true); _setFullLoading(true); }}
+        style={{ width: 300, height: 300, borderRadius: 4, overflow: "hidden", marginBottom: 4, marginRight: 4, backgroundColor: "rgba(0,0,0,0.05)" }}
+      >
+        {sError ? (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ fontSize: 11, color: gray(0.5) }}>Image unavailable</Text>
+          </View>
+        ) : isVideo ? (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ fontSize: 24 }}>&#9654;</Text>
+            <Text style={{ fontSize: 11, color: gray(0.4), marginTop: 4 }}>Video</Text>
+          </View>
+        ) : (
+          <>
+            <Image
+              source={{ uri: thumbnailUrl || url }}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode="cover"
+              onLoad={() => _setLoading(false)}
+              onError={() => { _setLoading(false); _setError(true); }}
+            />
+            {sLoading && (
+              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" }}>
+                <ActivityIndicator size="small" color={gray(0.5)} />
+              </View>
+            )}
+          </>
+        )}
+      </TouchableOpacity>
+      {sFullView && createPortal(
+        <div
+          onClick={() => _setFullView(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.85)",
+            zIndex: 9999,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "80%",
+              height: "80%",
+              position: "relative",
+              borderRadius: 8,
+            }}
+          >
+            {/* Download button */}
+            <div
+              onClick={(e) => { e.stopPropagation(); handleDownload(); }}
+              style={{
+                position: "absolute", top: 8, right: 8, width: 36, height: 36,
+                borderRadius: 18, backgroundColor: C.green,
+                display: "flex", justifyContent: "center", alignItems: "center",
+                cursor: "pointer", zIndex: 2,
+              }}
+            >
+              <span style={{ color: "white", fontSize: 16, fontWeight: "bold", lineHeight: 1 }}>&#8681;</span>
+            </div>
+            {isVideo ? (
+              <video
+                src={url}
+                controls
+                autoPlay
+                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+              />
+            ) : (
+              <div ref={wrapperDivRef} style={{ width: "100%", height: "100%" }}>
+                <TransformWrapper
+                  initialScale={1}
+                  minScale={1}
+                  maxScale={8}
+                  centerOnInit={true}
+                  wheel={{ step: 0.3 }}
+                  panning={{ velocityDisabled: true }}
+                  doubleClick={{ disabled: true }}
+                >
+                  <ZoomCursorHelper wrapperRef={wrapperDivRef} />
+                  <TransformComponent
+                    wrapperStyle={{ width: "100%", height: "100%" }}
+                    contentStyle={{ width: "100%", height: "100%" }}
+                  >
+                    <img
+                      src={url}
+                      onLoad={() => _setFullLoading(false)}
+                      style={{ width: "100%", height: "100%", objectFit: "contain", userSelect: "none" }}
+                      draggable={false}
+                    />
+                  </TransformComponent>
+                </TransformWrapper>
+              </div>
+            )}
+            {sFullLoading && !isVideo && (
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center", alignItems: "center", pointerEvents: "none" }}>
+                <ActivityIndicator size="large" color="white" />
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+});
+
 const IncomingMessageComponent = memo(({ msgObj }) => {
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
   let backgroundColor = "lightgray";
   return (
-    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start" }}>
-      <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE }}>
-        {msgObj.imageUrl ? (
-          <Image
-            source={{ uri: msgObj.imageUrl }}
-            style={{ width: "100%", height: 180, borderRadius: 4, marginBottom: 4 }}
-            resizeMode="cover"
-          />
+    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "60%" }}>
+      <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
+        {msgObj.mediaUrls?.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: msgObj.message ? 4 : 0 }}>
+            {msgObj.mediaUrls.map((media, i) => (
+              <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
+            ))}
+          </View>
+        ) : msgObj.imageUrl ? (
+          <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
         ) : null}
-        {msgObj.message && !msgObj.imageUrl ? (
+        {msgObj.message ? (
           <Text style={{ ...MESSAGE_TEXT_STYLE }}>{msgObj.message}</Text>
         ) : null}
       </View>
@@ -960,16 +1199,18 @@ const OutgoingMessageComponent = memo(({ msgObj }) => {
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
   let backgroundColor = msgObj.status === "failed" ? "rgb(200,80,80)" : "rgb(0,122,255)";
   return (
-    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end" }}>
-      <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE }}>
-        {msgObj.imageUrl ? (
-          <Image
-            source={{ uri: msgObj.imageUrl }}
-            style={{ width: "100%", height: 180, borderRadius: 4, marginBottom: 4 }}
-            resizeMode="cover"
-          />
+    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "60%" }}>
+      <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
+        {msgObj.mediaUrls?.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: msgObj.message ? 4 : 0 }}>
+            {msgObj.mediaUrls.map((media, i) => (
+              <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
+            ))}
+          </View>
+        ) : msgObj.imageUrl ? (
+          <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
         ) : null}
-        {msgObj.message && !msgObj.imageUrl ? (
+        {msgObj.message ? (
           <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
         ) : null}
       </View>

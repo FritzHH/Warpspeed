@@ -617,10 +617,6 @@ export const createTenantCallable = httpsCallable(
   functions,
   "createTenantCallable"
 );
-export const testCustomerPhoneWriteCallable = httpsCallable(
-  functions,
-  "testCustomerPhoneWrite"
-);
 export const lightspeedInitiateAuthCallable = httpsCallable(
   functions,
   "lightspeedInitiateAuth"

@@ -139,6 +139,7 @@ export function MessagesComponent({}) {
   const debounceTimerRef = useRef(null);
   const cursorPositionRef = useRef(0);
   const pendingActionRef = useRef(null);
+  const pendingMediaRef = useRef(null);
   const userOverrodeForwardRef = useRef(false);
   const userOverrodeCanRespondRef = useRef(false);
   const isUnmodifiedTemplateRef = useRef(false);
@@ -350,6 +351,8 @@ export function MessagesComponent({}) {
       if (pendingActionRef.current === "intake") {
         handleSendWorkorderTicket(true, true);
         pendingActionRef.current = null;
+      } else if (pendingActionRef.current === "media") {
+        sendMediaMessage(true, true);
       } else {
         sendMessage(sNewMessage, "", true, true);
       }
@@ -408,7 +411,7 @@ export function MessagesComponent({}) {
         msg.phoneNumber = sendPhone;
         msg.firstName = sCustomPhoneMode ? "" : zCustomer.first;
         msg.lastName = sCustomPhoneMode ? "" : zCustomer.last;
-        msg.canRespond = isLastChunk && useCanRespond ? new Date().getTime() : null;
+        msg.canRespond = isLastChunk && useCanRespond ? true : null;
         msg.millis = new Date().getTime() + i;
         msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
         msg.id = crypto.randomUUID();
@@ -493,7 +496,7 @@ export function MessagesComponent({}) {
       let messageTemplate = zSettings?.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
       let message = resolveTemplate(messageTemplate);
       let messageID = crypto.randomUUID();
-      let canRespondMillis = canRespondVal ? new Date().getTime() : null;
+      let canRespondBool = canRespondVal ? true : null;
       let forwardTo = buildForwardToPayload(forwardOverride);
       let result = await dbUploadPDFAndSendSMS({
         base64,
@@ -502,7 +505,7 @@ export function MessagesComponent({}) {
         phoneNumber: zCustomer.customerCell,
         customerID: zCustomer.id,
         messageID,
-        canRespond: canRespondMillis,
+        canRespond: canRespondBool,
         forwardTo,
       });
       if (result && result.success) {
@@ -514,7 +517,7 @@ export function MessagesComponent({}) {
           millis: new Date().getTime(),
           type: "outgoing",
           status: "sent",
-          canRespond: canRespondMillis,
+          canRespond: canRespondBool,
           senderUserObj: useLoginStore.getState().getCurrentUser(),
         });
       } else {
@@ -614,7 +617,93 @@ export function MessagesComponent({}) {
   function handleMediaPicked(mediaItem) {
     _setShowMediaPicker(false);
     if (!mediaItem || !mediaItem.url) return;
-    sendMessage("", mediaItem.url);
+    pendingMediaRef.current = [mediaItem];
+    pendingActionRef.current = "media";
+    _setShowReplyModal(true);
+    scheduleAutoSend(() => {
+      _setShowReplyModal(false);
+      sendMediaMessage(sCanRespond);
+      pendingActionRef.current = null;
+      pendingMediaRef.current = null;
+    });
+  }
+  function handleMediaMultiSelect(mediaItems) {
+    _setShowMediaPicker(false);
+    if (!mediaItems || !mediaItems.length) return;
+    pendingMediaRef.current = mediaItems;
+    pendingActionRef.current = "media";
+    _setShowReplyModal(true);
+    scheduleAutoSend(() => {
+      _setShowReplyModal(false);
+      sendMediaMessage(sCanRespond);
+      pendingActionRef.current = null;
+      pendingMediaRef.current = null;
+    });
+  }
+  function sendMediaMessage(canRespondVal, forwardOverride) {
+    let mediaItems = pendingMediaRef.current;
+    if (!mediaItems || !mediaItems.length) return;
+    let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer.customerCell;
+    if (!sendPhone || sendPhone.length !== 10) return;
+    useLoginStore.getState().requireLogin(async () => {
+      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+      let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+      let forwardTo = buildForwardToPayload(forwardOverride);
+      userOverrodeForwardRef.current = false;
+      userOverrodeCanRespondRef.current = false;
+      _setShowReplyModal(false);
+      let storeName = zSettings?.storeInfo?.displayName || "Our store";
+      let hasImages = mediaItems.some((m) => m.type === "image");
+      let hasVideos = mediaItems.some((m) => m.type === "video");
+      let imageCount = mediaItems.filter((m) => m.type === "image").length;
+      let videoCount = mediaItems.filter((m) => m.type === "video").length;
+      let parts = [];
+      if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
+      if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
+      let mediaText = storeName + " has sent you " + parts.join(" and ");
+      let msg = { ...SMS_PROTO };
+      msg.message = mediaText;
+      msg.mediaUrls = mediaItems.map((m) => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.type === "video" ? "video/mp4" : "image/jpeg" }));
+      msg.phoneNumber = sendPhone;
+      msg.firstName = sCustomPhoneMode ? "" : zCustomer.first;
+      msg.lastName = sCustomPhoneMode ? "" : zCustomer.last;
+      msg.canRespond = useCanRespond ? true : null;
+      msg.millis = new Date().getTime();
+      msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
+      msg.id = crypto.randomUUID();
+      msg.type = "outgoing";
+      msg.senderUserObj = zCurrentUserObj;
+      if (forwardTo) msg.forwardTo = forwardTo;
+      if (sCustomPhoneMode) {
+        _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
+      }
+      let result = await smsService.send(msg);
+      if (sCustomPhoneMode) {
+        _setCustomPhoneMessages(prev => prev.map(m =>
+          m.id === msg.id
+            ? { ...m, status: result.success ? "sent" : "failed", errorMessage: result.success ? "" : (result.error || "") }
+            : m
+        ));
+      }
+      if (result.success && !sCustomPhoneMode) {
+        let allWOs = useOpenWorkordersStore.getState().workorders;
+        allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
+          useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
+        });
+      }
+      if (!result.success) {
+        useAlertScreenStore.getState().setValues({
+          title: "Message Failed",
+          message: result.error || "Failed to send media",
+          btn1Text: "OK",
+          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+          showAlert: true,
+          canExitOnOuterClick: true,
+        });
+      }
+      pendingMediaRef.current = null;
+      pendingActionRef.current = null;
+    });
   }
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
@@ -666,7 +755,7 @@ export function MessagesComponent({}) {
     let sorted = [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0));
     let lastOutgoing = sorted[0];
     if (!lastOutgoing?.id) return;
-    let newCanRespond = sCanRespond ? null : new Date().getTime();
+    let newCanRespond = sCanRespond ? null : true;
     let result = await dbUpdateMessageCanRespond(phone, lastOutgoing.id, newCanRespond);
     if (result.success) {
       userOverrodeCanRespondRef.current = true;
@@ -823,14 +912,14 @@ export function MessagesComponent({}) {
                     <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}>
                       <Text style={{ fontSize: 15, color: 'dimgray', fontWeight: "500", marginRight: 10 }}>Can reply?</Text>
                       <TouchableOpacity_
-                        onPress={() => { clearAutoSend(); _setCanRespond(true); _setShowReplyModal(false); if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(true); pendingActionRef.current = null; } else { sendMessage(sNewMessage, "", true); } }}
+                        onPress={() => { clearAutoSend(); _setCanRespond(true); _setShowReplyModal(false); if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(true); pendingActionRef.current = null; } else if (pendingActionRef.current === "media") { sendMediaMessage(true); } else { sendMessage(sNewMessage, "", true); } }}
                         style={{ padding: 10, marginRight: 6 }}
                         hoverOpacity={0.5}
                       >
                         <Image_ icon={ICONS.check} size={70} />
                       </TouchableOpacity_>
                       <TouchableOpacity_
-                        onPress={() => { clearAutoSend(); _setCanRespond(false); _setShowReplyModal(false); if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(false); pendingActionRef.current = null; } else { sendMessage(sNewMessage, "", false); } }}
+                        onPress={() => { clearAutoSend(); _setCanRespond(false); _setShowReplyModal(false); if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(false); pendingActionRef.current = null; } else if (pendingActionRef.current === "media") { sendMediaMessage(false); } else { sendMessage(sNewMessage, "", false); } }}
                         style={{ padding: 10 }}
                         hoverOpacity={0.5}
                       >
@@ -998,6 +1087,7 @@ export function MessagesComponent({}) {
           workorderID={zWorkorderObj.id}
           mode="view"
           onSelect={handleMediaPicked}
+          onSendMedia={handleMediaMultiSelect}
         />
       )}
     </View>
@@ -1031,6 +1121,7 @@ const MESSAGE_TEXT_STYLE = {
 const INFO_TEXT_STYLE = {
   fontSize: 11,
   marginTop: 2,
+  color: gray(0.6),
 };
 
 const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {

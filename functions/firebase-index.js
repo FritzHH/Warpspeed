@@ -705,7 +705,7 @@ exports.sendSMSEnhanced = onCall(
 
       // Validate required fields
       if (
-        (!message || typeof message !== "string" || message.trim().length === 0) && !imageUrl
+        (!message || typeof message !== "string" || message.trim().length === 0) && !imageUrl && !(mediaUrlsParam.length > 0)
       ) {
         throw new HttpsError(
           "invalid-argument",

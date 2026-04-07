@@ -10,17 +10,12 @@ import {
   useAlertScreenStore,
   useLayoutStore,
   useSettingsStore,
-  useLoginStore,
-  useCustMessagesStore,
 } from "../../../stores";
 import {
   dbUploadWorkorderMedia,
   dbDeleteWorkorderMedia,
   dbSendEmail,
 } from "../../../db_calls_wrapper";
-import { smsService } from "../../../data_service_modules";
-import { SMS_PROTO } from "../../../data";
-import { cloneDeep } from "lodash";
 
 export const WorkorderMediaModal = ({
   visible,
@@ -28,6 +23,7 @@ export const WorkorderMediaModal = ({
   workorderID,
   mode, // "upload" or "view"
   onSelect, // (mediaItem) => void — when provided, tapping a thumbnail picks it instead of full-view
+  onSendMedia, // (mediaItems[]) => void — multi-select: pass selected items back to caller for SMS send
 }) => {
   const isMobile = useLayoutStore((s) => s.isMobile);
   const zMedia =
@@ -40,8 +36,8 @@ export const WorkorderMediaModal = ({
   const [sFullView, _setFullView] = useState(null); // media item for full-size overlay
   const [sSelectedIds, _setSelectedIds] = useState(new Set());
   const [sSending, _setSending] = useState(false);
-  const [sSendText, _setSendText] = useState(true);
   const [sSendEmail, _setSendEmail] = useState(false);
+  const [sSendText, _setSendText] = useState(!!onSendMedia);
   const fileInputRef = useRef(null);
 
   if (!visible) return null;
@@ -64,9 +60,8 @@ export const WorkorderMediaModal = ({
   function handleSendMedia() {
     const selectedItems = zMedia.filter((m) => sSelectedIds.has(m.id));
     if (!selectedItems.length) return;
-    let sendSms = sSendText && hasCell;
     let sendEmail = sSendEmail && hasEmail;
-    if (!sendSms && !sendEmail) return;
+    if (!sendEmail) return;
 
     // Update local store immediately — mark as sent
     const updatedMedia = zMedia.map((m) => {
@@ -74,8 +69,8 @@ export const WorkorderMediaModal = ({
       return {
         ...m,
         sentToCustomer: {
-          sms: sendSms || !!(m.sentToCustomer?.sms),
-          email: sendEmail || !!(m.sentToCustomer?.email),
+          sms: !!(m.sentToCustomer?.sms),
+          email: true,
           sentAt: Date.now(),
         },
       };
@@ -92,44 +87,47 @@ export const WorkorderMediaModal = ({
         ? selectedItems.filter((m) => m.type === "image").length === 1 ? "photo" : "photos"
         : selectedItems.filter((m) => m.type === "video").length === 1 ? "video" : "videos";
 
-    const mediaUrlsArr = selectedItems.map((m) => ({
-      url: m.url,
-      thumbnailUrl: m.thumbnailUrl || "",
-      contentType: m.type === "video" ? "video/mp4" : "image/jpeg",
-    }));
+    const linksHtml = selectedItems
+      .map((m) => {
+        const label = m.type === "video" ? "View Video" : "View Photo";
+        return `<p><a href="${m.url}">${label}: ${m.filename}</a></p>`;
+      })
+      .join("");
+    const htmlBody = `<p>${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:</p>${linksHtml}`;
+    const subject = `Media from ${storeName}`;
+    dbSendEmail(zWorkorder.customerEmail, subject, htmlBody);
+  }
 
-    if (sendSms) {
-      // Derive canRespond and forwardTo from last outgoing message
-      let msgStore = useCustMessagesStore.getState();
-      let lastOutgoing = [...msgStore.outgoingMessages].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
-      let useCanRespond = lastOutgoing?.canRespond ? new Date().getTime() : null;
-      let useForwardTo = lastOutgoing?.forwardTo || null;
+  function handleSendAll() {
+    const selectedItems = zMedia.filter((m) => sSelectedIds.has(m.id));
+    if (!selectedItems.length) return;
+    let willSendEmail = sSendEmail && hasEmail;
+    let willSendText = sSendText && !!onSendMedia;
+    if (!willSendEmail && !willSendText) return;
 
-      let msg = cloneDeep(SMS_PROTO);
-      msg.message = `${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:`;
-      msg.mediaUrls = mediaUrlsArr;
-      msg.phoneNumber = zWorkorder.customerCell;
-      msg.firstName = zWorkorder.customerFirst || "";
-      msg.lastName = zWorkorder.customerLast || "";
-      msg.canRespond = useCanRespond;
-      msg.forwardTo = useForwardTo;
-      msg.millis = new Date().getTime();
-      msg.customerID = zWorkorder.customerID || "";
-      msg.id = crypto.randomUUID();
-      msg.type = "outgoing";
-      msg.senderUserObj = useLoginStore.getState().currentUser || "";
-      smsService.send(msg).then((result) => {
-        if (result.success) {
-          let senderUser = useLoginStore.getState().currentUser;
-          let allWOs = useOpenWorkordersStore.getState().workorders;
-          allWOs.filter((wo) => wo.customerID === zWorkorder.customerID).forEach((wo) => {
-            useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", senderUser?.id || "", wo.id);
-          });
-        }
-      });
-    }
+    // Optimistic update: mark media as sent
+    const updatedMedia = zMedia.map((m) => {
+      if (!sSelectedIds.has(m.id)) return m;
+      return {
+        ...m,
+        sentToCustomer: {
+          sms: willSendText || !!(m.sentToCustomer?.sms),
+          email: willSendEmail || !!(m.sentToCustomer?.email),
+          sentAt: Date.now(),
+        },
+      };
+    });
+    useOpenWorkordersStore.getState().setField("media", updatedMedia, workorderID);
 
-    if (sendEmail) {
+    // Send email if checked
+    if (willSendEmail) {
+      const hasImages = selectedItems.some((m) => m.type === "image");
+      const hasVideos = selectedItems.some((m) => m.type === "video");
+      let noun = hasImages && hasVideos
+        ? "photo(s) and video(s)"
+        : hasImages
+          ? selectedItems.filter((m) => m.type === "image").length === 1 ? "photo" : "photos"
+          : selectedItems.filter((m) => m.type === "video").length === 1 ? "video" : "videos";
       const linksHtml = selectedItems
         .map((m) => {
           const label = m.type === "video" ? "View Video" : "View Photo";
@@ -140,6 +138,15 @@ export const WorkorderMediaModal = ({
       const subject = `Media from ${storeName}`;
       dbSendEmail(zWorkorder.customerEmail, subject, htmlBody);
     }
+
+    // Send text if checked - pass to parent for can respond flow
+    if (willSendText) {
+      onSendMedia(selectedItems);
+      return;
+    }
+
+    // Only email - close modal
+    onClose();
   }
 
   async function handleFilesSelected(e) {
@@ -307,7 +314,7 @@ export const WorkorderMediaModal = ({
             alignItems: "center",
             padding: 16,
             borderBottomWidth: 1,
-            borderBottomColor: gray(0.9),
+            borderBottomColor: gray(0.25),
           }}
         >
           <Text
@@ -473,7 +480,7 @@ export const WorkorderMediaModal = ({
                       >
                         <Text style={{ color: "white", fontSize: 9, fontWeight: "600" }}>
                           {item.sentToCustomer?.sms && item.sentToCustomer?.email
-                            ? "Text + Email"
+                            ? "Texted + Emailed"
                             : item.sentToCustomer?.sms
                               ? "Texted"
                               : "Emailed"}
@@ -504,8 +511,16 @@ export const WorkorderMediaModal = ({
           )}
         </ScrollView>
 
+        {/* Info — send media via text through Messages (only when NOT opened from Messages) */}
+        {zMedia.length > 0 && hasCell && !onSendMedia && !onSelect && (
+          <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 2 }}>
+            <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic", textAlign: "center" }}>
+              To send media via text, use the Messages tab
+            </Text>
+          </View>
+        )}
         {/* Footer — Send / Delete Media buttons */}
-        {zMedia.length > 0 && (selectedCount > 0 || (hasCell || hasEmail)) && (
+        {zMedia.length > 0 && (selectedCount > 0 || hasEmail || onSendMedia) && (
           <View
             style={{
               flexDirection: "row",
@@ -515,7 +530,7 @@ export const WorkorderMediaModal = ({
               paddingBottom: 12,
               paddingTop: 4,
               borderTopWidth: 1,
-              borderTopColor: gray(0.9),
+              borderTopColor: gray(0.25),
             }}
           >
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -524,7 +539,7 @@ export const WorkorderMediaModal = ({
                   {selectedCount} selected
                 </Text>
               )}
-              {hasCell && (
+              {onSendMedia && hasCell && (
                 <CheckBox_
                   text="Text"
                   isChecked={sSendText}
@@ -557,9 +572,25 @@ export const WorkorderMediaModal = ({
                 textStyle={{ fontSize: 14, fontWeight: "500" }}
               />
             )}
-            {(hasCell || hasEmail) && (
+            {onSendMedia ? (
               <Button_
-                text={sSending ? "Sending..." : "Send Media"}
+                text="Send Media"
+                colorGradientArr={COLOR_GRADIENTS.green}
+                icon={ICONS.paperPlane}
+                iconSize={16}
+                onPress={handleSendAll}
+                enabled={selectedCount > 0 && (sSendText || sSendEmail)}
+                buttonStyle={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 5,
+                  opacity: selectedCount > 0 && (sSendText || sSendEmail) ? 1 : 0.4,
+                }}
+                textStyle={{ fontSize: 14, fontWeight: "500" }}
+              />
+            ) : hasEmail ? (
+              <Button_
+                text={sSending ? "Sending..." : "Email Media"}
                 colorGradientArr={COLOR_GRADIENTS.green}
                 icon={ICONS.paperPlane}
                 iconSize={16}
@@ -573,7 +604,7 @@ export const WorkorderMediaModal = ({
                 }}
                 textStyle={{ fontSize: 14, fontWeight: "500" }}
               />
-            )}
+            ) : null}
             </View>
           </View>
         )}

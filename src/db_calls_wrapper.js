@@ -2744,7 +2744,7 @@ export async function dbSendSMS(
       throw new Error("Message object is required");
     }
 
-    if ((!message.message || typeof message.message !== "string") && !message.imageUrl) {
+    if ((!message.message || typeof message.message !== "string") && !message.imageUrl && !(message.mediaUrls?.length > 0)) {
       throw new Error("Message text or image URL is required");
     }
 

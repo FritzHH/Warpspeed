@@ -3630,7 +3630,21 @@ export const DepositsList = ({ deposits, credits, onDepositPress, onCreditPress 
         return (
           <TouchableOpacity_
             key={item.id}
-            onPress={() => isCredit ? onCreditPress?.(item) : onDepositPress?.(item)}
+            onPress={() => {
+              let inUse = (item.reservedCents || 0) > 0;
+              if (inUse) {
+                let label = isGiftCard ? "gift card" : isCredit ? "credit" : "deposit";
+                let actionWord = isCredit ? "make changes" : "issue refunds";
+                useAlertScreenStore.getState().setValues({
+                  title: "In Use",
+                  message: "This " + label + " must be fully released from the sale to " + actionWord + ".",
+                  btn1Text: "OK",
+                  canExitOnOuterClick: true,
+                });
+                return;
+              }
+              isCredit ? onCreditPress?.(item) : onDepositPress?.(item);
+            }}
             hoverOpacity={0.7}
             style={{
               marginBottom: 4,

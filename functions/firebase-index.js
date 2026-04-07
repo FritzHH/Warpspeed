@@ -696,6 +696,8 @@ exports.sendSMSEnhanced = onCall(
         storeID,
         customerID,
         messageID,
+        imageUrl = "",
+        mediaUrls: mediaUrlsParam = [],
         canRespond: canRespondParam = false,
         forwardTo: forwardToParam = null,
         fromNumber = "+12393171234", // Default from number
@@ -703,13 +705,11 @@ exports.sendSMSEnhanced = onCall(
 
       // Validate required fields
       if (
-        !message ||
-        typeof message !== "string" ||
-        message.trim().length === 0
+        (!message || typeof message !== "string" || message.trim().length === 0) && !imageUrl
       ) {
         throw new HttpsError(
           "invalid-argument",
-          "Message content is required and must be a non-empty string"
+          "Message content or image URL is required"
         );
       }
 
@@ -738,7 +738,7 @@ exports.sendSMSEnhanced = onCall(
       }
 
       // Message length validation (SMS limit)
-      if (message.length > 1600) {
+      if (message && message.length > 1600) {
         // Twilio SMS limit
         throw new HttpsError(
           "invalid-argument",
@@ -760,12 +760,17 @@ exports.sendSMSEnhanced = onCall(
       }
 
       // Send SMS via Twilio
+      // Build media URL list: prefer mediaUrls array, fall back to single imageUrl
+      const allMediaUrls = mediaUrlsParam.length > 0
+        ? mediaUrlsParam.map((m) => m.url || m)
+        : imageUrl ? [imageUrl] : [];
+      const callbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
       const twilioResponse = await twilioClient.messages.create({
-        body: message.trim(),
+        body: (message || "").trim(),
         to: `+1${cleanPhoneNumber}`,
         from: fromNumber,
-        // Optional: Add delivery status callback
-        statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback`,
+        ...(allMediaUrls.length > 0 ? { mediaUrl: allMediaUrls } : {}),
+        ...(messageID ? { statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${callbackParams}` } : {}),
       });
 
       log("SMS sent successfully", {
@@ -809,7 +814,7 @@ exports.sendSMSEnhanced = onCall(
           await messageRef.set({
             id: messageID,
             customerID: customerID || "",
-            message: message.trim(),
+            message: (message || "").trim(),
             phoneNumber: cleanPhoneNumber,
             messageSid: twilioResponse.sid,
             status: twilioResponse.status,
@@ -820,6 +825,8 @@ exports.sendSMSEnhanced = onCall(
             millis: Date.now(),
             canRespond: canRespondParam || null,
             forwardTo: currentForwardTo,
+            ...(mediaUrlsParam.length > 0 ? { mediaUrls: mediaUrlsParam } : {}),
+            ...(imageUrl && !mediaUrlsParam.length ? { imageUrl: imageUrl } : {}),
           });
 
           log("Outgoing message stored", {
@@ -920,6 +927,42 @@ exports.sendSMSEnhanced = onCall(
 
       throw new HttpsError(httpsErrorCode, errorMessage);
     }
+  }
+);
+
+/**
+ * SMS Status Callback — receives delivery status updates from Twilio
+ * Updates the outgoing message doc in Firestore with the latest status
+ * (queued, sending, sent, delivered, undelivered, failed)
+ */
+exports.smsStatusCallback = onRequest(
+  { cors: true, secrets: [firebaseServiceAccountKey] },
+  async (request, response) => {
+    try {
+      const { MessageSid, MessageStatus, ErrorCode } = request.body || {};
+      const { tenantID, storeID, phone, messageID } = request.query || {};
+
+      if (!MessageStatus || !tenantID || !storeID || !phone || !messageID) {
+        log("smsStatusCallback: missing params", { MessageSid, MessageStatus, tenantID, storeID, phone, messageID });
+        return response.status(200).send("OK");
+      }
+
+      const db = await getDB(firebaseServiceAccountKey);
+      const messageRef = db
+        .collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("sms-messages").doc(phone)
+        .collection("messages").doc(messageID);
+
+      const updateData = { status: MessageStatus };
+      if (ErrorCode) updateData.errorCode = ErrorCode;
+
+      await messageRef.update(updateData);
+      log("smsStatusCallback: updated", { messageID, status: MessageStatus, ErrorCode: ErrorCode || null });
+    } catch (error) {
+      log("smsStatusCallback error", error.message);
+    }
+    return response.status(200).send("OK");
   }
 );
 
@@ -1314,7 +1357,11 @@ exports.incomingSMSEnhanced = onRequest(
               twilioSecretKey.value()
             );
           }
-          const forwardBody = `Reply from ${customerData.first || ""} ${customerData.last || ""}: ${incomingMessage}`;
+          let forwardBody = `Reply from ${customerData.first || ""} ${customerData.last || ""}: ${incomingMessage}`;
+          if (incomingMessageData.mediaUrls && incomingMessageData.mediaUrls.length > 0) {
+            const mediaLinks = incomingMessageData.mediaUrls.map((m) => m.url).join("\n");
+            forwardBody += `\n${mediaLinks}`;
+          }
           const fromNumber = twilioData.To || "+12393171234";
           await Promise.all(forwardEntries.map(async ([userID, userData]) => {
             try {
@@ -5330,11 +5377,12 @@ exports.uploadPDFAndSendSMSCallable = onCall(
       }
 
       // Send SMS
+      const pdfCallbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
       const twilioResponse = await twilioClient.messages.create({
         body: finalMessage.trim(),
         to: `+1${cleanPhoneNumber}`,
         from: fromNumber,
-        statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback`,
+        ...(messageID ? { statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${pdfCallbackParams}` } : {}),
       });
 
       log("PDF SMS sent successfully", {
@@ -6643,12 +6691,14 @@ async function completeSaleServerSide({
         );
       }
       const receiptMsg = `Payment of $${amountDisplay} received by ${storeName}. Thank you! View your receipt: ${receiptUrl}`;
+      const receiptMsgID = crypto.randomUUID();
+      const receiptCallbackParams = `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhone}&messageID=${receiptMsgID}`;
       await _twilio.messages.create({
         body: receiptMsg,
         to: `+1${cleanPhone}`,
         from: "+12393171234",
+        statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${receiptCallbackParams}`,
       });
-      const receiptMsgID = crypto.randomUUID();
       await db.collection("tenants").doc(tenantID)
         .collection("stores").doc(storeID)
         .collection("sms-messages").doc(cleanPhone)

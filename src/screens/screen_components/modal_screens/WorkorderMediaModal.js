@@ -92,8 +92,11 @@ export const WorkorderMediaModal = ({
         ? selectedItems.filter((m) => m.type === "image").length === 1 ? "photo" : "photos"
         : selectedItems.filter((m) => m.type === "video").length === 1 ? "video" : "videos";
 
-    const links = selectedItems.map((m) => m.url).join("\n");
-    const messageText = `${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:\n\n${links}`;
+    const mediaUrlsArr = selectedItems.map((m) => ({
+      url: m.url,
+      thumbnailUrl: m.thumbnailUrl || "",
+      contentType: m.type === "video" ? "video/mp4" : "image/jpeg",
+    }));
 
     if (sendSms) {
       // Derive canRespond and forwardTo from last outgoing message
@@ -103,7 +106,8 @@ export const WorkorderMediaModal = ({
       let useForwardTo = lastOutgoing?.forwardTo || null;
 
       let msg = cloneDeep(SMS_PROTO);
-      msg.message = messageText;
+      msg.message = `${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:`;
+      msg.mediaUrls = mediaUrlsArr;
       msg.phoneNumber = zWorkorder.customerCell;
       msg.firstName = zWorkorder.customerFirst || "";
       msg.lastName = zWorkorder.customerLast || "";

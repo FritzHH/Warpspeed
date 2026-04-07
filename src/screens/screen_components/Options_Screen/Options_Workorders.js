@@ -173,7 +173,7 @@ export function WorkordersComponent({}) {
     return () => clearInterval(interval);
   }, [zPendingWOIDs.length]);
 
-  // Rehydration: remount real-time listener if messages are already persisted, or fetch fresh
+  // Rehydration: fetch fresh messages on reload (persisted ones show instantly while fetching)
   const hasRehydratedMsgsRef = useRef(false);
   useEffect(() => {
     if (hasRehydratedMsgsRef.current) return;
@@ -181,29 +181,9 @@ export function WorkordersComponent({}) {
     let wo = zOpenWorkorders.find((o) => o.id === zOpenWorkorderID);
     if (!wo?.customerCell) return;
     hasRehydratedMsgsRef.current = true;
-    let msgStore = useCustMessagesStore.getState();
-    let hasPersistedMessages = msgStore.messagesPhone === wo.customerCell && (msgStore.incomingMessages.length + msgStore.outgoingMessages.length) > 0;
-    if (hasPersistedMessages) {
-      // Messages already in store from persist — just remount the listener
-      let allMsgs = [...msgStore.incomingMessages, ...msgStore.outgoingMessages];
-      let lastMillis = 0;
-      allMsgs.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
-      if (!lastMillis) lastMillis = Date.now();
-      let unsub = dbListenToNewMessages(wo.customerCell, lastMillis, (newMessages) => {
-        if (useCustMessagesStore.getState().getMessagesPhone() !== wo.customerCell) return;
-        let s = useCustMessagesStore.getState();
-        let existingIDs = new Set([...s.incomingMessages, ...s.outgoingMessages].map((m) => m.id));
-        let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
-        if (!fresh.length) return;
-        let newIncoming = fresh.filter((m) => m.type === "incoming");
-        let newOutgoing = fresh.filter((m) => m.type !== "incoming");
-        if (newIncoming.length) set_store_incoming(s, newIncoming);
-        if (newOutgoing.length) set_store_outgoing(s, newOutgoing);
-      });
-      msgStore.setMessagesUnsub(unsub);
-    } else {
-      fetchCustomerMessages(wo.customerCell);
-    }
+    // Reset messagesPhone so fetchCustomerMessages doesn't skip due to "already loaded" guard
+    useCustMessagesStore.getState().setMessagesPhone(null);
+    fetchCustomerMessages(wo.customerCell);
   }, [zOpenWorkorderID, zOpenWorkorders]);
 
   // Sale IDs shared by 2+ workorders (linked/combined sales)

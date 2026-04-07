@@ -141,6 +141,7 @@ export function MessagesComponent({}) {
   const pendingActionRef = useRef(null);
   const userOverrodeForwardRef = useRef(false);
   const userOverrodeCanRespondRef = useRef(false);
+  const isUnmodifiedTemplateRef = useRef(false);
 
   const {
     translatedText, isEnToEs, isLoading: sTranslateLoading,
@@ -159,6 +160,7 @@ export function MessagesComponent({}) {
 
     // Update state immediately for responsive UI
     _setNewMessage(val);
+    isUnmodifiedTemplateRef.current = false;
     if (sShowReplyModal) { _setShowReplyModal(false); clearAutoSend(); }
 
     // Imperative height adjustment — reset to 0 then measure scrollHeight so it shrinks on delete
@@ -612,7 +614,7 @@ export function MessagesComponent({}) {
   function handleMediaPicked(mediaItem) {
     _setShowMediaPicker(false);
     if (!mediaItem || !mediaItem.url) return;
-    sendMessage(mediaItem.url, mediaItem.url);
+    sendMessage("", mediaItem.url);
   }
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
@@ -630,6 +632,11 @@ export function MessagesComponent({}) {
       zIncomingMessagesArr,
       zOutgoingMessagesArr
     );
+  }
+
+  let lastOutgoingID = null;
+  for (let i = messagesArr.length - 1; i >= 0; i--) {
+    if (messagesArr[i].type === "outgoing") { lastOutgoingID = messagesArr[i].id || messagesArr[i].millis; break; }
   }
 
   function handleEnterCustomPhoneMode() {
@@ -740,7 +747,8 @@ export function MessagesComponent({}) {
                 item = item.item;
                 if (item.type === "incoming")
                   return <IncomingMessageComponent msgObj={item} />;
-                return <OutgoingMessageComponent msgObj={item} />;
+                let isLast = (item.id || item.millis) === lastOutgoingID;
+                return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} />;
               }}
               onScroll={(e) => {
                 if (sCustomPhoneMode) return;
@@ -881,7 +889,7 @@ export function MessagesComponent({}) {
                 />
                 <View style={{ position: "relative" }}>
                   <TouchableOpacity
-                    onPress={() => { if (sNewMessage.trim()) { _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); sendMessage(sNewMessage, "", sCanRespond); }); } }}
+                    onPress={() => { if (sNewMessage.trim()) { if (isUnmodifiedTemplateRef.current) { sendMessage(sNewMessage, "", false, false); isUnmodifiedTemplateRef.current = false; } else { _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); sendMessage(sNewMessage, "", sCanRespond); }); } } }}
                     style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() ? 1 : 0.3 }}
                   >
                     <Image_ icon={ICONS.airplane} size={41} />
@@ -901,6 +909,7 @@ export function MessagesComponent({}) {
                   onSelect={(item) => {
                     let resolved = resolveTemplate(item.message);
                     _setNewMessage(resolved);
+                    isUnmodifiedTemplateRef.current = true;
                     if (sTranslateActive) debouncedTranslate(resolved, targetLang);
                   }}
                   buttonText={"Templates"}
@@ -1029,23 +1038,32 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
   const [sError, _setError] = useState(false);
   const [sFullView, _setFullView] = useState(false);
   const [sFullLoading, _setFullLoading] = useState(true);
+  const [sFullDims, _setFullDims] = useState(null);
   const wrapperDivRef = useRef(null);
   const isVideo = (contentType || "").startsWith("video/");
 
   function handleDownload() {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = url.split("/").pop() || "download";
-    a.target = "_blank";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    fetch(url)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = url.split("/").pop()?.split("?")[0] || "download";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      })
+      .catch(() => {
+        window.open(url, "_blank");
+      });
   }
 
   return (
     <>
       <TouchableOpacity
-        onPress={() => { _setFullView(true); _setFullLoading(true); }}
+        onPress={() => { _setFullView(true); _setFullLoading(true); _setFullDims(null); }}
         style={{ width: 300, height: 300, borderRadius: 4, overflow: "hidden", marginBottom: 4, marginRight: 4, backgroundColor: "rgba(0,0,0,0.05)" }}
       >
         {sError ? (
@@ -1093,8 +1111,8 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: "80%",
-              height: "80%",
+              width: sFullDims ? sFullDims.width : "80%",
+              height: sFullDims ? sFullDims.height : "80%",
               position: "relative",
               borderRadius: 8,
             }}
@@ -1136,7 +1154,14 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
                   >
                     <img
                       src={url}
-                      onLoad={() => _setFullLoading(false)}
+                      onLoad={(e) => {
+                        _setFullLoading(false);
+                        const { naturalWidth, naturalHeight } = e.target;
+                        const maxW = window.innerWidth * 0.8;
+                        const maxH = window.innerHeight * 0.8;
+                        const scale = Math.min(maxW / naturalWidth, maxH / naturalHeight, 1);
+                        _setFullDims({ width: Math.round(naturalWidth * scale), height: Math.round(naturalHeight * scale) });
+                      }}
                       style={{ width: "100%", height: "100%", objectFit: "contain", userSelect: "none" }}
                       draggable={false}
                     />
@@ -1159,7 +1184,8 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
 
 const IncomingMessageComponent = memo(({ msgObj }) => {
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
-  let backgroundColor = "lightgray";
+  let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
+  let backgroundColor = hasMedia && !msgObj.message ? "transparent" : "lightgray";
   return (
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "60%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
@@ -1195,24 +1221,38 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
   );
 });
 
-const OutgoingMessageComponent = memo(({ msgObj }) => {
+const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing }) => {
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
-  let backgroundColor = msgObj.status === "failed" ? "rgb(200,80,80)" : "rgb(0,122,255)";
+  let isFailed = msgObj.status === "failed" || msgObj.status === "undelivered";
+  let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
+  let backgroundColor = hasMedia && !msgObj.message ? "transparent" : (isFailed ? "rgb(200,80,80)" : "rgb(0,122,255)");
+  let showStatusIcons = isLastOutgoing && msgObj.senderUserObj;
+  let hasForward = showStatusIcons && msgObj.forwardTo?.enable;
   return (
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "60%" }}>
-      <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
-        {msgObj.mediaUrls?.length > 0 ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: msgObj.message ? 4 : 0 }}>
-            {msgObj.mediaUrls.map((media, i) => (
-              <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
-            ))}
+      <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, flexDirection: "row", alignItems: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
+        {showStatusIcons && (
+          <View style={{ flexDirection: "column", alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
+            <Image source={msgObj.canRespond ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
+            {hasForward && (
+              <Image source={ICONS.forward} style={{ width: 24, height: 24, marginTop: 3 }} />
+            )}
           </View>
-        ) : msgObj.imageUrl ? (
-          <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
-        ) : null}
-        {msgObj.message ? (
-          <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
-        ) : null}
+        )}
+        <View style={{ flex: 1 }}>
+          {msgObj.mediaUrls?.length > 0 ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: msgObj.message ? 4 : 0 }}>
+              {msgObj.mediaUrls.map((media, i) => (
+                <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
+              ))}
+            </View>
+          ) : msgObj.imageUrl ? (
+            <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
+          ) : null}
+          {msgObj.message ? (
+            <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
+          ) : null}
+        </View>
       </View>
       <View
         style={{
@@ -1225,11 +1265,17 @@ const OutgoingMessageComponent = memo(({ msgObj }) => {
         <Text style={{ ...INFO_TEXT_STYLE }}>
           {dateObj.dayOfWeek + ", " + dateObj.time}
         </Text>
-        {msgObj.status === "sending" && (
+        {(msgObj.status === "sending" || msgObj.status === "queued" || msgObj.status === "accepted") && (
           <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic" }}>Sending...</Text>
         )}
         {msgObj.status === "sent" && (
-          <Text style={{ fontSize: 10, color: C.green }}>Sent</Text>
+          <Text style={{ fontSize: 10, color: C.blue }}>Sent</Text>
+        )}
+        {msgObj.status === "delivered" && (
+          <Text style={{ fontSize: 10, color: C.green }}>Delivered</Text>
+        )}
+        {msgObj.status === "undelivered" && (
+          <Text style={{ fontSize: 10, color: C.red }}>Not Delivered</Text>
         )}
         {msgObj.status === "failed" && (
           <Text style={{ fontSize: 10, color: C.red }}>Failed{msgObj.errorMessage ? ": " + msgObj.errorMessage : ""}</Text>

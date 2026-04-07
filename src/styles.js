@@ -86,6 +86,7 @@ export const ICONS = {
   expandYellow: require(ASSETS_PATH + "expandYellow.png"),
   blocked: require(ASSETS_PATH + "blocked.png"),
   unblock: require(ASSETS_PATH + "unblock.png"),
+  forward: require(ASSETS_PATH + "forward.png"),
   colorWheel: require(ASSETS_PATH + "colorWheel.png"),
   tools1: require(ASSETS_PATH + "tools1.png"),
   upArrowOrange: require(ASSETS_PATH + "up_arrow_orange.png"),

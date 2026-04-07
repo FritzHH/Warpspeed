@@ -2744,8 +2744,8 @@ export async function dbSendSMS(
       throw new Error("Message object is required");
     }
 
-    if (!message.message || typeof message.message !== "string") {
-      throw new Error("Message text is required and must be a string");
+    if ((!message.message || typeof message.message !== "string") && !message.imageUrl) {
+      throw new Error("Message text or image URL is required");
     }
 
     if (!message.phoneNumber || typeof message.phoneNumber !== "string") {
@@ -2768,6 +2768,8 @@ export async function dbSendSMS(
       storeID: storeID,
       customerID: message.customerID || "",
       messageID: message.id || "",
+      imageUrl: message.imageUrl || "",
+      mediaUrls: message.mediaUrls || [],
       canRespond: message.canRespond || null,
       forwardTo: message.forwardTo || null,
     };

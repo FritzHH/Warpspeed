@@ -680,7 +680,9 @@ export const Items_WorkorderItemsTab = ({}) => {
           let activeSale = zOpenWorkorder?.activeSaleID ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID) : null;
           let paid = activeSale ? (activeSale.amountCaptured || 0) - (activeSale.amountRefunded || 0) : 0;
           let hasPayments = paid > 0;
-          let remaining = hasPayments ? Math.max(0, sTotals.finalTotal - paid) : 0;
+          let woCount = activeSale?.workorderIDs?.length || 1;
+          let saleBalance = Math.max(0, (activeSale?.total || sTotals.finalTotal) - paid);
+          let remaining = hasPayments ? Math.round(saleBalance / woCount) : 0;
           return (
             <View
               style={{

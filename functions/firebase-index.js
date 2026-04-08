@@ -787,17 +787,9 @@ exports.sendSMSEnhanced = onCall(
             .collection("stores").doc(storeID)
             .collection("sms-messages").doc(cleanPhoneNumber);
 
-          // Read recent messages to find last outgoing for current forwardTo state
-          let currentForwardTo = {};
-          try {
-            const recent = await conversationRef
-              .collection("messages")
-              .orderBy("millis", "desc")
-              .limit(10)
-              .get();
-            const prev = recent.docs.map(d => d.data()).find(m => m.type === "outgoing");
-            if (prev) currentForwardTo = prev.forwardTo || {};
-          } catch (e) { /* no prior outgoing messages */ }
+          // Read forwardTo from the parent doc (canonical source of truth)
+          const parentDoc = await conversationRef.get();
+          let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || {}) : {};
 
           // Apply the change from this send
           if (forwardToParam && forwardToParam.userID) {
@@ -808,7 +800,7 @@ exports.sendSMSEnhanced = onCall(
             }
           }
 
-          // Store outgoing message in sms-messages
+          // Store outgoing message in sms-messages (no forwardTo on individual messages)
           const messageRef = conversationRef.collection("messages").doc(messageID);
 
           await messageRef.set({
@@ -824,7 +816,6 @@ exports.sendSMSEnhanced = onCall(
             type: "outgoing",
             millis: Date.now(),
             canRespond: canRespondParam || null,
-            forwardTo: currentForwardTo,
             ...(mediaUrlsParam.length > 0 ? { mediaUrls: mediaUrlsParam } : {}),
             ...(imageUrl && !mediaUrlsParam.length ? { imageUrl: imageUrl } : {}),
           });
@@ -837,6 +828,10 @@ exports.sendSMSEnhanced = onCall(
             lastType: "outgoing",
             hasMedia: mediaUrlsParam.length > 0 || !!imageUrl,
             threadStatus: "open",
+            lastOutgoingMessageID: messageID,
+            lastOutgoingMessageStatus: twilioResponse.status || "queued",
+            lastOutgoingMillis: Date.now(),
+            forwardTo: currentForwardTo,
           }, { merge: true });
 
           log("Outgoing message stored", {
@@ -983,6 +978,22 @@ exports.smsStatusCallback = onRequest(
       if (ErrorCode) updateData.errorCode = ErrorCode;
 
       await messageRef.update(updateData);
+
+      // Also write delivery status to the parent thread doc so the client can display it in real-time
+      const conversationRef = db
+        .collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("sms-messages").doc(phone);
+      const parentDoc = await conversationRef.get();
+      const parentData = parentDoc.exists ? parentDoc.data() : {};
+      // Only update if this message is the current last outgoing, or no last outgoing is tracked yet
+      if (!parentData.lastOutgoingMessageID || parentData.lastOutgoingMessageID === messageID) {
+        await conversationRef.set({
+          lastOutgoingMessageID: messageID,
+          lastOutgoingMessageStatus: MessageStatus,
+        }, { merge: true });
+      }
+
       log("smsStatusCallback: updated", { messageID, status: MessageStatus, ErrorCode: ErrorCode || null });
     } catch (error) {
       log("smsStatusCallback error", error.message);
@@ -1189,31 +1200,24 @@ exports.incomingSMSEnhanced = onRequest(
           return response.status(200).type("text/xml").send(blockedResponse);
         }
 
-        // Read recent messages and find the last outgoing (avoids composite index)
-        const recentMsgSnapshot = await conversationRef
-          .collection("messages")
-          .orderBy("millis", "desc")
-          .limit(10)
-          .get();
+        // Read thread state from parent doc (canonical source for canRespond and forwardTo)
+        const parentDoc = await conversationRef.get();
+        const parentData = parentDoc.exists ? parentDoc.data() : null;
 
-        const lastOutgoing = recentMsgSnapshot.docs
-          .map(d => d.data())
-          .find(m => m.type === "outgoing");
-
-        if (lastOutgoing) {
-          canRespond = !!lastOutgoing.canRespond;
-          conversationData = { forwardTo: lastOutgoing.forwardTo || {} };
-          const lastMessageMillis = lastOutgoing.millis || 0;
+        if (parentData && parentData.lastOutgoingMessageID) {
+          canRespond = parentData.canRespond !== undefined ? !!parentData.canRespond : true;
+          conversationData = { forwardTo: parentData.forwardTo || {} };
+          const lastOutgoingMillis = parentData.lastOutgoingMillis || parentData.lastMillis || 0;
 
           // Apply timeout check
           const lockTimeoutDays = storeSettings.smsConversationLockTimeout || 2;
           const lockTimeoutMs = lockTimeoutDays * 86400000;
-          if (canRespond && lastMessageMillis > 0 && (lastMessageMillis + lockTimeoutMs < Date.now())) {
+          if (canRespond && lastOutgoingMillis > 0 && (lastOutgoingMillis + lockTimeoutMs < Date.now())) {
             canRespond = false;
             log("Conversation auto-closed due to timeout", {
-              lastMessageMillis,
+              lastOutgoingMillis,
               lockTimeoutDays,
-              elapsed: Date.now() - lastMessageMillis,
+              elapsed: Date.now() - lastOutgoingMillis,
             });
           }
         } else {
@@ -5430,17 +5434,9 @@ exports.uploadPDFAndSendSMSCallable = onCall(
             .collection("stores").doc(storeID)
             .collection("sms-messages").doc(cleanPhoneNumber);
 
-          // Read recent messages to find last outgoing for current forwardTo state
-          let currentForwardTo = {};
-          try {
-            const recent = await conversationRef
-              .collection("messages")
-              .orderBy("millis", "desc")
-              .limit(10)
-              .get();
-            const prev = recent.docs.map(d => d.data()).find(m => m.type === "outgoing");
-            if (prev) currentForwardTo = prev.forwardTo || {};
-          } catch (e) { /* no prior outgoing messages */ }
+          // Read forwardTo from the parent doc (canonical source of truth)
+          const parentDoc = await conversationRef.get();
+          let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || {}) : {};
 
           // Apply the change from this send
           if (forwardToParam && forwardToParam.userID) {
@@ -5466,8 +5462,20 @@ exports.uploadPDFAndSendSMSCallable = onCall(
             type: "outgoing",
             millis: Date.now(),
             canRespond: canRespond || null,
-            forwardTo: currentForwardTo,
           });
+
+          // Update conversation root with forwardTo and outgoing tracking
+          await conversationRef.set({
+            lastMessage: finalMessage.trim(),
+            lastMillis: Date.now(),
+            lastType: "outgoing",
+            lastOutgoingMessageID: messageID,
+            lastOutgoingMessageStatus: twilioResponse.status || "queued",
+            lastOutgoingMillis: Date.now(),
+            canRespond: canRespond || false,
+            forwardTo: currentForwardTo,
+            threadStatus: "open",
+          }, { merge: true });
         } catch (firestoreError) {
           log("Error storing outgoing message in Firestore", firestoreError.message);
         }
@@ -6730,10 +6738,10 @@ async function completeSaleServerSide({
         from: "+12393171234",
         statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${receiptCallbackParams}`,
       });
-      await db.collection("tenants").doc(tenantID)
+      const receiptConvRef = db.collection("tenants").doc(tenantID)
         .collection("stores").doc(storeID)
-        .collection("sms-messages").doc(cleanPhone)
-        .collection("messages").doc(receiptMsgID)
+        .collection("sms-messages").doc(cleanPhone);
+      await receiptConvRef.collection("messages").doc(receiptMsgID)
         .set({
           id: receiptMsgID,
           customerID: customerID || "",
@@ -6746,6 +6754,15 @@ async function completeSaleServerSide({
           paymentConfirmation: true,
           ...(channel ? { textToPay: true } : {}),
         });
+      await receiptConvRef.set({
+        lastMessage: receiptMsg,
+        lastMillis: Date.now(),
+        lastType: "outgoing",
+        lastOutgoingMessageID: receiptMsgID,
+        lastOutgoingMessageStatus: "queued",
+        lastOutgoingMillis: Date.now(),
+        threadStatus: "open",
+      }, { merge: true });
       log(`completeSaleServerSide[${logPrefix}]: receipt SMS sent`, { phone: cleanPhone });
     } catch (smsErr) {
       log(`completeSaleServerSide[${logPrefix}]: SMS error`, smsErr.message);

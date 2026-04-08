@@ -331,9 +331,41 @@ export function BaseScreen() {
       }
     });
 
-    // SMS threads: load from localStorage cache, then start real-time listener
-    const cachedThreads = localStorageWrapper.getItem("smsThreads");
-    if (cachedThreads) useCustMessagesStore.getState().setSmsThreads(cachedThreads);
+    // SMS threads: load from IndexedDB cache, then start real-time Firestore listener
+    import("../hubMessageDB").then(async (hubDB) => {
+      try {
+        // First-time setup: if IndexedDB is empty, seed from Firestore
+        const initialized = await hubDB.isInitialized();
+        if (!initialized) {
+          const { dbGetSmsThreadCards } = await import("../db_calls_wrapper");
+          const seedResult = await dbGetSmsThreadCards(500);
+          if (seedResult?.length > 0) {
+            await hubDB.putThreadCards(seedResult);
+          }
+          await hubDB.setInitialized();
+        }
+
+        // Load thread cards from IndexedDB -> Zustand (instant sidebar render)
+        const allCards = await hubDB.getAllThreadCards();
+        if (allCards.length > 0) {
+          useCustMessagesStore.getState().setSmsThreads(allCards);
+        }
+
+        // Load messages for the 30 most recent threads into Zustand cache
+        const recentPhones = allCards.slice(0, 30).map((c) => c.phone);
+        for (const phone of recentPhones) {
+          const msgs = await hubDB.getMessages(phone);
+          if (msgs.length > 0) {
+            useCustMessagesStore.getState().setHubCachedThread(phone, msgs, false);
+          }
+        }
+
+        // Purge old conversation messages (60 days inactive)
+        hubDB.purgeOldConversations(60);
+      } catch (e) {
+        log("IndexedDB init error (non-fatal)", e);
+      }
+    });
 
     const threadsUnsub = dbListenToActiveMessageThreads((changes) => {
       const current = useCustMessagesStore.getState().getSmsThreads();
@@ -350,7 +382,13 @@ export function BaseScreen() {
       });
       updated.sort((a, b) => b.lastMillis - a.lastMillis);
       useCustMessagesStore.getState().setSmsThreads(updated);
-      localStorageWrapper.setItem("smsThreads", updated);
+      // Sync changed thread cards to IndexedDB (fire-and-forget)
+      import("../hubMessageDB").then((hubDB) => {
+        changes.forEach(({ type, phone, ...data }) => {
+          if (type === "removed") return;
+          hubDB.putThreadCard(phone, { phone, ...data });
+        });
+      }).catch(() => {});
     });
     useCustMessagesStore.getState().setThreadsUnsub(threadsUnsub);
 

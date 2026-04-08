@@ -2851,15 +2851,15 @@ export async function dbUpdateMessageCanRespond(phone, messageId, canRespond) {
   try {
     const cleanPhone = (phone || "").replace(/\D/g, "");
     if (cleanPhone.length !== 10) return { success: false, error: "Invalid phone" };
-    if (!messageId) return { success: false, error: "No message ID" };
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
-    const path = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}/messages/${messageId}`;
-    await firestoreUpdate(path, { canRespond: canRespond });
-    log("Updated message canRespond", { phone: cleanPhone, messageId, canRespond });
+    // Write canRespond to thread parent doc (canonical source of truth)
+    const parentPath = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`;
+    await firestoreUpdate(parentPath, { canRespond: canRespond });
+    log("Updated thread canRespond", { phone: cleanPhone, canRespond });
     return { success: true };
   } catch (error) {
-    log("Error updating message canRespond", { error: error.message, phone, messageId });
+    log("Error updating thread canRespond", { error: error.message, phone });
     return { success: false, error: error.message };
   }
 }
@@ -2969,6 +2969,27 @@ export function dbListenToActiveMessageThreads(callback) {
   } catch (error) {
     log("Error setting up active threads listener", { error });
     return null;
+  }
+}
+
+/**
+ * Fetch thread cards (parent docs from sms-messages) ordered by lastMillis desc.
+ * Used for initial IndexedDB seed when no local cache exists.
+ * @param {number} maxCount - Maximum number of thread cards to fetch (default 500)
+ * @returns {Promise<Array>} Array of thread card objects with phone field
+ */
+export async function dbGetSmsThreadCards(maxCount = 500) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+    const { collection, query, orderBy, limit, getDocs } = await import("firebase/firestore");
+    const smsRef = collection(DB, "tenants", tenantID, "stores", storeID, "sms-messages");
+    const q = query(smsRef, orderBy("lastMillis", "desc"), limit(maxCount));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ phone: d.id, ...d.data() }));
+  } catch (error) {
+    log("Error fetching SMS thread cards", error);
+    return [];
   }
 }
 

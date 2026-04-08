@@ -898,7 +898,7 @@ Promise.resolve().then(() => {
   }
 });
 
-export const useCustMessagesStore = create(persist((set, get) => ({
+export const useCustMessagesStore = create((set, get) => ({
   incomingMessages: [],
   outgoingMessages: [],
   messagesLoading: false,
@@ -918,21 +918,23 @@ export const useCustMessagesStore = create(persist((set, get) => ({
     set({ _threadsUnsub: unsub });
   },
 
-  hubMessageCache: {},
-  getHubMessageCache: () => get().hubMessageCache,
-  getHubCachedThread: (phone) => get().hubMessageCache[phone] || null,
+  // In-memory hub conversation cache (backed by IndexedDB, NOT localStorage)
+  hubConversationCache: {},
+  getHubCachedThread: (phone) => get().hubConversationCache[phone] || null,
   setHubCachedThread: (phone, messages, noMoreHistory) => {
-    let cache = { ...get().hubMessageCache, [phone]: { messages, noMoreHistory } };
-    set({ hubMessageCache: cache });
-    localStorageWrapper.setItem("hubMessageCache", cache);
+    set((state) => ({
+      hubConversationCache: {
+        ...state.hubConversationCache,
+        [phone]: { messages, noMoreHistory },
+      },
+    }));
+    // Async write to IndexedDB (fire-and-forget)
+    import("./hubMessageDB").then(({ putMessages, capMessages }) => {
+      putMessages(phone, messages).then(() => capMessages(phone, 20));
+    }).catch(() => {});
   },
-  loadHubMessageCache: () => {
-    let cached = localStorageWrapper.getItem("hubMessageCache");
-    if (cached) set({ hubMessageCache: cached });
-  },
-  clearHubMessageCache: () => {
-    set({ hubMessageCache: {} });
-    localStorageWrapper.removeItem("hubMessageCache");
+  clearHubConversationCache: () => {
+    set({ hubConversationCache: {} });
   },
 
   getIncomingMessages: () => get().incomingMessages,
@@ -1005,18 +1007,7 @@ export const useCustMessagesStore = create(persist((set, get) => ({
       _messagesUnsub: null,
     });
   },
-}),
-  {
-    name: "warpspeed_messages",
-    partialize: (s) => ({
-      incomingMessages: s.incomingMessages,
-      outgoingMessages: s.outgoingMessages,
-      messagesPhone: s.messagesPhone,
-      messagesHasMore: s.messagesHasMore,
-      messagesNextCursor: s.messagesNextCursor,
-    }),
-  }
-));
+}));
 
 
 export function broadcastWorkorderToDisplay(wo) {
@@ -1608,8 +1599,8 @@ export function clearPersistedStores() {
   useLoginStore.persist.clearStorage();
   useCustMessagesStore.getState()._threadsUnsub?.();
   useCustMessagesStore.getState().setSmsThreads([]);
-  localStorageWrapper.removeItem("smsThreads");
-  useCustMessagesStore.setState({ hubMessageCache: {} });
-  localStorageWrapper.removeItem("hubMessageCache");
+  useCustMessagesStore.setState({ hubConversationCache: {} });
+  // Clear IndexedDB hub cache (async, fire-and-forget)
+  import("./hubMessageDB").then((hubDB) => hubDB.clearAll()).catch(() => {});
   clearIdPool();
 }

@@ -143,11 +143,7 @@ export function MessagesComponent({}) {
   const isUnmodifiedTemplateRef = useRef(false);
 
   // Hub mode (replaces custom phone dialer)
-  const hubCacheLoadedRef = useRef(false);
-  if (!hubCacheLoadedRef.current) {
-    hubCacheLoadedRef.current = true;
-    useCustMessagesStore.getState().loadHubMessageCache();
-  }
+  // Hub cache is now loaded from IndexedDB on app start (BaseScreen)
   const [sHubMode, _setHubMode] = useState(false);
   const [sHubSelectedPhone, _setHubSelectedPhone] = useState("");
   const [sHubNewPhone, _setHubNewPhone] = useState("");
@@ -227,35 +223,15 @@ export function MessagesComponent({}) {
     };
   }, []);
 
-  // Custom phone mode: fetch last 7 messages then listen for new ones
+  // Custom phone mode: redirect to hub mode when phone is entered
   useEffect(() => {
-    if (!sCustomPhoneMode || sCustomPhone.length !== 10) {
-      _setCustomPhoneMessages([]);
-      return;
-    }
-    let unsub = null;
-    let cancelled = false;
-    dbGetCustomerMessages(sCustomPhone, null, 7).then((result) => {
-      if (cancelled) return;
-      if (!result.success) return;
-      _setCustomPhoneMessages(result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0)));
-      let lastMillis = 0;
-      result.messages.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
-      if (!lastMillis) lastMillis = Date.now();
-      unsub = dbListenToNewMessages(sCustomPhone, lastMillis, (newMessages) => {
-        if (cancelled) return;
-        _setCustomPhoneMessages((prev) => {
-          let existingIDs = new Set(prev.map((m) => m.id));
-          let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
-          if (!fresh.length) return prev;
-          return [...prev, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
-        });
-      });
-    }).catch(() => { });
-    return () => {
-      cancelled = true;
-      if (unsub) unsub();
-    };
+    if (!sCustomPhoneMode || sCustomPhone.length !== 10) return;
+    // Switch to hub mode with the entered phone pre-selected
+    _setCustomPhoneMode(false);
+    _setHubMode(true);
+    _setHubSelectedPhone(sCustomPhone);
+    _setCustomPhone("");
+    _setCustomPhoneMessages([]);
   }, [sCustomPhoneMode, sCustomPhone]);
 
   // log("res", sCanRespond);
@@ -266,11 +242,10 @@ export function MessagesComponent({}) {
         zOutgoingMessagesArr
       );
 
-      let lastOutgoing = [...zOutgoingMessagesArr].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
-      if (lastOutgoing) {
-        if (!userOverrodeCanRespondRef.current) {
-          _setCanRespond(!lastOutgoing.senderUserObj || !!lastOutgoing.canRespond);
-        }
+      // Read canRespond from thread parent doc (not from individual messages)
+      if (!userOverrodeCanRespondRef.current && zCustomer?.customerCell) {
+        let thread = zSmsThreads.find(t => t.phone === zCustomer.customerCell);
+        if (thread) _setCanRespond(thread.canRespond !== undefined ? !!thread.canRespond : true);
       }
 
       if (arr.length - 1 > 0) {
@@ -287,13 +262,7 @@ export function MessagesComponent({}) {
     try {
       if (!sCustomPhoneMode || sCustomPhoneMessages.length < 1) return;
 
-      // Derive canRespond and forward replies state from last outgoing message
-      let lastOutgoing = sCustomPhoneMessages.filter(m => m.type === "outgoing").sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
-      if (lastOutgoing) {
-        if (!userOverrodeCanRespondRef.current) {
-          _setCanRespond(!lastOutgoing.senderUserObj || !!lastOutgoing.canRespond);
-        }
-      }
+      // canRespond is now read from thread parent doc (handled by hub mode redirect)
 
       if (sCustomPhoneMessages.length > 1) {
         messageListRef.current?.scrollToIndex({
@@ -1267,6 +1236,18 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
     if (d.getFullYear() !== new Date().getFullYear()) shortDate += " '" + String(d.getFullYear()).slice(-2);
   }
 
+  // Delivery status for last outgoing message
+  let deliveryLabel = "";
+  let deliveryColor = subtextColor;
+  if (!isIncoming && thread.lastOutgoingMessageStatus) {
+    let s = thread.lastOutgoingMessageStatus;
+    if (s === "delivered") { deliveryLabel = "Delivered"; deliveryColor = isIncoming ? C.green : "rgba(180,255,180,0.9)"; }
+    else if (s === "sent") { deliveryLabel = "Sent"; deliveryColor = subtextColor; }
+    else if (s === "failed") { deliveryLabel = "Failed"; deliveryColor = isIncoming ? C.red : "rgb(255,180,180)"; }
+    else if (s === "undelivered") { deliveryLabel = "Not Delivered"; deliveryColor = isIncoming ? C.red : "rgb(255,180,180)"; }
+    else if (s === "queued" || s === "accepted" || s === "sending") { deliveryLabel = "Sending..."; }
+  }
+
   return (
     <TouchableOpacity onPress={onPress} onMouseEnter={onHoverIn} onMouseLeave={onHoverOut} style={{ paddingVertical: 10, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: gray(0.08), backgroundColor: bgColor }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -1284,6 +1265,7 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
         <View style={{ alignItems: "flex-end" }}>
           <Text style={{ fontSize: 11, color: subtextColor }}>{shortDate}</Text>
           <Text style={{ fontSize: 11, color: subtextColor, marginTop: 2 }}>{dateObj?.time || ""}</Text>
+          {deliveryLabel ? <Text style={{ fontSize: 10, color: deliveryColor, marginTop: 1 }}>{deliveryLabel}</Text> : null}
         </View>
       </View>
       <View style={{ marginTop: 4 }}>
@@ -1310,7 +1292,12 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
   });
   const [sLoadingMore, _setLoadingMore] = useState(false);
   const [sNewMessage, _setNewMessage] = useState("");
-  const [sCanRespond, _setCanRespond] = useState(true);
+  const [sCanRespond, _setCanRespond] = useState(thread?.canRespond !== undefined ? !!thread.canRespond : true);
+  const lastThreadCanRespondRef = useRef(thread?.canRespond);
+  if (thread?.canRespond !== lastThreadCanRespondRef.current) {
+    lastThreadCanRespondRef.current = thread?.canRespond;
+    _setCanRespond(thread?.canRespond !== undefined ? !!thread.canRespond : true);
+  }
   const [sFromLang, _setFromLang] = useState("en");
   const [sToLang, _setToLang] = useState("en");
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
@@ -1334,13 +1321,12 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
     if (!phone || phone.length !== 10) { _setMessages([]); _setListenerConnecting(false); return; }
     let cancelled = false;
     _setNewMessage("");
-    _setCanRespond(true);
     _setShowReplyModal(false);
     _setForwardReplies(false);
     _setLoadingMore(false);
     clearAutoSend();
 
-    // Check cache
+    // Check Zustand cache first (synchronous, instant)
     let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
     let startMessages = [];
     let noMore = false;
@@ -1356,13 +1342,24 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
     noMoreRef.current = noMore;
     if (!startMessages.length) _setListenerConnecting(true);
 
-    // Determine canRespond from cached messages
-    let lastOutgoing = startMessages.filter(m => m.type === "outgoing").sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
-    if (lastOutgoing) _setCanRespond(!lastOutgoing.senderUserObj || !!lastOutgoing.canRespond);
-
-    // Initial fetch if no cache - grab first page of 7
+    // If not in Zustand, check IndexedDB, then Firestore as last resort
     if (!startMessages.length) {
-      dbGetCustomerMessages(phone, null, 7).then(result => {
+      (async () => {
+        try {
+          const { getMessages } = await import("../../../hubMessageDB");
+          const idbMsgs = await getMessages(phone);
+          if (!cancelled && idbMsgs.length > 0) {
+            sMessagesRef.current = idbMsgs;
+            _setMessages(idbMsgs);
+            _setNoMoreHistory(false);
+            noMoreRef.current = false;
+            useCustMessagesStore.getState().setHubCachedThread(phone, idbMsgs, false);
+            _setListenerConnecting(false);
+            return;
+          }
+        } catch (e) { /* IndexedDB unavailable, fall through to Firestore */ }
+        // Firestore fetch as last resort
+        let result = await dbGetCustomerMessages(phone, null, 7);
         if (cancelled || !result.success) { _setListenerConnecting(false); return; }
         let initialNoMore = result.messages.length < 7;
         let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
@@ -1372,10 +1369,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
         noMoreRef.current = initialNoMore;
         updateCache(sorted, initialNoMore);
         _setListenerConnecting(false);
-        // Determine canRespond from fetched messages
-        let fetchedOutgoing = sorted.filter(m => m.type === "outgoing").sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
-        if (fetchedOutgoing) _setCanRespond(!fetchedOutgoing.senderUserObj || !!fetchedOutgoing.canRespond);
-      });
+      })();
     }
 
     // Listener watches for messages after the newest one in the list
@@ -1393,8 +1387,6 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
         let merged = [...prev, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
         sMessagesRef.current = merged;
         updateCache(merged, noMoreRef.current);
-        let newOutgoing = fresh.filter(m => m.type === "outgoing").sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
-        if (newOutgoing) _setCanRespond(!newOutgoing.senderUserObj || !!newOutgoing.canRespond);
         return merged;
       });
     });
@@ -1553,7 +1545,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
             renderItem={({ item }) => {
               if (item.type === "incoming") return <IncomingMessageComponent msgObj={item} />;
               let isLast = (item.id || item.millis) === lastOutgoingID;
-              return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} />;
+              return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={thread} />;
             }}
             onScrollToIndexFailed={(info) => {
               setTimeout(() => { messageListRef.current?.scrollToIndex({ index: info.index, animated: true }); }, 50);
@@ -1637,9 +1629,10 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
             <Tooltip text="New number" position="top">
               <TouchableOpacity
                 onPress={onShowPhoneEntry}
-                onLongPress={() => {
-                  localStorage.removeItem("hubMessageCache");
-                  useCustMessagesStore.getState().clearHubMessageCache?.();
+                onLongPress={async () => {
+                  const { clearAll } = await import("../../../hubMessageDB");
+                  await clearAll();
+                  useCustMessagesStore.getState().clearHubConversationCache();
                   log("Hub message cache cleared");
                   alert("Message cache cleared. Refresh to reload.");
                 }}
@@ -1875,19 +1868,25 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
   );
 });
 
-const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing }) => {
+const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread }) => {
+  // Use live delivery status from thread parent doc for the last outgoing message
+  let displayStatus = msgObj.status;
+  if (isLastOutgoing && thread?.lastOutgoingMessageID === msgObj.id && thread?.lastOutgoingMessageStatus) {
+    displayStatus = thread.lastOutgoingMessageStatus;
+  }
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
-  let isFailed = msgObj.status === "failed" || msgObj.status === "undelivered";
+  let isFailed = displayStatus === "failed" || displayStatus === "undelivered";
   let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
   let backgroundColor = hasMedia && !msgObj.message ? "transparent" : (isFailed ? "rgb(200,80,80)" : "rgb(0,122,255)");
   let showStatusIcons = isLastOutgoing;
-  let hasForward = showStatusIcons && msgObj.forwardTo?.enable;
+  // Read forwardTo from thread parent doc instead of individual message
+  let hasForward = showStatusIcons && thread?.forwardTo && Object.keys(thread.forwardTo).length > 0;
   return (
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, flexDirection: "row", alignItems: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
         {showStatusIcons && (
           <View style={{ alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
-            <Image source={msgObj.canRespond ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
+            <Image source={(thread?.canRespond !== undefined ? thread.canRespond : msgObj.canRespond) ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
           </View>
         )}
         <View style={{ flex: 1 }}>
@@ -1921,19 +1920,19 @@ const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing }) => {
         <Text style={{ ...INFO_TEXT_STYLE }}>
           {dateObj.dayOfWeek + ", " + dateObj.time}
         </Text>
-        {(msgObj.status === "sending" || msgObj.status === "queued" || msgObj.status === "accepted") && (
+        {(displayStatus === "sending" || displayStatus === "queued" || displayStatus === "accepted") && (
           <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic" }}>Sending...</Text>
         )}
-        {msgObj.status === "sent" && (
+        {displayStatus === "sent" && (
           <Text style={{ fontSize: 10, color: C.blue }}>Sent</Text>
         )}
-        {msgObj.status === "delivered" && (
+        {displayStatus === "delivered" && (
           <Text style={{ fontSize: 10, color: C.green }}>Delivered</Text>
         )}
-        {msgObj.status === "undelivered" && (
+        {displayStatus === "undelivered" && (
           <Text style={{ fontSize: 10, color: C.red }}>Not Delivered</Text>
         )}
-        {msgObj.status === "failed" && (
+        {displayStatus === "failed" && (
           <Text style={{ fontSize: 10, color: C.red }}>Failed{msgObj.errorMessage ? ": " + msgObj.errorMessage : ""}</Text>
         )}
         <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>

@@ -397,51 +397,91 @@ export function WorkordersComponent({}) {
     let msgStore = useCustMessagesStore.getState();
     if (msgStore.messagesPhone === customerCell && (msgStore.incomingMessages.length + msgStore.outgoingMessages.length) > 0) return;
     msgStore.clearMessages();
-    msgStore.setMessagesLoading(true);
     msgStore.setMessagesPhone(customerCell);
-    dbGetCustomerMessages(customerCell, null, 7).then((result) => {
-      if (!result.success || useCustMessagesStore.getState().getMessagesPhone() !== customerCell) {
+
+    // Check hub cache first (shared with hub conversation panel)
+    let cached = msgStore.getHubCachedThread(customerCell);
+    if (cached && cached.messages.length > 0) {
+      let incoming = cached.messages.filter((m) => m.type === "incoming");
+      let outgoing = cached.messages.filter((m) => m.type !== "incoming");
+      msgStore.setIncomingMessages(incoming);
+      msgStore.setOutgoingMessages(outgoing);
+      msgStore.setMessagesHasMore(!cached.noMoreHistory);
+      setupCustomerMessageListener(customerCell, cached.messages);
+      return;
+    }
+
+    // Not in Zustand cache - check IndexedDB, then Firestore
+    msgStore.setMessagesLoading(true);
+    (async () => {
+      try {
+        const { getMessages } = await import("../../../hubMessageDB");
+        const idbMsgs = await getMessages(customerCell);
+        if (idbMsgs.length > 0 && useCustMessagesStore.getState().getMessagesPhone() === customerCell) {
+          let incoming = idbMsgs.filter((m) => m.type === "incoming");
+          let outgoing = idbMsgs.filter((m) => m.type !== "incoming");
+          let store = useCustMessagesStore.getState();
+          store.setIncomingMessages(incoming);
+          store.setOutgoingMessages(outgoing);
+          store.setMessagesLoading(false);
+          store.setHubCachedThread(customerCell, idbMsgs, false);
+          setupCustomerMessageListener(customerCell, idbMsgs);
+          return;
+        }
+      } catch (e) { /* IndexedDB unavailable, fall through */ }
+
+      // Firestore fetch as last resort
+      dbGetCustomerMessages(customerCell, null, 7).then((result) => {
+        if (!result.success || useCustMessagesStore.getState().getMessagesPhone() !== customerCell) {
+          useCustMessagesStore.getState().setMessagesLoading(false);
+          return;
+        }
+        let incoming = result.messages.filter((m) => m.type === "incoming");
+        let outgoing = result.messages.filter((m) => m.type !== "incoming");
+        let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
+        let store = useCustMessagesStore.getState();
+        store.setIncomingMessages(incoming);
+        store.setOutgoingMessages(outgoing);
+        store.setMessagesHasMore(result.hasMore);
+        store.setMessagesNextCursor(result.nextPageTimestamp);
+        store.setMessagesLoading(false);
+        // Write to shared hub cache
+        store.setHubCachedThread(customerCell, sorted, result.messages.length < 7);
+        setupCustomerMessageListener(customerCell, result.messages);
+      }).catch(() => {
         useCustMessagesStore.getState().setMessagesLoading(false);
-        return;
-      }
-      let incoming = result.messages.filter((m) => m.type === "incoming");
-      let outgoing = result.messages.filter((m) => m.type !== "incoming");
-      let store = useCustMessagesStore.getState();
-      store.setIncomingMessages(incoming);
-      store.setOutgoingMessages(outgoing);
-      store.setMessagesHasMore(result.hasMore);
-      store.setMessagesNextCursor(result.nextPageTimestamp);
-      store.setMessagesLoading(false);
-      // Mount real-time listener for messages newer than what we fetched
-      let lastMillis = 0;
-      result.messages.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
-      if (!lastMillis) lastMillis = Date.now();
-      let unsub = dbListenToNewMessages(customerCell, lastMillis, (newMessages) => {
-        if (useCustMessagesStore.getState().getMessagesPhone() !== customerCell) return;
-        let s = useCustMessagesStore.getState();
-        let existingIDs = new Set([...s.incomingMessages, ...s.outgoingMessages].map((m) => m.id));
-        let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
-        if (!fresh.length) return;
-        let newIncoming = fresh.filter((m) => m.type === "incoming");
-        let newOutgoing = fresh.filter((m) => m.type !== "incoming");
-        if (newIncoming.length) set_store_incoming(s, newIncoming);
-        if (newOutgoing.length) set_store_outgoing(s, newOutgoing);
       });
-      store.setMessagesUnsub(unsub);
-    }).catch(() => {
-      useCustMessagesStore.getState().setMessagesLoading(false);
-    });
+    })();
   }
 
-  function set_store_incoming(store, msgs) {
-    useCustMessagesStore.setState((state) => ({
-      incomingMessages: [...state.incomingMessages, ...msgs],
-    }));
-  }
-  function set_store_outgoing(store, msgs) {
-    useCustMessagesStore.setState((state) => ({
-      outgoingMessages: [...state.outgoingMessages, ...msgs],
-    }));
+  function setupCustomerMessageListener(customerCell, existingMessages) {
+    let lastMillis = 0;
+    existingMessages.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
+    if (!lastMillis) lastMillis = Date.now();
+    let unsub = dbListenToNewMessages(customerCell, lastMillis, (newMessages) => {
+      if (useCustMessagesStore.getState().getMessagesPhone() !== customerCell) return;
+      let s = useCustMessagesStore.getState();
+      let existingIDs = new Set([...s.incomingMessages, ...s.outgoingMessages].map((m) => m.id));
+      let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
+      if (!fresh.length) return;
+      let newIncoming = fresh.filter((m) => m.type === "incoming");
+      let newOutgoing = fresh.filter((m) => m.type !== "incoming");
+      if (newIncoming.length) {
+        useCustMessagesStore.setState((state) => ({
+          incomingMessages: [...state.incomingMessages, ...newIncoming],
+        }));
+      }
+      if (newOutgoing.length) {
+        useCustMessagesStore.setState((state) => ({
+          outgoingMessages: [...state.outgoingMessages, ...newOutgoing],
+        }));
+      }
+      // Also update the shared hub cache
+      let allMessages = [...s.incomingMessages, ...s.outgoingMessages, ...fresh]
+        .sort((a, b) => (a.millis || 0) - (b.millis || 0));
+      s.setHubCachedThread(customerCell, allMessages, false);
+    });
+    useCustMessagesStore.getState().setMessagesUnsub(unsub);
   }
 
   function workorderSelected(obj) {

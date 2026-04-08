@@ -25,6 +25,7 @@ import {
   useStripePaymentStore,
   useCurrentCustomerStore,
   useActiveSalesStore,
+  useCustMessagesStore,
   broadcastWorkorderToDisplay,
 } from "../stores";
 import {
@@ -46,9 +47,10 @@ import {
   dbListenToInventory,
   dbListenToActiveSales,
   dbGetCompletedSale,
+  dbListenToActiveMessageThreads,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
-import { clog, log, recoverPendingAutoTexts } from "../utils";
+import { clog, log, recoverPendingAutoTexts, localStorageWrapper } from "../utils";
 import { cloneDeep, throttle } from "lodash";
 import { ROUTES } from "../routes";
 
@@ -328,6 +330,29 @@ export function BaseScreen() {
         recoverPendingActiveSales(data);
       }
     });
+
+    // SMS threads: load from localStorage cache, then start real-time listener
+    const cachedThreads = localStorageWrapper.getItem("smsThreads");
+    if (cachedThreads) useCustMessagesStore.getState().setSmsThreads(cachedThreads);
+
+    const threadsUnsub = dbListenToActiveMessageThreads((changes) => {
+      const current = useCustMessagesStore.getState().getSmsThreads();
+      let updated = [...current];
+      changes.forEach(({ type, phone, ...data }) => {
+        const idx = updated.findIndex((t) => t.phone === phone);
+        if (type === "removed") {
+          if (idx !== -1) updated.splice(idx, 1);
+        } else {
+          const thread = { phone, ...data };
+          if (idx !== -1) updated[idx] = thread;
+          else updated.push(thread);
+        }
+      });
+      updated.sort((a, b) => b.lastMillis - a.lastMillis);
+      useCustMessagesStore.getState().setSmsThreads(updated);
+      localStorageWrapper.setItem("smsThreads", updated);
+    });
+    useCustMessagesStore.getState().setThreadsUnsub(threadsUnsub);
 
     // Recover any pending auto-text messages from localStorage (crash recovery)
     recoverPendingAutoTexts();

@@ -2,6 +2,7 @@
 import {
   View,
   Text,
+  TextInput,
   FlatList,
   ScrollView,
   TouchableOpacity,
@@ -33,17 +34,22 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
   useActiveSalesStore,
+  useAlertScreenStore,
 } from "../../../stores";
-import { CONTACT_RESTRICTIONS, CUSTOMER_CREDIT_PROTO, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, TAB_NAMES } from "../../../data";
-import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, SmallLoadingIndicator, TextInput_, TouchableOpacity_ } from "../../../components";
+import { CONTACT_RESTRICTIONS, CUSTOMER_CREDIT_PROTO, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, SMS_PROTO, TAB_NAMES } from "../../../data";
+import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, Image_, SmallLoadingIndicator, TextInput_, TouchableOpacity_ } from "../../../components";
 import {
   dbSaveCustomer,
   dbGetCustomer,
   dbGetCompletedWorkorder,
   dbGetCompletedSale,
+  dbGetCustomerMessages,
+  dbListenToNewMessages,
 } from "../../../db_calls_wrapper";
+import { smsService } from "../../../data_service_modules";
 import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
+import { DepositRefundModal } from "./newCheckoutModalScreen/DepositRefundModal";
 
 export const CustomerInfoScreenModalComponent = ({
   incomingCustomer = null,
@@ -77,8 +83,8 @@ export const CustomerInfoScreenModalComponent = ({
   const [sSalesLoading, _sSetSalesLoading] = useState(false);
   const [sShowDepositModal, _sSetShowDepositModal] = useState(false);
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
-  const [sDepositLoading, _sSetDepositLoading] = useState(false);
   const [sEditingCredit, _sSetEditingCredit] = useState(null);
+  const [sRefundDeposit, _sSetRefundDeposit] = useState(null);
   const mountedRef = useRef(true);
 
   // Fetch fresh customer on mount (background refresh even if we have cached data)
@@ -341,6 +347,7 @@ export const CustomerInfoScreenModalComponent = ({
         style={{
           padding: 20,
           backgroundColor: C.backgroundWhite,
+          width: "95%",
           height: "90%",
           flexDirection: "row",
           borderRadius: 15,
@@ -352,7 +359,7 @@ export const CustomerInfoScreenModalComponent = ({
           },
         }}
       >
-        <View style={{ width: 250, padding: 10 }}>
+        <View style={{ width: "15%", padding: 10 }}>
           <View
             style={{
               width: "100%",
@@ -498,9 +505,8 @@ export const CustomerInfoScreenModalComponent = ({
                 colorGradientArr={COLOR_GRADIENTS.blue}
                 buttonStyle={{
                   marginTop: 20,
-                  marginLeft: 20,
                   height: 40,
-                  width: 200,
+                  width: "90%",
                   borderWidth: 1,
                   borderColor: gray(0.1),
                 }}
@@ -517,9 +523,8 @@ export const CustomerInfoScreenModalComponent = ({
                 icon={ICONS.greenDollar}
                 buttonStyle={{
                   marginTop: 20,
-                  marginLeft: 20,
                   height: 36,
-                  width: 200,
+                  width: "90%",
                 }}
                 iconSize={16}
                 textStyle={{ color: C.textWhite, fontSize: 13 }}
@@ -535,10 +540,9 @@ export const CustomerInfoScreenModalComponent = ({
               onPress={handleButton2Press}
               buttonStyle={{
                 marginTop: 20,
-                marginLeft: 20,
                 marginBottom: 10,
                 height: 40,
-                width: 200,
+                width: "90%",
               }}
               iconSize={17}
               textStyle={{ marginLeft: 15, color: C.textWhite }}
@@ -549,7 +553,7 @@ export const CustomerInfoScreenModalComponent = ({
         {!isNewCustomer && (
           <View
             style={{
-              width: 550,
+              width: "25%",
               height: "100%",
               paddingHorizontal: 15,
               paddingVertical: 5,
@@ -587,7 +591,7 @@ export const CustomerInfoScreenModalComponent = ({
         {!isNewCustomer && (
           <View
             style={{
-              width: 550,
+              width: "25%",
               height: "100%",
               paddingHorizontal: 15,
               paddingVertical: 5,
@@ -627,23 +631,24 @@ export const CustomerInfoScreenModalComponent = ({
               </Text>
             ) : null}
             {/* Deposits section — directly below sales, pushes down until bottom */}
-            {sDepositLoading && <LoadingOverlay text="Loading transaction..." />}
             <DepositsList
               deposits={sCustomerInfo.deposits || []}
               credits={sCustomerInfo.credits || []}
-              onDepositPress={async (deposit) => {
-                if (!deposit.id) return;
-                _sSetDepositLoading(true);
-                try {
-                  let sale = await dbGetCompletedSale(deposit.id);
-                  if (sale) useOpenWorkordersStore.getState().setSaleModalObj(sale);
-                } finally {
-                  if (mountedRef.current) _sSetDepositLoading(false);
-                }
+              onDepositPress={(deposit) => {
+                if (!deposit.id || !deposit.transactionId) return;
+                _sSetRefundDeposit(deposit);
               }}
               onCreditPress={(credit) => _sSetEditingCredit(credit)}
             />
           </View>
+        )}
+        {!isNewCustomer && !!sCustomerInfo?.customerCell && (
+          <CustomerMessagesPanel
+            customerPhone={sCustomerInfo.customerCell}
+            customerID={sCustomerInfo.id}
+            customerFirst={sCustomerInfo.first}
+            customerLast={sCustomerInfo.last}
+          />
         )}
         <DepositModal
           visible={sShowDepositModal}
@@ -664,6 +669,15 @@ export const CustomerInfoScreenModalComponent = ({
             _setCustomerInfo(updated);
             useCurrentCustomerStore.getState().setCustomer(updated);
             dbSaveCustomer(updated);
+          }}
+        />
+        <DepositRefundModal
+          visible={!!sRefundDeposit}
+          deposit={sRefundDeposit}
+          customer={sCustomerInfo}
+          onClose={() => _sSetRefundDeposit(null)}
+          onCustomerUpdated={(updatedCustomer) => {
+            _setCustomerInfo(updatedCustomer);
           }}
         />
         <ClosedWorkorderModal
@@ -1115,6 +1129,216 @@ const CreditEditModal = ({ credit, onClose, onSave, onDelete }) => {
             />
           </View>
         </View>
+      </View>
+    </View>
+  );
+};
+
+const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, customerLast }) => {
+  const [sMessages, _sSetMessages] = useState([]);
+  const [sNewMessage, _sSetNewMessage] = useState("");
+  const [sLoading, _sSetLoading] = useState(true);
+  const [sSending, _sSending] = useState(false);
+  const flatListRef = useRef(null);
+  const unsubRef = useRef(null);
+
+  // Load messages and set up real-time listener
+  // (useEffect required: this is a new self-contained component that needs to fetch/subscribe on mount)
+  useEffect(() => {
+    if (!customerPhone || customerPhone.length !== 10) {
+      _sSetMessages([]);
+      _sSetLoading(false);
+      return;
+    }
+    let cancelled = false;
+    _sSetLoading(true);
+    dbGetCustomerMessages(customerPhone, null, 20).then((result) => {
+      if (cancelled) return;
+      _sSetLoading(false);
+      if (!result.success) return;
+      let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
+      _sSetMessages(sorted);
+      let lastMillis = 0;
+      sorted.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
+      if (!lastMillis) lastMillis = Date.now();
+      unsubRef.current = dbListenToNewMessages(customerPhone, lastMillis, (newMessages) => {
+        if (cancelled) return;
+        _sSetMessages((prev) => {
+          let existingIDs = new Set(prev.map((m) => m.id));
+          let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
+          if (!fresh.length) return prev;
+          return [...prev, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+        });
+      });
+    }).catch(() => { _sSetLoading(false); });
+    return () => {
+      cancelled = true;
+      if (unsubRef.current) unsubRef.current();
+    };
+  }, [customerPhone]);
+
+  // Auto-scroll to bottom when new messages arrive
+  // (useEffect required: auto-scroll on messages change)
+  useEffect(() => {
+    if (sMessages.length > 0 && flatListRef.current) {
+      setTimeout(() => {
+        try { flatListRef.current.scrollToEnd({ animated: true }); } catch (e) { }
+      }, 100);
+    }
+  }, [sMessages.length]);
+
+  async function handleSend() {
+    let text = sNewMessage.trim();
+    if (!text || !customerPhone || customerPhone.length !== 10) return;
+    _sSetNewMessage("");
+    _sSending(true);
+    let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+    let msg = { ...SMS_PROTO };
+    msg.message = text;
+    msg.phoneNumber = customerPhone;
+    msg.firstName = customerFirst || "";
+    msg.lastName = customerLast || "";
+    msg.canRespond = true;
+    msg.millis = Date.now();
+    msg.customerID = customerID || "";
+    msg.id = crypto.randomUUID();
+    msg.type = "outgoing";
+    msg.senderUserObj = zCurrentUserObj;
+    _sSetMessages((prev) => [...prev, { ...msg, status: "sending" }]);
+    let result = await smsService.send(msg);
+    _sSending(false);
+    if (!result.success) {
+      _sSetMessages((prev) =>
+        prev.map((m) => m.id === msg.id ? { ...m, status: "failed" } : m)
+      );
+      useAlertScreenStore.getState().setValues({
+        title: "Message Failed",
+        message: result.error || "Failed to send message",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+    } else {
+      _sSetMessages((prev) =>
+        prev.map((m) => m.id === msg.id ? { ...m, status: "sent" } : m)
+      );
+    }
+  }
+
+  const renderMessage = ({ item }) => {
+    let isOutgoing = item.type === "outgoing";
+    return (
+      <View
+        style={{
+          alignSelf: isOutgoing ? "flex-end" : "flex-start",
+          maxWidth: "80%",
+          marginBottom: 6,
+          backgroundColor: isOutgoing ? C.blue : C.listItemWhite,
+          borderRadius: 10,
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderWidth: isOutgoing ? 0 : 1,
+          borderColor: C.buttonLightGreenOutline,
+        }}
+      >
+        <Text style={{ color: isOutgoing ? C.textWhite : C.text, fontSize: 13 }}>
+          {item.message}
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 3 }}>
+          <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.6)" : gray(0.4), fontSize: 10 }}>
+            {formatMillisForDisplay(item.millis)}
+          </Text>
+          {item.status === "sending" && (
+            <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.6)" : gray(0.4), fontSize: 10, marginLeft: 6 }}>
+              Sending...
+            </Text>
+          )}
+          {item.status === "failed" && (
+            <Text style={{ color: C.lightred, fontSize: 10, marginLeft: 6 }}>
+              Failed
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View
+      style={{
+        width: "35%",
+        height: "100%",
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderLeftWidth: 1,
+        borderLeftColor: C.buttonLightGreenOutline,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+        <Image_ source={ICONS.cellPhone} style={{ width: 16, height: 16, marginRight: 6 }} />
+        <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>
+          Messages
+        </Text>
+        <Text style={{ fontSize: 11, color: gray(0.4), marginLeft: 8 }}>
+          {formatPhoneWithDashes(customerPhone)}
+        </Text>
+      </View>
+      {sLoading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <SmallLoadingIndicator />
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={sMessages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingVertical: 5 }}
+          ListEmptyComponent={
+            <Text style={{ color: gray(0.4), fontSize: 12, textAlign: "center", marginTop: 20 }}>
+              No messages yet
+            </Text>
+          }
+        />
+      )}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          marginTop: 8,
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+          borderRadius: 8,
+          backgroundColor: C.listItemWhite,
+          paddingHorizontal: 8,
+        }}
+      >
+        <TextInput
+          value={sNewMessage}
+          onChangeText={_sSetNewMessage}
+          placeholder="Type a message..."
+          placeholderTextColor={gray(0.4)}
+          onSubmitEditing={handleSend}
+          style={{
+            flex: 1,
+            height: 36,
+            fontSize: 13,
+            color: C.text,
+            outlineWidth: 0,
+            outlineStyle: "none",
+            borderWidth: 0,
+          }}
+        />
+        <Button_
+          text="Send"
+          colorGradientArr={COLOR_GRADIENTS.blue}
+          textStyle={{ color: C.textWhite, fontSize: 12 }}
+          buttonStyle={{ height: 28, paddingHorizontal: 12, borderRadius: 6 }}
+          onPress={handleSend}
+          enabled={!sSending && !!sNewMessage.trim()}
+        />
       </View>
     </View>
   );

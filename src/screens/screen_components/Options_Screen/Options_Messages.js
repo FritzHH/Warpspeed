@@ -64,7 +64,18 @@ import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
 import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond } from "../../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
+import { ReplyOptionsBar, scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "./ReplyOptionsBar";
 
+
+const TRANSLATION_LANGUAGES = [
+  { label: "English", code: "en" },
+  { label: "Spanish", code: "es" },
+  { label: "French", code: "fr" },
+  { label: "German", code: "de" },
+  { label: "Creole", code: "ht" },
+  { label: "Arabic", code: "ar" },
+];
+const LANG_NAME_TO_CODE = { English: "en", Spanish: "es", French: "fr", German: "de", Creole: "ht", Arabic: "ar" };
 
 const TEXT_TEMPLATE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
@@ -79,23 +90,6 @@ const TEXT_TEMPLATE_VARIABLES = [
   { label: "Store Phone", variable: "{storePhone}" },
 ];
 
-// Module-level auto-send timer — survives component unmount
-let _autoSendTimer = null;
-let _autoSendThunk = null;
-function scheduleAutoSend(thunk) {
-  clearAutoSend();
-  _autoSendThunk = thunk;
-  _autoSendTimer = setTimeout(() => {
-    if (_autoSendThunk) _autoSendThunk();
-    _autoSendThunk = null;
-    _autoSendTimer = null;
-  }, 10000);
-}
-function clearAutoSend() {
-  if (_autoSendTimer) clearTimeout(_autoSendTimer);
-  _autoSendTimer = null;
-  _autoSendThunk = null;
-}
 
 export function MessagesComponent({}) {
   // getters ///////////////////////////////////////////////////////////////
@@ -105,6 +99,8 @@ export function MessagesComponent({}) {
   const zCustomer = zWorkorderObj?.customerID
     ? { id: zWorkorderObj.customerID, first: zWorkorderObj.customerFirst, last: zWorkorderObj.customerLast, customerCell: zWorkorderObj.customerCell }
     : CUSTOMER_PROTO;
+  const zAllWorkorders = useOpenWorkordersStore((state) => state.workorders);
+  const hasCustomer = !!zCustomer?.id && !!zCustomer?.customerCell;
   const zSettings = useSettingsStore((state) => state.settings);
   const zIncomingMessagesArr = useCustMessagesStore(
     (state) => state.incomingMessages
@@ -115,6 +111,7 @@ export function MessagesComponent({}) {
   const zMessagesLoading = useCustMessagesStore((state) => state.messagesLoading);
   const zMessagesLoadingMore = useCustMessagesStore((state) => state.messagesLoadingMore);
   const zMessagesHasMore = useCustMessagesStore((state) => state.messagesHasMore);
+  const zSmsThreads = useCustMessagesStore((state) => state.getSmsThreads());
   //////////////////////////////////////////////////////////////////////////
 
   // Clear hasNewSMS flag when messages are viewed
@@ -127,7 +124,8 @@ export function MessagesComponent({}) {
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);
   const [sInputHeight, _setInputHeight] = useState(36);
-  const [sTranslateActive, _setTranslateActive] = useState(false);
+  const [sFromLang, _setFromLang] = useState("en");
+  const [sToLang, _setToLang] = useState(() => LANG_NAME_TO_CODE[zWorkorderObj?.customerLanguage] || "en");
   const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
   const [sCustomPhoneMode, _setCustomPhoneMode] = useState(false);
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
@@ -144,10 +142,23 @@ export function MessagesComponent({}) {
   const userOverrodeCanRespondRef = useRef(false);
   const isUnmodifiedTemplateRef = useRef(false);
 
+  // Hub mode (replaces custom phone dialer)
+  const hubCacheLoadedRef = useRef(false);
+  if (!hubCacheLoadedRef.current) {
+    hubCacheLoadedRef.current = true;
+    useCustMessagesStore.getState().loadHubMessageCache();
+  }
+  const [sHubMode, _setHubMode] = useState(false);
+  const [sHubSelectedPhone, _setHubSelectedPhone] = useState("");
+  const [sHubNewPhone, _setHubNewPhone] = useState("");
+  const [sHubSidebarCollapsed, _setHubSidebarCollapsed] = useState(false);
+  const [sHubSidebarFullWidth, _setHubSidebarFullWidth] = useState(false);
+  const [sHubHoverPhone, _setHubHoverPhone] = useState("");
+
   const {
-    translatedText, isEnToEs, isLoading: sTranslateLoading,
-    targetLang, debouncedTranslate, flipDirection, doTranslate, clearTranslation,
-  } = useTranslation({ defaultDirection: "es-to-en" });
+    translatedText, isLoading: sTranslateLoading,
+    debouncedTranslate, clearTranslation,
+  } = useTranslation({ defaultDirection: "en-to-es" });
 
   // Debounced handler for message input
   const handleMessageChange = useCallback((val) => {
@@ -173,9 +184,9 @@ export function MessagesComponent({}) {
       _setInputHeight(h);
     }
 
-    // Trigger translation if active
-    if (sTranslateActive) {
-      debouncedTranslate(val, targetLang);
+    // Trigger translation if languages differ
+    if (sFromLang && sToLang && sFromLang !== sToLang) {
+      debouncedTranslate(val, sToLang);
     }
 
     // Debounce any side effects (if needed in future)
@@ -183,7 +194,7 @@ export function MessagesComponent({}) {
       // Any debounced logic can go here
       // Currently just using for debouncing the state update itself
     }, DEBOUNCE_DELAY);
-  }, [sTranslateActive, debouncedTranslate, targetLang]);
+  }, [sFromLang, sToLang, debouncedTranslate]);
 
   // Load more messages on scroll to top (pagination)
   const loadMoreMessages = useCallback(() => {
@@ -260,11 +271,6 @@ export function MessagesComponent({}) {
         if (!userOverrodeCanRespondRef.current) {
           _setCanRespond(!lastOutgoing.senderUserObj || !!lastOutgoing.canRespond);
         }
-        if (!userOverrodeForwardRef.current) {
-          const currentUser = useLoginStore.getState().getCurrentUser();
-          let fwd = lastOutgoing.forwardTo;
-          _setForwardReplies(!!fwd && fwd.userID === currentUser?.id && !!fwd.enable);
-        }
       }
 
       if (arr.length - 1 > 0) {
@@ -287,11 +293,6 @@ export function MessagesComponent({}) {
         if (!userOverrodeCanRespondRef.current) {
           _setCanRespond(!lastOutgoing.senderUserObj || !!lastOutgoing.canRespond);
         }
-        if (!userOverrodeForwardRef.current) {
-          const currentUser = useLoginStore.getState().getCurrentUser();
-          let fwd = lastOutgoing.forwardTo;
-          _setForwardReplies(!!fwd && fwd.userID === currentUser?.id && !!fwd.enable);
-        }
       }
 
       if (sCustomPhoneMessages.length > 1) {
@@ -311,20 +312,7 @@ export function MessagesComponent({}) {
     _setNewMessage(newMessage);
     cursorPositionRef.current = cursorPos + variableStr.length + 1;
     textInputRef.current?.focus();
-    if (sTranslateActive) debouncedTranslate(newMessage, targetLang);
-  }
-
-  function handleToggleTranslate() {
-    let newActive = !sTranslateActive;
-    _setTranslateActive(newActive);
-    if (newActive && sNewMessage.trim()) debouncedTranslate(sNewMessage, targetLang);
-    if (!newActive) clearTranslation();
-  }
-
-  function handleFlipDirection() {
-    flipDirection();
-    let newTarget = isEnToEs ? "en" : "es";
-    if (sTranslateActive && sNewMessage.trim()) doTranslate(sNewMessage, newTarget);
+    if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(newMessage, sToLang);
   }
 
   function handleToggleForwardReplies() {
@@ -359,16 +347,6 @@ export function MessagesComponent({}) {
     }
   }
 
-  function buildForwardToPayload(forwardOverride) {
-    const currentUser = useLoginStore.getState().getCurrentUser();
-    if (!currentUser?.id) return null;
-    let shouldForward = forwardOverride !== undefined ? forwardOverride : sForwardReplies;
-    if (shouldForward) {
-      if (!currentUser.phone) return null;
-      return { userID: currentUser.id, phone: currentUser.phone, first: currentUser.first || "", enable: true };
-    }
-    return { userID: currentUser.id, enable: false };
-  }
 
   function splitIntoChunks(text, maxLen = 1600) {
     if (text.length <= maxLen) return [text];
@@ -391,7 +369,7 @@ export function MessagesComponent({}) {
     useLoginStore.getState().requireLogin(async () => {
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-      let forwardTo = buildForwardToPayload(forwardOverride);
+      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
       userOverrodeForwardRef.current = false;
       userOverrodeCanRespondRef.current = false;
       _setNewMessage("");
@@ -497,7 +475,7 @@ export function MessagesComponent({}) {
       let message = resolveTemplate(messageTemplate);
       let messageID = crypto.randomUUID();
       let canRespondBool = canRespondVal ? true : null;
-      let forwardTo = buildForwardToPayload(forwardOverride);
+      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
       let result = await dbUploadPDFAndSendSMS({
         base64,
         storagePath,
@@ -648,7 +626,7 @@ export function MessagesComponent({}) {
     useLoginStore.getState().requireLogin(async () => {
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-      let forwardTo = buildForwardToPayload(forwardOverride);
+      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
       userOverrodeForwardRef.current = false;
       userOverrodeCanRespondRef.current = false;
       _setShowReplyModal(false);
@@ -709,7 +687,6 @@ export function MessagesComponent({}) {
   /////////////////////////////////////////////////////////////////
 
   // Determine active phone and message source based on mode
-  const hasCustomer = !!zCustomer?.id && !!zCustomer?.customerCell;
   const activePhone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
   const isCustomPhoneReady = sCustomPhoneMode && sCustomPhone.length === 10;
 
@@ -726,6 +703,46 @@ export function MessagesComponent({}) {
   let lastOutgoingID = null;
   for (let i = messagesArr.length - 1; i >= 0; i--) {
     if (messagesArr[i].type === "outgoing") { lastOutgoingID = messagesArr[i].id || messagesArr[i].millis; break; }
+  }
+
+  function handleEnterHubMode() {
+    _setHubMode(true);
+    _setHubSelectedPhone("");
+    _setHubNewPhone("");
+    _setNewMessage("");
+    _setForwardReplies(false);
+    clearTranslation();
+  }
+
+  function handleExitHubMode() {
+    _setHubMode(false);
+    _setHubSelectedPhone("");
+    _setHubNewPhone("");
+    _setNewMessage("");
+    _setForwardReplies(false);
+    clearTranslation();
+  }
+
+  function handleHubThreadClick(thread) {
+    _setHubSelectedPhone(prev => {
+      if (prev === thread.phone) {
+        _setHubHoverPhone("");
+        return "";
+      }
+      return thread.phone;
+    });
+  }
+
+  function handleHubNewThread() {
+    let phone = sHubNewPhone.replace(/\D/g, "").slice(0, 10);
+    if (phone.length !== 10) return;
+    let existing = zSmsThreads.find(t => t.phone === phone);
+    if (existing) {
+      handleHubThreadClick(existing);
+    } else {
+      _setHubSelectedPhone(phone);
+    }
+    _setHubNewPhone("");
   }
 
   function handleEnterCustomPhoneMode() {
@@ -766,6 +783,128 @@ export function MessagesComponent({}) {
 
   // Whether the compose area should show
   const hasActivePhone = sCustomPhoneMode ? sCustomPhone.length === 10 : !!zCustomer?.customerCell;
+
+  // Hub mode: 2-panel layout for all message threads
+  const showHub = sHubMode || !hasCustomer;
+  if (showHub) {
+    return (
+      <View style={{ flex: 1, flexDirection: "row" }}>
+        {/* Left panel: thread list */}
+        {sHubSidebarCollapsed ? (
+          <View style={{ width: 36, borderRightWidth: 2, borderRightColor: gray(0.15), alignItems: "center", paddingTop: 10 }}>
+            <Tooltip text="Show conversations" position="right">
+              <TouchableOpacity onPress={() => _setHubSidebarCollapsed(false)} style={{ padding: 6 }}>
+                <Image_ icon={ICONS.greenRightArrow} size={30} />
+              </TouchableOpacity>
+            </Tooltip>
+          </View>
+        ) : (
+          <View style={{ width: sHubSidebarFullWidth ? "100%" : "30%", borderRightWidth: sHubSidebarFullWidth ? 0 : 2, borderRightColor: gray(0.15), flexDirection: "column" }}>
+            {/* Header */}
+            <View style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Tooltip text="Collapse" position="right">
+                  <TouchableOpacity onPress={() => _setHubSidebarCollapsed(true)} style={{ padding: 4 }}>
+                    <Image_ icon={ICONS.greenLeftArrow} size={26} />
+                  </TouchableOpacity>
+                </Tooltip>
+                <View style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text }}>Messages</Text>
+                </View>
+                <Tooltip text={sHubSidebarFullWidth ? "Shrink sidebar" : "Expand sidebar"} position="left">
+                  <TouchableOpacity onPress={() => _setHubSidebarFullWidth(!sHubSidebarFullWidth)} style={{ padding: 4 }}>
+                    <Image_ icon={sHubSidebarFullWidth ? ICONS.greenLeftArrow : ICONS.greenRightArrow} size={26} />
+                  </TouchableOpacity>
+                </Tooltip>
+              </View>
+            </View>
+            {/* Thread list */}
+            <View style={{ flex: 1, overflow: "hidden" }}>
+            {zSmsThreads.length < 1 ? (
+              <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                <Text style={{ fontSize: 14, color: gray(0.3) }}>No conversations yet</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={zSmsThreads}
+                keyExtractor={(item) => item.phone}
+                renderItem={({ item }) => {
+                  let activeWO = zAllWorkorders.find(wo => wo.customerCell === item.phone);
+                  return (
+                    <ThreadCard
+                      thread={item}
+                      isSelected={sHubSelectedPhone === item.phone}
+                      isHovered={sHubHoverPhone === item.phone}
+                      activeWO={activeWO}
+                      onPress={() => handleHubThreadClick(item)}
+                      onHoverIn={() => _setHubHoverPhone(item.phone)}
+                      onHoverOut={() => _setHubHoverPhone((prev) => prev === item.phone ? "" : prev)}
+                    />
+                  );
+                }}
+              />
+            )}
+            </View>
+          </View>
+        )}
+        {/* Right panel: conversation */}
+        {!sHubSidebarFullWidth && (
+          <View style={{ flex: 1 }}>
+            {(sHubHoverPhone || sHubSelectedPhone) ? (
+              <HubConversationPanel
+                phone={sHubHoverPhone || sHubSelectedPhone}
+                thread={zSmsThreads.find(t => t.phone === (sHubHoverPhone || sHubSelectedPhone))}
+                previewMode={!!sHubHoverPhone && sHubHoverPhone !== sHubSelectedPhone}
+                onShowPhoneEntry={() => { _setHubSelectedPhone(""); _setHubNewPhone(""); }}
+                exitHubButton={hasCustomer ? (
+                  <Tooltip text="Back to customer" position="top" offsetX={-20}>
+                    <TouchableOpacity onPress={handleExitHubMode} style={{ padding: 4 }}>
+                      <Image_ icon={ICONS.person} size={28} />
+                    </TouchableOpacity>
+                  </Tooltip>
+                ) : null}
+              />
+            ) : (
+              <View style={{ flex: 1, flexDirection: "column" }}>
+                <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                  <Text style={{ fontSize: 16, color: gray(0.25) }}>Select a conversation</Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", paddingTop: 8, paddingHorizontal: 8, paddingBottom: 8 }}>
+                  <PhoneNumberInput
+                    value={sHubNewPhone}
+                    onChangeText={(val) => {
+                      let cleaned = val.replace(/\D/g, "").slice(0, 10);
+                      _setHubNewPhone(cleaned);
+                      if (cleaned.length === 10) {
+                        let existing = zSmsThreads.find(t => t.phone === cleaned);
+                        if (existing) {
+                          handleHubThreadClick(existing);
+                        } else {
+                          _setHubSelectedPhone(cleaned);
+                        }
+                        _setHubNewPhone("");
+                      }
+                    }}
+                    maxLength={10}
+                    height={36}
+                    fontSize={15}
+                    style={{ flex: 1 }}
+                  />
+                  {hasCustomer && (
+                    <Tooltip text="Back to customer" position="top" offsetX={-20}>
+                      <TouchableOpacity onPress={handleExitHubMode} style={{ marginLeft: 8, padding: 4 }}>
+                        <Image_ icon={ICONS.person} size={28} />
+                      </TouchableOpacity>
+                    </Tooltip>
+                  )}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View
@@ -874,9 +1013,9 @@ export function MessagesComponent({}) {
               {hasCustomer && (
                 <TouchableOpacity
                   onPress={handleExitCustomPhoneMode}
-                  style={{ marginLeft: 12, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, borderWidth: 1, borderColor: C.blue }}
+                  style={{ marginLeft: 12, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: C.blue }}
                 >
-                  <Text style={{ fontSize: 13, color: C.blue }}>Back to customer</Text>
+                  <Text style={{ fontSize: 13, color: "white" }}>Back to customer</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -890,7 +1029,7 @@ export function MessagesComponent({}) {
               width: "100%",
           }}
         >
-          {sTranslateActive && (translatedText || sTranslateLoading) ? (
+          {(sFromLang && sToLang && sFromLang !== sToLang) && (translatedText || sTranslateLoading) ? (
             <View style={{
               padding: 6, marginBottom: 4, backgroundColor: "rgb(245,245,220)",
               borderRadius: 5, borderWidth: 1, borderColor: gray(0.15),
@@ -903,40 +1042,20 @@ export function MessagesComponent({}) {
           ) : null}
             <View style={{ width: "100%" }}>
 
-              {sShowReplyModal && (
-                <View style={{ width: '100%', justifyContent: "space-between", flexDirection: 'row', marginBottom: 4, backgroundColor: 'orange', padding: 10, borderRadius: 6 }}>
-                  {/**install an indicator here showing countdown to auto-send */}
-                  <View style={{ alignItems: 'flex-start' }}><Text style={{ color: 'dimgray' }}>Auto-sending in 10 seconds</Text></View>
-                  <View style={{ alignItems: 'flex-end' }}>
-
-                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}>
-                      <Text style={{ fontSize: 15, color: 'dimgray', fontWeight: "500", marginRight: 10 }}>Can reply?</Text>
-                      <TouchableOpacity_
-                        onPress={() => { clearAutoSend(); _setCanRespond(true); _setShowReplyModal(false); if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(true); pendingActionRef.current = null; } else if (pendingActionRef.current === "media") { sendMediaMessage(true); } else { sendMessage(sNewMessage, "", true); } }}
-                        style={{ padding: 10, marginRight: 6 }}
-                        hoverOpacity={0.5}
-                      >
-                        <Image_ icon={ICONS.check} size={70} />
-                      </TouchableOpacity_>
-                      <TouchableOpacity_
-                        onPress={() => { clearAutoSend(); _setCanRespond(false); _setShowReplyModal(false); if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(false); pendingActionRef.current = null; } else if (pendingActionRef.current === "media") { sendMediaMessage(false); } else { sendMessage(sNewMessage, "", false); } }}
-                        style={{ padding: 10 }}
-                        hoverOpacity={0.5}
-                      >
-                        <Image_ icon={ICONS.redx} size={70} />
-                      </TouchableOpacity_>
-                    </View>
-                    <CheckBox_
-                      text={"Forward replies to me"}
-                      isChecked={sForwardReplies}
-                      onCheck={handleToggleForwardReplies}
-                      enabled={hasActivePhone}
-                      textStyle={{ fontSize: 17, color: C.text }}
-                      enableMouseOver={true}
-                    />
-                  </View>
-                </View>
-              )}
+              <ReplyOptionsBar
+                visible={sShowReplyModal}
+                forwardReplies={sForwardReplies}
+                hasActivePhone={hasActivePhone}
+                onSelectCanRespond={(canRespond) => {
+                  clearAutoSend();
+                  _setCanRespond(canRespond);
+                  _setShowReplyModal(false);
+                  if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(canRespond); pendingActionRef.current = null; }
+                  else if (pendingActionRef.current === "media") { sendMediaMessage(canRespond); }
+                  else { sendMessage(sNewMessage, "", canRespond); }
+                }}
+                onToggleForward={handleToggleForwardReplies}
+              />
               <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
                 <TextInput
                   onChangeText={handleMessageChange}
@@ -988,21 +1107,49 @@ export function MessagesComponent({}) {
           </View>
             <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 10 }}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <CheckBox_
-                  text={"Translate"}
-                  isChecked={sTranslateActive}
-                  onCheck={handleToggleTranslate}
-                />
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <DropdownMenu
+                    dataArr={TRANSLATION_LANGUAGES}
+                    onSelect={(item) => {
+                      _setFromLang(item.code);
+                      if (item.code && sToLang && item.code !== sToLang && sNewMessage.trim()) debouncedTranslate(sNewMessage, sToLang);
+                      if (!item.code || item.code === sToLang) clearTranslation();
+                    }}
+                    buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
+                    buttonStyle={{ paddingVertical: 5 }}
+                    openUpward={true}
+                  />
+                  <Image_ icon={ICONS.rightArrowBlue} size={16} style={{ marginHorizontal: 6 }} />
+                  <DropdownMenu
+                    dataArr={TRANSLATION_LANGUAGES}
+                    onSelect={(item) => {
+                      _setToLang(item.code);
+                      if (sFromLang && item.code && sFromLang !== item.code && sNewMessage.trim()) debouncedTranslate(sNewMessage, item.code);
+                      if (!item.code || sFromLang === item.code) clearTranslation();
+                    }}
+                    buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "English"}
+                    buttonStyle={{ paddingVertical: 5 }}
+                    openUpward={true}
+                  />
+                </View>
                 <DropdownMenu
-                  dataArr={(zSettings?.smsTemplates || zSettings?.textTemplates || []).map((t) => ({ label: t.label || t.name || t.buttonLabel || "Untitled", message: t.content || t.message || t.text || "" }))}
+                  dataArr={(zSettings?.smsTemplates || zSettings?.textTemplates || [])
+                    .filter((t) => t.showInChat !== false)
+                    .sort((a, b) => {
+                      let aOrd = a.order || 999;
+                      let bOrd = b.order || 999;
+                      return bOrd - aOrd;
+                    })
+                    .map((t) => ({ label: t.label || t.name || t.buttonLabel || "Untitled", message: t.content || t.message || t.text || "" }))}
                   onSelect={(item) => {
                     let resolved = resolveTemplate(item.message);
                     _setNewMessage(resolved);
                     isUnmodifiedTemplateRef.current = true;
-                    if (sTranslateActive) debouncedTranslate(resolved, targetLang);
+                    if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(resolved, sToLang);
                   }}
                   buttonText={"Templates"}
-                  buttonStyle={{ paddingVertical: 5 }}
+                  buttonStyle={{ paddingVertical: 5, backgroundColor: C.blue }}
+                  buttonTextStyle={{ color: "white" }}
                   openUpward={true}
                 />
                 <Tooltip text="Variables" position="top">
@@ -1054,9 +1201,9 @@ export function MessagesComponent({}) {
                   </TouchableOpacity>
                 </Tooltip>
                 {hasCustomer && !sCustomPhoneMode ? (
-                  <Tooltip text="Number entry" position="top">
+                  <Tooltip text="Messages Hub" position="top">
                     <TouchableOpacity
-                      onPress={handleEnterCustomPhoneMode}
+                      onPress={handleEnterHubMode}
                       style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
                     >
                       <Image_ icon={ICONS.cellPhone} size={35} />
@@ -1069,9 +1216,9 @@ export function MessagesComponent({}) {
                     {hasCustomer && (
                       <TouchableOpacity
                         onPress={handleExitCustomPhoneMode}
-                        style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, borderWidth: 1, borderColor: C.blue }}
+                        style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: C.blue }}
                       >
-                        <Text style={{ fontSize: 13, color: C.blue }}>Back to customer</Text>
+                        <Text style={{ fontSize: 13, color: "white" }}>Back to customer</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1094,6 +1241,422 @@ export function MessagesComponent({}) {
   );
 }
 
+function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverIn, onHoverOut }) {
+  let isIncoming = thread.lastType === "incoming";
+  let bgColor = isIncoming ? "rgb(230,230,230)" : "rgb(0,122,255)";
+  if (isSelected) bgColor = isIncoming ? "rgb(215,215,215)" : "rgb(0,100,220)";
+  else if (isHovered) bgColor = isIncoming ? "rgb(220,220,220)" : "rgb(0,110,235)";
+  let textColor = isIncoming ? C.text : "white";
+  let subtextColor = isIncoming ? gray(0.35) : "rgba(255,255,255,0.7)";
+  let formattedPhone = formatPhoneWithDashes(thread.phone);
+  let customerName = activeWO
+    ? (activeWO.customerFirst + " " + activeWO.customerLast).trim()
+    : thread.customerInfo
+      ? ((thread.customerInfo.first || "") + " " + (thread.customerInfo.last || "")).trim()
+      : "";
+  let dateObj = formatDateTimeForReceipt(null, thread.lastMillis);
+  let preview = thread.lastMessage || (thread.hasMedia ? "[Media]" : "");
+
+  // Build short date: "Wed, Apr 7" or "Wed, Apr 7 '25" if not current year
+  let shortDate = "";
+  if (thread.lastMillis) {
+    let d = new Date(thread.lastMillis);
+    let dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    let monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    shortDate = dayNames[d.getDay()] + ", " + monthNames[d.getMonth()] + " " + d.getDate();
+    if (d.getFullYear() !== new Date().getFullYear()) shortDate += " '" + String(d.getFullYear()).slice(-2);
+  }
+
+  return (
+    <TouchableOpacity onPress={onPress} onMouseEnter={onHoverIn} onMouseLeave={onHoverOut} style={{ paddingVertical: 10, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: gray(0.08), backgroundColor: bgColor }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {!activeWO && <Image_ icon={ICONS.questionMark} size={14} style={{ marginRight: 6 }} />}
+            <Text style={{ fontSize: 14, fontWeight: Fonts.weight.textHeavy, color: textColor }}>{formattedPhone}</Text>
+          </View>
+          {customerName ? (
+            <Text style={{ fontSize: 12, color: isIncoming ? C.blue : "rgba(255,255,255,0.85)", marginTop: 2 }} numberOfLines={1}>{customerName}</Text>
+          ) : (
+            <View style={{ height: 18, marginTop: 2 }} />
+          )}
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={{ fontSize: 11, color: subtextColor }}>{shortDate}</Text>
+          <Text style={{ fontSize: 11, color: subtextColor, marginTop: 2 }}>{dateObj?.time || ""}</Text>
+        </View>
+      </View>
+      <View style={{ marginTop: 4 }}>
+        <Text numberOfLines={2} style={{ fontSize: 13, color: isIncoming ? gray(0.5) : "rgba(255,255,255,0.85)", flex: 1 }}>{preview}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, exitHubButton }) {
+  // Initialize from cache synchronously to avoid layout flash on hover
+  const [sMessages, _setMessages] = useState(() => {
+    let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
+    if (cached && cached.messages.length > 0) return cached.messages;
+    return [];
+  });
+  const [sListenerConnecting, _setListenerConnecting] = useState(() => {
+    let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
+    return !(cached && cached.messages.length > 0);
+  });
+  const [sNoMoreHistory, _setNoMoreHistory] = useState(() => {
+    let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
+    return cached?.noMoreHistory || false;
+  });
+  const [sLoadingMore, _setLoadingMore] = useState(false);
+  const [sNewMessage, _setNewMessage] = useState("");
+  const [sCanRespond, _setCanRespond] = useState(true);
+  const [sFromLang, _setFromLang] = useState("en");
+  const [sToLang, _setToLang] = useState("en");
+  const [sShowReplyModal, _setShowReplyModal] = useState(false);
+  const [sForwardReplies, _setForwardReplies] = useState(false);
+  const messageListRef = useRef(null);
+  const pendingSendTextRef = useRef("");
+  const sMessagesRef = useRef([]);
+  const noMoreRef = useRef(false);
+
+  const {
+    translatedText, isLoading: sTranslateLoading,
+    debouncedTranslate, clearTranslation,
+  } = useTranslation({ defaultDirection: "en-to-es" });
+
+  function updateCache(messages, noMoreHistory) {
+    noMoreRef.current = noMoreHistory;
+    useCustMessagesStore.getState().setHubCachedThread(phone, messages, noMoreHistory);
+  }
+
+  useEffect(() => {
+    if (!phone || phone.length !== 10) { _setMessages([]); _setListenerConnecting(false); return; }
+    let cancelled = false;
+    _setNewMessage("");
+    _setCanRespond(true);
+    _setShowReplyModal(false);
+    _setForwardReplies(false);
+    _setLoadingMore(false);
+    clearAutoSend();
+
+    // Check cache
+    let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
+    let startMessages = [];
+    let noMore = false;
+
+    if (cached && cached.messages.length > 0) {
+      startMessages = cached.messages;
+      noMore = cached.noMoreHistory || false;
+    }
+
+    _setMessages(startMessages);
+    sMessagesRef.current = startMessages;
+    _setNoMoreHistory(noMore);
+    noMoreRef.current = noMore;
+    if (!startMessages.length) _setListenerConnecting(true);
+
+    // Determine canRespond from cached messages
+    let lastOutgoing = startMessages.filter(m => m.type === "outgoing").sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+    if (lastOutgoing) _setCanRespond(!lastOutgoing.senderUserObj || !!lastOutgoing.canRespond);
+
+    // Initial fetch if no cache - grab first page of 7
+    if (!startMessages.length) {
+      dbGetCustomerMessages(phone, null, 7).then(result => {
+        if (cancelled || !result.success) { _setListenerConnecting(false); return; }
+        let initialNoMore = result.messages.length < 7;
+        let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
+        sMessagesRef.current = sorted;
+        _setMessages(sorted);
+        _setNoMoreHistory(initialNoMore);
+        noMoreRef.current = initialNoMore;
+        updateCache(sorted, initialNoMore);
+        _setListenerConnecting(false);
+        // Determine canRespond from fetched messages
+        let fetchedOutgoing = sorted.filter(m => m.type === "outgoing").sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+        if (fetchedOutgoing) _setCanRespond(!fetchedOutgoing.senderUserObj || !!fetchedOutgoing.canRespond);
+      });
+    }
+
+    // Listener watches for messages after the newest one in the list
+    let maxMillis = 0;
+    startMessages.forEach(m => { if (m.millis > maxMillis) maxMillis = m.millis; });
+    let listenerStartMillis = maxMillis || Date.now();
+
+    let unsub = dbListenToNewMessages(phone, listenerStartMillis, (newMsgs) => {
+      if (cancelled) return;
+      _setListenerConnecting(false);
+      _setMessages(prev => {
+        let ids = new Set(prev.map(m => m.id));
+        let fresh = newMsgs.filter(m => !ids.has(m.id));
+        if (!fresh.length) return prev;
+        let merged = [...prev, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+        sMessagesRef.current = merged;
+        updateCache(merged, noMoreRef.current);
+        let newOutgoing = fresh.filter(m => m.type === "outgoing").sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+        if (newOutgoing) _setCanRespond(!newOutgoing.senderUserObj || !!newOutgoing.canRespond);
+        return merged;
+      });
+    });
+    return () => { cancelled = true; if (unsub) unsub(); };
+  }, [phone]);
+
+  async function handleLoadMore() {
+    if (sNoMoreHistory || sLoadingMore) return;
+    if (!sMessagesRef.current.length) return;
+    _setLoadingMore(true);
+    let oldestMillis = Math.min(...sMessagesRef.current.map(m => m.millis));
+    let result = await dbGetCustomerMessages(phone, oldestMillis, 7);
+    if (!result.success) { _setLoadingMore(false); return; }
+    let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
+    let currentMessages = sMessagesRef.current;
+    let ids = new Set(currentMessages.map(m => m.id));
+    let fresh = sorted.filter(m => !ids.has(m.id));
+    let noMore = fresh.length < 7;
+    let merged = [...fresh, ...currentMessages].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+    sMessagesRef.current = merged;
+    _setMessages(merged);
+    _setNoMoreHistory(noMore);
+    updateCache(merged, noMore);
+    _setLoadingMore(false);
+  }
+
+  useEffect(() => {
+    if (sMessages.length > 1) {
+      try { messageListRef.current?.scrollToIndex({ index: sMessages.length - 1, animated: true }); } catch (e) {}
+    }
+  }, [sMessages]);
+
+  function handleSend() {
+    if (!sNewMessage.trim() || !phone || phone.length !== 10) return;
+    pendingSendTextRef.current = sNewMessage;
+    _setShowReplyModal(true);
+    scheduleAutoSend(() => {
+      _setShowReplyModal(false);
+      doSend(pendingSendTextRef.current, sCanRespond);
+    });
+  }
+
+  async function doSend(text, canRespondVal, forwardOverride) {
+    if (!text?.trim() || !phone || phone.length !== 10) return;
+    _setNewMessage("");
+    clearTranslation();
+    useLoginStore.getState().requireLogin(async () => {
+      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+      let msg = { ...SMS_PROTO };
+      msg.message = text;
+      msg.phoneNumber = phone;
+      msg.canRespond = canRespondVal ? true : null;
+      msg.millis = Date.now();
+      msg.id = crypto.randomUUID();
+      msg.type = "outgoing";
+      msg.senderUserObj = zCurrentUserObj;
+      if (forwardTo) msg.forwardTo = forwardTo;
+      let optimistic = { ...msg, status: "sending" };
+      let addedMessages = [...sMessagesRef.current, optimistic];
+      sMessagesRef.current = addedMessages;
+      _setMessages(addedMessages);
+      updateCache(addedMessages, noMoreRef.current);
+      let result = await smsService.send(msg);
+      let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: result.success ? "sent" : "failed" } : m);
+      sMessagesRef.current = updatedMessages;
+      _setMessages(updatedMessages);
+      updateCache(updatedMessages, noMoreRef.current);
+      if (!result.success) {
+        useAlertScreenStore.getState().setValues({
+          title: "Message Failed", message: result.error || "Failed to send message",
+          btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+          showAlert: true, canExitOnOuterClick: true,
+        });
+      }
+    });
+  }
+
+  function handleToggleForwardReplies() {
+    const currentUser = useLoginStore.getState().getCurrentUser();
+    if (!currentUser?.id) return;
+    if (!currentUser?.phone) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Phone Number",
+        message: "Your account needs a personal phone number to enable SMS forwarding. Ask an admin to add one.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true, canExitOnOuterClick: true,
+      });
+      return;
+    }
+    let newVal = !sForwardReplies;
+    _setForwardReplies(newVal);
+    if (newVal) {
+      clearAutoSend();
+      _setCanRespond(true);
+      _setShowReplyModal(false);
+      doSend(pendingSendTextRef.current, true, true);
+    }
+  }
+
+  async function handleToggleBlock() {
+    let outgoing = sMessages.filter(m => m.type === "outgoing");
+    if (!outgoing.length) return;
+    let last = [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+    if (!last?.id) return;
+    let newCanRespond = sCanRespond ? null : true;
+    log("handleToggleBlock", { phone, id: last.id, newCanRespond });
+    let result = await dbUpdateMessageCanRespond(phone, last.id, newCanRespond);
+    log("handleToggleBlock result", result);
+    _setCanRespond(!sCanRespond);
+    let updated = sMessages.map(m => m.id === last.id ? { ...m, canRespond: newCanRespond } : m);
+    sMessagesRef.current = updated;
+    _setMessages(updated);
+    updateCache(updated, noMoreRef.current);
+  }
+
+  let lastOutgoingID = null;
+  for (let i = sMessages.length - 1; i >= 0; i--) {
+    if (sMessages[i].type === "outgoing") { lastOutgoingID = sMessages[i].id || sMessages[i].millis; break; }
+  }
+
+  let customerInfo = thread?.customerInfo;
+  let customerName = customerInfo ? ((customerInfo.first || "") + " " + (customerInfo.last || "")).trim() : "";
+
+  return (
+    <View style={{ flex: 1, flexDirection: "column" }}>
+      {/* Header */}
+      <View style={{ paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: gray(0.1), flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <View>
+          <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text }}>{formatPhoneWithDashes(phone)}</Text>
+          {customerName ? <Text style={{ fontSize: 13, color: C.blue, marginTop: 2 }}>{customerName}</Text> : null}
+        </View>
+        {!thread && !sListenerConnecting ? (
+          <View style={{ backgroundColor: C.green, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4 }}>
+            <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>New Thread</Text>
+          </View>
+        ) : sListenerConnecting ? <ActivityIndicator size={16} color="#007bff" /> : null}
+        {(
+          <TouchableOpacity onPress={handleLoadMore} disabled={sLoadingMore || sNoMoreHistory} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: (sLoadingMore || sNoMoreHistory) ? gray(0.15) : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}>
+            {sLoadingMore ? <SmallLoadingIndicator /> : <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Load more</Text>}
+          </TouchableOpacity>
+        )}
+      </View>
+      {/* Messages */}
+      <View style={{ flex: 1, overflow: "hidden" }}>
+        {sMessages.length < 1 && !sListenerConnecting ? (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ fontSize: 16, color: gray(0.25) }}>No messages yet</Text>
+          </View>
+        ) : sMessages.length < 1 ? null : (
+          <FlatList
+            ref={messageListRef}
+            data={sMessages}
+            keyExtractor={(item) => item.id || String(item.millis)}
+            renderItem={({ item }) => {
+              if (item.type === "incoming") return <IncomingMessageComponent msgObj={item} />;
+              let isLast = (item.id || item.millis) === lastOutgoingID;
+              return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} />;
+            }}
+            onScrollToIndexFailed={(info) => {
+              setTimeout(() => { messageListRef.current?.scrollToIndex({ index: info.index, animated: true }); }, 50);
+            }}
+            scrollEnabled={!previewMode}
+            scrollEventThrottle={200}
+          />
+        )}
+      </View>
+      {/* Compose — hidden in preview mode */}
+      {!previewMode && <View style={{ paddingTop: 8, paddingHorizontal: 8 }}>
+        {(sFromLang && sToLang && sFromLang !== sToLang) && (translatedText || sTranslateLoading) ? (
+          <View style={{ padding: 6, marginBottom: 4, backgroundColor: "rgb(245,245,220)", borderRadius: 5, borderWidth: 1, borderColor: gray(0.15) }}>
+            {sTranslateLoading
+              ? <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
+              : <Text style={{ fontSize: 14, color: C.text }}>{translatedText}</Text>
+            }
+          </View>
+        ) : null}
+        <ReplyOptionsBar
+          visible={sShowReplyModal}
+          forwardReplies={sForwardReplies}
+          hasActivePhone={!!phone && phone.length === 10}
+          onSelectCanRespond={(canRespond) => {
+            clearAutoSend();
+            _setCanRespond(canRespond);
+            _setShowReplyModal(false);
+            doSend(pendingSendTextRef.current, canRespond);
+          }}
+          onToggleForward={handleToggleForwardReplies}
+        />
+        <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
+          <TextInput
+            onChangeText={(val) => {
+              if (val.length > 10000) val = val.slice(0, 10000);
+              _setNewMessage(val);
+              if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(val, sToLang);
+            }}
+            multiline={true}
+            placeholder="Message..."
+            placeholderTextColor="gray"
+            style={{ outlineStyle: "none", borderWidth: 0, color: C.text, paddingLeft: 5, paddingRight: 4, marginVertical: 8, fontSize: 15, lineHeight: 20, minHeight: 36, flex: 1 }}
+            value={sNewMessage}
+          />
+          <TouchableOpacity onPress={handleSend} style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() ? 1 : 0.3 }}>
+            <Image_ icon={ICONS.airplane} size={41} />
+          </TouchableOpacity>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, marginBottom: 8, paddingHorizontal: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <DropdownMenu
+              dataArr={TRANSLATION_LANGUAGES}
+              onSelect={(item) => {
+                _setFromLang(item.code);
+                if (item.code && sToLang && item.code !== sToLang && sNewMessage.trim()) debouncedTranslate(sNewMessage, sToLang);
+                if (!item.code || item.code === sToLang) clearTranslation();
+              }}
+              buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
+              buttonStyle={{ paddingVertical: 5 }}
+              openUpward={true}
+            />
+            <Image_ icon={ICONS.rightArrowBlue} size={16} style={{ marginHorizontal: 6 }} />
+            <DropdownMenu
+              dataArr={TRANSLATION_LANGUAGES}
+              onSelect={(item) => {
+                _setToLang(item.code);
+                if (sFromLang && item.code && sFromLang !== item.code && sNewMessage.trim()) debouncedTranslate(sNewMessage, item.code);
+                if (!item.code || sFromLang === item.code) clearTranslation();
+              }}
+              buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "Spanish"}
+              buttonStyle={{ paddingVertical: 5 }}
+              openUpward={true}
+            />
+          </View>
+          <Tooltip text={sCanRespond ? "Block response" : "Allow responses from user"} position="top">
+            <TouchableOpacity onPress={handleToggleBlock} style={{ alignItems: "center", justifyContent: "center", padding: 6 }}>
+              <Image_ icon={sCanRespond ? ICONS.unblock : ICONS.blocked} size={35} />
+            </TouchableOpacity>
+          </Tooltip>
+          {onShowPhoneEntry && (
+            <Tooltip text="New number" position="top">
+              <TouchableOpacity
+                onPress={onShowPhoneEntry}
+                onLongPress={() => {
+                  localStorage.removeItem("hubMessageCache");
+                  useCustMessagesStore.getState().clearHubMessageCache?.();
+                  log("Hub message cache cleared");
+                  alert("Message cache cleared. Refresh to reload.");
+                }}
+                delayLongPress={1000}
+                style={{ padding: 6 }}
+              >
+                <Image_ icon={ICONS.cellPhone} size={35} />
+              </TouchableOpacity>
+            </Tooltip>
+          )}
+          {exitHubButton}
+        </View>
+      </View>}
+    </View>
+  );
+}
+
 const INNER_MSG_BOX_STYLE = {
   width: "100%",
   borderRadius: 5,
@@ -1101,7 +1664,7 @@ const INNER_MSG_BOX_STYLE = {
   paddingVertical: 5,
 };
 const OUTER_MSG_BOX_STYLE = {
-  width: "60%",
+  width: "75%",
   marginVertical: 10,
   marginHorizontal: 4,
   // padding: 5,
@@ -1276,9 +1839,9 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
 const IncomingMessageComponent = memo(({ msgObj }) => {
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
   let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
-  let backgroundColor = hasMedia && !msgObj.message ? "transparent" : "lightgray";
+  let backgroundColor = hasMedia && !msgObj.message ? "transparent" : "rgb(230,230,230)";
   return (
-    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "60%" }}>
+    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
         {msgObj.mediaUrls?.length > 0 ? (
           <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: msgObj.message ? 4 : 0 }}>
@@ -1317,17 +1880,14 @@ const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing }) => {
   let isFailed = msgObj.status === "failed" || msgObj.status === "undelivered";
   let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
   let backgroundColor = hasMedia && !msgObj.message ? "transparent" : (isFailed ? "rgb(200,80,80)" : "rgb(0,122,255)");
-  let showStatusIcons = isLastOutgoing && msgObj.senderUserObj;
+  let showStatusIcons = isLastOutgoing;
   let hasForward = showStatusIcons && msgObj.forwardTo?.enable;
   return (
-    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "60%" }}>
+    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, flexDirection: "row", alignItems: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
         {showStatusIcons && (
-          <View style={{ flexDirection: "column", alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
+          <View style={{ alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
             <Image source={msgObj.canRespond ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
-            {hasForward && (
-              <Image source={ICONS.forward} style={{ width: 24, height: 24, marginTop: 3 }} />
-            )}
           </View>
         )}
         <View style={{ flex: 1 }}>
@@ -1344,6 +1904,11 @@ const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing }) => {
             <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
           ) : null}
         </View>
+        {hasForward && (
+          <View style={{ alignItems: "center", justifyContent: "center", marginLeft: 5, marginTop: 2 }}>
+            <Image source={ICONS.forward} style={{ width: 24, height: 24 }} />
+          </View>
+        )}
       </View>
       <View
         style={{

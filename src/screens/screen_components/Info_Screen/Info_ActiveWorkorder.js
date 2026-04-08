@@ -1048,7 +1048,7 @@ export const ActiveWorkorderComponent = ({}) => {
               return estimateLabel ? (
                 <Text
                   style={{
-                    color: gray(0.5),
+                    color: isMissing ? C.red : gray(0.5),
                     fontSize: 13,
                     fontStyle: "italic",
                     marginTop: 4,

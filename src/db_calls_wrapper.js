@@ -2917,6 +2917,62 @@ export async function dbSendEmail(to, subject, htmlBody) {
 }
 
 /**
+ * Retrieve all SMS conversation threads from denormalized parent docs.
+ * Single collection read - no subcollection fan-out.
+ * @returns {Promise<Object>} { success, threads: [{ phone, customerInfo, lastMessage, lastMillis, lastType, hasMedia, canRespond, threadStatus }] }
+ */
+export async function dbGetAllMessageThreads() {
+  try {
+    const { getDocs } = await import("firebase/firestore");
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) throw new Error("Missing tenantID or storeID");
+
+    const smsRef = collection(DB, "tenants", tenantID, "stores", storeID, "sms-messages");
+    const snap = await getDocs(smsRef);
+    const threads = snap.docs
+      .filter((d) => d.data().lastMillis)
+      .map((d) => ({ phone: d.id, ...d.data() }))
+      .sort((a, b) => b.lastMillis - a.lastMillis);
+
+    return { success: true, threads };
+  } catch (error) {
+    log("Error fetching message threads", { error: error.message });
+    return { success: false, threads: [], error: error.message };
+  }
+}
+
+/**
+ * Real-time listener for active SMS threads (canRespond == true).
+ * Returns docChanges (added/modified/removed) so the caller can incrementally update state.
+ * @param {Function} callback - receives array of { type, phone, ...threadData }
+ * @returns {Function} unsubscribe function
+ */
+export function dbListenToActiveMessageThreads(callback) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return null;
+    const smsRef = collection(DB, "tenants", tenantID, "stores", storeID, "sms-messages");
+    const unsub = onSnapshot(
+      smsRef,
+      (snapshot) => {
+        const changes = [];
+        snapshot.docChanges().forEach((change) => {
+          changes.push({ type: change.type, phone: change.doc.id, ...change.doc.data() });
+        });
+        callback(changes);
+      },
+      (error) => {
+        log("Active threads listener error", { error });
+      }
+    );
+    return unsub;
+  } catch (error) {
+    log("Error setting up active threads listener", { error });
+    return null;
+  }
+}
+
+/**
  * Retrieve customer's last 10 messages with pagination support
  * @param {string} customerPhone - Customer's phone number (10 digits)
  * @param {Timestamp|null} startAfterTimestamp - Firestore timestamp to paginate from (optional)

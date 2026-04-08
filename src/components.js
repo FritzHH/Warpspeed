@@ -688,7 +688,7 @@ export const DropdownMenu = ({
   modalCoordY = 25,
   mouseOverOptions = {
     enable: true,
-    opacity: 0.6,
+    opacity: 0.8,
   },
   showButtonShadow,
   shadowStyle = {},
@@ -3113,6 +3113,11 @@ export const Tooltip = ({
   children,
   position = "top",
   style = {},
+  backgroundColor,
+  color,
+  alert,
+  offsetX = 0,
+  offsetY = 0,
 }) => {
   const [sRect, _setRect] = useState(null);
   const GAP = 6;
@@ -3136,13 +3141,13 @@ export const Tooltip = ({
     if (!sRect) return null;
     const base = { position: "fixed", zIndex: 99999, pointerEvents: "none" };
     if (position === "top")
-      return { ...base, bottom: window.innerHeight - sRect.top + GAP, left: sRect.left, width: sRect.width, alignItems: "center" };
+      return { ...base, bottom: window.innerHeight - sRect.top + GAP + offsetY, left: sRect.left + offsetX, width: sRect.width, alignItems: "center" };
     if (position === "bottom")
-      return { ...base, top: sRect.bottom + GAP, left: sRect.left, width: sRect.width, alignItems: "center" };
+      return { ...base, top: sRect.bottom + GAP - offsetY, left: sRect.left + offsetX, width: sRect.width, alignItems: "center" };
     if (position === "left")
-      return { ...base, right: window.innerWidth - sRect.left + GAP, top: sRect.top, height: sRect.height, justifyContent: "center", alignItems: "flex-end" };
+      return { ...base, right: window.innerWidth - sRect.left + GAP - offsetX, top: sRect.top + offsetY, height: sRect.height, justifyContent: "center", alignItems: "flex-end" };
     if (position === "right")
-      return { ...base, left: sRect.right + GAP, top: sRect.top, height: sRect.height, justifyContent: "center" };
+      return { ...base, left: sRect.right + GAP + offsetX, top: sRect.top + offsetY, height: sRect.height, justifyContent: "center" };
   }
 
   const portalStyle = getPortalStyle();
@@ -3158,13 +3163,13 @@ export const Tooltip = ({
         <View style={portalStyle}>
           <View
             style={{
-              backgroundColor: "rgba(105,105,105,0.88)",
+              backgroundColor: backgroundColor || (alert ? C.orange : "rgba(105,105,105,0.88)"),
               borderRadius: 6,
               paddingHorizontal: 9,
               paddingVertical: 5,
             }}
           >
-            <Text style={{ color: "white", fontSize: 12, whiteSpace: "pre" }}>
+            <Text style={{ color: color || "white", fontSize: 12, whiteSpace: "pre" }}>
               {text}
             </Text>
           </View>

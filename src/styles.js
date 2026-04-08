@@ -84,6 +84,8 @@ export const ICONS = {
   rightArrowBlue: require(ASSETS_PATH + "right-arrow.png"),
   expandGreen: require(ASSETS_PATH + "expandGreen.png"),
   expandYellow: require(ASSETS_PATH + "expandYellow.png"),
+  greenLeftArrow: require(ASSETS_PATH + "greenLeftArrow.png"),
+  greenRightArrow: require(ASSETS_PATH + "greenRightArrow.png"),
   blocked: require(ASSETS_PATH + "blocked.png"),
   unblock: require(ASSETS_PATH + "unblock.png"),
   forward: require(ASSETS_PATH + "forward.png"),
@@ -91,6 +93,8 @@ export const ICONS = {
   tools1: require(ASSETS_PATH + "tools1.png"),
   upArrowOrange: require(ASSETS_PATH + "up_arrow_orange.png"),
   downArrowOrange: require(ASSETS_PATH + "down_arrow_orange.png"),
+  downArrow: require(ASSETS_PATH + "down-arrow.png"),
+  upRightArrow: require(ASSETS_PATH + "up-right-arrow.png"),
   clickHere: require(ASSETS_PATH + "clickHere.png"),
   importIcon: require(ASSETS_PATH + "in.png"),
   exportIcon: require(ASSETS_PATH + "out.png"),
@@ -157,6 +161,7 @@ export const ICONS = {
   thoughtBubble: require(ASSETS_PATH + "thoughtBubble.png"),
   print: require(ASSETS_PATH + "print.png"),
   variable: require(ASSETS_PATH + "variable.png"),
+  person: require(ASSETS_PATH + "person.png"),
 };
 
 // rgb(64, 174, 113)

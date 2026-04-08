@@ -829,6 +829,16 @@ exports.sendSMSEnhanced = onCall(
             ...(imageUrl && !mediaUrlsParam.length ? { imageUrl: imageUrl } : {}),
           });
 
+          // Update conversation root with denormalized thread metadata
+          await conversationRef.set({
+            canRespond: canRespondParam || false,
+            lastMessage: (message || "").trim(),
+            lastMillis: Date.now(),
+            lastType: "outgoing",
+            hasMedia: mediaUrlsParam.length > 0 || !!imageUrl,
+            threadStatus: "open",
+          }, { merge: true });
+
           log("Outgoing message stored", {
             messageID,
             customerID: customerID || "",
@@ -947,12 +957,27 @@ exports.smsStatusCallback = onRequest(
         return response.status(200).send("OK");
       }
 
+      // Priority order - higher index wins, never downgrade
+      const STATUS_PRIORITY = ["queued", "accepted", "sending", "sent", "delivered", "undelivered", "failed"];
+
       const db = await getDB(firebaseServiceAccountKey);
       const messageRef = db
         .collection("tenants").doc(tenantID)
         .collection("stores").doc(storeID)
         .collection("sms-messages").doc(phone)
         .collection("messages").doc(messageID);
+
+      // Read current status and skip if incoming is lower priority
+      const doc = await messageRef.get();
+      if (doc.exists) {
+        const currentStatus = doc.data().status || "";
+        const currentPriority = STATUS_PRIORITY.indexOf(currentStatus);
+        const incomingPriority = STATUS_PRIORITY.indexOf(MessageStatus);
+        if (incomingPriority >= 0 && currentPriority >= 0 && incomingPriority < currentPriority) {
+          log("smsStatusCallback: skipped downgrade", { messageID, current: currentStatus, incoming: MessageStatus });
+          return response.status(200).send("OK");
+        }
+      }
 
       const updateData = { status: MessageStatus };
       if (ErrorCode) updateData.errorCode = ErrorCode;
@@ -1307,9 +1332,15 @@ exports.incomingSMSEnhanced = onRequest(
       try {
         await messageDocRef(messageSid).set(incomingMessageData);
 
-        // Update conversation root
+        // Update conversation root with denormalized thread metadata
         await conversationRef.set({
           customerInfo: { id: customerData.id, first: customerData.first || "", last: customerData.last || "" },
+          canRespond: canRespond,
+          lastMessage: incomingMessage,
+          lastMillis: Date.now(),
+          lastType: "incoming",
+          hasMedia: numMedia > 0,
+          threadStatus: threadStatus,
         }, { merge: true });
 
         log("Incoming message stored successfully", {
@@ -7374,48 +7405,3 @@ exports.generateId = onCall(
   }
 );
 
-// ============================================================================
-// SMS STATUS CALLBACK - Twilio delivery status webhook
-// ============================================================================
-
-exports.smsStatusCallback = onRequest(
-  {
-    cors: true,
-    secrets: [firebaseServiceAccountKey],
-  },
-  async (request, response) => {
-    const db = await getDB(firebaseServiceAccountKey);
-
-    try {
-      const { MessageSid, MessageStatus } = request.body || {};
-
-      if (!MessageSid || !MessageStatus) {
-        log("smsStatusCallback: missing params", request.body);
-        return response.status(200).send("OK");
-      }
-
-      log("smsStatusCallback", { MessageSid, MessageStatus });
-
-      // Find the message by messageSid using collection group query
-      const snapshot = await db.collectionGroup("messages")
-        .where("messageSid", "==", MessageSid)
-        .limit(1)
-        .get();
-
-      if (snapshot.empty) {
-        log("smsStatusCallback: no message found for SID", { MessageSid });
-        return response.status(200).send("OK");
-      }
-
-      const docRef = snapshot.docs[0].ref;
-      await docRef.update({ status: MessageStatus });
-
-      log("smsStatusCallback: status updated", { MessageSid, MessageStatus, path: docRef.path });
-
-      return response.status(200).send("OK");
-    } catch (error) {
-      log("smsStatusCallback error", { error: error.message });
-      return response.status(200).send("OK");
-    }
-  }
-);

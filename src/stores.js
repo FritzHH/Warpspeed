@@ -16,6 +16,7 @@ import {
   arrHasItem,
   checkArr,
   log,
+  localStorageWrapper,
   removeFieldFromObj,
   replaceOrAddToArr,
   resolveStatus,
@@ -160,15 +161,12 @@ export const useTabNamesStore = create(
           if (wo && wo.customerID) {
             merged.infoTabName = TAB_NAMES.infoTab.workorder;
             merged.itemsTabName = TAB_NAMES.itemsTab.workorderItems;
-            merged.optionsTabName = TAB_NAMES.optionsTab.inventory;
           } else if (wo && !wo.customerID && wo.workorderLines?.length > 0) {
             merged.infoTabName = TAB_NAMES.infoTab.checkout;
             merged.itemsTabName = TAB_NAMES.itemsTab.workorderItems;
-            merged.optionsTabName = TAB_NAMES.optionsTab.inventory;
           } else {
             merged.infoTabName = TAB_NAMES.infoTab.customer;
             merged.itemsTabName = TAB_NAMES.itemsTab.empty;
-            merged.optionsTabName = TAB_NAMES.optionsTab.workorders;
           }
         } catch (e) {}
         return merged;
@@ -910,6 +908,33 @@ export const useCustMessagesStore = create(persist((set, get) => ({
   messagesPhone: null,
   _messagesUnsub: null,
 
+  smsThreads: [],
+  _threadsUnsub: null,
+  getSmsThreads: () => get().smsThreads,
+  setSmsThreads: (smsThreads) => set({ smsThreads }),
+  setThreadsUnsub: (unsub) => {
+    let prev = get()._threadsUnsub;
+    if (prev) prev();
+    set({ _threadsUnsub: unsub });
+  },
+
+  hubMessageCache: {},
+  getHubMessageCache: () => get().hubMessageCache,
+  getHubCachedThread: (phone) => get().hubMessageCache[phone] || null,
+  setHubCachedThread: (phone, messages, noMoreHistory) => {
+    let cache = { ...get().hubMessageCache, [phone]: { messages, noMoreHistory } };
+    set({ hubMessageCache: cache });
+    localStorageWrapper.setItem("hubMessageCache", cache);
+  },
+  loadHubMessageCache: () => {
+    let cached = localStorageWrapper.getItem("hubMessageCache");
+    if (cached) set({ hubMessageCache: cached });
+  },
+  clearHubMessageCache: () => {
+    set({ hubMessageCache: {} });
+    localStorageWrapper.removeItem("hubMessageCache");
+  },
+
   getIncomingMessages: () => get().incomingMessages,
   getOutgoingMessages: () => get().outgoingMessages,
   getMessagesLoading: () => get().messagesLoading,
@@ -1581,5 +1606,10 @@ export function clearPersistedStores() {
   useInventoryStore.persist.clearStorage();
   useSettingsStore.persist.clearStorage();
   useLoginStore.persist.clearStorage();
+  useCustMessagesStore.getState()._threadsUnsub?.();
+  useCustMessagesStore.getState().setSmsThreads([]);
+  localStorageWrapper.removeItem("smsThreads");
+  useCustMessagesStore.setState({ hubMessageCache: {} });
+  localStorageWrapper.removeItem("hubMessageCache");
   clearIdPool();
 }

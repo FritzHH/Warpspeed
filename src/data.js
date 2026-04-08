@@ -484,10 +484,12 @@ export const CUSTOMER_PREVIOUS_BIKE_PROTO = {
 };
 
 export const CUSTOMER_LANGUAGES = {
-  spanish: "Spanish",
   english: "English",
+  spanish: "Spanish",
   french: "French",
-  creole: "Creole"
+  german: "German",
+  creole: "Creole",
+  arabic: "Arabic",
 }
 
 export const CUSTOMER_CREDIT_PROTO = {
@@ -1106,24 +1108,32 @@ export const SETTINGS_OBJ = {
       label: "Finished",
       content: "Hi {firstName}, your {brand} {description} is ready for pickup! Your total is {totalAmount}. We're open {storeHours}. Call us at {storePhone} with any questions.",
       type: "",
+      order: 0,
+      showInChat: true,
     },
     {
       id: "fkdnfdfd",
       label: "Part Ordered",
       content: "Hi {firstName}, we've ordered a part for your {brand} {description}. As soon as we get the part we will proceed with the requested service. Call us at {storePhone} with any questions.",
       type: "",
+      order: 0,
+      showInChat: true,
     },
     {
       id: "default_sms_sale_receipt",
       label: "Sale Receipt",
       content: "🎉 Thanks for your purchase, {firstName}! Your total was {total}. Here's your receipt: {link}\n\nWe appreciate your business! — {storeName} 🚲",
       type: "saleReceipt",
+      order: 0,
+      showInChat: false,
     },
     {
       id: "default_sms_intake_receipt",
       label: "Intake Receipt",
       content: "🔧 Hey {firstName}! Your {brand} {description} is checked in and in good hands. Here's your receipt: {link}\n\nTrack your workorder: {workorderLink}\n\nWe'll keep you posted! — {storeName} 🚲",
       type: "intakeReceipt",
+      order: 0,
+      showInChat: false,
     },
   ],
   autoCustomerNoteTexts: [],
@@ -1175,6 +1185,8 @@ export const SMS_TEMPLATE_PROTO = {
   label: "",
   content: "",
   type: "", // "" = general, "saleReceipt", "intakeReceipt"
+  order: 0,
+  showInChat: true,
 }
 
 export const EMAIL_TEMPLATE_PROTO = {

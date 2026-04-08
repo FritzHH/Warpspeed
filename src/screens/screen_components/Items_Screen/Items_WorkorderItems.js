@@ -422,7 +422,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             alignSelf: "center",
           }}
         >
-          <Tooltip text="Delete workorder" position="top">
+          <Tooltip text={hasActiveSale ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale}>
             <Button_
               icon={ICONS.trash}
               iconSize={22}
@@ -579,7 +579,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           alignSelf: "center",
         }}
       >
-        <Tooltip text="Delete workorder" position="top">
+        <Tooltip text={hasActiveSale ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale}>
           <Button_
             icon={ICONS.trash}
             iconSize={22}

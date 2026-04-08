@@ -7417,6 +7417,8 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
       label: "",
       content: "",
       type: "",
+      order: 0,
+      showInChat: true,
     };
     _setUnsavedTemplates([newTemplate, ...sUnsavedTemplates]);
     _setNewTemplateIds([...sNewTemplateIds, newTemplate.id]);
@@ -7429,6 +7431,8 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
       label: getLocalValue(templateObj.id, "label") ?? getLabel(templateObj),
       content: getLocalValue(templateObj.id, "content") ?? getContent(templateObj),
       type: templateObj.type || "",
+      order: templateObj.order || 0,
+      showInChat: templateObj.showInChat !== false,
     };
     let arr = [finalTemplate, ...savedTemplates];
     handleSettingsFieldChange("smsTemplates", arr);
@@ -7563,15 +7567,36 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                     )}
                   </View>
 
+                  {/* Order + Show in Chat row */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 6 }}>Order</Text>
+                    <DropdownMenu
+                      dataArr={(() => {
+                        let usedOrders = new Set(savedTemplates.filter(t => t.id !== templateObj.id && t.order > 0).map(t => t.order));
+                        let available = [{ label: "---", value: 0 }];
+                        for (let i = 1; i <= savedTemplates.length; i++) {
+                          if (!usedOrders.has(i)) available.push({ label: String(i), value: i });
+                        }
+                        return available;
+                      })()}
+                      onSelect={(item) => handleFieldChange(templateObj, "order", item.value)}
+                      buttonText={templateObj.order > 0 ? String(templateObj.order) : "---"}
+                      buttonStyle={{ paddingVertical: 4, paddingHorizontal: 8, minWidth: 50 }}
+                      buttonTextStyle={{ fontSize: 13 }}
+                    />
+                    <View style={{ marginLeft: 20 }}>
+                      <CheckBox_
+                        text="Show in Chat"
+                        isChecked={templateObj.showInChat !== false}
+                        onCheck={() => handleFieldChange(templateObj, "showInChat", templateObj.showInChat === false)}
+                      />
+                    </View>
+                  </View>
+
                   {/* Message body */}
-                  <TextInput
-                    ref={(el) => {
-                      if (el) {
-                        textInputRefs.current[templateObj.id] = el;
-                        setTimeout(() => { if (el.style) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }, 0);
-                      }
-                    }}
+                  <TextInput_
                     multiline={true}
+                    numberOfLines={6}
                     onChangeText={(val) =>
                       handleFieldChange(templateObj, "content", val)
                     }
@@ -7579,13 +7604,6 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                     onSelectionChange={(event) => {
                       let { start } = event.nativeEvent.selection;
                       cursorPositionRefs.current[templateObj.id] = start;
-                    }}
-                    onContentSizeChange={(event) => {
-                      let el = event?.target || event?.nativeEvent?.target;
-                      if (el) {
-                        el.style.height = "auto";
-                        el.style.height = el.scrollHeight + "px";
-                      }
                     }}
                     placeholder="Message body..."
                     placeholderTextColor={gray(0.3)}
@@ -7598,7 +7616,6 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                       outlineWidth: 0,
                       fontSize: 14,
                       minHeight: 80,
-                      textAlignVertical: "top",
                       overflow: "hidden",
                     }}
                     value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj)) : getContent(templateObj)}

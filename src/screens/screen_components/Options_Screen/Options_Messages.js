@@ -1019,7 +1019,7 @@ export function MessagesComponent({}) {
                 let idx = item.index;
                 item = item.item;
                 if (item.type === "incoming")
-                  return <IncomingMessageComponent msgObj={item} />;
+                  return <IncomingMessageComponent msgObj={item} onScrollToBottom={() => { setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: true }); }, 50); }} />;
                 let isLast = (item.id || item.millis) === lastOutgoingID;
                 return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={customerThread} onToggleBlock={handleToggleBlockResponses} />;
               }}
@@ -1726,7 +1726,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             data={sMessages}
             keyExtractor={(item) => item.id || String(item.millis)}
             renderItem={({ item }) => {
-              if (item.type === "incoming") return <IncomingMessageComponent msgObj={item} />;
+              if (item.type === "incoming") return <IncomingMessageComponent msgObj={item} onScrollToBottom={() => { setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: true }); }, 50); }} />;
               let isLast = (item.id || item.millis) === lastOutgoingID;
               return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={thread} onToggleBlock={handleToggleBlock} />;
             }}
@@ -2065,7 +2065,7 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
   );
 });
 
-const IncomingMessageComponent = memo(({ msgObj }) => {
+const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom }) => {
   const [sTranslation, _setTranslation] = useState({ text: "", loading: false, langCode: "" });
   const [sContextMenu, _setContextMenu] = useState({ x: 0, y: 0, visible: false });
 
@@ -2085,6 +2085,7 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
   function handleSelectLanguage(langCode) {
     _setContextMenu(prev => ({ ...prev, visible: false }));
     _setTranslation({ text: "", loading: true, langCode });
+    if (onScrollToBottom) onScrollToBottom();
     translateText({ text: msgObj.message, targetLanguage: langCode })
       .then((result) => {
         if (result.success) {
@@ -2094,6 +2095,7 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
         } else {
           _setTranslation({ text: "", loading: false, langCode });
         }
+        if (onScrollToBottom) onScrollToBottom();
       })
       .catch(() => { _setTranslation({ text: "", loading: false, langCode }); });
   }
@@ -2147,14 +2149,15 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
         <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic" }}>Auto-response sent (thread was closed)</Text>
       )}
       {sContextMenu.visible && createPortal(
-        <div onMouseDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: sContextMenu.x, top: sContextMenu.y, zIndex: 99999, backgroundColor: "white", borderRadius: 6, boxShadow: "0 2px 12px rgba(0,0,0,0.18)", padding: 4, minWidth: 130 }}>
+        <div onMouseDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: sContextMenu.x, bottom: window.innerHeight - sContextMenu.y, zIndex: 99999, backgroundColor: "white", borderRadius: 8, boxShadow: "0 3px 16px rgba(0,0,0,0.22)", padding: 6, minWidth: 160 }}>
+          <div style={{ padding: "5px 12px", fontSize: 11, fontWeight: "600", color: gray(0.45), textTransform: "uppercase", letterSpacing: 0.5 }}>Translate to</div>
           {TRANSLATION_LANGUAGES.map((lang) => (
             <div
               key={lang.code}
               onClick={() => handleSelectLanguage(lang.code)}
-              style={{ padding: "7px 12px", cursor: "pointer", borderRadius: 4, fontSize: 14, color: "#333" }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgb(235,235,235)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+              style={{ padding: "9px 14px", cursor: "pointer", borderRadius: 5, fontSize: 15, fontWeight: "500", color: C.text }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.blue; e.currentTarget.style.color = "white"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.text; }}
             >
               {lang.label}
             </div>

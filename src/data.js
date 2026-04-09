@@ -296,8 +296,6 @@ export const ALERT_SCREEN_PROTO = {
 };
 
 export const SMS_PROTO = {
-  firstName: "",
-  lastName: "",
   phoneNumber: "",
   canRespond: false,
   millis: "",
@@ -313,6 +311,8 @@ export const SMS_PROTO = {
   senderUserObj: "",
   status: "",
   errorMessage: "",
+  originalMessage: "",
+  translatedFrom: "",
 };
 
 // payments stuff ///////////////////////////////////////////////////////////

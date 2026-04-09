@@ -2772,6 +2772,8 @@ export async function dbSendSMS(
       mediaUrls: message.mediaUrls || [],
       canRespond: message.canRespond || null,
       forwardTo: message.forwardTo || null,
+      customerFirst: message.customerFirst || "",
+      customerLast: message.customerLast || "",
     };
 
     // Call the enhanced SMS function

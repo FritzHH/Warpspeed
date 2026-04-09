@@ -13,7 +13,6 @@ import {
 import { createPortal } from "react-dom";
 import {
   capitalizeFirstLetterOfString,
-  combine2ArraysOrderByMillis,
   calculateRunningTotals,
   dim,
   formatDateTimeForReceipt,
@@ -90,6 +89,14 @@ const TEXT_TEMPLATE_VARIABLES = [
   { label: "Store Phone", variable: "{storePhone}" },
 ];
 
+// Auto-capitalize: first letter, after sentence-ending punctuation, standalone "i"
+function autoCapitalize(val) {
+  if (!val) return val;
+  if (val.length > 10000) val = val.slice(0, 10000);
+  val = val.replace(/(^|[.!?]\s+)([a-z])/g, (m, before, letter) => before + letter.toUpperCase());
+  val = val.replace(/(^|\s)i(?=$|\s|[.,!?;:'])/g, (m, before) => before + "I");
+  return val;
+}
 
 export function MessagesComponent({}) {
   // getters ///////////////////////////////////////////////////////////////
@@ -102,12 +109,7 @@ export function MessagesComponent({}) {
   const zAllWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const hasCustomer = !!zCustomer?.id && !!zCustomer?.customerCell;
   const zSettings = useSettingsStore((state) => state.settings);
-  const zIncomingMessagesArr = useCustMessagesStore(
-    (state) => state.incomingMessages
-  );
-  const zOutgoingMessagesArr = useCustMessagesStore(
-    (state) => state.outgoingMessages
-  );
+  const zMessages = useCustMessagesStore((state) => state.messages);
   const zMessagesLoading = useCustMessagesStore((state) => state.messagesLoading);
   const zMessagesLoadingMore = useCustMessagesStore((state) => state.messagesLoadingMore);
   const zMessagesHasMore = useCustMessagesStore((state) => state.messagesHasMore);
@@ -163,8 +165,7 @@ export function MessagesComponent({}) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Cap at 10,000 characters
-    if (val.length > 10000) val = val.slice(0, 10000);
+    val = autoCapitalize(val);
 
     // Update state immediately for responsive UI
     _setNewMessage(val);
@@ -209,6 +210,10 @@ export function MessagesComponent({}) {
       store.setMessagesHasMore(result.hasMore);
       store.setMessagesNextCursor(result.nextPageTimestamp);
       store.setMessagesLoadingMore(false);
+      // Update IndexedDB cache with full merged array
+      let allMessages = useCustMessagesStore.getState().getMessages();
+      let phone = useCustMessagesStore.getState().getMessagesPhone();
+      if (phone) store.setHubCachedThread(phone, allMessages, !result.hasMore);
     }).catch(() => {
       useCustMessagesStore.getState().setMessagesLoadingMore(false);
     });
@@ -234,28 +239,22 @@ export function MessagesComponent({}) {
     _setCustomPhoneMessages([]);
   }, [sCustomPhoneMode, sCustomPhone]);
 
-  // log("res", sCanRespond);
   useEffect(() => {
     try {
-      let arr = combine2ArraysOrderByMillis(
-        zIncomingMessagesArr,
-        zOutgoingMessagesArr
-      );
-
       // Read canRespond from thread parent doc (not from individual messages)
       if (!userOverrodeCanRespondRef.current && zCustomer?.customerCell) {
         let thread = zSmsThreads.find(t => t.phone === zCustomer.customerCell);
         if (thread) _setCanRespond(thread.canRespond !== undefined ? !!thread.canRespond : true);
       }
 
-      if (arr.length - 1 > 0) {
+      if (zMessages.length > 0) {
         messageListRef.current?.scrollToIndex({
-          index: arr.length - 1,
+          index: zMessages.length - 1,
           animated: true,
         });
       }
     } catch (e) {}
-  }, [zIncomingMessagesArr, zOutgoingMessagesArr]);
+  }, [zMessages]);
 
   // Auto-scroll custom phone messages to bottom
   useEffect(() => {
@@ -341,12 +340,18 @@ export function MessagesComponent({}) {
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
       userOverrodeForwardRef.current = false;
       userOverrodeCanRespondRef.current = false;
+
+      let isTranslated = !!(translatedText && sFromLang && sToLang && sFromLang !== sToLang);
+      let sendText = isTranslated ? translatedText : text;
+      let originalText = isTranslated ? text : "";
+      let translatedFromLang = isTranslated ? sFromLang : "";
+
       _setNewMessage("");
       _setInputHeight(36);
       _setShowReplyModal(false);
       clearTranslation();
 
-      let chunks = splitIntoChunks(text || "");
+      let chunks = splitIntoChunks(sendText || "");
       let anyFailed = false;
       let lastError = "";
 
@@ -354,13 +359,18 @@ export function MessagesComponent({}) {
         let isLastChunk = i === chunks.length - 1;
         let msg = { ...SMS_PROTO };
         msg.message = chunks[i];
+        if (i === 0 && originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; }
         msg.imageUrl = i === 0 ? imageUrl : "";
         msg.phoneNumber = sendPhone;
-        msg.firstName = sCustomPhoneMode ? "" : zCustomer.first;
-        msg.lastName = sCustomPhoneMode ? "" : zCustomer.last;
         msg.canRespond = isLastChunk && useCanRespond ? true : null;
         msg.millis = new Date().getTime() + i;
         msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
+        if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
+        if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
+        if (sCustomPhoneMode) {
+          let matchedWO = zAllWorkorders.find(wo => wo.customerCell === sendPhone);
+          if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
+        }
         msg.id = crypto.randomUUID();
         msg.type = "outgoing";
         msg.senderUserObj = zCurrentUserObj;
@@ -612,11 +622,15 @@ export function MessagesComponent({}) {
       msg.message = mediaText;
       msg.mediaUrls = mediaItems.map((m) => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.type === "video" ? "video/mp4" : "image/jpeg" }));
       msg.phoneNumber = sendPhone;
-      msg.firstName = sCustomPhoneMode ? "" : zCustomer.first;
-      msg.lastName = sCustomPhoneMode ? "" : zCustomer.last;
       msg.canRespond = useCanRespond ? true : null;
       msg.millis = new Date().getTime();
       msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
+      if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
+      if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
+      if (sCustomPhoneMode) {
+        let matchedWO = zAllWorkorders.find(wo => wo.customerCell === sendPhone);
+        if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
+      }
       msg.id = crypto.randomUUID();
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
@@ -663,11 +677,10 @@ export function MessagesComponent({}) {
   if (sCustomPhoneMode) {
     messagesArr = sCustomPhoneMessages;
   } else {
-    messagesArr = combine2ArraysOrderByMillis(
-      zIncomingMessagesArr,
-      zOutgoingMessagesArr
-    );
+    messagesArr = zMessages;
   }
+
+  let customerThread = zSmsThreads.find(t => t.phone === (sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell));
 
   let lastOutgoingID = null;
   for (let i = messagesArr.length - 1; i >= 0; i--) {
@@ -736,18 +749,10 @@ export function MessagesComponent({}) {
   async function handleToggleBlockResponses() {
     let phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
     if (!phone || phone.length !== 10) return;
-    let outgoing = (sCustomPhoneMode ? sCustomPhoneMessages : zOutgoingMessagesArr).filter(m => m.type === "outgoing");
-    if (!outgoing.length) return;
-    let sorted = [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0));
-    let lastOutgoing = sorted[0];
-    if (!lastOutgoing?.id) return;
     let newCanRespond = sCanRespond ? null : true;
-    let result = await dbUpdateMessageCanRespond(phone, lastOutgoing.id, newCanRespond);
-    if (result.success) {
-      userOverrodeCanRespondRef.current = true;
-      _setCanRespond(!sCanRespond);
-      useCustMessagesStore.getState().updateMessageField(lastOutgoing.id, "canRespond", newCanRespond);
-    }
+    userOverrodeCanRespondRef.current = true;
+    _setCanRespond(!sCanRespond);
+    await dbUpdateMessageCanRespond(phone, null, newCanRespond);
   }
 
   // Whether the compose area should show
@@ -945,7 +950,7 @@ export function MessagesComponent({}) {
                 if (item.type === "incoming")
                   return <IncomingMessageComponent msgObj={item} />;
                 let isLast = (item.id || item.millis) === lastOutgoingID;
-                return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} />;
+                return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={customerThread} onToggleBlock={handleToggleBlockResponses} />;
               }}
               onScroll={(e) => {
                 if (sCustomPhoneMode) return;
@@ -1161,14 +1166,6 @@ export function MessagesComponent({}) {
                     openUpward={true}
                   />
                 </Tooltip>
-                <Tooltip text={sCanRespond ? "Block response" : "Allow responses from user"} position="top">
-                  <TouchableOpacity
-                    onPress={handleToggleBlockResponses}
-                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                  >
-                    <Image_ icon={sCanRespond ? ICONS.unblock : ICONS.blocked} size={35} />
-                  </TouchableOpacity>
-                </Tooltip>
                 {hasCustomer && !sCustomPhoneMode ? (
                   <Tooltip text="Messages Hub" position="top">
                     <TouchableOpacity
@@ -1220,9 +1217,7 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
   let formattedPhone = formatPhoneWithDashes(thread.phone);
   let customerName = activeWO
     ? (activeWO.customerFirst + " " + activeWO.customerLast).trim()
-    : thread.customerInfo
-      ? ((thread.customerInfo.first || "") + " " + (thread.customerInfo.last || "")).trim()
-      : "";
+    : ((thread.customerFirst || "") + " " + (thread.customerLast || "")).trim();
   let dateObj = formatDateTimeForReceipt(null, thread.lastMillis);
   let preview = thread.lastMessage || (thread.hasMedia ? "[Media]" : "");
 
@@ -1302,8 +1297,11 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
   const [sToLang, _setToLang] = useState("en");
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
   const [sForwardReplies, _setForwardReplies] = useState(false);
+  const [sHubMediaUploading, _setHubMediaUploading] = useState(false);
+  const [sHubInputHeight, _setHubInputHeight] = useState(36);
   const messageListRef = useRef(null);
   const pendingSendTextRef = useRef("");
+  const hubFileInputRef = useRef(null);
   const sMessagesRef = useRef([]);
   const noMoreRef = useRef(false);
 
@@ -1321,6 +1319,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
     if (!phone || phone.length !== 10) { _setMessages([]); _setListenerConnecting(false); return; }
     let cancelled = false;
     _setNewMessage("");
+    _setHubInputHeight(36);
     _setShowReplyModal(false);
     _setForwardReplies(false);
     _setLoadingMore(false);
@@ -1431,13 +1430,21 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
 
   async function doSend(text, canRespondVal, forwardOverride) {
     if (!text?.trim() || !phone || phone.length !== 10) return;
+
+    let isTranslated = !!(translatedText && sFromLang && sToLang && sFromLang !== sToLang);
+    let sendText = isTranslated ? translatedText : text;
+    let originalText = isTranslated ? text : "";
+    let translatedFromLang = isTranslated ? sFromLang : "";
+
     _setNewMessage("");
+    _setHubInputHeight(36);
     clearTranslation();
     useLoginStore.getState().requireLogin(async () => {
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
       let msg = { ...SMS_PROTO };
-      msg.message = text;
+      msg.message = sendText;
+      if (originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; }
       msg.phoneNumber = phone;
       msg.canRespond = canRespondVal ? true : null;
       msg.millis = Date.now();
@@ -1445,6 +1452,8 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
       if (forwardTo) msg.forwardTo = forwardTo;
+      let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
+      if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
       let optimistic = { ...msg, status: "sending" };
       let addedMessages = [...sMessagesRef.current, optimistic];
       sMessagesRef.current = addedMessages;
@@ -1504,32 +1513,109 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
     updateCache(updated, noMoreRef.current);
   }
 
+  async function handleHubFilesSelected(e) {
+    let files = Array.from(e.target.files);
+    if (!files.length || !phone || phone.length !== 10) return;
+    _setHubMediaUploading(true);
+    try {
+      const { uploadFileToStorage } = await import("../../../db_calls");
+      const { compressImage } = await import("../../../utils");
+      let zSettings = useSettingsStore.getState().settings;
+      let tenantID = zSettings?.tenantID;
+      let storeID = zSettings?.storeID;
+      let storeName = zSettings?.storeInfo?.displayName || "Our store";
+      let mediaItems = [];
+      for (let i = 0; i < files.length; i++) {
+        let file = files[i];
+        let timestamp = Date.now();
+        let storagePath = `${tenantID}/${storeID}/message-media/${timestamp}_${file.name}`;
+        let result = await uploadFileToStorage(file, storagePath);
+        if (!result.success) { log("Hub media upload failed:", result.error); continue; }
+        let thumbnailUrl = "";
+        if (file.type.startsWith("image")) {
+          let thumbBlob = await compressImage(file, 300, 0.5);
+          if (thumbBlob) {
+            let thumbPath = `${tenantID}/${storeID}/message-media/thumbnails/${timestamp}_${file.name}`;
+            let thumbResult = await uploadFileToStorage(thumbBlob, thumbPath);
+            if (thumbResult.success) thumbnailUrl = thumbResult.downloadURL;
+          }
+        }
+        let isVideo = file.type.startsWith("video");
+        mediaItems.push({ url: result.downloadURL, thumbnailUrl, type: isVideo ? "video" : "image", contentType: isVideo ? "video/mp4" : "image/jpeg" });
+      }
+      if (hubFileInputRef.current) hubFileInputRef.current.value = "";
+      if (!mediaItems.length) { _setHubMediaUploading(false); return; }
+      // Build and send media message using same pattern as customer messages sendMediaMessage
+      useLoginStore.getState().requireLogin(async () => {
+        let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+        let hasImages = mediaItems.some(m => m.type === "image");
+        let hasVideos = mediaItems.some(m => m.type === "video");
+        let imageCount = mediaItems.filter(m => m.type === "image").length;
+        let videoCount = mediaItems.filter(m => m.type === "video").length;
+        let parts = [];
+        if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
+        if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
+        let mediaText = storeName + " has sent you " + parts.join(" and ");
+        let msg = { ...SMS_PROTO };
+        msg.message = mediaText;
+        msg.mediaUrls = mediaItems.map(m => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.contentType }));
+        msg.phoneNumber = phone;
+        msg.canRespond = sCanRespond ? true : null;
+        msg.millis = Date.now();
+        msg.id = crypto.randomUUID();
+        msg.type = "outgoing";
+        msg.senderUserObj = zCurrentUserObj;
+        let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
+        if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
+        let optimistic = { ...msg, status: "sending" };
+        let addedMessages = [...sMessagesRef.current, optimistic];
+        sMessagesRef.current = addedMessages;
+        _setMessages(addedMessages);
+        updateCache(addedMessages, noMoreRef.current);
+        _setHubMediaUploading(false);
+        let result = await smsService.send(msg);
+        let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: result.success ? "sent" : "failed" } : m);
+        sMessagesRef.current = updatedMessages;
+        _setMessages(updatedMessages);
+        updateCache(updatedMessages, noMoreRef.current);
+        if (!result.success) {
+          useAlertScreenStore.getState().setValues({
+            title: "Message Failed", message: result.error || "Failed to send media",
+            btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+            showAlert: true, canExitOnOuterClick: true,
+          });
+        }
+      });
+    } catch (err) {
+      log("Hub media upload error:", err);
+      _setHubMediaUploading(false);
+      if (hubFileInputRef.current) hubFileInputRef.current.value = "";
+    }
+  }
+
   let lastOutgoingID = null;
   for (let i = sMessages.length - 1; i >= 0; i--) {
     if (sMessages[i].type === "outgoing") { lastOutgoingID = sMessages[i].id || sMessages[i].millis; break; }
   }
 
-  let customerInfo = thread?.customerInfo;
-  let customerName = customerInfo ? ((customerInfo.first || "") + " " + (customerInfo.last || "")).trim() : "";
+  let customerName = ((thread?.customerFirst || "") + " " + (thread?.customerLast || "")).trim();
 
   return (
     <View style={{ flex: 1, flexDirection: "column" }}>
       {/* Header */}
-      <View style={{ paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: gray(0.1), flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <View>
-          <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text }}>{formatPhoneWithDashes(phone)}</Text>
-          {customerName ? <Text style={{ fontSize: 13, color: C.blue, marginTop: 2 }}>{customerName}</Text> : null}
+      <View style={{ paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: gray(0.1), flexDirection: "row", alignItems: "center" }}>
+        <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text }}>{formatPhoneWithDashes(phone)}</Text>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          {customerName ? <Text style={{ fontSize: 13, color: C.blue }} numberOfLines={1}>{customerName}</Text>
+          : !thread && !sListenerConnecting ? (
+            <View style={{ backgroundColor: C.green, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4 }}>
+              <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>New Thread</Text>
+            </View>
+          ) : sListenerConnecting ? <ActivityIndicator size={16} color="#007bff" /> : null}
         </View>
-        {!thread && !sListenerConnecting ? (
-          <View style={{ backgroundColor: C.green, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4 }}>
-            <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>New Thread</Text>
-          </View>
-        ) : sListenerConnecting ? <ActivityIndicator size={16} color="#007bff" /> : null}
-        {(
-          <TouchableOpacity onPress={handleLoadMore} disabled={sLoadingMore || sNoMoreHistory} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: (sLoadingMore || sNoMoreHistory) ? gray(0.15) : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}>
-            {sLoadingMore ? <SmallLoadingIndicator /> : <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Load more</Text>}
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity onPress={handleLoadMore} disabled={sLoadingMore || sNoMoreHistory} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: (sLoadingMore || sNoMoreHistory) ? gray(0.15) : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}>
+          {sLoadingMore ? <SmallLoadingIndicator /> : <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Load more</Text>}
+        </TouchableOpacity>
       </View>
       {/* Messages */}
       <View style={{ flex: 1, overflow: "hidden" }}>
@@ -1545,7 +1631,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
             renderItem={({ item }) => {
               if (item.type === "incoming") return <IncomingMessageComponent msgObj={item} />;
               let isLast = (item.id || item.millis) === lastOutgoingID;
-              return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={thread} />;
+              return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={thread} onToggleBlock={handleToggleBlock} />;
             }}
             onScrollToIndexFailed={(info) => {
               setTimeout(() => { messageListRef.current?.scrollToIndex({ index: info.index, animated: true }); }, 50);
@@ -1580,14 +1666,38 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
         <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
           <TextInput
             onChangeText={(val) => {
-              if (val.length > 10000) val = val.slice(0, 10000);
+              val = autoCapitalize(val);
               _setNewMessage(val);
               if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(val, sToLang);
             }}
             multiline={true}
             placeholder="Message..."
             placeholderTextColor="gray"
-            style={{ outlineStyle: "none", borderWidth: 0, color: C.text, paddingLeft: 5, paddingRight: 4, marginVertical: 8, fontSize: 15, lineHeight: 20, minHeight: 36, flex: 1 }}
+            onContentSizeChange={(e) => {
+              let h = e?.nativeEvent?.contentSize?.height;
+              if (typeof h === "number" && h > 0) {
+                _setHubInputHeight(Math.max(36, Math.ceil(h)));
+              }
+            }}
+            style={{
+              outlineStyle: "none",
+              outlineColor: "transparent",
+              outlineWidth: 0,
+              borderWidth: 0,
+              borderColor: "transparent",
+              color: C.text,
+              paddingTop: 0,
+              paddingBottom: 0,
+              paddingLeft: 5,
+              paddingRight: 4,
+              marginVertical: 8,
+              fontSize: 15,
+              lineHeight: 20,
+              height: sHubInputHeight,
+              overflow: "hidden",
+              flex: 1,
+              textAlignVertical: "top",
+            }}
             value={sNewMessage}
           />
           <TouchableOpacity onPress={handleSend} style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() ? 1 : 0.3 }}>
@@ -1620,9 +1730,23 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
               openUpward={true}
             />
           </View>
-          <Tooltip text={sCanRespond ? "Block response" : "Allow responses from user"} position="top">
-            <TouchableOpacity onPress={handleToggleBlock} style={{ alignItems: "center", justifyContent: "center", padding: 6 }}>
-              <Image_ icon={sCanRespond ? ICONS.unblock : ICONS.blocked} size={35} />
+          <input
+            ref={hubFileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onChange={handleHubFilesSelected}
+            style={{ display: "none" }}
+          />
+          <Tooltip text={sHubMediaUploading ? "Uploading..." : "Send photo/video"} position="top">
+            <TouchableOpacity
+              onPress={() => !sHubMediaUploading && hubFileInputRef.current?.click()}
+              style={{ alignItems: "center", justifyContent: "center", padding: 6, opacity: sHubMediaUploading ? 0.4 : 1 }}
+            >
+              {sHubMediaUploading
+                ? <SmallLoadingIndicator />
+                : <Image_ icon={ICONS.uploadCamera} size={35} />
+              }
             </TouchableOpacity>
           </Tooltip>
           {onShowPhoneEntry && (
@@ -1832,7 +1956,7 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
 const IncomingMessageComponent = memo(({ msgObj }) => {
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
   let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
-  let backgroundColor = hasMedia && !msgObj.message ? "transparent" : "rgb(230,230,230)";
+  let backgroundColor = hasMedia ? "transparent" : "rgb(230,230,230)";
   return (
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
@@ -1868,7 +1992,7 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
   );
 });
 
-const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread }) => {
+const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread, onToggleBlock }) => {
   // Use live delivery status from thread parent doc for the last outgoing message
   let displayStatus = msgObj.status;
   if (isLastOutgoing && thread?.lastOutgoingMessageID === msgObj.id && thread?.lastOutgoingMessageStatus) {
@@ -1877,17 +2001,18 @@ const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread }) => {
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
   let isFailed = displayStatus === "failed" || displayStatus === "undelivered";
   let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
-  let backgroundColor = hasMedia && !msgObj.message ? "transparent" : (isFailed ? "rgb(200,80,80)" : "rgb(0,122,255)");
+  let backgroundColor = hasMedia ? "transparent" : (isFailed ? "rgb(200,80,80)" : "rgb(0,122,255)");
   let showStatusIcons = isLastOutgoing;
   // Read forwardTo from thread parent doc instead of individual message
   let hasForward = showStatusIcons && thread?.forwardTo && Object.keys(thread.forwardTo).length > 0;
+  let isResponding = (thread?.canRespond !== undefined ? thread.canRespond : msgObj.canRespond);
   return (
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, flexDirection: "row", alignItems: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
         {showStatusIcons && (
-          <View style={{ alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
-            <Image source={(thread?.canRespond !== undefined ? thread.canRespond : msgObj.canRespond) ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
-          </View>
+          <TouchableOpacity onPress={onToggleBlock} style={{ alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
+            <Image source={isResponding ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
+          </TouchableOpacity>
         )}
         <View style={{ flex: 1 }}>
           {msgObj.mediaUrls?.length > 0 ? (
@@ -1901,6 +2026,11 @@ const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread }) => {
           ) : null}
           {msgObj.message ? (
             <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
+          ) : null}
+          {msgObj.originalMessage ? (
+            <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontStyle: "italic", marginTop: 3 }}>
+              {"Original" + (msgObj.translatedFrom ? " (" + (TRANSLATION_LANGUAGES.find(l => l.code === msgObj.translatedFrom)?.label || msgObj.translatedFrom) + ")" : "") + ": " + msgObj.originalMessage}
+            </Text>
           ) : null}
         </View>
         {hasForward && (

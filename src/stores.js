@@ -899,8 +899,7 @@ Promise.resolve().then(() => {
 });
 
 export const useCustMessagesStore = create((set, get) => ({
-  incomingMessages: [],
-  outgoingMessages: [],
+  messages: [],
   messagesLoading: false,
   messagesHasMore: false,
   messagesNextCursor: null,
@@ -944,56 +943,60 @@ export const useCustMessagesStore = create((set, get) => ({
     set({ hubConversationCache: {} });
   },
 
-  getIncomingMessages: () => get().incomingMessages,
-  getOutgoingMessages: () => get().outgoingMessages,
+  getMessages: () => get().messages,
   getMessagesLoading: () => get().messagesLoading,
   getMessagesHasMore: () => get().messagesHasMore,
   getMessagesNextCursor: () => get().messagesNextCursor,
   getMessagesLoadingMore: () => get().messagesLoadingMore,
   getMessagesPhone: () => get().messagesPhone,
 
+  setMessages: (messages) => set({ messages }),
   setMessagesLoading: (messagesLoading) => set({ messagesLoading }),
   setMessagesHasMore: (messagesHasMore) => set({ messagesHasMore }),
   setMessagesNextCursor: (messagesNextCursor) => set({ messagesNextCursor }),
   setMessagesLoadingMore: (messagesLoadingMore) => set({ messagesLoadingMore }),
   setMessagesPhone: (messagesPhone) => set({ messagesPhone }),
-  setOutgoingMessages: (outgoingMessages) => set({ outgoingMessages }),
-  setIncomingMessages: (incomingMessages) => set({ incomingMessages }),
-  setIncomingMessage: (obj) => {
-    let messages = get().incomingMessages;
-    if (checkArr(messages, obj)) return;
-    set((state) => ({
-      incomingMessages: [...state.incomingMessages, obj],
-    }));
-  },
+  // Add single message with dedup (used by smsService.send and handleSendWorkorderTicket)
   setOutgoingMessage: (message) => {
-    let messages = get().outgoingMessages;
-    if (checkArr(messages, message)) return;
-    set((state) => ({
-      outgoingMessages: [...state.outgoingMessages, message],
-    }));
+    set((state) => {
+      if (state.messages.find(m => m.id === message.id)) return state;
+      let merged = [...state.messages, message].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+      return { messages: merged };
+    });
+  },
+  // Atomic merge with dedup (used by listener)
+  mergeMessages: (newMsgs) => {
+    set((state) => {
+      let ids = new Set(state.messages.map(m => m.id));
+      let fresh = newMsgs.filter(m => !ids.has(m.id));
+      if (!fresh.length) return state;
+      let merged = [...state.messages, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+      return { messages: merged };
+    });
   },
   updateMessageStatus: (messageId, status, errorMessage) => {
     set((state) => ({
-      outgoingMessages: state.outgoingMessages.map((msg) =>
+      messages: state.messages.map((msg) =>
         msg.id === messageId ? { ...msg, status, errorMessage: errorMessage || "" } : msg
       ),
     }));
   },
   updateMessageField: (messageId, field, value) => {
     set((state) => ({
-      outgoingMessages: state.outgoingMessages.map((msg) =>
+      messages: state.messages.map((msg) =>
         msg.id === messageId ? { ...msg, [field]: value } : msg
       ),
     }));
   },
+  // Atomic prepend with dedup (used by pagination)
   prependMessages: (newMessages) => {
-    let newIncoming = newMessages.filter((m) => m.type === "incoming");
-    let newOutgoing = newMessages.filter((m) => m.type !== "incoming");
-    set((state) => ({
-      incomingMessages: [...newIncoming, ...state.incomingMessages],
-      outgoingMessages: [...newOutgoing, ...state.outgoingMessages],
-    }));
+    set((state) => {
+      let ids = new Set(state.messages.map(m => m.id));
+      let fresh = newMessages.filter(m => !ids.has(m.id));
+      if (!fresh.length) return state;
+      let merged = [...fresh, ...state.messages].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+      return { messages: merged };
+    });
   },
   setMessagesUnsub: (unsub) => {
     let prev = get()._messagesUnsub;
@@ -1004,8 +1007,7 @@ export const useCustMessagesStore = create((set, get) => ({
     let prev = get()._messagesUnsub;
     if (prev) prev();
     set({
-      incomingMessages: [],
-      outgoingMessages: [],
+      messages: [],
       messagesLoading: false,
       messagesHasMore: false,
       messagesNextCursor: null,

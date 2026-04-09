@@ -72,8 +72,8 @@ export function MobileMessagesScreen() {
       let msg = { ...SMS_PROTO };
       msg.message = sNewMessage.trim();
       msg.phoneNumber = customerPhone;
-      msg.firstName = customerFirst;
-      msg.lastName = customerLast;
+      if (customerFirst) msg.customerFirst = customerFirst;
+      if (customerLast) msg.customerLast = customerLast;
       msg.canRespond = null;
       msg.millis = new Date().getTime();
       msg.customerID = customerID;

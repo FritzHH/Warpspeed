@@ -121,8 +121,6 @@ onInit(async () => {
 }, [stripeSecretKey, firebaseServiceAccountKey]);
 
 const SMS_PROTO = {
-  firstName: "",
-  lastName: "",
   phoneNumber: "",
   canRespond: false,
   millis: "",
@@ -701,6 +699,8 @@ exports.sendSMSEnhanced = onCall(
         canRespond: canRespondParam = false,
         forwardTo: forwardToParam = null,
         fromNumber = "+12393171234", // Default from number
+        customerFirst = "",
+        customerLast = "",
       } = request.data;
 
       // Validate required fields
@@ -832,6 +832,8 @@ exports.sendSMSEnhanced = onCall(
             lastOutgoingMessageStatus: twilioResponse.status || "queued",
             lastOutgoingMillis: Date.now(),
             forwardTo: currentForwardTo,
+            ...(customerFirst ? { customerFirst } : {}),
+            ...(customerLast ? { customerLast } : {}),
           }, { merge: true });
 
           log("Outgoing message stored", {
@@ -1345,6 +1347,8 @@ exports.incomingSMSEnhanced = onRequest(
           lastType: "incoming",
           hasMedia: numMedia > 0,
           threadStatus: threadStatus,
+          ...(customerData.first ? { customerFirst: customerData.first } : {}),
+          ...(customerData.last ? { customerLast: customerData.last } : {}),
         }, { merge: true });
 
         log("Incoming message stored successfully", {

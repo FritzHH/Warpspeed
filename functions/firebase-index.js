@@ -701,6 +701,9 @@ exports.sendSMSEnhanced = onCall(
         fromNumber = "+12393171234", // Default from number
         customerFirst = "",
         customerLast = "",
+        originalMessage = "",
+        translatedFrom = "",
+        translatedTo = "",
       } = request.data;
 
       // Validate required fields
@@ -842,6 +845,9 @@ exports.sendSMSEnhanced = onCall(
             canRespond: canRespondParam || null,
             ...(mediaUrlsParam.length > 0 ? { mediaUrls: mediaUrlsParam } : {}),
             ...(imageUrl && !mediaUrlsParam.length ? { imageUrl: imageUrl } : {}),
+            ...(originalMessage ? { originalMessage } : {}),
+            ...(translatedFrom ? { translatedFrom } : {}),
+            ...(translatedTo ? { translatedTo } : {}),
           });
 
           // Update conversation root with denormalized thread metadata

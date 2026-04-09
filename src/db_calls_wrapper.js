@@ -2774,6 +2774,9 @@ export async function dbSendSMS(
       forwardTo: message.forwardTo || null,
       customerFirst: message.customerFirst || "",
       customerLast: message.customerLast || "",
+      ...(message.originalMessage ? { originalMessage: message.originalMessage } : {}),
+      ...(message.translatedFrom ? { translatedFrom: message.translatedFrom } : {}),
+      ...(message.translatedTo ? { translatedTo: message.translatedTo } : {}),
     };
 
     // Call the enhanced SMS function

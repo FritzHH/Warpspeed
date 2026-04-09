@@ -144,6 +144,15 @@ export const useTabNamesStore = create(
       dashboardQBMenuPath: [],
       getDashboardQBMenuPath: () => get().dashboardQBMenuPath,
       setDashboardQBMenuPath: (val) => set({ dashboardQBMenuPath: val }),
+
+      // Messages Hub persistent state
+      messagesHubMode: false,
+      getMessagesHubMode: () => get().messagesHubMode,
+      setMessagesHubMode: (val) => set({ messagesHubMode: val }),
+
+      messagesHubPhone: "",
+      getMessagesHubPhone: () => get().messagesHubPhone,
+      setMessagesHubPhone: (val) => set({ messagesHubPhone: val }),
     }),
     {
       name: "warpspeed_tabs",
@@ -151,6 +160,8 @@ export const useTabNamesStore = create(
         infoTabName: s.infoTabName,
         itemsTabName: s.itemsTabName,
         optionsTabName: s.optionsTabName,
+        messagesHubMode: s.messagesHubMode,
+        messagesHubPhone: s.messagesHubPhone,
       }),
       merge: (persisted, current) => {
         let merged = { ...current, ...persisted };

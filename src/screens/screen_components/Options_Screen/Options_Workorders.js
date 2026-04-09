@@ -402,8 +402,10 @@ export function WorkordersComponent({}) {
     // Check hub cache first (shared with hub conversation panel)
     let cached = msgStore.getHubCachedThread(customerCell);
     if (cached && cached.messages.length > 0) {
-      msgStore.setMessages(cached.messages);
-      msgStore.setMessagesHasMore(!cached.noMoreHistory);
+      let recent = cached.messages.slice(-7);
+      msgStore.setMessages(recent);
+      msgStore.setMessagesHasMore(cached.messages.length > 7 || !cached.noMoreHistory);
+      if (recent.length > 0) msgStore.setMessagesNextCursor(recent[0].millis);
       setupCustomerMessageListener(customerCell, cached.messages);
       return;
     }
@@ -417,7 +419,10 @@ export function WorkordersComponent({}) {
         if (idbMsgs.length > 0 && useCustMessagesStore.getState().getMessagesPhone() === customerCell) {
           let store = useCustMessagesStore.getState();
           let sorted = idbMsgs.sort((a, b) => (a.millis || 0) - (b.millis || 0));
-          store.setMessages(sorted);
+          let recent = sorted.slice(-7);
+          store.setMessages(recent);
+          store.setMessagesHasMore(sorted.length > 7);
+          if (recent.length > 0) store.setMessagesNextCursor(recent[0].millis);
           store.setMessagesLoading(false);
           store.setHubCachedThread(customerCell, sorted, false);
           setupCustomerMessageListener(customerCell, sorted);

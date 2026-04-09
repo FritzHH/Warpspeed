@@ -64,6 +64,7 @@ import {
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
 import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbGetCustomer } from "../../../db_calls_wrapper";
+import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
 import { ReplyOptionsBar, scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "./ReplyOptionsBar";
@@ -146,11 +147,29 @@ export function MessagesComponent({}) {
   const userOverrodeForwardRef = useRef(false);
   const userOverrodeCanRespondRef = useRef(false);
   const isUnmodifiedTemplateRef = useRef(false);
+  const hasInitialScrolledRef = useRef(false);
+  const lastMsgIdRef = useRef(null);
 
   // Hub mode (replaces custom phone dialer)
   // Hub cache is now loaded from IndexedDB on app start (BaseScreen)
-  const [sHubMode, _setHubMode] = useState(false);
-  const [sHubSelectedPhone, _setHubSelectedPhone] = useState("");
+  const [sHubMode, __setHubMode] = useState(() => useTabNamesStore.getState().getMessagesHubMode());
+  const [sHubSelectedPhone, __setHubSelectedPhone] = useState(() => useTabNamesStore.getState().getMessagesHubPhone());
+
+  const _setHubMode = useCallback((valOrFn) => {
+    __setHubMode((prev) => {
+      let val = typeof valOrFn === "function" ? valOrFn(prev) : valOrFn;
+      useTabNamesStore.getState().setMessagesHubMode(val);
+      return val;
+    });
+  }, []);
+
+  const _setHubSelectedPhone = useCallback((valOrFn) => {
+    __setHubSelectedPhone((prev) => {
+      let val = typeof valOrFn === "function" ? valOrFn(prev) : valOrFn;
+      useTabNamesStore.getState().setMessagesHubPhone(val);
+      return val;
+    });
+  }, []);
   const [sHubNewPhone, _setHubNewPhone] = useState("");
   const [sHubSidebarCollapsed, _setHubSidebarCollapsed] = useState(false);
   const [sHubSidebarFullWidth, _setHubSidebarFullWidth] = useState(false);
@@ -203,7 +222,7 @@ export function MessagesComponent({}) {
     let cursor = msgStore.messagesNextCursor;
     if (!cursor) return;
     msgStore.setMessagesLoadingMore(true);
-    dbGetCustomerMessages(msgStore.messagesPhone, cursor, 10).then((result) => {
+    dbGetCustomerMessages(msgStore.messagesPhone, cursor, 7).then((result) => {
       if (!result.success) {
         useCustMessagesStore.getState().setMessagesLoadingMore(false);
         return;
@@ -249,14 +268,19 @@ export function MessagesComponent({}) {
         let thread = zSmsThreads.find(t => t.phone === zCustomer.customerCell);
         if (thread) _setCanRespond(thread.canRespond !== undefined ? !!thread.canRespond : true);
       }
-
-      if (zMessages.length > 0) {
-        messageListRef.current?.scrollToIndex({
-          index: zMessages.length - 1,
-          animated: true,
-        });
-      }
     } catch (e) {}
+
+    // Scroll: reset refs when messages clear, let onContentSizeChange handle initial
+    if (zMessages.length === 0) {
+      hasInitialScrolledRef.current = false;
+      lastMsgIdRef.current = null;
+      return;
+    }
+    if (!hasInitialScrolledRef.current) return;
+    let lastId = zMessages[zMessages.length - 1]?.id;
+    if (lastId === lastMsgIdRef.current) return;
+    lastMsgIdRef.current = lastId;
+    try { messageListRef.current?.scrollToEnd({ animated: true }); } catch (e) {}
   }, [zMessages]);
 
   // Auto-scroll custom phone messages to bottom
@@ -980,13 +1004,14 @@ export function MessagesComponent({}) {
             )}
             <FlatList
               onScrollToIndexFailed={(info) => {
-                const wait = new Promise((resolve) => setTimeout(resolve, 50));
-                wait.then(() => {
-                  messageListRef.current?.scrollToIndex({
-                    index: info.index,
-                    animated: true,
-                  });
-                });
+                setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 50);
+              }}
+              onContentSizeChange={() => {
+                if (!hasInitialScrolledRef.current && messagesArr.length > 0) {
+                  hasInitialScrolledRef.current = true;
+                  lastMsgIdRef.current = messagesArr[messagesArr.length - 1]?.id;
+                  messageListRef.current?.scrollToEnd({ animated: false });
+                }
               }}
               ref={messageListRef}
               data={messagesArr}
@@ -1049,14 +1074,14 @@ export function MessagesComponent({}) {
               width: "100%",
           }}
         >
-          {(sFromLang && sToLang && sFromLang !== sToLang) && (translatedText || sTranslateLoading) ? (
+          {(sFromLang && sToLang && sFromLang !== sToLang) && sNewMessage.trim() ? (
             <View style={{
               padding: 6, marginBottom: 4, backgroundColor: "rgb(245,245,220)",
               borderRadius: 5, borderWidth: 1, borderColor: gray(0.15),
             }}>
-              {sTranslateLoading
-                ? <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
-                : <Text style={{ fontSize: 14, color: C.text }}>{translatedText}</Text>
+              {translatedText && !sTranslateLoading
+                ? <Text style={{ fontSize: 14, color: C.text }}>{translatedText}</Text>
+                : <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
               }
             </View>
           ) : null}
@@ -1320,7 +1345,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
   // Initialize from cache synchronously to avoid layout flash on hover
   const [sMessages, _setMessages] = useState(() => {
     let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
-    if (cached && cached.messages.length > 0) return cached.messages;
+    if (cached && cached.messages.length > 0) return cached.messages.slice(-7);
     return [];
   });
   const [sListenerConnecting, _setListenerConnecting] = useState(() => {
@@ -1350,6 +1375,8 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
   const hubFileInputRef = useRef(null);
   const sMessagesRef = useRef([]);
   const noMoreRef = useRef(false);
+  const hasInitialScrolledRef = useRef(false);
+  const lastMsgIdRef = useRef(null);
 
   const {
     translatedText, isLoading: sTranslateLoading,
@@ -1383,14 +1410,16 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     // Check Zustand cache first (synchronous, instant)
     let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
     let startMessages = [];
+    let fullCachedMessages = [];
     let noMore = false;
 
     if (cached && cached.messages.length > 0) {
-      startMessages = cached.messages;
-      noMore = cached.noMoreHistory || false;
+      fullCachedMessages = cached.messages;
+      startMessages = cached.messages.slice(-7);
+      noMore = cached.noMoreHistory && cached.messages.length <= 7;
     }
 
-    detectToLang(startMessages);
+    detectToLang(fullCachedMessages.length > 0 ? fullCachedMessages : startMessages);
     _setMessages(startMessages);
     sMessagesRef.current = startMessages;
     _setNoMoreHistory(noMore);
@@ -1404,13 +1433,15 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
           const { getMessages } = await import("../../../hubMessageDB");
           const idbMsgs = await getMessages(phone);
           if (!cancelled && idbMsgs.length > 0) {
-            sMessagesRef.current = idbMsgs;
-            _setMessages(idbMsgs);
+            let recent = idbMsgs.slice(-7);
+            sMessagesRef.current = recent;
+            _setMessages(recent);
             detectToLang(idbMsgs);
             _setNoMoreHistory(false);
             noMoreRef.current = false;
             useCustMessagesStore.getState().setHubCachedThread(phone, idbMsgs, false);
             _setListenerConnecting(false);
+            fullCachedMessages = idbMsgs;
             return;
           }
         } catch (e) { /* IndexedDB unavailable, fall through to Firestore */ }
@@ -1429,9 +1460,10 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       })();
     }
 
-    // Listener watches for messages after the newest one in the list
+    // Listener watches for messages after the newest one in the full cache (not sliced)
+    let allForListener = fullCachedMessages.length > 0 ? fullCachedMessages : startMessages;
     let maxMillis = 0;
-    startMessages.forEach(m => { if (m.millis > maxMillis) maxMillis = m.millis; });
+    allForListener.forEach(m => { if (m.millis > maxMillis) maxMillis = m.millis; });
     let listenerStartMillis = maxMillis || Date.now();
 
     let unsub = dbListenToNewMessages(phone, listenerStartMillis, (newMsgs) => {
@@ -1471,9 +1503,16 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
   }
 
   useEffect(() => {
-    if (sMessages.length > 1) {
-      try { messageListRef.current?.scrollToIndex({ index: sMessages.length - 1, animated: true }); } catch (e) {}
+    if (sMessages.length === 0) {
+      hasInitialScrolledRef.current = false;
+      lastMsgIdRef.current = null;
+      return;
     }
+    if (!hasInitialScrolledRef.current) return;
+    let lastId = sMessages[sMessages.length - 1]?.id;
+    if (lastId === lastMsgIdRef.current) return;
+    lastMsgIdRef.current = lastId;
+    try { messageListRef.current?.scrollToEnd({ animated: true }); } catch (e) {}
   }, [sMessages]);
 
   function handleSend() {
@@ -1692,7 +1731,14 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
               return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={thread} onToggleBlock={handleToggleBlock} />;
             }}
             onScrollToIndexFailed={(info) => {
-              setTimeout(() => { messageListRef.current?.scrollToIndex({ index: info.index, animated: true }); }, 50);
+              setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 50);
+            }}
+            onContentSizeChange={() => {
+              if (!hasInitialScrolledRef.current && sMessages.length > 0) {
+                hasInitialScrolledRef.current = true;
+                lastMsgIdRef.current = sMessages[sMessages.length - 1]?.id;
+                messageListRef.current?.scrollToEnd({ animated: false });
+              }
             }}
             scrollEnabled={!previewMode}
             scrollEventThrottle={200}
@@ -1701,11 +1747,11 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       </View>
       {/* Compose — hidden in preview mode */}
       {!previewMode && <View style={{ paddingTop: 8, paddingHorizontal: 8 }}>
-        {(sFromLang && sToLang && sFromLang !== sToLang) && (translatedText || sTranslateLoading) ? (
+        {(sFromLang && sToLang && sFromLang !== sToLang) && sNewMessage.trim() ? (
           <View style={{ padding: 6, marginBottom: 4, backgroundColor: "rgb(245,245,220)", borderRadius: 5, borderWidth: 1, borderColor: gray(0.15) }}>
-            {sTranslateLoading
-              ? <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
-              : <Text style={{ fontSize: 14, color: C.text }}>{translatedText}</Text>
+            {translatedText && !sTranslateLoading
+              ? <Text style={{ fontSize: 14, color: C.text }}>{translatedText}</Text>
+              : <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
             }
           </View>
         ) : null}
@@ -2020,9 +2066,45 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
 });
 
 const IncomingMessageComponent = memo(({ msgObj }) => {
+  const [sTranslation, _setTranslation] = useState({ text: "", loading: false, langCode: "" });
+  const [sContextMenu, _setContextMenu] = useState({ x: 0, y: 0, visible: false });
+
+  useEffect(() => {
+    if (!sContextMenu.visible) return;
+    function dismiss() { _setContextMenu(prev => ({ ...prev, visible: false })); }
+    document.addEventListener("mousedown", dismiss);
+    return () => document.removeEventListener("mousedown", dismiss);
+  }, [sContextMenu.visible]);
+
+  function handleContextMenu(e) {
+    if (!msgObj.message) return;
+    e.preventDefault();
+    _setContextMenu({ x: e.clientX, y: e.clientY, visible: true });
+  }
+
+  function handleSelectLanguage(langCode) {
+    _setContextMenu(prev => ({ ...prev, visible: false }));
+    _setTranslation({ text: "", loading: true, langCode });
+    translateText({ text: msgObj.message, targetLanguage: langCode })
+      .then((result) => {
+        if (result.success) {
+          let translated = result.data?.data?.translatedText || result.data?.translatedText || "";
+          let detected = result.data?.data?.detectedSourceLanguage || result.data?.detectedSourceLanguage || "";
+          _setTranslation({ text: translated, loading: false, langCode, detectedFrom: detected });
+        } else {
+          _setTranslation({ text: "", loading: false, langCode });
+        }
+      })
+      .catch(() => { _setTranslation({ text: "", loading: false, langCode }); });
+  }
+
   let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
   let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
   let backgroundColor = hasMedia ? "transparent" : "rgb(230,230,230)";
+  let fromLangLabel = sTranslation.detectedFrom
+    ? (TRANSLATION_LANGUAGES.find(l => l.code === sTranslation.detectedFrom)?.label || sTranslation.detectedFrom)
+    : "";
+
   return (
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
@@ -2036,23 +2118,49 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
           <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
         ) : null}
         {msgObj.message ? (
-          <Text style={{ ...MESSAGE_TEXT_STYLE }}>{msgObj.message}</Text>
+          <Tooltip text="Right click for translation" position="top">
+            <View onContextMenu={handleContextMenu} style={{ cursor: "context-menu" }}>
+              {sTranslation.loading ? (
+                <>
+                  <Text style={{ ...MESSAGE_TEXT_STYLE, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
+                  <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>{msgObj.message}</Text>
+                </>
+              ) : sTranslation.text ? (
+                <>
+                  <Text style={{ ...MESSAGE_TEXT_STYLE }}>{sTranslation.text}</Text>
+                  <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>
+                    {"Original" + (fromLangLabel ? " (" + fromLangLabel + ")" : "") + ": " + msgObj.message}
+                  </Text>
+                </>
+              ) : (
+                <Text style={{ ...MESSAGE_TEXT_STYLE }}>{msgObj.message}</Text>
+              )}
+            </View>
+          </Tooltip>
         ) : null}
       </View>
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          justifyContent: "space-between",
-        }}
-      >
+      <View style={{ width: "100%", flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>
-        <Text style={{ ...INFO_TEXT_STYLE }}>
-          {dateObj.dayOfWeek + ", " + dateObj.time}
-        </Text>
+        <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.dayOfWeek + ", " + dateObj.time}</Text>
       </View>
       {msgObj.autoResponseSent && (
         <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic" }}>Auto-response sent (thread was closed)</Text>
+      )}
+      {sContextMenu.visible && createPortal(
+        <div onMouseDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: sContextMenu.x, top: sContextMenu.y, zIndex: 99999, backgroundColor: "white", borderRadius: 6, boxShadow: "0 2px 12px rgba(0,0,0,0.18)", padding: 4, minWidth: 130 }}>
+          {TRANSLATION_LANGUAGES.map((lang) => (
+            <div
+              key={lang.code}
+              onClick={() => handleSelectLanguage(lang.code)}
+              style={{ padding: "7px 12px", cursor: "pointer", borderRadius: 4, fontSize: 14, color: "#333" }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgb(235,235,235)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+            >
+              {lang.label}
+            </div>
+          ))}
+        </div>,
+        document.body
       )}
     </View>
   );

@@ -18,7 +18,7 @@ import {
   resolveStatus,
   calculateWaitEstimateLabel,
   findTemplateByType,
-  compressImage,
+
   scheduleAutoText,
   localStorageWrapper,
 } from "../../../utils";
@@ -54,7 +54,6 @@ import {
 } from "../../../data";
 import { MILLIS_IN_DAY, build_db_path } from "../../../constants";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import ReactDOM from "react-dom";
 import { cloneDeep } from "lodash";
 import {
   useCurrentCustomerStore,
@@ -67,7 +66,7 @@ import {
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbUploadWorkorderMedia, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, startNewWorkorder } from "../../../db_calls_wrapper";
+import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, startNewWorkorder } from "../../../db_calls_wrapper";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 const RECEIPT_DROPDOWN_SELECTIONS = [
@@ -105,12 +104,9 @@ export const ActiveWorkorderComponent = ({}) => {
   ///////////////////////////////////////////////////////////////////////////////
   const [sShowCustomerInfoScreen, _setShowCustomerInfoScreen] =
     React.useState(false);
-  const [sShowMediaModal, _setShowMediaModal] = useState(null); // null | "upload" | "view"
+  const [sShowMediaModal, _setShowMediaModal] = useState(false);
   const [sWaitTimeBlink, _setWaitTimeBlink] = useState(false);
-  const uploadInputRef = useRef(null);
   const sUploadProgress = useUploadProgressStore((s) => s.progress);
-  const [sPendingFiles, _setPendingFiles] = useState(null); // null | File[]
-  const [sCompressConfirm, _setCompressConfirm] = useState(true);
   const [sPrinterAlert, _setPrinterAlert] = useState(null); // { x, y }
 
   // Estimated wait days — local state for instant UI, debounced DB write
@@ -153,62 +149,6 @@ export const ActiveWorkorderComponent = ({}) => {
       useOpenWorkordersStore.getState().setField("partOrderedMillis", now, woID, false);
       useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), woID);
     }, 700);
-  }
-
-  function handleDirectUpload(e) {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    _setPendingFiles(files);
-    _setCompressConfirm(true);
-    if (uploadInputRef.current) uploadInputRef.current.value = "";
-  }
-
-  function handleCancelUpload() {
-    _setPendingFiles(null);
-  }
-
-  async function handleConfirmUpload() {
-    let files = sPendingFiles;
-    let shouldCompress = sCompressConfirm;
-    _setPendingFiles(null);
-    if (!files?.length) return;
-    let total = files.length;
-    let completed = 0;
-    let failed = 0;
-    useUploadProgressStore.getState().setProgress({ completed: 0, total, failed: 0, done: false });
-    let newMedia = [...(zOpenWorkorder?.media || [])];
-    let storeName = (zSettings?.storeInfo?.displayName || "photo").replace(/\s+/g, "_");
-    for (let i = 0; i < files.length; i++) {
-      let fileToUpload = files[i];
-      let originalFilename = fileToUpload.name;
-      let originalFileSize = fileToUpload.size;
-      let ext = fileToUpload.name.split(".").pop() || "jpg";
-      let rand = Math.floor(1000 + Math.random() * 9000);
-      let typeLabel = fileToUpload.type.startsWith("video") ? "Video" : "Image";
-      let cleanName = `${storeName}_${typeLabel}_${rand}.${ext}`;
-      if (shouldCompress && fileToUpload.type.startsWith("image")) {
-        let compressed = await compressImage(fileToUpload, 1024, 0.65);
-        if (compressed) {
-          compressed.name = cleanName;
-          fileToUpload = compressed;
-        } else {
-          fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
-        }
-      } else {
-        fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
-      }
-      const result = await dbUploadWorkorderMedia(zOpenWorkorder.id, fileToUpload, { originalFilename, originalFileSize });
-      if (result.success) {
-        newMedia.push(result.mediaItem);
-        completed++;
-      } else {
-        failed++;
-      }
-      useUploadProgressStore.getState().setProgress({ completed, total, failed, done: false });
-    }
-    useOpenWorkordersStore.getState().setField("media", newMedia, zOpenWorkorder.id);
-    useUploadProgressStore.getState().setProgress({ completed, total, failed, done: true });
-    setTimeout(() => useUploadProgressStore.getState().setProgress(null), failed > 0 ? 5000 : 3000);
   }
 
   // Refs for dropdown components
@@ -1248,15 +1188,7 @@ export const ActiveWorkorderComponent = ({}) => {
           </View>
         </View>
       </View>
-      {/* Media Buttons */}
-      <input
-        ref={uploadInputRef}
-        type="file"
-        accept="image/*,video/*"
-        multiple
-        onChange={handleDirectUpload}
-        style={{ display: "none" }}
-      />
+      {/* Media Button */}
       <style>{`
         @keyframes uploadBarCycle {
           0% { transform: translateX(-100%); }
@@ -1267,35 +1199,18 @@ export const ActiveWorkorderComponent = ({}) => {
         style={{
           backgroundColor: 'transparent',
           borderRadius: 10,
-          borderColor: C.listItemBorder,
-          borderWidth: 0,
           paddingHorizontal: 25,
-          // paddingTop: 4, paddingBottom: 0,
           marginBottom: 0,
           alignItems: "center",
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-          <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "Upload photo"} position="top">
-            <Button_
-              icon={ICONS.uploadCamera}
-              iconSize={40}
-              disabled={isDonePaid}
-              onPress={() => !isDonePaid && uploadInputRef.current?.click()}
-              buttonStyle={{
-                backgroundColor: "transparent",
-                paddingHorizontal: 0,
-                paddingVertical: 0,
-                opacity: isDonePaid ? 0.3 : 1,
-              }}
-            />
-          </Tooltip>
           <View>
-            <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "View photos"} position="top">
+            <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "View & upload photos"} position="top">
               <Button_
-                icon={ICONS.viewPhoto}
-                iconSize={50}
-                onPress={() => _setShowMediaModal("view")}
+                icon={ICONS.uploadCamera}
+                iconSize={40}
+                onPress={() => _setShowMediaModal(true)}
                 buttonStyle={{
                   backgroundColor: "transparent",
                   paddingHorizontal: 0,
@@ -1303,31 +1218,30 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
               />
             </Tooltip>
-            {/* {zOpenWorkorder?.media?.length > 0 && ( */}
-              <View
+            <View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                top: -1,
+                right: -5,
+                borderRadius: 8,
+                minWidth: 16,
+                height: 16,
+                justifyContent: "center",
+                alignItems: "center",
+                paddingHorizontal: 3,
+              }}
+            >
+              <Text
                 style={{
-                  position: "absolute",
-                  top: -1,
-                  right: -5,
-                  borderRadius: 8,
-                  minWidth: 16,
-                  height: 16,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  paddingHorizontal: 3,
+                  color: zOpenWorkorder?.media?.length > 0 ? C.red : 'gray',
+                  fontSize: 15,
+                  fontWeight: "700",
                 }}
               >
-                <Text
-                  style={{
-                    color: zOpenWorkorder?.media?.length > 0 ? C.red : 'gray',
-                    fontSize: 15,
-                    fontWeight: "700",
-                  }}
-                >
-                  {zOpenWorkorder?.media?.length || 0}
-                </Text>
-              </View>
-            {/* )} */}
+                {zOpenWorkorder?.media?.length || 0}
+              </Text>
+            </View>
           </View>
         </View>
         {/* Upload progress bar */}
@@ -1425,75 +1339,13 @@ export const ActiveWorkorderComponent = ({}) => {
           />
         </Tooltip>
       </View>
-      {/* Upload confirmation modal */}
-      {sPendingFiles && ReactDOM.createPortal(
-        <View
-          style={{
-            position: "fixed",
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 9999,
-          }}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={handleCancelUpload}
-            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, cursor: "default" }}
-          />
-          <View
-            style={{
-              width: 624,
-              backgroundColor: C.backgroundWhite,
-              borderRadius: 12,
-              borderWidth: 2,
-              borderColor: C.buttonLightGreenOutline,
-              padding: 20,
-            }}
-          >
-            <Text style={{ fontSize: 14, color: C.text, marginBottom: 10, lineHeight: 20, textAlign: "center" }}>
-              Compression is set to medium. Only uncheck the box if you need high zoom capability, as the process takes drastically longer. Recommendation: first try the compressed image to see if it's good enough before using the uncompressed option.
-            </Text>
-            {sPendingFiles.map((f, idx) => (
-              <Text key={idx} style={{ fontSize: 12, color: gray(0.45), textAlign: "center" }}>
-                {f.name} — {f.size < 1048576 ? (f.size / 1024).toFixed(0) + " KB" : (f.size / 1048576).toFixed(1) + " MB"}
-              </Text>
-            ))}
-            <View style={{ height: 14 }} />
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <CheckBox_
-                text="Medium compression"
-                isChecked={sCompressConfirm}
-                onCheck={() => _setCompressConfirm(!sCompressConfirm)}
-              />
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <Button_
-                  text="Upload"
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  onPress={handleConfirmUpload}
-                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 }}
-                  textStyle={{ fontSize: 14 }}
-                />
-                <Button_
-                  text="Cancel"
-                  colorGradientArr={COLOR_GRADIENTS.grey}
-                  onPress={handleCancelUpload}
-                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 }}
-                  textStyle={{ fontSize: 14 }}
-                />
-              </View>
-            </View>
-          </View>
-        </View>,
-        document.body
-      )}
       {sShowMediaModal && (
         <WorkorderMediaModal
-          visible={!!sShowMediaModal}
-          onClose={() => _setShowMediaModal(null)}
+          visible={sShowMediaModal}
+          onClose={() => _setShowMediaModal(false)}
           workorderID={zOpenWorkorder?.id}
-          mode={sShowMediaModal}
+          mode="view"
+          isDonePaid={isDonePaid}
         />
       )}
       <PrinterAlert

@@ -4,12 +4,13 @@ import { createPortal } from "react-dom";
 import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { Button_, Image_, CheckBox_, Tooltip } from "../../../components";
-import { gray, log } from "../../../utils";
+import { gray, log, compressImage } from "../../../utils";
 import {
   useOpenWorkordersStore,
   useAlertScreenStore,
   useLayoutStore,
   useSettingsStore,
+  useUploadProgressStore,
 } from "../../../stores";
 import {
   dbUploadWorkorderMedia,
@@ -22,6 +23,7 @@ export const WorkorderMediaModal = ({
   onClose,
   workorderID,
   mode, // "upload" or "view"
+  isDonePaid,
   onSelect, // (mediaItem) => void — when provided, tapping a thumbnail picks it instead of full-view
   onSendMedia, // (mediaItems[]) => void — multi-select: pass selected items back to caller for SMS send
 }) => {
@@ -38,6 +40,8 @@ export const WorkorderMediaModal = ({
   const [sSending, _setSending] = useState(false);
   const [sSendEmail, _setSendEmail] = useState(false);
   const [sSendText, _setSendText] = useState(!!onSendMedia);
+  const [sPendingFiles, _setPendingFiles] = useState(null);
+  const [sCompressConfirm, _setCompressConfirm] = useState(true);
   const fileInputRef = useRef(null);
 
   if (!visible) return null;
@@ -55,6 +59,63 @@ export const WorkorderMediaModal = ({
       else next.add(itemId);
       return next;
     });
+  }
+
+  // Upload handlers
+  function handleDirectUpload(e) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    _setPendingFiles(files);
+    _setCompressConfirm(true);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleCancelUpload() {
+    _setPendingFiles(null);
+  }
+
+  async function handleConfirmUpload() {
+    let files = sPendingFiles;
+    let shouldCompress = sCompressConfirm;
+    _setPendingFiles(null);
+    if (!files?.length) return;
+    let total = files.length;
+    let completed = 0;
+    let failed = 0;
+    useUploadProgressStore.getState().setProgress({ completed: 0, total, failed: 0, done: false });
+    let newMedia = [...zMedia];
+    let storeNameClean = (zSettings?.storeInfo?.displayName || "photo").replace(/\s+/g, "_");
+    for (let i = 0; i < files.length; i++) {
+      let fileToUpload = files[i];
+      let originalFilename = fileToUpload.name;
+      let originalFileSize = fileToUpload.size;
+      let ext = fileToUpload.name.split(".").pop() || "jpg";
+      let rand = Math.floor(1000 + Math.random() * 9000);
+      let typeLabel = fileToUpload.type.startsWith("video") ? "Video" : "Image";
+      let cleanName = `${storeNameClean}_${typeLabel}_${rand}.${ext}`;
+      if (shouldCompress && fileToUpload.type.startsWith("image")) {
+        let compressed = await compressImage(fileToUpload, 1024, 0.65);
+        if (compressed) {
+          compressed.name = cleanName;
+          fileToUpload = compressed;
+        } else {
+          fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
+        }
+      } else {
+        fileToUpload = new File([fileToUpload], cleanName, { type: fileToUpload.type });
+      }
+      const result = await dbUploadWorkorderMedia(workorderID, fileToUpload, { originalFilename, originalFileSize });
+      if (result.success) {
+        newMedia.push(result.mediaItem);
+        completed++;
+      } else {
+        failed++;
+      }
+      useUploadProgressStore.getState().setProgress({ completed, total, failed, done: false });
+    }
+    useOpenWorkordersStore.getState().setField("media", newMedia, workorderID);
+    useUploadProgressStore.getState().setProgress({ completed, total, failed, done: true });
+    setTimeout(() => useUploadProgressStore.getState().setProgress(null), failed > 0 ? 5000 : 3000);
   }
 
   function handleSendMedia() {
@@ -149,35 +210,6 @@ export const WorkorderMediaModal = ({
     onClose();
   }
 
-  async function handleFilesSelected(e) {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    _setUploading(true);
-    _setUploadMsg(`Uploading ${files.length} file(s)...`);
-
-    let newMedia = [...zMedia];
-
-    for (let i = 0; i < files.length; i++) {
-      _setUploadMsg(`Uploading ${i + 1} of ${files.length}...`);
-      const result = await dbUploadWorkorderMedia(workorderID, files[i]);
-      if (result.success) {
-        newMedia.push(result.mediaItem);
-      } else {
-        log("Media upload failed:", result.error);
-      }
-    }
-
-    useOpenWorkordersStore
-      .getState()
-      .setField("media", newMedia, workorderID);
-
-    _setUploading(false);
-    _setUploadMsg("");
-    // Reset file input so same file can be re-selected
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
   const [sDeleting, _setDeleting] = useState(false);
 
   function handleDeleteSelected() {
@@ -187,7 +219,7 @@ export const WorkorderMediaModal = ({
     // Update local store immediately and close
     const remaining = zMedia.filter((m) => !sSelectedIds.has(m.id));
     useOpenWorkordersStore.getState().setField("media", remaining, workorderID);
-    onClose();
+    _setSelectedIds(new Set());
 
     // Fire off storage deletes in background
     for (let i = 0; i < selectedItems.length; i++) {
@@ -195,25 +227,15 @@ export const WorkorderMediaModal = ({
     }
   }
 
-  function handleDeleteMedia(mediaItem) {
-    useAlertScreenStore.getState().setValues({
-      title: "Delete Media",
-      message: `Delete "${mediaItem.filename}"?`,
-      btn1Text: "Delete",
-      btn2Text: "Cancel",
-      handleBtn1Press: async () => {
-        useAlertScreenStore.getState().setValues({ showAlert: false });
-        await dbDeleteWorkorderMedia(mediaItem);
-        const updated = zMedia.filter((m) => m.id !== mediaItem.id);
-        useOpenWorkordersStore
-          .getState()
-          .setField("media", updated, workorderID);
-        if (sFullView?.id === mediaItem.id) _setFullView(null);
-      },
-      handleBtn2Press: () => {
-        useAlertScreenStore.getState().setValues({ showAlert: false });
-      },
+  function handleDeleteSingle(mediaItem) {
+    const remaining = zMedia.filter((m) => m.id !== mediaItem.id);
+    useOpenWorkordersStore.getState().setField("media", remaining, workorderID);
+    _setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(mediaItem.id);
+      return next;
     });
+    dbDeleteWorkorderMedia(mediaItem);
   }
 
   const MODAL_WIDTH = isMobile ? "95%" : 600;
@@ -324,64 +346,53 @@ export const WorkorderMediaModal = ({
               color: C.text,
             }}
           >
-            {mode === "upload" ? "Upload Media" : "Workorder Media"}
+            Workorder Media
           </Text>
-          <Button_
-            text="X"
-            onPress={onClose}
-            buttonStyle={{
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 6,
-            }}
-            textStyle={{ fontSize: 16, fontWeight: "600", color: C.lightText }}
-          />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            {/* Upload button in header */}
+            {!isDonePaid && (
+              <Button_
+                text="UPLOAD"
+                icon={ICONS.uploadCamera}
+                iconSize={18}
+                onPress={() => fileInputRef.current?.click()}
+                buttonStyle={{
+                  backgroundColor: C.orange,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 5,
+                }}
+                textStyle={{ color: "white", fontSize: 14, fontWeight: "700" }}
+              />
+            )}
+            <Button_
+              text="X"
+              onPress={onClose}
+              buttonStyle={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 6,
+              }}
+              textStyle={{ fontSize: 16, fontWeight: "600", color: C.lightText }}
+            />
+          </View>
         </View>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          {...(isMobile ? { capture: "environment" } : {})}
+          onChange={handleDirectUpload}
+          style={{ display: "none" }}
+        />
 
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16 }}
         >
-          {/* Upload area (shown in upload mode) */}
-          {mode === "upload" && (
-            <View style={{ marginBottom: 16 }}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                {...(isMobile ? { capture: "environment" } : {})}
-                onChange={handleFilesSelected}
-                style={{ display: "none" }}
-              />
-              <Button_
-                text={sUploading ? sUploadMsg : "Select Files"}
-                icon={ICONS.camera}
-                iconSize={20}
-                colorGradientArr={COLOR_GRADIENTS.green}
-                onPress={() => !sUploading && fileInputRef.current?.click()}
-                buttonStyle={{
-                  paddingVertical: 14,
-                  borderRadius: 5,
-                  opacity: sUploading ? 0.6 : 1,
-                }}
-                textStyle={{ fontSize: 16, fontWeight: "500" }}
-              />
-              {sUploading && (
-                <Text
-                  style={{
-                    color: C.lightText,
-                    fontSize: 13,
-                    marginTop: 6,
-                    textAlign: "center",
-                  }}
-                >
-                  {sUploadMsg}
-                </Text>
-              )}
-            </View>
-          )}
-
           {/* Media grid */}
           {zMedia.length > 0 ? (
             <View
@@ -463,6 +474,24 @@ export const WorkorderMediaModal = ({
                         icon={isSelected ? ICONS.checkbox : ICONS.checkoxEmpty}
                         size={16}
                       />
+                    </TouchableOpacity>
+
+                    {/* Delete X — top-right */}
+                    <TouchableOpacity
+                      onPress={() => handleDeleteSingle(item)}
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        backgroundColor: C.red,
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ color: "white", fontSize: 13, fontWeight: "700", lineHeight: 14, marginTop: -1 }}>X</Text>
                     </TouchableOpacity>
 
                     {/* Sent badge — bottom-right */}
@@ -609,6 +638,70 @@ export const WorkorderMediaModal = ({
           </View>
         )}
       </div>
+
+      {/* Upload compression confirmation overlay */}
+      {sPendingFiles && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            zIndex: 10000,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <div
+            onClick={handleCancelUpload}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, cursor: "default" }}
+          />
+          <View
+            style={{
+              width: 624,
+              backgroundColor: C.backgroundWhite,
+              borderRadius: 12,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 20,
+            }}
+          >
+            <Text style={{ fontSize: 14, color: C.text, marginBottom: 10, lineHeight: 20, textAlign: "center" }}>
+              Compression is set to medium. Only uncheck the box if you need high zoom capability, as the process takes drastically longer. Recommendation: first try the compressed image to see if it's good enough before using the uncompressed option.
+            </Text>
+            {sPendingFiles.map((f, idx) => (
+              <Text key={idx} style={{ fontSize: 12, color: gray(0.45), textAlign: "center" }}>
+                {f.name} - {f.size < 1048576 ? (f.size / 1024).toFixed(0) + " KB" : (f.size / 1048576).toFixed(1) + " MB"}
+              </Text>
+            ))}
+            <View style={{ height: 14 }} />
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <CheckBox_
+                text="Medium compression"
+                isChecked={sCompressConfirm}
+                onCheck={() => _setCompressConfirm(!sCompressConfirm)}
+              />
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Button_
+                  text="Upload"
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  onPress={handleConfirmUpload}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 }}
+                  textStyle={{ fontSize: 14 }}
+                />
+                <Button_
+                  text="Cancel"
+                  colorGradientArr={COLOR_GRADIENTS.grey}
+                  onPress={handleCancelUpload}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 }}
+                  textStyle={{ fontSize: 14 }}
+                />
+              </View>
+            </View>
+          </View>
+        </div>
+      )}
     </div>,
     document.body
   );

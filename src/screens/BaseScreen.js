@@ -424,6 +424,8 @@ export function BaseScreen() {
 
   return (
     <View
+      onMouseMove={() => throttledSetLastAction()}
+      onKeyUp={() => throttledSetLastAction()}
       style={{
         width: screenWidth,
         height: screenHeight,
@@ -433,11 +435,6 @@ export function BaseScreen() {
         position: "relative",
       }}
     >
-      <div
-        onKeyUp={() => throttledSetLastAction()}
-        onMouseMove={() => throttledSetLastAction()}
-        style={{ width: "100%", height: 0 }}
-      />
 
       <style>{`
         @keyframes bannerPulse {

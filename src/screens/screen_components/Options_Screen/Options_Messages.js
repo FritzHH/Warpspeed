@@ -41,6 +41,7 @@ import {
   SMS_PROTO,
   CUSTOMER_PROTO,
   SETTINGS_OBJ,
+  TAB_NAMES,
 } from "../../../data";
 import React, {
   memo,
@@ -57,10 +58,12 @@ import {
   useSettingsStore,
   useAlertScreenStore,
   useActiveSalesStore,
+  useCurrentCustomerStore,
+  useTabNamesStore,
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond } from "../../../db_calls_wrapper";
+import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbGetCustomer } from "../../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
 import { ReplyOptionsBar, scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "./ReplyOptionsBar";
@@ -359,7 +362,7 @@ export function MessagesComponent({}) {
         let isLastChunk = i === chunks.length - 1;
         let msg = { ...SMS_PROTO };
         msg.message = chunks[i];
-        if (i === 0 && originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; }
+        if (i === 0 && originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; msg.translatedTo = isTranslated ? sToLang : ""; }
         msg.imageUrl = i === 0 ? imageUrl : "";
         msg.phoneNumber = sendPhone;
         msg.canRespond = isLastChunk && useCanRespond ? true : null;
@@ -705,6 +708,47 @@ export function MessagesComponent({}) {
     clearTranslation();
   }
 
+  async function handleHubOpenWorkorder(phone) {
+    let wo = zAllWorkorders.find(w => w.customerCell === phone);
+    if (!wo) return;
+    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+    if (wo.customerID) {
+      dbGetCustomer(wo.customerID).then((c) => {
+        if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+      });
+    }
+    if (wo.paymentComplete) useOpenWorkordersStore.getState().setLockedWorkorderID(wo.id);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.messages,
+    });
+    // Populate customer messages store from Hub cache so messages appear immediately
+    let msgStore = useCustMessagesStore.getState();
+    let cached = msgStore.getHubCachedThread(phone);
+    msgStore.clearMessages();
+    msgStore.setMessagesPhone(phone);
+    let msgs = [];
+    if (cached && cached.messages.length > 0) {
+      msgs = cached.messages;
+      msgStore.setMessages(msgs);
+      msgStore.setMessagesHasMore(!cached.noMoreHistory);
+    }
+    // Set up real-time listener for new incoming messages
+    let lastMillis = 0;
+    msgs.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
+    if (!lastMillis) lastMillis = Date.now();
+    let unsub = dbListenToNewMessages(phone, lastMillis, (newMessages) => {
+      if (useCustMessagesStore.getState().getMessagesPhone() !== phone) return;
+      let store = useCustMessagesStore.getState();
+      store.mergeMessages(newMessages);
+      let allMessages = store.getMessages();
+      store.setHubCachedThread(phone, allMessages, false);
+    });
+    msgStore.setMessagesUnsub(unsub);
+    handleExitHubMode();
+  }
+
   function handleHubThreadClick(thread) {
     _setHubSelectedPhone(prev => {
       if (prev === thread.phone) {
@@ -830,6 +874,8 @@ export function MessagesComponent({}) {
                 thread={zSmsThreads.find(t => t.phone === (sHubHoverPhone || sHubSelectedPhone))}
                 previewMode={!!sHubHoverPhone && sHubHoverPhone !== sHubSelectedPhone}
                 onShowPhoneEntry={() => { _setHubSelectedPhone(""); _setHubNewPhone(""); }}
+                onOpenWorkorder={handleHubOpenWorkorder}
+                hasMatchingWorkorder={!hasCustomer && !!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
                 exitHubButton={hasCustomer ? (
                   <Tooltip text="Back to customer" position="top" offsetX={-20}>
                     <TouchableOpacity onPress={handleExitHubMode} style={{ padding: 4 }}>
@@ -1244,7 +1290,7 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
   }
 
   return (
-    <TouchableOpacity onPress={onPress} onMouseEnter={onHoverIn} onMouseLeave={onHoverOut} style={{ paddingVertical: 10, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: gray(0.08), backgroundColor: bgColor }}>
+    <TouchableOpacity onPress={onPress} onMouseEnter={onHoverIn} onMouseLeave={onHoverOut} style={{ paddingVertical: 10, paddingHorizontal: 2, borderBottomWidth: isSelected ? 2 : 1, borderBottomColor: isSelected ? C.orange : gray(0.08), backgroundColor: bgColor, borderWidth: isSelected ? 2 : 0, borderColor: isSelected ? C.orange : "transparent" }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -1270,7 +1316,7 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
   );
 }
 
-function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, exitHubButton }) {
+function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, hasMatchingWorkorder, exitHubButton }) {
   // Initialize from cache synchronously to avoid layout flash on hover
   const [sMessages, _setMessages] = useState(() => {
     let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
@@ -1315,6 +1361,15 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
     useCustMessagesStore.getState().setHubCachedThread(phone, messages, noMoreHistory);
   }
 
+  function detectToLang(msgs) {
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      let m = msgs[i];
+      if (m.type === "outgoing" && m.translatedTo) { _setToLang(m.translatedTo); return; }
+      if (m.type === "outgoing" && m.translatedFrom && m.originalMessage) { _setToLang(m.translatedFrom === "en" ? "es" : m.translatedFrom); return; }
+    }
+    _setToLang("en");
+  }
+
   useEffect(() => {
     if (!phone || phone.length !== 10) { _setMessages([]); _setListenerConnecting(false); return; }
     let cancelled = false;
@@ -1335,6 +1390,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
       noMore = cached.noMoreHistory || false;
     }
 
+    detectToLang(startMessages);
     _setMessages(startMessages);
     sMessagesRef.current = startMessages;
     _setNoMoreHistory(noMore);
@@ -1350,6 +1406,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
           if (!cancelled && idbMsgs.length > 0) {
             sMessagesRef.current = idbMsgs;
             _setMessages(idbMsgs);
+            detectToLang(idbMsgs);
             _setNoMoreHistory(false);
             noMoreRef.current = false;
             useCustMessagesStore.getState().setHubCachedThread(phone, idbMsgs, false);
@@ -1364,6 +1421,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
         let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
         sMessagesRef.current = sorted;
         _setMessages(sorted);
+        detectToLang(sorted);
         _setNoMoreHistory(initialNoMore);
         noMoreRef.current = initialNoMore;
         updateCache(sorted, initialNoMore);
@@ -1444,7 +1502,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
       let msg = { ...SMS_PROTO };
       msg.message = sendText;
-      if (originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; }
+      if (originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; msg.translatedTo = isTranslated ? sToLang : ""; }
       msg.phoneNumber = phone;
       msg.canRespond = canRespondVal ? true : null;
       msg.millis = Date.now();
@@ -1700,7 +1758,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
             }}
             value={sNewMessage}
           />
-          <TouchableOpacity onPress={handleSend} style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() ? 1 : 0.3 }}>
+          <TouchableOpacity onPress={() => !sHubMediaUploading && handleSend()} style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sHubMediaUploading ? 0.3 : (sNewMessage.trim() ? 1 : 0.3) }}>
             <Image_ icon={ICONS.airplane} size={41} />
           </TouchableOpacity>
         </View>
@@ -1752,8 +1810,9 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
           {onShowPhoneEntry && (
             <Tooltip text="New number" position="top">
               <TouchableOpacity
-                onPress={onShowPhoneEntry}
+                onPress={() => !sHubMediaUploading && onShowPhoneEntry()}
                 onLongPress={async () => {
+                  if (sHubMediaUploading) return;
                   const { clearAll } = await import("../../../hubMessageDB");
                   await clearAll();
                   useCustMessagesStore.getState().clearHubConversationCache();
@@ -1761,9 +1820,16 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, ex
                   alert("Message cache cleared. Refresh to reload.");
                 }}
                 delayLongPress={1000}
-                style={{ padding: 6 }}
+                style={{ padding: 6, opacity: sHubMediaUploading ? 0.3 : 1 }}
               >
                 <Image_ icon={ICONS.cellPhone} size={35} />
+              </TouchableOpacity>
+            </Tooltip>
+          )}
+          {hasMatchingWorkorder && (
+            <Tooltip text="Open workorder" position="top" offsetX={-15}>
+              <TouchableOpacity onPress={() => !sHubMediaUploading && onOpenWorkorder(phone)} style={{ padding: 6, opacity: sHubMediaUploading ? 0.3 : 1 }}>
+                <Image_ icon={ICONS.letterW} size={35} />
               </TouchableOpacity>
             </Tooltip>
           )}
@@ -1961,7 +2027,7 @@ const IncomingMessageComponent = memo(({ msgObj }) => {
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
         {msgObj.mediaUrls?.length > 0 ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: msgObj.message ? 4 : 0 }}>
+          <View style={{ flexDirection: "column", marginBottom: msgObj.message ? 4 : 0 }}>
             {msgObj.mediaUrls.map((media, i) => (
               <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
             ))}
@@ -2010,13 +2076,15 @@ const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread, onToggl
     <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
       <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, flexDirection: "row", alignItems: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
         {showStatusIcons && (
-          <TouchableOpacity onPress={onToggleBlock} style={{ alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
-            <Image source={isResponding ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
-          </TouchableOpacity>
+          <Tooltip text={isResponding ? "Block responses from user" : "Allow responses"} position="top">
+            <TouchableOpacity onPress={onToggleBlock} style={{ alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
+              <Image source={isResponding ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
+            </TouchableOpacity>
+          </Tooltip>
         )}
         <View style={{ flex: 1 }}>
           {msgObj.mediaUrls?.length > 0 ? (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: msgObj.message ? 4 : 0 }}>
+            <View style={{ flexDirection: "column", marginBottom: msgObj.message ? 4 : 0 }}>
               {msgObj.mediaUrls.map((media, i) => (
                 <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
               ))}

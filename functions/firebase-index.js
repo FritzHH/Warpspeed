@@ -765,19 +765,43 @@ exports.sendSMSEnhanced = onCall(
         ? mediaUrlsParam.map((m) => m.url || m)
         : imageUrl ? [imageUrl] : [];
       const callbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
-      const twilioResponse = await twilioClient.messages.create({
-        body: (message || "").trim(),
-        to: `+1${cleanPhoneNumber}`,
-        from: fromNumber,
-        ...(allMediaUrls.length > 0 ? { mediaUrl: allMediaUrls } : {}),
-        ...(messageID ? { statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${callbackParams}` } : {}),
-      });
+      const statusCallbackUrl = messageID ? `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${callbackParams}` : "";
 
-      log("SMS sent successfully", {
-        messageSid: twilioResponse.sid,
-        to: twilioResponse.to,
-        status: twilioResponse.status,
-      });
+      let twilioResponse;
+
+      // Send each image as a separate MMS for reliable carrier delivery
+      if (allMediaUrls.length > 1) {
+        // First message: text body + first image
+        twilioResponse = await twilioClient.messages.create({
+          body: (message || "").trim(),
+          to: `+1${cleanPhoneNumber}`,
+          from: fromNumber,
+          mediaUrl: [allMediaUrls[0]],
+          ...(statusCallbackUrl ? { statusCallback: statusCallbackUrl } : {}),
+        });
+        log("SMS sent (1/" + allMediaUrls.length + ")", { messageSid: twilioResponse.sid, status: twilioResponse.status });
+
+        // Remaining images: no text body, just the image
+        for (let i = 1; i < allMediaUrls.length; i++) {
+          let extraResponse = await twilioClient.messages.create({
+            body: "",
+            to: `+1${cleanPhoneNumber}`,
+            from: fromNumber,
+            mediaUrl: [allMediaUrls[i]],
+          });
+          log("SMS sent (" + (i + 1) + "/" + allMediaUrls.length + ")", { messageSid: extraResponse.sid, status: extraResponse.status });
+        }
+      } else {
+        // Single image or text-only: send as one message
+        twilioResponse = await twilioClient.messages.create({
+          body: (message || "").trim(),
+          to: `+1${cleanPhoneNumber}`,
+          from: fromNumber,
+          ...(allMediaUrls.length > 0 ? { mediaUrl: allMediaUrls } : {}),
+          ...(statusCallbackUrl ? { statusCallback: statusCallbackUrl } : {}),
+        });
+        log("SMS sent successfully", { messageSid: twilioResponse.sid, to: twilioResponse.to, status: twilioResponse.status });
+      }
 
       // Store message in Firestore if messageID provided
       if (messageID) {

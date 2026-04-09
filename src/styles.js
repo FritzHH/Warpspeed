@@ -152,6 +152,7 @@ export const ICONS = {
   listsAndOptions: require(ASSETS_PATH + "listsAndOptions.png"),
   storeInfo: require(ASSETS_PATH + "storeInfo.png"),
   ordering: require(ASSETS_PATH + "ordering.png"),
+  letterW: require(ASSETS_PATH + "w-letter.png"),
   letterI: require(ASSETS_PATH + "letter-i.png"),
   letterR: require(ASSETS_PATH + "letter-r.png"),
   airplane: require(ASSETS_PATH + "airplane.png"),

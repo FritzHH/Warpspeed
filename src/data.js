@@ -313,6 +313,7 @@ export const SMS_PROTO = {
   errorMessage: "",
   originalMessage: "",
   translatedFrom: "",
+  translatedTo: "",
 };
 
 // payments stuff ///////////////////////////////////////////////////////////

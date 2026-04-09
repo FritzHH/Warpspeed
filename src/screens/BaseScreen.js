@@ -331,7 +331,8 @@ export function BaseScreen() {
       }
     });
 
-    // SMS threads: load from IndexedDB cache, then start real-time Firestore listener
+    // SMS threads: load from IndexedDB FIRST, then start Firestore listener
+    // (avoids race condition where listener fires against empty state)
     import("../hubMessageDB").then(async (hubDB) => {
       try {
         // First-time setup: if IndexedDB is empty, seed from Firestore
@@ -351,13 +352,15 @@ export function BaseScreen() {
           useCustMessagesStore.getState().setSmsThreads(allCards);
         }
 
-        // Load messages for the 30 most recent threads into Zustand cache
+        // Batch-load 30 most recent conversations (single state update, no write-back)
         const recentPhones = allCards.slice(0, 30).map((c) => c.phone);
+        const batch = {};
         for (const phone of recentPhones) {
           const msgs = await hubDB.getMessages(phone);
-          if (msgs.length > 0) {
-            useCustMessagesStore.getState().setHubCachedThread(phone, msgs, false);
-          }
+          if (msgs.length > 0) batch[phone] = { messages: msgs, noMoreHistory: false };
+        }
+        if (Object.keys(batch).length > 0) {
+          useCustMessagesStore.getState().batchSetHubCachedThreads(batch);
         }
 
         // Purge old conversation messages (60 days inactive)
@@ -365,32 +368,31 @@ export function BaseScreen() {
       } catch (e) {
         log("IndexedDB init error (non-fatal)", e);
       }
-    });
 
-    const threadsUnsub = dbListenToActiveMessageThreads((changes) => {
-      const current = useCustMessagesStore.getState().getSmsThreads();
-      let updated = [...current];
-      changes.forEach(({ type, phone, ...data }) => {
-        const idx = updated.findIndex((t) => t.phone === phone);
-        if (type === "removed") {
-          if (idx !== -1) updated.splice(idx, 1);
-        } else {
-          const thread = { phone, ...data };
-          if (idx !== -1) updated[idx] = thread;
-          else updated.push(thread);
-        }
-      });
-      updated.sort((a, b) => b.lastMillis - a.lastMillis);
-      useCustMessagesStore.getState().setSmsThreads(updated);
-      // Sync changed thread cards to IndexedDB (fire-and-forget)
-      import("../hubMessageDB").then((hubDB) => {
+      // Start Firestore listener AFTER IndexedDB is loaded so getSmsThreads() is pre-populated
+      const threadsUnsub = dbListenToActiveMessageThreads((changes) => {
+        const current = useCustMessagesStore.getState().getSmsThreads();
+        let updated = [...current];
+        changes.forEach(({ type, phone, ...data }) => {
+          const idx = updated.findIndex((t) => t.phone === phone);
+          if (type === "removed") {
+            if (idx !== -1) updated.splice(idx, 1);
+          } else {
+            const thread = { phone, ...data };
+            if (idx !== -1) updated[idx] = thread;
+            else updated.push(thread);
+          }
+        });
+        updated.sort((a, b) => b.lastMillis - a.lastMillis);
+        useCustMessagesStore.getState().setSmsThreads(updated);
+        // Sync changed thread cards to IndexedDB (fire-and-forget)
         changes.forEach(({ type, phone, ...data }) => {
           if (type === "removed") return;
           hubDB.putThreadCard(phone, { phone, ...data });
         });
-      }).catch(() => {});
+      });
+      useCustMessagesStore.getState().setThreadsUnsub(threadsUnsub);
     });
-    useCustMessagesStore.getState().setThreadsUnsub(threadsUnsub);
 
     // Recover any pending auto-text messages from localStorage (crash recovery)
     recoverPendingAutoTexts();

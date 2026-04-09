@@ -71,6 +71,7 @@
     "login": "firebase login --reauth",
     "begin": "yarn build && serve -s build --ssl-cert cert.pem --ssl-key key.pem",
     "serveit": "serve -s build --ssl-cert cert.pem --ssl-key key.pem"
+
   },
   "eslintConfig": {
     "extends": [

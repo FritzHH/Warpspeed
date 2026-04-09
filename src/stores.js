@@ -933,6 +933,13 @@ export const useCustMessagesStore = create((set, get) => ({
       putMessages(phone, messages).then(() => capMessages(phone, 20));
     }).catch(() => {});
   },
+  // Batch-set multiple threads at once (single state update, NO IndexedDB write-back)
+  // Used during init when data already comes from IndexedDB
+  batchSetHubCachedThreads: (entries) => {
+    set((state) => ({
+      hubConversationCache: { ...state.hubConversationCache, ...entries },
+    }));
+  },
   clearHubConversationCache: () => {
     set({ hubConversationCache: {} });
   },

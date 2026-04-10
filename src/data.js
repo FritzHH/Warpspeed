@@ -1038,6 +1038,7 @@ export const SETTINGS_OBJ = {
 
   },
   labelLayouts: [],
+  labelTemplates: {},
   quickPrintLayouts: [],
   defaultLabelSize: { name: '2.25" x 1.25"', width: 464, height: 254 },
   autoSMSIntakeReceipt: true,

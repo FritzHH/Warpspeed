@@ -243,7 +243,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   //////////////////////////////////////////////////////////////////////////////
 
   function handleButton1Press() {
-    zButton1Handler();
+    if (typeof zButton1Handler === "function") zButton1Handler();
     useAlertScreenStore.getState().setShowAlert(false);
     setTimeout(() => {
       useAlertScreenStore.getState().resetAll();
@@ -251,7 +251,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   }
 
   function handleButton2Press() {
-    zButton2Handler();
+    if (typeof zButton2Handler === "function") zButton2Handler();
     useAlertScreenStore.getState().setShowAlert(false);
     setTimeout(() => {
       useAlertScreenStore.getState().resetAll();

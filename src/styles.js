@@ -121,6 +121,7 @@ export const ICONS = {
   checkoxEmpty: require(ASSETS_PATH + "checkbox-empty.png"),
   search: require(ASSETS_PATH + "search.png"),
   info: require(ASSETS_PATH + "info.png"),
+  info2: require(ASSETS_PATH + "info2.png"),
   settings: require(ASSETS_PATH + "settings.png"),
   infoGear: require(ASSETS_PATH + "info-gear.png"),
   internetOnlineGIF: require(ASSETS_PATH + "internetOnlineGIF.gif"),

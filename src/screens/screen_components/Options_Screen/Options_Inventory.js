@@ -93,15 +93,17 @@ const QuickItemCanvasCard = ({
   const dragStartRef = useRef(null);
   const didDragRef = useRef(false);
 
-  function handlePrintWithLayout(layout) {
+  function handlePrintWithTemplate(slug) {
     if (!invItem) return;
     let printerID = localStorageWrapper.getItem("selectedLabelPrinterID") || "";
     if (!printerID) {
       showAlert({ title: "No Label Printer", message: "Select a label printer for this device in Settings.", btn1Text: "OK" });
       return;
     }
-    let printObj = labelPrintBuilder.label(layout, invItem);
-    dbSavePrintObj(printObj, printerID);
+    let settings = useSettingsStore.getState().settings;
+    let template = settings?.labelTemplates?.[slug];
+    let printJob = labelPrintBuilder.label(slug, invItem, 1, template);
+    dbSavePrintObj(printJob, printerID);
     _setShowPrintPicker(false);
     _setPrintSuccess(true);
     setTimeout(() => _setPrintSuccess(false), 1500);
@@ -110,15 +112,16 @@ const QuickItemCanvasCard = ({
   function handlePrintClick() {
     if (!invItem) return;
     let settings = useSettingsStore.getState().settings;
-    let allLayouts = settings?.labelLayouts || [];
-    let quickPrintIDs = settings?.quickPrintLayouts || [];
-    let qpLayouts = allLayouts.filter((l) => quickPrintIDs.includes(l.id));
-    if (qpLayouts.length === 0) {
+    let allTemplates = settings?.labelTemplates || {};
+    let templateEntries = Object.entries(allTemplates);
+    let quickPrintSlugs = settings?.quickPrintLayouts || [];
+    let qpEntries = templateEntries.filter(([slug]) => quickPrintSlugs.includes(slug));
+    if (qpEntries.length === 0) {
       showAlert({ title: "No Quick Print Layouts", message: "Mark layouts as Quick Print in the Label Designer.", btn1Text: "OK" });
       return;
     }
-    if (qpLayouts.length === 1) {
-      handlePrintWithLayout(qpLayouts[0]);
+    if (qpEntries.length === 1) {
+      handlePrintWithTemplate(qpEntries[0][0]);
     } else {
       _setShowPrintPicker(true);
     }
@@ -382,9 +385,10 @@ const QuickItemCanvasCard = ({
           {/* Print layout picker */}
           {sShowPrintPicker && (() => {
             let settings = useSettingsStore.getState().settings;
-            let allLayouts = settings?.labelLayouts || [];
-            let quickPrintIDs = settings?.quickPrintLayouts || [];
-            let qpLayouts = allLayouts.filter((l) => quickPrintIDs.includes(l.id));
+            let allTemplates = settings?.labelTemplates || {};
+            let templateEntries = Object.entries(allTemplates);
+            let quickPrintSlugs = settings?.quickPrintLayouts || [];
+            let qpEntries = templateEntries.filter(([slug]) => quickPrintSlugs.includes(slug));
             return (
               <div
                 onClick={(e) => e.stopPropagation()}
@@ -402,10 +406,10 @@ const QuickItemCanvasCard = ({
                   overflow: "hidden",
                 }}
               >
-                {qpLayouts.map((layout) => (
+                {qpEntries.map(([slug, template]) => (
                   <div
-                    key={layout.id}
-                    onClick={() => handlePrintWithLayout(layout)}
+                    key={slug}
+                    onClick={() => handlePrintWithTemplate(slug)}
                     style={{
                       padding: "5px 8px",
                       cursor: "pointer",
@@ -416,7 +420,7 @@ const QuickItemCanvasCard = ({
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
                   >
-                    {layout.name}
+                    {template.name}
                   </div>
                 ))}
                 <div

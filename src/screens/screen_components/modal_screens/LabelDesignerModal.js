@@ -6,7 +6,6 @@ import {
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  ScrollView,
 } from "react-native-web";
 import {
   Button_,
@@ -17,7 +16,6 @@ import {
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
 import {
-  generate36CharUUID,
   formatCurrencyDisp,
   gray,
   lightenRGBByPercent,
@@ -27,10 +25,7 @@ import { useSettingsStore, useInventoryStore, useAlertScreenStore } from "../../
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import { cloneDeep } from "lodash";
-import {
-  generateZPLTemplate as _generateZPLTemplate,
-  substituteZPLData as _substituteZPLData,
-} from "../../../shared/labelPrintBuilder";
+import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -46,13 +41,12 @@ const LABEL_SIZES = [
 ];
 
 const AVAILABLE_FIELDS = [
-  { name: "formalName", label: "Product Name", type: "text" },
-  { name: "id", label: "Product ID", type: "text" },
-  { name: "brand", label: "Brand", type: "text" },
-  { name: "price", label: "Price", type: "text" },
-  { name: "salePrice", label: "Sale Price", type: "text" },
-  { name: "primaryBarcode", label: "Barcode", type: "barcode" },
-  { name: "storeName", label: "Store Name", type: "text" },
+  { name: "formalName", label: "Product Name", type: "text", placeholder: "Tire Kenda Kwick Trax 700x35 Continental Gatorskin Folding" },
+  { name: "informalName", label: "Product Short Name", type: "text", placeholder: "Kwick Trax 700 Continental Gatorskin Folding Bead Hardshell DuraSkin" },
+  { name: "id", label: "Barcode Number", type: "text", placeholder: "4827103956281" },
+  { name: "price", label: "Price", type: "text", placeholder: "$49.99" },
+  { name: "salePrice", label: "Sale Price", type: "text", placeholder: "$39.99" },
+  { name: "barcode", label: "Barcode", type: "barcode" },
 ];
 
 const DEFAULT_TEXT_FIELD = {
@@ -61,6 +55,8 @@ const DEFAULT_TEXT_FIELD = {
   y: 20,
   fontHeight: 30,
   fontWidth: 30,
+  maxWidth: 0,
+  letterSpacing: 0,
   bold: false,
 };
 
@@ -68,22 +64,68 @@ const DEFAULT_BARCODE_FIELD = {
   type: "barcode",
   x: 20,
   y: 20,
-  barcodeHeight: 60,
-  moduleWidth: 2,
+  width: 300,
+  height: 60,
 };
 
 const MAX_CANVAS_WIDTH = 520;
 const MAX_CANVAS_HEIGHT = 380;
 
-// ─── ZPL Functions (delegated to shared/labelPrintBuilder.js) ───────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-export const generateZPLTemplate = _generateZPLTemplate;
-export const substituteZPLData = _substituteZPLData;
+function slugify(name) {
+  return (name || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "untitled";
+}
+
+function cleanField(field) {
+  let f = { type: field.type, x: field.x, y: field.y };
+  if (field.type === "barcode") {
+    f.width = field.width;
+    f.height = field.height;
+  } else {
+    f.fontHeight = field.fontHeight;
+    f.fontWidth = field.fontWidth;
+    if (field.maxWidth) f.maxWidth = field.maxWidth;
+    if (field.letterSpacing) f.letterSpacing = field.letterSpacing;
+    f.bold = field.bold;
+  }
+  f.name = field.name;
+  return f;
+}
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
-function CanvasField({ field, scale, isSelected, onSelect, onDragStart }) {
-  let displayLabel = AVAILABLE_FIELDS.find((af) => af.name === field.name)?.label || field.name;
+const HANDLE_SIZE = 8;
+const HANDLE_STYLE_BASE = {
+  position: "absolute",
+  width: HANDLE_SIZE,
+  height: HANDLE_SIZE,
+  backgroundColor: C.blue,
+  borderRadius: 1,
+  zIndex: 2,
+};
+
+function ResizeHandle({ position, onResizeStart }) {
+  let cursorMap = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", ne: "nesw-resize", nw: "nwse-resize", se: "nwse-resize", sw: "nesw-resize" };
+  let posStyle = {};
+  let half = -(HANDLE_SIZE / 2);
+  if (position.includes("n")) posStyle.top = half;
+  if (position.includes("s")) posStyle.bottom = half;
+  if (position.includes("e")) posStyle.right = half;
+  if (position.includes("w")) posStyle.left = half;
+  if (position === "n" || position === "s") { posStyle.left = "50%"; posStyle.marginLeft = half; }
+  if (position === "e" || position === "w") { posStyle.top = "50%"; posStyle.marginTop = half; }
+  return (
+    <div
+      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onResizeStart(e, position); }}
+      style={{ ...HANDLE_STYLE_BASE, ...posStyle, cursor: cursorMap[position] }}
+    />
+  );
+}
+
+function CanvasField({ field, scale, isSelected, onSelect, onDragStart, onResizeStart, canvasW }) {
+  let fieldDef = AVAILABLE_FIELDS.find((af) => af.name === field.name);
+  let displayLabel = field.type === "barcode" ? "4827103956281" : (fieldDef?.placeholder || fieldDef?.label || field.name);
 
   function handleMouseDown(e) {
     e.stopPropagation();
@@ -91,6 +133,10 @@ function CanvasField({ field, scale, isSelected, onSelect, onDragStart }) {
     onSelect();
     onDragStart(e);
   }
+
+  let handles = isSelected ? ["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((pos) => (
+    <ResizeHandle key={pos} position={pos} onResizeStart={onResizeStart} />
+  )) : null;
 
   if (field.type === "barcode") {
     return (
@@ -108,20 +154,18 @@ function CanvasField({ field, scale, isSelected, onSelect, onDragStart }) {
           padding: 2,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "stretch", height: field.barcodeHeight * scale }}>
-          {Array.from({ length: 24 }).map((_, i) => (
+        {handles}
+        <div style={{ width: field.width * scale, height: field.height * scale, display: "flex", flexDirection: "row", alignItems: "stretch" }}>
+          {Array.from({ length: 30 }).map((_, i) => (
             <div
               key={i}
               style={{
-                width: field.moduleWidth * scale * (i % 3 === 0 ? 2 : 1),
+                flex: i % 3 === 0 ? 2 : 1,
                 backgroundColor: i % 2 === 0 ? "black" : "white",
                 height: "100%",
               }}
             />
           ))}
-        </div>
-        <div style={{ fontSize: Math.max(9, 10 * scale), color: gray(0.4), marginTop: 2 }}>
-          {displayLabel}
         </div>
       </div>
     );
@@ -139,15 +183,19 @@ function CanvasField({ field, scale, isSelected, onSelect, onDragStart }) {
         top: field.y * scale,
         fontSize: fontSize,
         fontWeight: field.bold ? "bold" : "normal",
+        letterSpacing: (field.letterSpacing || 0) * scale,
         color: isSelected ? C.blue : C.text,
         border: isSelected ? "2px dashed " + C.blue : "2px solid transparent",
         backgroundColor: isSelected ? lightenRGBByPercent(C.blue, 85) : "transparent",
+        maxWidth: field.maxWidth ? field.maxWidth * scale : canvasW - field.x * scale,
         padding: "1px 3px",
         cursor: isSelected ? "grab" : "pointer",
         userSelect: "none",
-        whiteSpace: "nowrap",
+        wordBreak: "break-word",
+        textAlign: "center",
       }}
     >
+      {handles}
       {displayLabel}
     </div>
   );
@@ -239,26 +287,26 @@ function PropertiesPanel({ field, onUpdate, onRemove }) {
 
       {isBarcode ? (
         <>
-          {/* Barcode Height */}
-          <PropRow label="Barcode Height" value={field.barcodeHeight}>
+          {/* Width */}
+          <PropRow label="Width" value={field.width}>
             <StepperButtons
-              onMinus={() => handleChange("barcodeHeight", Math.max(20, field.barcodeHeight - 10))}
-              onPlus={() => handleChange("barcodeHeight", field.barcodeHeight + 10)}
+              onMinus={() => handleChange("width", Math.max(40, field.width - 20))}
+              onPlus={() => handleChange("width", field.width + 20)}
             />
           </PropRow>
 
-          {/* Module Width */}
-          <PropRow label="Module Width" value={field.moduleWidth}>
+          {/* Height */}
+          <PropRow label="Height" value={field.height}>
             <StepperButtons
-              onMinus={() => handleChange("moduleWidth", Math.max(1, field.moduleWidth - 1))}
-              onPlus={() => handleChange("moduleWidth", Math.min(10, field.moduleWidth + 1))}
+              onMinus={() => handleChange("height", Math.max(20, field.height - 10))}
+              onPlus={() => handleChange("height", field.height + 10)}
             />
           </PropRow>
         </>
       ) : (
         <>
-          {/* Font Height */}
-          <PropRow label="Font Height" value={field.fontHeight}>
+          {/* Font Size */}
+          <PropRow label="Font Size" value={field.fontHeight}>
             <StepperButtons
               onMinus={() => {
                 let newH = Math.max(10, field.fontHeight - 5);
@@ -274,6 +322,22 @@ function PropertiesPanel({ field, onUpdate, onRemove }) {
                 else update.fontWidth = newH;
                 onUpdate({ ...field, ...update });
               }}
+            />
+          </PropRow>
+
+          {/* Max Width */}
+          <PropRow label="Max Width" value={field.maxWidth || "auto"}>
+            <StepperButtons
+              onMinus={() => handleChange("maxWidth", Math.max(0, (field.maxWidth || 200) - 20))}
+              onPlus={() => handleChange("maxWidth", (field.maxWidth || 0) + 20)}
+            />
+          </PropRow>
+
+          {/* Letter Spacing */}
+          <PropRow label="Letter Spacing" value={field.letterSpacing || 0}>
+            <StepperButtons
+              onMinus={() => handleChange("letterSpacing", Math.max(0, (field.letterSpacing || 0) - 1))}
+              onPlus={() => handleChange("letterSpacing", (field.letterSpacing || 0) + 1)}
             />
           </PropRow>
 
@@ -454,24 +518,22 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
   const [sSelectedFieldIdx, _setSelectedFieldIdx] = useState(null);
   const [sLayoutName, _setLayoutName] = useState("");
   const [sCurrentLayout, _setCurrentLayout] = useState(null);
+  const [sCurrentSlug, _setCurrentSlug] = useState(null);
   const [sIsDirty, _setIsDirty] = useState(false);
 
-  // Drag state (ref to avoid re-renders during drag)
+  // Drag/resize state (ref to avoid re-renders during drag)
   const dragRef = useRef(null);
+  const resizeRef = useRef(null);
   const canvasRef = useRef(null);
 
-  // Bottom bar
-  const [sShowZPL, _setShowZPL] = useState(false);
-  const [sCopies, _setCopies] = useState(1);
-  const [sShowPrintSearch, _setShowPrintSearch] = useState(false);
   const [sPrintSuccess, _setPrintSuccess] = useState(false);
 
   // Derived
-  let layouts = zSettingsObj?.labelLayouts || [];
-  let quickPrintIDs = zSettingsObj?.quickPrintLayouts || [];
-  let isQuickPrint = sCurrentLayout ? quickPrintIDs.includes(sCurrentLayout.id) : false;
+  let templates = zSettingsObj?.labelTemplates || {};
+  let templateEntries = Object.entries(templates);
+  let quickPrintSlugs = zSettingsObj?.quickPrintLayouts || [];
+  let isQuickPrint = sCurrentSlug ? quickPrintSlugs.includes(sCurrentSlug) : false;
   let selectedField = sSelectedFieldIdx !== null ? sFields[sSelectedFieldIdx] : null;
-  let zplTemplate = generateZPLTemplate(sLabelSize, sFields);
   let isDefaultSize = zSettingsObj?.defaultLabelSize?.width === sLabelSize.width && zSettingsObj?.defaultLabelSize?.height === sLabelSize.height;
 
   // Canvas scale
@@ -548,6 +610,73 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
     window.addEventListener("mouseup", onMouseUp);
   }
 
+  function handleFieldResizeStart(idx, e, position) {
+    let field = sFields[idx];
+    resizeRef.current = {
+      idx,
+      position,
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startField: { ...field },
+    };
+    function onMouseMove(moveE) {
+      let r = resizeRef.current;
+      if (!r) return;
+      let dx = (moveE.clientX - r.startMouseX) / scale;
+      let dy = (moveE.clientY - r.startMouseY) / scale;
+      _setFields((prev) => {
+        let updated = [...prev];
+        let f = { ...r.startField };
+        let pos = r.position;
+        if (f.type === "barcode") {
+          if (pos.includes("s")) f.height = Math.max(20, Math.round(r.startField.height + dy));
+          if (pos.includes("n")) {
+            let newH = Math.max(20, Math.round(r.startField.height - dy));
+            f.y = Math.max(0, Math.round(r.startField.y + (r.startField.height - newH)));
+            f.height = newH;
+          }
+          if (pos.includes("e")) f.width = Math.max(40, Math.round(r.startField.width + dx));
+          if (pos.includes("w")) {
+            let newW = Math.max(40, Math.round(r.startField.width - dx));
+            f.x = Math.max(0, Math.round(r.startField.x + (r.startField.width - newW)));
+            f.width = newW;
+          }
+        } else {
+          if (pos.includes("e")) f.maxWidth = Math.max(20, Math.round((r.startField.maxWidth || 200) + dx));
+          if (pos.includes("w")) {
+            let newW = Math.max(20, Math.round((r.startField.maxWidth || 200) - dx));
+            f.x = Math.max(0, Math.round(r.startField.x + ((r.startField.maxWidth || 200) - newW)));
+            f.maxWidth = newW;
+          }
+          if (pos.includes("s")) {
+            let newH = Math.max(10, Math.round(r.startField.fontHeight + dy));
+            f.fontHeight = newH;
+            f.fontWidth = f.bold ? Math.round(newH * 1.4) : newH;
+          }
+          if (pos.includes("n")) {
+            let newH = Math.max(10, Math.round(r.startField.fontHeight - dy));
+            f.y = Math.max(0, Math.round(r.startField.y + (r.startField.fontHeight - newH)));
+            f.fontHeight = newH;
+            f.fontWidth = f.bold ? Math.round(newH * 1.4) : newH;
+          }
+        }
+        updated[r.idx] = f;
+        return updated;
+      });
+    }
+    function onMouseUp() {
+      if (resizeRef.current) {
+        _setIsDirty(true);
+        resizeRef.current = null;
+      }
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      canvasRef.current?.focus();
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }
+
   function handleAddField(availableField) {
     let nextY = 20 + sFields.length * 45;
     if (nextY > sLabelSize.height - 30) nextY = 20;
@@ -582,62 +711,101 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
   }
 
   function handleSaveLayout() {
-    let layout = {
-      id: sCurrentLayout?.id || generate36CharUUID(),
-      name: sLayoutName || "Untitled Layout",
-      labelWidth: sLabelSize.width,
-      labelHeight: sLabelSize.height,
-      labelSizeName: sLabelSize.name,
-      fields: cloneDeep(sFields),
-    };
+    let name = sLayoutName || "Untitled Layout";
+    let baseSlug = slugify(name);
+    let existingTemplates = zSettingsObj?.labelTemplates || {};
 
-    let existingLayouts = zSettingsObj?.labelLayouts || [];
-    let existingIdx = existingLayouts.findIndex((l) => l.id === layout.id);
-    let updatedLayouts;
-
-    if (existingIdx >= 0) {
-      updatedLayouts = existingLayouts.map((l, i) =>
-        i === existingIdx ? layout : l
-      );
-    } else {
-      updatedLayouts = [...existingLayouts, layout];
+    // Resolve unique slug (skip conflict check if same as current)
+    let slug = baseSlug;
+    if (existingTemplates[slug] && slug !== sCurrentSlug) {
+      let counter = 2;
+      while (existingTemplates[slug + "-" + counter]) counter++;
+      slug = slug + "-" + counter;
     }
 
-    handleSettingsFieldChange("labelLayouts", updatedLayouts);
-    _setCurrentLayout(layout);
+    let template = {
+      name: name,
+      labelWidth: sLabelSize.width,
+      labelHeight: sLabelSize.height,
+      fields: sFields.map(cleanField),
+    };
+    console.log("Save Layout:", JSON.stringify(template, null, 2));
+
+    let updatedTemplates = { ...existingTemplates };
+
+    // If slug changed (rename), remove old key and update quickPrintLayouts
+    if (sCurrentSlug && sCurrentSlug !== slug) {
+      delete updatedTemplates[sCurrentSlug];
+      let qp = zSettingsObj?.quickPrintLayouts || [];
+      if (qp.includes(sCurrentSlug)) {
+        handleSettingsFieldChange("quickPrintLayouts", qp.map((id) => id === sCurrentSlug ? slug : id));
+      }
+    }
+
+    updatedTemplates[slug] = template;
+    handleSettingsFieldChange("labelTemplates", updatedTemplates);
+    _setCurrentSlug(slug);
+    _setCurrentLayout(template);
     _setIsDirty(false);
   }
 
-  function handleLoadLayout(layout) {
+  function migrateField(field) {
+    let f = { ...field };
+    // Migrate old barcode fields
+    if (f.type === "barcode") {
+      if (f.barcodeHeight && !f.height) f.height = Number(f.barcodeHeight);
+      if (!f.width) f.width = 300;
+      if (f.name === "primaryBarcode") f.name = "barcode";
+      delete f.barcodeHeight;
+      delete f.moduleWidth;
+    }
+    // Ensure numbers
+    f.x = Number(f.x) || 0;
+    f.y = Number(f.y) || 0;
+    if (f.type === "barcode") {
+      f.width = Number(f.width) || 300;
+      f.height = Number(f.height) || 60;
+    } else {
+      f.fontHeight = Number(f.fontHeight) || 30;
+      f.fontWidth = Number(f.fontWidth) || 30;
+      f.maxWidth = Number(f.maxWidth) || 0;
+      f.letterSpacing = Number(f.letterSpacing) || 0;
+      f.bold = f.bold === true || f.bold === "true";
+    }
+    return f;
+  }
+
+  function handleLoadLayout(slug, template) {
     let size =
       LABEL_SIZES.find(
-        (s) => s.width === layout.labelWidth && s.height === layout.labelHeight
+        (s) => s.width === Number(template.labelWidth) && s.height === Number(template.labelHeight)
       ) || LABEL_SIZES[0];
     _setLabelSize(size);
-    _setFields(cloneDeep(layout.fields));
-    _setLayoutName(layout.name);
-    _setCurrentLayout(layout);
+    _setFields((template.fields || []).map(migrateField));
+    _setLayoutName(template.name);
+    _setCurrentLayout(template);
+    _setCurrentSlug(slug);
     _setSelectedFieldIdx(null);
     _setIsDirty(false);
   }
 
   function handleDeleteLayout() {
-    if (!sCurrentLayout) return;
+    if (!sCurrentSlug) return;
     useAlertScreenStore.getState().setValues({
       title: "Delete Layout",
-      message: 'Delete layout "' + sCurrentLayout.name + '"?',
+      message: 'Delete layout "' + (sCurrentLayout?.name || sCurrentSlug) + '"?',
       btn1Text: "Cancel",
       btn2Text: "Delete",
       handleBtn2Press: () => {
-        let updatedLayouts = (zSettingsObj?.labelLayouts || []).filter(
-          (l) => l.id !== sCurrentLayout.id
-        );
-        handleSettingsFieldChange("labelLayouts", updatedLayouts);
+        let updatedTemplates = { ...(zSettingsObj?.labelTemplates || {}) };
+        delete updatedTemplates[sCurrentSlug];
+        handleSettingsFieldChange("labelTemplates", updatedTemplates);
         let currentQP = zSettingsObj?.quickPrintLayouts || [];
-        if (currentQP.includes(sCurrentLayout.id)) {
-          handleSettingsFieldChange("quickPrintLayouts", currentQP.filter((id) => id !== sCurrentLayout.id));
+        if (currentQP.includes(sCurrentSlug)) {
+          handleSettingsFieldChange("quickPrintLayouts", currentQP.filter((id) => id !== sCurrentSlug));
         }
         _setCurrentLayout(null);
+        _setCurrentSlug(null);
         _setFields([]);
         _setLayoutName("");
         _setSelectedFieldIdx(null);
@@ -660,14 +828,15 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
     }
   }
 
-  function handlePrintItem(item) {
-    let itemWithStore = { ...item, storeName: zSettingsObj?.storeInfo?.displayName || "" };
-    let finalZPL = substituteZPLData(zplTemplate, itemWithStore);
-    let printObj = {
-      id: generate36CharUUID(),
-      zpl: finalZPL,
-      copies: sCopies,
-    };
+  function handleTestPrint() {
+    if (!sCurrentSlug) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Template",
+        message: "Save the current layout as a template before printing.",
+        btn1Text: "OK",
+      });
+      return;
+    }
     let printerID = localStorageWrapper.getItem("selectedLabelPrinterID") || "";
     if (!printerID) {
       useAlertScreenStore.getState().setValues({
@@ -677,8 +846,18 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
       });
       return;
     }
-    dbSavePrintObj(printObj, printerID);
-    _setShowPrintSearch(false);
+    let testItem = {};
+    sFields.forEach((f) => {
+      let fieldDef = AVAILABLE_FIELDS.find((af) => af.name === f.name);
+      if (f.name === "price") testItem.price = 4999;
+      else if (f.name === "salePrice") testItem.salePrice = 3999;
+      else if (f.name === "barcode") testItem.barcode = "4827103956281";
+      else testItem[f.name] = fieldDef?.placeholder || fieldDef?.label || f.name;
+    });
+    let template = { labelWidth: sLabelSize.width, labelHeight: sLabelSize.height, fields: sFields.map(cleanField) };
+    let printJob = labelPrintBuilder.label(sCurrentSlug, testItem, 1, template);
+    console.log("Test Print Job:", JSON.stringify(printJob, null, 2));
+    dbSavePrintObj(printJob, printerID);
     _setPrintSuccess(true);
     setTimeout(() => _setPrintSuccess(false), 2000);
   }
@@ -696,13 +875,13 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
   }
 
   function handleToggleQuickPrint() {
-    if (!sCurrentLayout) return;
+    if (!sCurrentSlug) return;
     let current = zSettingsObj?.quickPrintLayouts || [];
     let updated;
-    if (current.includes(sCurrentLayout.id)) {
-      updated = current.filter((id) => id !== sCurrentLayout.id);
+    if (current.includes(sCurrentSlug)) {
+      updated = current.filter((id) => id !== sCurrentSlug);
     } else {
-      updated = [...current, sCurrentLayout.id];
+      updated = [...current, sCurrentSlug];
     }
     handleSettingsFieldChange("quickPrintLayouts", updated);
   }
@@ -744,10 +923,10 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                 />
 
                 {/* Load layout dropdown */}
-                {layouts.length > 0 && (
+                {templateEntries.length > 0 && (
                   <DropdownMenu
-                    dataArr={layouts.map((l) => l.name)}
-                    onSelect={(item, idx) => handleLoadLayout(layouts[idx])}
+                    dataArr={templateEntries.map(([slug, t]) => t.name)}
+                    onSelect={(item, idx) => handleLoadLayout(templateEntries[idx][0], templateEntries[idx][1])}
                     buttonText="Load Layout"
                     buttonStyle={{ paddingHorizontal: 10, paddingVertical: 4, marginRight: 8 }}
                     buttonTextStyle={{ fontSize: 12 }}
@@ -773,18 +952,8 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                   )}
                 </View>
 
-                {/* Save */}
-                <Button_
-                  text="Save"
-                  onPress={handleSaveLayout}
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  style={{ marginRight: 6, paddingHorizontal: 12 }}
-                  textStyle={{ fontSize: 12 }}
-                  disabled={sFields.length === 0}
-                />
-
                 {/* Delete */}
-                {sCurrentLayout && (
+                {sCurrentSlug && (
                   <Button_
                     text="Delete"
                     onPress={handleDeleteLayout}
@@ -795,7 +964,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                 )}
 
                 {/* Quick Print toggle */}
-                {sCurrentLayout && (
+                {sCurrentSlug && (
                   <View style={{ flexDirection: "row", alignItems: "center", marginRight: 8 }}>
                     <CheckBox_
                       isChecked={isQuickPrint}
@@ -807,10 +976,6 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                   </View>
                 )}
 
-                {/* Dirty indicator */}
-                {sIsDirty && (
-                  <Text style={{ fontSize: 11, color: C.orange, marginLeft: 4 }}>Unsaved</Text>
-                )}
               </View>
 
               {/* ─── Main Area ─── */}
@@ -824,6 +989,14 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
 
                 {/* Canvas area */}
                 <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                  <Button_
+                    text={sIsDirty ? "Save Layout" : "Saved"}
+                    onPress={handleSaveLayout}
+                    colorGradientArr={sIsDirty ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
+                    style={{ paddingHorizontal: 40, paddingVertical: 10, marginBottom: 6 }}
+                    textStyle={{ fontSize: 18 }}
+                    disabled={!sIsDirty || sFields.length === 0}
+                  />
                   <Text style={{ fontSize: 11, color: gray(0.5), marginBottom: 6 }}>
                     {sLabelSize.name} - {sLabelSize.width} x {sLabelSize.height} dots
                   </Text>
@@ -844,14 +1017,24 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                       outline: "none",
                     }}
                   >
+                    {/* Printer margin guides */}
+                    <div style={{ position: "absolute", left: 30 * scale, top: 0, width: 0, height: "100%", borderLeft: "1px dashed " + gray(0.7), pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", right: 30 * scale, top: 0, width: 0, height: "100%", borderLeft: "1px dashed " + gray(0.7), pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", left: 0, top: 20 * scale, width: "100%", height: 0, borderTop: "1px dashed " + gray(0.7), pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", left: 0, bottom: 20 * scale, width: "100%", height: 0, borderTop: "1px dashed " + gray(0.7), pointerEvents: "none" }} />
+                    {/* Vertical center line */}
+                    <div style={{ position: "absolute", left: "50%", top: 0, width: 0, height: "100%", borderLeft: "2px dashed rgba(70,150,255,0.8)", pointerEvents: "none" }} />
+
                     {sFields.map((field, idx) => (
                       <CanvasField
                         key={field.name}
                         field={field}
                         scale={scale}
+                        canvasW={canvasW}
                         isSelected={idx === sSelectedFieldIdx}
                         onSelect={() => _setSelectedFieldIdx(idx)}
                         onDragStart={(e) => handleFieldDragStart(idx, e)}
+                        onResizeStart={(e, pos) => handleFieldResizeStart(idx, e, pos)}
                       />
                     ))}
                   </div>
@@ -869,57 +1052,16 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
 
               {/* ─── Bottom Bar ─── */}
               <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: gray(0.85), paddingTop: 10 }}>
-                {/* ZPL Preview */}
-                {sShowZPL && (
-                  <View
-                    style={{
-                      backgroundColor: gray(0.95),
-                      borderRadius: 6,
-                      padding: 10,
-                      marginBottom: 8,
-                      maxHeight: 120,
-                    }}
-                  >
-                    <ScrollView>
-                      <Text style={{ fontSize: 11, fontFamily: "monospace", color: C.text }}>
-                        {zplTemplate}
-                      </Text>
-                    </ScrollView>
-                  </View>
-                )}
-
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    {/* Show ZPL */}
                     <Button_
-                      text={sShowZPL ? "Hide ZPL" : "Show ZPL"}
-                      onPress={() => _setShowZPL(!sShowZPL)}
-                      colorGradientArr={COLOR_GRADIENTS.lightBlue}
-                      style={{ marginRight: 8, paddingHorizontal: 12 }}
-                      textStyle={{ fontSize: 12 }}
-                    />
-
-                    {/* Copies */}
-                    <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12 }}>
-                      <Text style={{ fontSize: 12, color: C.text, marginRight: 6 }}>Copies:</Text>
-                      <StepperButtons
-                        onMinus={() => _setCopies(Math.max(1, sCopies - 1))}
-                        onPlus={() => _setCopies(sCopies + 1)}
-                      />
-                      <Text style={{ fontSize: 13, fontWeight: "500", color: C.text, marginLeft: 6 }}>{sCopies}</Text>
-                    </View>
-
-                    {/* Print */}
-                    <Button_
-                      text="Print"
-                      onPress={() => _setShowPrintSearch(true)}
+                      text="Test Print Label Design"
+                      onPress={handleTestPrint}
                       colorGradientArr={COLOR_GRADIENTS.green}
                       style={{ marginRight: 8, paddingHorizontal: 16 }}
                       textStyle={{ fontSize: 12 }}
                       disabled={sFields.length === 0}
                     />
-
-                    {/* Print success */}
                     {sPrintSuccess && (
                       <Text style={{ fontSize: 12, color: C.green, fontWeight: "500" }}>Sent to printer!</Text>
                     )}
@@ -940,13 +1082,6 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
         </View>
       </TouchableWithoutFeedback>
 
-      {/* Print search overlay */}
-      {sShowPrintSearch && (
-        <PrintSearchOverlay
-          onSelect={handlePrintItem}
-          onClose={() => _setShowPrintSearch(false)}
-        />
-      )}
     </View>,
     document.body
   );

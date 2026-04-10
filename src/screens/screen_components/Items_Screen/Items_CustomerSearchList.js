@@ -14,6 +14,7 @@ import {
   Image_,
   ScreenModal,
   SmallLoadingIndicator,
+  Tooltip,
   TouchableOpacity_,
 } from "../../../components";
 import { cloneDeep } from "lodash";
@@ -169,11 +170,13 @@ export function CustomerSearchListComponent({}) {
                   justifyContent: "center",
                 }}
               >
-                <Button_
-                  onPress={() => _setCustomerInfo(customer)}
-                  iconSize={20}
-                  icon={ICONS.info}
-                />
+                <Tooltip text="Customer info">
+                  <Button_
+                    onPress={() => _setCustomerInfo(customer)}
+                    iconSize={25}
+                    icon={ICONS.info2}
+                  />
+                </Tooltip>
               </View>
               <TouchableOpacity_
                 style={{ width: "92%", height: "100%", flexDirection: "row" }}
@@ -203,7 +206,7 @@ export function CustomerSearchListComponent({}) {
                         <Text style={{ color: gray(0.35), fontSize: 12 }}>
                           {"landline:  "}
                         </Text>
-                        {customer?.customerLandline || customer?.land}
+                        {formatPhoneForDisplay(customer?.customerLandline || customer?.land)}
                       </Text>
                     )}
                     {!!customer?.email && (

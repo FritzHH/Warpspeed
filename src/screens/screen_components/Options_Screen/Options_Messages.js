@@ -775,6 +775,23 @@ export function MessagesComponent({}) {
     handleExitHubMode();
   }
 
+  function handleHubOpenWorkorderKeepHub(phone) {
+    let wo = zAllWorkorders.find(w => w.customerCell === phone);
+    if (!wo) return;
+    useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
+    if (wo.customerID) {
+      dbGetCustomer(wo.customerID).then((c) => {
+        if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
+      });
+    }
+    if (wo.paymentComplete) useOpenWorkordersStore.getState().setLockedWorkorderID(wo.id);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.messages,
+    });
+  }
+
   function handleHubThreadClick(thread) {
     _setHubSelectedPhone(prev => {
       if (prev === thread.phone) {
@@ -902,7 +919,9 @@ export function MessagesComponent({}) {
                 previewMode={!!sHubHoverPhone && sHubHoverPhone !== sHubSelectedPhone}
                 onShowPhoneEntry={() => { _setHubSelectedPhone(""); _setHubNewPhone(""); }}
                 onOpenWorkorder={handleHubOpenWorkorder}
+                onOpenWorkorderKeepHub={handleHubOpenWorkorderKeepHub}
                 hasMatchingWorkorder={!hasCustomer && !!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
+                hasWorkorderForPhone={!!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
                 exitHubButton={hasCustomer ? (
                   <Tooltip text="Back to customer" position="top" offsetX={-20}>
                     <TouchableOpacity onPress={handleExitHubMode} style={{ padding: 4 }}>
@@ -1344,7 +1363,7 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
   );
 }
 
-function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, hasMatchingWorkorder, exitHubButton }) {
+function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, onOpenWorkorderKeepHub, hasMatchingWorkorder, hasWorkorderForPhone, exitHubButton }) {
   // Initialize from cache synchronously to avoid layout flash on hover
   const [sMessages, _setMessages] = useState(() => {
     let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
@@ -1713,6 +1732,9 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             </View>
           ) : sListenerConnecting ? <ActivityIndicator size={16} color="#007bff" /> : null}
         </View>
+        <TouchableOpacity onPress={() => hasWorkorderForPhone && onOpenWorkorderKeepHub(phone)} disabled={!hasWorkorderForPhone} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, marginRight: 6, backgroundColor: C.orange, opacity: hasWorkorderForPhone ? 1 : 0 }}>
+          <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Open Workorder</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={handleLoadMore} disabled={sLoadingMore || sNoMoreHistory} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: (sLoadingMore || sNoMoreHistory) ? gray(0.15) : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}>
           {sLoadingMore ? <SmallLoadingIndicator /> : <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Load more</Text>}
         </TouchableOpacity>
@@ -1845,17 +1867,19 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             onChange={handleHubFilesSelected}
             style={{ display: "none" }}
           />
-          <Tooltip text={sHubMediaUploading ? "Uploading..." : "Send photo/video"} position="top">
-            <TouchableOpacity
-              onPress={() => !sHubMediaUploading && hubFileInputRef.current?.click()}
-              style={{ alignItems: "center", justifyContent: "center", padding: 6, opacity: sHubMediaUploading ? 0.4 : 1 }}
-            >
-              {sHubMediaUploading
-                ? <SmallLoadingIndicator />
-                : <Image_ icon={ICONS.uploadCamera} size={35} />
-              }
-            </TouchableOpacity>
-          </Tooltip>
+          {!hasWorkorderForPhone && (
+            <Tooltip text={sHubMediaUploading ? "Uploading..." : "Send photo/video"} position="top">
+              <TouchableOpacity
+                onPress={() => !sHubMediaUploading && hubFileInputRef.current?.click()}
+                style={{ alignItems: "center", justifyContent: "center", padding: 6, opacity: sHubMediaUploading ? 0.4 : 1 }}
+              >
+                {sHubMediaUploading
+                  ? <SmallLoadingIndicator />
+                  : <Image_ icon={ICONS.uploadCamera} size={35} />
+                }
+              </TouchableOpacity>
+            </Tooltip>
+          )}
           {onShowPhoneEntry && (
             <Tooltip text="New number" position="top">
               <TouchableOpacity
@@ -1875,10 +1899,10 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
               </TouchableOpacity>
             </Tooltip>
           )}
-          {hasMatchingWorkorder && (
-            <Tooltip text="Open workorder" position="top" offsetX={-15}>
-              <TouchableOpacity onPress={() => !sHubMediaUploading && onOpenWorkorder(phone)} style={{ padding: 6, opacity: sHubMediaUploading ? 0.3 : 1 }}>
-                <Image_ icon={ICONS.letterW} size={35} />
+          {hasWorkorderForPhone && (
+            <Tooltip text="Go to customer" position="top" offsetX={-15}>
+              <TouchableOpacity onPress={() => onOpenWorkorder(phone)} style={{ padding: 6 }}>
+                <Image_ icon={ICONS.person} size={35} />
               </TouchableOpacity>
             </Tooltip>
           )}

@@ -83,6 +83,7 @@ import { DB_NODES } from "../../../../constants";
 import { newCheckoutGetStripeReaders } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { StandButtonsCanvasEditor } from "./StandButtonsCanvas";
 import { LabelDesignerModal } from "../../modal_screens/LabelDesignerModal";
+import { labelPrintBuilder } from "../../../../shared/labelPrintBuilder";
 
 
 const TAB_NAMES = {
@@ -3504,9 +3505,19 @@ const PaymentProcessingComponent = ({
   );
 };
 
-const PrintersComponent = ({ zSettingsObj }) => {
+const PRINTER_ONLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+
+function isPrinterOnline(printer) {
+  let lastSeen = printer.lastSeen;
+  if (!lastSeen || typeof lastSeen !== "number") return false;
+  return Date.now() - lastSeen < PRINTER_ONLINE_THRESHOLD_MS;
+}
+
+const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   const printersObj = zSettingsObj?.printers || {};
   const printersList = Object.values(printersObj);
+  const receiptPrinters = printersList.filter((p) => p.type === "receipt");
+  const labelPrinters = printersList.filter((p) => p.type === "label");
   const [sSelectedReceiptPrinter, _setSelectedReceiptPrinter] = useState(localStorageWrapper.getItem("selectedPrinterID") || "");
   const [sSelectedLabelPrinter, _setSelectedLabelPrinter] = useState(localStorageWrapper.getItem("selectedLabelPrinterID") || "");
 
@@ -3527,10 +3538,10 @@ const PrintersComponent = ({ zSettingsObj }) => {
         <View style={{ width: "100%", marginBottom: 10 }}>
           <Text style={{ fontSize: 12, color: gray(0.6) }}>RECEIPT PRINTER (this device)</Text>
         </View>
-        {printersList.length === 0 && (
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>No printers configured</Text>
+        {receiptPrinters.length === 0 && (
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>No receipt printers configured</Text>
         )}
-        {printersList.map((printer, idx) => (
+        {receiptPrinters.map((printer, idx) => (
           <View
             key={printer.id || idx}
             style={{
@@ -3539,24 +3550,37 @@ const PrintersComponent = ({ zSettingsObj }) => {
               borderColor: sSelectedReceiptPrinter === printer.id ? C.green : C.buttonLightGreenOutline,
               backgroundColor: C.backgroundListWhite,
               padding: 10,
-              marginBottom: idx < printersList.length - 1 ? 8 : 0,
+              marginBottom: idx < receiptPrinters.length - 1 ? 8 : 0,
               width: "100%",
             }}
           >
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: printer.online === true ? C.green : C.red, marginRight: 8 }} />
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isPrinterOnline(printer) ? C.green : C.red, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
                 <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
               </View>
             </View>
-            <CheckBox_
-              isChecked={sSelectedReceiptPrinter === printer.id}
-              text="Use for receipts"
-              textStyle={{ fontSize: 13 }}
-              buttonStyle={{ backgroundColor: "transparent", marginTop: 8 }}
-              onCheck={() => handleSelectReceiptPrinter(printer.id)}
-            />
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
+              <CheckBox_
+                isChecked={sSelectedReceiptPrinter === printer.id}
+                text="Use for receipts"
+                textStyle={{ fontSize: 13 }}
+                buttonStyle={{ backgroundColor: "transparent" }}
+                onCheck={() => handleSelectReceiptPrinter(printer.id)}
+              />
+              <Button_
+                text="Test Print"
+                onPress={() => {
+                  let testObj = printBuilder.test();
+                  dbSavePrintObj(testObj, printer.id);
+                }}
+                colorGradientArr={COLOR_GRADIENTS.lightBlue}
+                style={{ paddingHorizontal: 12 }}
+                textStyle={{ fontSize: 11 }}
+                enabled={isPrinterOnline(printer)}
+              />
+            </View>
           </View>
         ))}
       </BoxContainerInnerComponent>
@@ -3566,10 +3590,10 @@ const PrintersComponent = ({ zSettingsObj }) => {
         <View style={{ width: "100%", marginBottom: 10 }}>
           <Text style={{ fontSize: 12, color: gray(0.6) }}>LABEL PRINTER (this device)</Text>
         </View>
-        {printersList.length === 0 && (
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>No printers configured</Text>
+        {labelPrinters.length === 0 && (
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>No label printers configured</Text>
         )}
-        {printersList.map((printer, idx) => (
+        {labelPrinters.map((printer, idx) => (
           <View
             key={printer.id || idx}
             style={{
@@ -3578,24 +3602,37 @@ const PrintersComponent = ({ zSettingsObj }) => {
               borderColor: sSelectedLabelPrinter === printer.id ? C.green : C.buttonLightGreenOutline,
               backgroundColor: C.backgroundListWhite,
               padding: 10,
-              marginBottom: idx < printersList.length - 1 ? 8 : 0,
+              marginBottom: idx < labelPrinters.length - 1 ? 8 : 0,
               width: "100%",
             }}
           >
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: printer.online === true ? C.green : C.red, marginRight: 8 }} />
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isPrinterOnline(printer) ? C.green : C.red, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
                 <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
               </View>
             </View>
-            <CheckBox_
-              isChecked={sSelectedLabelPrinter === printer.id}
-              text="Use for labels"
-              textStyle={{ fontSize: 13 }}
-              buttonStyle={{ backgroundColor: "transparent", marginTop: 8 }}
-              onCheck={() => handleSelectLabelPrinter(printer.id)}
-            />
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
+              <CheckBox_
+                isChecked={sSelectedLabelPrinter === printer.id}
+                text="Use for labels"
+                textStyle={{ fontSize: 13 }}
+                buttonStyle={{ backgroundColor: "transparent" }}
+                onCheck={() => handleSelectLabelPrinter(printer.id)}
+              />
+              <Button_
+                text="Test Print"
+                onPress={() => {
+                  let testObj = labelPrintBuilder.test();
+                  dbSavePrintObj(testObj, printer.id);
+                }}
+                colorGradientArr={COLOR_GRADIENTS.lightBlue}
+                style={{ paddingHorizontal: 12 }}
+                textStyle={{ fontSize: 11 }}
+                enabled={isPrinterOnline(printer)}
+              />
+            </View>
           </View>
         ))}
       </BoxContainerInnerComponent>

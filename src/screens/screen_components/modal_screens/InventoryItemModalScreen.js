@@ -414,11 +414,12 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   // ─── quick print label ─────────────────────────────────────────────────
 
   let zSettings = useSettingsStore.getState().settings;
-  let allLayouts = zSettings?.labelLayouts || [];
-  let quickPrintIDs = zSettings?.quickPrintLayouts || [];
-  let quickPrintLayoutsList = allLayouts.filter((l) => quickPrintIDs.includes(l.id));
+  let allTemplates = zSettings?.labelTemplates || {};
+  let templateEntries = Object.entries(allTemplates);
+  let quickPrintSlugs = zSettings?.quickPrintLayouts || [];
+  let quickPrintEntries = templateEntries.filter(([slug]) => quickPrintSlugs.includes(slug));
 
-  function handleQuickPrint(layout) {
+  function handleQuickPrint(slug) {
     let printerID = localStorageWrapper.getItem("selectedLabelPrinterID") || "";
     if (!printerID) {
       showAlert({
@@ -428,8 +429,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
       });
       return;
     }
-    let printObj = labelPrintBuilder.label(layout, sItem);
-    dbSavePrintObj(printObj, printerID);
+    let template = allTemplates[slug];
+    let printJob = labelPrintBuilder.label(slug, sItem, 1, template);
+    dbSavePrintObj(printJob, printerID);
     _setPrintSuccess(true);
     setTimeout(() => _setPrintSuccess(false), 2000);
   }
@@ -552,11 +554,11 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               {/* Print Label */}
-              {!isNew && allLayouts.length > 0 && (
+              {!isNew && templateEntries.length > 0 && (
                 <View style={{ flexDirection: "row", alignItems: "center", marginRight: 10 }}>
                   <DropdownMenu
-                    dataArr={allLayouts.map((l) => l.name)}
-                    onSelect={(name, idx) => handleQuickPrint(allLayouts[idx])}
+                    dataArr={templateEntries.map(([slug, t]) => t.name)}
+                    onSelect={(name, idx) => handleQuickPrint(templateEntries[idx][0])}
                     buttonText=""
                     buttonIcon={ICONS.print}
                     buttonIconSize={26}

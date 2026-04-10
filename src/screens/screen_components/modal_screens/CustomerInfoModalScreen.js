@@ -553,7 +553,7 @@ export const CustomerInfoScreenModalComponent = ({
         {!isNewCustomer && (
           <View
             style={{
-              width: "25%",
+              width: "30%",
               height: "100%",
               paddingHorizontal: 15,
               paddingVertical: 5,
@@ -591,7 +591,7 @@ export const CustomerInfoScreenModalComponent = ({
         {!isNewCustomer && (
           <View
             style={{
-              width: "25%",
+              width: "30%",
               height: "100%",
               paddingHorizontal: 15,
               paddingVertical: 5,
@@ -643,12 +643,14 @@ export const CustomerInfoScreenModalComponent = ({
           </View>
         )}
         {!isNewCustomer && !!sCustomerInfo?.customerCell && (
-          <CustomerMessagesPanel
-            customerPhone={sCustomerInfo.customerCell}
-            customerID={sCustomerInfo.id}
-            customerFirst={sCustomerInfo.first}
-            customerLast={sCustomerInfo.last}
-          />
+          <View style={{ width: "25%", height: "100%" }}>
+            <CustomerMessagesPanel
+              customerPhone={sCustomerInfo.customerCell}
+              customerID={sCustomerInfo.id}
+              customerFirst={sCustomerInfo.first}
+              customerLast={sCustomerInfo.last}
+            />
+          </View>
         )}
         <DepositModal
           visible={sShowDepositModal}

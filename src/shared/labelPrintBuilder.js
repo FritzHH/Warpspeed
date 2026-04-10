@@ -68,7 +68,8 @@ function substituteZPLData(zplTemplate, item) {
     .replace("{brand}", item.brand || "")
     .replace("{price}", formatCentsAsCurrency(item.price))
     .replace("{salePrice}", formatCentsAsCurrency(item.salePrice))
-    .replace("{primaryBarcode}", item.primaryBarcode || item.id || "");
+    .replace("{primaryBarcode}", item.primaryBarcode || item.id || "")
+    .replace("{storeName}", item.storeName || "");
 }
 
 // ── Label print builder ──

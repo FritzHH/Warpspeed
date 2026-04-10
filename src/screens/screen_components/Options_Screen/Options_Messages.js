@@ -730,6 +730,8 @@ export function MessagesComponent({}) {
     _setNewMessage("");
     _setForwardReplies(false);
     clearTranslation();
+    hasInitialScrolledRef.current = false;
+    lastMsgIdRef.current = null;
   }
 
   async function handleHubOpenWorkorder(phone) {
@@ -894,6 +896,7 @@ export function MessagesComponent({}) {
           <View style={{ flex: 1 }}>
             {(sHubHoverPhone || sHubSelectedPhone) ? (
               <HubConversationPanel
+                key={sHubHoverPhone || sHubSelectedPhone}
                 phone={sHubHoverPhone || sHubSelectedPhone}
                 thread={zSmsThreads.find(t => t.phone === (sHubHoverPhone || sHubSelectedPhone))}
                 previewMode={!!sHubHoverPhone && sHubHoverPhone !== sHubSelectedPhone}

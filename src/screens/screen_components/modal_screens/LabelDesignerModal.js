@@ -52,6 +52,7 @@ const AVAILABLE_FIELDS = [
   { name: "price", label: "Price", type: "text" },
   { name: "salePrice", label: "Sale Price", type: "text" },
   { name: "primaryBarcode", label: "Barcode", type: "barcode" },
+  { name: "storeName", label: "Store Name", type: "text" },
 ];
 
 const DEFAULT_TEXT_FIELD = {
@@ -81,16 +82,26 @@ export const substituteZPLData = _substituteZPLData;
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
-function CanvasField({ field, scale, isSelected, onSelect }) {
+function CanvasField({ field, scale, isSelected, onSelect, onDragStart }) {
+  let displayLabel = AVAILABLE_FIELDS.find((af) => af.name === field.name)?.label || field.name;
+
+  function handleMouseDown(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    onSelect();
+    onDragStart(e);
+  }
+
   if (field.type === "barcode") {
     return (
       <div
-        onClick={(e) => { e.stopPropagation(); onSelect(); }}
+        onMouseDown={handleMouseDown}
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
           left: field.x * scale,
           top: field.y * scale,
-          cursor: "pointer",
+          cursor: isSelected ? "grab" : "pointer",
           userSelect: "none",
           border: isSelected ? "2px dashed " + C.blue : "2px solid transparent",
           backgroundColor: isSelected ? lightenRGBByPercent(C.blue, 85) : "transparent",
@@ -110,7 +121,7 @@ function CanvasField({ field, scale, isSelected, onSelect }) {
           ))}
         </div>
         <div style={{ fontSize: Math.max(9, 10 * scale), color: gray(0.4), marginTop: 2 }}>
-          {field.name}
+          {displayLabel}
         </div>
       </div>
     );
@@ -120,7 +131,8 @@ function CanvasField({ field, scale, isSelected, onSelect }) {
   let fontSize = Math.max(8, field.fontHeight * scale * 0.75);
   return (
     <div
-      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onMouseDown={handleMouseDown}
+      onClick={(e) => e.stopPropagation()}
       style={{
         position: "absolute",
         left: field.x * scale,
@@ -131,12 +143,12 @@ function CanvasField({ field, scale, isSelected, onSelect }) {
         border: isSelected ? "2px dashed " + C.blue : "2px solid transparent",
         backgroundColor: isSelected ? lightenRGBByPercent(C.blue, 85) : "transparent",
         padding: "1px 3px",
-        cursor: "pointer",
+        cursor: isSelected ? "grab" : "pointer",
         userSelect: "none",
         whiteSpace: "nowrap",
       }}
     >
-      {field.name}
+      {displayLabel}
     </div>
   );
 }
@@ -444,6 +456,10 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
   const [sCurrentLayout, _setCurrentLayout] = useState(null);
   const [sIsDirty, _setIsDirty] = useState(false);
 
+  // Drag state (ref to avoid re-renders during drag)
+  const dragRef = useRef(null);
+  const canvasRef = useRef(null);
+
   // Bottom bar
   const [sShowZPL, _setShowZPL] = useState(false);
   const [sCopies, _setCopies] = useState(1);
@@ -494,6 +510,42 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
     newFields[sSelectedFieldIdx] = updated;
     _setFields(newFields);
     _setIsDirty(true);
+  }
+
+  function handleFieldDragStart(idx, e) {
+    let rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    dragRef.current = {
+      idx,
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startFieldX: sFields[idx].x,
+      startFieldY: sFields[idx].y,
+    };
+    function onMouseMove(moveE) {
+      let drag = dragRef.current;
+      if (!drag) return;
+      let dx = (moveE.clientX - drag.startMouseX) / scale;
+      let dy = (moveE.clientY - drag.startMouseY) / scale;
+      let newX = Math.round(Math.max(0, Math.min(sLabelSize.width - 10, drag.startFieldX + dx)));
+      let newY = Math.round(Math.max(0, Math.min(sLabelSize.height - 10, drag.startFieldY + dy)));
+      _setFields((prev) => {
+        let updated = [...prev];
+        updated[drag.idx] = { ...updated[drag.idx], x: newX, y: newY };
+        return updated;
+      });
+    }
+    function onMouseUp() {
+      if (dragRef.current) {
+        _setIsDirty(true);
+        dragRef.current = null;
+      }
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+      canvasRef.current?.focus();
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
   }
 
   function handleAddField(availableField) {
@@ -571,7 +623,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
 
   function handleDeleteLayout() {
     if (!sCurrentLayout) return;
-    useAlertScreenStore.getState().showAlert({
+    useAlertScreenStore.getState().setValues({
       title: "Delete Layout",
       message: 'Delete layout "' + sCurrentLayout.name + '"?',
       btn1Text: "Cancel",
@@ -596,7 +648,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
 
   function handleExitPress() {
     if (sIsDirty) {
-      useAlertScreenStore.getState().showAlert({
+      useAlertScreenStore.getState().setValues({
         title: "Unsaved Changes",
         message: "You have unsaved changes. Exit anyway?",
         btn1Text: "Cancel",
@@ -609,7 +661,8 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
   }
 
   function handlePrintItem(item) {
-    let finalZPL = substituteZPLData(zplTemplate, item);
+    let itemWithStore = { ...item, storeName: zSettingsObj?.storeInfo?.displayName || "" };
+    let finalZPL = substituteZPLData(zplTemplate, itemWithStore);
     let printObj = {
       id: generate36CharUUID(),
       zpl: finalZPL,
@@ -617,7 +670,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
     };
     let printerID = localStorageWrapper.getItem("selectedLabelPrinterID") || "";
     if (!printerID) {
-      useAlertScreenStore.getState().showAlert({
+      useAlertScreenStore.getState().setValues({
         title: "No Label Printer",
         message: "Select a label printer for this device in Settings.",
         btn1Text: "OK",
@@ -663,7 +716,6 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
           <TouchableWithoutFeedback onPress={() => {}}>
             <div
               tabIndex={0}
-              onKeyDown={handleKeyDown}
               ref={(el) => { if (el) el.focus(); }}
               style={{
                 width: "92%",
@@ -776,7 +828,10 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                     {sLabelSize.name} - {sLabelSize.width} x {sLabelSize.height} dots
                   </Text>
                   <div
-                    onClick={() => _setSelectedFieldIdx(null)}
+                    ref={canvasRef}
+                    tabIndex={0}
+                    onKeyDown={handleKeyDown}
+                    onClick={() => { _setSelectedFieldIdx(null); canvasRef.current?.focus(); }}
                     style={{
                       width: canvasW,
                       height: canvasH,
@@ -786,6 +841,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                       position: "relative",
                       overflow: "hidden",
                       boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                      outline: "none",
                     }}
                   >
                     {sFields.map((field, idx) => (
@@ -795,6 +851,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                         scale={scale}
                         isSelected={idx === sSelectedFieldIdx}
                         onSelect={() => _setSelectedFieldIdx(idx)}
+                        onDragStart={(e) => handleFieldDragStart(idx, e)}
                       />
                     ))}
                   </div>
